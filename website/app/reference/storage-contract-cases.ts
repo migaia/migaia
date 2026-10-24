@@ -135,7 +135,6 @@ async function recordVisit(store: IStorageStore<typeof counter>) {
   return store.use(counter).increment('visits')
 }
 const increment = snapshotStorageCounterIncrement(undefined, 'memory')
-// A backend applies increment(currentText) inside its existing atomic native operation.
 const nextText = String(increment('41'))`,
   result: t(
     'The actual native increment is atomic. The pure captured calculation validates safe integers and canonical text but opens no transaction or resource.',
@@ -288,7 +287,12 @@ const sparqlAuthorCase: ICaseDoc = {
   ),
   example: `import { createSparqlTag } from '@migaia/storage-contract'
 function bindNative(original: Parameters<typeof createSparqlTag>[0]) {
-  return createSparqlTag(original)
+  return createSparqlTag({
+    select: (prepare, ctx) => original.select(prepare, ctx),
+    ask: (prepare, ctx) => original.ask(prepare, ctx),
+    construct: (prepare, ctx) => original.construct(prepare, ctx),
+    update: (prepare, ctx) => original.update(prepare, ctx)
+  })
 }`,
   result: t(
     'Callbacks own native admission and invoke lazy prepare afterward. Receiver, context and Promise identity remain exact.',
@@ -353,6 +357,129 @@ async function deleteDrafts(store: IStorageStore<typeof vector>) {
 
 /** Exercises public contract tools without supplying a fictional storage implementation. */
 export const storageContractCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  blobBodyAuthor: [
+    {
+      title: t(
+        'Read admitted upload chunks with native reporting',
+        '读取已准入上传块并接入原生报告'
+      ),
+      problem: t(
+        'An existing sink needs one reader and its own failure classification after checking write conditions.',
+        '已有写入端在检查写入条件后，需要一个读取器及所属后端的失败分类。'
+      ),
+      example:
+        "import { createStorageBlobBodyReader } from '@migaia/storage-contract'\nawait using body = createStorageBlobBodyReader(new Uint8Array([1, 2]), {\n  backend: 'object',\n  report: error => console.error(error),\n  normalizeFailure: error => error\n})\nconst part = await body.next()\nconsole.log(part.value)",
+      result: t(
+        'The admitted bytes use the original reader lifecycle; the backend can substitute its registered normalizer and reporter.',
+        '已准入字节使用原读取器生命周期；后端可传入自己已登记的规范化与报告函数。'
+      )
+    }
+  ],
+  blobObjectAuthor: [
+    {
+      title: t('Keep one object content right', '保留单个对象内容消费权'),
+      problem: t(
+        'A native download must release its original content after one consumption and settle its bookkeeping.',
+        '原生下载须在一次消费后释放原内容，并完成所属拥有者的记账。'
+      ),
+      example:
+        "import { createStorageBlobObject } from '@migaia/storage-contract'\nconst source = new ReadableStream<Uint8Array>({\n  start(controller) {\n    controller.enqueue(new Uint8Array([7]))\n    controller.close()\n  }\n})\nconst object = createStorageBlobObject(\n  { key: 'file', size: 1, etag: 'native', updatedAt: 1, metadata: {} },\n  source,\n  {\n    close: async () => undefined,\n    report: error => console.error(error),\n    backend: 'object',\n    onSettled: () => console.info('content settled'),\n    normalizeFailure: error => error\n  }\n)\ntry { console.log((await object.bytes())[0]) }\nfinally { await object.dispose() }",
+      result: t(
+        'Prints the single content byte; EOF and explicit cleanup reuse the same resource settlement.',
+        '输出唯一内容字节，完整读取与显式清理复用同一资源结算。'
+      )
+    }
+  ],
+  iteratorAuthor: [
+    {
+      title: t('Release an actual native cursor once', '释放实际原生游标一次'),
+      problem: t(
+        'A native cursor already has a close method; the shared lifetime should only drain and release that original resource.',
+        '原生游标已有关闭方法，共享生命周期只应排空推进并释放原资源。'
+      ),
+      example:
+        "import { createStorageIteratorLifetime } from '@migaia/storage-contract'\nasync function releaseCursor(cursor: { close(): Promise<void> }) {\n  const lifetime = createStorageIteratorLifetime<unknown>({\n    close: () => cursor.close(),\n    report: error => console.error(error),\n    onSettled: () => console.info('cursor settled')\n  })\n  await lifetime.dispose()\n}",
+      result: t(
+        'The caller supplies the real cursor. Disposal awaits its native close and the original reporter observes symbolic cleanup failures.',
+        '调用方提供真实游标；释放等待原生关闭，原报告函数观察符号清理失败。'
+      )
+    }
+  ],
+  ownerAuthor: [
+    {
+      title: t('Capture the original transaction owner configuration', '捕获原事务拥有者配置'),
+      problem: t(
+        'An existing backend needs the neutral owner to retain its real mode, resource symbol and concurrency observer.',
+        '已有后端需要中立拥有者保留真实模式、资源符号及并发观察接点。'
+      ),
+      example:
+        "import {\n  createTransactionOwner, ConcurrencyPolicy, TransactionActivityMode,\n  type IStorageBase, type IConcurrencyStageObserver\n} from '@migaia/storage-contract'\nfunction ownTransactions(\n  store: IStorageBase,\n  normalize: Parameters<typeof createTransactionOwner>[1],\n  concurrencyStages: IConcurrencyStageObserver\n) {\n  return createTransactionOwner(store, normalize, {\n    activityMode: TransactionActivityMode.managed,\n    asyncDisposeKey: Symbol.asyncDispose,\n    defaultPolicy: ConcurrencyPolicy.wait(),\n    concurrencyStages\n  })\n}",
+      result: t(
+        'The backend passes its existing resource and observers. Registration supplies no native transaction or connection.',
+        '后端传入原资源与观察接点，此登记本身不提供原生事务或连接。'
+      )
+    }
+  ],
+  capabilityAuthor: [
+    {
+      title: t('Describe a native RDF transaction binding', '描述原生图事务绑定'),
+      problem: t(
+        'Native RDF implementations need an authentic transaction projection without borrowing a root API closure.',
+        '原生图实现需要真实事务投影，不能借用根接口闭包。'
+      ),
+      example:
+        "import {\n  implement, rdf, assertTransactionOwner,\n  type IStorageBase, type IRdfApi, type ITransactionRdfApi\n} from '@migaia/storage-contract'\nfunction describeRdf(\n  store: IStorageBase,\n  api: IRdfApi,\n  readNativeDraft: (scope: object) => ITransactionRdfApi\n) {\n  return implement(rdf, api, {\n    forTransaction: scope => {\n      assertTransactionOwner(store, scope)\n      return readNativeDraft(scope)\n    }\n  })\n}",
+      result: t(
+        'The supplied native draft reader runs only for the same live original store scope; descriptor creation executes no binder.',
+        '传入的原生草稿读取器只接受同一活跃原存储视图，创建描述时不会执行绑定器。'
+      )
+    }
+  ],
+  installerAuthor: [
+    {
+      title: t('Capture the original capability publication port', '捕获原能力发布接点'),
+      problem: t(
+        'An author needs the store’s single publication port while preserving the original base resource.',
+        '作者需要存储唯一发布接点，同时保留原基础资源。'
+      ),
+      example:
+        "import {\n  defineStorageCapability, implement, provideCapabilities,\n  type IStorageBase, type ICapabilityInstallPort\n} from '@migaia/storage-contract'\nfunction describeCatalog(\n  base: IStorageBase,\n  onInstaller: (port: ICapabilityInstallPort) => void\n) {\n  const catalog = defineStorageCapability<{ read(): string }>()('catalog')\n  return provideCapabilities(base, [implement(catalog, { read: () => 'value' })], {\n    onInstaller\n  })\n}",
+      result: t(
+        'The callback receives the original finite prepare/publish/release port; the caller still owns the supplied base.',
+        '回调取得原有有限准备、发布与释放接点，传入基础资源仍由调用方拥有。'
+      )
+    }
+  ],
+  migrationAsyncOptions: [
+    {
+      title: t('Observe and cancel one migration', '观察并取消一次迁移'),
+      problem: t(
+        'Migration observations must not veto state conversion; cancellation and late errors use the borrowed utility ports.',
+        '迁移观察不能否决状态转换，取消与迟到错误沿借用的工具接点处理。'
+      ),
+      example:
+        "import { createMigrationPlan, migrateEnvelope } from '@migaia/storage-contract'\nconst plan = createMigrationPlan({\n  version: 1, steps: { 1: value => ({ previous: value }) }\n})\nconst controller = new AbortController()\nconst state = await migrateEnvelope(plan, { version: 0, state: 'old' }, {\n  signal: controller.signal,\n  observe: { afterStep: context => console.info(context.toVersion) },\n  report: (error, context) => console.error(context.phase, error)\n})\nconsole.log(state)",
+      result: t(
+        'Prints the completed step and converted state. The signal can cancel waiting; user mutations are not rolled back.',
+        '输出完成的步骤与转换状态；信号可取消等待，用户已做的修改不会回滚。'
+      )
+    }
+  ],
+  migrationSyncOptions: [
+    {
+      title: t('Observe synchronous migration steps', '观察同步迁移步骤'),
+      problem: t(
+        'A synchronous reader needs step notifications while keeping source conversion failures visible.',
+        '同步读取器需要步骤通知，同时保持源转换失败可见。'
+      ),
+      example:
+        "import { createMigrationPlan, migrateEnvelopeSync } from '@migaia/storage-contract'\nconst plan = createMigrationPlan({\n  version: 1, steps: { 1: value => ({ previous: value }) }\n})\nconst state = migrateEnvelopeSync(plan, { version: 0, state: 'old' }, {\n  observe: { afterStep: context => console.info(context.toVersion) }\n})\nconsole.log(state)",
+      result: t(
+        'Runs the synchronous step once; notification results are not awaited and cannot replace its conversion result.',
+        '同步步骤运行一次，通知结果不会被等待，也不能替换转换结果。'
+      )
+    }
+  ],
   runConformance: [
     {
       title: t('Verify a backend with its existing runner', '用现有 runner 验证后端'),
@@ -523,9 +650,8 @@ export function verifyKvBackend(
       example: `import { createStorageBatchKeyCapture } from '@migaia/storage-contract'
 const capture = createStorageBatchKeyCapture('memory')
 const first = capture(['users', 1])
-// Capture this entry’s original value/TTL fields at the backend’s original point.
 const second = capture(['users', 1])
-// second.firstIndex is 0; native authors reject at their original duplicate check.`,
+console.log(first.firstIndex, second.firstIndex)`,
       result: t(
         'Each call captures one key and retains the shared canonical identity. No later entry, value, TTL or consumer callback is read by the helper.',
         '每次调用捕获一个键并保留共享规范身份；helper 不读取后项、value、TTL 或消费者回调。'
@@ -545,7 +671,7 @@ const removals = reads.filter((entry, index) => entry.firstIndex === index)
 const writes = snapshotStorageBatchKeys(['first', 'second'], 'memory', {
   rejectDuplicates: true
 })
-// Use reads in input order, removals once per identity, and writes in one native operation.`,
+console.log(removals.map(entry => entry.key), writes.map(entry => entry.key))`,
       result: t(
         'The first two read positions share one identity. Duplicate write keys reject INVALID_ARGUMENT before native work; malformed logical keys retain INVALID_KEY.',
         '前两个读取位置共享同一身份。重复写键在原生操作前抛 INVALID_ARGUMENT；非法逻辑键保留 INVALID_KEY。'
@@ -571,7 +697,7 @@ const prefix = snapshotStorageKeyPrefix(['cache', 'users'], 'memory')
 const included = prefix.matches(['cache', 'users', 1])
 const excluded = prefix.matches(['cache', 'users-extra'])
 // included === true; excluded === false
-// Native ordered stores use prefix.lower <= encodedKey < prefix.upper.`
+// 原生有序存储使用包含 lower、不包含 upper 的字节区间。`
       ),
       result: t(
         'The complete child sequence matches the extended tuple but excludes a different last child. lower/upper bound the same canonical byte range; the matcher is independent of exposed mutable copies.',
@@ -647,13 +773,23 @@ async function readUser(executor: ISqlExecutor, id: number) {
 function bindNative(
   original: Omit<Parameters<typeof createSqlTag>[0], 'dialect'>
 ) {
-  return createSqlTag({ dialect: 'postgres', ...original })
+  return createSqlTag({
+    dialect: 'postgres',
+    all: (prepare, ctx) => original.all(prepare, ctx),
+    get: (prepare, ctx) => original.get(prepare, ctx),
+    run: (prepare, ctx) => original.run(prepare, ctx)
+  })
 }`,
         `import { createSqlTag } from '@migaia/storage-contract'
 function bindNative(
   original: Omit<Parameters<typeof createSqlTag>[0], 'dialect'>
 ) {
-  return createSqlTag({ dialect: 'postgres', ...original })
+  return createSqlTag({
+    dialect: 'postgres',
+    all: (prepare, ctx) => original.all(prepare, ctx),
+    get: (prepare, ctx) => original.get(prepare, ctx),
+    run: (prepare, ctx) => original.run(prepare, ctx)
+  })
 }`
       ),
       result: t(
@@ -988,13 +1124,17 @@ function readLocked(store: IRecordStore<{ count: number }>) {
         '没有物理键锁的原生后端须复用原 builder，不公开 lock，也不创建第二策略循环。'
       ),
       example: t(
-        `import { createTransactionBuilder, ConcurrencyPolicy, type IRecordStore } from '@migaia/storage-contract'
+        `import {
+  createTransactionBuilder, ConcurrencyPolicy, type IRecordStore
+} from '@migaia/storage-contract'
 function readNative(store: IRecordStore<{ count: number }>) {
   return createTransactionBuilder(store, undefined, undefined, { mode: 'optimistic' })
     .concurrency(ConcurrencyPolicy.optimistic({ retries: 1 })).timeout(2_000)
     .run(tx => tx.getRecord('counter'))
 }`,
-        `import { createTransactionBuilder, ConcurrencyPolicy, type IRecordStore } from '@migaia/storage-contract'
+        `import {
+  createTransactionBuilder, ConcurrencyPolicy, type IRecordStore
+} from '@migaia/storage-contract'
 function readNative(store: IRecordStore<{ count: number }>) {
   return createTransactionBuilder(store, undefined, undefined, { mode: 'optimistic' })
     .concurrency(ConcurrencyPolicy.optimistic({ retries: 1 })).timeout(2_000)
@@ -1296,8 +1436,28 @@ try {
   if (!(error instanceof StorageContractError)) throw error
   console.log(error.code, error.cause === originalError) // MIGRATION_FAILED true
 }`,
-        `const plan = createMigrationPlan({ version: 1, steps: { 1: value => ({ previous: value }) } })
-console.log(migrateEnvelopeSync(plan, { version: 0, state: 'old' })) // { previous: 'old' }`
+        `import { createMigrationPlan, migrateEnvelopeSync, StorageContractError } from '@migaia/storage-contract'
+try {
+  createMigrationPlan({ version: 3, steps: { 1: value => value, 3: value => value } })
+} catch (error) {
+  if (!(error instanceof StorageContractError)) throw error
+  console.log(error.code) // MIGRATION_GAP
+}
+const plan = createMigrationPlan({ version: 1, reset: () => ({}) })
+try {
+  migrateEnvelopeSync(plan, { version: 2, state: {} })
+} catch (error) {
+  if (!(error instanceof StorageContractError)) throw error
+  console.log(error.code) // VERSION_UNSUPPORTED
+}
+const originalError = new Error('upgrade failed')
+const failing = createMigrationPlan({ version: 1, steps: { 1: () => { throw originalError } } })
+try {
+  migrateEnvelopeSync(failing, { version: 0, state: {} })
+} catch (error) {
+  if (!(error instanceof StorageContractError)) throw error
+  console.log(error.code, error.cause === originalError) // MIGRATION_FAILED true
+}`
       ),
       result: t(
         'The complete example prints MIGRATION_GAP, VERSION_UNSUPPORTED and MIGRATION_FAILED true. No storage writes occur; current-version state identity is preserved.',

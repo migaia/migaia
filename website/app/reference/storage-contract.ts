@@ -814,7 +814,7 @@ export const storageContractReference: ILibraryReference = {
       role: 'operation',
       purpose: t(
         'Validate and detach a structural raw RDF term through the canonical term owner.',
-        '通过规范 term owner 校验并复制结构化 raw RDF 项。'
+        '通过规范项拥有者校验并独立复制结构化原始项，保留响应局部空白项的原适用范围。'
       ),
       params: {
         value: t(
@@ -834,7 +834,7 @@ export const storageContractReference: ILibraryReference = {
       role: 'operation',
       purpose: t(
         'Capture only supplied ground positions without inserting a default graph.',
-        '只捕获给定 ground 位置，不补入默认图。'
+        '只捕获调用方给定的规范四元组位置，省略的图保持不受约束，供原查询源匹配。'
       ),
       params: {
         pattern: t(
@@ -854,7 +854,7 @@ export const storageContractReference: ILibraryReference = {
       role: 'operation',
       purpose: t(
         'Capture every required ground position before native identity or writes.',
-        '在原生身份处理或写入前捕获每个必需 ground 位置。'
+        '在原生身份编码或写入前捕获四个完整规范位置，统一校验项类型、语言和数据类型。'
       ),
       params: {
         quad: t(
@@ -874,7 +874,7 @@ export const storageContractReference: ILibraryReference = {
       role: 'operation',
       purpose: t(
         'Encode a canonical raw RDF term for native ordered index components using the original key writer.',
-        '沿原 key writer 编码规范 raw RDF term，作为原生有序索引分量。'
+        '沿原键写入器编码规范原始项，作为原生索引的自定界分量，保留项类型与精确文字身份。'
       ),
       params: {
         value: t(
@@ -897,7 +897,7 @@ export const storageContractReference: ILibraryReference = {
       role: 'operation',
       purpose: t(
         'Snapshot ground RDF identity and encode term boundaries with the original ordered-key writer.',
-        '快照 ground RDF 身份，并用原有序键 writer 编码项边界。'
+        '快照完整规范四元组身份，再由原保序键写入器编码项边界，保留文字与图的身份规则。'
       ),
       params: {
         quad: t(
@@ -915,7 +915,10 @@ export const storageContractReference: ILibraryReference = {
     },
     decodeOrderedStorageKey: {
       role: 'operation',
-      purpose: t('Read the original ordered physical key wire format.', '读取原保序物理键格式。'),
+      purpose: t(
+        'Read the original ordered physical key wire format.',
+        '按原规范保序字节格式还原独立逻辑键，拒绝不完整、非规范或超出键域的输入。'
+      ),
       params: {
         encoded: t(
           'Complete canonical key bytes from encodeOrderedStorageKey.',
@@ -932,12 +935,42 @@ export const storageContractReference: ILibraryReference = {
     },
     snapshotStorageVectorCollection: {
       role: 'operation',
+      optionDocs: {
+        dimensions: {
+          summary: t(
+            'Positive safe integer dimension; a provided vector must have exactly this many components.',
+            '正安全整数维度，已给定向量必须具有精确相同的分量数量。'
+          ),
+          example:
+            "import { snapshotStorageVectorCollection } from '@migaia/storage-contract'\nconst schema = snapshotStorageVectorCollection('docs', {\n  dimensions: 2, metric: 'cosine'\n})"
+        },
+        metric: {
+          summary: t(
+            'Exact native metric fact used for validation, not a request to create or change a collection.',
+            '用于校验的精确原生度量事实，真实集合的创建或修改仍由原生拥有者负责。'
+          ),
+          values: {
+            cosine: t(
+              'Cosine direction; reject a zero vector when this fact is supplied.',
+              '余弦方向度量，提供此事实时拒绝零向量。'
+            ),
+            dot: t('Native dot-product metric.', '使用原生点积度量。'),
+            euclid: t('Native Euclidean-distance metric.', '使用原生欧氏距离度量。')
+          },
+          whenToUse: t(
+            'Match the schema supplied by the actual native collection.',
+            '选择与实际原生集合提供的模式一致的度量。'
+          ),
+          example:
+            "import { snapshotStorageVectorCollection } from '@migaia/storage-contract'\nconst schema = snapshotStorageVectorCollection('docs', {\n  dimensions: 2, metric: 'cosine'\n})"
+        }
+      },
       purpose: t(
         'Capture a collection name and optional declared configuration.',
-        '捕获 collection 名和可选声明配置。'
+        '捕获逻辑集合名称与可选完整模式，省略配置时保持未指定，真实模式仍由原生集合提供。'
       ),
       params: {
-        name: t('Logical collection name.', '逻辑 collection 名。'),
+        name: t('Application-selected logical collection name.', '应用选定的逻辑向量集合名称。'),
         options: t(
           'Optional positive dimensions and cosine/dot/euclid metric; omission stays absent.',
           '可选正维度与 cosine/dot/euclid metric；省略仍缺省。'
@@ -953,9 +986,44 @@ export const storageContractReference: ILibraryReference = {
     },
     snapshotStorageVector: {
       role: 'operation',
+      optionDocs: {
+        dimensions: {
+          summary: t(
+            'Positive safe integer dimension; a provided vector must have exactly this many components.',
+            '正安全整数维度，已给定向量必须具有精确相同的分量数量。'
+          ),
+          default: t(
+            'Omission captures finite dense components without a dimension comparison.',
+            '省略时捕获有限稠密分量，不比较具体维度。'
+          ),
+          example:
+            "import { snapshotStorageVector } from '@migaia/storage-contract'\nconst direction = snapshotStorageVector([1, 0], { dimensions: 2, metric: 'cosine' })"
+        },
+        metric: {
+          summary: t(
+            'Exact native metric fact used for validation, not a request to create or change a collection.',
+            '用于校验的精确原生度量事实，真实集合的创建或修改仍由原生拥有者负责。'
+          ),
+          default: t('No metric-specific validation when omitted.', '省略时不进行度量专属校验。'),
+          values: {
+            cosine: t(
+              'Cosine direction; reject a zero vector when this fact is supplied.',
+              '余弦方向度量，提供此事实时拒绝零向量。'
+            ),
+            dot: t('Native dot-product metric.', '使用原生点积度量。'),
+            euclid: t('Native Euclidean-distance metric.', '使用原生欧氏距离度量。')
+          },
+          whenToUse: t(
+            'Match the schema supplied by the actual native collection.',
+            '选择与实际原生集合提供的模式一致的度量。'
+          ),
+          example:
+            "import { snapshotStorageVector } from '@migaia/storage-contract'\nconst direction = snapshotStorageVector([1, 0], { dimensions: 2, metric: 'cosine' })"
+        }
+      },
       purpose: t(
         'Detach finite dense components under optional dimension and metric facts.',
-        '按可选维度与 metric 事实独立捕获有限稠密分量。'
+        '依可选维度与度量事实独立捕获有限稠密分量，已知余弦模式同时拒绝零向量。'
       ),
       params: {
         input: t('Readonly numeric component array.', '只读数字分量数组。'),
@@ -976,7 +1044,7 @@ export const storageContractReference: ILibraryReference = {
       role: 'operation',
       purpose: t(
         'Prevalidate a complete point batch using the serialize payload owner.',
-        '沿 serialize payload owner 预校验完整点批次。'
+        '沿原便携负载与向量输入拥有者预校验完整点批次，重复标识保留最后一次给定的值。'
       ),
       params: {
         points: t(
@@ -1000,7 +1068,7 @@ export const storageContractReference: ILibraryReference = {
       role: 'operation',
       purpose: t(
         'Snapshot a closed native vector filter AST without executing it.',
-        '快照封闭原生向量过滤 AST，不执行过滤。'
+        '捕获封闭原生向量过滤语法树，统一检查逻辑组合、自有字段路径与有限标量边界。'
       ),
       params: {
         filter: t(
@@ -1027,7 +1095,7 @@ export const storageContractReference: ILibraryReference = {
         backend: t('Optional diagnostic backend.', '可选诊断后端。'),
         rejectDuplicates: t(
           'Reject duplicates when true; defaults false.',
-          'true 时拒绝重复，默认 false。'
+          '为 true 时拒绝等价重复标识，缺省保留重复输入。'
         )
       },
       returns: t('Frozen ordered string array.', '冻结的有序字符串数组。'),
@@ -1038,10 +1106,13 @@ export const storageContractReference: ILibraryReference = {
       role: 'operation',
       purpose: t(
         'Validate precount/scroll and resolve omission to precount without native I/O.',
-        '校验 precount/scroll，省略时归为 precount，不做原生 I/O。'
+        '校验条件删除计数模式，并将省略值解析为预计数；原生删除仍由所属后端执行。'
       ),
       params: {
-        value: t('precount, scroll or undefined.', 'precount、scroll 或 undefined。'),
+        value: t(
+          'precount, scroll or undefined.',
+          '调用方选择 precount 预计数或 scroll 滚动收集，undefined 使用缺省模式。'
+        ),
         backend: t('Optional diagnostic backend.', '可选诊断后端。')
       },
       returns: t(
@@ -1055,7 +1126,7 @@ export const storageContractReference: ILibraryReference = {
       role: 'operation',
       purpose: t(
         'Capture direct-search arguments even for k=0 before native retrieval.',
-        '在原生检索前捕获直接搜索参数，包含 k=0。'
+        '在原生检索前完整捕获查询方向、数量与过滤参数，零结果请求仍执行相同输入校验。'
       ),
       params: {
         query: t(
@@ -1108,7 +1179,7 @@ export const storageContractReference: ILibraryReference = {
       role: 'operation',
       purpose: t(
         'Capture inclusive range bounds before opening object content.',
-        '打开对象内容前捕获闭区间范围。'
+        '打开原生对象内容前捕获键与闭区间范围，统一校验安全整数端点与原调用上下文。'
       ),
       params: {
         key: t('Logical object string key.', '逻辑对象字符串键。'),
@@ -1127,7 +1198,10 @@ export const storageContractReference: ILibraryReference = {
     },
     snapshotStorageBlobList: {
       role: 'operation',
-      purpose: t('Capture the shared bounded object-page request.', '捕获共享有界对象分页请求。'),
+      purpose: t(
+        'Capture the shared bounded object-page request.',
+        '捕获有界原生对象分页请求，保留不透明游标并应用相同前缀、页量与上下文校验。'
+      ),
       params: {
         options: t(
           'Optional string prefix and cursor, with positive safe-integer limit defaulting to 100.',
@@ -1148,9 +1222,60 @@ export const storageContractReference: ILibraryReference = {
     },
     createStorageBlobBodyReader: {
       role: 'operation',
+      optionDocs: {
+        report: {
+          summary: t(
+            'Observe cleanup failures through the original backend reporter; reporting does not grant storage control.',
+            '通过所属后端的原报告函数观察清理失败，该接点不授予存储控制权。'
+          ),
+          whenToUse: t(
+            'Connect the original report-only symbolic cleanup path.',
+            '连接原符号清理的只报告路径。'
+          ),
+          example: storageContractCases.blobBodyAuthor![0]!.example,
+          params: {
+            error: t(
+              'Original cleanup error, including failed symbolic disposal.',
+              '原清理错误，包含符号释放失败。'
+            )
+          },
+          returns: t(
+            'The symbolic cleanup Promise adopts the callback result; the original reporter should finish successfully.',
+            '符号清理承诺采用回调结果，原报告器应成功完成自身工作。'
+          )
+        },
+        backend: {
+          summary: t(
+            'Actual backend diagnostic label captured from the original native store.',
+            '从原生存储取得的实际后端诊断标签，用于标注所属实现。'
+          ),
+          default: t(
+            'Undefined leaves the diagnostic backend absent.',
+            '省略时不附加后端诊断名称。'
+          ),
+          example: storageContractCases.blobBodyAuthor![0]!.example
+        },
+        normalizeFailure: {
+          summary: t(
+            'Classify native read, cancellation or close failures while keeping the original cause and runtime type reachable.',
+            '分类原生读取、取消或关闭失败，并使原始原因与运行时类型继续可追踪。'
+          ),
+          default: t('Identity: return the original thrown value.', '缺省直接返回原抛出值。'),
+          whenToUse: t(
+            'Pass the owning backend’s registered failure normalizer.',
+            '传入所属后端已登记的失败规范化函数。'
+          ),
+          example: storageContractCases.blobBodyAuthor![0]!.example,
+          params: { error: t('Original native thrown value.', '原生最初抛出的值。') },
+          returns: t(
+            'The backend-classified failure retaining the original cause.',
+            '返回后端分类且保留原始原因的失败值。'
+          )
+        }
+      },
       purpose: t(
         'Read detached upload chunks through the original iterator lifetime after native condition admission.',
-        '原生条件准入后，沿原 iterator 生命周期读取独立上传 chunk。'
+        '原生条件通过后，沿原迭代器生命周期按需读取独立上传字节块，缓冲与写入归原后端。'
       ),
       params: {
         body: t(
@@ -1171,6 +1296,88 @@ export const storageContractReference: ILibraryReference = {
     },
     createStorageBlobObject: {
       role: 'operation',
+      optionDocs: {
+        close: {
+          summary: t(
+            'Release the already-owned native resource after all accepted advances have settled.',
+            '在全部已接纳推进结算之后释放后端已经持有的原生资源。'
+          ),
+          whenToUse: t(
+            'Supply the existing native close operation when constructing this lifetime.',
+            '创建生命周期时提供现有原生关闭操作。'
+          ),
+          example: storageContractCases.blobObjectAuthor![0]!.example,
+          returns: t(
+            'Awaited completion of native release; a failure remains observable on main disposal.',
+            '等待原生释放完成，失败可通过主释放承诺观察。'
+          )
+        },
+        report: {
+          summary: t(
+            'Observe cleanup failures through the original backend reporter; reporting does not grant storage control.',
+            '通过所属后端的原报告函数观察清理失败，该接点不授予存储控制权。'
+          ),
+          whenToUse: t(
+            'Connect the original report-only symbolic cleanup path.',
+            '连接原符号清理的只报告路径。'
+          ),
+          example: storageContractCases.blobObjectAuthor![0]!.example,
+          params: {
+            error: t(
+              'Original cleanup error, including failed symbolic disposal.',
+              '原清理错误，包含符号释放失败。'
+            )
+          },
+          returns: t(
+            'The symbolic cleanup Promise adopts the callback result; the original reporter should finish successfully.',
+            '符号清理承诺采用回调结果，原报告器应成功完成自身工作。'
+          )
+        },
+        backend: {
+          summary: t(
+            'Actual backend diagnostic label captured from the original native store.',
+            '从原生存储取得的实际后端诊断标签，用于标注所属实现。'
+          ),
+          default: t(
+            'Undefined leaves the diagnostic backend absent.',
+            '省略时不附加后端诊断名称。'
+          ),
+          example: storageContractCases.blobObjectAuthor![0]!.example
+        },
+        onSettled: {
+          summary: t(
+            'Synchronous native bookkeeping when shared cleanup settles, whether it fulfills or rejects.',
+            '共享清理成功或拒绝结算时执行原生同步记账，保留原拥有者的资源登记。'
+          ),
+          default: t('No additional settlement callback.', '省略时不调用额外结算回调。'),
+          whenToUse: t(
+            'Release the original owner’s cursor registration after resource settlement.',
+            '资源结算后清除原拥有者的游标登记时使用。'
+          ),
+          example: storageContractCases.blobObjectAuthor![0]!.example,
+          returns: t(
+            'No result; the original owner supplies a nonthrowing bookkeeping callback.',
+            '无结果，由原拥有者提供不会抛错的记账回调。'
+          )
+        },
+        normalizeFailure: {
+          summary: t(
+            'Classify native read, cancellation or close failures while keeping the original cause and runtime type reachable.',
+            '分类原生读取、取消或关闭失败，并使原始原因与运行时类型继续可追踪。'
+          ),
+          default: t('Identity: return the original thrown value.', '缺省直接返回原抛出值。'),
+          whenToUse: t(
+            'Pass the owning backend’s registered failure normalizer.',
+            '传入所属后端已登记的失败规范化函数。'
+          ),
+          example: storageContractCases.blobObjectAuthor![0]!.example,
+          params: { error: t('Original native thrown value.', '原生最初抛出的值。') },
+          returns: t(
+            'The backend-classified failure retaining the original cause.',
+            '返回后端分类且保留原始原因的失败值。'
+          )
+        }
+      },
       purpose: t(
         'Give one native object snapshot one stream-or-bytes right and original resource cleanup.',
         '为一个原生对象快照提供一次 stream 或 bytes 权限及原资源清理。'
@@ -1197,7 +1404,7 @@ export const storageContractReference: ILibraryReference = {
       role: 'operation',
       purpose: t(
         'Capture native batch keys in the backend’s existing per-entry getter and failure order.',
-        '按后端既有逐项 getter 与失败次序捕获原生批键。'
+        '依后端原有逐项捕获次序记录规范键身份，保留重复键的首次位置供原校验点使用。'
       ),
       params: {
         backend: t('Actual backend diagnostic or undefined.', '真实后端诊断，或 undefined。')
@@ -1213,7 +1420,7 @@ export const storageContractReference: ILibraryReference = {
       role: 'constant',
       purpose: t(
         'Exact standard token for native physical-channel TTL.',
-        '原生物理通道 TTL 的精确标准令牌。'
+        '实际物理通道期限能力的精确标准令牌，到期、持久化与剩余期限查询均沿原后端兑现。'
       ),
       example: storageContractCases.ttl![0]!.example,
       cases: storageContractCases.ttl
@@ -1222,7 +1429,7 @@ export const storageContractReference: ILibraryReference = {
       role: 'constant',
       purpose: t(
         'Exact standard token for a nested native SQL executor.',
-        '嵌套原生 SQL executor 的精确标准令牌。'
+        '嵌套原生关系查询能力的精确标准令牌，语句与值由共享片段拥有者准备，实际执行归原后端。'
       ),
       example: storageContractCases.sql![0]!.example,
       cases: storageContractCases.sql
@@ -1231,7 +1438,7 @@ export const storageContractReference: ILibraryReference = {
       role: 'constant',
       purpose: t(
         'Exact standard token for independent native byte objects.',
-        '独立原生字节对象的精确标准令牌。'
+        '独立原生字节对象能力的精确标准令牌，实际内容读取、条件写入与释放均由后端实现。'
       ),
       example: storageContractCases.blob![0]!.example,
       cases: storageContractCases.blob
@@ -1240,7 +1447,7 @@ export const storageContractReference: ILibraryReference = {
       role: 'constant',
       purpose: t(
         'Exact optional token for native durable replay and tails.',
-        '原生持久重放与 tail 的精确可选令牌。'
+        '原生持久变更流的精确可选令牌，历史重放、游标确认和实时尾流均沿所属后端执行。'
       ),
       example: storageContractCases.durableChangeFeed![0]!.example,
       cases: storageContractCases.durableChangeFeed
@@ -1249,7 +1456,7 @@ export const storageContractReference: ILibraryReference = {
       role: 'constant',
       purpose: t(
         'Exact native callable SPARQL capability, without a generic transaction projection.',
-        '原生 callable SPARQL 的精确能力，不带通用事务投影。'
+        '原生可调用查询能力的精确令牌，查询渲染与原生终端共用原端点，事务使用实际后端投影。'
       ),
       example: storageContractCases.sparql![0]!.example,
       cases: storageContractCases.sparql
@@ -1258,7 +1465,7 @@ export const storageContractReference: ILibraryReference = {
       role: 'operation',
       purpose: t(
         'Capture validated RDF values and authentic pure fragment references.',
-        '捕获已校验 RDF 值与真实纯片段引用。'
+        '捕获已校验图项与真实纯片段引用，由共享渲染器转义参数后组合成原生查询语法。'
       ),
       params: {
         strings: t('A real frozen template.', '真实冻结模板。'),
@@ -1276,9 +1483,105 @@ export const storageContractReference: ILibraryReference = {
     },
     createSparqlTag: {
       role: 'operation',
+      optionDocs: {
+        select: {
+          summary: t(
+            'Original native select callback; enter the existing operation owner before invoking prepare.',
+            '原生 select 回调须先进入现有操作拥有者，再调用惰性准备函数生成文本。'
+          ),
+          whenToUse: t(
+            'Bind the actual endpoint’s select terminal without another executor.',
+            '绑定实际端点的 select 终端并保留原执行拥有者。'
+          ),
+          example: storageContractCases.createSparqlTag![0]!.example,
+          params: {
+            prepare: t(
+              'Call after native admission to render the same captured query once.',
+              '原生准入后调用，以同一已捕获查询准备文本。'
+            ),
+            ctx: t(
+              'The unchanged optional caller operation context.',
+              '原样传入的可选调用方操作上下文。'
+            )
+          },
+          returns: t('The original Promise of native binding rows.', '原生绑定行数组的原承诺。')
+        },
+        ask: {
+          summary: t(
+            'Original native ask callback; enter the existing operation owner before invoking prepare.',
+            '原生 ask 回调须先进入现有操作拥有者，再调用惰性准备函数生成文本。'
+          ),
+          whenToUse: t(
+            'Bind the actual endpoint’s ask terminal without another executor.',
+            '绑定实际端点的 ask 终端并保留原执行拥有者。'
+          ),
+          example: storageContractCases.createSparqlTag![0]!.example,
+          params: {
+            prepare: t(
+              'Call after native admission to render the same captured query once.',
+              '原生准入后调用，以同一已捕获查询准备文本。'
+            ),
+            ctx: t(
+              'The unchanged optional caller operation context.',
+              '原样传入的可选调用方操作上下文。'
+            )
+          },
+          returns: t('The original Promise of the native boolean answer.', '原生布尔回答的原承诺。')
+        },
+        construct: {
+          summary: t(
+            'Original native construct callback; enter the existing operation owner before invoking prepare.',
+            '原生 construct 回调须先进入现有操作拥有者，再调用惰性准备函数生成文本。'
+          ),
+          whenToUse: t(
+            'Bind the actual endpoint’s construct terminal without another executor.',
+            '绑定实际端点的 construct 终端并保留原执行拥有者。'
+          ),
+          example: storageContractCases.createSparqlTag![0]!.example,
+          params: {
+            prepare: t(
+              'Call after native admission to render the same captured query once.',
+              '原生准入后调用，以同一已捕获查询准备文本。'
+            ),
+            ctx: t(
+              'The unchanged optional caller operation context.',
+              '原样传入的可选调用方操作上下文。'
+            )
+          },
+          returns: t(
+            'The original Promise of raw response-local quads, including blank terms.',
+            '原始响应局部四元组数组的原承诺，可含空白项。'
+          )
+        },
+        update: {
+          summary: t(
+            'Original native update callback; enter the existing operation owner before invoking prepare.',
+            '原生 update 回调须先进入现有操作拥有者，再调用惰性准备函数生成文本。'
+          ),
+          whenToUse: t(
+            'Bind the actual endpoint’s update terminal without another executor.',
+            '绑定实际端点的 update 终端并保留原执行拥有者。'
+          ),
+          example: storageContractCases.createSparqlTag![0]!.example,
+          params: {
+            prepare: t(
+              'Call after native admission to render the same captured query once.',
+              '原生准入后调用，以同一已捕获查询准备文本。'
+            ),
+            ctx: t(
+              'The unchanged optional caller operation context.',
+              '原样传入的可选调用方操作上下文。'
+            )
+          },
+          returns: t(
+            'The original Promise that settles native update execution.',
+            '原生更新执行结算的原承诺。'
+          )
+        }
+      },
       purpose: t(
         'Bind pure SPARQL nodes to original native callbacks after their actual admission.',
-        '将纯 SPARQL 节点绑定至实际准入后的原生回调。'
+        '将纯查询节点接到原生回调，原后端先完成操作准入，再请求同一渲染器准备文本。'
       ),
       params: {
         options: t(
@@ -1297,7 +1600,7 @@ export const storageContractReference: ILibraryReference = {
       role: 'constant',
       purpose: t(
         'Exact standard capability for native vector collections.',
-        '原生向量 collection 的精确标准能力。'
+        '原生向量集合能力的精确标准令牌，集合模式、检索排名与写入期限由实际后端持有。'
       ),
       example: storageContractCases.vector![0]!.example,
       cases: storageContractCases.vector
@@ -1306,7 +1609,7 @@ export const storageContractReference: ILibraryReference = {
       role: 'constant',
       purpose: t(
         'Exact standard ground RDF capability and original transaction projection.',
-        '精确标准 ground RDF 能力与原事务投影。'
+        '规范四元组能力的精确标准令牌，根操作与事务投影均使用实际后端的原查询和写入拥有者。'
       ),
       example: storageContractCases.rdf![0]!.example,
       cases: storageContractCases.rdf
@@ -1315,7 +1618,7 @@ export const storageContractReference: ILibraryReference = {
       role: 'constant',
       purpose: t(
         'Precount or scroll strategy for native shared vector deletion counts.',
-        '原生共享向量删除计数的 precount 或 scroll 策略。'
+        '声明共享向量条件删除的预计数或滚动收集策略，具体计数及并发保证由后端兑现。'
       ),
       example: storageContractCases.DeleteCountMode![0]!.example,
       cases: storageContractCases.DeleteCountMode
@@ -1324,7 +1627,7 @@ export const storageContractReference: ILibraryReference = {
       role: 'constant',
       purpose: t(
         'Exact standard token for atomic canonical decimal text increments.',
-        '原子规范十进制文本递增的精确标准令牌。'
+        '原子十进制文本递增的精确标准令牌，安全整数校验与真实原子更新各沿原拥有者执行。'
       ),
       example: storageContractCases.counter![0]!.example,
       cases: storageContractCases.counter
@@ -1333,7 +1636,7 @@ export const storageContractReference: ILibraryReference = {
       role: 'operation',
       purpose: t(
         'Capture TTL targets with the original physical lock-key validator.',
-        '通过原物理锁键 validator 捕获 TTL 目标。'
+        '用原物理锁键校验器捕获实际期限目标，明确文本、字节、记录或向量所属通道。'
       ),
       params: {
         target: t(
@@ -1353,7 +1656,7 @@ export const storageContractReference: ILibraryReference = {
       role: 'operation',
       purpose: t(
         'Admit finite nonnegative milliseconds before native TTL work.',
-        '在原生 TTL 操作前接纳有限非负毫秒数。'
+        '在原生期限操作开始前校验有限非负毫秒数，保留零值与小数的合法含义。'
       ),
       params: {
         ms: t(
@@ -1393,7 +1696,7 @@ export const storageContractReference: ILibraryReference = {
       role: 'operation',
       purpose: t(
         'Capture detached native batch keys and canonical identities once before I/O.',
-        '在 I/O 前单次捕获独立的原生批键与规范身份。'
+        '原生操作前一次捕获独立批键与规范身份，保留读取位置并可在写入前拒绝等价重复键。'
       ),
       params: {
         keys: t(
@@ -1424,7 +1727,7 @@ export const storageContractReference: ILibraryReference = {
       role: 'operation',
       purpose: t(
         'Snapshot one typed prefix through the canonical key validator/writer and produce native ordered bounds.',
-        '通过规范键 validator/writer 快照一个 typed 前缀，生成原生有序边界。'
+        '通过规范键校验与写入器捕获类型化前缀，返回同一匹配规则及原生有序扫描边界。'
       ),
       params: {
         prefix: t(
@@ -1447,7 +1750,7 @@ export const storageContractReference: ILibraryReference = {
       role: 'operation',
       purpose: t(
         'Read the sole capability table through an authentic original transaction view.',
-        '通过真实原事务视图读取唯一能力表。'
+        '通过真实原事务视图读取唯一能力表的事务接口，实际终端继续进入同一事务准入和清理。'
       ),
       params: {
         scope: t(
@@ -1455,8 +1758,8 @@ export const storageContractReference: ILibraryReference = {
           '具备精确已接纳能力集合的真实活跃完整 scope；不修改 raw/frozen scope。'
         ),
         capability: t(
-          'Authentic published kv or records with an original forTransaction binder.',
-          '具备原 forTransaction 绑定的真实已发布 kv 或 records。'
+          'Authentic published transactional standard token with its original forTransaction binder.',
+          '具备原 forTransaction 绑定的真实已发布事务标准令牌。'
         )
       },
       returns: t(
@@ -1491,9 +1794,104 @@ export const storageContractReference: ILibraryReference = {
     },
     createSqlTag: {
       role: 'operation',
+      optionDocs: {
+        dialect: {
+          summary: t(
+            'Native dialect determines placeholder numbering, identifier quoting and scanner restrictions.',
+            '原生方言决定占位符编号、标识符引用与单语句扫描限制。'
+          ),
+          values: {
+            sqlite: t(
+              'Question-mark parameters and SQLite statement restrictions.',
+              '问号参数与 SQLite 原语句限制。'
+            ),
+            postgres: t(
+              'Numbered parameters and PostgreSQL statement restrictions.',
+              '编号参数与 PostgreSQL 原语句限制。'
+            )
+          },
+          whenToUse: t(
+            'Use the original database dialect for every derived fragment.',
+            '所有派生片段均使用原数据库方言时选择。'
+          ),
+          example: storageContractCases.createSqlTag![0]!.example
+        },
+        all: {
+          summary: t(
+            'Original native all callback; enter native admission before invoking prepare.',
+            '原生 all 回调先进入实际操作准入，再调用惰性准备函数。'
+          ),
+          whenToUse: t(
+            'Bind the real driver’s all terminal and preserve its returned Promise.',
+            '绑定真实驱动的 all 终端并保留原返回承诺。'
+          ),
+          example: storageContractCases.createSqlTag![0]!.example,
+          params: {
+            prepare: t(
+              'Return the captured statement text and original typed parameter values.',
+              '返回已捕获语句文本与原类型参数值。'
+            ),
+            ctx: t(
+              'Unchanged optional caller operation context.',
+              '原样传入的可选调用方操作上下文。'
+            )
+          },
+          returns: t('Original Promise of all native rows.', '全部原生结果行的原承诺。')
+        },
+        get: {
+          summary: t(
+            'Original native get callback; enter native admission before invoking prepare.',
+            '原生 get 回调先进入实际操作准入，再调用惰性准备函数。'
+          ),
+          whenToUse: t(
+            'Bind the real driver’s get terminal and preserve its returned Promise.',
+            '绑定真实驱动的 get 终端并保留原返回承诺。'
+          ),
+          example: storageContractCases.createSqlTag![0]!.example,
+          params: {
+            prepare: t(
+              'Return the captured statement text and original typed parameter values.',
+              '返回已捕获语句文本与原类型参数值。'
+            ),
+            ctx: t(
+              'Unchanged optional caller operation context.',
+              '原样传入的可选调用方操作上下文。'
+            )
+          },
+          returns: t(
+            'Original Promise of the first native row or undefined.',
+            '首条原生结果行或 undefined 的原承诺。'
+          )
+        },
+        run: {
+          summary: t(
+            'Original native run callback; enter native admission before invoking prepare.',
+            '原生 run 回调先进入实际操作准入，再调用惰性准备函数。'
+          ),
+          whenToUse: t(
+            'Bind the real driver’s run terminal and preserve its returned Promise.',
+            '绑定真实驱动的 run 终端并保留原返回承诺。'
+          ),
+          example: storageContractCases.createSqlTag![0]!.example,
+          params: {
+            prepare: t(
+              'Return the captured statement text and original typed parameter values.',
+              '返回已捕获语句文本与原类型参数值。'
+            ),
+            ctx: t(
+              'Unchanged optional caller operation context.',
+              '原样传入的可选调用方操作上下文。'
+            )
+          },
+          returns: t(
+            'Original Promise of the backend’s native write-result shape.',
+            '后端原生写入结果形状的原承诺。'
+          )
+        }
+      },
       purpose: t(
         'Bind the same fragment/scanner owner to original backend all/get/run callbacks.',
-        '将同一片段与 scanner owner 绑定至原后端 all/get/run 回调。'
+        '将共享片段与单语句扫描规则接到原后端回调，原生准入先于惰性文本与参数准备。'
       ),
       params: {
         options: t(
@@ -1512,7 +1910,7 @@ export const storageContractReference: ILibraryReference = {
       role: 'operation',
       purpose: t(
         'Derive terminal callbacks over the same authentic SQL node.',
-        '在同一真实 SQL 节点上派生终端回调。'
+        '在真实已有查询节点上替换有限终端回调，继续共享原片段身份、上下文与惰性准备。'
       ),
       params: {
         fragment: t('An authentic existing SQL fragment or query.', '已有真实 SQL 片段或查询。'),
@@ -1532,7 +1930,7 @@ export const storageContractReference: ILibraryReference = {
       role: 'operation',
       purpose: t(
         'Return original entries in stable canonical byte order.',
-        '按稳定规范字节序返回原条目。'
+        '按一次捕获的规范字节键稳定排列原条目，相同字节身份继续保持输入的先后顺序。'
       ),
       params: {
         entries: t('Input entries in their original order.', '原顺序输入条目。'),
@@ -1552,10 +1950,13 @@ export const storageContractReference: ILibraryReference = {
       role: 'operation',
       purpose: t(
         'Encode a string content prefix inside the exact original organization envelope.',
-        '在精确原组织 envelope 内编码 string 内容前缀。'
+        '在精确组织封装内编码字符串内容前缀，为原生有序扫描提供相同字节边界规则。'
       ),
       params: {
-        orgId: t('Canonical lowercase UUID.', '规范小写 UUID。'),
+        orgId: t(
+          'Canonical lowercase UUID from the caller’s host configuration or organization view; use that same identity at read and write boundaries.',
+          '来自调用方宿主配置或组织视图指定的规范小写 UUID，读写边界须使用相同身份。'
+        ),
         prefix: t(
           'Logical string prefix, including empty or lone UTF-16 surrogates.',
           '逻辑 string 前缀，含空值与单独 UTF-16 代理项。'
@@ -1573,7 +1974,7 @@ export const storageContractReference: ILibraryReference = {
       role: 'operation',
       purpose: t(
         'Snapshot paired canonical keys and identities without acquiring locks.',
-        '对配对规范键与身份制作快照，不取锁。'
+        '单次捕获配对的规范锁键与编码身份，输出稳定排序去重的独立只读快照供原锁拥有者使用。'
       ),
       params: {
         keys: t(
@@ -1593,7 +1994,7 @@ export const storageContractReference: ILibraryReference = {
       role: 'operation',
       purpose: t(
         'Project a channel or typed prefix into canonical half-open lock identity bounds.',
-        '将通道或 typed 前缀投影为规范半开锁身份边界。'
+        '将通道及可选类型化前缀投影为半开身份区间，沿用原通道顺序与规范键前缀编码。'
       ),
       params: {
         range: t(
@@ -1651,7 +2052,7 @@ export const storageContractReference: ILibraryReference = {
       role: 'constant',
       purpose: t(
         'Authentic standard records API token, implemented by a native backend or a Feature through the same provider table.',
-        '真实标准 records API token，由原生后端或 Feature 经同一 provider 表实现。'
+        '真实标准记录能力令牌，经同一能力表发布；原后端或已选特性提供实际查询和记录操作。'
       ),
       returns: t(
         'IRecordsApi query uses the implemented shared IQueryChain slice; removeByPrefix stays with the original native write pipeline.',
@@ -1664,7 +2065,7 @@ export const storageContractReference: ILibraryReference = {
       role: 'operation',
       purpose: t(
         'Read authentic published token membership through the original provider table without modifying the base.',
-        '通过原 provider 表读取真实已发布 token 成员关系，不修改 base。'
+        '通过唯一原能力表只读检查真实令牌成员关系，返回值与原存储的能力判断完全一致。'
       ),
       params: {
         store: t(
@@ -1687,7 +2088,7 @@ export const storageContractReference: ILibraryReference = {
       role: 'operation',
       purpose: t(
         'Read the same original capability API and native refinements as store.use(token), without provider authority.',
-        '读取与 store.use(token) 相同的原能力 API 与原生扩展，不取得 provider 权限。'
+        '按真实令牌读取与原存储完全相同的已安装接口，保留具体原生类型及原能力错误语义。'
       ),
       params: {
         store: t(
@@ -1733,7 +2134,7 @@ export const storageContractReference: ILibraryReference = {
       role: 'factory',
       purpose: t(
         'Create an immutable pre-topK vector builder over the native ranking cursor.',
-        '在原生排名游标上创建 topK 前的不可变向量 builder。'
+        '在原生排名数据源上创建不可变向量构建器，先处理可下推过滤，再由显式上限开启读取。'
       ),
       params: {
         source: t(
@@ -1756,7 +2157,7 @@ export const storageContractReference: ILibraryReference = {
       role: 'factory',
       purpose: t(
         'Create a ground RDF read query with ordered native traversal steps.',
-        '创建带有序原生遍历步骤的 ground RDF 读取查询。'
+        '在原数据源上创建不可变的规范四元组查询，依声明执行原生或客户端有序遍历步骤。'
       ),
       params: {
         source: t(
@@ -1780,7 +2181,7 @@ export const storageContractReference: ILibraryReference = {
       role: 'constant',
       purpose: t(
         'Canonical reserved shared and vector query methods.',
-        '共享与向量查询的规范保留方法。'
+        '共享读取与向量构建方法的规范保留名称，防止已选特性覆盖原排名、上限与向量投影规则。'
       ),
       example: 'console.log(VectorQueryMethod.topK, VectorQueryMethod.withVector)'
     },
@@ -1788,7 +2189,7 @@ export const storageContractReference: ILibraryReference = {
       role: 'constant',
       purpose: t(
         'Canonical reserved shared and RDF traversal methods.',
-        '共享与 RDF 遍历的规范保留方法。'
+        '共享读取与规范图遍历方法的保留名称表，用于拒绝与内建查询方法冲突的特性名称。'
       ),
       example: 'console.log(RdfQueryMethod.follow, RdfQueryMethod.inverse)'
     },
@@ -1804,7 +2205,7 @@ export const storageContractReference: ILibraryReference = {
       role: 'constant',
       purpose: t(
         'Canonical reserved builder methods shared by unlocked and locked branches.',
-        '未锁定与已锁定分支共用的规范 builder 保留方法。'
+        '未锁定与已锁定事务分支共用的保留方法名，内建配置与运行终点不接受同名特性覆盖。'
       ),
       example:
         'console.log(TransactionBuilderMethod.lock, TransactionBuilderMethod.run) // lock run'
@@ -1840,7 +2241,7 @@ export const storageContractReference: ILibraryReference = {
       role: 'operation',
       purpose: t(
         'Compile an already canonical source AST using the original condition compiler.',
-        '使用原条件 compiler 编译 source 已收到的规范 AST。'
+        '通过原条件编译器处理数据源已收到的规范语法树，使原生作者复用相同谓词语义。'
       ),
       params: {
         condition: t(
@@ -1859,7 +2260,7 @@ export const storageContractReference: ILibraryReference = {
       role: 'operation',
       purpose: t(
         'Capture the canonical declarative AST once and compile a stateless typed candidate predicate.',
-        '一次捕获规范声明式 AST，编译无状态 typed 候选谓词。'
+        '一次捕获声明式过滤条件并编译无状态候选谓词，字段校验与操作符规则沿用原实现。'
       ),
       params: {
         where: t(
@@ -1878,12 +2279,40 @@ export const storageContractReference: ILibraryReference = {
       role: 'constant',
       purpose: t(
         'Single runtime table of supported declarative field operators.',
-        '声明式字段操作符的唯一运行时表。'
+        '声明式字段比较操作符的唯一运行时常量表，由原解析器和原生下推声明共同使用。'
       ),
       example: 'console.log(QueryOperator.eq, QueryOperator.in) // eq in'
     },
     createTransactionBuilder: {
       role: 'factory',
+      optionDocs: {
+        lock: {
+          summary: t(
+            'Excluded from raw builder options; append physical keys with the default builder’s lock method instead.',
+            '原始构建选项不接受锁列表，默认构建分支通过自身锁方法追加物理键。'
+          ),
+          default: t(
+            'No raw lock option; the default branch requires a later lock call before run.',
+            '缺省不含原始锁选项，默认分支运行前须调用锁方法。'
+          ),
+          whenToUse: t(
+            'Declare locks on the original builder branch, preserving its single normalization.',
+            '在原构建分支声明锁，保留原有单次规范化时使用。'
+          ),
+          example: storageContractCases.createTransactionBuilder![0]!.example
+        },
+        concurrency: {
+          summary: t(
+            'Authentic optimistic policy in explicit optimistic author mode; normal builders retain the actual store option domain.',
+            '显式乐观作者模式接纳真实乐观策略，普通构建分支保留实际存储选项域。'
+          ),
+          default: t(
+            'Defer to the same owner’s registered store policy.',
+            '省略时沿用同一拥有者登记的存储策略。'
+          ),
+          example: storageContractCases.createTransactionBuilder![1]!.example
+        }
+      },
       purpose: t(
         'Create an immutable builder that preserves the actual native transaction scope and options without starting work.',
         '创建保留真实原生事务 scope 与 options 的不可变 builder，不启动工作。'
@@ -1965,7 +2394,10 @@ export const storageContractReference: ILibraryReference = {
         '返回精确组织筛选、删除使用的规范原生图前缀。'
       ),
       params: {
-        orgId: t('Canonical lowercase UUID, including zero.', '规范小写 UUID，包括全零值。')
+        orgId: t(
+          'Canonical lowercase UUID from the caller’s host configuration or organization view; use that same identity at read and write boundaries.',
+          '来自调用方宿主配置或组织视图指定的规范小写 UUID，读写边界须使用相同身份。'
+        )
       },
       returns: t(
         'urn:migaia:org:<orgId>: without store creation or I/O. Invalid UUID throws INVALID_ARGUMENT.',
@@ -1981,7 +2413,10 @@ export const storageContractReference: ILibraryReference = {
         '把逻辑默认图、命名图映射到互不冲突的原生命名图身份。'
       ),
       params: {
-        orgId: t('Canonical lowercase organization UUID.', '规范小写组织 UUID。'),
+        orgId: t(
+          'Canonical lowercase UUID from the caller’s host configuration or organization view; use that same identity at read and write boundaries.',
+          '来自调用方宿主配置或组织视图指定的规范小写 UUID，读写边界须使用相同身份。'
+        ),
         graph: t(
           'Ground named or default graph captured once.',
           '单次捕获的 ground 命名图或默认图。'
@@ -1998,12 +2433,12 @@ export const storageContractReference: ILibraryReference = {
       role: 'operation',
       purpose: t(
         'Restore a shared frozen RDF graph only from the exact canonical organization envelope.',
-        '仅从精确规范组织封装还原共享冻结 RDF 图。'
+        '仅从精确组织的规范物理图封装还原逻辑图，保留共享冻结项以及原命名图的精确拼写。'
       ),
       params: {
         orgId: t(
-          'Exact canonical lowercase UUID expected in the native graph.',
-          '原生图内应匹配的精确规范小写 UUID。'
+          'Canonical lowercase UUID from the caller’s host configuration or organization view; use that same identity at read and write boundaries.',
+          '来自调用方宿主配置或组织视图指定的规范小写 UUID，读写边界须使用相同身份。'
         ),
         graph: t(
           'Physical IRdfNamedNode returned by the shared writer.',
@@ -2021,7 +2456,7 @@ export const storageContractReference: ILibraryReference = {
       role: 'constant',
       purpose: t(
         'Canonical RDF structural discriminants reused by native parsers and adapters.',
-        '原生解析器和适配器复用的规范 RDF 结构标签。'
+        '规范原始图项的结构判别值，供项工厂、原生解析器与适配器按同一项类型协议处理。'
       ),
       example: storageContractCases.RdfTermType![0]!.example,
       cases: storageContractCases.RdfTermType
@@ -2030,7 +2465,7 @@ export const storageContractReference: ILibraryReference = {
       role: 'constant',
       purpose: t(
         'Canonical RDF 1.1 string and language-string datatype IRIs.',
-        '规范 RDF 1.1 字符串、语言字符串 datatype IRI。'
+        '声明规范字符串与语言字符串的数据类型标识，项工厂与原生解析适配共用这些精确身份。'
       ),
       example: storageContractCases.RdfDatatype![0]!.example,
       cases: storageContractCases.RdfDatatype
@@ -2043,10 +2478,11 @@ export const storageContractReference: ILibraryReference = {
       ),
       params: {
         orgId: t(
-          'Canonical lowercase 36-character UUID, including zero; no default is inserted.',
-          '规范小写 36 字符 UUID，包括全零值；不插入默认值。'
+          'Canonical lowercase UUID from the caller’s host configuration or organization view; use that same identity at read and write boundaries.',
+          '来自调用方宿主配置或组织视图指定的规范小写 UUID，读写边界须使用相同身份。'
         ),
-        key: recordKeyParam
+        key: recordKeyParam,
+        backend: optionalKeyBackend
       },
       returns: t(
         'Detached three-part IStorageKey envelope [marker, orgId, logicalKey]; tuple keys remain nested. Invalid org throws INVALID_ARGUMENT; invalid logical key throws INVALID_KEY.',
@@ -2063,8 +2499,8 @@ export const storageContractReference: ILibraryReference = {
       ),
       params: {
         orgId: t(
-          'Exact canonical lowercase UUID expected in the physical key.',
-          '物理键中应匹配的精确规范小写 UUID。'
+          'Canonical lowercase UUID from the caller’s host configuration or organization view; use that same identity at read and write boundaries.',
+          '来自调用方宿主配置或组织视图指定的规范小写 UUID，读写边界须使用相同身份。'
         ),
         key: t(
           'Three-part envelope returned by prefixStorageOrgKey.',
@@ -2110,7 +2546,7 @@ export const storageContractReference: ILibraryReference = {
       role: 'constant',
       purpose: t(
         'Canonical wait, fail and optimistic factories create authentic identities through the original policy registry.',
-        '规范 wait、fail 与 optimistic 工厂经原策略登记创建真实身份。'
+        '构造真实并发策略身份，由原逻辑循环执行等待、失败或乐观重试的既定规则。'
       ),
       example: `const policy = ConcurrencyPolicy.wait({ timeoutMs: 2_000 })`
     },
@@ -2118,7 +2554,7 @@ export const storageContractReference: ILibraryReference = {
       role: 'constant',
       purpose: t(
         'Actual managed or native activity mode captured by the real backend owner.',
-        '真实后端拥有者捕获的 managed 或 native 活跃模式。'
+        '声明真实后端采用的托管或原生活跃范围，决定事务视图如何沿原登记检查有效性。'
       )
     },
     TransactionBeforeStage: {
@@ -2132,11 +2568,65 @@ export const storageContractReference: ILibraryReference = {
       role: 'constant',
       purpose: t(
         'Canonical operation and terminal transaction observation names.',
-        '规范操作与事务终态观察名。'
+        '声明事务操作及确定终态的只观察事件名，原事务拥有者仍控制提交、回滚和错误顺序。'
       )
     },
     createStorageIteratorLifetime: {
       role: 'factory',
+      optionDocs: {
+        close: {
+          summary: t(
+            'Release the already-owned native resource after all accepted advances have settled.',
+            '在全部已接纳推进结算之后释放后端已经持有的原生资源。'
+          ),
+          whenToUse: t(
+            'Supply the existing native close operation when constructing this lifetime.',
+            '创建生命周期时提供现有原生关闭操作。'
+          ),
+          example: storageContractCases.iteratorAuthor![0]!.example,
+          returns: t(
+            'Awaited completion of native release; a failure remains observable on main disposal.',
+            '等待原生释放完成，失败可通过主释放承诺观察。'
+          )
+        },
+        report: {
+          summary: t(
+            'Observe cleanup failures through the original backend reporter; reporting does not grant storage control.',
+            '通过所属后端的原报告函数观察清理失败，该接点不授予存储控制权。'
+          ),
+          whenToUse: t(
+            'Connect the original report-only symbolic cleanup path.',
+            '连接原符号清理的只报告路径。'
+          ),
+          example: storageContractCases.iteratorAuthor![0]!.example,
+          params: {
+            error: t(
+              'Original cleanup error, including failed symbolic disposal.',
+              '原清理错误，包含符号释放失败。'
+            )
+          },
+          returns: t(
+            'The symbolic cleanup Promise adopts the callback result; the original reporter should finish successfully.',
+            '符号清理承诺采用回调结果，原报告器应成功完成自身工作。'
+          )
+        },
+        onSettled: {
+          summary: t(
+            'Synchronous native bookkeeping when shared cleanup settles, whether it fulfills or rejects.',
+            '共享清理成功或拒绝结算时执行原生同步记账，保留原拥有者的资源登记。'
+          ),
+          default: t('No additional settlement callback.', '省略时不调用额外结算回调。'),
+          whenToUse: t(
+            'Release the original owner’s cursor registration after resource settlement.',
+            '资源结算后清除原拥有者的游标登记时使用。'
+          ),
+          example: storageContractCases.iteratorAuthor![0]!.example,
+          returns: t(
+            'No result; the original owner supplies a nonthrowing bookkeeping callback.',
+            '无结果，由原拥有者提供不会抛错的记账回调。'
+          )
+        }
+      },
       purpose: t(
         'Reuse the original iterator drain and cached cleanup paths when authoring a native cursor; data admission and transaction registration stay with the original backend.',
         '编写原生游标时复用既有迭代器排空与缓存清理路径；数据准入和事务登记仍属于原后端。'
@@ -2156,6 +2646,54 @@ export const storageContractReference: ILibraryReference = {
     },
     createTransactionOwner: {
       role: 'operation',
+      optionDocs: {
+        activityMode: {
+          summary: t(
+            'Use managed callback views or the backend’s actual native activity checks.',
+            '选择托管回调视图或后端真实原生活跃检查，使视图失效沿原事务规则处理。'
+          ),
+          default: t(
+            'managed uses the original managed activity mode.',
+            '缺省使用原托管活跃模式。'
+          ),
+          values: { enum: 'TransactionActivityMode' },
+          whenToUse: t(
+            'Use native only when the actual backend owns transaction activity boundaries.',
+            '仅在实际后端掌握事务活跃边界时选择原生模式。'
+          ),
+          example: storageContractCases.ownerAuthor![0]!.example
+        },
+        asyncDisposeKey: {
+          summary: t(
+            'The fixed resource symbol from the outer host; it must be a real symbol identity.',
+            '来自外层宿主的固定资源释放符号，必须使用真实符号身份。'
+          ),
+          default: t(
+            'Native Symbol.asyncDispose; absence requires the host’s existing fallback.',
+            '缺省使用原生 Symbol.asyncDispose，原生缺失时须提供宿主既有后备符号。'
+          ),
+          example: storageContractCases.ownerAuthor![0]!.example
+        },
+        defaultPolicy: {
+          summary: t(
+            'Authentic store-default concurrency policy captured once by this owner.',
+            '由本拥有者一次捕获的真实存储缺省并发策略，后续操作沿该身份解析。'
+          ),
+          default: t(
+            'Create one authentic wait policy for this owner.',
+            '省略时为本拥有者创建一个真实等待策略。'
+          ),
+          example: storageContractCases.ownerAuthor![0]!.example
+        },
+        concurrencyStages: {
+          summary: t(
+            'Original kind:concurrency observer supplied by the existing host stage registry.',
+            '既有宿主阶段登记提供的并发观察接点，其判别值必须为 concurrency。'
+          ),
+          default: t('No concurrency-stage observer.', '省略时不连接并发阶段观察器。'),
+          example: storageContractCases.ownerAuthor![0]!.example
+        }
+      },
       purpose: t(
         'Initialize one neutral owner for an original resource base. Backends retain registration and lifecycle authority; no database is opened.',
         '为原资源基础对象初始化唯一中立拥有者。后端保留登记与生命周期权限，不打开数据库。'
@@ -2185,7 +2723,7 @@ const control = owner.register(scope, { createScope, onFailure })`
       role: 'operation',
       purpose: t(
         'Check authentic live view identity for the exact original store.',
-        '检查精确原 store 的真实有效视图身份。'
+        '按原登记核验事务视图是否仍然有效，并确认它属于所指定的精确存储对象。'
       ),
       params: {
         store: t('Original registered resource base.', '已登记原资源基础对象。'),
@@ -2310,7 +2848,10 @@ await codec.encode(value, context)`
     },
     ConcurrencyHolderState: {
       role: 'constant',
-      purpose: t('Canonical held and remote handoff state names.', '规范的持有与远端交接状态名。')
+      purpose: t(
+        'Canonical held and remote handoff state names.',
+        '区分已确认持有与远端交接中的锁状态，使检查结果不会把旧持有者当作新持有者。'
+      )
     },
     defineStorageCapability: {
       role: 'operation',
@@ -2332,6 +2873,33 @@ await codec.encode(value, context)`
     },
     implement: {
       role: 'operation',
+      optionDocs: {
+        forTransaction: {
+          summary: t(
+            'Original standard-capability binder receiving a live precise scope; return that native draft’s transaction API.',
+            '原标准能力绑定器接收精确活跃视图，并返回该原生草稿的事务接口。'
+          ),
+          default: t(
+            'No transaction projection; a transactional standard publication requires this binder.',
+            '省略时不提供事务投影，事务标准能力发布需要此绑定器。'
+          ),
+          whenToUse: t(
+            'Publish a genuine native standard capability for the same transaction owner.',
+            '为同一事务拥有者发布真实原生标准能力时使用。'
+          ),
+          example: storageContractCases.capabilityAuthor![0]!.example,
+          params: {
+            scope: t(
+              'Authentic scope of the same native store; verify ownership before retrieving its draft API.',
+              '同一原生存储的真实视图，取得草稿接口前须核对归属。'
+            )
+          },
+          returns: t(
+            'The original transaction API; it is used at an accepted operation, not descriptor creation.',
+            '返回原事务接口，在已接纳操作中使用，创建描述时不执行。'
+          )
+        }
+      },
       purpose: t(
         'Capture one authentic token/API pairing as a frozen descriptor; an optional standard forTransaction binder remains private and unexecuted.',
         '将真实令牌与 API 配对为冻结记录；可选的标准 forTransaction 绑定器私有保存，不在装配时执行。'
@@ -2358,6 +2926,30 @@ await codec.encode(value, context)`
     },
     provideCapabilities: {
       role: 'operation',
+      optionDocs: {
+        onInstaller: {
+          summary: t(
+            'Capture this store’s unique finite prepare/publish/release port after original base admission.',
+            '原基础准入后捕获此存储唯一的有限准备、发布与释放接点。'
+          ),
+          default: t('No installer callback is invoked.', '省略时不调用安装接点回调。'),
+          whenToUse: t(
+            'Let the original host installation window retain the native publication port.',
+            '让原宿主安装窗口保留原生发布接点时使用。'
+          ),
+          example: storageContractCases.installerAuthor![0]!.example,
+          params: {
+            port: t(
+              'The same store’s original capability installation port.',
+              '同一存储的原能力安装接点。'
+            )
+          },
+          returns: t(
+            'No result; the supplied base remains caller-owned.',
+            '无结果，传入基础资源仍由调用方拥有。'
+          )
+        }
+      },
       purpose: t(
         'Admit a complete implementation batch and modify the same resource-backed base, preserving its public class and hidden members.',
         '准入整批实现并改装同一资源基础对象，保留类公开方法与非枚举成员。'
@@ -2367,7 +2959,7 @@ await codec.encode(value, context)`
           'Unprovided resource base with valid backend, support facts and both cleanup entries.',
           '尚未装配能力且具有有效后端名、能力事实与两个清理入口的资源基础对象。'
         ),
-        implementations: t(
+        entries: t(
           'Authentic implementation records with no duplicate tokens.',
           '没有重复令牌的真实实现记录。'
         ),
@@ -2385,7 +2977,7 @@ await codec.encode(value, context)`
 }`
     },
     kv: {
-      role: 'operation',
+      role: 'constant',
       purpose: t(
         'Standard text key-value contract token; the backend still owns every operation and its lifecycle.',
         '标准文本键值契约令牌；每个操作及生命周期仍由后端拥有。'
@@ -2397,7 +2989,7 @@ console.log(api === store.use(kv)) // true`
       role: 'operation',
       purpose: t(
         'Validate an open backend name without admitting a store or granting capability authority.',
-        '校验开放后端名称，不准入 store，也不授予能力权限。'
+        '校验开放后端名称的字符与长度规则，只接纳名称形状，存储能力仍由原准入检查。'
       ),
       params: { value: t('Unknown backend label.', '未知后端标签。') },
       returns: t(
@@ -2407,10 +2999,10 @@ console.log(api === store.use(kv)) // true`
       example: `console.log(isBackendKind('example-catalog'), isBackendKind('Invalid Name')) // true false`
     },
     BACKEND_KIND_PATTERN: {
-      role: 'operation',
+      role: 'constant',
       purpose: t(
         'Canonical backend label pattern used by all contract admission checks.',
-        '全部契约准入检查共用的规范后端名模式。'
+        '全部契约准入共用的后端名称正则，约束小写开头、后续字符及最大长度。'
       ),
       example: `console.log(BACKEND_KIND_PATTERN.test('example-catalog')) // true`
     },
@@ -2433,6 +3025,44 @@ console.log(archive.state === state) // true`
     },
     createMigrationPlan: {
       role: 'operation',
+      optionDocs: {
+        version: {
+          summary: t(
+            'Application’s current nonnegative safe integer archive version.',
+            '应用定义的当前存档版本，必须为非负安全整数。'
+          ),
+          example:
+            "import { createMigrationPlan, migrateEnvelopeSync } from '@migaia/storage-contract'\nconst plan = createMigrationPlan({\n  version: 1, steps: { 1: previous => ({ previous }) }\n})\nconsole.log(migrateEnvelopeSync(plan, { version: 0, state: 'old' }))"
+        },
+        reset: {
+          summary: t(
+            'Exclusive reset-plan callback returning one fresh state for any supported older archive; do not combine with steps.',
+            '重置计划专用回调，为受支持旧存档返回一次新状态，与逐步迁移配置互斥。'
+          ),
+          whenToUse: t(
+            'Discard old state instead of applying individual version transitions.',
+            '需要舍弃旧状态而不逐个执行版本转换时使用。'
+          ),
+          example:
+            "import { createMigrationPlan, migrateEnvelopeSync } from '@migaia/storage-contract'\nconst plan = createMigrationPlan({ version: 1, reset: () => ({ settings: {} }) })\nconsole.log(migrateEnvelopeSync(plan, { version: 0, state: 'old' }))",
+          returns: t(
+            'One replacement state, or a Promise used through migrateEnvelope.',
+            '一个替换状态，或通过异步迁移入口使用的承诺。'
+          )
+        },
+        steps: {
+          summary: t(
+            'Own canonical target-version keys mapped to conversion callbacks; the suffix through version must be continuous.',
+            '以自有规范目标版本为键的转换回调表，直到当前版本的后缀必须连续。'
+          ),
+          default: t(
+            'No steps supports only an archive already at the current version.',
+            '没有步骤时只支持已经处于当前版本的存档。'
+          ),
+          example:
+            "import { createMigrationPlan, migrateEnvelopeSync } from '@migaia/storage-contract'\nconst plan = createMigrationPlan({\n  version: 1, steps: { 1: previous => ({ previous }) }\n})\nconsole.log(migrateEnvelopeSync(plan, { version: 0, state: 'old' }))"
+        }
+      },
       purpose: t(
         'Snapshot and freeze canonical continuous version steps, or a constant-space reset callback.',
         '快照并冻结规范连续版本步骤，或常数空间的重置回调。'
@@ -2452,6 +3082,16 @@ console.log(plan.baseVersion, Object.isFrozen(plan.steps)) // 1 true`
     },
     migrateEnvelopeSync: {
       role: 'operation',
+      optionDocs: {
+        observe: {
+          summary: t(
+            'Optional beforeStep/afterStep observations share each actual conversion context; their results never veto migration.',
+            '可选的步骤前后观察共用实际转换上下文，其返回结果不会否决迁移。'
+          ),
+          default: t('No migration step observations.', '省略时不发送迁移步骤观察。'),
+          example: storageContractCases.migrationSyncOptions![0]!.example
+        }
+      },
       purpose: t(
         'Run synchronous steps in target-version order. Refuse newer archives and preserve original errors as cause.',
         '按目标版本顺序执行同步步骤；拒绝未来存档，将原始错误保留在 cause。'
@@ -2476,6 +3116,41 @@ console.log(migrateEnvelopeSync(plan, { version: 0, state: 'old' })) // { previo
     },
     migrateEnvelope: {
       role: 'operation',
+      optionDocs: {
+        observe: {
+          summary: t(
+            'Optional beforeStep/afterStep observations share each actual conversion context; their results never veto migration.',
+            '可选的步骤前后观察共用实际转换上下文，其返回结果不会否决迁移。'
+          ),
+          default: t('No migration step observations.', '省略时不发送迁移步骤观察。'),
+          example: storageContractCases.migrationAsyncOptions![0]!.example
+        },
+        signal: {
+          summary: t(
+            'Borrow the caller’s cancellation signal for waiting and per-step checks, including the unchanged-version path.',
+            '借用调用方取消信号进行等待与逐步检查，同版直接返回前也检查取消。'
+          ),
+          default: t('No external cancellation signal.', '省略时没有外部取消信号。'),
+          example: storageContractCases.migrationAsyncOptions![0]!.example
+        },
+        report: {
+          summary: t(
+            'Original utility reporter receives late rejections and cleanup/reporter context without changing the migration result.',
+            '原工具报告函数接收迟到拒绝及清理或报告阶段上下文，不改变迁移结果。'
+          ),
+          default: t('Use the original host rethrow reporter.', '省略时使用原宿主重抛报告器。'),
+          whenToUse: t(
+            'Observe failures that arrive after a cancelled migration has already settled.',
+            '需要观察已取消迁移结算后到达的迟到失败时使用。'
+          ),
+          example: storageContractCases.migrationAsyncOptions![0]!.example,
+          params: {
+            error: t('Original asynchronous failure.', '原异步失败值。'),
+            context: t('Original utility operation and failure phase.', '原工具操作名与失败阶段。')
+          },
+          returns: t('No result; reporting stays observation-only.', '无返回结果，报告只作观察。')
+        }
+      },
       purpose: t(
         'Run asynchronous migrations with shared cancellation and late-rejection reporting, including cancellation before unchanged-version returns.',
         '借用共享取消与迟到拒绝报告执行异步迁移，同版返回前仍检查取消。'
@@ -2651,6 +3326,20 @@ if (snapshot) console.log(await snapshot.store.get('theme'))`
     },
     snapshotStorageBaseDetailed: {
       role: 'operation',
+      optionDocs: {
+        asyncDisposeKey: {
+          summary: t(
+            'Fixed canonical cleanup symbol from the outer host, including its existing fallback where native support is absent.',
+            '来自外层宿主的固定规范清理符号，包括原生缺失环境中的既有后备符号。'
+          ),
+          default: t(
+            'Use the native Symbol.asyncDispose identity when available.',
+            '可用时缺省使用原生 Symbol.asyncDispose 身份。'
+          ),
+          example:
+            "import { snapshotStorageBaseDetailed } from '@migaia/storage-contract'\nfunction inspectResource(candidate: unknown, asyncDisposeKey: typeof Symbol.asyncDispose) {\n  return snapshotStorageBaseDetailed(candidate, { asyncDisposeKey })\n}"
+        }
+      },
       purpose: t(
         'Admit the common resource, backend and capability facts without requiring key-value operations, mutating the base or taking cleanup ownership.',
         '准入共用资源、后端与能力事实，不强制键值操作，不修改基础对象，不取得清理所有权。'
@@ -2798,6 +3487,17 @@ if (snapshot) console.log(await snapshot.store.getRecord('profile'))`
         'Project half-open native byte bounds from the original organization and logical prefix owners.',
         '从原组织与逻辑前缀拥有者投影原生半开字节界。'
       ),
+      params: {
+        orgId: t(
+          'Canonical lowercase UUID from the caller’s host configuration or organization view; use that same identity at read and write boundaries.',
+          '来自调用方宿主配置或组织视图指定的规范小写 UUID，读写边界须使用相同身份。'
+        ),
+        prefix: t(
+          'Logical typed key prefix; explicit undefined selects all logical keys in this organization.',
+          '逻辑类型化键前缀，显式 undefined 选择本组织的全部逻辑键。'
+        ),
+        backend: optionalKeyBackend
+      },
       returns: t(
         'Detached lower/upper bytes; undefined prefix selects all logical keys in only that organization.',
         '独立lower/upper字节；undefined前缀仅选择该组织全部逻辑键。'
@@ -2809,8 +3509,16 @@ if (snapshot) console.log(await snapshot.store.getRecord('profile'))`
       role: 'operation',
       purpose: t(
         'Encode the original organization envelope without reducing logical key limits.',
-        '编码原组织封装，不缩减逻辑键限制。'
+        '使用原组织封装与保序编码写出物理字节，使不同组织中的相同逻辑键保持隔离。'
       ),
+      params: {
+        orgId: t(
+          'Canonical lowercase UUID from the caller’s host configuration or organization view; use that same identity at read and write boundaries.',
+          '来自调用方宿主配置或组织视图指定的规范小写 UUID，读写边界须使用相同身份。'
+        ),
+        key: recordKeyParam,
+        backend: optionalKeyBackend
+      },
       returns: t(
         'Original ordered bytes; only the logical key consumes depth and node budgets.',
         '原保序字节；只有逻辑键消耗深度和节点预算。'
@@ -2822,8 +3530,19 @@ if (snapshot) console.log(await snapshot.store.getRecord('profile'))`
       role: 'operation',
       purpose: t(
         'Validate the requested organization boundary and reuse the original logical decoder.',
-        '校验请求的组织边界，复用原逻辑键解码器。'
+        '从指定组织的规范物理字节中还原逻辑键，使用原键解码与组织身份检查规则。'
       ),
+      params: {
+        orgId: t(
+          'Canonical lowercase UUID from the caller’s host configuration or organization view; use that same identity at read and write boundaries.',
+          '来自调用方宿主配置或组织视图指定的规范小写 UUID，读写边界须使用相同身份。'
+        ),
+        encoded: t(
+          'Complete bytes returned by encodeStorageOrgKey for that organization.',
+          '该组织的 encodeStorageOrgKey 返回的完整物理字节。'
+        ),
+        backend: optionalKeyBackend
+      },
       returns: t(
         'Detached logical key; foreign boundaries are INVALID_ARGUMENT, invalid logical bytes are INVALID_KEY.',
         '独立逻辑键；其它组织边界报INVALID_ARGUMENT，无效逻辑字节报INVALID_KEY。'
@@ -2837,7 +3556,7 @@ if (snapshot) console.log(await snapshot.store.getRecord('profile'))`
         'Validate and copy a key, then encode independently owned bytes whose lexicographic order equals compareStorageKeys.',
         '校验并复制键，再编码成独立字节；字典序与 compareStorageKeys 相同。'
       ),
-      params: keyValidationParams,
+      params: { key: keyValidationParams.value, backend: optionalKeyBackend },
       returns: t(
         'Uint8Array in linear key size; invalid input reuses INVALID_KEY. Signed zero normalizes to the same encoding.',
         '线性键大小的 Uint8Array；无效输入复用 INVALID_KEY。正负零规范化为同一编码。'
@@ -3088,8 +3807,8 @@ console.log(candidate.name, candidate.output)`
           '必填的 `StorageContractErrorCode` 语义值：输入、键、能力、资源、取消、envelope 与迁移错误。生产者按失败契约选择。'
         ),
         details: t(
-          'Optional producer-authored details, default `{}`. Optional `backend` is `local`, `session`, `cookie`, `indexeddb` or `memory`; optional `key` is a string or `IStorageKey`; optional `cause` is any original thrown value. All fields default to `undefined`; key and cause are retained by reference without validation or copying.',
-          '生产者提供的可选详情，默认 `{}`。可选 `backend` 为 `local`、`session`、`cookie`、`indexeddb` 或 `memory`；可选 `key` 为字符串或 `IStorageKey`；可选 `cause` 为任意原始抛出值。各字段默认 `undefined`，键和原因按引用保留，不校验或复制。'
+          'Optional producer-authored details, default `{}`. Optional `backend` is the caller’s open diagnostic backend name; optional `key` is a string or `IStorageKey`; optional `cause` is any original thrown value. All fields default to `undefined`; key and cause are retained by reference without validation or copying.',
+          '生产者提供的可选详情，默认 `{}`。可选 `backend` 为调用方的开放诊断后端名称；可选 `key` 为字符串或 `IStorageKey`；可选 `cause` 为任意原始抛出值。各字段默认 `undefined`，键和原因按引用保留，不校验或复制。'
         ),
         message: t(
           'Optional producer-selected diagnostic message; default is exactly `[storage-contract] ${code}` using the supplied semantic code.',
