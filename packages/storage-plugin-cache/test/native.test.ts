@@ -1,3 +1,5 @@
+import { Logger } from '@migaia/logger'
+import { binlog, wal, undoLog, memoryLogStore } from '@migaia/logger/plugins/durable'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -62,6 +64,81 @@ async function vectorApplication(collection: IVectorCollection<{ kind: string }>
 }
 
 describe('native borrowed cache tiers', () => {
+  it('shares one binlog, WAL and undo logger across Memory, SQLite and PostgreSQL', async () => {
+    const pg = new Pool({ connectionString: pgUrl }),
+      connection = nodeSqliteDriver(':memory:'),
+      changes = memoryLogStore(),
+      intents = memoryLogStore(),
+      images = memoryLogStore(),
+      logger = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+        runtimeManager: {
+          randomUUID: () => crypto.randomUUID(),
+          defer: (task: () => void) => queueMicrotask(task),
+          write: () => undefined
+        },
+        plugins: [binlog({ store: changes }), wal({ store: intents }), undoLog({ store: images })]
+      }),
+      host = await createStorageHost({
+        plugins: [
+          memoryBackendPlugin(),
+          sqliteBackendPlugin({ driver: connection }),
+          postgresBackendPlugin({
+            driver: pgDriver(pg),
+            prefix: 'shared_log_' + crypto.randomUUID().slice(0, 8)
+          })
+        ] as const,
+        journal: { logger, namespace: 'shared-business', binlogValues: true }
+      }),
+      stores = [host.backend('memory'), host.backend('sqlite'), host.backend('postgres')]
+    try {
+      for (const store of stores) await store.set('same', 'before')
+      const transactions: string[] = []
+      for (const store of stores) {
+        await store.transaction(async (scope) => {
+          await scope.set('same', 'intermediate')
+          await scope.set('same', 'after')
+        })
+        const record = (await logger.binlog.read(await logger.binlog.lastSeq()))[0]!,
+          payload = record.payload as { txId: string; changes: unknown[] }
+        expect(payload.changes).toHaveLength(2)
+        expect(await logger.undo.get(payload.txId)).toHaveLength(1)
+        transactions.push(payload.txId)
+      }
+      for (const [index, store] of stores.entries()) {
+        expect(await store.get('same')).toBe('after')
+        await store.undo(transactions[index]!)
+        expect(await store.get('same')).toBe('before')
+        const failure = new RangeError('shared logger rollback')
+        await expect(
+          store.transaction(async (scope) => {
+            await scope.set('same', 'rolled-back')
+            throw failure
+          })
+        ).rejects.toMatchObject({ cause: failure })
+        expect(await store.get('same')).toBe('before')
+      }
+      const merged = await logger.binlog.read(1)
+      expect(merged.map((entry) => entry.seq)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9])
+      for (const [index, id] of ['memory', 'sqlite', 'postgres'].entries())
+        expect(
+          merged
+            .filter(
+              (entry) =>
+                (entry.payload as { target: { backendInstanceId: string } }).target
+                  .backendInstanceId === id
+            )
+            .map((entry) => entry.seq)
+        ).toEqual([index + 1, index + 4, index + 7])
+      expect(await logger.wal.pending()).toEqual([])
+    } finally {
+      await host.dispose()
+      await logger.shutdown('manual')
+      await connection.dispose()
+      await pg.end()
+    }
+  })
+
   it('runs the same exact vector ranking and counted deletion on four native engines', async () => {
     const stackUrl = process.env.MIGAIA_REDIS_STACK_URL,
       qdrantUrl = process.env.MIGAIA_QDRANT_URL

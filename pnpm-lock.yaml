@@ -850,6 +850,9 @@ importers:
         specifier: workspace:^
         version: link:../utils
     devDependencies:
+      '@migaia/logger':
+        specifier: workspace:^
+        version: link:../logger
       '@migaia/storage-plugin-postgres':
         specifier: workspace:^
         version: link:../storage-plugin-postgres
