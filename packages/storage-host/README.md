@@ -256,3 +256,7 @@ PENDING-USER-REVIEW：dropOrg 遇到存活的全局 journal 时，原私有 name
 同作者入口重导原 `storageJournalLockKey(prefix, part)` 与 `StorageJournalLock`（head/resource）。后端把这一个规范身份交给原并发 provider，普通私有事务和同原生 append 共用相同 head，资源持有另用 resource；函数只产生只读逻辑 key，不授予获取锁、安装或关闭权限。空 prefix 或非法 part 按原 INVALID_ARGUMENT 拒绝，不复制锁元组编码。
 
 首个显式组织终点的 telemetry 等原操作内的 journal prepare 完成后，读取同一 org cell 的配置；观察本身不额外 prepare、不开新预算，首事务也不漏记。已经明确关闭时仍直接进入原工作且不生成普通日志条目。
+
+选择全局 `journal` 后，既有 bootstrap 会安装异步 stage。公开 `sync.set`、`sync.remove`、`sync.clearValues` 在修改数据或历史前报原 ASYNC_STAGE_IN_SYNC_ENTRY。同一 stage 目前也拒绝同步读取，包括仅启用遥测的配置。此组合使用异步方法；未选 journal 的宿主保留原同步方法。同步日志写入需要既有 logger 拥有者提供真实同步 append 完成接点。
+
+`/authoring/backend` 的 `encodeStorageJournalImage(present, value?, bytes?)` 与 `decodeStorageJournalImage(image, bytes?)` 为原生 adapter 复用原 memory 可移植镜像 codec。缺失与存在的 null 保持区分；字节镜像沿既有 base64 拥有者处理。codec id/version 与原 serialize 错误均不变。Memory 消费同一实现；调用方不获得原生、提交或安装权限。
