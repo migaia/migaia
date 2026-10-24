@@ -34,6 +34,8 @@ export async function compileJournalBinding(
   orgId: string,
   scope: Omit<ITransactionScope, 'use'>
 ): Promise<void> {
+  const optIn: true | undefined = binding.requiresIndexedDbUndo
+  void optIn
   const namespace: IStorageJournalNamespace = await binding.forOrg(orgId).openNamespace('history')
   const transactionId: string = namespace.transactionInfo(scope).id
   void transactionId
