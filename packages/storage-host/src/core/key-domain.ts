@@ -148,76 +148,52 @@ export const decodeFlatStorageKey = (
   }
 }
 
-/** Read and validate a range once so getter-backed inputs cannot change after validation. */
-export const snapshotKeyRange = (
-  range: IKeyRange | undefined,
-  backend: IBackendKind
-): IKeyRange | undefined => {
+/** Validate range shape, bounds and ordering without copying a synchronous native read's input. */
+export const assertKeyRange = (range: IKeyRange | undefined, backend: IBackendKind): void => {
   if (range === undefined) return
   if (typeof range !== 'object' || range === null || Array.isArray(range))
     throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
       backend,
       cause: new TypeError(StorageErrorText.keyRangeObject)
     })
-  /** Each caller option is read once before any bound is cloned or compared. */
-  let snapshot: IKeyRange
-  try {
-    snapshot = {
-      lower: range.lower,
-      lowerOpen: range.lowerOpen,
-      upper: range.upper,
-      upperOpen: range.upperOpen
-    }
-  } catch (cause) {
-    throw new StorageContractError(StorageContractErrorCode.invalidArgument, { backend, cause })
-  }
+  const { lower, lowerOpen, upper, upperOpen } = range
   if (
-    (snapshot.lowerOpen !== undefined && typeof snapshot.lowerOpen !== 'boolean') ||
-    (snapshot.upperOpen !== undefined && typeof snapshot.upperOpen !== 'boolean')
+    (lowerOpen !== undefined && typeof lowerOpen !== 'boolean') ||
+    (upperOpen !== undefined && typeof upperOpen !== 'boolean')
   )
     throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
       backend,
       cause: new TypeError(StorageErrorText.keyRangeFlags)
     })
-  /** Clone one range bound before validation so later caller mutation cannot alter the operation. */
-  const snapshotBound = (value: IStorageKey, label: string): IStorageKey => {
-    try {
-      return snapshotStorageKey(value, backend, label)
-    } catch (cause) {
-      if (cause instanceof StorageContractError) throw cause
-      throw new StorageContractError(StorageContractErrorCode.invalidKey, {
-        backend,
-        key: value,
-        cause: new TypeError(StorageErrorText.keyRangeBound(label), { cause })
-      })
-    }
-  }
-  /** Fully detached range used by every downstream comparison and backend adapter. */
-  const normalized: IKeyRange = {
-    lower:
-      snapshot.lower === undefined
-        ? undefined
-        : snapshotBound(snapshot.lower, FlatStorageKeyWire.lower),
-    lowerOpen: snapshot.lowerOpen,
-    upper:
-      snapshot.upper === undefined
-        ? undefined
-        : snapshotBound(snapshot.upper, FlatStorageKeyWire.upper),
-    upperOpen: snapshot.upperOpen
-  }
-  if (normalized.lower !== undefined && normalized.upper !== undefined) {
-    /** Only the canonical key comparator decides ordering and empty-open intervals. */
-    const comparison = compareStorageKeys(normalized.lower, normalized.upper)
-    if (comparison > 0 || (comparison === 0 && (normalized.lowerOpen || normalized.upperOpen)))
+  if (lower !== undefined) assertStorageKey(lower, backend, FlatStorageKeyWire.lower)
+  if (upper !== undefined) assertStorageKey(upper, backend, FlatStorageKeyWire.upper)
+  if (lower !== undefined && upper !== undefined) {
+    /** Canonical key order also rejects an empty interval with an open endpoint. */
+    const comparison = compareStorageKeys(lower, upper)
+    if (comparison > 0 || (comparison === 0 && (lowerOpen || upperOpen)))
       throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
         backend,
         cause: new RangeError(StorageErrorText.keyRangeInvalid)
       })
   }
-  return normalized
 }
-
-/** Validate a range when no caller needs to retain the stable snapshot. */
-export const assertKeyRange = (range: IKeyRange | undefined, backend: IBackendKind): void => {
-  snapshotKeyRange(range, backend)
+/** Copy caller bounds only when a deferred operation can await before using the native range. */
+export const snapshotKeyRange = (
+  range: IKeyRange | undefined,
+  backend: IBackendKind
+): IKeyRange | undefined => {
+  assertKeyRange(range, backend)
+  if (range === undefined) return
+  return {
+    lower:
+      range.lower === undefined
+        ? undefined
+        : snapshotStorageKey(range.lower, backend, FlatStorageKeyWire.lower),
+    lowerOpen: range.lowerOpen,
+    upper:
+      range.upper === undefined
+        ? undefined
+        : snapshotStorageKey(range.upper, backend, FlatStorageKeyWire.upper),
+    upperOpen: range.upperOpen
+  }
 }

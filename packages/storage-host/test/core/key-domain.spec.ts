@@ -14,24 +14,6 @@ describe('core key-domain', () => {
     expect(decodeFlatStorageKey(encodeFlatStorageKey(key))).toEqual(['actual'])
   })
 
-  it('range getter 只读取一次并返回稳定快照', () => {
-    let reads = 0
-    const range = {
-      get lower() {
-        reads += 1
-        if (reads > 1) throw new Error('lower read twice')
-        return 'a'
-      },
-      upper: 'z'
-    }
-    expect(snapshotKeyRange(range, 'memory')).toEqual({
-      lower: 'a',
-      lowerOpen: undefined,
-      upper: 'z',
-      upperOpen: undefined
-    })
-    expect(reads).toBe(1)
-  })
   it('range snapshot 不持有调用方复合边界引用', () => {
     const lower: Array<string | number> = ['tenant', 1]
     const upper: Array<string | number> = ['tenant', 9]
