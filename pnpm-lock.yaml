@@ -1011,10 +1011,10 @@ importers:
       '@rdfjs/types':
         specifier: 2.0.1
         version: 2.0.1
+    devDependencies:
       '@types/n3':
         specifier: 1.26.1
         version: 1.26.1
-    devDependencies:
       n3:
         specifier: 1.26.0
         version: 1.26.0
@@ -1055,9 +1055,6 @@ importers:
 
   packages/storage-web:
     dependencies:
-      '@migaia/capability':
-        specifier: workspace:^
-        version: link:../capability
       '@migaia/event-subscriber':
         specifier: workspace:^
         version: link:../event-subscriber
