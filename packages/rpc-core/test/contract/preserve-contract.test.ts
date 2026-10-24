@@ -67,14 +67,14 @@ function createPlainEnvelope(reads: string[]): IRpcEnvelope {
   }
 }
 
-it('ordinary byte and object fallbacks retain their respective field and getter order', () => {
+it('ordinary byte and object fallbacks retain own field and getter order', () => {
   /** Both actual descriptors consume the same unowned caller envelope through their fallback. */
   const reads: string[] = []
   /** Plain input retains integer-key enumeration and reversed text-key insertion at two levels. */
   const envelope = createPlainEnvelope(reads)
   /** One portable admission precedes each format's own projection of the original getters. */
   const admittedReads = ['2', '10', 'b', 'shared.z', 'shared.a', 'a', 'shared.z', 'shared.a']
-  /** Canonical object descriptor retains its existing portable sorting owner. */
+  /** Both canonical descriptors preserve the admitted portable input's own-key order. */
   const objectCodec = createRuntimeObjectPipeline('json-wire-fixture').codec
   /** The byte fallback delegates to the selected JSON codec's property enumeration order. */
   const wire = remoteProcessJsonCodec.encode(envelope)
@@ -84,17 +84,13 @@ it('ordinary byte and object fallbacks retain their respective field and getter 
   )
   assert.deepEqual(reads, [...admittedReads, ...admittedReads], 'byte admission and projection')
   reads.length = 0
-  /** Object materialization keeps lexical traversal while integer output keys enumerate first. */
+  /** Object materialization retains the same traversal while integer output keys enumerate first. */
   const object = objectCodec.encode(envelope)
   assert.equal(
     JSON.stringify(object),
-    '{"data":{"payload":{"2":2,"10":10,"a":{"a":4,"z":3},"b":{"a":4,"z":3}},"route":{"applicationVersion":"1","profile":"migaia.rpc.route","senderId":"a","sentAt":0,"targetId":"b","type":"request"}},"id":"plain-wire","kind":"request","method":"echo"}'
+    '{"kind":"request","id":"plain-wire","method":"echo","data":{"route":{"profile":"migaia.rpc.route","type":"request","applicationVersion":"1","senderId":"a","targetId":"b","sentAt":0},"payload":{"2":2,"10":10,"b":{"z":3,"a":4},"a":{"z":3,"a":4}}}}'
   )
-  assert.deepEqual(
-    reads,
-    [...admittedReads, '10', '2', 'a', 'shared.a', 'shared.z', 'b', 'shared.a', 'shared.z'],
-    'object admission then sorted projection'
-  )
+  assert.deepEqual(reads, [...admittedReads, ...admittedReads], 'object admission and projection')
   /** Caller getter failure stays outside either format's error-normalization boundary. */
   const original = new Error('plain envelope getter failed')
   /** The failing data getter is reachable during the same ordinary admission path. */
@@ -188,7 +184,7 @@ it('two portable inputs preserve null prototypes, frozen own snapshots and share
   assert.equal(Object.isFrozen((outputs[1]!.second as Record<string, unknown>).child), true)
 })
 
-it('process JSON and Worker signer input preserve integer keys, sorted owned keys and getter order', () => {
+it('process JSON and Worker signer input preserve integer keys, own text-key order and getter order', () => {
   /**
    * Deliberately reversed text keys and integer keys distinguish semantic sorting from insertion
    * order.
@@ -233,16 +229,16 @@ it('process JSON and Worker signer input preserve integer keys, sorted owned key
   assert.deepEqual(reads, ['2', '10', 'z', 'a'], 'caller getter order unchanged')
   /** Actual process codec output is compared byte-for-byte with the preserved wire spelling. */
   const wire = remoteProcessJsonCodec.encode(envelope) as string
-  /** Pinned complete wire vector includes integer-key enumeration and sorted record keys. */
+  /** Pinned complete wire vector includes integer-key enumeration and own text-key order. */
   const expected =
-    '{"data":{"payload":{"2":2,"10":10,"a":{"a":2,"z":3},"z":1},"route":{"applicationVersion":"1","profile":"migaia.rpc.route","senderId":"a","sentAt":0,"targetId":"b","type":"request"}},"id":"fixture-wire","kind":"request","method":"echo"}'
+    '{"kind":"request","id":"fixture-wire","method":"echo","data":{"route":{"profile":"migaia.rpc.route","type":"request","applicationVersion":"1","senderId":"a","targetId":"b","sentAt":0},"payload":{"2":2,"10":10,"z":1,"a":{"z":3,"a":2}}}}'
   assert.equal(wire, expected, 'exact process JSON wire')
   assert.equal(remoteProcessJsonCodec.encode(envelope), expected, 'prepared owned JSON wire')
   assert.deepEqual(materializeOutboundJson(envelope), JSON.parse(expected))
   assert.equal(
     JSON.stringify(createRuntimeObjectPipeline('json-wire-fixture').codec.encode(envelope)),
     expected,
-    'owned object codec keeps sorted keys'
+    'owned object codec keeps own key order'
   )
   assert.equal(
     messageProcessPipeline.codec.encode(envelope),

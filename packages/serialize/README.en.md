@@ -322,7 +322,7 @@ console.log(text) // {"$rpc":"map","entries":[["roles",{"$rpc":"set","values":["
 console.log(codec.decode(text)) // Map { 'roles' => Set { 'read', 'write' } }
 ```
 
-Format codecs keep integer-index enumeration followed by string insertion order, including getter traversal. Public toPortableValue and RPC owned snapshots keep their existing ordering. Ordinary RPC byte fallback uses its selected JSON codec and therefore uses property order; object fallback keeps its existing portable owner.
+Format codecs keep integer-index enumeration followed by string insertion order, including getter traversal. Public toPortableValue still supplies a sorted intermediate projection. RPC owned snapshots and ordinary object and byte JSON paths preserve each object's own key order. The existing private RPC snapshot owner still copies and computes the byte upper bound in one traversal, skipping already encoded binary subtrees.
 
 ### Carry a format tag in the encoded value
 

@@ -164,7 +164,7 @@ describe('object port contracts', () => {
     const observe = (encode: (value: unknown) => unknown) => {
       /** Changing legal return values expose extra reads even when every value stays portable. */
       let nextValue = 0
-      /** The original outer admission uses insertion order; portable projection sorts keys. */
+      /** Outer admission and portable projection both preserve own-key insertion order. */
       const reads: string[] = []
       /** User-visible access side effects must occur twice per key, never during materialization. */
       const read = (key: string): number => {
@@ -194,9 +194,9 @@ describe('object port contracts', () => {
     /** This unchanged public owner supplies the pre-C2 validation/projection baseline. */
     const baseline = observe((value) => JSON.parse(remoteProcessJsonCodec.encode(value) as string))
     expect(baseline).toEqual({
-      reads: ['z', 'a', 'a', 'z'],
+      reads: ['z', 'a', 'z', 'a'],
       nextValue: 4,
-      result: { a: 3, z: 4 }
+      result: { z: 3, a: 4 }
     })
     /** A second outer asCodecValue call changes both access order/count and retained values. */
     const candidate = observe((value) => jsonObjectCodec.encode(value as IRpcEnvelope))

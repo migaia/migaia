@@ -36,12 +36,11 @@ export function readOwnedJsonSnapshot(value: unknown): IOwnedJsonSnapshot | unde
 }
 
 /**
- * Materialize the canonical owned JSON tree once, preserving the legacy ordering selector. Binary
- * roots are already encoded by the binary owner; their captured bounds stop this walk.
+ * Materialize the owned JSON tree once, preserving each object's own key order. Binary roots are
+ * already encoded by the binary owner; their captured bounds stop this walk.
  */
 export function captureOwnedJson(
   value: unknown,
-  sortKeys = true,
   binaryRoots?: ReadonlyMap<object, number>
 ): IOwnedJsonSnapshot {
   if (typeof value === 'string') return { value, byteUpperBound: value.length * 6 + 2 }
@@ -56,7 +55,7 @@ export function captureOwnedJson(
     /** Map retains the original hole shape while each present child is captured exactly once. */
     const output = value.map((item, index) => {
       /** Child facts are consumed immediately, without a second recursive sizing pass. */
-      const child = captureOwnedJson(item, sortKeys, binaryRoots)
+      const child = captureOwnedJson(item, binaryRoots)
       /** Retain the original legacy bound, which also charged each present array index name. */
       byteUpperBound += String(index).length * 6 + 4 + child.byteUpperBound
       return child.value
@@ -65,14 +64,13 @@ export function captureOwnedJson(
   }
   /** The original materializer publishes ordinary JSON records, defining **proto** as data. */
   const output: Record<string, unknown> = {}
-  /** Sorting changes only the owned JSON view; the semantic snapshot keeps its own key order. */
+  /** JSON retains own-key enumeration order, including native integer-index ordering. */
   const keys = Object.keys(value)
-  if (sortKeys) keys.sort()
   /** Record delimiters and escaped keys are included in the same construction pass. */
   let byteUpperBound = 2
   for (const key of keys) {
     /** The source is already admitted; original user accessors are never revisited here. */
-    const child = captureOwnedJson((value as Record<string, unknown>)[key], sortKeys, binaryRoots)
+    const child = captureOwnedJson((value as Record<string, unknown>)[key], binaryRoots)
     byteUpperBound += key.length * 6 + 4 + child.byteUpperBound
     Object.defineProperty(output, key, {
       value: child.value,
@@ -104,6 +102,6 @@ export function prepareOwnedBinaryJsonSnapshot(
   binaryRoots: ReadonlyMap<object, number>
 ): void {
   /** Dummy and final manifests each capture their own metadata, sharing immutable business roots. */
-  const snapshot = captureOwnedJson(manifest, true, binaryRoots)
+  const snapshot = captureOwnedJson(manifest, binaryRoots)
   new OwnedJsonSnapshot(manifest, snapshot)
 }

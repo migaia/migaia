@@ -6,7 +6,6 @@ import { SerializeErrorCode } from '@migaia/serialize/core'
 import {
   asCodecValue,
   assertPortableValue,
-  toPortableValue,
   normalizeCodecFailure,
   CodecErrorText,
   type ICodec
@@ -29,7 +28,7 @@ const pipelines = new Map<
  * Object carriers use this ordinary data operation before delivering their existing listeners.
  */
 export function materializeAdapterJson(value: unknown): unknown {
-  return materializeOutboundJson(value, false)
+  return materializeOutboundJson(value)
 }
 
 /** Construct the canonical private object view paired with the Core-owned textual JSON pipeline. */
@@ -55,10 +54,10 @@ export function createRuntimeObjectPipeline(expectedStringText: string): Readonl
       const admitted = owned ? value : asCodecValue(value)
       try {
         if (owned) return materializeOutboundJson(admitted)
-        /** Source codec owns outgoing sorting and the fresh validated data-only tree. */
-        const portable = toPortableValue(admitted)
+        /** Admission accepts JSON-ready records; the private copy preserves their own-key order. */
+        const portable = materializeAdapterJson(admitted)
         assertPortableValue(portable)
-        return materializeAdapterJson(portable)
+        return portable
       } catch (error) {
         throw normalizeCodecFailure(
           error,

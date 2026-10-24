@@ -322,7 +322,7 @@ console.log(text) // {"$rpc":"map","entries":[["roles",{"$rpc":"set","values":["
 console.log(codec.decode(text)) // Map { 'roles' => Set { 'read', 'write' } }
 ```
 
-格式 codec 先枚举整数索引，再按字符串插入顺序输出，getter 遍历顺序相同。公开 toPortableValue 与 RPC owned 快照保持既有顺序。普通 RPC 字节 fallback 使用所选 JSON codec，因此按属性顺序输出；对象 fallback 继续使用原 portable 拥有者。
+格式 codec 先枚举整数索引，再按字符串插入顺序输出，getter 遍历顺序相同。公开 toPortableValue 仍提供按键排序的中间投影。RPC owned 快照与普通对象、字节 JSON 路径均保持对象自身的 key 顺序；RPC 私有快照仍由原单遍遍历同时完成复制与字节上限计算，并跳过已经编码的二进制子树。
 
 ### 编码结果自带格式标签
 
