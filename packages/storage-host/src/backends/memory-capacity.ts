@@ -100,197 +100,261 @@ export function memoryCapacityValueBytes(value: unknown): number {
   }
 }
 
+/** One native policy owner exposes mutation accounting and bounded reversible planning. */
+type IMemoryCapacityIndex = {
+  touch(id: string): void
+  put(entry: IMemoryCapacityEntry): void
+  remove(id: string): void
+  clear(): void
+  preview(changes: readonly IMemoryCapacityChange[]): readonly IMemoryCapacityEntry[]
+}
+
 /**
  * Creates only native policy metadata. Temporary planning uses a bounded inverse log over touched
  * linked nodes; it never clones all entries, changes data, waits or owns a resource lifetime.
  */
-export function createMemoryCapacityIndex(options: IMemoryCapacity) {
+
+/** One physical capacity index owns its linked policy rows and bounded preview inverse log. */
+type IMemoryCapacityContext = {
+  /** Original options is captured before native construction begins. */
+  readonly options: IMemoryCapacity
+
   /** Hash membership is the sole physical-entry count and direct policy lookup. */
-  const nodes = new Map<string, ICapacityNode>()
+  nodes: Map<string, ICapacityNode>
+
   /** The first nonempty bucket is minFreq; each bucket retains least-recent order internally. */
-  let first: ICapacityBucket | undefined
+  first: ICapacityBucket | undefined
+
   /** Byte count advances only alongside native physical puts and removals. */
-  let bytes = 0
+  bytes: number
+
   /** Planning remembers only actually changed node/bucket links, then restores those exact facts. */
-  let inverse: Map<ICapacityBucket | ICapacityNode, object> | undefined
+  inverse: Map<ICapacityBucket | ICapacityNode, object> | undefined
+
   /** Hash changes have the same bounded inverse ownership as their linked nodes. */
-  let previousNodes: Map<string, ICapacityNode | undefined> | undefined
+  previousNodes: Map<string, ICapacityNode | undefined> | undefined
+}
+/** Create the original linked capacity owner with bounded reversible preview state. */
+export function createMemoryCapacityIndex(options: IMemoryCapacity): IMemoryCapacityIndex {
+  /** Initialize native facts in original construction order before publishing any port. */
+  const capacityState = { options } as IMemoryCapacityContext
 
-  /** Capture each object before its first mutation in one synchronous preview. */
-  const remember = (value: ICapacityBucket | ICapacityNode): void => {
-    if (inverse !== undefined && !inverse.has(value)) inverse.set(value, { ...value })
-  }
-  /** Capture original hash membership once, including rows newly introduced by a preview. */
-  const rememberId = (id: string): void => {
-    if (previousNodes !== undefined && !previousNodes.has(id)) previousNodes.set(id, nodes.get(id))
-  }
-  /** Remove a policy bucket only when its final member has left. */
-  const unlinkBucket = (bucket: ICapacityBucket): void => {
-    if (bucket.first !== undefined) return
-    if (bucket.previous !== undefined) {
-      remember(bucket.previous)
-      bucket.previous.next = bucket.next
-    } else first = bucket.next
-    if (bucket.next !== undefined) {
-      remember(bucket.next)
-      bucket.next.previous = bucket.previous
-    }
-  }
-  /** Detach one node while retaining the exact bucket until its replacement is known. */
-  const unlink = (node: ICapacityNode): void => {
-    remember(node)
-    remember(node.bucket)
-    if (node.previous !== undefined) {
-      remember(node.previous)
-      node.previous.next = node.next
-    } else node.bucket.first = node.next
-    if (node.next !== undefined) {
-      remember(node.next)
-      node.next.previous = node.previous
-    } else node.bucket.last = node.previous
-    node.previous = undefined
-    node.next = undefined
-  }
-  /** Append one hit or write as the most recent member of its chosen frequency. */
-  const append = (bucket: ICapacityBucket, node: ICapacityNode): void => {
-    remember(bucket)
-    remember(node)
-    node.bucket = bucket
-    node.previous = bucket.last
-    node.next = undefined
-    if (bucket.last !== undefined) {
-      remember(bucket.last)
-      bucket.last.next = node
-    } else bucket.first = node
-    bucket.last = node
-  }
-  /** A new physical entry joins minFreq one, without scanning frequency gaps. */
-  const initialBucket = (): ICapacityBucket => {
-    if (first?.frequency === 1) return first
-    /** At most one initial bucket is allocated per insertion before an empty one is unlinked. */
-    const bucket: ICapacityBucket = { frequency: 1, next: first }
-    if (first !== undefined) {
-      remember(first)
-      first.previous = bucket
-    }
-    first = bucket
-    return bucket
-  }
-  /** Point hits update LRU or promote exactly one LFU bucket with constant link work. */
-  const touch = (id: string): void => {
-    /** Misses never manufacture policy history. */
-    const node = nodes.get(id)
-    if (node === undefined) return
-    /** An LRU hit stays in its one bucket; an LFU hit moves only to frequency plus one. */
-    const previous = node.bucket
-    if (options.eviction === MemoryEviction.lru) {
-      unlink(node)
-      append(previous, node)
-      return
-    }
-    /** Adjacent frequency is located directly even if the current bucket becomes empty. */
-    let next = previous.next
-    if (next?.frequency !== previous.frequency + 1) {
-      next = { frequency: previous.frequency + 1, previous, next: previous.next }
-      remember(previous)
-      if (previous.next !== undefined) {
-        remember(previous.next)
-        previous.next.previous = next
-      }
-      previous.next = next
-    }
-    unlink(node)
-    append(next, node)
-    unlinkBucket(previous)
-  }
-  /** Explicit removal and eviction maintain the same membership and byte owner. */
-  const remove = (id: string): void => {
-    /** An absent native identity has no policy side effect. */
-    const node = nodes.get(id)
-    if (node === undefined) return
-    rememberId(id)
-    unlink(node)
-    unlinkBucket(node.bucket)
-    nodes.delete(id)
-    bytes -= node.bytes
-  }
-  /** A put counts one physical entry and treats overwrite as a policy hit. */
-  const put = (entry: IMemoryCapacityEntry): void => {
-    /** Existing native identity retains its key and bucket node. */
-    const existing = nodes.get(entry.id)
-    if (existing !== undefined) {
-      remember(existing)
-      bytes += entry.bytes - existing.bytes
-      existing.bytes = entry.bytes
-      touch(entry.id)
-      return
-    }
-    rememberId(entry.id)
-    /** Initial links contain no borrowed values or native handles. */
-    const node: ICapacityNode = { ...entry, bucket: initialBucket() }
-    nodes.set(entry.id, node)
-    append(node.bucket, node)
-    bytes += entry.bytes
-  }
-  /** Native final turns and previews share one exact predicate, including oversized entries. */
-  const overLimit = (): boolean =>
-    (options.maxEntries !== undefined && nodes.size > options.maxEntries) ||
-    (options.maxBytes !== undefined && bytes > options.maxBytes)
+  /** Hash membership is the sole physical-entry count and direct policy lookup. */
+  capacityState.nodes = new Map<string, ICapacityNode>()
 
+  /** Byte count advances only alongside native physical puts and removals. */
+  capacityState.bytes = 0
+  return createCapacityMethods(capacityState)
+}
+
+/** Capture each object before its first mutation in one synchronous preview. */
+function remember(
+  capacityState: IMemoryCapacityContext,
+  value: ICapacityBucket | ICapacityNode
+): void {
+  if (capacityState.inverse !== undefined && !capacityState.inverse.has(value))
+    capacityState.inverse.set(value, { ...value })
+}
+
+/** Capture original hash membership once, including rows newly introduced by a preview. */
+function rememberId(capacityState: IMemoryCapacityContext, id: string): void {
+  if (capacityState.previousNodes !== undefined && !capacityState.previousNodes.has(id))
+    capacityState.previousNodes.set(id, capacityState.nodes.get(id))
+}
+
+/** Remove a policy bucket only when its final member has left. */
+function unlinkBucket(capacityState: IMemoryCapacityContext, bucket: ICapacityBucket): void {
+  if (bucket.first !== undefined) return
+  if (bucket.previous !== undefined) {
+    remember(capacityState, bucket.previous)
+    bucket.previous.next = bucket.next
+  } else capacityState.first = bucket.next
+  if (bucket.next !== undefined) {
+    remember(capacityState, bucket.next)
+    bucket.next.previous = bucket.previous
+  }
+}
+
+/** Detach one node while retaining the exact bucket until its replacement is known. */
+function unlink(capacityState: IMemoryCapacityContext, node: ICapacityNode): void {
+  remember(capacityState, node)
+  remember(capacityState, node.bucket)
+  if (node.previous !== undefined) {
+    remember(capacityState, node.previous)
+    node.previous.next = node.next
+  } else node.bucket.first = node.next
+  if (node.next !== undefined) {
+    remember(capacityState, node.next)
+    node.next.previous = node.previous
+  } else node.bucket.last = node.previous
+  node.previous = undefined
+  node.next = undefined
+}
+
+/** Append one hit or write as the most recent member of its chosen frequency. */
+function append(
+  capacityState: IMemoryCapacityContext,
+  bucket: ICapacityBucket,
+  node: ICapacityNode
+): void {
+  remember(capacityState, bucket)
+  remember(capacityState, node)
+  node.bucket = bucket
+  node.previous = bucket.last
+  node.next = undefined
+  if (bucket.last !== undefined) {
+    remember(capacityState, bucket.last)
+    bucket.last.next = node
+  } else bucket.first = node
+  bucket.last = node
+}
+
+/** A new physical entry joins minFreq one, without scanning frequency gaps. */
+function initialBucket(capacityState: IMemoryCapacityContext): ICapacityBucket {
+  if (capacityState.first?.frequency === 1) return capacityState.first
+  /** At most one initial bucket is allocated per insertion before an empty one is unlinked. */
+  const bucket: ICapacityBucket = { frequency: 1, next: capacityState.first }
+  if (capacityState.first !== undefined) {
+    remember(capacityState, capacityState.first)
+    capacityState.first.previous = bucket
+  }
+  capacityState.first = bucket
+  return bucket
+}
+
+/** Point hits update LRU or promote exactly one LFU bucket with constant link work. */
+function touch(capacityState: IMemoryCapacityContext, id: string): void {
+  /** Misses never manufacture policy history. */
+  const node = capacityState.nodes.get(id)
+  if (node === undefined) return
+  /** An LRU hit stays in its one bucket; an LFU hit moves only to frequency plus one. */
+  const previous = node.bucket
+  if (capacityState.options.eviction === MemoryEviction.lru) {
+    unlink(capacityState, node)
+    append(capacityState, previous, node)
+    return
+  }
+  /** Adjacent frequency is located directly even if the current bucket becomes empty. */
+  let next = previous.next
+  if (next?.frequency !== previous.frequency + 1) {
+    next = { frequency: previous.frequency + 1, previous, next: previous.next }
+    remember(capacityState, previous)
+    if (previous.next !== undefined) {
+      remember(capacityState, previous.next)
+      previous.next.previous = next
+    }
+    previous.next = next
+  }
+  unlink(capacityState, node)
+  append(capacityState, next, node)
+  unlinkBucket(capacityState, previous)
+}
+
+/** Explicit removal and eviction maintain the same membership and byte owner. */
+function remove(capacityState: IMemoryCapacityContext, id: string): void {
+  /** An absent native identity has no policy side effect. */
+  const node = capacityState.nodes.get(id)
+  if (node === undefined) return
+  rememberId(capacityState, id)
+  unlink(capacityState, node)
+  unlinkBucket(capacityState, node.bucket)
+  capacityState.nodes.delete(id)
+  capacityState.bytes -= node.bytes
+}
+
+/** A put counts one physical entry and treats overwrite as a policy hit. */
+function put(capacityState: IMemoryCapacityContext, entry: IMemoryCapacityEntry): void {
+  /** Existing native identity retains its key and bucket node. */
+  const existing = capacityState.nodes.get(entry.id)
+  if (existing !== undefined) {
+    remember(capacityState, existing)
+    capacityState.bytes += entry.bytes - existing.bytes
+    existing.bytes = entry.bytes
+    touch(capacityState, entry.id)
+    return
+  }
+  rememberId(capacityState, entry.id)
+  /** Initial links contain no borrowed values or native handles. */
+  const node: ICapacityNode = { ...entry, bucket: initialBucket(capacityState) }
+  capacityState.nodes.set(entry.id, node)
+  append(capacityState, node.bucket, node)
+  capacityState.bytes += entry.bytes
+}
+
+/** Native final turns and previews share one exact predicate, including oversized entries. */
+function overLimit(capacityState: IMemoryCapacityContext): boolean {
+  return (
+    (capacityState.options.maxEntries !== undefined &&
+      capacityState.nodes.size > capacityState.options.maxEntries) ||
+    (capacityState.options.maxBytes !== undefined &&
+      capacityState.bytes > capacityState.options.maxBytes)
+  )
+}
+/** Publish native capacity methods over their original policy state. */
+function createCapacityMethods(capacityState: IMemoryCapacityContext): IMemoryCapacityIndex {
   return {
-    touch,
-    put,
-    remove,
+    touch: (id: string) => touch(capacityState, id),
+    put: (entry: IMemoryCapacityEntry) => put(capacityState, entry),
+    remove: (id: string) => remove(capacityState, id),
     /** Metadata clearing is proportional only to the channel entries actually removed by its owner. */
-    clear: () => {
-      nodes.clear()
-      first = undefined
-      bytes = 0
-    },
+    clear: () => memoryCapacityClear(capacityState),
     /**
      * Derive only actual victims from proposed native changes. Restore existing links before
      * returning so waiting, rejected writes and rolled-back transactions cannot leak eviction.
      */
-    preview: (changes: readonly IMemoryCapacityChange[]): readonly IMemoryCapacityEntry[] => {
-      /** The index has no callback or await while this bounded inverse log is active. */
-      const originalFirst = first
-      /** Scalar accounting restores alongside the exact old node objects. */
-      const originalBytes = bytes
-      inverse = new Map()
-      previousNodes = new Map()
-      try {
-        for (const change of changes)
-          if (change.bytes === undefined) remove(change.id)
-          else put({ ...change, bytes: change.bytes })
-        /** Only removed victims are retained; no candidate array is materialized. */
-        const victims: IMemoryCapacityEntry[] = []
-        while (overLimit()) {
-          /** A nonempty over-budget index always has exactly one first linked candidate. */
-          const victim = first!.first!
-          victims.push({
-            id: victim.id,
-            channel: victim.channel,
-            encoded: victim.encoded,
-            key: victim.key,
-            bytes: victim.bytes,
-            lock: victim.lock
-          })
-          remove(victim.id)
-        }
-        return victims
-      } finally {
-        for (const [target, original] of inverse) {
-          /** Undefined links must be restored too, including properties absent from the old node. */
-          Object.assign(target, { previous: undefined, next: undefined }, original)
-        }
-        for (const [id, original] of previousNodes)
-          if (original === undefined) nodes.delete(id)
-          else nodes.set(id, original)
-        first = originalFirst
-        bytes = originalBytes
-        inverse = undefined
-        previousNodes = undefined
-      }
+    preview: (changes: readonly IMemoryCapacityChange[]) =>
+      memoryCapacityPreview(capacityState, changes)
+  }
+}
+
+/** Perform clear on this owner's original linked capacity state. */
+function memoryCapacityClear(capacityState: IMemoryCapacityContext) {
+  capacityState.nodes.clear()
+  capacityState.first = undefined
+  capacityState.bytes = 0
+}
+/** Perform preview on this owner's original linked capacity state. */
+function memoryCapacityPreview(
+  capacityState: IMemoryCapacityContext,
+  changes: readonly IMemoryCapacityChange[]
+): readonly IMemoryCapacityEntry[] {
+  /** The index has no callback or await while this bounded inverse log is active. */
+  const originalFirst = capacityState.first
+  /** Scalar accounting restores alongside the exact old node objects. */
+  const originalBytes = capacityState.bytes
+  capacityState.inverse = new Map()
+  capacityState.previousNodes = new Map()
+  try {
+    for (const change of changes)
+      if (change.bytes === undefined) remove(capacityState, change.id)
+      else put(capacityState, { ...change, bytes: change.bytes })
+    /** Only removed victims are retained; no candidate array is materialized. */
+    const victims: IMemoryCapacityEntry[] = []
+    while (overLimit(capacityState)) {
+      /** A nonempty over-budget index always has exactly one first linked candidate. */
+      const victim = capacityState.first!.first!
+      victims.push({
+        id: victim.id,
+        channel: victim.channel,
+        encoded: victim.encoded,
+        key: victim.key,
+        bytes: victim.bytes,
+        lock: victim.lock
+      })
+      remove(capacityState, victim.id)
     }
+    return victims
+  } finally {
+    for (const [target, original] of capacityState.inverse) {
+      /** Undefined links must be restored too, including properties absent from the old node. */
+      Object.assign(target, { previous: undefined, next: undefined }, original)
+    }
+    for (const [id, original] of capacityState.previousNodes)
+      if (original === undefined) capacityState.nodes.delete(id)
+      else capacityState.nodes.set(id, original)
+    capacityState.first = originalFirst
+    capacityState.bytes = originalBytes
+    capacityState.inverse = undefined
+    capacityState.previousNodes = undefined
   }
 }
