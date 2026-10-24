@@ -11,7 +11,8 @@ export default defineConfig({
         'features/hybrid': 'src/features/hybrid.ts',
         'features/recommend': 'src/features/recommend.ts',
         'features/group-by': 'src/features/group-by.ts',
-        'features/management': 'src/features/management.ts'
+        'features/management': 'src/features/management.ts',
+        'features/rescore': 'src/features/rescore.ts'
       },
       formats: ['es'],
       fileName: (_format, name) => `${name}.js`

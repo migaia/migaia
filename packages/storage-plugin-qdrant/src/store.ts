@@ -71,7 +71,13 @@ import { QdrantErrorCode } from './error-code.js'
 import { nativeId } from './id.js'
 import { encodePointPayload, decodePointPayload, assertPointPayload } from './envelope.js'
 import { nativeCondition, orgFilter, type IQdrantFilter } from './filter.js'
-import { collectionVectors, readCollectionConfiguration } from './schema.js'
+import { collectionVectors, readCollectionConfiguration, readCollectionRescore } from './schema.js'
+import { snapshotRescoreVector, snapshotRescorePoints } from './feature-input.js'
+import type {
+  IQdrantRescoreConfiguration,
+  IQdrantRescoreVector,
+  IQdrantRescorePoint
+} from './feature-types.js'
 import { nativeFeaturePort, type IQdrantNativeFeaturePort } from './native-feature.js'
 import type {
   IQdrantBase,
@@ -86,7 +92,11 @@ import type {} from './hooks.js'
 type ICollectionState = {
   readonly name: string
   configuration?: IStorageVectorConfiguration
-  resolved?: Promise<{ name: string; configuration: IStorageVectorConfiguration }>
+  resolved?: Promise<{
+    name: string
+    configuration: IStorageVectorConfiguration
+    rescore?: IQdrantRescoreConfiguration[string]
+  }>
 }
 /** Genuine missing native methods never become a fabricated fallback transport. */
 function unsupported(): never {
@@ -132,7 +142,8 @@ function vectorCondition(
 /** Install the existing controller, lifecycle and immutable organization projection owners. */
 export function createQdrantBackend(
   options: IQdrantOptions & { readonly http: IQdrantHttp; readonly collectionPrefix: string },
-  core: IStoragePluginCore
+  core: IStoragePluginCore,
+  rescore?: IQdrantRescoreConfiguration
 ) {
   const resources = createLifecycleScope(),
     collections = new Map<string, ICollectionState>(),
@@ -144,6 +155,38 @@ export function createQdrantBackend(
     namespace = nativeId([options.collectionPrefix]).then((hash) => QdrantText.prefix + hash + '_')
   let detected = false,
     symbolic: Promise<void> | undefined
+  /** A captured installation schema is shared by organizations, never registered per point. */
+  const rescoreSlot = (name: string) =>
+    rescore && Object.hasOwn(rescore, name) ? rescore[name] : undefined
+  /** Dense and matrix admission stays with the existing dense-vector snapshot owner. */
+  const admitRescore = (
+    value: IQdrantRescoreVector,
+    slot: IQdrantRescoreConfiguration[string]
+  ): number[] | number[][] => {
+    const matrix = Array.isArray(value[0])
+    if (matrix !== (slot.multivector !== undefined)) throw invalidArgument()
+    if (matrix)
+      return (value as readonly (readonly number[])[]).map((row) => [
+        ...snapshotStorageVector(row, slot, QdrantText.backend)
+      ])
+    return [...snapshotStorageVector(value as readonly number[], slot, QdrantText.backend)]
+  }
+  /** Missing or incompatible slots isolate only the new Feature, never the standard collection. */
+  const requireRescore = (
+    name: string,
+    actual: IQdrantRescoreConfiguration[string] | undefined
+  ) => {
+    const selected = rescoreSlot(name)
+    if (
+      !selected ||
+      !actual ||
+      selected.dimensions !== actual.dimensions ||
+      selected.metric !== actual.metric ||
+      selected.multivector !== actual.multivector
+    )
+      unsupported()
+    return selected
+  }
   const report = (error: unknown): void => {
     core.stageBindings.backendStages.report(error)
   }
@@ -299,7 +342,7 @@ export function createQdrantBackend(
           try {
             await send(
               'createCollection',
-              [name, { vectors: collectionVectors(state.configuration) }],
+              [name, { vectors: collectionVectors(state.configuration, rescoreSlot(state.name)) }],
               ctx
             )
           } catch (cause) {
@@ -352,7 +395,7 @@ export function createQdrantBackend(
             ],
             ctx
           )
-        return { name, configuration }
+        return { name, configuration, rescore: readCollectionRescore(info) }
       })().catch((error) => {
         state.resolved = undefined
         throw error
@@ -493,6 +536,7 @@ export function createQdrantBackend(
         {
           exact,
           origin,
+          ...(rescore === undefined ? {} : { native: true as const }),
           beginOperation: () => controller.beginMutation(),
           groupBy: true,
           pushdown: {
@@ -523,7 +567,35 @@ export function createQdrantBackend(
             })
             const load = () =>
               run(QdrantText.search, input, input.ctx, false, async (next, context) => {
-                const { name, configuration } = await resolveCollection(state, context)
+                /** Pipeline replacements are captured before schema reads or native ranking. */
+                const refinement = next.native
+                const native =
+                  refinement === undefined
+                    ? undefined
+                    : capture(() => {
+                        const { kind, query, topN } = refinement as {
+                          kind: unknown
+                          query: IQdrantRescoreVector
+                          topN: number
+                        }
+                        if (
+                          kind !== QdrantText.rescore ||
+                          !Number.isSafeInteger(topN) ||
+                          topN < 1 ||
+                          topN > next.topK
+                        )
+                          throw invalidArgument()
+                        const selected = rescoreSlot(state.name)
+                        if (!selected) unsupported()
+                        return { query: admitRescore(snapshotRescoreVector(query), selected), topN }
+                      })
+                const {
+                  name,
+                  configuration,
+                  rescore: actualSlot
+                } = await resolveCollection(state, context)
+                const extra =
+                  native === undefined ? undefined : requireRescore(state.name, actualSlot)
                 if (metric !== undefined && metric !== configuration.metric) unsupported()
                 const now = Date.now(),
                   selected = await resolve(name, configuration, context, now)
@@ -545,12 +617,34 @@ export function createQdrantBackend(
                     [
                       name,
                       {
-                        query: [...direction],
-                        using: QdrantManagedVectorName.search,
+                        query: native?.query ?? [...direction],
+                        using:
+                          native === undefined
+                            ? QdrantManagedVectorName.search
+                            : QdrantManagedVectorName.rescore,
                         filter,
-                        params: { exact },
-                        limit: next.topK,
-                        ...(next.minScore === undefined
+                        params: { exact: native === undefined ? exact : true },
+                        limit: native?.topN ?? next.topK,
+                        ...(native === undefined
+                          ? {}
+                          : {
+                              prefetch: {
+                                query: [...direction],
+                                using: QdrantManagedVectorName.search,
+                                filter,
+                                params: { exact },
+                                limit: next.topK,
+                                ...(next.minScore === undefined
+                                  ? {}
+                                  : {
+                                      score_threshold:
+                                        configuration.metric === 'euclid'
+                                          ? -next.minScore
+                                          : next.minScore
+                                    })
+                              }
+                            }),
+                        ...(native !== undefined || next.minScore === undefined
                           ? {}
                           : {
                               score_threshold:
@@ -579,7 +673,10 @@ export function createQdrantBackend(
                     row.id,
                     {
                       id: row.id,
-                      score: configuration.metric === 'euclid' ? -point.score : point.score,
+                      score:
+                        (extra?.metric ?? configuration.metric) === 'euclid'
+                          ? -point.score
+                          : point.score,
                       ...(row.payload === undefined ? {} : { payload: row.payload as TPayload }),
                       ...(next.withVector ? { vector: sample(point, configuration) } : {})
                     }
@@ -935,6 +1032,39 @@ export function createQdrantBackend(
     }
     Object.defineProperty(base, nativeFeaturePort, {
       value: {
+        updateRescoreVectors: (
+          collection: string,
+          points: readonly IQdrantRescorePoint[],
+          ctx?: IOperationContext
+        ) => {
+          if (typeof http[QdrantRoute.updateVectors.name] !== 'function') unsupported()
+          const selected = rescoreSlot(collection)
+          if (!selected) unsupported()
+          for (const point of points) admitRescore(point.vector, selected)
+          return run(QdrantText.rescore, points, ctx, true, async (input, context) => {
+            const prepared = snapshotRescorePoints(input)
+            const vectors = prepared.map((point) => admitRescore(point.vector, selected))
+            const state = collections.get(collection) ?? { name: collection }
+            const resolved = await resolveCollection(state, context)
+            requireRescore(collection, resolved.rescore)
+            return send(
+              QdrantRoute.updateVectors.name,
+              [
+                resolved.name,
+                {
+                  points: await Promise.all(
+                    prepared.map(async (point, index) => ({
+                      id: await nativeId([orgId, point.id]),
+                      vector: { [QdrantManagedVectorName.rescore]: vectors[index]! }
+                    }))
+                  ),
+                  wait: true
+                }
+              ],
+              context
+            )
+          })
+        },
         run: <K extends IQdrantOperationName>(
           operation: K,
           args: readonly unknown[],

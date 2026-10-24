@@ -1843,7 +1843,8 @@
       "./features/hybrid": ["qdrantHybridFeature"],
       "./features/recommend": ["qdrantRecommendFeature"],
       "./features/group-by": ["qdrantGroupByFeature"],
-      "./features/management": ["qdrantManagementFeature"]
+      "./features/management": ["qdrantManagementFeature"],
+      "./features/rescore": ["qdrantRescoreFeature"]
     },
     "@migaia/storage-plugin-redis": {
       ".": ["ERROR_SOURCE", "RedisErrorCode", "redisBackendKind", "redisBackendPlugin"],
