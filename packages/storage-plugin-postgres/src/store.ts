@@ -307,7 +307,7 @@ export async function createPostgresStore<T>(
           const input = prepare()
           if (empty?.when(input)) return empty.value
           return runtime.execution.run(
-            { operation, input, ctx: state.ctx, scope: current },
+            { operation, input, ctx: state.ctx, scope: current, internal: true },
             (actual) => {
               throwIfAborted(state.ctx?.signal)
               return observed(
@@ -471,7 +471,8 @@ export async function createPostgresStore<T>(
                   operation: PgOperation.next,
                   input: { range: captured },
                   ctx: engine.stateFor(current).ctx,
-                  scope: current
+                  scope: current,
+                  internal: true
                 },
                 () => advance(engine.stateFor(current))
               ),
