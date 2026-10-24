@@ -129,7 +129,7 @@ export function validateBranch(
   }
   if (sparse && Object.hasOwn(sparse, name)) {
     if (Array.isArray(query)) throw invalidArgument()
-    if (typeof query === 'object' && query !== null && !Array.isArray(query) && 'indices' in query)
+    if (typeof query === 'object' && query !== null && 'indices' in query)
       validateSparse(query as Schemas['SparseVector'])
     return true
   }
