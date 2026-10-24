@@ -1,9 +1,256 @@
 import { describe, expect, it } from 'vitest'
 import { createStorageHost, memoryBackendPlugin, definePlugin } from '@migaia/storage-host'
 import { blob, records, ttl, lockKey } from '@migaia/storage-contract'
+import { createManualScheduler } from '@migaia/utils/testing'
 import { cachePlugin } from '../src/index.js'
 
 describe('cache policy composition', () => {
+  it('loads exactly four absent batch keys while preserving three-tier provenance and an existing flight', async () => {
+    const calls: { backendId: string; operation: string; input: unknown }[] = []
+    const observer = definePlugin('mixed-batch', (core) => ({
+      install() {
+        core.useAsyncPipeline((input, next) => {
+          calls.push({ backendId: input.backendId, operation: input.operation, input: input.input })
+          return next(input)
+        })
+        return {}
+      }
+    }))
+    const base = await createStorageHost({
+      plugins: [
+        memoryBackendPlugin({ id: 'zero' }),
+        memoryBackendPlugin({ id: 'one' }),
+        memoryBackendPlugin({ id: 'two' }),
+        observer
+      ]
+    })
+    const host = await base.use(
+      cachePlugin({
+        propagate: false,
+        tiers: [{ backend: 'zero' }, { backend: 'one' }, { backend: 'two' }]
+      })
+    )
+    await host.detect()
+    try {
+      const cache = host.backend('cache'),
+        keys = Array.from({ length: 10 }, (_, index) => 'key' + index)
+      const raw = (key: string) =>
+        JSON.stringify({
+          v: 1,
+          s: 'hit',
+          t: 'c',
+          d: JSON.stringify(key),
+          w: Date.now(),
+          m: { seed: true },
+          g: []
+        })
+      for (const key of keys.slice(0, 3))
+        await base.backend('zero').set('cache:cache:' + key, raw(key))
+      for (const key of keys.slice(3, 5))
+        await base.backend('one').set('cache:cache:' + key, raw(key))
+      expect(await cache.peek(keys[3]!)).toMatchObject({
+        value: keys[3],
+        tier: 1,
+        stale: false,
+        negative: false,
+        meta: { seed: true }
+      })
+      expect(await base.backend('zero').get('cache:cache:' + keys[3])).toBeNull()
+      let began!: () => void,
+        finishFlight!: () => void,
+        finishBatch!: () => void,
+        batchBegan!: () => void
+      const entered = new Promise<void>((resolve) => {
+          began = resolve
+        }),
+        gate = new Promise<void>((resolve) => {
+          finishFlight = resolve
+        }),
+        batchGate = new Promise<void>((resolve) => {
+          finishBatch = resolve
+        }),
+        batchEntered = new Promise<void>((resolve) => {
+          batchBegan = resolve
+        })
+      const flight = cache.getOrLoad(keys[5]!, async () => {
+        began()
+        await gate
+        return keys[5]!
+      })
+      await entered
+      calls.length = 0
+      let loads = 0
+      const batch = cache.getOrLoadMany(keys, async (missing) => {
+        loads++
+        expect(missing).toEqual(keys.slice(6))
+        batchBegan()
+        await batchGate
+        return new Map(missing.map((key) => [key, key]))
+      })
+      await batchEntered
+      const single = cache.getOrLoad(keys[6]!, async () => 'wrong')
+      finishBatch()
+      finishFlight()
+      expect(await batch).toEqual(new Map(keys.map((key) => [key, key])))
+      expect(await single).toBe(keys[6])
+      expect(await flight).toBe(keys[5])
+      expect(loads).toBe(1)
+      for (const [id, writes] of [
+        ['zero', 2],
+        ['one', 1],
+        ['two', 1]
+      ] as const) {
+        expect(
+          calls.filter((item) => item.backendId === id && item.operation === 'getMany')
+        ).toHaveLength(1)
+        expect(
+          calls.filter((item) => item.backendId === id && item.operation === 'setMany')
+        ).toHaveLength(writes)
+      }
+      const zeroWrites = calls.filter(
+        (item) => item.backendId === 'zero' && item.operation === 'setMany'
+      )
+      expect((zeroWrites[0]!.input as { key: string }[]).map((item) => item.key)).toEqual(
+        keys.slice(3, 5).map((key) => 'cache:cache:' + key)
+      )
+      expect((zeroWrites[1]!.input as { key: string }[]).map((item) => item.key)).toEqual(
+        keys.slice(6).map((key) => 'cache:cache:' + key)
+      )
+      const primary = new RangeError('four-key batch source rejected')
+      let reject!: (error: Error) => void, failedBegan!: () => void
+      const failedEntered = new Promise<void>((resolve) => {
+          failedBegan = resolve
+        }),
+        rejected = new Promise<ReadonlyMap<string, string>>((_resolve, fail) => {
+          reject = fail
+        })
+      const missing = ['failed-a', 'failed-b', 'failed-c', 'failed-d']
+      const failed = cache.getOrLoadMany(missing, async () => {
+        failedBegan()
+        return rejected
+      })
+      const batchFailure = expect(failed).rejects.toMatchObject({
+        code: 'CACHE_LOAD_FAILED',
+        cause: primary
+      })
+      await failedEntered
+      const joined = missing.map((key) =>
+        expect(cache.getOrLoad(key, async () => 'wrong')).rejects.toMatchObject({
+          code: 'CACHE_LOAD_FAILED',
+          cause: primary
+        })
+      )
+      await new Promise((resolve) => setTimeout(resolve, 5))
+      reject(primary)
+      await Promise.all([batchFailure, ...joined])
+      for (const key of missing) expect(await cache.peek(key)).toBeUndefined()
+      expect(await cache.getOrLoad(missing[0]!, async () => 'retry')).toBe('retry')
+    } finally {
+      await host.dispose()
+    }
+  })
+  it('samples bounded varied TTLs and applies size limits without exposing custom encrypted values', async () => {
+    const scheduler = createManualScheduler(),
+      key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 128 }, false, [
+        'encrypt',
+        'decrypt'
+      ])
+    let sample = 0
+    const base = await createStorageHost({
+      scheduler,
+      plugins: [memoryBackendPlugin({ id: 'small' }), memoryBackendPlugin({ id: 'full' })]
+    })
+    const host = await base.use(
+      cachePlugin({
+        propagate: false,
+        clock: () => 10000,
+        jitterRatio: 0.2,
+        random: () => (sample++ % 20) / 19,
+        tiers: [
+          { backend: 'small', ttlMs: 1000, maxEntryBytes: 256 },
+          { backend: 'full', ttlMs: 1000 }
+        ],
+        codec: {
+          name: 'application-aes-gcm',
+          output: 'text',
+          async encode(value) {
+            const iv = crypto.getRandomValues(new Uint8Array(12)),
+              encrypted = new Uint8Array(
+                await crypto.subtle.encrypt(
+                  { name: 'AES-GCM', iv },
+                  key,
+                  new TextEncoder().encode(JSON.stringify(value))
+                )
+              )
+            return Buffer.concat([iv, encrypted]).toString('base64')
+          },
+          async decode(raw) {
+            const bytes = new Uint8Array(Buffer.from(raw, 'base64'))
+            return JSON.parse(
+              new TextDecoder().decode(
+                await crypto.subtle.decrypt(
+                  { name: 'AES-GCM', iv: bytes.slice(0, 12) },
+                  key,
+                  bytes.slice(12)
+                )
+              )
+            )
+          }
+        }
+      })
+    )
+    await host.detect()
+    try {
+      const cache = host.backend('cache'),
+        durations: number[] = []
+      for (let index = 0; index < 20; index++) {
+        await cache.getOrLoad('jitter' + index, async () => ({ secret: 'private-answer' }))
+        const duration = await base
+          .backend('full')
+          .use(ttl)
+          .remaining(lockKey.text('cache:cache:jitter' + index))
+        durations.push(duration!)
+        expect(duration).toBeGreaterThanOrEqual(800)
+        expect(duration).toBeLessThanOrEqual(1000)
+        for (const id of ['small', 'full'] as const)
+          expect(await base.backend(id).get('cache:cache:jitter' + index)).not.toContain(
+            'private-answer'
+          )
+      }
+      expect(new Set(durations).size).toBeGreaterThan(1)
+      const before = cache.stats().skipped[0]!
+      const large = { secret: 'private-answer'.repeat(100) }
+      expect(await cache.getOrLoad('large', async () => large)).toEqual(large)
+      expect(await base.backend('small').get('cache:cache:large')).toBeNull()
+      expect(await base.backend('full').get('cache:cache:large')).not.toContain('private-answer')
+      expect(cache.stats().skipped[0]).toBe(before + 1)
+      expect((await cache.peek<typeof large>('large'))?.value).toEqual(large)
+      await cache.getOrLoad('short', async () => 'short', { ttlMs: 100 })
+      scheduler.advance(101)
+      expect(await cache.peek('short')).toBeUndefined()
+      expect((await cache.peek('jitter0'))?.value).toEqual({ secret: 'private-answer' })
+      let loads = 0
+      const results = await Promise.all(
+        Array.from({ length: 5 }, () =>
+          cache.getOrLoad(
+            'uncached',
+            async () => {
+              loads++
+              await new Promise((resolve) => setTimeout(resolve, 5))
+              return undefined
+            },
+            { cacheIf: () => false, negativeTtlMs: 10 }
+          )
+        )
+      )
+      expect(results).toEqual(Array(5).fill(undefined))
+      expect(loads).toBe(1)
+      for (const id of ['small', 'full'] as const)
+        expect(await base.backend(id).get('cache:cache:uncached')).toBeNull()
+    } finally {
+      await host.dispose()
+    }
+  })
   it('uses one native batch per layer and joins a single-key caller to the same batch source', async () => {
     const calls: { backendId: string; operation: string }[] = []
     const observer = definePlugin('observer', (core) => ({
@@ -74,6 +321,19 @@ describe('cache policy composition', () => {
       expect(
         calls.filter((call) => call.operation === 'getMany' && call.backendId === 'slow')
       ).toHaveLength(0)
+      calls.length = 0
+      expect(await cache.getOrLoad('a', async () => 'refreshed', { mode: 'refresh' })).toBe(
+        'refreshed'
+      )
+      expect(
+        calls.filter(
+          (call) =>
+            ['fast', 'slow'].includes(call.backendId) && ['get', 'getMany'].includes(call.operation)
+        )
+      ).toEqual([])
+      calls.length = 0
+      expect(await cache.getOrLoad('a', async () => 'bypass', { mode: 'bypass' })).toBe('bypass')
+      expect(calls.filter((call) => ['fast', 'slow'].includes(call.backendId))).toEqual([])
     } finally {
       await host.dispose()
     }
@@ -93,15 +353,16 @@ describe('cache policy composition', () => {
     try {
       const cache = host.backend('cache')
       await cache.getOrLoad('a', async () => ({ answer: 1 }), {
-        tags: ['doc:1', 'doc:2'],
+        tags: ['doc:1'],
         meta: { model: 'm' }
       })
-      await cache.getOrLoad('b', async () => ({ answer: 2 }), { tags: ['doc:2'] })
+      await cache.getOrLoad('b', async () => ({ answer: 2 }), { tags: ['doc:1', 'doc:2'] })
+      await cache.getOrLoad('c', async () => ({ answer: 3 }), { tags: ['doc:2'] })
       expect(await cache.peek('a')).toMatchObject({
-        tags: ['doc:1', 'doc:2'],
+        tags: ['doc:1'],
         meta: { model: 'm' }
       })
-      expect(await host.backend('tags').use(records).query().count()).toBe(3)
+      expect(await host.backend('tags').use(records).query().count()).toBe(4)
       expect(
         await host
           .backend('tags')
@@ -110,28 +371,43 @@ describe('cache policy composition', () => {
       ).toBeGreaterThan(0)
       await cache.invalidate({ tag: 'doc:1' })
       expect(await cache.peek('a')).toBeUndefined()
-      expect((await cache.peek('b'))?.value).toEqual({ answer: 2 })
+      expect(await cache.peek('b')).toBeUndefined()
+      expect((await cache.peek('c'))?.value).toEqual({ answer: 3 })
+      const remaining = host.backend('tags').iterateRecords({
+        lower: ['cache:cache:', 'doc:1'],
+        upper: ['cache:cache:', 'doc:1', new ArrayBuffer(0)],
+        upperOpen: true
+      })
+      try {
+        expect(await remaining.next()).toMatchObject({ done: true })
+      } finally {
+        await remaining.dispose()
+      }
     } finally {
       await host.dispose()
     }
   })
   it('offloads full encoded content, reuses native content hash and deletes references independently', async () => {
     let now = Date.now()
+    const reports: unknown[] = []
     const base = await createStorageHost({
+      report: (error) => {
+        reports.push(error)
+      },
       plugins: [memoryBackendPlugin({ id: 'tier' }), memoryBackendPlugin({ id: 'objects' })]
     })
     const host = await base.use(
       cachePlugin({
         propagate: false,
         clock: () => now,
-        tiers: [{ backend: 'tier', ttlMs: 1000, offload: { backend: 'objects', minBytes: 1 } }]
+        tiers: [{ backend: 'tier', ttlMs: 1000, offload: { backend: 'objects', minBytes: 1024 } }]
       })
     )
     await host.detect()
     try {
       const cache = host.backend('cache'),
         objects = host.backend('objects').use(blob)
-      const value = { answer: 'large'.repeat(100) }
+      const value = { answer: 'large'.repeat(410) }
       expect(await cache.getOrLoad('a', async () => value)).toEqual(value)
       const raw = JSON.parse((await host.backend('tier').get('cache:cache:a'))!)
       expect(raw.d).toMatchObject({
@@ -140,6 +416,23 @@ describe('cache policy composition', () => {
       })
       expect((await objects.list({ prefix: 'cache:cache:' })).items).toHaveLength(1)
       expect((await cache.peek('a'))?.value).toEqual(value)
+      await cache.getOrLoad('small', async () => 'x'.repeat(512))
+      expect(typeof JSON.parse((await host.backend('tier').get('cache:cache:small'))!).d).toBe(
+        'string'
+      )
+      expect((await objects.list({ prefix: 'cache:cache:' })).items).toHaveLength(1)
+      expect(await cache.sweepOffload()).toBe(0)
+      expect((await cache.peek('a'))?.value).toEqual(value)
+      await objects.remove(raw.d.$blob)
+      let reloads = 0
+      expect(
+        await cache.getOrLoad('a', async () => {
+          reloads++
+          return value
+        })
+      ).toEqual(value)
+      expect(reloads).toBe(1)
+      expect(reports).toEqual([expect.objectContaining({ code: 'INVALID_ARGUMENT' })])
       await cache.invalidate('a')
       expect((await objects.list({ prefix: 'cache:cache:' })).items).toHaveLength(1)
       now += 2000
@@ -249,7 +542,7 @@ describe('cache policy composition', () => {
         undefined,
         undefined
       ])
-      expect(reports.length).toBeGreaterThan(0)
+      expect(reports).toHaveLength(3)
     } finally {
       await host.dispose()
     }
@@ -308,6 +601,19 @@ describe('cache policy composition', () => {
         meta: { original: true },
         ageMs: expect.any(Number)
       })
+      expect(
+        await cache.getOrLoad(
+          'a',
+          async () => {
+            loads++
+            return 'actual-background-refresh'
+          },
+          { staleAfterMs: 1 }
+        )
+      ).toBe('existing')
+      await new Promise((resolve) => setTimeout(resolve, 5))
+      expect(loads).toBe(1)
+      expect((await cache.peek('a'))?.value).toBe('actual-background-refresh')
     } finally {
       await host.dispose()
     }

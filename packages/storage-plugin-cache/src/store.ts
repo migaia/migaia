@@ -529,13 +529,13 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
       return undefined
     }
     /** Invalidations detach the original flight rather than retaining generations outside its Map. */
-    const supersede = (matches: (key: string) => boolean): void => {
+    const supersede = (matches: (key: string) => boolean, clearPending = true): void => {
       for (const [key, flight] of inflight)
         if (matches(key)) {
           flight.superseded = true
           inflight.delete(key)
         }
-      for (const key of pending.keys()) if (matches(key)) pending.delete(key)
+      if (clearPending) for (const key of pending.keys()) if (matches(key)) pending.delete(key)
     }
     /** One source failure is shared by all joined callers and never stored as a negative result. */
     const callLoader = async (
@@ -700,7 +700,8 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
       upto = tiers.length,
       strict = false
     ): Promise<number> => {
-      supersede((value) => (prefix ? value.startsWith(key) : value === key))
+      /** Propagation touches only through tiers above its feed; lower back facts keep their owner. */
+      supersede((value) => (prefix ? value.startsWith(key) : value === key), upto === tiers.length)
       let removed = 0,
         first: unknown
       for (let index = 0; index < upto; index++) {

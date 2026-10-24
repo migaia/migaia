@@ -1,6 +1,13 @@
 import { describe, it, expect } from 'vitest'
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
-import { kv, ttl, lockKey } from '@migaia/storage-contract'
+import {
+  createStorageHost,
+  memoryBackendPlugin,
+  definePlugin,
+  defineStorageBackendKind,
+  type IStoragePluginCore
+} from '@migaia/storage-host'
+import { kv, ttl, lockKey, type IStorageBase } from '@migaia/storage-contract'
+import { IdentifyError, walkErrorCauses } from '@migaia/utils/error'
 import { cachePlugin, CacheErrorCode, type ICacheOptions } from '../src/index.js'
 
 /** Every case owns fresh native memory tiers and an independently installed cache. */
@@ -25,6 +32,437 @@ async function fixture(options: Partial<ICacheOptions> = {}) {
 }
 
 describe('borrowed multi-tier cache', () => {
+  it('admits only earlier capable tiers and keeps independently configured cache prefixes separate', async () => {
+    const invalid: Partial<ICacheOptions>[] = [
+      { tiers: [{ backend: 'a' }, { backend: 'a' }] },
+      { tiers: [{ backend: 'a', write: 'back' }] },
+      { tiers: [{ backend: 'a', ttlMs: 1.5 }] },
+      { tiers: [{ backend: 'a', ttlMs: 0 }] },
+      { maxAgeMs: 100, staleAfterMs: 100 },
+      { tiers: [{ backend: 'a', offload: { backend: 'objects', minBytes: 1024 } }] }
+    ]
+    for (const options of invalid) {
+      const host = await createStorageHost({ plugins: [memoryBackendPlugin({ id: 'a' })] })
+      try {
+        expect(() => cachePlugin({ tiers: [{ backend: 'a' }], ...options })).toThrowError(
+          expect.objectContaining({ source: 'storage.backend.cache', code: 'CACHE_TIER_INVALID' })
+        )
+      } finally {
+        await host.dispose()
+      }
+    }
+    for (const options of [
+      { tiers: [{ backend: 'a' }, { backend: 'b' }] },
+      { tiers: [{ backend: 'a', ttlMs: 100, write: 'back' as const }, { backend: 'b' }] }
+    ] as const) {
+      const host = await createStorageHost({
+        plugins: [memoryBackendPlugin({ id: 'a' }), memoryBackendPlugin({ id: 'b' })]
+      })
+      try {
+        const failure = await host.use(cachePlugin(options)).catch((error) => error)
+        expect(walkErrorCauses(failure)).toContainEqual(
+          expect.objectContaining({
+            source: 'storage.backend.cache',
+            code: 'CACHE_TIER_INVALID',
+            tier: 0
+          })
+        )
+      } finally {
+        await host.dispose()
+      }
+    }
+    for (const sameBatch of [false, true]) {
+      const host = await createStorageHost()
+      try {
+        const plugin = cachePlugin({ tiers: [{ backend: 'future' }] })
+        const failure = await (
+          sameBatch ? host.use(memoryBackendPlugin({ id: 'future' }), plugin) : host.use(plugin)
+        ).catch((error) => error)
+        expect(walkErrorCauses(failure)).toContainEqual(
+          expect.objectContaining({ code: 'BACKEND_NOT_INSTALLED' })
+        )
+      } finally {
+        await host.dispose()
+      }
+    }
+    const emptyKind = defineStorageBackendKind<IStorageBase, undefined>()('empty')
+    const raw = definePlugin('empty', (core: IStoragePluginCore) => ({
+      kind: emptyKind,
+      featureExpose: () => ({ getClient: () => undefined }),
+      install() {
+        core.registerStore({
+          backend: 'empty',
+          capabilities: {
+            syncRead: false,
+            binary: false,
+            records: false,
+            transactions: false,
+            iteration: false,
+            secondaryIndexes: false,
+            changeFeed: false,
+            maxValueBytes: undefined,
+            opaqueEntries: false
+          },
+          dispose: async () => {},
+          [Symbol.asyncDispose]: async () => {}
+        })
+        return {}
+      }
+    }))
+    const host = await createStorageHost({ plugins: [memoryBackendPlugin({ id: 'a' }), raw] })
+    try {
+      const failure = await host
+        .use(cachePlugin({ propagate: false, tiers: [{ backend: 'a' }, { backend: 'empty' }] }))
+        .catch((error) => error)
+      const missing = walkErrorCauses(failure).find(
+        (error) => IdentifyError.identityOf(error)?.code === 'UNSUPPORTED_CAPABILITY'
+      )
+      expect(missing).toMatchObject({
+        source: '@migaia/storage-contract',
+        code: 'UNSUPPORTED_CAPABILITY',
+        message: expect.stringContaining('1')
+      })
+      const inner = await host.use(
+        cachePlugin({ id: 'inner', propagate: false, tiers: [{ backend: 'a' }] })
+      )
+      for (const options of [
+        { tiers: [{ backend: 'inner', ttlMs: 10 }] },
+        { tiers: [{ backend: 'inner' }], stampedeLock: { backend: 'inner' } }
+      ] as const) {
+        const error = await inner
+          .use(cachePlugin({ propagate: false, ...options }))
+          .catch((value) => value)
+        expect(walkErrorCauses(error)).toContainEqual(
+          expect.objectContaining({
+            code: 'UNSUPPORTED_CAPABILITY',
+            message: expect.stringContaining('0')
+          })
+        )
+      }
+      const configured = await host.use(
+        cachePlugin({ id: 'one', prefix: 'one:', propagate: false, tiers: [{ backend: 'a' }] }),
+        cachePlugin({ id: 'two', prefix: 'two:', propagate: false, tiers: [{ backend: 'a' }] })
+      )
+      await configured.detect()
+      await configured.backend('one').set('same', 'first')
+      await configured.backend('two').set('same', 'second')
+      expect(await configured.backend('one').get('same')).toBe('first')
+      expect(await configured.backend('two').get('same')).toBe('second')
+      expect(() =>
+        configured.backend('one').getOrLoad('tag', async () => 'value', { tags: ['doc'] })
+      ).toThrowError(expect.objectContaining({ code: 'CACHE_TIER_INVALID' }))
+    } finally {
+      await host.dispose()
+    }
+  })
+  it('coalesces thirty callers for each of three independent keys', async () => {
+    const { host, cache } = await fixture()
+    try {
+      const loads = [0, 0, 0]
+      const results = await Promise.all(
+        [0, 1, 2].flatMap((key) =>
+          Array.from({ length: 30 }, () =>
+            cache.getOrLoad('key' + key, async () => {
+              loads[key]!++
+              await new Promise((resolve) => setTimeout(resolve, 5))
+              return key
+            })
+          )
+        )
+      )
+      expect(loads).toEqual([1, 1, 1])
+      expect(results).toEqual([0, 1, 2].flatMap((key) => Array(30).fill(key)))
+    } finally {
+      await host.dispose()
+    }
+  })
+  it('keeps stale data after background failure and expires negative entries without caching failures', async () => {
+    let now = 1000
+    const reports: unknown[] = []
+    const base = await createStorageHost({
+      report: (error) => {
+        reports.push(error)
+      },
+      plugins: [memoryBackendPlugin({ id: 'tier' })]
+    })
+    const host = await base.use(
+      cachePlugin({
+        propagate: false,
+        clock: () => now,
+        maxAgeMs: 100,
+        staleAfterMs: 20,
+        negativeTtlMs: 10,
+        tiers: [{ backend: 'tier' }]
+      })
+    )
+    await host.detect()
+    try {
+      const cache = host.backend('cache'),
+        original = new RangeError('background source failed')
+      await cache.getOrLoad('stale', async () => 'old')
+      now += 21
+      expect(
+        await cache.getOrLoad('stale', async () => {
+          throw original
+        })
+      ).toBe('old')
+      await new Promise((resolve) => setTimeout(resolve, 5))
+      expect(reports).toEqual([
+        expect.objectContaining({ code: 'CACHE_LOAD_FAILED', cause: original })
+      ])
+      expect((await cache.peek('stale'))?.value).toBe('old')
+      let loads = 0
+      const missing = async () => {
+        loads++
+        return undefined
+      }
+      await cache.getOrLoad('negative', missing)
+      await cache.getOrLoad('negative', missing)
+      expect(loads).toBe(1)
+      now += 11
+      await cache.getOrLoad('negative', missing)
+      expect(loads).toBe(2)
+      now = 1101
+      expect(await cache.getOrLoad('stale', async () => 'new')).toBe('new')
+      const unbounded = await host.use(
+        cachePlugin({ id: 'no-negative', propagate: false, tiers: [{ backend: 'tier' }] })
+      )
+      await unbounded.detect()
+      const noNegative = unbounded.backend('no-negative')
+      await noNegative.getOrLoad('missing', missing)
+      await noNegative.getOrLoad('missing', missing)
+      expect(loads).toBe(4)
+    } finally {
+      await host.dispose()
+    }
+  })
+  it('drops each failed back write once and never flushes invalidated pending values', async () => {
+    let writes = 0
+    const reports: unknown[] = [],
+      original = new RangeError('back write failed')
+    const observer = definePlugin('back-errors', (core) => ({
+      install() {
+        core.useAsyncPipeline((input, next) => {
+          if (input.backendId === 'fast' && input.operation === 'set') {
+            writes++
+            throw original
+          }
+          return next(input)
+        })
+        return {}
+      }
+    }))
+    const base = await createStorageHost({
+      report: (error) => {
+        reports.push(error)
+      },
+      plugins: [memoryBackendPlugin({ id: 'fast' }), memoryBackendPlugin({ id: 'slow' }), observer]
+    })
+    const host = await base.use(
+      cachePlugin({
+        propagate: false,
+        writeBackIntervalMs: 10000,
+        tiers: [{ backend: 'fast', write: 'back', ttlMs: 10000 }, { backend: 'slow' }]
+      })
+    )
+    await host.detect()
+    const dropped: unknown[] = []
+    host.hooks.on('onCacheWriteBackDropped', (event) => {
+      dropped.push(event)
+    })
+    try {
+      const cache = host.backend('cache')
+      await cache.set('a', 'one')
+      await cache.set('a', 'two')
+      await cache.flush()
+      await cache.flush()
+      expect(writes).toBe(1)
+      expect(cache.stats().writeBackDropped).toBe(1)
+      expect(dropped).toEqual([expect.objectContaining({ tier: 0, count: 1 })])
+      expect(reports).toContain(original)
+      await cache.set('removed', 'value')
+      await cache.remove('removed')
+      await cache.set('prefix:a', 'value')
+      await cache.invalidate({ prefix: 'prefix:' })
+      await cache.set('cleared', 'value')
+      await cache.clearAll()
+      await cache.flush()
+      expect(writes).toBe(1)
+      expect(await base.backend('slow').keys()).toEqual([])
+    } finally {
+      await host.dispose()
+    }
+  })
+  it('reports corrupt reads and native tier failures while keeping exact hook counters and lazy payloads', async () => {
+    let now = 1000,
+      failing = false,
+      builds = 0
+    const reports: unknown[] = [],
+      original = new RangeError('tier read or write failed')
+    let emit!: IStoragePluginCore['emit']
+    const observer = definePlugin('tier-errors', (core) => ({
+      install() {
+        emit = core.emit
+        core.useAsyncPipeline((input, next) => {
+          if (
+            failing &&
+            (input.backendId === 'zero' || input.backendId === 'one') &&
+            input.operation === 'get'
+          )
+            throw original
+          if (
+            failing &&
+            (input.backendId === 'zero' || input.backendId === 'two') &&
+            input.operation === 'set'
+          )
+            throw original
+          return next(input)
+        })
+        return {}
+      }
+    }))
+    const base = await createStorageHost({
+      report: (error) => {
+        reports.push(error)
+      },
+      plugins: [
+        memoryBackendPlugin({ id: 'zero' }),
+        memoryBackendPlugin({ id: 'one' }),
+        memoryBackendPlugin({ id: 'two' }),
+        observer
+      ]
+    })
+    const host = await base.use(
+      cachePlugin({
+        propagate: false,
+        clock: () => now,
+        maxAgeMs: 100,
+        staleAfterMs: 20,
+        negativeTtlMs: 10,
+        tiers: [{ backend: 'zero' }, { backend: 'one' }, { backend: 'two' }]
+      })
+    )
+    await host.detect()
+    const hits: unknown[] = [],
+      misses: unknown[] = [],
+      loads: unknown[] = [],
+      errors: { tier: number; operation: string; code?: string }[] = []
+    try {
+      emit('onCacheHit', () => {
+        builds++
+        return {
+          backendId: 'cache',
+          backend: 'cache',
+          orgId: '00000000-0000-0000-0000-000000000000',
+          tier: 0,
+          stale: false,
+          negative: false
+        }
+      })
+      expect(builds).toBe(0)
+      host.hooks.on('onCacheHit', (event) => {
+        hits.push(event)
+      })
+      host.hooks.on('onCacheMiss', (event) => {
+        misses.push(event)
+      })
+      host.hooks.on('onCacheLoad', (event) => {
+        loads.push(event)
+      })
+      host.hooks.on('onCacheTierError', (event) => {
+        errors.push(event)
+      })
+      const raw = (value: string) =>
+        JSON.stringify({ v: 1, s: 'hit', t: 's', d: value, w: now, x: 1100, g: [] })
+      await base.backend('zero').set('cache:cache:a', raw('A'))
+      await base.backend('one').set('cache:cache:b', raw('B'))
+      await base.backend('two').set('cache:cache:c', raw('C'))
+      for (const [key, value, tier] of [
+        ['a', 'A', 0],
+        ['b', 'B', 1],
+        ['c', 'C', 2]
+      ] as const) {
+        expect(await host.backend('cache').getOrLoadEntry(key, async () => 'wrong')).toMatchObject({
+          value,
+          tier,
+          stale: false,
+          negative: false
+        })
+        expect(
+          JSON.parse((await base.backend('zero').get('cache:cache:' + key))!).x
+        ).toBeLessThanOrEqual(1100)
+      }
+      expect(host.backend('cache').stats()).toMatchObject({
+        hits: [1, 1, 1],
+        misses: [2, 1, 0],
+        loads: 0
+      })
+      expect(hits).toHaveLength(3)
+      expect(misses).toHaveLength(3)
+      expect(loads).toHaveLength(0)
+      await base.backend('zero').set('cache:cache:broken', '{')
+      expect(await host.backend('cache').getOrLoad('broken', async () => 'repaired')).toBe(
+        'repaired'
+      )
+      expect(errors.filter((event) => event.operation === 'decode')).toEqual([
+        expect.objectContaining({ tier: 0 })
+      ])
+      failing = true
+      expect(await host.backend('cache').getOrLoad('c', async () => 'wrong')).toBe('C')
+      expect(
+        errors.filter((event) => event.operation === 'get').map((event) => event.tier)
+      ).toEqual([0, 1])
+      expect(await host.backend('cache').getOrLoad('new', async () => 'source')).toBe('source')
+      expect(
+        errors.filter((event) => event.operation === 'set').map((event) => event.tier)
+      ).toContain(2)
+      failing = false
+      expect(await base.backend('one').get('cache:cache:new')).toContain('source')
+      host.hooks.on('onCacheHit', () => {
+        throw original
+      })
+      expect(await host.backend('cache').getOrLoad('new', async () => 'wrong')).toBe('source')
+      expect(reports).toContain(original)
+      const cache = host.backend('cache'),
+        invalidations: unknown[] = []
+      host.hooks.on('onCacheInvalidate', (event) => {
+        invalidations.push(event)
+      })
+      await cache.getOrLoad('negative', async () => undefined)
+      expect(await cache.getOrLoadEntry('negative', async () => 'wrong')).toMatchObject({
+        tier: 0,
+        stale: false,
+        negative: true
+      })
+      now = 1021
+      expect(await cache.getOrLoadEntry('a', async () => 'refreshed')).toMatchObject({
+        value: 'A',
+        tier: 0,
+        stale: true,
+        negative: false
+      })
+      await new Promise((resolve) => setTimeout(resolve, 5))
+      await cache.invalidate('negative')
+      expect(cache.stats()).toMatchObject({
+        hits: [3, 2, 2],
+        misses: [7, 5, 3],
+        loads: 4,
+        staleServed: 1,
+        negativeHits: 1,
+        invalidations: 1
+      })
+      expect(hits).toHaveLength(7)
+      expect(misses).toHaveLength(15)
+      expect(loads).toHaveLength(4)
+      expect(invalidations).toHaveLength(1)
+      now = 1122
+      for (const key of ['a', 'b', 'c'])
+        expect(await host.backend('cache').getOrLoad(key, async () => 'expired')).toBe('expired')
+      expect(loads).toHaveLength(7)
+    } finally {
+      await host.dispose()
+    }
+  })
   it('loads, reads through and fills without exposing coded values as flat KV', async () => {
     const { host, cache, fast, slow } = await fixture()
     try {
@@ -42,6 +480,15 @@ describe('borrowed multi-tier cache', () => {
         })
       ).toEqual({ answer: 42 })
       expect(loads).toBe(1)
+      expect(
+        await cache.getOrLoadEntry('source-info', async () => 'loaded', { meta: { source: true } })
+      ).toMatchObject({
+        value: 'loaded',
+        tier: undefined,
+        stale: false,
+        negative: false,
+        meta: { source: true }
+      })
       expect(await cache.get('object')).toBeNull()
       await cache.set('text', 'hello')
       expect(await cache.get('text')).toBe('hello')
@@ -133,27 +580,32 @@ describe('borrowed multi-tier cache', () => {
       await host.dispose()
     }
   })
-  it('supersedes a detached old flight and does not store its late result', async () => {
-    const { host, cache } = await fixture()
-    try {
-      let finish!: (value: string) => void
-      const started = cache.getOrLoad(
-        'a',
-        () =>
-          new Promise<string>((resolve) => {
-            finish = resolve
-          })
-      )
-      await new Promise((resolve) => setTimeout(resolve, 5))
-      await cache.invalidate('a')
-      expect(await cache.getOrLoad('a', async () => 'new')).toBe('new')
-      finish('old')
-      expect(await started).toBe('old')
-      expect(await cache.getOrLoad('a', async () => 'wrong')).toBe('new')
-    } finally {
-      await host.dispose()
+  it.each(['key', 'remove', 'prefix'] as const)(
+    'supersedes a detached old flight through %s without storing its late result',
+    async (method) => {
+      const { host, cache } = await fixture()
+      try {
+        let finish!: (value: string) => void
+        const started = cache.getOrLoad(
+          'a',
+          () =>
+            new Promise<string>((resolve) => {
+              finish = resolve
+            })
+        )
+        await new Promise((resolve) => setTimeout(resolve, 5))
+        if (method === 'key') await cache.invalidate('a')
+        else if (method === 'remove') await cache.remove('a')
+        else await cache.invalidate({ prefix: 'a' })
+        expect(await cache.getOrLoad('a', async () => 'new')).toBe('new')
+        finish('old')
+        expect(await started).toBe('old')
+        expect(await cache.getOrLoad('a', async () => 'wrong')).toBe('new')
+      } finally {
+        await host.dispose()
+      }
     }
-  })
+  )
   it('returns stale values, refreshes once and enforces an envelope hard expiry', async () => {
     let now = 1000
     const { host, cache, fast } = await fixture({
