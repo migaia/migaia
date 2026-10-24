@@ -41,7 +41,7 @@ import {
   createEntityQuery,
   type IEntityQueryPlan,
   type IEntityQuerySourceSelection
-} from './query.js'
+} from './query-adapter.js'
 import { snapshotOperationContext } from '../authoring/context.js'
 import type { IOperationContext, IStorageKey } from '@migaia/storage-contract'
 

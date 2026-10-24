@@ -30,7 +30,7 @@ import { encodeFlatStorageKey, snapshotKeyRange } from '../core/key-domain.js'
 
 import { createStorageOperationRuntime } from '../core/operation-reporter.js'
 import { EntityText } from './text.js'
-import { createEntityQuery } from './query.js'
+import { createEntityQuery } from './query-adapter.js'
 import { snapshotOperationContext } from '../authoring/context.js'
 import type { IOperationContext, IStorageKey } from '@migaia/storage-contract'
 

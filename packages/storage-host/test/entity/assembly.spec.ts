@@ -1,9 +1,10 @@
+import { entityMigrationFeature } from '@migaia/storage-host/entity/migration'
 import { describe, expect, it } from 'vitest'
 import { defineEntity } from '../../src/entity.js'
-import { entityUniqueFeature } from '../../src/entity/unique-feature.js'
-import { entityQueryFeature } from '../../src/entity/query-feature.js'
-import { entityIndexesFeature } from '../../src/entity/indexes-feature.js'
-import { entityKeysetFeature } from '../../src/entity/keyset.js'
+import { entityUniqueFeature } from '@migaia/storage-host/entity/unique'
+import { entityQueryFeature } from '@migaia/storage-host/entity/query'
+import { entityIndexesFeature } from '@migaia/storage-host/entity/indexes'
+import { entityKeysetFeature } from '@migaia/storage-host/entity/keyset'
 import { StorageErrorCode } from '../../src/error-code.js'
 import { STORAGE_HOST_SOURCE } from '../../src/errors.js'
 import { memoryBackend } from '../helpers/memory.js'
@@ -47,6 +48,20 @@ describe('explicit entity assembly', () => {
       expect.objectContaining(missing('indexes'))
     )
     await expect(repository.query().page(1)).rejects.toMatchObject(missing('keyset'))
+  })
+
+  it('migrates an older record through the public migration unit without enabling queries', async () => {
+    const store = await memoryBackend()
+    await store.putRecord({ version: 1, state: { id: 'a', group: 'one' } }, ['migration-only', 'a'])
+    const repository = defineEntity<IRow>({
+      name: 'migration-only',
+      key: 'id',
+      version: 2,
+      features: [entityMigrationFeature()],
+      migrations: { 2: (state) => ({ ...(state as IRow), group: 'migrated' }) }
+    }).connect(store)
+    expect(await repository.get('a')).toEqual({ id: 'a', group: 'migrated' })
+    expect(() => repository.query()).toThrow(expect.objectContaining(missing('query')))
   })
 
   it('never hides a missing migration assembly behind the invalid-record skip policy', async () => {
