@@ -1,5 +1,7 @@
+/** Owned configuration admission, snapshots and source-ordered merge policy. */
 import { ERROR_SOURCE, UtilsErrorCode } from './error-code.js'
 import { UtilsErrorText } from './error-text.js'
+import { ConfigArrayMerge } from './internal/config-array-merge.js'
 import { parseObjectPath, probeObjectPath, type IObjectPathTupleFor } from './object-path.js'
 
 /**
@@ -94,7 +96,9 @@ export type IConfigPathRule = {
 }
 /**
  * Options of `combineConfig`: global `strategies`, per-prefix `pathRules`, and a synchronous
- * `onConflict` for values that cannot be merged automatically.
+ * `onConflict` for values that cannot be merged automatically. Array conflicts observe the current
+ * accumulated contents; a retained accumulator reference receives later array merges in this call.
+ * Resolver-selected graphs are captured when accepted so their nested arrays are private builders.
  */
 export type IConfigCombineOptions = IOwnConfigOptions & {
   readonly strategies?: Partial<IConfigMergeStrategies>
@@ -593,6 +597,8 @@ export function combineConfig(
       )
     : sourceLimits
   const result: Record<PropertyKey, unknown> = Object.create(null)
+  /** One call owns every array builder, including aliases and arrays copied inside graph nodes. */
+  const arrays = new ConfigArrayMerge()
   /** All source merges share one immutable input snapshot and advance its prefix cursor. */
   const ruleIndex = indexConfigPathRules(pathRules)
   for (const source of sources)
@@ -606,8 +612,10 @@ export function combineConfig(
       source,
       new WeakMap<object, object>(),
       profile,
-      limits
+      limits,
+      arrays
     )
+  arrays.finish()
   return ownConfig(result, { profile, limits })
 }
 
@@ -631,7 +639,8 @@ function copyOwnDataDescriptors(
   profile: IConfigProfile,
   seen: WeakMap<object, object>,
   depth: number,
-  state: { nodes: number; keys: number }
+  state: { nodes: number; keys: number },
+  arrays?: ConfigArrayMerge
 ): void {
   for (const key of Reflect.ownKeys(source)) {
     state.keys++
@@ -642,7 +651,7 @@ function copyOwnDataDescriptors(
       throw configError(UtilsErrorCode.configUnsupported, String(key), 'accessor unsupported')
     Object.defineProperty(target, key, {
       ...descriptor,
-      value: cloneGraph(descriptor.value, profile, limits, seen, depth + 1, state)
+      value: cloneGraph(descriptor.value, profile, limits, seen, depth + 1, state, false, arrays)
     })
   }
 }
@@ -654,7 +663,8 @@ function cloneCallable(
   limits: IConfigLimits,
   seen: WeakMap<object, object>,
   depth: number,
-  state: { nodes: number; keys: number }
+  state: { nodes: number; keys: number },
+  arrays?: ConfigArrayMerge
 ): (...args: unknown[]) => unknown {
   if (profile === ConfigProfile.data)
     throw configError(UtilsErrorCode.configUnsupported, 'value', 'function requires richRuntime')
@@ -690,7 +700,7 @@ function cloneCallable(
       )
     Object.defineProperty(wrapper, key, {
       ...descriptor,
-      value: cloneGraph(descriptor.value, profile, limits, seen, depth + 1, state)
+      value: cloneGraph(descriptor.value, profile, limits, seen, depth + 1, state, false, arrays)
     })
   }
   if (constructable && prototypeDescriptor && 'value' in prototypeDescriptor) {
@@ -701,7 +711,8 @@ function cloneCallable(
       seen,
       depth + 1,
       state,
-      true
+      true,
+      arrays
     )
     Object.defineProperty(wrapper, 'prototype', {
       ...prototypeDescriptor,
@@ -719,8 +730,10 @@ function cloneGraph<T>(
   seen = new WeakMap<object, object>(),
   depth = 0,
   state: { nodes: number; keys: number } = { nodes: 0, keys: 0 },
-  allowConstructorKey = false
+  allowConstructorKey = false,
+  arrays?: ConfigArrayMerge
 ): T {
+  if (Array.isArray(value) && arrays?.has(value)) return value
   if (depth > limits.maxDepth)
     throw configError(UtilsErrorCode.configLimitExceeded, 'maxDepth', 'graph depth')
   if (value !== null && (typeof value === 'object' || typeof value === 'function')) {
@@ -734,7 +747,8 @@ function cloneGraph<T>(
       limits,
       seen,
       depth,
-      state
+      state,
+      arrays
     ) as T
   if (value === null || typeof value !== 'object') return value
   state.nodes++
@@ -748,7 +762,7 @@ function cloneGraph<T>(
         ? Reflect.construct(Date, [time], constructor)
         : new Date(time)
     seen.set(value as object, copy)
-    copyOwnDataDescriptors(value, copy, limits, profile, seen, depth, state)
+    copyOwnDataDescriptors(value, copy, limits, profile, seen, depth, state, arrays)
     return copy as T
   }
   if (hasBuiltinBrand(value, 'regexp')) {
@@ -762,7 +776,7 @@ function cloneGraph<T>(
         ? Reflect.construct(RegExp, [source, flags], constructor)
         : new RegExp(source, flags)
     seen.set(value as object, copy)
-    copyOwnDataDescriptors(value, copy, limits, profile, seen, depth, state)
+    copyOwnDataDescriptors(value, copy, limits, profile, seen, depth, state, arrays)
     return copy as T
   }
   if (hasBuiltinBrand(value, 'map')) {
@@ -780,15 +794,15 @@ function cloneGraph<T>(
         throw configError(UtilsErrorCode.configLimitExceeded, 'maxKeys', 'graph entries')
       else
         copy.set(
-          cloneGraph(key, profile, limits, seen, depth + 1, state),
-          cloneGraph(entry, profile, limits, seen, depth + 1, state)
+          cloneGraph(key, profile, limits, seen, depth + 1, state, false, arrays),
+          cloneGraph(entry, profile, limits, seen, depth + 1, state, false, arrays)
         )
-    copyOwnDataDescriptors(value, copy, limits, profile, seen, depth, state)
+    copyOwnDataDescriptors(value, copy, limits, profile, seen, depth, state, arrays)
     const sourcePrototype = Object.getPrototypeOf(value)
     if (sourcePrototype && !intrinsicPrototypes.has(sourcePrototype))
       Object.setPrototypeOf(
         copy,
-        cloneGraph(sourcePrototype, profile, limits, seen, depth + 1, state, true)
+        cloneGraph(sourcePrototype, profile, limits, seen, depth + 1, state, true, arrays)
       )
     return copy as T
   }
@@ -803,26 +817,27 @@ function cloneGraph<T>(
     for (const entry of entries) {
       if (++state.keys > limits.maxKeys)
         throw configError(UtilsErrorCode.configLimitExceeded, 'maxKeys', 'graph entries')
-      copy.add(cloneGraph(entry, profile, limits, seen, depth + 1, state))
+      copy.add(cloneGraph(entry, profile, limits, seen, depth + 1, state, false, arrays))
     }
-    copyOwnDataDescriptors(value, copy, limits, profile, seen, depth, state)
+    copyOwnDataDescriptors(value, copy, limits, profile, seen, depth, state, arrays)
     const sourcePrototype = Object.getPrototypeOf(value)
     if (sourcePrototype && !intrinsicPrototypes.has(sourcePrototype))
       Object.setPrototypeOf(
         copy,
-        cloneGraph(sourcePrototype, profile, limits, seen, depth + 1, state, true)
+        cloneGraph(sourcePrototype, profile, limits, seen, depth + 1, state, true, arrays)
       )
     return copy as T
   }
   const sourcePrototype = Object.getPrototypeOf(value)
   const target = Array.isArray(value) ? [] : Object.create(null)
   seen.set(value as object, target)
+  if (Array.isArray(target)) arrays?.track(target)
   if (sourcePrototype === null || intrinsicPrototypes.has(sourcePrototype))
     Object.setPrototypeOf(target, sourcePrototype)
   else
     Object.setPrototypeOf(
       target,
-      cloneGraph(sourcePrototype, profile, limits, seen, depth + 1, state, true)
+      cloneGraph(sourcePrototype, profile, limits, seen, depth + 1, state, true, arrays)
     )
   for (const key of Reflect.ownKeys(value as object)) {
     state.keys++
@@ -837,10 +852,13 @@ function cloneGraph<T>(
     const descriptor = Object.getOwnPropertyDescriptor(value as object, key)!
     if (!('value' in descriptor))
       throw configError(UtilsErrorCode.configUnsupported, String(key), 'accessor unsupported')
-    Object.defineProperty(target, key, {
+    /** Graph admission stays shared; only this call's array descriptor flags are provisional. */
+    const clonedDescriptor = {
       ...descriptor,
-      value: cloneGraph(descriptor.value, profile, limits, seen, depth + 1, state)
-    })
+      value: cloneGraph(descriptor.value, profile, limits, seen, depth + 1, state, false, arrays)
+    }
+    if (arrays && Array.isArray(target)) arrays.define(target, key, clonedDescriptor)
+    else Object.defineProperty(target, key, clonedDescriptor)
   }
   return target as T
 }
@@ -1115,13 +1133,80 @@ function unwrapReadonly(value: unknown): unknown {
   return readonlyRawCache.get(value) ?? value
 }
 
+/** Explicit entry context keeps native forEach timing without capturing graph state in a callback. */
+type IConfigArrayEntryContext = {
+  /** All writes remain on the per-call private array builder. */
+  readonly target: unknown[]
+  /** Admission retains the enclosing combine operation's selected profile. */
+  readonly profile: IConfigProfile
+  /** Graph cloning uses the same existing resource limits as sibling values. */
+  readonly limits: IConfigLimits
+  /** Incoming element aliases share the source's canonical clone memo. */
+  readonly seen: WeakMap<object, object>
+  /** Sparse-index bookkeeping belongs to the one array owner of this combine call. */
+  readonly arrays: ConfigArrayMerge
+}
+
+/** Clone one present incoming index and apply its replacement/deletion to the private builder. */
+function mergeConfigArrayEntry(
+  context: IConfigArrayEntryContext,
+  entry: unknown,
+  index: number
+): void {
+  context.arrays.set(
+    context.target,
+    index,
+    entry === CONFIG_DELETE
+      ? undefined
+      : cloneGraph(
+          entry,
+          context.profile,
+          context.limits,
+          context.seen,
+          0,
+          undefined,
+          false,
+          context.arrays
+        ),
+    entry === CONFIG_DELETE
+  )
+}
+
+/** Extend one private array without copying any already accumulated prefix. */
+function mergeConfigArray(
+  target: unknown[],
+  source: unknown[],
+  strategy: 'concat' | 'mergeByIndex',
+  profile: IConfigProfile,
+  limits: IConfigLimits,
+  seen: WeakMap<object, object>,
+  arrays: ConfigArrayMerge
+): void {
+  /** Register the incoming array before visiting its entries, preserving self and sibling aliases. */
+  seen.set(source, target)
+  /** A callback can feed this builder into a later owned source; snapshot only that self-alias. */
+  const incoming =
+    target === source ? (strategy === 'concat' ? [...source] : source.slice()) : source
+  if (strategy === 'concat') {
+    arrays.concat(target)
+    for (const entry of incoming)
+      target.push(cloneGraph(entry, profile, limits, seen, 0, undefined, false, arrays))
+  } else {
+    arrays.begin(target)
+    /** The native/custom forEach keeps its existing hole and initial-length semantics. */
+    const context: IConfigArrayEntryContext = { target, profile, limits, seen, arrays }
+    incoming.forEach((entry, index) => mergeConfigArrayEntry(context, entry, index))
+  }
+}
+
 /** Merge a Map in entry order while sharing the enclosing graph's original clone identities. */
 function mergeConfigMap(
   target: Map<unknown, unknown>,
   source: Map<unknown, unknown>,
   profile: IConfigProfile,
   limits: IConfigLimits,
-  seen: WeakMap<object, object>
+  seen: WeakMap<object, object>,
+  arrays: ConfigArrayMerge
 ): void {
   for (const [key, value] of source) {
     if (value === CONFIG_DELETE) target.delete(key)
@@ -1129,12 +1214,12 @@ function mergeConfigMap(
       /** Object keys reuse the same traversal identity as values and sibling record properties. */
       const mappedKey =
         key !== null && (typeof key === 'object' || typeof key === 'function')
-          ? cloneGraph(key, profile, limits, seen)
+          ? cloneGraph(key, profile, limits, seen, 0, undefined, false, arrays)
           : key
       /** Each value is cloned only through the existing graph owner and its shared memo. */
       const mappedValue =
         value !== null && (typeof value === 'object' || typeof value === 'function')
-          ? cloneGraph(value, profile, limits, seen)
+          ? cloneGraph(value, profile, limits, seen, 0, undefined, false, arrays)
           : value
       target.set(mappedKey, mappedValue)
     }
@@ -1148,7 +1233,8 @@ function unionConfigSet(
   key: PropertyKey,
   profile: IConfigProfile,
   limits: IConfigLimits,
-  seen: WeakMap<object, object>
+  seen: WeakMap<object, object>,
+  arrays: ConfigArrayMerge
 ): void {
   for (const entry of source) {
     if (entry === CONFIG_DELETE)
@@ -1160,7 +1246,7 @@ function unionConfigSet(
     /** The graph's clone cache preserves aliases across all values in the enclosing merge. */
     const mapped =
       entry !== null && (typeof entry === 'object' || typeof entry === 'function')
-        ? cloneGraph(entry, profile, limits, seen)
+        ? cloneGraph(entry, profile, limits, seen, 0, undefined, false, arrays)
         : entry
     target.add(mapped)
   }
@@ -1168,7 +1254,10 @@ function unionConfigSet(
 
 /**
  * Merge properties in observable source order, delegating collection-specific work to its named
- * owner.
+ * owner. The source loop stays together because alias memo registration and synchronous conflict
+ * decisions must occur at the current property before the next property is read. Collection
+ * algorithms already have named owners; splitting this dispatch would add forwarding helpers with
+ * the same graph context instead of separating another responsibility.
  */
 function mergeRecord(
   target: Record<PropertyKey, unknown>,
@@ -1180,7 +1269,8 @@ function mergeRecord(
   sourceRoot: IConfigRecord = source,
   sourceSeen = new WeakMap<object, object>(),
   profile: IConfigProfile = ConfigProfile.data,
-  limits: IConfigLimits = defaultLimits
+  limits: IConfigLimits = defaultLimits,
+  arrays = new ConfigArrayMerge()
 ): void {
   if (sourceSeen.has(source as object)) return
   sourceSeen.set(source as object, target)
@@ -1229,7 +1319,8 @@ function mergeRecord(
         right as Map<unknown, unknown>,
         profile,
         limits,
-        sourceSeen
+        sourceSeen,
+        arrays
       )
       continue
     }
@@ -1238,18 +1329,28 @@ function mergeRecord(
       hasBuiltinBrand(right as object, 'set') &&
       effective.set === 'union'
     ) {
-      unionConfigSet(left as Set<unknown>, right as Set<unknown>, key, profile, limits, sourceSeen)
+      unionConfigSet(
+        left as Set<unknown>,
+        right as Set<unknown>,
+        key,
+        profile,
+        limits,
+        sourceSeen,
+        arrays
+      )
       continue
     }
-    if (Array.isArray(left) && Array.isArray(right) && effective.array === 'concat')
-      target[key] = [...left, ...right]
-    else if (Array.isArray(left) && Array.isArray(right) && effective.array === 'mergeByIndex') {
-      const merged = left.slice()
-      right.forEach((entry, index) => {
-        if (entry === CONFIG_DELETE) delete merged[index]
-        else merged[index] = entry
-      })
-      target[key] = merged
+    if (
+      Array.isArray(left) &&
+      Array.isArray(right) &&
+      (effective.array === 'concat' || effective.array === 'mergeByIndex')
+    ) {
+      /** Resolver-provided arrays also enter the existing graph clone before any in-place write. */
+      const accumulator = arrays.has(left)
+        ? left
+        : cloneGraph(left, profile, limits, sourceSeen, 0, undefined, false, arrays)
+      mergeConfigArray(accumulator, right, effective.array, profile, limits, sourceSeen, arrays)
+      target[key] = accumulator
     } else if (
       left &&
       right &&
@@ -1277,7 +1378,8 @@ function mergeRecord(
         sourceRoot,
         sourceSeen,
         profile,
-        limits
+        limits,
+        arrays
       )
     else if (key in target && onConflict) {
       const decision = onConflict({ path: currentPath, left, right })
@@ -1302,17 +1404,22 @@ function mergeRecord(
         delete target[key]
         continue
       }
-      target[key] = decision.kind === 'value' ? decision.value : right
+      /** Capture selected graphs now so nested arrays are private before later nested conflicts. */
+      const selected = decision.kind === 'value' ? decision.value : right
+      target[key] =
+        selected !== null && (typeof selected === 'object' || typeof selected === 'function')
+          ? cloneGraph(selected, profile, limits, sourceSeen, 0, undefined, false, arrays)
+          : selected
     } else if (right !== undefined || effective.undefined === 'assign') {
       if (hasBuiltinBrand(right as object, 'map')) {
         const mapped = new Map<unknown, unknown>()
         for (const [mapKey, mapValue] of right as Map<unknown, unknown>) {
           mapped.set(
             mapKey !== null && (typeof mapKey === 'object' || typeof mapKey === 'function')
-              ? cloneGraph(mapKey, profile, limits, sourceSeen)
+              ? cloneGraph(mapKey, profile, limits, sourceSeen, 0, undefined, false, arrays)
               : mapKey,
             mapValue !== null && (typeof mapValue === 'object' || typeof mapValue === 'function')
-              ? cloneGraph(mapValue, profile, limits, sourceSeen)
+              ? cloneGraph(mapValue, profile, limits, sourceSeen, 0, undefined, false, arrays)
               : mapValue
           )
         }
@@ -1327,7 +1434,7 @@ function mergeRecord(
           )
         target[key] = mapped
       } else if (right !== null && (typeof right === 'object' || typeof right === 'function')) {
-        target[key] = cloneGraph(right, profile, limits, sourceSeen)
+        target[key] = cloneGraph(right, profile, limits, sourceSeen, 0, undefined, false, arrays)
       } else target[key] = right
     }
   }
