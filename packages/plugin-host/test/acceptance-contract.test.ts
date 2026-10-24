@@ -1,4 +1,5 @@
 import { openComposition } from '../src/composition-entry.js'
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { defineFeature, definePlugin, PluginHost } from '../src/index.js'
 import { PluginHostErrorCode } from '../src/error-code.js'
