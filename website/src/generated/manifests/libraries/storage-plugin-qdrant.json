@@ -1,0 +1,3195 @@
+{
+  "version": 1,
+  "library": {
+    "slug": "storage-plugin-qdrant",
+    "description": "Native Qdrant vector storage backend",
+    "version": "0.0.0",
+    "exports": [
+      ".",
+      "./client",
+      "./features/group-by",
+      "./features/hybrid",
+      "./features/management",
+      "./features/recommend",
+      "./http"
+    ],
+    "readmeLocales": ["zh", "en"],
+    "documentation": {
+      "readme": {
+        "sections": [
+          {
+            "id": "qdrant-存储后端",
+            "heading": "Qdrant 存储后端",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "为 `@migaia/storage-host` 提供原生 Qdrant 向量与向量期限。需要真实 Qdrant 服务及 `@qdrant/js-client-rest` 1.11 或更新版本。SDK 是必需 peer，只有显式 `/client` 适配入口在运行时访问它。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { vector } from '@migaia/storage-contract'\nimport { qdrantBackendPlugin } from '@migaia/storage-plugin-qdrant'\n\nawait using host = await createStorageHost({\n  plugins: [qdrantBackendPlugin({ url: 'http://127.0.0.1:6333' })] as const\n})\nconst documents = host\n  .backend('qdrant')\n  .use(vector)\n  .collection<{ category: string }>('documents', { dimensions: 2, metric: 'cosine' })\nawait documents.upsert([{ id: 'a', vector: [100, 0], payload: { category: 'guide' } }])\nconsole.log(await documents.near([1, 0], { exact: true }).topK(5).withVector().all())"
+              },
+              {
+                "type": "paragraph",
+                "text": "collection 在执行前是纯描述。Cosine 使用原生搜索槽与原样本槽，使 `withVector`、`similarTo` 及标准均值推荐保留输入幅度，精度以原生 float32 为界。Dot、Euclid 使用一个原生槽；Euclid 距离取负成为分数。后端不在 JavaScript 中给候选评分。"
+              },
+              {
+                "type": "table",
+                "headers": ["入口", "用途"],
+                "rows": [
+                  ["根", "`qdrantBackendPlugin`、`qdrantBackendKind`、错误身份与类型"],
+                  ["`/http`", "基于运行时 fetch 的 `fetchHttp(url, apiKey?)`"],
+                  ["`/client`", "借用真实 SDK 客户端的 `qdrantClientHttp(client)`"],
+                  ["`/features/hybrid`", "两个原生 dense/sparse RRF 分支及仅 sparse 更新"],
+                  ["`/features/recommend`", "原生 `best_score`、lookup 与样本语义"],
+                  ["`/features/group-by`", "原生多值分组，不提供 `with_lookup`"],
+                  ["`/features/management`", "集合、别名、快照、按条件删除及显式清理过期点"]
+                ]
+              },
+              {
+                "type": "paragraph",
+                "text": "仅提供 `vector` 与 vector 目标的 `ttl`。没有 KV、records、RDF、事务、二级索引、change feed 或原生 live 查询；需要轮询时使用既有 host reactive Feature。显式锁与并发策略组合在原生修改前拒绝。"
+              },
+              {
+                "type": "paragraph",
+                "text": "删除计数、TTL、组织隔离、检测及失败边界见 USEGUIDE.md。"
+              },
+              {
+                "type": "paragraph",
+                "text": "删除与标准推荐通过共享向量输入拥有者捕获稠密字符串 ID 数组；原生请求仍按首次出现去重。删除计数选项复用同一准入，不改变 precount 或 scroll 行为。"
+              },
+              {
+                "type": "paragraph",
+                "text": "SDK 请求发出后，取消不会撤销原生修改；即使调用方随后取消，请求仍可能成功返回。后端释放等待该真实结果，响应丢失时保留结果未知且不自动重放。hooks 的同步异常或异步拒绝仅上报，介入操作使用宿主原 pipeline。"
+              }
+            ]
+          }
+        ]
+      },
+      "guide": {
+        "sections": [
+          {
+            "id": "查询与-payload",
+            "heading": "查询与 payload",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "新建逻辑 collection 时声明真实维度与 `cosine`、`dot` 或 `euclid`。无 options 的描述在执行时读取既有原生 schema；不匹配时拒绝，不创建占位向量。`collectionPrefix` 缺省 `migaia_`，选择托管命名空间。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`near`、`similarTo`、标准 `recommend` 使用共享不可变链。`topK` 要求正安全整数；低层 `search(query,{k})` 也接受 0，且不发送搜索。`exact` 缺省 false，沿引擎原生索引；true 请求原生精确检索。标准 `groupBy` 只处理所选 top-k 命中；标准推荐读取请求的原样本，以共享正样本均值减负样本均值合成查询，不调用原生 `best_score`。"
+              },
+              {
+                "type": "paragraph",
+                "text": "可忠实表达的标量相等、成员、存在性与数字范围在引擎排名前执行。字符串范围、子串/前缀条件及 JavaScript 函数只处理实际原生命中，不补搜，结果可少于 k。`explain()` 区分两者；需要客户端处理时，`requirePushdown()` 在原生读取前拒绝。仅组织与期限保留路径强制建立索引，任意动态标量路径可能未索引。真实成本取决于引擎计划、输入及输出字节。"
+              },
+              {
+                "type": "paragraph",
+                "text": "portable payload 与任意 UTF-16 ID 由原 codec 往返。用户不能替换 payload 根 `$org`、`$expiresAt`。整批在 I/O 前快照与验证；重复 ID 保留最后一个已验证点。"
+              }
+            ]
+          },
+          {
+            "id": "期限与数字删除",
+            "heading": "期限与数字删除",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { ttl, lockKey, DeleteCountMode } from '@migaia/storage-contract'\n\nawait documents.upsert([{ id: 'temporary', vector: [1, 0], payload: { category: 'guide' } }], {\n  ttlMs: 5000\n})\nconst target = lockKey.vector('documents', 'temporary')\nawait host.backend('qdrant').use(ttl).expire(target, 10000)\nconsole.log(await host.backend('qdrant').use(ttl).remaining(target))\nawait host.backend('qdrant').use(ttl).persist(target)\nconst deleted = await documents.deleteWhere(\n  { category: 'guide' },\n  { count: DeleteCountMode.scroll }\n)"
+              },
+              {
+                "type": "paragraph",
+                "text": "TTL 以一次客户端墙钟采样及原生 datetime payload 字段实现，客户端时钟偏差会影响期限。省略 `ttlMs` 时保留活点期限，新点或已过期点变为无限期；0 立即不可见。`remaining` 对缺失/无限期返回 undefined；`expire`、`persist` 对缺失/已过期返回 false。text、bytes、record TTL 目标不受支持。没有后台 timer 删除数据。"
+              },
+              {
+                "type": "paragraph",
+                "text": "删除包含物理仍存在的过期点。缺省 `precount` 发送一次 exact count，再以同一 filter 做一次 wait:true 删除；并发写入会使预统计数不同于之后实际删除数。显式 `scroll` 在任何删除前收集原生各页实际读到的 ID，再按 ID 批删并返回成功提交的 ID 数。扫描期间新增点可能被读到，也可能保留；收集结束后未在集合中的新增 ID 不参与。已收集 ID 即使随后改为不匹配也会删除。"
+              },
+              {
+                "type": "paragraph",
+                "text": "原生 precount 与管理 filter 删除对不能忠实表示的条件（如通用 `contains`、`startsWith`）在 I/O 前拒绝。对此可显式选 `scroll`，以共享 predicate 检查当前组织各页真实候选；成本包含扫描候选与所收集 ID。"
+              }
+            ]
+          },
+          {
+            "id": "原生-feature",
+            "heading": "原生 Feature",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { qdrantManagementFeature } from '@migaia/storage-plugin-qdrant/features/management'\nimport { qdrantHybridFeature } from '@migaia/storage-plugin-qdrant/features/hybrid'\nimport { qdrantRecommendFeature } from '@migaia/storage-plugin-qdrant/features/recommend'\nimport { qdrantGroupByFeature } from '@migaia/storage-plugin-qdrant/features/group-by'"
+              },
+              {
+                "type": "paragraph",
+                "text": "将需要的 Feature 作为工厂第二参数，增加 `store.api.qdrantManagement`、`qdrantHybrid`、`qdrantRecommend`、`qdrantGroupBy`，没有 transaction API。原生方法使用调用方自管的物理 collection 名，保留真实 SDK 参数与结果类型。"
+              },
+              {
+                "type": "paragraph",
+                "text": "Hybrid 接受恰两个 named dense/sparse prefetch 分支及 `{fusion:'rrf'}`。sparse 更新只接受已配置的 sparse 名，indices 是唯一非负整数，长度匹配且数值有限，不改 dense。原生推荐保留 lookup 与策略差异；原生分组保留多值成员语义，不提供 SDK 1.11 未转发的 `with_lookup`。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`qdrantManagement.deleteByFilter(logicalCollection,where,{wait?,ordering?},ctx)` 追加当前组织，不加存活过滤。`purgeExpired(logicalCollection,{wait?},ctx)` 仅一次采样墙钟，原生删除当前组织中早于此刻的期限点。两者零 count/scroll，返回 `{operationId,status}`，wait 缺省 true；operation ID 不代表删除数。其它管理方法保留原生 boolean 与可空 snapshot。"
+              }
+            ]
+          },
+          {
+            "id": "组织-释放与失败",
+            "heading": "组织、释放与失败",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "`host.org(orgId).backend('qdrant')` 共享物理 collection，在原生排名前加租户条件；点身份包含 org。新组织不创建 collection 或索引。组织视图不能调用自管 collection 的原生 Feature 方法；`deleteByFilter`、`purgeExpired` 仍可按组织执行。`host.dropOrg` 发现当前配置命名空间内全部托管 collection，仅清理目标组织（含物理过期点），保留共享 collection 与其它命名空间。"
+              },
+              {
+                "type": "paragraph",
+                "text": "缺省在 host 创建时检测；`autoDetect:false` 必须显式 `host.detect()`。未检测的业务终点拒绝且不发送隐式检测。服务端与 SDK 至少 1.11。"
+              },
+              {
+                "type": "paragraph",
+                "text": "检测检查标准 vector、TTL 与组织清理所需方法。可选原生 Feature 方法在调用时检查；缺少方法时在发送修改前报 `UNSUPPORTED_CAPABILITY`。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`dispose()` 封闭新调用，等待已接受的实际请求及 iterator。主释放与符号释放分别缓存 Promise，共用一次清理。后端从不关闭借用的 HTTP/SDK client。fetch 接收原操作取消信号；SDK 1.11 没有 per-call signal，必须等真实请求结算。写入不自动重试或跟随重定向，已发送失败的结果可能未知。"
+              },
+              {
+                "type": "paragraph",
+                "text": "错误域 `storage.backend.qdrant`：原生 4xx 为 `QDRANT_REQUEST_FAILED`；网络/5xx 为 `QDRANT_UNAVAILABLE`；坏响应或意外响应为 `QDRANT_RESPONSE_INVALID`。保留原错误及适配端能取得的全部证据。HTTP 保留完整 status/body；SDK 1.11 的非等待 snapshot 遇到 202 时，自身 `QdrantClientUnexpectedResponseError` 会丢弃 status 并截断文案，适配器报告 response-invalid，但快照可能已接受。HTTP 端口对此返回原生 null。没有自动 fallback 或重放。hooks 只含净化路由、耗时与可取得的 status，不含认证头或正文。"
+              },
+              {
+                "type": "paragraph",
+                "text": "删除与标准推荐通过共享向量输入拥有者捕获稠密字符串 ID 数组；原生请求仍按首次出现去重。删除计数选项复用同一准入，不改变 precount 或 scroll 行为。"
+              },
+              {
+                "type": "paragraph",
+                "text": "SDK 请求发出后，取消不会撤销原生修改；即使调用方随后取消，请求仍可能成功返回。后端释放等待该真实结果，响应丢失时保留结果未知且不自动重放。hooks 的同步异常或异步拒绝仅上报，介入操作使用宿主原 pipeline。"
+              }
+            ]
+          }
+        ]
+      },
+      "en": {
+        "readme": {
+          "sections": [
+            {
+              "id": "qdrant-storage-backend",
+              "heading": "Qdrant storage backend",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Native Qdrant vectors and vector TTL for `@migaia/storage-host`. Install a real Qdrant server and `@qdrant/js-client-rest` 1.11 or later. The SDK is a required peer; only the explicit `/client` adapter accesses it at runtime."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { vector } from '@migaia/storage-contract'\nimport { qdrantBackendPlugin } from '@migaia/storage-plugin-qdrant'\n\nawait using host = await createStorageHost({\n  plugins: [qdrantBackendPlugin({ url: 'http://127.0.0.1:6333' })] as const\n})\nconst documents = host\n  .backend('qdrant')\n  .use(vector)\n  .collection<{ category: string }>('documents', { dimensions: 2, metric: 'cosine' })\nawait documents.upsert([{ id: 'a', vector: [100, 0], payload: { category: 'guide' } }])\nconsole.log(await documents.near([1, 0], { exact: true }).topK(5).withVector().all())"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Collections are pure descriptors until execution. Cosine uses native search and source vector slots so `withVector`, `similarTo` and the standard centroid recommendation retain the original amplitude at native float32 precision. Dot and Euclid use one native slot; Euclid distances become negative scores. This backend does not score candidates in JavaScript."
+                },
+                {
+                  "type": "table",
+                  "headers": ["Entry", "Purpose"],
+                  "rows": [
+                    [
+                      "Root",
+                      "`qdrantBackendPlugin`, `qdrantBackendKind`, error identity and types"
+                    ],
+                    ["`/http`", "`fetchHttp(url, apiKey?)` using runtime fetch"],
+                    ["`/client`", "`qdrantClientHttp(client)` borrowing an actual SDK client"],
+                    [
+                      "`/features/hybrid`",
+                      "Two native dense/sparse RRF branches and sparse-only updates"
+                    ],
+                    ["`/features/recommend`", "Native `best_score`, lookup and sample semantics"],
+                    ["`/features/group-by`", "Native multivalue grouping; no `with_lookup`"],
+                    [
+                      "`/features/management`",
+                      "Collections, aliases, snapshots, filter deletion and explicit expired-point purge"
+                    ]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Only `vector` and vector-target `ttl` are provided. KV, records, RDF, transactions, secondary indexes, change feeds and native live queries are absent. Use the existing host reactive Feature when polling is needed. Explicit lock/concurrency combinations are rejected before native modification."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Read USEGUIDE.en.md for deletion counts, TTL, organization isolation, detection and failure boundaries."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Deletion and standard recommendation capture dense string ID arrays through the shared vector input owner. Native requests retain first-occurrence ID deduplication. Deletion count options use the same shared admission without changing precount or scroll behavior."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Cancellation after SDK dispatch does not undo a native modification; the request can still return success. Backend disposal waits for that actual result. A lost response leaves the outcome unknown and is never replayed automatically. Synchronous observer errors and rejected observer Promises are only reported; intervention uses the host's original pipeline."
+                }
+              ]
+            }
+          ]
+        },
+        "guide": {
+          "sections": [
+            {
+              "id": "queries-and-payloads",
+              "heading": "Queries and payloads",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Declare real dimensions and one metric (`cosine`, `dot`, `euclid`) when creating a new logical collection. A descriptor without options resolves an existing native schema on execution. Incompatible schemas reject instead of creating placeholder vectors. `collectionPrefix` defaults to `migaia_` and selects the managed namespace."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`near`, `similarTo` and standard `recommend` return the shared immutable vector chain. `topK` requires a positive safe integer; low-level `search(query, { k })` also accepts zero and performs no search. `exact` defaults to false and uses the engine's native index. `exact: true` requests native exact retrieval. Standard `groupBy` processes only the selected top-k hits. Standard recommendation reads requested source samples and uses the shared positive mean minus negative mean; it does not invoke native `best_score`."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Faithful scalar equality, membership, existence and numeric ranges execute before native ranking. String ranges, substring/prefix predicates and JavaScript functions process only actual bounded native hits. Results can contain fewer than k rows; no refill search occurs. `explain()` reports this distinction, and `requirePushdown()` rejects before native reads when a condition needs client evaluation. Only the reserved organization and expiration paths have mandatory native indexes; arbitrary dynamic scalar paths may be unindexed. Native query cost depends on the actual engine plan, input and returned bytes."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Portable payloads and arbitrary UTF-16 IDs round-trip through the original codec. User payloads cannot replace root `$org` or `$expiresAt`. Complete batches are detached and checked before I/O; repeated IDs retain the last validated point."
+                }
+              ]
+            },
+            {
+              "id": "expiration-and-numeric-deletion",
+              "heading": "Expiration and numeric deletion",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { ttl, lockKey, DeleteCountMode } from '@migaia/storage-contract'\n\nawait documents.upsert([{ id: 'temporary', vector: [1, 0], payload: { category: 'guide' } }], {\n  ttlMs: 5000\n})\nconst target = lockKey.vector('documents', 'temporary')\nawait host.backend('qdrant').use(ttl).expire(target, 10000)\nconsole.log(await host.backend('qdrant').use(ttl).remaining(target))\nawait host.backend('qdrant').use(ttl).persist(target)\nconst deleted = await documents.deleteWhere(\n  { category: 'guide' },\n  { count: DeleteCountMode.scroll }\n)"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "TTL uses one client wall-clock sample and a native datetime payload field. Clock skew between clients affects expiration. Omitted `ttlMs` preserves a live point's deadline; a new or expired point becomes unlimited. Zero means immediately invisible. Missing/unlimited `remaining` returns undefined; `expire` and `persist` return false for missing or expired points. Text, bytes and record TTL targets are unsupported. No background timer removes data."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Deletion includes physically present expired points. Default `precount` sends one exact count followed by one deletion with the same filter and `wait: true`; concurrent writes can make that count differ from the later actual deletion. Explicit `scroll` collects IDs observed on native pages before sending any ID deletion and returns the number of successfully submitted IDs. Writes during scanning may or may not be observed; uncollected IDs added after collection remain. Once collected, an ID is deleted even if its payload changes."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Native precount and management filter deletion reject conditions that Qdrant cannot represent faithfully, including general `contains` and `startsWith`. Use explicit `scroll` for those declarative conditions; it evaluates the shared predicate on actual organization-page candidates. Its cost includes all scanned candidates and collected IDs."
+                }
+              ]
+            },
+            {
+              "id": "native-features",
+              "heading": "Native Features",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { qdrantManagementFeature } from '@migaia/storage-plugin-qdrant/features/management'\nimport { qdrantHybridFeature } from '@migaia/storage-plugin-qdrant/features/hybrid'\nimport { qdrantRecommendFeature } from '@migaia/storage-plugin-qdrant/features/recommend'\nimport { qdrantGroupByFeature } from '@migaia/storage-plugin-qdrant/features/group-by'"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Pass selected Features as the factory's second argument. They add `store.api.qdrantManagement`, `qdrantHybrid`, `qdrantRecommend` and `qdrantGroupBy`, without transaction APIs. Native methods operate on caller-managed physical collection names and preserve genuine SDK parameter/result types."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Hybrid accepts exactly two named dense/sparse prefetch branches and `{ fusion: 'rrf' }`. Sparse updates require configured sparse names, unique nonnegative integer indices, matching lengths and finite values; dense vectors remain untouched. Native recommendation preserves lookup and strategy differences. Native group search preserves multivalue membership and omits the SDK 1.11 `with_lookup` option because that method does not forward it."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`qdrantManagement.deleteByFilter(logicalCollection, where, { wait?, ordering? }, ctx)` adds the current organization without expiration filtering. `purgeExpired(logicalCollection, { wait? }, ctx)` sends one organization-scoped deletion for deadlines strictly before one client clock sample. Neither counts or scrolls. Both return `{ operationId, status }`, with wait defaulting to true; operation IDs are never counts. Other management methods preserve native booleans and nullable snapshots."
+                }
+              ]
+            },
+            {
+              "id": "organizations-lifetime-and-failures",
+              "heading": "Organizations, lifetime and failures",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`host.org(orgId).backend('qdrant')` shares physical collections and adds native tenant filtering before ranking. Point identities include organization identity. Creating an organization does not create collections or indexes. Native self-managed Feature methods are unavailable in organization views; `deleteByFilter` and `purgeExpired` remain organization-scoped. `host.dropOrg` discovers all managed collections in this configuration's namespace and deletes only the requested organization's points, including expired data, while retaining shared collections and other namespaces."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Detection normally runs during host creation. With `autoDetect: false`, call `host.detect()` explicitly; business terminals reject before detection without sending implicit detection requests. Server and SDK require version 1.11 or later."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Detection checks the standard vector, TTL and organization cleanup methods. Optional native Feature methods are checked when called; an absent method rejects with `UNSUPPORTED_CAPABILITY` before sending a modification."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`dispose()` seals new calls and waits for accepted native requests and iterators. Its primary and symbolic cleanup Promises are separately cached. The backend never closes a borrowed HTTP or SDK client. Native fetch receives the operation cancellation signal. SDK 1.11 lacks per-call signals, so its request must actually settle before admission is released. No write is automatically retried or redirected; sent failures may have an unknown result."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Errors use `storage.backend.qdrant`: native 4xx is `QDRANT_REQUEST_FAILED`, network/5xx is `QDRANT_UNAVAILABLE`, and malformed or unexpected responses are `QDRANT_RESPONSE_INVALID`. Original errors and all evidence available from the adapter stay reachable. HTTP retains full status/body; SDK 1.11 itself discards status and truncates the message of `QdrantClientUnexpectedResponseError` for a non-waiting snapshot returning 202. That path reports response-invalid even though the snapshot may be accepted. The HTTP port returns native null for that accepted response. There is no automatic fallback or replay. Hooks contain sanitized route, elapsed time and available status, without authentication headers or payloads."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Deletion and standard recommendation capture dense string ID arrays through the shared vector input owner. Native requests retain first-occurrence ID deduplication. Deletion count options use the same shared admission without changing precount or scroll behavior."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Cancellation after SDK dispatch does not undo a native modification; the request can still return success. Backend disposal waits for that actual result. A lost response leaves the outcome unknown and is never replayed automatically. Synchronous observer errors and rejected observer Promises are only reported; intervention uses the host's original pipeline."
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  },
+  "apis": [
+    {
+      "id": "storage-plugin-qdrant:index",
+      "library": "storage-plugin-qdrant",
+      "module": "index",
+      "exportPath": ".",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/docs/storage-plugin-qdrant/getting-started",
+      "architecturePath": "/en/docs/storage-plugin-qdrant",
+      "symbols": [
+        {
+          "name": "ERROR_SOURCE",
+          "kind": "const",
+          "signature": "export declare const ERROR_SOURCE = \"storage.backend.qdrant\";",
+          "declarationLine": 2,
+          "source": "packages/storage-plugin-qdrant/dist/error-code.d.ts",
+          "purpose": "Registered domain storage.backend.qdrant.",
+          "core": "Registered domain storage.backend.qdrant.",
+          "advanced": "",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "aliasOf": "ERROR_SOURCE",
+          "exportPath": ".",
+          "overloadSignatures": ["export declare const ERROR_SOURCE = \"storage.backend.qdrant\";"],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Registered domain storage.backend.qdrant."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ERROR_SOURCE from @migaia/storage-plugin-qdrant, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ERROR_SOURCE when its const contract and declared inputs match the result you need. Choose a different public symbol when ERROR_SOURCE does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "Registered domain storage.backend.qdrant."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-qdrant/dist/error-code.d.ts:ERROR_SOURCE:export declare const ERROR_SOURCE = \"storage.backend.qdrant\";",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-qdrant-index--ERROR_SOURCE"
+        },
+        {
+          "name": "IQdrantErrorCode",
+          "kind": "type",
+          "signature": "export type IQdrantErrorCode = (typeof QdrantErrorCode)[keyof typeof QdrantErrorCode];",
+          "declarationLine": 12,
+          "source": "packages/storage-plugin-qdrant/dist/error-code.d.ts",
+          "purpose": "IQdrantErrorCode is part of this module's public type contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IQdrantErrorCode.",
+          "advanced": "No additional advanced behavior is declared for IQdrantErrorCode.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IQdrantErrorCode."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IQdrantErrorCode.",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "aliasOf": "IQdrantErrorCode",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IQdrantErrorCode = (typeof QdrantErrorCode)[keyof typeof QdrantErrorCode];"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IQdrantErrorCode when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IQdrantErrorCode does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "IQdrantErrorCode is part of this module's public type contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IQdrantErrorCode from @migaia/storage-plugin-qdrant, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IQdrantErrorCode when its type contract and declared inputs match the result you need. Choose a different public symbol when IQdrantErrorCode does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IQdrantErrorCode."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IQdrantErrorCode."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-qdrant/dist/error-code.d.ts:IQdrantErrorCode:export type IQdrantErrorCode = (typeof QdrantErrorCode)[keyof typeof QdrantErrorCode];",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-qdrant-index--IQdrantErrorCode"
+        },
+        {
+          "name": "IQdrantHttp",
+          "kind": "type",
+          "signature": "export type IQdrantHttp = { readonly [K in IQdrantOperationName]: IQdrantOperation<QdrantClient[K]>; } & { getVersion(ctx?: IOperationContext): Promise<string>; };",
+          "declarationLine": 7,
+          "source": "packages/storage-plugin-qdrant/dist/types.d.ts",
+          "purpose": "Actual SDK method shapes plus operation context, without an arbitrary request method.",
+          "core": "Actual SDK method shapes plus operation context, without an arbitrary request method.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "getVersion",
+              "kind": "method",
+              "optional": false,
+              "signature": "getVersion(ctx?: IOperationContext): Promise<string>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "ctx",
+                  "type": "IOperationContext",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<string>"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "IQdrantHttp",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IQdrantHttp = { readonly [K in IQdrantOperationName]: IQdrantOperation<QdrantClient[K]>; } & { getVersion(ctx?: IOperationContext): Promise<string>; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Actual SDK method shapes plus operation context, without an arbitrary request method."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IQdrantHttp from @migaia/storage-plugin-qdrant, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IQdrantHttp when its type contract and declared inputs match the result you need. Choose a different public symbol when IQdrantHttp does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "Actual SDK method shapes plus operation context, without an arbitrary request method."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-qdrant/dist/types.d.ts:IQdrantHttp:export type IQdrantHttp = { readonly [K in IQdrantOperationName]: IQdrantOperation<QdrantClient[K]>; } & { getVersion(ctx?: IOperationContext): Promise<string>; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-qdrant-index--IQdrantHttp"
+        },
+        {
+          "name": "IQdrantHttpHookPayload",
+          "kind": "type",
+          "signature": "export type IQdrantHttpHookPayload = IStorageHttpHookPayload;",
+          "declarationLine": 9,
+          "source": "packages/storage-plugin-qdrant/dist/hooks.d.ts",
+          "purpose": "The shared hook payload contains only sanitized route and aggregate request facts.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IQdrantHttpHookPayload.",
+          "advanced": "No additional advanced behavior is declared for IQdrantHttpHookPayload.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IQdrantHttpHookPayload."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IQdrantHttpHookPayload.",
+          "examples": [],
+          "members": [],
+          "composes": ["IStorageHttpHookPayload"],
+          "aliasOf": "IQdrantHttpHookPayload",
+          "exportPath": ".",
+          "overloadSignatures": ["export type IQdrantHttpHookPayload = IStorageHttpHookPayload;"],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IQdrantHttpHookPayload when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IQdrantHttpHookPayload does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "The shared hook payload contains only sanitized route and aggregate request facts."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IQdrantHttpHookPayload from @migaia/storage-plugin-qdrant, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IQdrantHttpHookPayload when its type contract and declared inputs match the result you need. Choose a different public symbol when IQdrantHttpHookPayload does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IQdrantHttpHookPayload."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IQdrantHttpHookPayload."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-qdrant/dist/hooks.d.ts:IQdrantHttpHookPayload:export type IQdrantHttpHookPayload = IStorageHttpHookPayload;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-qdrant-index--IQdrantHttpHookPayload"
+        },
+        {
+          "name": "IQdrantOperation",
+          "kind": "type",
+          "signature": "export type IQdrantOperation<M extends (...args: never[]) => Promise<unknown>> = (...args: [...Parameters<M>, ctx?: IOperationContext]) => ReturnType<M>;",
+          "declarationLine": 4,
+          "source": "packages/storage-plugin-qdrant/dist/types.d.ts",
+          "purpose": "The finite native protocol appends the original context to actual SDK operation signatures.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IQdrantOperation.",
+          "advanced": "No additional advanced behavior is declared for IQdrantOperation.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IQdrantOperation."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IQdrantOperation.",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "aliasOf": "IQdrantOperation",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IQdrantOperation<M extends (...args: never[]) => Promise<unknown>> = (...args: [...Parameters<M>, ctx?: IOperationContext]) => ReturnType<M>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IQdrantOperation when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IQdrantOperation does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "The finite native protocol appends the original context to actual SDK operation signatures."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IQdrantOperation from @migaia/storage-plugin-qdrant, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IQdrantOperation when its type contract and declared inputs match the result you need. Choose a different public symbol when IQdrantOperation does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IQdrantOperation."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IQdrantOperation."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-qdrant/dist/types.d.ts:IQdrantOperation:export type IQdrantOperation<M extends (...args: never[]) => Promise<unknown>> = (...args: [...Parameters<M>, ctx?: IOperationContext]) => ReturnType<M>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-qdrant-index--IQdrantOperation"
+        },
+        {
+          "name": "IQdrantOperationName",
+          "kind": "type",
+          "signature": "export type IQdrantOperationName = 'scroll' | 'upsert' | 'delete' | 'retrieve' | 'getCollection' | 'createCollection' | 'getCollections' | 'deleteCollection' | 'query' | 'recommend' | 'searchPointGroups' | 'updateVectors' | 'updateCollectionAliases' | 'createSnapshot' | 'createPayloadIndex' | 'count' | 'setPayload' | 'deletePayload';",
+          "declarationLine": 6,
+          "source": "packages/storage-plugin-qdrant/dist/types.d.ts",
+          "purpose": "Only these genuine native methods belong to the backend and its closed Features.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IQdrantOperationName.",
+          "advanced": "No additional advanced behavior is declared for IQdrantOperationName.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IQdrantOperationName."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IQdrantOperationName.",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "aliasOf": "IQdrantOperationName",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IQdrantOperationName = 'scroll' | 'upsert' | 'delete' | 'retrieve' | 'getCollection' | 'createCollection' | 'getCollections' | 'deleteCollection' | 'query' | 'recommend' | 'searchPointGroups' | 'updateVectors' | 'updateCollectionAliases' | 'createSnapshot' | 'createPayloadIndex' | 'count' | 'setPayload' | 'deletePayload';"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IQdrantOperationName when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IQdrantOperationName does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Only these genuine native methods belong to the backend and its closed Features."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IQdrantOperationName from @migaia/storage-plugin-qdrant, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IQdrantOperationName when its type contract and declared inputs match the result you need. Choose a different public symbol when IQdrantOperationName does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IQdrantOperationName."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IQdrantOperationName."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-qdrant/dist/types.d.ts:IQdrantOperationName:export type IQdrantOperationName = 'scroll' | 'upsert' | 'delete' | 'retrieve' | 'getCollection' | 'createCollection' | 'getCollections' | 'deleteCollection' | 'query' | 'recommend' | 'searchPointGroups' | 'updateVectors' | 'updateCollectionAliases' | 'createSnapshot' | 'createPayloadIndex' | 'count' | 'setPayload' | 'deletePayload';",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-qdrant-index--IQdrantOperationName"
+        },
+        {
+          "name": "IQdrantOptions",
+          "kind": "type",
+          "signature": "export type IQdrantOptions = { readonly url: string; readonly apiKey?: string; readonly collectionPrefix?: string; readonly http?: IQdrantHttp; };",
+          "declarationLine": 18,
+          "source": "packages/storage-plugin-qdrant/dist/types.d.ts",
+          "purpose": "Connection options and an optional borrowed finite native port.",
+          "core": "Connection options and an optional borrowed finite native port.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "url",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly url: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "apiKey",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly apiKey?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "collectionPrefix",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly collectionPrefix?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "http",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly http?: IQdrantHttp;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IQdrantHttp"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "IQdrantOptions",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IQdrantOptions = { readonly url: string; readonly apiKey?: string; readonly collectionPrefix?: string; readonly http?: IQdrantHttp; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Connection options and an optional borrowed finite native port."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IQdrantOptions from @migaia/storage-plugin-qdrant, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IQdrantOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when IQdrantOptions does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "Connection options and an optional borrowed finite native port."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-qdrant/dist/types.d.ts:IQdrantOptions:export type IQdrantOptions = { readonly url: string; readonly apiKey?: string; readonly collectionPrefix?: string; readonly http?: IQdrantHttp; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-qdrant-index--IQdrantOptions"
+        },
+        {
+          "name": "IQdrantStore",
+          "kind": "type",
+          "signature": "export type IQdrantStore = ICapabilityStore<IQdrantBase, typeof vector | typeof ttl, readonly [ICapabilityImpl<typeof vector, IVectorApi<true>>, ICapabilityImpl<typeof ttl, ITtlApi>]>;",
+          "declarationLine": 39,
+          "source": "packages/storage-plugin-qdrant/dist/types.d.ts",
+          "purpose": "Exact vector and vector-target TTL store; every base boolean capability is false.",
+          "core": "Exact vector and vector-target TTL store; every base boolean capability is false.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": ["ICapabilityStore"],
+          "aliasOf": "IQdrantStore",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IQdrantStore = ICapabilityStore<IQdrantBase, typeof vector | typeof ttl, readonly [ICapabilityImpl<typeof vector, IVectorApi<true>>, ICapabilityImpl<typeof ttl, ITtlApi>]>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Exact vector and vector-target TTL store; every base boolean capability is false."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IQdrantStore from @migaia/storage-plugin-qdrant, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IQdrantStore when its type contract and declared inputs match the result you need. Choose a different public symbol when IQdrantStore does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "Exact vector and vector-target TTL store; every base boolean capability is false."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-qdrant/dist/types.d.ts:IQdrantStore:export type IQdrantStore = ICapabilityStore<IQdrantBase, typeof vector | typeof ttl, readonly [ICapabilityImpl<typeof vector, IVectorApi<true>>, ICapabilityImpl<typeof ttl, ITtlApi>]>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-qdrant-index--IQdrantStore"
+        },
+        {
+          "name": "IQdrantUpdateResult",
+          "kind": "type",
+          "signature": "export type IQdrantUpdateResult = { readonly operationId: number; readonly status: 'acknowledged' | 'completed'; };",
+          "declarationLine": 13,
+          "source": "packages/storage-plugin-qdrant/dist/types.d.ts",
+          "purpose": "Native operationId and acknowledged/completed status, never a deletion count.",
+          "core": "Native operationId and acknowledged/completed status, never a deletion count.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "operationId",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly operationId: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "status",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly status: 'acknowledged' | 'completed';",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "'acknowledged' | 'completed'"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "IQdrantUpdateResult",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IQdrantUpdateResult = { readonly operationId: number; readonly status: 'acknowledged' | 'completed'; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Native operationId and acknowledged/completed status, never a deletion count."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IQdrantUpdateResult from @migaia/storage-plugin-qdrant, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IQdrantUpdateResult when its type contract and declared inputs match the result you need. Choose a different public symbol when IQdrantUpdateResult does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "Native operationId and acknowledged/completed status, never a deletion count."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-qdrant/dist/types.d.ts:IQdrantUpdateResult:export type IQdrantUpdateResult = { readonly operationId: number; readonly status: 'acknowledged' | 'completed'; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-qdrant-index--IQdrantUpdateResult"
+        },
+        {
+          "name": "qdrantBackendKind",
+          "kind": "const",
+          "signature": "export declare const qdrantBackendKind: import(\"@migaia/storage-host\").IStorageBackendKind<\"qdrant\", IQdrantStore, IQdrantHttp, {}>;",
+          "declarationLine": 4,
+          "source": "packages/storage-plugin-qdrant/dist/plugin.d.ts",
+          "purpose": "Authenticate native store/client Feature identity.",
+          "core": "Authenticate native store/client Feature identity.",
+          "advanced": "",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "aliasOf": "qdrantBackendKind",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const qdrantBackendKind: import(\"@migaia/storage-host\").IStorageBackendKind<\"qdrant\", IQdrantStore, IQdrantHttp, {}>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Authenticate native store/client Feature identity."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import qdrantBackendKind from @migaia/storage-plugin-qdrant, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use qdrantBackendKind when its const contract and declared inputs match the result you need. Choose a different public symbol when qdrantBackendKind does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "Authenticate native store/client Feature identity."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-qdrant/dist/plugin.d.ts:qdrantBackendKind:export declare const qdrantBackendKind: import(\"@migaia/storage-host\").IStorageBackendKind<\"qdrant\", IQdrantStore, IQdrantHttp, {}>;",
+          "guidance": [],
+          "usageScore": 2,
+          "configuration": [],
+          "fragment": "storage-plugin-qdrant-index--qdrantBackendKind"
+        },
+        {
+          "name": "qdrantBackendPlugin",
+          "kind": "function",
+          "signature": "export declare function qdrantBackendPlugin<const TId extends string = 'qdrant', const F extends IStorageFeatureRecord = {}>(options: IQdrantOptions & { readonly id?: TId; }, features?: F & IStorageFeatureStoreCompatibility<typeof qdrantBackendKind, NoInfer<F>, IQdrantStore>): IStorageBackendPlugin<typeof qdrantBackendKind, NoInfer<TId>, F, IQdrantStore>;",
+          "declarationLine": 6,
+          "source": "packages/storage-plugin-qdrant/dist/plugin.d.ts",
+          "purpose": "Capture connection data and install native vector/TTL through the original host owners.",
+          "core": "features: Selected exact-kind native Features; no transaction projection.\nA pure plugin descriptor; detection belongs to host creation or explicit host.detect.\nurl: Native HTTP(S) server URL.\napiKey: Request authentication header, never hook payload.\ncollectionPrefix: Managed collection namespace; organizations share its physical collections.\nmigaia_.\nhttp: Borrow a genuine finite protocol object; disposal does not close it.\nid: Exact backend id used by host.backend.\nqdrant.",
+          "advanced": "",
+          "parameters": [
+            "options: IQdrantOptions & { readonly id?: TId; }",
+            "features: F & IStorageFeatureStoreCompatibility<typeof qdrantBackendKind, NoInfer<F>, IQdrantStore> (optional)"
+          ],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "IQdrantOptions & { readonly id?: TId; }",
+              "optional": false
+            },
+            {
+              "name": "features",
+              "type": "F & IStorageFeatureStoreCompatibility<typeof qdrantBackendKind, NoInfer<F>, IQdrantStore>",
+              "optional": true
+            }
+          ],
+          "returns": "IStorageBackendPlugin<typeof qdrantBackendKind, NoInfer<TId>, F, IQdrantStore>",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [
+            "import { createStorageHost } from '@migaia/storage-host'\nimport { vector } from '@migaia/storage-contract'\nimport { qdrantBackendPlugin } from '@migaia/storage-plugin-qdrant'\n\nawait using host = await createStorageHost({\n  plugins: [qdrantBackendPlugin({ url: 'http://127.0.0.1:6333' })] as const\n})\nconst documents = host\n  .backend('qdrant')\n  .use(vector)\n  .collection<{ category: string }>('documents', { dimensions: 2, metric: 'cosine' })\nawait documents.upsert([{ id: 'a', vector: [100, 0], payload: { category: 'guide' } }])\nconsole.log(await documents.near([1, 0], { exact: true }).topK(5).withVector().all())"
+          ],
+          "members": [],
+          "composes": [],
+          "aliasOf": "qdrantBackendPlugin",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare function qdrantBackendPlugin<const TId extends string = 'qdrant', const F extends IStorageFeatureRecord = {}>(options: IQdrantOptions & { readonly id?: TId; }, features?: F & IStorageFeatureStoreCompatibility<typeof qdrantBackendKind, NoInfer<F>, IQdrantStore>): IStorageBackendPlugin<typeof qdrantBackendKind, NoInfer<TId>, F, IQdrantStore>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "IQdrantOptions & { readonly id?: TId; }",
+                "optional": false
+              },
+              {
+                "name": "features",
+                "type": "F & IStorageFeatureStoreCompatibility<typeof qdrantBackendKind, NoInfer<F>, IQdrantStore>",
+                "optional": true
+              }
+            ]
+          ],
+          "overloadReturns": [
+            "IStorageBackendPlugin<typeof qdrantBackendKind, NoInfer<TId>, F, IQdrantStore>"
+          ],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Capture connection data and install native vector/TTL through the original host owners."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import qdrantBackendPlugin from @migaia/storage-plugin-qdrant, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use qdrantBackendPlugin when its function contract and declared inputs match the result you need. Choose a different public symbol when qdrantBackendPlugin does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "features: Selected exact-kind native Features; no transaction projection.\nA pure plugin descriptor; detection belongs to host creation or explicit host.detect.\nurl: Native HTTP(S) server URL.\napiKey: Request authentication header, never hook payload.\ncollectionPrefix: Managed collection namespace; organizations share its physical collections.\nmigaia_.\nhttp: Borrow a genuine finite protocol object; disposal does not close it.\nid: Exact backend id used by host.backend.\nqdrant."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [
+            {
+              "name": "id",
+              "type": "TId",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "url",
+              "type": "string",
+              "optional": false,
+              "description": ""
+            },
+            {
+              "name": "apiKey",
+              "type": "string",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "collectionPrefix",
+              "type": "string",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "http",
+              "type": "IQdrantHttp",
+              "optional": true,
+              "description": ""
+            }
+          ],
+          "identity": "packages/storage-plugin-qdrant/dist/plugin.d.ts:qdrantBackendPlugin:export declare function qdrantBackendPlugin<const TId extends string = 'qdrant', const F extends IStorageFeatureRecord = {}>(options: IQdrantOptions & { readonly id?: TId; }, features?: F & IStorageFeatureStoreCompatibility<typeof qdrantBackendKind, NoInfer<F>, IQdrantStore>): IStorageBackendPlugin<typeof qdrantBackendKind, NoInfer<TId>, F, IQdrantStore>;",
+          "guidance": [],
+          "usageScore": 12,
+          "configuration": [
+            {
+              "name": "id",
+              "type": "TId",
+              "optional": true,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            },
+            {
+              "name": "url",
+              "type": "string",
+              "optional": false,
+              "description": "`/http` — 基于运行时 fetch 的 `fetchHttp(url, apiKey?)`",
+              "descriptionEn": "",
+              "descriptionZh": "`/http` — 基于运行时 fetch 的 `fetchHttp(url, apiKey?)`"
+            },
+            {
+              "name": "apiKey",
+              "type": "string",
+              "optional": true,
+              "description": "`/http` — 基于运行时 fetch 的 `fetchHttp(url, apiKey?)`",
+              "descriptionEn": "",
+              "descriptionZh": "`/http` — 基于运行时 fetch 的 `fetchHttp(url, apiKey?)`"
+            },
+            {
+              "name": "collectionPrefix",
+              "type": "string",
+              "optional": true,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            },
+            {
+              "name": "http",
+              "type": "IQdrantHttp",
+              "optional": true,
+              "description": "`/http` — 基于运行时 fetch 的 `fetchHttp(url, apiKey?)`",
+              "descriptionEn": "",
+              "descriptionZh": "`/http` — 基于运行时 fetch 的 `fetchHttp(url, apiKey?)`"
+            }
+          ],
+          "fragment": "storage-plugin-qdrant-index--qdrantBackendPlugin"
+        },
+        {
+          "name": "QdrantErrorCode",
+          "kind": "const",
+          "signature": "export declare const QdrantErrorCode: { /** The native service or transport failed; a dispatched modification may have an unknown outcome. */ readonly unavailable: 'QDRANT_UNAVAILABLE'; /** A native 4xx explicitly rejected the request; inspect the original response. */ readonly requestFailed: 'QDRANT_REQUEST_FAILED'; /** A necessary native response field or managed envelope cannot be decoded. */ readonly responseInvalid: 'QDRANT_RESPONSE_INVALID'; };",
+          "declarationLine": 4,
+          "source": "packages/storage-plugin-qdrant/dist/error-code.d.ts",
+          "purpose": "Classify unavailable, rejected and invalid native responses while retaining original causes.",
+          "core": "Classify unavailable, rejected and invalid native responses while retaining original causes.",
+          "advanced": "",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "unavailable",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly unavailable: 'QDRANT_UNAVAILABLE';",
+              "description": "The native service or transport failed; a dispatched modification may have an unknown outcome.",
+              "parameterDetails": [],
+              "returns": "'QDRANT_UNAVAILABLE'"
+            },
+            {
+              "name": "requestFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly requestFailed: 'QDRANT_REQUEST_FAILED';",
+              "description": "A native 4xx explicitly rejected the request; inspect the original response.",
+              "parameterDetails": [],
+              "returns": "'QDRANT_REQUEST_FAILED'"
+            },
+            {
+              "name": "responseInvalid",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly responseInvalid: 'QDRANT_RESPONSE_INVALID';",
+              "description": "A necessary native response field or managed envelope cannot be decoded.",
+              "parameterDetails": [],
+              "returns": "'QDRANT_RESPONSE_INVALID'"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "QdrantErrorCode",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const QdrantErrorCode: { /** The native service or transport failed; a dispatched modification may have an unknown outcome. */ readonly unavailable: 'QDRANT_UNAVAILABLE'; /** A native 4xx explicitly rejected the request; inspect the original response. */ readonly requestFailed: 'QDRANT_REQUEST_FAILED'; /** A necessary native response field or managed envelope cannot be decoded. */ readonly responseInvalid: 'QDRANT_RESPONSE_INVALID'; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Classify unavailable, rejected and invalid native responses while retaining original causes."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import QdrantErrorCode from @migaia/storage-plugin-qdrant, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use QdrantErrorCode when its const contract and declared inputs match the result you need. Choose a different public symbol when QdrantErrorCode does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "Classify unavailable, rejected and invalid native responses while retaining original causes."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-qdrant/dist/error-code.d.ts:QdrantErrorCode:export declare const QdrantErrorCode: { /** The native service or transport failed; a dispatched modification may have an unknown outcome. */ readonly unavailable: 'QDRANT_UNAVAILABLE'; /** A native 4xx explicitly rejected the request; inspect the original response. */ readonly requestFailed: 'QDRANT_REQUEST_FAILED'; /** A necessary native response field or managed envelope cannot be decoded. */ readonly responseInvalid: 'QDRANT_RESPONSE_INVALID'; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-qdrant-index--QdrantErrorCode"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "storage-plugin-qdrant:client",
+      "library": "storage-plugin-qdrant",
+      "module": "client",
+      "exportPath": "./client",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/docs/storage-plugin-qdrant/getting-started",
+      "architecturePath": "/en/docs/storage-plugin-qdrant",
+      "symbols": [
+        {
+          "name": "qdrantClientHttp",
+          "kind": "function",
+          "signature": "export declare function qdrantClientHttp(client: QdrantClient): IQdrantHttp;",
+          "declarationLine": 4,
+          "source": "packages/storage-plugin-qdrant/dist/client.d.ts",
+          "purpose": "Keep the real borrowed SDK configuration and actual request lifetime.",
+          "core": "Keep the real borrowed SDK configuration and actual request lifetime.",
+          "advanced": "",
+          "parameters": ["client: QdrantClient"],
+          "parameterDetails": [
+            {
+              "name": "client",
+              "type": "QdrantClient",
+              "optional": false
+            }
+          ],
+          "returns": "IQdrantHttp",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "exportPath": "./client",
+          "overloadSignatures": [
+            "export declare function qdrantClientHttp(client: QdrantClient): IQdrantHttp;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "client",
+                "type": "QdrantClient",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["IQdrantHttp"],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Keep the real borrowed SDK configuration and actual request lifetime."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import qdrantClientHttp from @migaia/storage-plugin-qdrant/client, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use qdrantClientHttp when its function contract and declared inputs match the result you need. Choose a different public symbol when qdrantClientHttp does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "Keep the real borrowed SDK configuration and actual request lifetime."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-qdrant/dist/client.d.ts:qdrantClientHttp:export declare function qdrantClientHttp(client: QdrantClient): IQdrantHttp;",
+          "guidance": [],
+          "usageScore": 2,
+          "configuration": [],
+          "fragment": "storage-plugin-qdrant-client--qdrantClientHttp"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "storage-plugin-qdrant:features/group-by",
+      "library": "storage-plugin-qdrant",
+      "module": "features/group-by",
+      "exportPath": "./features/group-by",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/docs/storage-plugin-qdrant/getting-started",
+      "architecturePath": "/en/docs/storage-plugin-qdrant",
+      "symbols": [
+        {
+          "name": "IQdrantGroupByApi",
+          "kind": "type",
+          "signature": "export type IQdrantGroupByApi = { search(collection: string, request: IQdrantGroupByRequest, ctx?: IOperationContext): Promise<IQdrantGroupByResult>; };",
+          "declarationLine": 45,
+          "source": "packages/storage-plugin-qdrant/dist/feature-types.d.ts",
+          "purpose": "IQdrantGroupByApi is part of this module's public type contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IQdrantGroupByApi.",
+          "advanced": "No additional advanced behavior is declared for IQdrantGroupByApi.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IQdrantGroupByApi."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IQdrantGroupByApi.",
+          "examples": [],
+          "members": [
+            {
+              "name": "search",
+              "kind": "method",
+              "optional": false,
+              "signature": "search(collection: string, request: IQdrantGroupByRequest, ctx?: IOperationContext): Promise<IQdrantGroupByResult>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "collection",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "request",
+                  "type": "IQdrantGroupByRequest",
+                  "optional": false
+                },
+                {
+                  "name": "ctx",
+                  "type": "IOperationContext",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<IQdrantGroupByResult>"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "IQdrantGroupByApi",
+          "exportPath": "./features/group-by",
+          "overloadSignatures": [
+            "export type IQdrantGroupByApi = { search(collection: string, request: IQdrantGroupByRequest, ctx?: IOperationContext): Promise<IQdrantGroupByResult>; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IQdrantGroupByApi when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IQdrantGroupByApi does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "IQdrantGroupByApi is part of this module's public type contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IQdrantGroupByApi from @migaia/storage-plugin-qdrant/features/group-by, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IQdrantGroupByApi when its type contract and declared inputs match the result you need. Choose a different public symbol when IQdrantGroupByApi does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IQdrantGroupByApi."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IQdrantGroupByApi."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-qdrant/dist/feature-types.d.ts:IQdrantGroupByApi:export type IQdrantGroupByApi = { search(collection: string, request: IQdrantGroupByRequest, ctx?: IOperationContext): Promise<IQdrantGroupByResult>; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-qdrant-features/group-by--IQdrantGroupByApi"
+        },
+        {
+          "name": "IQdrantGroupByOutput",
+          "kind": "type",
+          "signature": "export type IQdrantGroupByOutput = IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly qdrantGroupBy: IQdrantGroupByApi; }; readonly transaction: {}; }>;",
+          "declarationLine": 48,
+          "source": "packages/storage-plugin-qdrant/dist/feature-types.d.ts",
+          "purpose": "IQdrantGroupByOutput is part of this module's public type contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IQdrantGroupByOutput.",
+          "advanced": "No additional advanced behavior is declared for IQdrantGroupByOutput.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IQdrantGroupByOutput."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IQdrantGroupByOutput.",
+          "examples": [],
+          "members": [],
+          "composes": ["IStorageFeatureOutput"],
+          "aliasOf": "IQdrantGroupByOutput",
+          "exportPath": "./features/group-by",
+          "overloadSignatures": [
+            "export type IQdrantGroupByOutput = IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly qdrantGroupBy: IQdrantGroupByApi; }; readonly transaction: {}; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IQdrantGroupByOutput when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IQdrantGroupByOutput does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "IQdrantGroupByOutput is part of this module's public type contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IQdrantGroupByOutput from @migaia/storage-plugin-qdrant/features/group-by, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IQdrantGroupByOutput when its type contract and declared inputs match the result you need. Choose a different public symbol when IQdrantGroupByOutput does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IQdrantGroupByOutput."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IQdrantGroupByOutput."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-qdrant/dist/feature-types.d.ts:IQdrantGroupByOutput:export type IQdrantGroupByOutput = IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly qdrantGroupBy: IQdrantGroupByApi; }; readonly transaction: {}; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-qdrant-features/group-by--IQdrantGroupByOutput"
+        },
+        {
+          "name": "IQdrantGroupByRequest",
+          "kind": "type",
+          "signature": "export type IQdrantGroupByRequest = Omit<Parameters<QdrantClient['searchPointGroups']>[1], 'with_lookup'>;",
+          "declarationLine": 43,
+          "source": "packages/storage-plugin-qdrant/dist/feature-types.d.ts",
+          "purpose": "Actual native grouping parameters with with_lookup omitted.",
+          "core": "Actual native grouping parameters with with_lookup omitted.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "aliasOf": "IQdrantGroupByRequest",
+          "exportPath": "./features/group-by",
+          "overloadSignatures": [
+            "export type IQdrantGroupByRequest = Omit<Parameters<QdrantClient['searchPointGroups']>[1], 'with_lookup'>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Actual native grouping parameters with with_lookup omitted."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IQdrantGroupByRequest from @migaia/storage-plugin-qdrant/features/group-by, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IQdrantGroupByRequest when its type contract and declared inputs match the result you need. Choose a different public symbol when IQdrantGroupByRequest does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "Actual native grouping parameters with with_lookup omitted."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-qdrant/dist/feature-types.d.ts:IQdrantGroupByRequest:export type IQdrantGroupByRequest = Omit<Parameters<QdrantClient['searchPointGroups']>[1], 'with_lookup'>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-qdrant-features/group-by--IQdrantGroupByRequest"
+        },
+        {
+          "name": "IQdrantGroupByResult",
+          "kind": "type",
+          "signature": "export type IQdrantGroupByResult = Awaited<ReturnType<QdrantClient['searchPointGroups']>>;",
+          "declarationLine": 44,
+          "source": "packages/storage-plugin-qdrant/dist/feature-types.d.ts",
+          "purpose": "IQdrantGroupByResult is part of this module's public type contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IQdrantGroupByResult.",
+          "advanced": "No additional advanced behavior is declared for IQdrantGroupByResult.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IQdrantGroupByResult."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IQdrantGroupByResult.",
+          "examples": [],
+          "members": [],
+          "composes": ["Awaited"],
+          "aliasOf": "IQdrantGroupByResult",
+          "exportPath": "./features/group-by",
+          "overloadSignatures": [
+            "export type IQdrantGroupByResult = Awaited<ReturnType<QdrantClient['searchPointGroups']>>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IQdrantGroupByResult when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IQdrantGroupByResult does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "IQdrantGroupByResult is part of this module's public type contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IQdrantGroupByResult from @migaia/storage-plugin-qdrant/features/group-by, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IQdrantGroupByResult when its type contract and declared inputs match the result you need. Choose a different public symbol when IQdrantGroupByResult does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IQdrantGroupByResult."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IQdrantGroupByResult."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-qdrant/dist/feature-types.d.ts:IQdrantGroupByResult:export type IQdrantGroupByResult = Awaited<ReturnType<QdrantClient['searchPointGroups']>>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-qdrant-features/group-by--IQdrantGroupByResult"
+        },
+        {
+          "name": "qdrantGroupByFeature",
+          "kind": "function",
+          "signature": "export declare function qdrantGroupByFeature(): IStorageFeature<typeof qdrantBackendKind, IQdrantGroupByOutput>;",
+          "declarationLine": 5,
+          "source": "packages/storage-plugin-qdrant/dist/features/group-by.d.ts",
+          "purpose": "Native groups retain multivalue membership and omit unforwarded lookup.",
+          "core": "Native groups retain multivalue membership and omit unforwarded lookup.",
+          "advanced": "",
+          "parameters": ["This function declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "IStorageFeature<typeof qdrantBackendKind, IQdrantGroupByOutput>",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "exportPath": "./features/group-by",
+          "overloadSignatures": [
+            "export declare function qdrantGroupByFeature(): IStorageFeature<typeof qdrantBackendKind, IQdrantGroupByOutput>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": ["IStorageFeature<typeof qdrantBackendKind, IQdrantGroupByOutput>"],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Native groups retain multivalue membership and omit unforwarded lookup."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import qdrantGroupByFeature from @migaia/storage-plugin-qdrant/features/group-by, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use qdrantGroupByFeature when its function contract and declared inputs match the result you need. Choose a different public symbol when qdrantGroupByFeature does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "Native groups retain multivalue membership and omit unforwarded lookup."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-qdrant/dist/features/group-by.d.ts:qdrantGroupByFeature:export declare function qdrantGroupByFeature(): IStorageFeature<typeof qdrantBackendKind, IQdrantGroupByOutput>;",
+          "guidance": [],
+          "usageScore": 10,
+          "configuration": [],
+          "fragment": "storage-plugin-qdrant-features/group-by--qdrantGroupByFeature"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "storage-plugin-qdrant:features/hybrid",
+      "library": "storage-plugin-qdrant",
+      "module": "features/hybrid",
+      "exportPath": "./features/hybrid",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/docs/storage-plugin-qdrant/getting-started",
+      "architecturePath": "/en/docs/storage-plugin-qdrant",
+      "symbols": [
+        {
+          "name": "IQdrantHybridApi",
+          "kind": "type",
+          "signature": "export type IQdrantHybridApi = { query(collection: string, request: IQdrantHybridRequest, ctx?: IOperationContext): Promise<IQdrantHybridResult>; updateSparseVectors(collection: string, request: IQdrantSparseVectorsRequest, ctx?: IOperationContext): Promise<IQdrantSparseVectorsResult>; };",
+          "declarationLine": 22,
+          "source": "packages/storage-plugin-qdrant/dist/feature-types.d.ts",
+          "purpose": "IQdrantHybridApi is part of this module's public type contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IQdrantHybridApi.",
+          "advanced": "No additional advanced behavior is declared for IQdrantHybridApi.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IQdrantHybridApi."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IQdrantHybridApi.",
+          "examples": [],
+          "members": [
+            {
+              "name": "query",
+              "kind": "method",
+              "optional": false,
+              "signature": "query(collection: string, request: IQdrantHybridRequest, ctx?: IOperationContext): Promise<IQdrantHybridResult>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "collection",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "request",
+                  "type": "IQdrantHybridRequest",
+                  "optional": false
+                },
+                {
+                  "name": "ctx",
+                  "type": "IOperationContext",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<IQdrantHybridResult>"
+            },
+            {
+              "name": "updateSparseVectors",
+              "kind": "method",
+              "optional": false,
+              "signature": "updateSparseVectors(collection: string, request: IQdrantSparseVectorsRequest, ctx?: IOperationContext): Promise<IQdrantSparseVectorsResult>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "collection",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "request",
+                  "type": "IQdrantSparseVectorsRequest",
+                  "optional": false
+                },
+                {
+                  "name": "ctx",
+                  "type": "IOperationContext",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<IQdrantSparseVectorsResult>"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "IQdrantHybridApi",
+          "exportPath": "./features/hybrid",
+          "overloadSignatures": [
+            "export type IQdrantHybridApi = { query(collection: string, request: IQdrantHybridRequest, ctx?: IOperationContext): Promise<IQdrantHybridResult>; updateSparseVectors(collection: string, request: IQdrantSparseVectorsRequest, ctx?: IOperationContext): Promise<IQdrantSparseVectorsResult>; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IQdrantHybridApi when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IQdrantHybridApi does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "IQdrantHybridApi is part of this module's public type contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IQdrantHybridApi from @migaia/storage-plugin-qdrant/features/hybrid, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IQdrantHybridApi when its type contract and declared inputs match the result you need. Choose a different public symbol when IQdrantHybridApi does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IQdrantHybridApi."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IQdrantHybridApi."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-qdrant/dist/feature-types.d.ts:IQdrantHybridApi:export type IQdrantHybridApi = { query(collection: string, request: IQdrantHybridRequest, ctx?: IOperationContext): Promise<IQdrantHybridResult>; updateSparseVectors(collection: string, request: IQdrantSparseVectorsRequest, ctx?: IOperationContext): Promise<IQdrantSparseVectorsResult>; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-qdrant-features/hybrid--IQdrantHybridApi"
+        },
+        {
+          "name": "IQdrantHybridBranch",
+          "kind": "type",
+          "signature": "export type IQdrantHybridBranch = Omit<Schemas['Prefetch'], 'prefetch' | 'query' | 'using'> & { query: Schemas['VectorInput']; using: string; };",
+          "declarationLine": 5,
+          "source": "packages/storage-plugin-qdrant/dist/feature-types.d.ts",
+          "purpose": "IQdrantHybridBranch is part of this module's public type contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IQdrantHybridBranch.",
+          "advanced": "No additional advanced behavior is declared for IQdrantHybridBranch.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IQdrantHybridBranch."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IQdrantHybridBranch.",
+          "examples": [],
+          "members": [
+            {
+              "name": "query",
+              "kind": "property",
+              "optional": false,
+              "signature": "query: Schemas['VectorInput'];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Schemas['VectorInput']"
+            },
+            {
+              "name": "using",
+              "kind": "property",
+              "optional": false,
+              "signature": "using: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "IQdrantHybridBranch",
+          "exportPath": "./features/hybrid",
+          "overloadSignatures": [
+            "export type IQdrantHybridBranch = Omit<Schemas['Prefetch'], 'prefetch' | 'query' | 'using'> & { query: Schemas['VectorInput']; using: string; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IQdrantHybridBranch when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IQdrantHybridBranch does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "IQdrantHybridBranch is part of this module's public type contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IQdrantHybridBranch from @migaia/storage-plugin-qdrant/features/hybrid, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IQdrantHybridBranch when its type contract and declared inputs match the result you need. Choose a different public symbol when IQdrantHybridBranch does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IQdrantHybridBranch."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IQdrantHybridBranch."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-qdrant/dist/feature-types.d.ts:IQdrantHybridBranch:export type IQdrantHybridBranch = Omit<Schemas['Prefetch'], 'prefetch' | 'query' | 'using'> & { query: Schemas['VectorInput']; using: string; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-qdrant-features/hybrid--IQdrantHybridBranch"
+        },
+        {
+          "name": "IQdrantHybridOutput",
+          "kind": "type",
+          "signature": "export type IQdrantHybridOutput = IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly qdrantHybrid: IQdrantHybridApi; }; readonly transaction: {}; }>;",
+          "declarationLine": 26,
+          "source": "packages/storage-plugin-qdrant/dist/feature-types.d.ts",
+          "purpose": "IQdrantHybridOutput is part of this module's public type contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IQdrantHybridOutput.",
+          "advanced": "No additional advanced behavior is declared for IQdrantHybridOutput.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IQdrantHybridOutput."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IQdrantHybridOutput.",
+          "examples": [],
+          "members": [],
+          "composes": ["IStorageFeatureOutput"],
+          "aliasOf": "IQdrantHybridOutput",
+          "exportPath": "./features/hybrid",
+          "overloadSignatures": [
+            "export type IQdrantHybridOutput = IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly qdrantHybrid: IQdrantHybridApi; }; readonly transaction: {}; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IQdrantHybridOutput when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IQdrantHybridOutput does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "IQdrantHybridOutput is part of this module's public type contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IQdrantHybridOutput from @migaia/storage-plugin-qdrant/features/hybrid, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IQdrantHybridOutput when its type contract and declared inputs match the result you need. Choose a different public symbol when IQdrantHybridOutput does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IQdrantHybridOutput."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IQdrantHybridOutput."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-qdrant/dist/feature-types.d.ts:IQdrantHybridOutput:export type IQdrantHybridOutput = IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly qdrantHybrid: IQdrantHybridApi; }; readonly transaction: {}; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-qdrant-features/hybrid--IQdrantHybridOutput"
+        },
+        {
+          "name": "IQdrantHybridRequest",
+          "kind": "type",
+          "signature": "export type IQdrantHybridRequest = Omit<Parameters<QdrantClient['query']>[1], 'query' | 'prefetch'> & { query: Schemas['FusionQuery']; prefetch: [IQdrantHybridBranch, IQdrantHybridBranch]; };",
+          "declarationLine": 9,
+          "source": "packages/storage-plugin-qdrant/dist/feature-types.d.ts",
+          "purpose": "Exactly two named branches and native RRF fusion.",
+          "core": "Exactly two named branches and native RRF fusion.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "query",
+              "kind": "property",
+              "optional": false,
+              "signature": "query: Schemas['FusionQuery'];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Schemas['FusionQuery']"
+            },
+            {
+              "name": "prefetch",
+              "kind": "property",
+              "optional": false,
+              "signature": "prefetch: [IQdrantHybridBranch, IQdrantHybridBranch];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "[IQdrantHybridBranch, IQdrantHybridBranch]"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "IQdrantHybridRequest",
+          "exportPath": "./features/hybrid",
+          "overloadSignatures": [
+            "export type IQdrantHybridRequest = Omit<Parameters<QdrantClient['query']>[1], 'query' | 'prefetch'> & { query: Schemas['FusionQuery']; prefetch: [IQdrantHybridBranch, IQdrantHybridBranch]; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Exactly two named branches and native RRF fusion."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IQdrantHybridRequest from @migaia/storage-plugin-qdrant/features/hybrid, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IQdrantHybridRequest when its type contract and declared inputs match the result you need. Choose a different public symbol when IQdrantHybridRequest does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "Exactly two named branches and native RRF fusion."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-qdrant/dist/feature-types.d.ts:IQdrantHybridRequest:export type IQdrantHybridRequest = Omit<Parameters<QdrantClient['query']>[1], 'query' | 'prefetch'> & { query: Schemas['FusionQuery']; prefetch: [IQdrantHybridBranch, IQdrantHybridBranch]; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-qdrant-features/hybrid--IQdrantHybridRequest"
+        },
+        {
+          "name": "IQdrantHybridResult",
+          "kind": "type",
+          "signature": "export type IQdrantHybridResult = Awaited<ReturnType<QdrantClient['query']>>;",
+          "declarationLine": 20,
+          "source": "packages/storage-plugin-qdrant/dist/feature-types.d.ts",
+          "purpose": "IQdrantHybridResult is part of this module's public type contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IQdrantHybridResult.",
+          "advanced": "No additional advanced behavior is declared for IQdrantHybridResult.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IQdrantHybridResult."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IQdrantHybridResult.",
+          "examples": [],
+          "members": [],
+          "composes": ["Awaited"],
+          "aliasOf": "IQdrantHybridResult",
+          "exportPath": "./features/hybrid",
+          "overloadSignatures": [
+            "export type IQdrantHybridResult = Awaited<ReturnType<QdrantClient['query']>>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IQdrantHybridResult when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IQdrantHybridResult does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "IQdrantHybridResult is part of this module's public type contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IQdrantHybridResult from @migaia/storage-plugin-qdrant/features/hybrid, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IQdrantHybridResult when its type contract and declared inputs match the result you need. Choose a different public symbol when IQdrantHybridResult does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IQdrantHybridResult."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IQdrantHybridResult."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-qdrant/dist/feature-types.d.ts:IQdrantHybridResult:export type IQdrantHybridResult = Awaited<ReturnType<QdrantClient['query']>>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-qdrant-features/hybrid--IQdrantHybridResult"
+        },
+        {
+          "name": "IQdrantSparseVectorsRequest",
+          "kind": "type",
+          "signature": "export type IQdrantSparseVectorsRequest = Omit<Parameters<QdrantClient['updateVectors']>[1], 'points'> & { points: Array<Omit<Schemas['PointVectors'], 'vector'> & { vector: { [name: string]: Schemas['SparseVector']; }; }>; };",
+          "declarationLine": 13,
+          "source": "packages/storage-plugin-qdrant/dist/feature-types.d.ts",
+          "purpose": "Configured sparse names with unique nonnegative indices and finite values.",
+          "core": "Configured sparse names with unique nonnegative indices and finite values.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "points",
+              "kind": "property",
+              "optional": false,
+              "signature": "points: Array<Omit<Schemas['PointVectors'], 'vector'> & { vector: { [name: string]: Schemas['SparseVector']; }; }>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Array<Omit<Schemas['PointVectors'], 'vector'> & { vector: { [name: string]: Schemas['SparseVector']; }; }>"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "IQdrantSparseVectorsRequest",
+          "exportPath": "./features/hybrid",
+          "overloadSignatures": [
+            "export type IQdrantSparseVectorsRequest = Omit<Parameters<QdrantClient['updateVectors']>[1], 'points'> & { points: Array<Omit<Schemas['PointVectors'], 'vector'> & { vector: { [name: string]: Schemas['SparseVector']; }; }>; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Configured sparse names with unique nonnegative indices and finite values."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IQdrantSparseVectorsRequest from @migaia/storage-plugin-qdrant/features/hybrid, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IQdrantSparseVectorsRequest when its type contract and declared inputs match the result you need. Choose a different public symbol when IQdrantSparseVectorsRequest does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "Configured sparse names with unique nonnegative indices and finite values."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-qdrant/dist/feature-types.d.ts:IQdrantSparseVectorsRequest:export type IQdrantSparseVectorsRequest = Omit<Parameters<QdrantClient['updateVectors']>[1], 'points'> & { points: Array<Omit<Schemas['PointVectors'], 'vector'> & { vector: { [name: string]: Schemas['SparseVector']; }; }>; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-qdrant-features/hybrid--IQdrantSparseVectorsRequest"
+        },
+        {
+          "name": "IQdrantSparseVectorsResult",
+          "kind": "type",
+          "signature": "export type IQdrantSparseVectorsResult = Awaited<ReturnType<QdrantClient['updateVectors']>>;",
+          "declarationLine": 21,
+          "source": "packages/storage-plugin-qdrant/dist/feature-types.d.ts",
+          "purpose": "IQdrantSparseVectorsResult is part of this module's public type contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IQdrantSparseVectorsResult.",
+          "advanced": "No additional advanced behavior is declared for IQdrantSparseVectorsResult.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IQdrantSparseVectorsResult."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IQdrantSparseVectorsResult.",
+          "examples": [],
+          "members": [],
+          "composes": ["Awaited"],
+          "aliasOf": "IQdrantSparseVectorsResult",
+          "exportPath": "./features/hybrid",
+          "overloadSignatures": [
+            "export type IQdrantSparseVectorsResult = Awaited<ReturnType<QdrantClient['updateVectors']>>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IQdrantSparseVectorsResult when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IQdrantSparseVectorsResult does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "IQdrantSparseVectorsResult is part of this module's public type contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IQdrantSparseVectorsResult from @migaia/storage-plugin-qdrant/features/hybrid, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IQdrantSparseVectorsResult when its type contract and declared inputs match the result you need. Choose a different public symbol when IQdrantSparseVectorsResult does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IQdrantSparseVectorsResult."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IQdrantSparseVectorsResult."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-qdrant/dist/feature-types.d.ts:IQdrantSparseVectorsResult:export type IQdrantSparseVectorsResult = Awaited<ReturnType<QdrantClient['updateVectors']>>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-qdrant-features/hybrid--IQdrantSparseVectorsResult"
+        },
+        {
+          "name": "qdrantHybridFeature",
+          "kind": "function",
+          "signature": "export declare function qdrantHybridFeature(): IStorageFeature<typeof qdrantBackendKind, IQdrantHybridOutput>;",
+          "declarationLine": 5,
+          "source": "packages/storage-plugin-qdrant/dist/features/hybrid.d.ts",
+          "purpose": "Native RRF and sparse-only vector updates; no client scoring.",
+          "core": "Native RRF and sparse-only vector updates; no client scoring.",
+          "advanced": "",
+          "parameters": ["This function declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "IStorageFeature<typeof qdrantBackendKind, IQdrantHybridOutput>",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "exportPath": "./features/hybrid",
+          "overloadSignatures": [
+            "export declare function qdrantHybridFeature(): IStorageFeature<typeof qdrantBackendKind, IQdrantHybridOutput>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": ["IStorageFeature<typeof qdrantBackendKind, IQdrantHybridOutput>"],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Native RRF and sparse-only vector updates; no client scoring."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import qdrantHybridFeature from @migaia/storage-plugin-qdrant/features/hybrid, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use qdrantHybridFeature when its function contract and declared inputs match the result you need. Choose a different public symbol when qdrantHybridFeature does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "Native RRF and sparse-only vector updates; no client scoring."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-qdrant/dist/features/hybrid.d.ts:qdrantHybridFeature:export declare function qdrantHybridFeature(): IStorageFeature<typeof qdrantBackendKind, IQdrantHybridOutput>;",
+          "guidance": [],
+          "usageScore": 10,
+          "configuration": [],
+          "fragment": "storage-plugin-qdrant-features/hybrid--qdrantHybridFeature"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "storage-plugin-qdrant:features/management",
+      "library": "storage-plugin-qdrant",
+      "module": "features/management",
+      "exportPath": "./features/management",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/docs/storage-plugin-qdrant/getting-started",
+      "architecturePath": "/en/docs/storage-plugin-qdrant",
+      "symbols": [
+        {
+          "name": "IQdrantManagementApi",
+          "kind": "type",
+          "signature": "export type IQdrantManagementApi = Pick<IQdrantHttp, 'getCollections' | 'createCollection' | 'deleteCollection' | 'updateCollectionAliases' | 'createSnapshot'> & { deleteByFilter<TPayload>(collection: string, where: IWhere<TPayload>, options?: { readonly wait?: boolean; readonly ordering?: 'weak' | 'medium' | 'strong'; }, ctx?: IOperationContext & IWriteConcurrencyOptions): Promise<IQdrantUpdateResult>; purgeExpired(collection: string, options?: { readonly wait?: boolean; }, ctx?: IOperationContext & IWriteConcurrencyOptions): Promise<IQdrantUpdateResult>; };",
+          "declarationLine": 54,
+          "source": "packages/storage-plugin-qdrant/dist/feature-types.d.ts",
+          "purpose": "Native results plus organization-constrained logical filter deletion and expired-point purge.",
+          "core": "Native results plus organization-constrained logical filter deletion and expired-point purge.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "deleteByFilter",
+              "kind": "method",
+              "optional": false,
+              "signature": "deleteByFilter<TPayload>(collection: string, where: IWhere<TPayload>, options?: { readonly wait?: boolean; readonly ordering?: 'weak' | 'medium' | 'strong'; }, ctx?: IOperationContext & IWriteConcurrencyOptions): Promise<IQdrantUpdateResult>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "collection",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "where",
+                  "type": "IWhere<TPayload>",
+                  "optional": false
+                },
+                {
+                  "name": "options",
+                  "type": "{ readonly wait?: boolean; readonly ordering?: 'weak' | 'medium' | 'strong'; }",
+                  "optional": true
+                },
+                {
+                  "name": "ctx",
+                  "type": "IOperationContext & IWriteConcurrencyOptions",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<IQdrantUpdateResult>"
+            },
+            {
+              "name": "purgeExpired",
+              "kind": "method",
+              "optional": false,
+              "signature": "purgeExpired(collection: string, options?: { readonly wait?: boolean; }, ctx?: IOperationContext & IWriteConcurrencyOptions): Promise<IQdrantUpdateResult>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "collection",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "options",
+                  "type": "{ readonly wait?: boolean; }",
+                  "optional": true
+                },
+                {
+                  "name": "ctx",
+                  "type": "IOperationContext & IWriteConcurrencyOptions",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<IQdrantUpdateResult>"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "IQdrantManagementApi",
+          "exportPath": "./features/management",
+          "overloadSignatures": [
+            "export type IQdrantManagementApi = Pick<IQdrantHttp, 'getCollections' | 'createCollection' | 'deleteCollection' | 'updateCollectionAliases' | 'createSnapshot'> & { deleteByFilter<TPayload>(collection: string, where: IWhere<TPayload>, options?: { readonly wait?: boolean; readonly ordering?: 'weak' | 'medium' | 'strong'; }, ctx?: IOperationContext & IWriteConcurrencyOptions): Promise<IQdrantUpdateResult>; purgeExpired(collection: string, options?: { readonly wait?: boolean; }, ctx?: IOperationContext & IWriteConcurrencyOptions): Promise<IQdrantUpdateResult>; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Native results plus organization-constrained logical filter deletion and expired-point purge."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IQdrantManagementApi from @migaia/storage-plugin-qdrant/features/management, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IQdrantManagementApi when its type contract and declared inputs match the result you need. Choose a different public symbol when IQdrantManagementApi does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "Native results plus organization-constrained logical filter deletion and expired-point purge."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-qdrant/dist/feature-types.d.ts:IQdrantManagementApi:export type IQdrantManagementApi = Pick<IQdrantHttp, 'getCollections' | 'createCollection' | 'deleteCollection' | 'updateCollectionAliases' | 'createSnapshot'> & { deleteByFilter<TPayload>(collection: string, where: IWhere<TPayload>, options?: { readonly wait?: boolean; readonly ordering?: 'weak' | 'medium' | 'strong'; }, ctx?: IOperationContext & IWriteConcurrencyOptions): Promise<IQdrantUpdateResult>; purgeExpired(collection: string, options?: { readonly wait?: boolean; }, ctx?: IOperationContext & IWriteConcurrencyOptions): Promise<IQdrantUpdateResult>; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-qdrant-features/management--IQdrantManagementApi"
+        },
+        {
+          "name": "IQdrantManagementOutput",
+          "kind": "type",
+          "signature": "export type IQdrantManagementOutput = IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly qdrantManagement: IQdrantManagementApi; }; readonly transaction: {}; }>;",
+          "declarationLine": 63,
+          "source": "packages/storage-plugin-qdrant/dist/feature-types.d.ts",
+          "purpose": "IQdrantManagementOutput is part of this module's public type contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IQdrantManagementOutput.",
+          "advanced": "No additional advanced behavior is declared for IQdrantManagementOutput.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IQdrantManagementOutput."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IQdrantManagementOutput.",
+          "examples": [],
+          "members": [],
+          "composes": ["IStorageFeatureOutput"],
+          "aliasOf": "IQdrantManagementOutput",
+          "exportPath": "./features/management",
+          "overloadSignatures": [
+            "export type IQdrantManagementOutput = IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly qdrantManagement: IQdrantManagementApi; }; readonly transaction: {}; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IQdrantManagementOutput when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IQdrantManagementOutput does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "IQdrantManagementOutput is part of this module's public type contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IQdrantManagementOutput from @migaia/storage-plugin-qdrant/features/management, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IQdrantManagementOutput when its type contract and declared inputs match the result you need. Choose a different public symbol when IQdrantManagementOutput does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IQdrantManagementOutput."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IQdrantManagementOutput."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-qdrant/dist/feature-types.d.ts:IQdrantManagementOutput:export type IQdrantManagementOutput = IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly qdrantManagement: IQdrantManagementApi; }; readonly transaction: {}; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-qdrant-features/management--IQdrantManagementOutput"
+        },
+        {
+          "name": "qdrantManagementFeature",
+          "kind": "function",
+          "signature": "export declare function qdrantManagementFeature(): IStorageFeature<typeof qdrantBackendKind, IQdrantManagementOutput>;",
+          "declarationLine": 8,
+          "source": "packages/storage-plugin-qdrant/dist/features/management.d.ts",
+          "purpose": "Only management filter deletion/purge return native operation records; standard deleteWhere remains numeric.",
+          "core": "Only management filter deletion/purge return native operation records; standard deleteWhere remains numeric.",
+          "advanced": "",
+          "parameters": ["This function declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "IStorageFeature<typeof qdrantBackendKind, IQdrantManagementOutput>",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "exportPath": "./features/management",
+          "overloadSignatures": [
+            "export declare function qdrantManagementFeature(): IStorageFeature<typeof qdrantBackendKind, IQdrantManagementOutput>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": ["IStorageFeature<typeof qdrantBackendKind, IQdrantManagementOutput>"],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Only management filter deletion/purge return native operation records; standard deleteWhere remains numeric."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import qdrantManagementFeature from @migaia/storage-plugin-qdrant/features/management, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use qdrantManagementFeature when its function contract and declared inputs match the result you need. Choose a different public symbol when qdrantManagementFeature does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "Only management filter deletion/purge return native operation records; standard deleteWhere remains numeric."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-qdrant/dist/features/management.d.ts:qdrantManagementFeature:export declare function qdrantManagementFeature(): IStorageFeature<typeof qdrantBackendKind, IQdrantManagementOutput>;",
+          "guidance": [],
+          "usageScore": 10,
+          "configuration": [],
+          "fragment": "storage-plugin-qdrant-features/management--qdrantManagementFeature"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "storage-plugin-qdrant:features/recommend",
+      "library": "storage-plugin-qdrant",
+      "module": "features/recommend",
+      "exportPath": "./features/recommend",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/docs/storage-plugin-qdrant/getting-started",
+      "architecturePath": "/en/docs/storage-plugin-qdrant",
+      "symbols": [
+        {
+          "name": "IQdrantRecommendApi",
+          "kind": "type",
+          "signature": "export type IQdrantRecommendApi = { recommend(collection: string, request: IQdrantRecommendRequest, ctx?: IOperationContext): Promise<IQdrantRecommendResult>; };",
+          "declarationLine": 34,
+          "source": "packages/storage-plugin-qdrant/dist/feature-types.d.ts",
+          "purpose": "IQdrantRecommendApi is part of this module's public type contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IQdrantRecommendApi.",
+          "advanced": "No additional advanced behavior is declared for IQdrantRecommendApi.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IQdrantRecommendApi."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IQdrantRecommendApi.",
+          "examples": [],
+          "members": [
+            {
+              "name": "recommend",
+              "kind": "method",
+              "optional": false,
+              "signature": "recommend(collection: string, request: IQdrantRecommendRequest, ctx?: IOperationContext): Promise<IQdrantRecommendResult>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "collection",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "request",
+                  "type": "IQdrantRecommendRequest",
+                  "optional": false
+                },
+                {
+                  "name": "ctx",
+                  "type": "IOperationContext",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<IQdrantRecommendResult>"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "IQdrantRecommendApi",
+          "exportPath": "./features/recommend",
+          "overloadSignatures": [
+            "export type IQdrantRecommendApi = { recommend(collection: string, request: IQdrantRecommendRequest, ctx?: IOperationContext): Promise<IQdrantRecommendResult>; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IQdrantRecommendApi when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IQdrantRecommendApi does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "IQdrantRecommendApi is part of this module's public type contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IQdrantRecommendApi from @migaia/storage-plugin-qdrant/features/recommend, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IQdrantRecommendApi when its type contract and declared inputs match the result you need. Choose a different public symbol when IQdrantRecommendApi does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IQdrantRecommendApi."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IQdrantRecommendApi."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-qdrant/dist/feature-types.d.ts:IQdrantRecommendApi:export type IQdrantRecommendApi = { recommend(collection: string, request: IQdrantRecommendRequest, ctx?: IOperationContext): Promise<IQdrantRecommendResult>; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-qdrant-features/recommend--IQdrantRecommendApi"
+        },
+        {
+          "name": "IQdrantRecommendOutput",
+          "kind": "type",
+          "signature": "export type IQdrantRecommendOutput = IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly qdrantRecommend: IQdrantRecommendApi; }; readonly transaction: {}; }>;",
+          "declarationLine": 37,
+          "source": "packages/storage-plugin-qdrant/dist/feature-types.d.ts",
+          "purpose": "IQdrantRecommendOutput is part of this module's public type contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IQdrantRecommendOutput.",
+          "advanced": "No additional advanced behavior is declared for IQdrantRecommendOutput.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IQdrantRecommendOutput."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IQdrantRecommendOutput.",
+          "examples": [],
+          "members": [],
+          "composes": ["IStorageFeatureOutput"],
+          "aliasOf": "IQdrantRecommendOutput",
+          "exportPath": "./features/recommend",
+          "overloadSignatures": [
+            "export type IQdrantRecommendOutput = IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly qdrantRecommend: IQdrantRecommendApi; }; readonly transaction: {}; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IQdrantRecommendOutput when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IQdrantRecommendOutput does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "IQdrantRecommendOutput is part of this module's public type contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IQdrantRecommendOutput from @migaia/storage-plugin-qdrant/features/recommend, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IQdrantRecommendOutput when its type contract and declared inputs match the result you need. Choose a different public symbol when IQdrantRecommendOutput does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IQdrantRecommendOutput."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IQdrantRecommendOutput."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-qdrant/dist/feature-types.d.ts:IQdrantRecommendOutput:export type IQdrantRecommendOutput = IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly qdrantRecommend: IQdrantRecommendApi; }; readonly transaction: {}; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-qdrant-features/recommend--IQdrantRecommendOutput"
+        },
+        {
+          "name": "IQdrantRecommendRequest",
+          "kind": "type",
+          "signature": "export type IQdrantRecommendRequest = Parameters<QdrantClient['recommend']>[1];",
+          "declarationLine": 32,
+          "source": "packages/storage-plugin-qdrant/dist/feature-types.d.ts",
+          "purpose": "IQdrantRecommendRequest is part of this module's public type contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IQdrantRecommendRequest.",
+          "advanced": "No additional advanced behavior is declared for IQdrantRecommendRequest.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IQdrantRecommendRequest."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IQdrantRecommendRequest.",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "aliasOf": "IQdrantRecommendRequest",
+          "exportPath": "./features/recommend",
+          "overloadSignatures": [
+            "export type IQdrantRecommendRequest = Parameters<QdrantClient['recommend']>[1];"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IQdrantRecommendRequest when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IQdrantRecommendRequest does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "IQdrantRecommendRequest is part of this module's public type contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IQdrantRecommendRequest from @migaia/storage-plugin-qdrant/features/recommend, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IQdrantRecommendRequest when its type contract and declared inputs match the result you need. Choose a different public symbol when IQdrantRecommendRequest does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IQdrantRecommendRequest."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IQdrantRecommendRequest."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-qdrant/dist/feature-types.d.ts:IQdrantRecommendRequest:export type IQdrantRecommendRequest = Parameters<QdrantClient['recommend']>[1];",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-qdrant-features/recommend--IQdrantRecommendRequest"
+        },
+        {
+          "name": "IQdrantRecommendResult",
+          "kind": "type",
+          "signature": "export type IQdrantRecommendResult = Awaited<ReturnType<QdrantClient['recommend']>>;",
+          "declarationLine": 33,
+          "source": "packages/storage-plugin-qdrant/dist/feature-types.d.ts",
+          "purpose": "IQdrantRecommendResult is part of this module's public type contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IQdrantRecommendResult.",
+          "advanced": "No additional advanced behavior is declared for IQdrantRecommendResult.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IQdrantRecommendResult."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IQdrantRecommendResult.",
+          "examples": [],
+          "members": [],
+          "composes": ["Awaited"],
+          "aliasOf": "IQdrantRecommendResult",
+          "exportPath": "./features/recommend",
+          "overloadSignatures": [
+            "export type IQdrantRecommendResult = Awaited<ReturnType<QdrantClient['recommend']>>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IQdrantRecommendResult when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IQdrantRecommendResult does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "IQdrantRecommendResult is part of this module's public type contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IQdrantRecommendResult from @migaia/storage-plugin-qdrant/features/recommend, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IQdrantRecommendResult when its type contract and declared inputs match the result you need. Choose a different public symbol when IQdrantRecommendResult does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IQdrantRecommendResult."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IQdrantRecommendResult."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-qdrant/dist/feature-types.d.ts:IQdrantRecommendResult:export type IQdrantRecommendResult = Awaited<ReturnType<QdrantClient['recommend']>>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-qdrant-features/recommend--IQdrantRecommendResult"
+        },
+        {
+          "name": "qdrantRecommendFeature",
+          "kind": "function",
+          "signature": "export declare function qdrantRecommendFeature(): IStorageFeature<typeof qdrantBackendKind, IQdrantRecommendOutput>;",
+          "declarationLine": 5,
+          "source": "packages/storage-plugin-qdrant/dist/features/recommend.d.ts",
+          "purpose": "Native best_score and lookup retain their distinct engine semantics.",
+          "core": "Native best_score and lookup retain their distinct engine semantics.",
+          "advanced": "",
+          "parameters": ["This function declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "IStorageFeature<typeof qdrantBackendKind, IQdrantRecommendOutput>",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "exportPath": "./features/recommend",
+          "overloadSignatures": [
+            "export declare function qdrantRecommendFeature(): IStorageFeature<typeof qdrantBackendKind, IQdrantRecommendOutput>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": ["IStorageFeature<typeof qdrantBackendKind, IQdrantRecommendOutput>"],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Native best_score and lookup retain their distinct engine semantics."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import qdrantRecommendFeature from @migaia/storage-plugin-qdrant/features/recommend, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use qdrantRecommendFeature when its function contract and declared inputs match the result you need. Choose a different public symbol when qdrantRecommendFeature does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "Native best_score and lookup retain their distinct engine semantics."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-qdrant/dist/features/recommend.d.ts:qdrantRecommendFeature:export declare function qdrantRecommendFeature(): IStorageFeature<typeof qdrantBackendKind, IQdrantRecommendOutput>;",
+          "guidance": [],
+          "usageScore": 10,
+          "configuration": [],
+          "fragment": "storage-plugin-qdrant-features/recommend--qdrantRecommendFeature"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "storage-plugin-qdrant:http",
+      "library": "storage-plugin-qdrant",
+      "module": "http",
+      "exportPath": "./http",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/docs/storage-plugin-qdrant/getting-started",
+      "architecturePath": "/en/docs/storage-plugin-qdrant",
+      "symbols": [
+        {
+          "name": "fetchHttp",
+          "kind": "function",
+          "signature": "export declare function fetchHttp(url: string, apiKey?: string): IQdrantHttp;",
+          "declarationLine": 3,
+          "source": "packages/storage-plugin-qdrant/dist/http.d.ts",
+          "purpose": "Use native fetch with one-send writes and complete evidence available at the adapter.",
+          "core": "Use native fetch with one-send writes and complete evidence available at the adapter.",
+          "advanced": "",
+          "parameters": ["url: string", "apiKey: string (optional)"],
+          "parameterDetails": [
+            {
+              "name": "url",
+              "type": "string",
+              "optional": false
+            },
+            {
+              "name": "apiKey",
+              "type": "string",
+              "optional": true
+            }
+          ],
+          "returns": "IQdrantHttp",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "exportPath": "./http",
+          "overloadSignatures": [
+            "export declare function fetchHttp(url: string, apiKey?: string): IQdrantHttp;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "url",
+                "type": "string",
+                "optional": false
+              },
+              {
+                "name": "apiKey",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          ],
+          "overloadReturns": ["IQdrantHttp"],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Use native fetch with one-send writes and complete evidence available at the adapter."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import fetchHttp from @migaia/storage-plugin-qdrant/http, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use fetchHttp when its function contract and declared inputs match the result you need. Choose a different public symbol when fetchHttp does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "Use native fetch with one-send writes and complete evidence available at the adapter."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-qdrant/dist/http.d.ts:fetchHttp:export declare function fetchHttp(url: string, apiKey?: string): IQdrantHttp;",
+          "guidance": [],
+          "usageScore": 2,
+          "configuration": [],
+          "fragment": "storage-plugin-qdrant-http--fetchHttp"
+        }
+      ],
+      "aliases": []
+    }
+  ]
+}
