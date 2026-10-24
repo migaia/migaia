@@ -71,6 +71,10 @@ export const StorageErrorCode = {
   journalRecordInvalid: 'JOURNAL_RECORD_INVALID',
   /** Recovery or a journal commit is uncertain; close this handle and reopen from its durable head. */
   journalRecoveryFailed: 'JOURNAL_RECOVERY_FAILED',
+  /** Current value or full revision differs from the stored final image; no restore was written. */
+  undoConflict: 'UNDO_CONFLICT',
+  /** The selected target has no committed images for this txId; inspect the target and log. */
+  undoNotFound: 'UNDO_NOT_FOUND',
   /** A user extension failed; inspect its original cause and operation context before retrying. */
   extensionFailed: 'EXTENSION_FAILED'
 } as const
