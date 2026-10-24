@@ -136,6 +136,25 @@ console.log(host.extensions.label('draft'))`
       example: storageHostCases.createBackendChangeIterator![0]!.example,
       cases: storageHostCases.createBackendChangeIterator
     },
+    createBackendJournalNamespace: {
+      role: 'operation',
+      purpose: t(
+        'Reuse the original private namespace resource lifetime; backend owners retain data and actual native terminal decisions.',
+        '复用原私有 namespace 资源生命周期，数据与实际原生终态仍归后端拥有者。'
+      ),
+      params: {
+        options: t(
+          'Original assertLive/closingSignal/report, native facts, reservation, authenticated private transaction and native transaction entry.',
+          '原 assertLive/closingSignal/report、native 事实、reservation、认证私有事务与原生事务入口。'
+        )
+      },
+      returns: t(
+        'Promise of IStorageJournalNamespace. run and terminal subscriptions retain accepted work until actual onEnd; transactionInfo is a pure authenticated fact. No raw client, installer or backend close rights.',
+        'Promise<IStorageJournalNamespace>；run 与终态订阅保留已接纳工作直到实际 onEnd，transactionInfo 仅返回认证事实，不外露 raw client、installer 或后端关闭权。'
+      ),
+      example: storageHostCases.storageLogStore![0]!.example,
+      cases: storageHostCases.storageLogStore
+    },
     observeStorageBatch: {
       role: 'operation',
       purpose: t(
@@ -367,8 +386,8 @@ console.log(host.extensions.label('draft'))`,
   types: {
     IStorageJournalOptions: {
       summary: t(
-        'Borrow a logger with a stable namespace and explicit same-registration atomicBinlog/atomicUndo handles by backend id. telemetry=true requires the actual level plugin; selected unimplemented guarantees reject.',
-        '借用 logger，固定 namespace，按 backend id 显式选择同 registration 的 atomicBinlog/atomicUndo；telemetry=true 要求真实 level 插件，未实现的已选保证明确拒绝。'
+        'Borrow a logger with a stable namespace and explicit same-registration atomicBinlog/atomicUndo handles by backend id. telemetry=true requires the actual level plugin atLevel port and emits ordinary storage-category entries without changing payload/Error references.',
+        '借用 logger，固定 namespace，按 backend id 显式选择同 registration 的 atomicBinlog/atomicUndo；telemetry=true 要求真实 level 插件 atLevel 接点，沿普通 storage 分类条目交付 payload 与原 Error 引用。'
       ),
       members: {}
     },
@@ -419,8 +438,8 @@ console.log(host.extensions.label('draft'))`,
       members: {
         journal: {
           summary: t(
-            'Optional global journal configuration; omitted configurations leave the original execution path unchanged. Memory external WAL uses the original intent/marker protocol when its binding explicitly supports external awaits. Native memory undo checks all original revisions and values before restoring through the original locked transaction. Redo, blob capture, external undo and other-backend wiring remain unfinished.',
-            '可选全局 journal；省略时保持原路径。memory 外置 WAL 在原 binding 显式允许外部等待时使用原 intent/marker 协议；memory 原生 undo 比较全部原修订和值，再沿原加锁事务恢复；redo、blob 捕获、外置 undo 和其它后端接线尚未完成。'
+            'Optional global journal configuration; omitted configurations leave the original execution path unchanged. Memory external WAL uses the original intent/marker protocol when its binding explicitly supports external awaits. Native memory undo checks all original revisions and values before restoring through the original locked transaction. External undo uses the same full-image WAL/marker protocol with exact-only repeated mirror publication. Redo, blob capture and other-backend wiring remain unfinished.',
+            '可选全局 journal；省略时保持原路径。memory 外置 WAL 在原 binding 显式允许外部等待时使用原 intent/marker 协议；memory 原生 undo 比较全部原修订和值，再沿原加锁事务恢复；外置 undo 复用完整镜像 WAL/marker 协议，仅完整相同的已发布镜像可幂等略过；redo、blob 捕获和其它后端接线尚未完成。'
           )
         }
       }

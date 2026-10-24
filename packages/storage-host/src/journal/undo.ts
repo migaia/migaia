@@ -8,6 +8,7 @@ import {
 import {
   snapshotLogRecords,
   type IUndoLogExt,
+  type IUndoImage,
   type ILogPayload
 } from '@migaia/logger/plugins/durable'
 import { StorageError, StorageErrorCode } from '../errors.js'
@@ -15,6 +16,7 @@ import { StorageErrorText } from '../error-text.js'
 import type { IStorageJournalBackendAccess } from './binding.js'
 import type {
   IStorageJournalImage,
+  IStorageJournalChange,
   IStorageJournalNamespace,
   IStorageJournalTarget,
   IStorageJournalUndoRunner
@@ -22,7 +24,8 @@ import type {
 import {
   invalidStorageJournalRecord,
   readStorageJournalTarget,
-  storageJournalTargetIdentity
+  storageJournalTargetIdentity,
+  storageJournalTargetWire
 } from './targets.js'
 import { StorageJournalKind } from './constants.js'
 
@@ -34,7 +37,7 @@ type IStorageUndoRow = {
   readonly afterRevision: ILogPayload
 }
 /** Logger JSON has no cycles; compare complete revisions linearly without key sorting or recursion. */
-function equalPayload(left: ILogPayload, right: ILogPayload): boolean {
+export function equalStorageJournalPayload(left: ILogPayload, right: ILogPayload): boolean {
   /** Only unvisited revision pairs remain; this is not a retained history index. */
   const pending: Array<readonly [ILogPayload, ILogPayload]> = [[left, right]]
   while (pending.length !== 0) {
@@ -71,6 +74,102 @@ function image(input: unknown): IStorageJournalImage {
     return Object.freeze({ present: true, value: value.value })
   return invalidStorageJournalRecord()
 }
+/** Complete undo targets survive the original logger's target/before/after projection. */
+export type IStorageUndoTarget = Readonly<{
+  version: 1
+  namespace: string
+  backendInstanceId: string
+  orgId: string
+  identity: ILogPayload
+  afterRevision: ILogPayload
+}>
+
+/** Repeated writes keep their first before image and last actual after image and full revision. */
+export function storageJournalUndoImages(
+  target: Readonly<{ namespace: string; backendInstanceId: string; orgId: string }>,
+  changes: readonly IStorageJournalChange[],
+  backend: IBackendKind
+): readonly IUndoImage[] {
+  /** Only this commit's canonical identities participate; no history index or authority is added. */
+  const merged = new Map<string, IUndoImage>()
+  for (const change of changes) {
+    /** The original target codec keeps every persisted business key in its existing domain. */
+    const identity = storageJournalTargetWire(change.target)
+    /** Metadata and native point identities remain distinct even when their strings coincide. */
+    const key = storageJournalTargetIdentity(change.target, backend)
+    /** First-before ownership survives every later overwrite of this same physical identity. */
+    const previous = merged.get(key)
+    merged.set(key, {
+      target: {
+        version: 1,
+        ...target,
+        identity,
+        afterRevision: change.afterRevision
+      } satisfies IStorageUndoTarget,
+      before: previous?.before ?? change.before,
+      after: change.after
+    })
+  }
+  /** The original logger validator supplies the detached immutable JSON domain once. */
+  return snapshotLogRecords([
+    { kind: StorageJournalKind.commit, payload: [...merged.values()] }
+  ])[0]!.payload as readonly IUndoImage[]
+}
+
+/** Validate this owned mirror once before restore or external recovery publishes it. */
+export function readStorageUndoRows(
+  input: unknown,
+  owner: Readonly<{ namespace: string; backendInstanceId: string; orgId: string }>,
+  backend: IBackendKind
+): readonly IStorageUndoRow[] {
+  try {
+    /** Reuse logger's one JSON snapshot validator rather than a second persistence codec. */
+    const captured = snapshotLogRecords([
+      { kind: StorageJournalKind.commit, payload: input as readonly IUndoImage[] }
+    ])[0]!.payload
+    if (!Array.isArray(captured) || captured.length === 0) invalidStorageJournalRecord()
+    /** Only this decoded record is deduplicated; value and deadline remain distinct image rows. */
+    const seen = new Set<string>()
+    return captured.map((entry) => {
+      if (entry === null || typeof entry !== 'object' || Array.isArray(entry))
+        invalidStorageJournalRecord()
+      /** Mirror target fields survive logger's existing target/before/after projection. */
+      const record = entry as Record<string, ILogPayload>
+      /** An encoded target never grants authority until it matches this exact fixed closure. */
+      const raw = record.target
+      if (raw === null || typeof raw !== 'object' || Array.isArray(raw))
+        invalidStorageJournalRecord()
+      /** The original org validator supplies the same UUID domain used by all host operations. */
+      const target = raw as Record<string, ILogPayload>
+      assertOperationContext({ orgId: target.orgId as string })
+      if (
+        target.version !== 1 ||
+        target.namespace !== owner.namespace ||
+        target.backendInstanceId !== owner.backendInstanceId ||
+        target.orgId !== owner.orgId ||
+        !Object.hasOwn(target, 'afterRevision')
+      )
+        invalidStorageJournalRecord()
+      /** The original target codec distinguishes image identity from its potentially shared lock. */
+      const decoded = readStorageJournalTarget(target.identity, backend)
+      /** Repeated persisted rows could otherwise restore two different before images in sequence. */
+      const key = storageJournalTargetIdentity(decoded, backend)
+      if (seen.has(key)) invalidStorageJournalRecord()
+      seen.add(key)
+      return {
+        target: decoded,
+        before: image(record.before),
+        after: image(record.after),
+        afterRevision: target.afterRevision!
+      }
+    })
+  } catch (cause) {
+    if (cause instanceof StorageError && cause.code === StorageErrorCode.journalRecordInvalid)
+      throw cause
+    return invalidStorageJournalRecord(cause)
+  }
+}
+
 /** Undo borrows original committed images and executes only the backend's original lock builder. */
 export function createStorageJournalUndo(options: {
   readonly access: IStorageJournalBackendAccess
@@ -97,54 +196,8 @@ export function createStorageJournalUndo(options: {
     const stored = await options.undo.get(txId)
     if (stored === undefined)
       throw new StorageError(StorageErrorCode.undoNotFound, {}, StorageErrorText.undoNotFound)
-    /** All target/image validation completes before acquiring the original business locks. */
-    let rows: readonly IStorageUndoRow[]
-    try {
-      /** Reuse logger's one JSON snapshot validator rather than a second persistence codec. */
-      const captured = snapshotLogRecords([
-        { kind: StorageJournalKind.commit, payload: stored }
-      ])[0]!.payload
-      if (!Array.isArray(captured) || captured.length === 0) invalidStorageJournalRecord()
-      /** Only this decoded record is deduplicated; value and deadline remain distinct image rows. */
-      const seen = new Set<string>()
-      rows = captured.map((entry) => {
-        if (entry === null || typeof entry !== 'object' || Array.isArray(entry))
-          invalidStorageJournalRecord()
-        /** Mirror target fields survive logger's existing target/before/after projection. */
-        const record = entry as Record<string, ILogPayload>
-        /** An encoded target never grants authority until it matches this exact fixed closure. */
-        const raw = record.target
-        if (raw === null || typeof raw !== 'object' || Array.isArray(raw))
-          invalidStorageJournalRecord()
-        /** The original org validator supplies the same UUID domain used by all host operations. */
-        const target = raw as Record<string, ILogPayload>
-        assertOperationContext({ orgId: target.orgId as string })
-        if (
-          target.version !== 1 ||
-          target.namespace !== options.target.namespace ||
-          target.backendInstanceId !== options.target.backendInstanceId ||
-          target.orgId !== options.target.orgId ||
-          !Object.hasOwn(target, 'afterRevision')
-        )
-          invalidStorageJournalRecord()
-        /** The original target codec distinguishes image identity from its potentially shared lock. */
-        const decoded = readStorageJournalTarget(target.identity, options.backend)
-        /** Repeated persisted rows could otherwise restore two different before images in sequence. */
-        const key = storageJournalTargetIdentity(decoded, options.backend)
-        if (seen.has(key)) invalidStorageJournalRecord()
-        seen.add(key)
-        return {
-          target: decoded,
-          before: image(record.before),
-          after: image(record.after),
-          afterRevision: target.afterRevision!
-        }
-      })
-    } catch (cause) {
-      if (cause instanceof StorageError && cause.code === StorageErrorCode.journalRecordInvalid)
-        throw cause
-      return invalidStorageJournalRecord(cause)
-    }
+    /** All mirror validation completes before the original business locks are acquired. */
+    const rows = readStorageUndoRows(stored, options.target, options.backend)
     /** The backend maps metadata onto its existing point; canonical ordering remains in tx().lock. */
     const keys = snapshotConcurrencyLockKeys(
       rows.map((row) => binding.lockTarget!(row.target)),
@@ -160,7 +213,7 @@ export function createStorageJournalUndo(options: {
         /** Compare the same codec wire and presence that were persisted at the original commit. */
         const current = await binding.readImage!(scope, row.target)
         if (
-          !equalPayload(revision, row.afterRevision) ||
+          !equalStorageJournalPayload(revision, row.afterRevision) ||
           current.present !== row.after.present ||
           (current.present && row.after.present && current.value !== row.after.value)
         )
