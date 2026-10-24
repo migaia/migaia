@@ -1274,3 +1274,65 @@ describe('original concurrency execution per native commit attempt', () => {
     expect(attempt).not.toHaveBeenCalled()
   })
 })
+
+describe('prepared native option facts', () => {
+  for (const entry of ['prepare', 'execute', 'executeAttempt'] as const)
+    it(
+      'keeps captured native fields in ' + entry + ' lock derivation without getter rereads',
+      async () => {
+        const { store } = base()
+        const nativeSymbol = Symbol('captured native field')
+        const value = { unchanged: true }
+        let reads = 0
+        let captured: object | undefined
+        const options = {
+          timeoutMs: 100,
+          get ttlMs() {
+            reads++
+            return 10
+          },
+          [nativeSymbol]: value
+        }
+        const observe = (context: object) => {
+          captured = context
+          expect(Object.isFrozen(context)).toBe(true)
+          expect(Reflect.get(context, 'ttlMs')).toBe(10)
+          expect(Reflect.get(context, nativeSymbol)).toBe(value)
+        }
+        const wrapper = (context: object, invoke: () => Promise<number>) => {
+          observe(context)
+          return invoke()
+        }
+        const result = await runWithConcurrency<number>(
+          {
+            store,
+            options,
+            ...(entry === 'prepare'
+              ? {
+                  prepare: (context: object) => {
+                    observe(context)
+                  }
+                }
+              : {}),
+            ...(entry === 'execute' ? { execute: wrapper } : {}),
+            ...(entry === 'executeAttempt' ? { executeAttempt: wrapper } : {}),
+            lock: (context) => {
+              expect(context).toBe(captured)
+              expect(Reflect.get(context, 'ttlMs')).toBe(10)
+              expect(Reflect.get(context, nativeSymbol)).toBe(value)
+              return [lockKey.text('native')]
+            }
+          },
+          {
+            attempt: async (context) => {
+              expect(Reflect.get(context, 'ttlMs')).toBe(10)
+              expect(Reflect.get(context, nativeSymbol)).toBe(value)
+              return { status: 'committed', value: 7 } as const
+            }
+          }
+        )
+        expect(result).toBe(7)
+        expect(reads).toBe(1)
+      }
+    )
+})
