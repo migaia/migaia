@@ -273,6 +273,7 @@ describe('immutable storage organizations', () => {
     })
     const base = await createStorageHost({ plugins: [memoryBackendPlugin()] })
     const host = await base.use(plugin)
+    await host.detect()
     expect(reads).toBe(1)
     selected.push('data')
     const first = createOrgId()
