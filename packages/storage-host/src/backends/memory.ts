@@ -1606,32 +1606,19 @@ function watchChanges<T>(
   })
 }
 
-/** New root batch admission keeps borrowed accessor failures on the contract error chain. */
-function captureBatch<T, R>(namespaceContext: IMemoryNamespaceContext<T>, capture: () => R): R {
-  try {
-    return capture()
-  } catch (cause) {
-    if (isStorageErrorFamily(cause)) throw cause
-    throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
-      backend: STORAGE_MEMORY_BACKEND,
-      cause
-    })
-  }
-}
-
 /** Empty batches have no pipeline or native transaction, while resource expiry still applies. */
 function batchSize<T>(
   namespaceContext: IMemoryNamespaceContext<T>,
   input: readonly unknown[]
 ): number {
   namespaceContext.controller.assertLive()
-  return captureBatch(namespaceContext, () => {
+  return (() => {
     if (!Array.isArray(input))
       throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
         backend: STORAGE_MEMORY_BACKEND
       })
     return input.length
-  })
+  })()
 }
 
 /** One high-level batch reports one observation without exposing per-key native work. */
@@ -1790,7 +1777,7 @@ function createMemoryNamespaceBase<T>(
 ): IMemoryNamespaceContext<T>['base'] {
   return {
     backend: STORAGE_MEMORY_BACKEND,
-    capabilities: Object.freeze({
+    capabilities: {
       batch: true,
       syncRead: true,
       binary: true,
@@ -1801,276 +1788,12 @@ function createMemoryNamespaceBase<T>(
       changeFeed: true,
       maxValueBytes: undefined,
       opaqueEntries: false
-    }),
-    sync: {
-      get: (key) =>
-        namespaceContext.core.execution.runSync(
-          { operation: MemoryOperation.get, input: key },
-          (captured) => {
-            assertStringStorageKey(captured, STORAGE_MEMORY_BACKEND)
-            return (read(namespaceContext, 'value', captured) as string | undefined) ?? null
-          }
-        ),
-      set: (key, value, options) =>
-        namespaceContext.core.execution.runSync(
-          { operation: MemoryOperation.set, input: { key, value, options } },
-          (captured) => {
-            assertStringStorageKey(captured.key, STORAGE_MEMORY_BACKEND)
-            /** Sync policy capture never calls the asynchronous concurrency callback. */
-            const options = snapshotSyncWriteOptions(captured.options)
-            /** Payload preparation precedes the final active-key probe. */
-            const mutation = prepareWrite(
-              namespaceContext,
-              'value',
-              captured.key,
-              captured.value,
-              options.conflictPolicy
-            )
-            assertUnlocked(namespaceContext, mutation.keys)
-            /**
-             * Synchronous writes share exact victim planning but reject a busy victim without
-             * waiting.
-             */
-            const plan =
-              mutation.capacityChanges === undefined
-                ? undefined
-                : planCapacity(namespaceContext, mutation.capacityChanges())
-            const held =
-              plan === undefined ? undefined : namespaceContext.locks.probe(plan.identities)
-            if (held !== undefined)
-              throw new StorageContractError(StorageContractErrorCode.lockRejected, {
-                backend: STORAGE_MEMORY_BACKEND,
-                keys: [held.key],
-                holder: held.holder
-              })
-            commitCapacity(namespaceContext, plan, mutation.run)
-          }
-        ),
-      remove: (key) =>
-        namespaceContext.core.execution.runSync(
-          { operation: MemoryOperation.remove, input: key },
-          (captured) => {
-            assertStringStorageKey(captured, STORAGE_MEMORY_BACKEND)
-            assertUnlocked(namespaceContext, [lockKey.text(captured)])
-            remove(namespaceContext, 'value', captured)
-          }
-        ),
-      has: (key) =>
-        namespaceContext.core.execution.runSync(
-          { operation: MemoryOperation.has, input: key },
-          (captured) => {
-            assertStringStorageKey(captured, STORAGE_MEMORY_BACKEND)
-            return read(namespaceContext, 'value', captured) !== undefined
-          }
-        ),
-      keys: () =>
-        namespaceContext.core.execution.runSync(
-          { operation: MemoryOperation.keys, input: undefined },
-          () => {
-            namespaceContext.controller.assertLive()
-            return [...namespaceContext.data.value.entries()]
-              .filter(([encoded]) => liveEntry(namespaceContext, 'value', encoded) !== undefined)
-              .map(([, entry]) => entry.key)
-              .filter((key): key is string => typeof key === 'string')
-          }
-        ),
-      clearValues: () =>
-        namespaceContext.core.execution.runSync(
-          { operation: MemoryOperation.clearValues, input: undefined },
-          () => {
-            namespaceContext.controller.assertLive()
-            assertUnlocked(namespaceContext, [], mutationRanges(namespaceContext, ['value']))
-            clear(namespaceContext, 'value')
-          }
-        )
     },
-    get: (key, ctx) =>
-      asyncEntry(
-        namespaceContext,
-        MemoryOperation.get,
-        key,
-        ctx,
-        (captured) => {
-          assertStringStorageKey(captured, STORAGE_MEMORY_BACKEND)
-          return (read(namespaceContext, 'value', captured) as string | undefined) ?? null
-        },
-        (captured) => [lockKey.text(captured)]
-      ),
-    set: (key, value, ctx) =>
-      mutationEntry(
-        namespaceContext,
-        MemoryOperation.set,
-        { key, value },
-        ctx,
-        (captured, context) => {
-          assertStringStorageKey(captured.key, STORAGE_MEMORY_BACKEND)
-          return prepareWrite(
-            namespaceContext,
-            'value',
-            captured.key,
-            captured.value,
-            context.conflictPolicy
-          )
-        }
-      ),
-    remove: (key, ctx) =>
-      mutationEntry(namespaceContext, MemoryOperation.remove, key, ctx, (captured) => {
-        assertStringStorageKey(captured, STORAGE_MEMORY_BACKEND)
-        return {
-          keys: [lockKey.text(captured)],
-          invoke: (draft) => {
-            draft.remove('value', captured)
-          },
-          run: () => remove(namespaceContext, 'value', captured)
-        }
-      }),
-    has: (key, ctx) =>
-      asyncEntry(
-        namespaceContext,
-        MemoryOperation.has,
-        key,
-        ctx,
-        (captured) => {
-          assertStringStorageKey(captured, STORAGE_MEMORY_BACKEND)
-          return read(namespaceContext, 'value', captured) !== undefined
-        },
-        (captured) => [lockKey.text(captured)]
-      ),
-    keys: (ctx) =>
-      asyncEntry(namespaceContext, MemoryOperation.keys, undefined, ctx, () => {
-        namespaceContext.controller.assertLive()
-        return [...namespaceContext.data.value.entries()]
-          .filter(([encoded]) => liveEntry(namespaceContext, 'value', encoded) !== undefined)
-          .map(([, entry]) => entry.key)
-          .filter((key): key is string => typeof key === 'string')
-      }),
-    clearValues: (ctx) => clearEntry(namespaceContext, MemoryOperation.clearValues, 'value', ctx),
-    clearAll: (ctx) => clearEntry(namespaceContext, MemoryOperation.clearAll, undefined, ctx),
-    getBytes: (key, ctx) =>
-      asyncEntry(
-        namespaceContext,
-        MemoryOperation.getBytes,
-        key,
-        ctx,
-        (captured) => {
-          assertStringStorageKey(captured, STORAGE_MEMORY_BACKEND)
-          return (read(namespaceContext, 'bytes', captured) as Uint8Array | undefined) ?? null
-        },
-        (captured) => [lockKey.bytes(captured)]
-      ),
-    setBytes: (key, value, ctx) =>
-      mutationEntry(
-        namespaceContext,
-        MemoryOperation.setBytes,
-        { key, value },
-        ctx,
-        (captured, context) => {
-          assertStringStorageKey(captured.key, STORAGE_MEMORY_BACKEND)
-          return prepareWrite(
-            namespaceContext,
-            'bytes',
-            captured.key,
-            captured.value,
-            context.conflictPolicy
-          )
-        }
-      ),
-    removeBytes: (key, ctx) =>
-      mutationEntry(namespaceContext, MemoryOperation.removeBytes, key, ctx, (captured) => {
-        assertStringStorageKey(captured, STORAGE_MEMORY_BACKEND)
-        return {
-          keys: [lockKey.bytes(captured)],
-          invoke: (draft) => {
-            draft.remove('bytes', captured)
-          },
-          run: () => remove(namespaceContext, 'bytes', captured)
-        }
-      }),
-    clearBytes: (ctx) => clearEntry(namespaceContext, MemoryOperation.clearBytes, 'bytes', ctx),
-    getRecord: (key, ctx) =>
-      asyncEntry(
-        namespaceContext,
-        MemoryOperation.getRecord,
-        key,
-        ctx,
-        (captured) => read(namespaceContext, 'record', captured) as T | undefined,
-        (captured) => [lockKey.record(captured)]
-      ),
-    putRecord: (value, key, ctx) =>
-      mutationEntry(
-        namespaceContext,
-        MemoryOperation.putRecord,
-        { value, key },
-        ctx,
-        (captured, context) => {
-          /** Generated identity is fixed once for the logical write, including retries and waiting. */
-          const resolved = snapshotStorageKey(
-            captured.key ?? createStorageToken(),
-            STORAGE_MEMORY_BACKEND
-          )
-          /** The mutation retains the same detached identity that its implicit locks protect. */
-          const mutation = prepareWrite(
-            namespaceContext,
-            'record',
-            resolved,
-            captured.value,
-            context.conflictPolicy
-          )
-          return {
-            ...mutation,
-            invoke: (draft) => {
-              mutation.invoke!(draft)
-              return resolved
-            },
-            run: () => {
-              mutation.run()
-              return resolved
-            }
-          }
-        }
-      ),
-    deleteRecord: (key, ctx) =>
-      mutationEntry(namespaceContext, MemoryOperation.deleteRecord, key, ctx, (captured) => {
-        /** Mutable record identity detaches before the original policy can wait. */
-        const key = snapshotStorageKey(captured, STORAGE_MEMORY_BACKEND)
-        return {
-          keys: [lockKey.record(key)],
-          invoke: (draft) => {
-            draft.remove('record', key)
-          },
-          run: () => remove(namespaceContext, 'record', key)
-        }
-      }),
-    clearRecords: (ctx) =>
-      clearEntry(namespaceContext, MemoryOperation.clearRecords, 'record', ctx),
-    iterateRecords: (range, ctx) => rootIterator(namespaceContext, range, ctx),
-    transaction: <R>(
-      run: (scope: IMemoryScope<T>) => R,
-      ctx?: ITransactionOptions
-    ): Promise<Awaited<R>> =>
-      atomicEntry(
-        namespaceContext,
-        MemoryOperation.transaction,
-        (context) => ({ run, ctx: context }),
-        ctx,
-        (input, admit) => {
-          assertTransactionCallback(input.run, STORAGE_MEMORY_BACKEND)
-          admit()
-          /**
-           * Keep the original second read before waiting, with no receiver or private draft
-           * argument.
-           */
-          const callback = input.run
-          return { invoke: (scope) => callback(scope) }
-        }
-      ),
-    tx: () =>
-      createTransactionBuilder(
-        namespaceContext.store,
-        undefined,
-        namespaceContext.core.getChainMethods('tx')
-      ),
-    /** Backend construction alone publishes undo; the host never patches a frozen root base. */
+    sync: createMemoryNamespaceSync(namespaceContext),
+    ...createMemoryNamespaceBaseText(namespaceContext),
+    ...createMemoryNamespaceBaseBytes(namespaceContext),
+    ...createMemoryNamespaceBaseRecords(namespaceContext),
+    ...createMemoryNamespaceBaseTransactions(namespaceContext),
     ...(namespaceContext.core.journal === undefined
       ? {}
       : {
@@ -2105,24 +1828,7 @@ function createMemoryNamespaceBase<T>(
             ).finally(release)
           }
         }),
-    inspectLocks: (ctx) =>
-      asyncEntry(namespaceContext, MemoryOperation.inspectLocks, undefined, ctx, () => {
-        namespaceContext.controller.assertLive()
-        return namespaceContext.locks.inspectLocks()
-      }),
-    watch: (key, ctx) => {
-      namespaceContext.controller.assertLive()
-      assertStringStorageKey(key, STORAGE_MEMORY_BACKEND)
-      return watchChanges(namespaceContext, 'value', ctx, key)
-    },
-    subscribeChanges: (listener) => {
-      namespaceContext.controller.assertLive()
-      return namespaceContext.controller.subscribe((change) => {
-        if (namespaceContext.root || change.orgId === namespaceContext.orgId)
-          return listener(change)
-      })
-    },
-    dispose: () => namespaceContext.controller.dispose(),
+    ...createMemoryNamespaceBaseObservation(namespaceContext),
     [asyncDisposeKey]: () =>
       (namespaceContext.symbolic ??= namespaceContext.controller
         .dispose()
@@ -2166,15 +1872,15 @@ function logicalRdfQuad<T>(
   namespaceContext: IMemoryNamespaceContext<T>,
   entry: IMemoryEntry
 ): IQuad {
-  /** Native RDF entries own frozen ground terms and an organization-prefixed named graph. */
+  /** Native RDF entries own detached ground terms and an organization-prefixed named graph. */
   const quad = entry.value as IQuad
-  return Object.freeze({
+  return {
     ...quad,
     graph: unprefixStorageOrgGraph(
       namespaceContext.orgId,
       quad.graph as Parameters<typeof unprefixStorageOrgGraph>[1]
     )
-  })
+  }
 }
 
 /** Full-batch canonical capture finishes before any logical lock or physical mutation. */
@@ -2182,27 +1888,23 @@ function captureRdfEntries<T>(
   namespaceContext: IMemoryNamespaceContext<T>,
   input: readonly IQuad[]
 ): readonly IMemoryRdfEntry[] {
-  return captureBatch(namespaceContext, () => {
+  return (() => {
     if (!Array.isArray(input))
       throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
         backend: STORAGE_MEMORY_BACKEND
       })
     /** Borrowed array bounds are captured once before validating any member or changing data. */
     const length = input.length
-    if (!Number.isSafeInteger(length) || length < 0)
-      throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
-        backend: STORAGE_MEMORY_BACKEND
-      })
     /** Duplicate quads share one eventual physical change after every input has been admitted. */
     const entries = new Map<string, IMemoryRdfEntry>()
     for (let index = 0; index < length; index++) {
       /** The contract alone owns ground position rules and detached term identity. */
       const logical = snapshotStorageRdfQuad(input[index]!, STORAGE_MEMORY_BACKEND)
       /** Each namespace stores real organization graphs even though its maps are also isolated. */
-      const value = Object.freeze({
+      const value = {
         ...logical,
         graph: prefixStorageOrgGraph(namespaceContext.orgId, logical.graph)
-      })
+      }
       /** Explicit user locks and additional capacity victims must meet on this logical quad. */
       const rdfLock = lockKey.rdf(logical)
       /** A string row key avoids reclassifying large canonical RDF bytes as public binary keys. */
@@ -2221,7 +1923,7 @@ function captureRdfEntries<T>(
       })
     }
     return [...entries.values()]
-  })
+  })()
 }
 
 /** Root pattern reads stream only the selected native prefix and retain safe leaf advancement. */
@@ -2384,7 +2086,6 @@ function nativeIterator<T, V, R>(
   }
 }
 
-/** Execute one isolated native attempt; the contract alone decides policy and retry. */
 /** One accepted native attempt owns its draft, repeatable reads and original scope controls. */
 type IMemoryTransactionContext<T, R> = {
   /** Original namespaceContext belongs to this accepted transaction attempt. */
@@ -2396,11 +2097,11 @@ type IMemoryTransactionContext<T, R> = {
   /** Original protectedRanges belongs to this accepted transaction attempt. */
   readonly protectedRanges: IMemoryRootMutation<unknown>['ranges']
   /** Original setCapacityIdentities belongs to this accepted transaction attempt. */
-  readonly setCapacityIdentities: (identities: readonly string[]) => void
+  readonly setCapacityIdentities?: (identities: readonly string[]) => void
   /** Original journaled belongs to this accepted transaction attempt. */
   readonly journaled: boolean
   /** Original observeKeys belongs to this accepted transaction attempt. */
-  readonly observeKeys: (keys: readonly ILockKey[]) => void
+  readonly observeKeys?: (keys: readonly ILockKey[]) => void
 
   /** Private log writes and terminal effects belong to this exact original native attempt. */
   journalDraft: ReturnType<IMemoryNamespaceContext<T>['journal']['draft']> | undefined
@@ -2464,6 +2165,7 @@ type IMemoryTransactionContext<T, R> = {
     ReturnType<IStoragePluginCore['stageBindings']['transactionStages']>['forTransaction']
   >
 }
+/** Execute one isolated attempt while the shared contract owner controls policy and retry. */
 async function transact<T, R>(
   namespaceContext: IMemoryNamespaceContext<T>,
   run: (scope: IMemoryScope<T>, draft: IMemoryTextDraft) => R,
@@ -2473,8 +2175,8 @@ async function transact<T, R>(
   journaled = true,
   observeKeys?: (keys: readonly ILockKey[]) => void
 ): Promise<IConcurrencyAttempt<Awaited<R>>> {
-  /** Initialize attempt-local facts before publishing its original native scope. */
-  const transactionContext = {
+  /** Native attempt state is complete before callback admission begins. */
+  const transactionContext = createMemoryTransactionContext(
     namespaceContext,
     run,
     ctx,
@@ -2482,72 +2184,7 @@ async function transact<T, R>(
     setCapacityIdentities,
     journaled,
     observeKeys
-  } as IMemoryTransactionContext<T, R>
-
-  transactionContext.namespaceContext.controller.assertLive()
-
-  throwIfAborted(transactionContext.ctx.signal)
-
-  transactionContext.setCapacityIdentities?.([])
-  transactionContext.draft = new Map<string, IMemoryDraft>()
-  transactionContext.clearAllRequested = false
-  transactionContext.clearChanged = false
-  transactionContext.draftOrdered = {
-    value: createOrderedRecordIndex<IMemoryDraft>(),
-    bytes: createOrderedRecordIndex<IMemoryDraft>(),
-    record: createOrderedRecordIndex<IMemoryDraft>(),
-    vector: createOrderedRecordIndex<IMemoryDraft>(),
-    rdf: createOrderedRecordIndex<IMemoryDraft>()
-  }
-  transactionContext.draftRdfIndex = createMemoryRdfIndex(transactionContext.draftOrdered.rdf)
-  transactionContext.snapshots = new Map<string, IMemorySnapshot | undefined>()
-  transactionContext.expected = new Map<
-    string,
-    { channel: IMemoryChannel; encoded: string; key: IStorageKey; revision: number }
-  >()
-  transactionContext.snapshotEpochs = new Map<IMemoryChannel, number>()
-  transactionContext.textDraft = createMemoryTransactionTextDraft(transactionContext)
-  transactionContext.scope = createScope(transactionContext)
-  transactionContext.control = transactionContext.namespaceContext.owner.register(
-    transactionContext.scope,
-    {
-      context: transactionContext.ctx,
-      createScope: () => createScope(transactionContext),
-      onFailure: (error) => {
-        transactionContext.failure ??= error
-      },
-      beforeCommit: (current) => {
-        transactionContext.namespaceContext.controller.assertLive()
-        throwIfAborted(transactionContext.ctx.signal)
-        void transactionContext.namespaceContext.core.stageBindings
-          .transactionStages(transactionContext.namespaceContext.store)
-          .forTransaction(current)
-          .beforeCommit?.()
-        if (transactionContext.journalAttempt === undefined) return
-        transactionContext.journalCapacity = draftCapacityPlan(transactionContext)
-        for (const victim of transactionContext.journalCapacity?.victims ?? []) {
-          /** Blob has no shared transaction target; never fabricate a logical blob lock/image. */
-          if (victim.channel === 'blob')
-            throw new StorageContractError(StorageContractErrorCode.unsupported)
-          const channel = victim.channel as IMemoryChannel
-          const current = txSnapshot(transactionContext, channel, victim.encoded, victim.key)
-          if (current === undefined) continue
-          ;(transactionContext.journalVictims ??= new Set()).add(victim.id)
-          stageDraft(transactionContext, {
-            ...current,
-            channel,
-            encoded: victim.encoded,
-            remove: true
-          })
-        }
-        return transactionContext.journalAttempt.record(current)
-      }
-    }
   )
-  transactionContext.stage = transactionContext.namespaceContext.core.stageBindings
-    .transactionStages(transactionContext.namespaceContext.store)
-    .forTransaction(transactionContext.scope)
-
   try {
     if (transactionContext.journaled)
       transactionContext.journalAttempt = transactionContext.namespaceContext.core.journal?.begin(
@@ -2563,259 +2200,16 @@ async function transact<T, R>(
     await transactionContext.control.runFinalizers()
     transactionContext.namespaceContext.controller.assertLive()
     throwIfAborted(transactionContext.ctx.signal)
-    if (transactionContext.protectedRanges !== undefined) {
-      /** Batch commits cannot bypass a holder admitted while this original draft was preparing. */
-      const held = transactionContext.namespaceContext.locks.probe(
-        readConcurrencyLockIdentities(transactionContext.ctx),
-        transactionContext.protectedRanges,
-        transactionContext.ctx
-      )
-      if (held !== undefined) {
-        void transactionContext.stage.afterRollback?.(StorageContractErrorCode.lockRejected)
-        return { status: 'conflict', phase: 'acquire', keys: [held.key], holder: held.holder }
-      }
-    }
-    /** Expiry after an observed read changes the same original revision before commit checks. */
-    for (const entry of transactionContext.expected.values())
-      liveEntry(transactionContext.namespaceContext, entry.channel, entry.encoded)
-    /** The same original retry owner handles concurrent private-head changes and drop/reopen. */
-    const journalConflict = transactionContext.journalDraft?.conflict()
-    if (journalConflict !== undefined) {
-      void transactionContext.stage.afterRollback?.(StorageContractErrorCode.writeConflict)
-      return { status: 'conflict', phase: 'commit', keys: [], holder: undefined }
-    }
-    /** Conflict identities are collected before the synchronous all-channel draft merge. */
-    const conflicts = [...transactionContext.expected.values()].filter(
-      (entry) =>
-        revision(transactionContext.namespaceContext, entry.channel, entry.encoded) !==
-          entry.revision ||
-        transactionContext.namespaceContext.revisions.epoch(
-          entry.channel === 'value' ? 'text' : entry.channel
-        ) !== transactionContext.snapshotEpochs.get(entry.channel)
-    )
-    if (
-      conflicts.length !== 0 ||
-      [...transactionContext.snapshotEpochs].some(
-        ([channel, epoch]) =>
-          transactionContext.namespaceContext.revisions.epoch(
-            channel === 'value' ? 'text' : channel
-          ) !== epoch
-      )
-    ) {
-      void transactionContext.stage.afterRollback?.(StorageContractErrorCode.writeConflict)
-      return {
-        status: 'conflict',
-        phase: 'commit',
-        keys: conflicts.map((entry) =>
-          entry.channel === 'value'
-            ? lockKey.text(entry.key)
-            : entry.channel === 'bytes'
-              ? lockKey.bytes(entry.key as string)
-              : entry.channel === 'vector'
-                ? lockKey.vector(
-                    (entry.key as readonly [string, string])[0],
-                    (entry.key as readonly [string, string])[1]
-                  )
-                : entry.channel === 'rdf'
-                  ? (transactionContext.draft.get(
-                      identity(transactionContext.namespaceContext, 'rdf', entry.encoded)
-                    ) ??
-                      transactionContext.snapshots.get(
-                        identity(transactionContext.namespaceContext, 'rdf', entry.encoded)
-                      ))!.rdfLock!
-                  : lockKey.record(entry.key)
-        ),
-        holder: undefined,
-        cause: new Error(
-          conflicts[0] &&
-            revision(
-              transactionContext.namespaceContext,
-              conflicts[0].channel,
-              conflicts[0].encoded
-            ) !== conflicts[0].revision
-            ? StorageErrorText.memoryRevisionChanged(
-                conflicts[0].revision,
-                revision(
-                  transactionContext.namespaceContext,
-                  conflicts[0].channel,
-                  conflicts[0].encoded
-                )
-              )
-            : StorageErrorText.memoryEpochChanged
-        )
-      }
-    }
+    /** Return the same conflict before changing any committed row. */
+    const conflict = memoryTransactionConflict(transactionContext)
+    if (conflict !== undefined) return conflict
     /** Final capacity admission shares the same original attempt, locks and no-await commit turn. */
     const capacityPlan = draftCapacityPlan(transactionContext)
-    if (
-      transactionContext.journalAttempt !== undefined &&
-      (capacityPlan?.expired.length !== transactionContext.journalCapacity?.expired.length ||
-        capacityPlan?.victims.length !== transactionContext.journalCapacity?.victims.length ||
-        capacityPlan?.expired.some(
-          (entry, index) => entry.id !== transactionContext.journalCapacity!.expired[index]!.id
-        ) ||
-        capacityPlan?.victims.some(
-          (entry, index) => entry.id !== transactionContext.journalCapacity!.victims[index]!.id
-        ))
-    ) {
-      void transactionContext.stage.afterRollback?.(StorageContractErrorCode.writeConflict)
-      return { status: 'conflict', phase: 'commit', keys: [], holder: undefined }
-    }
-    transactionContext.setCapacityIdentities?.(capacityPlan?.identities ?? [])
-    const capacityHeld =
-      capacityPlan === undefined
-        ? undefined
-        : transactionContext.namespaceContext.locks.probe(
-            capacityPlan.identities,
-            undefined,
-            transactionContext.ctx
-          )
-    if (capacityHeld !== undefined) {
-      void transactionContext.stage.afterRollback?.(StorageContractErrorCode.lockRejected)
-      return {
-        status: 'conflict',
-        phase: 'acquire',
-        keys: [capacityHeld.key],
-        holder: capacityHeld.holder
-      }
-    }
+    /** Capacity retains the existing original-attempt admission point. */
+    const capacityConflict = memoryTransactionCapacityConflict(transactionContext, capacityPlan)
+    if (capacityConflict !== undefined) return capacityConflict
     /** Each channel reports one batch after all physical draft rows have committed. */
-    const changed = {
-      value: [] as IStorageKey[],
-      bytes: [] as IStorageKey[],
-      record: [] as IStorageKey[],
-      vector: [] as IStorageKey[],
-      rdf: [] as IStorageKey[]
-    }
-    commitCapacity(
-      transactionContext.namespaceContext,
-      capacityPlan,
-      () => {
-        /** Clear's physical maps, revisions and accounting remain owned by their original turn. */
-        if (transactionContext.clearedChannels !== undefined) {
-          if (transactionContext.clearAllRequested)
-            clearAll(transactionContext.namespaceContext, false)
-          else
-            clear(
-              transactionContext.namespaceContext,
-              transactionContext.clearedChannels[0] as IStorageChannel,
-              false
-            )
-        }
-        for (const proposed of transactionContext.draft.values()) {
-          if (transactionContext.clearedChannels?.includes(proposed.channel)) {
-            changed[proposed.channel].push(proposed.key)
-            continue
-          }
-          /** Policy eviction remains owned by commitCapacity, including revision and onEvict. */
-          if (
-            transactionContext.journalVictims?.has(
-              identity(transactionContext.namespaceContext, proposed.channel, proposed.encoded)
-            )
-          )
-            continue
-          /** Existing draft identities retain their already captured logical key. */
-          const encoded = proposed.encoded
-          /** New deadlines that elapsed within this draft commit as immediate absence. */
-          if (
-            proposed.remove ||
-            (proposed.deadline !== undefined &&
-              proposed.deadline <= transactionContext.namespaceContext.scheduler.now())
-          ) {
-            setDeadline(transactionContext.namespaceContext, proposed.channel, encoded, undefined)
-            transactionContext.namespaceContext.capacityIndex?.remove(
-              identity(transactionContext.namespaceContext, proposed.channel, encoded)
-            )
-            if (!transactionContext.namespaceContext.data[proposed.channel].delete(encoded))
-              continue
-            if (proposed.channel === 'rdf')
-              transactionContext.namespaceContext.rdfIndex.delete(proposed.rdfKeys!)
-            else
-              transactionContext.namespaceContext.ordered[proposed.channel].delete(proposed.ordered)
-          } else {
-            /**
-             * An overwrite retains its original live ordered encoding instead of keeping duplicate
-             * key bytes.
-             */
-            const keyBytes =
-              transactionContext.namespaceContext.ordered[proposed.channel].get(proposed.ordered)
-                ?.key ?? proposed.ordered
-            const entry = {
-              key: proposed.key,
-              value: proposed.value,
-              ordered: keyBytes,
-              bytes: proposed.bytes,
-              rdfKeys: proposed.rdfKeys,
-              rdfLock: proposed.rdfLock
-            }
-            transactionContext.namespaceContext.data[proposed.channel].set(encoded, entry)
-            if (proposed.channel === 'rdf')
-              transactionContext.namespaceContext.rdfIndex.set(proposed.rdfKeys!, entry)
-            else transactionContext.namespaceContext.ordered[proposed.channel].set(keyBytes, entry)
-            setDeadline(
-              transactionContext.namespaceContext,
-              proposed.channel,
-              encoded,
-              proposed.deadline
-            )
-            transactionContext.namespaceContext.capacityIndex?.put({
-              ...capacityFact(
-                transactionContext.namespaceContext,
-                proposed.channel,
-                proposed.key,
-                undefined,
-                proposed.rdfLock
-              ),
-              bytes: proposed.bytes ?? 0
-            })
-          }
-          bump(transactionContext.namespaceContext, proposed.channel, encoded)
-          changed[proposed.channel].push(proposed.key)
-        }
-        /** The original capacity buffer preserves batch-before-victim notification order. */
-        if (capacityPlan !== undefined)
-          for (const channel of transactionContext.namespaceContext.physicalChannels)
-            if (
-              !transactionContext.clearedChannels?.includes(channel) &&
-              changed[channel].length !== 0
-            )
-              publish(transactionContext.namespaceContext, channel, 'batch', changed[channel])
-      },
-      () => {
-        /** Actual data and capacity victims are final before private indexes become visible. */
-        transactionContext.journalDraft?.commit()
-        transactionContext.journalDraft?.complete(true)
-        if (transactionContext.clearChanged) {
-          if (transactionContext.clearAllRequested)
-            transactionContext.namespaceContext.controller.publish({
-              channel: 'all',
-              kind: 'clear',
-              orgId: transactionContext.namespaceContext.orgId
-            })
-          else
-            publish(
-              transactionContext.namespaceContext,
-              transactionContext.clearedChannels![0]!,
-              'clear'
-            )
-        }
-        if (capacityPlan === undefined)
-          for (const channel of transactionContext.namespaceContext.physicalChannels)
-            if (
-              !transactionContext.clearedChannels?.includes(channel) &&
-              changed[channel].length !== 0
-            )
-              publish(transactionContext.namespaceContext, channel, 'batch', changed[channel])
-      }
-    )
-    void transactionContext.stage.afterCommit?.(
-      transactionContext.namespaceContext.physicalChannels.reduce(
-        (count, channel) => count + changed[channel].length,
-        0
-      ) +
-        (capacityPlan?.expired.length ?? 0) +
-        (capacityPlan?.victims.length ?? 0)
-    )
+    commitMemoryTransaction(transactionContext, capacityPlan)
     return { status: 'committed', value }
   } catch (cause) {
     /** The original owner combines cleanup after the first failure without replacing its cause. */
@@ -3579,14 +2973,14 @@ function readJournalRevision<T, R>(
   const changed =
     proposed !== undefined && (!removes || transactionContext.snapshots.get(id) !== undefined)
   if (transactionContext.clearedChannels?.includes(row.channel))
-    return Object.freeze({
+    return {
       epoch: transactionContext.snapshotEpochs.get(row.channel)! + 1,
       revision: 0
-    })
-  return Object.freeze({
+    }
+  return {
     epoch: transactionContext.snapshotEpochs.get(row.channel)!,
     revision: transactionContext.expected.get(id)!.revision + (changed ? 1 : 0)
-  })
+  }
 }
 
 /** Capture each actual native staging step before it changes this attempt's existing draft. */
@@ -3631,16 +3025,14 @@ function captureJournalStage<T, R>(
       entry.channel === 'bytes'
     )
     if (beforeImage.present || afterImage.present)
-      proposed.push(Object.freeze({ target, before: beforeImage, after: afterImage }))
+      proposed.push({ target, before: beforeImage, after: afterImage })
   }
   if (target.channel !== 'rdf' && before?.deadline !== after?.deadline)
-    proposed.push(
-      Object.freeze({
-        target: memoryJournalDeadlineTarget(target),
-        before: encodeStorageJournalImage(before?.deadline !== undefined, before?.deadline),
-        after: encodeStorageJournalImage(after?.deadline !== undefined, after?.deadline)
-      })
-    )
+    proposed.push({
+      target: memoryJournalDeadlineTarget(target),
+      before: encodeStorageJournalImage(before?.deadline !== undefined, before?.deadline),
+      after: encodeStorageJournalImage(after?.deadline !== undefined, after?.deadline)
+    })
   transactionContext.journalChanges.push(...proposed)
 }
 
@@ -3665,501 +3057,546 @@ function changes<T, R>(
       )!.revision
     )
       continue
-    result.push(Object.freeze({ ...change, afterRevision }))
+    result.push({ ...change, afterRevision })
   }
-  return Object.freeze(result)
+  return result
 }
 
 /** The same physical scope factory serves callbacks, nested operations and final checks. */
+/** One published view borrows the original attempt and authentic native scope. */
+type IMemoryScopeContext<T, R> = {
+  /** The accepted transaction owns draft rows, stages and lifetime. */
+  readonly transactionContext: IMemoryTransactionContext<T, R>
+  /** Every method uses this published view for owner admission. */
+  scope: IMemoryScope<T>
+}
+/** Publish native channel methods before attaching the original feature API. */
 function createScope<T, R>(transactionContext: IMemoryTransactionContext<T, R>): IMemoryScope<T> {
-  /** Each method closes over its own authentic view, never an independently registered guard. */
-  const scope: IMemoryScope<T> = {
-    [journalOperations]: {
-      changes: () => {
-        assertTransactionOwner(transactionContext.namespaceContext.store, scope)
-        return changes(transactionContext)
-      },
-      readImage: (target) =>
-        runTransactionOperation(scope, () => readJournalImage(transactionContext, target)),
-      writeImage: (target, image) =>
-        runTransactionOperation(scope, () => writeJournalImage(transactionContext, target, image)),
-      readRevision: (target) =>
-        runTransactionOperation(scope, () => readJournalRevision(transactionContext, target)),
-      run: (prefix, work) =>
-        runTransactionOperation(scope, (current) =>
-          privateJournal(transactionContext).port.run(prefix, work, (run) =>
-            runTransactionOperation(current, run)
-          )
-        ),
-      onCommit: (effect) => {
-        assertTransactionOwner(transactionContext.namespaceContext.store, scope)
-        return privateJournal(transactionContext).port.onCommit(effect)
-      },
-      onRollback: (effect) => {
-        assertTransactionOwner(transactionContext.namespaceContext.store, scope)
-        return privateJournal(transactionContext).port.onRollback(effect)
+  /** Channel callbacks access the scope only after construction completes. */
+  const scopeContext = { transactionContext } as IMemoryScopeContext<T, R>
+  scopeContext.scope = {
+    [journalOperations]: createMemoryScopeJournal(scopeContext),
+    [queryDraft]: createMemoryScopeQueryDraft(scopeContext),
+    [recordQueries]: createMemoryScopeRecordQuery(scopeContext),
+    [ttlOperations]: createMemoryScopeTtl(scopeContext),
+    [counterOperations]: createMemoryScopeCounter(scopeContext),
+    [rdfOperations]: createMemoryScopeRdf(scopeContext),
+    [recordPrefix]: createMemoryScopeRecordPrefix(scopeContext),
+    use: (capability) => useTransactionCapability(scopeContext.scope, capability),
+    ...createMemoryScopeText(scopeContext),
+    ...createMemoryScopeBytes(scopeContext),
+    ...createMemoryScopeRecords(scopeContext)
+  }
+  /** Feature assembly receives the same authentic native view. */
+  const api = transactionContext.namespaceContext.core.createTransactionApi(scopeContext.scope)
+  if (api !== undefined)
+    Object.defineProperty(scopeContext.scope, 'api', { value: api, enumerable: true })
+  return scopeContext.scope
+}
+/** Admit one native operation before pipeline evaluation and stage observation. */
+function memoryScopeOperation<T, R, I, V>(
+  scopeContext: IMemoryScopeContext<T, R>,
+  name: string,
+  input: I,
+  invoke: (captured: I) => V,
+  settle?: true
+): Promise<Awaited<V>> {
+  return runTransactionOperation(scopeContext.scope, (current) =>
+    acceptedMemoryScopeOperation(scopeContext, name, input, invoke, current, settle)
+  )
+}
+/** Run already-admitted draft work through the sole pipeline and original stage pair. */
+function acceptedMemoryScopeOperation<T, R, I, V>(
+  scopeContext: IMemoryScopeContext<T, R>,
+  name: string,
+  input: I,
+  invoke: (captured: I) => V,
+  current: ITransactionScope,
+  settle?: true
+): Promise<V> {
+  return scopeContext.transactionContext.namespaceContext.core.execution.run(
+    { operation: name, input, scope: current, ctx: scopeContext.transactionContext.ctx },
+    async (captured) => {
+      scopeContext.transactionContext.namespaceContext.controller.assertLive()
+      throwIfAborted(scopeContext.transactionContext.ctx.signal)
+      /** This current scope is authentic for exactly this operation's original lifetime. */
+      const stage = scopeContext.transactionContext.namespaceContext.core.stageBindings
+        .transactionStages(scopeContext.transactionContext.namespaceContext.store)
+        .forTransaction(current)
+      void stage.beforeTxOperation?.(name)
+      /** Native memory operations mutate only the private isolated draft. */
+      const result = invoke(captured)
+      if (settle) {
+        /** Query writes finish their existing asynchronous reader before the after stage. */
+        const completed = await result
+        void stage.afterTxOperation?.(name)
+        return completed
       }
-    },
-    [queryDraft]: {
-      record: (request, run) => {
-        assertTransactionOwner(transactionContext.namespaceContext.store, scope)
-        /** Pipeline-provided patches detach once before selection can touch any draft row. */
-        const patch =
-          request.operation === 'update'
-            ? clone(transactionContext.namespaceContext, request.patch)
-            : undefined
-        if (
-          request.operation !== 'delete' &&
-          (request.operation !== 'update' ||
-            typeof patch !== 'object' ||
-            patch === null ||
-            Array.isArray(patch))
-        )
-          throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
-            backend: STORAGE_MEMORY_BACKEND
-          })
-        return run({
-          execute: () =>
-            queryIterator(transactionContext, scope, function* () {
-              for (const row of txRows(transactionContext, 'record'))
-                yield [
-                  clone(transactionContext.namespaceContext, row.key),
-                  copyValue(transactionContext.namespaceContext, 'record', row.value, row.key)
-                ] as const
-            }),
-          accept: (key) => {
-            assertTransactionOwner(transactionContext.namespaceContext.store, scope)
-            if (request.operation === 'delete') return txRemove(transactionContext, 'record', key)
-            /** Query projections never become replacement values; patch the actual draft row. */
-            const current = txEntry(transactionContext, 'record', key)
-            if (current === undefined) return false
-            if (typeof current.value !== 'object' || current.value === null)
-              throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
-                backend: STORAGE_MEMORY_BACKEND
-              })
-            /** Existing native cloning preserves Date/Map values admitted by memory. */
-            const value = clone(transactionContext.namespaceContext, current.value, key)
-            for (const field of Object.keys(patch!)) {
-              /** Existing native fields such as Array.length retain their original descriptors. */
-              const descriptor = Object.getOwnPropertyDescriptor(value, field)
-              Object.defineProperty(
-                value,
-                field,
-                descriptor === undefined
-                  ? {
-                      value: patch![field],
-                      enumerable: true,
-                      configurable: true,
-                      writable: true
-                    }
-                  : { ...descriptor, value: patch![field] }
-              )
-            }
-            txWrite(transactionContext, 'record', key, value, 'replace')
-            return true
-          }
-        })
-      },
-      rdf: (request, run) => {
-        assertTransactionOwner(transactionContext.namespaceContext.store, scope)
-        /** Replacement admission precedes selection or any draft tombstone. */
-        const replacement =
-          request.operation === 'replace'
-            ? captureRdfEntries(transactionContext.namespaceContext, [request.newQuad])[0]
-            : undefined
-        return run({
-          execute: (input) =>
-            queryIterator(transactionContext, scope, function* () {
-              for (const row of txRdfRows(transactionContext, input.pattern))
-                yield [row.key, logicalRdfQuad(transactionContext.namespaceContext, row)] as const
-            }),
-          accept: (_key, quad) => {
-            assertTransactionOwner(transactionContext.namespaceContext.store, scope)
-            /**
-             * The original physical identity resolves actual draft membership and no-op
-             * replacement.
-             */
-            const entry = captureRdfEntries(transactionContext.namespaceContext, [quad])[0]!
-            const proposed = transactionContext.draft.get(
-              identity(transactionContext.namespaceContext, 'rdf', entry.encoded)
-            )
-            const current = proposed
-              ? proposed.remove
-                ? undefined
-                : proposed
-              : txSnapshot(transactionContext, 'rdf', entry.encoded, entry.key)
-            if (current === undefined || replacement?.encoded === entry.encoded) return false
-            txRdfWrite(transactionContext, [quad], true)
-            if (replacement !== undefined)
-              txRdfWrite(
-                transactionContext,
-                [logicalRdfQuad(transactionContext.namespaceContext, replacement)],
-                false
-              )
-            return true
-          }
-        })
-      },
-      vector: <P>(
-        collection: string,
-        _request: IQueryDelete,
-        run: Parameters<NonNullable<IVectorQuerySource<P>['mutate']>>[1],
-        select: IMemoryVectorSelection<P>
-      ) => {
-        assertTransactionOwner(transactionContext.namespaceContext.store, scope)
-        return run({
-          execute: (input) =>
-            queryIterator(transactionContext, scope, () =>
-              select(
-                input,
-                txVectorPoints<T, R, P>(transactionContext, collection),
-                (id) =>
-                  txRead(
-                    transactionContext,
-                    'vector',
-                    vectorKey(transactionContext.namespaceContext, collection, id)
-                  ) as IStorageVectorPoint<P> | undefined
-              )
-            ),
-          accept: (_key, hit) => {
-            assertTransactionOwner(transactionContext.namespaceContext.store, scope)
-            return txRemove(
-              transactionContext,
-              'vector',
-              vectorKey(transactionContext.namespaceContext, collection, hit.id)
-            )
-          }
-        })
-      }
-    },
-    [recordQueries]: <R>() =>
-      createRecordQuery<R>(
-        {
-          asyncDisposeKey,
-          cursorSource: scope,
-          pushdown: { source: MemoryState.querySource, operations: [], operators: [] },
-          execute: () => scope.iterateRecords(),
-          mutate: (request, run) =>
-            operation(
-              request.operation === 'delete'
-                ? MemoryOperation.recordQueryDelete
-                : MemoryOperation.recordQueryUpdate,
-              request,
-              (captured) => scope[queryDraft].record(captured, run),
-              true
-            )
-        },
-        transactionContext.namespaceContext.core.getChainMethods('query')
-      ),
-    [ttlOperations]: {
-      expire: (target, ms) =>
-        acceptedOperation(
-          MemoryOperation.ttlExpire,
-          { target, ms },
-          (input) => {
-            /** Validation stays inside the one operation already admitted by tx.use(ttl). */
-            const target = captureTtlTarget(transactionContext.namespaceContext, input.target)
-            /** Preserve this pipeline-provided duration while the native operation settles. */
-            const ms = input.ms
-            assertStorageTtlDuration(ms, STORAGE_MEMORY_BACKEND)
-            return txTtl(transactionContext, target, ms, false)
-          },
-          scope
-        ),
-      remaining: (target) =>
-        acceptedOperation(
-          MemoryOperation.ttlRemaining,
-          target,
-          (input) =>
-            txRemaining(
-              transactionContext,
-              captureTtlTarget(transactionContext.namespaceContext, input)
-            ),
-          scope
-        ),
-      persist: (target) =>
-        acceptedOperation(
-          MemoryOperation.ttlPersist,
-          target,
-          (input) =>
-            txTtl(
-              transactionContext,
-              captureTtlTarget(transactionContext.namespaceContext, input),
-              undefined,
-              true
-            ),
-          scope
-        )
-    },
-    [counterOperations]: {
-      increment: (key, by) =>
-        acceptedOperation(
-          MemoryOperation.counterIncrement,
-          { key, by },
-          (input) => {
-            /** Snapshot pipeline-provided identity before any native text access. */
-            const key = input.key
-            assertStringStorageKey(key, STORAGE_MEMORY_BACKEND)
-            /** The pure contract calculation runs against this native text draft only. */
-            const increment = snapshotStorageCounterIncrement(input.by, STORAGE_MEMORY_BACKEND)
-            const result = increment(txRead(transactionContext, 'value', key) as string | undefined)
-            txWrite(transactionContext, 'value', key, String(result), 'conflict')
-            return result
-          },
-          scope
-        )
-    },
-    [rdfOperations]: {
-      add: (quads) =>
-        acceptedOperation(
-          MemoryOperation.rdfAdd,
-          quads,
-          (input) => txRdfWrite(transactionContext, input, false),
-          scope
-        ),
-      delete: (quads) =>
-        acceptedOperation(
-          MemoryOperation.rdfDelete,
-          quads,
-          (input) => txRdfWrite(transactionContext, input, true),
-          scope
-        ),
-      match: (pattern) =>
-        rdfQuery(transactionContext, pattern, scope, (request, run) =>
-          operation(
-            request.operation === 'delete'
-              ? MemoryOperation.rdfQueryDelete
-              : MemoryOperation.rdfQueryReplace,
-            request,
-            (captured) => scope[queryDraft].rdf(captured, run),
-            true
-          )
-        )
-    },
-    [recordPrefix]: (prefix) =>
-      operation(MemoryOperation.recordRemoveByPrefix, prefix, (current) => {
-        /** Native record prefix deletion uses the same bounded draft merge as record iteration. */
-        const captured = snapshotStorageKeyPrefix(current, STORAGE_MEMORY_BACKEND)
-        let count = 0
-        for (const row of txRows(transactionContext, 'record', {
-          lower: captured.lower,
-          upper: captured.upper,
-          upperOpen: true
-        }))
-          if (txRemove(transactionContext, 'record', row.key)) count++
-        return count
-      }),
-    use: (capability) => useTransactionCapability(scope, capability),
-    get: (key) =>
-      operation(MemoryOperation.get, key, (current) => {
-        assertStringStorageKey(current, STORAGE_MEMORY_BACKEND)
-        return (txRead(transactionContext, 'value', current) as string | undefined) ?? null
-      }),
-    set: (key, value, options) =>
-      operation(MemoryOperation.set, { key, value, options }, (current) => {
-        assertStringStorageKey(current.key, STORAGE_MEMORY_BACKEND)
-        txWrite(
-          transactionContext,
-          'value',
-          current.key,
-          current.value,
-          readTransactionConflictPolicy(current.options, STORAGE_MEMORY_BACKEND)
-        )
-      }),
-    remove: (key) =>
-      operation(MemoryOperation.remove, key, (current) => {
-        assertStringStorageKey(current, STORAGE_MEMORY_BACKEND)
-        txRemove(transactionContext, 'value', current)
-      }),
-    has: (key) =>
-      operation(MemoryOperation.has, key, (current) => {
-        assertStringStorageKey(current, STORAGE_MEMORY_BACKEND)
-        return txRead(transactionContext, 'value', current) !== undefined
-      }),
-    getMany: (keys) =>
-      batchOperation(MemoryOperation.getMany, keys, (current) =>
-        readTextBatch(
-          transactionContext.namespaceContext,
-          current,
-          (key) => txRead(transactionContext, 'value', key) as string | undefined
-        )
-      ),
-    setMany: (entries) =>
-      batchOperation(MemoryOperation.setMany, entries, (current) =>
-        transactionContext.textDraft.setMany(
-          captureTextEntries(transactionContext.namespaceContext, current)
-        )
-      ),
-    removeMany: (keys) =>
-      batchOperation(MemoryOperation.removeMany, keys, (current) => {
-        /** Validate every key before applying the batch's first tombstone. */
-        const captured = snapshotStorageBatchKeys(current, STORAGE_MEMORY_BACKEND)
-          .filter(({ firstIndex }, index) => firstIndex === index)
-          .map(({ key }) => key)
-        return transactionContext.textDraft.removeMany(captured)
-      }),
-    removeByPrefix: (prefix) =>
-      operation(MemoryOperation.removeByPrefix, prefix, (current) =>
+      void stage.afterTxOperation?.(name)
+      return result
+    }
+  )
+}
+/** Empty batches retain owner admission while skipping pipeline and batch observation. */
+function memoryScopeBatchOperation<T, R, I extends readonly unknown[], V>(
+  scopeContext: IMemoryScopeContext<T, R>,
+  name: string,
+  input: I,
+  invoke: (captured: I) => V
+): Promise<Awaited<V>> {
+  return runTransactionOperation(scopeContext.scope, (current) => {
+    if (batchSize(scopeContext.transactionContext.namespaceContext, input) === 0)
+      return invoke(input)
+    return acceptedMemoryScopeOperation(
+      scopeContext,
+      name,
+      input,
+      (captured) =>
         observeBatch(
-          transactionContext.namespaceContext,
-          MemoryOperation.removeByPrefix,
-          undefined,
-          () => transactionContext.textDraft.removeByPrefix(current),
-          scope
+          scopeContext.transactionContext.namespaceContext,
+          name,
+          captured.length,
+          () => invoke(captured),
+          scopeContext.scope
+        ),
+      current
+    )
+  })
+}
+/** Compose the current native view's Journal channel. */
+function createMemoryScopeJournal<T, R>(
+  scopeContext: IMemoryScopeContext<T, R>
+): IMemoryScope<T>[typeof journalOperations] {
+  return {
+    changes: () => {
+      assertTransactionOwner(
+        scopeContext.transactionContext.namespaceContext.store,
+        scopeContext.scope
+      )
+      return changes(scopeContext.transactionContext)
+    },
+    readImage: (target) =>
+      runTransactionOperation(scopeContext.scope, () =>
+        readJournalImage(scopeContext.transactionContext, target)
+      ),
+    writeImage: (target, image) =>
+      runTransactionOperation(scopeContext.scope, () =>
+        writeJournalImage(scopeContext.transactionContext, target, image)
+      ),
+    readRevision: (target) =>
+      runTransactionOperation(scopeContext.scope, () =>
+        readJournalRevision(scopeContext.transactionContext, target)
+      ),
+    run: (prefix, work) =>
+      runTransactionOperation(scopeContext.scope, (current) =>
+        privateJournal(scopeContext.transactionContext).port.run(prefix, work, (run) =>
+          runTransactionOperation(current, run)
         )
       ),
-    getBytes: (key) =>
-      operation(MemoryOperation.getBytes, key, (current) => {
-        assertStringStorageKey(current, STORAGE_MEMORY_BACKEND)
-        return (txRead(transactionContext, 'bytes', current) as Uint8Array | undefined) ?? null
-      }),
-    setBytes: (key, value, options) =>
-      operation(MemoryOperation.setBytes, { key, value, options }, (current) => {
-        assertStringStorageKey(current.key, STORAGE_MEMORY_BACKEND)
-        txWrite(
-          transactionContext,
-          'bytes',
-          current.key,
-          current.value,
-          readTransactionConflictPolicy(current.options, STORAGE_MEMORY_BACKEND)
-        )
-      }),
-    removeBytes: (key) =>
-      operation(MemoryOperation.removeBytes, key, (current) => {
-        assertStringStorageKey(current, STORAGE_MEMORY_BACKEND)
-        txRemove(transactionContext, 'bytes', current)
-      }),
-    getRecord: (key) =>
-      operation(
-        MemoryOperation.getRecord,
-        key,
-        (current) => txRead(transactionContext, 'record', current) as T | undefined
-      ),
-    putRecord: (value, key, options) =>
-      operation(MemoryOperation.putRecord, { value, key, options }, (current) => {
-        /** Opaque generated record identities use the existing native entropy helper. */
-        const resolved = current.key ?? createStorageToken()
-        txWrite(
-          transactionContext,
-          'record',
-          resolved,
-          current.value,
-          readTransactionConflictPolicy(current.options, STORAGE_MEMORY_BACKEND)
-        )
-        return resolved
-      }),
-    deleteRecord: (key) =>
-      operation(MemoryOperation.deleteRecord, key, (current) => {
-        txRemove(transactionContext, 'record', current)
-      }),
-    iterateRecords: (range) => {
-      /** Bounds are captured at construction; native rows are snapshotted at first advance. */
-      const captured = orderedRange(transactionContext.namespaceContext, range)
-      /** The actual native iterator is registered once with the original transaction owner. */
-      const iterator = (async function* () {
-        /** Snapshot values together with membership on the first actual native advance. */
-        const rows = txRows(transactionContext, 'record', captured).map(
-          (row) =>
-            [
-              clone(transactionContext.namespaceContext, row.key),
-              txRead(transactionContext, 'record', row.key) as T
-            ] as [IStorageKey, T]
-        )
-        for (const [key, value] of rows) {
-          transactionContext.namespaceContext.controller.assertLive()
-          throwIfAborted(transactionContext.ctx.signal)
-          yield [
-            clone(transactionContext.namespaceContext, key),
-            clone(transactionContext.namespaceContext, value)
-          ] as [IStorageKey, T]
-        }
-      })()
-      return transactionContext.namespaceContext.owner.registerIterator(scope, {
-        next: (current) =>
-          transactionContext.namespaceContext.core.execution.run(
-            {
-              operation: MemoryOperation.iterateRecords,
-              input: undefined,
-              scope: current,
-              ctx: transactionContext.ctx
-            },
-            () => iterator.next()
+    onCommit: (effect) => {
+      assertTransactionOwner(
+        scopeContext.transactionContext.namespaceContext.store,
+        scopeContext.scope
+      )
+      return privateJournal(scopeContext.transactionContext).port.onCommit(effect)
+    },
+    onRollback: (effect) => {
+      assertTransactionOwner(
+        scopeContext.transactionContext.namespaceContext.store,
+        scopeContext.scope
+      )
+      return privateJournal(scopeContext.transactionContext).port.onRollback(effect)
+    }
+  }
+}
+/** Compose the current native view's QueryDraft channel. */
+function createMemoryScopeQueryDraft<T, R>(
+  scopeContext: IMemoryScopeContext<T, R>
+): IMemoryScope<T>[typeof queryDraft] {
+  return {
+    record: (...args) => memoryScopeQueryRecord(scopeContext, ...args),
+    rdf: (...args) => memoryScopeQueryRdf(scopeContext, ...args),
+    vector: <P>(
+      collection: string,
+      _request: IQueryDelete,
+      run: Parameters<NonNullable<IVectorQuerySource<P>['mutate']>>[1],
+      select: IMemoryVectorSelection<P>
+    ) => {
+      assertTransactionOwner(
+        scopeContext.transactionContext.namespaceContext.store,
+        scopeContext.scope
+      )
+      return run({
+        execute: (input) =>
+          queryIterator(scopeContext.transactionContext, scopeContext.scope, () =>
+            select(
+              input,
+              txVectorPoints<T, R, P>(scopeContext.transactionContext, collection),
+              (id) =>
+                txRead(
+                  scopeContext.transactionContext,
+                  'vector',
+                  vectorKey(scopeContext.transactionContext.namespaceContext, collection, id)
+                ) as IStorageVectorPoint<P> | undefined
+            )
           ),
-        close: async () => {
-          await iterator.return(undefined)
+        accept: (_key, hit) => {
+          assertTransactionOwner(
+            scopeContext.transactionContext.namespaceContext.store,
+            scopeContext.scope
+          )
+          return txRemove(
+            scopeContext.transactionContext,
+            'vector',
+            vectorKey(scopeContext.transactionContext.namespaceContext, collection, hit.id)
+          )
         }
       })
     }
   }
-  /** One real operation is admitted before its pipeline, stage observations and native draft work. */
-  function operation<I, V>(
-    name: string,
-    input: I,
-    invoke: (captured: I) => V,
-    settle?: true
-  ): Promise<Awaited<V>> {
-    return runTransactionOperation(scope, (current) =>
-      acceptedOperation(name, input, invoke, current, settle)
+}
+/** Compose the current native view's RecordQuery channel. */
+function createMemoryScopeRecordQuery<T, R>(
+  scopeContext: IMemoryScopeContext<T, R>
+): IMemoryScope<T>[typeof recordQueries] {
+  return <R>() =>
+    createRecordQuery<R>(
+      {
+        asyncDisposeKey,
+        cursorSource: scopeContext.scope,
+        pushdown: { source: MemoryState.querySource, operations: [], operators: [] },
+        execute: () => scopeContext.scope.iterateRecords(),
+        mutate: (request, run) =>
+          memoryScopeOperation(
+            scopeContext,
+            request.operation === 'delete'
+              ? MemoryOperation.recordQueryDelete
+              : MemoryOperation.recordQueryUpdate,
+            request,
+            (captured) => scopeContext.scope[queryDraft].record(captured, run),
+            true
+          )
+      },
+      scopeContext.transactionContext.namespaceContext.core.getChainMethods('query')
     )
-  }
-  /** An already-admitted operation uses the same sole pipeline and native draft body. */
-  function acceptedOperation<I, V>(
-    name: string,
-    input: I,
-    invoke: (captured: I) => V,
-    current: ITransactionScope,
-    settle?: true
-  ): Promise<V> {
-    return transactionContext.namespaceContext.core.execution.run(
-      { operation: name, input, scope: current, ctx: transactionContext.ctx },
-      async (captured) => {
-        transactionContext.namespaceContext.controller.assertLive()
-        throwIfAborted(transactionContext.ctx.signal)
-        /** This current scope is authentic for exactly this operation's original lifetime. */
-        const stage = transactionContext.namespaceContext.core.stageBindings
-          .transactionStages(transactionContext.namespaceContext.store)
-          .forTransaction(current)
-        void stage.beforeTxOperation?.(name)
-        /** Native memory operations mutate only the private isolated draft. */
-        const result = invoke(captured)
-        if (settle) {
-          /** Query writes finish their existing asynchronous reader before the after stage. */
-          const completed = await result
-          void stage.afterTxOperation?.(name)
-          return completed
-        }
-        void stage.afterTxOperation?.(name)
-        return result
-      }
-    )
-  }
-  /** Existing scopes retain owner admission for empty batches without entering the pipeline. */
-  function batchOperation<I extends readonly unknown[], V>(
-    name: string,
-    input: I,
-    invoke: (captured: I) => V
-  ): Promise<Awaited<V>> {
-    return runTransactionOperation(scope, (current) => {
-      if (batchSize(transactionContext.namespaceContext, input) === 0) return invoke(input)
-      return acceptedOperation(
-        name,
-        input,
-        (captured) =>
-          observeBatch(
-            transactionContext.namespaceContext,
-            name,
-            captureBatch(transactionContext.namespaceContext, () => captured.length),
-            () => invoke(captured),
-            scope
+}
+/** Compose the current native view's Ttl channel. */
+function createMemoryScopeTtl<T, R>(
+  scopeContext: IMemoryScopeContext<T, R>
+): IMemoryScope<T>[typeof ttlOperations] {
+  return {
+    expire: (target, ms) =>
+      acceptedMemoryScopeOperation(
+        scopeContext,
+        MemoryOperation.ttlExpire,
+        { target, ms },
+        (input) => {
+          /** Validation stays inside the one operation already admitted by tx.use(ttl). */
+          const target = captureTtlTarget(
+            scopeContext.transactionContext.namespaceContext,
+            input.target
+          )
+          /** Preserve this pipeline-provided duration while the native operation settles. */
+          const ms = input.ms
+          assertStorageTtlDuration(ms, STORAGE_MEMORY_BACKEND)
+          return txTtl(scopeContext.transactionContext, target, ms, false)
+        },
+        scopeContext.scope
+      ),
+    remaining: (target) =>
+      acceptedMemoryScopeOperation(
+        scopeContext,
+        MemoryOperation.ttlRemaining,
+        target,
+        (input) =>
+          txRemaining(
+            scopeContext.transactionContext,
+            captureTtlTarget(scopeContext.transactionContext.namespaceContext, input)
           ),
-        current
+        scopeContext.scope
+      ),
+    persist: (target) =>
+      acceptedMemoryScopeOperation(
+        scopeContext,
+        MemoryOperation.ttlPersist,
+        target,
+        (input) =>
+          txTtl(
+            scopeContext.transactionContext,
+            captureTtlTarget(scopeContext.transactionContext.namespaceContext, input),
+            undefined,
+            true
+          ),
+        scopeContext.scope
       )
-    })
   }
-  /** Feature methods belong to this exact original view, before its owner admission/freeze. */
-  const api = transactionContext.namespaceContext.core.createTransactionApi(scope)
-  if (api !== undefined) Object.defineProperty(scope, 'api', { value: api, enumerable: true })
-  return Object.freeze(scope)
+}
+/** Compose the current native view's Counter channel. */
+function createMemoryScopeCounter<T, R>(
+  scopeContext: IMemoryScopeContext<T, R>
+): IMemoryScope<T>[typeof counterOperations] {
+  return {
+    increment: (key, by) =>
+      acceptedMemoryScopeOperation(
+        scopeContext,
+        MemoryOperation.counterIncrement,
+        { key, by },
+        (input) => {
+          /** Snapshot pipeline-provided identity before any native text access. */
+          const key = input.key
+          assertStringStorageKey(key, STORAGE_MEMORY_BACKEND)
+          /** The pure contract calculation runs against this native text draft only. */
+          const increment = snapshotStorageCounterIncrement(input.by, STORAGE_MEMORY_BACKEND)
+          const result = increment(
+            txRead(scopeContext.transactionContext, 'value', key) as string | undefined
+          )
+          txWrite(scopeContext.transactionContext, 'value', key, String(result), 'conflict')
+          return result
+        },
+        scopeContext.scope
+      )
+  }
+}
+/** Compose the current native view's Rdf channel. */
+function createMemoryScopeRdf<T, R>(
+  scopeContext: IMemoryScopeContext<T, R>
+): IMemoryScope<T>[typeof rdfOperations] {
+  return {
+    add: (quads) =>
+      acceptedMemoryScopeOperation(
+        scopeContext,
+        MemoryOperation.rdfAdd,
+        quads,
+        (input) => txRdfWrite(scopeContext.transactionContext, input, false),
+        scopeContext.scope
+      ),
+    delete: (quads) =>
+      acceptedMemoryScopeOperation(
+        scopeContext,
+        MemoryOperation.rdfDelete,
+        quads,
+        (input) => txRdfWrite(scopeContext.transactionContext, input, true),
+        scopeContext.scope
+      ),
+    match: (pattern) =>
+      rdfQuery(scopeContext.transactionContext, pattern, scopeContext.scope, (request, run) =>
+        memoryScopeOperation(
+          scopeContext,
+          request.operation === 'delete'
+            ? MemoryOperation.rdfQueryDelete
+            : MemoryOperation.rdfQueryReplace,
+          request,
+          (captured) => scopeContext.scope[queryDraft].rdf(captured, run),
+          true
+        )
+      )
+  }
+}
+/** Compose the current native view's RecordPrefix channel. */
+function createMemoryScopeRecordPrefix<T, R>(
+  scopeContext: IMemoryScopeContext<T, R>
+): IMemoryScope<T>[typeof recordPrefix] {
+  return (prefix) =>
+    memoryScopeOperation(scopeContext, MemoryOperation.recordRemoveByPrefix, prefix, (current) => {
+      /** Native record prefix deletion uses the same bounded draft merge as record iteration. */
+      const captured = snapshotStorageKeyPrefix(current, STORAGE_MEMORY_BACKEND)
+      let count = 0
+      for (const row of txRows(scopeContext.transactionContext, 'record', {
+        lower: captured.lower,
+        upper: captured.upper,
+        upperOpen: true
+      }))
+        if (txRemove(scopeContext.transactionContext, 'record', row.key)) count++
+      return count
+    })
+}
+/** Compose the current native view's text methods. */
+function createMemoryScopeText<T, R>(
+  scopeContext: IMemoryScopeContext<T, R>
+): Pick<
+  IMemoryScope<T>,
+  'get' | 'set' | 'remove' | 'has' | 'getMany' | 'setMany' | 'removeMany' | 'removeByPrefix'
+> {
+  return {
+    get: (key) =>
+      memoryScopeOperation(scopeContext, MemoryOperation.get, key, (current) => {
+        assertStringStorageKey(current, STORAGE_MEMORY_BACKEND)
+        return (
+          (txRead(scopeContext.transactionContext, 'value', current) as string | undefined) ?? null
+        )
+      }),
+    set: (key, value, options) =>
+      memoryScopeOperation(
+        scopeContext,
+        MemoryOperation.set,
+        { key, value, options },
+        (current) => {
+          assertStringStorageKey(current.key, STORAGE_MEMORY_BACKEND)
+          txWrite(
+            scopeContext.transactionContext,
+            'value',
+            current.key,
+            current.value,
+            readTransactionConflictPolicy(current.options, STORAGE_MEMORY_BACKEND)
+          )
+        }
+      ),
+    remove: (key) =>
+      memoryScopeOperation(scopeContext, MemoryOperation.remove, key, (current) => {
+        assertStringStorageKey(current, STORAGE_MEMORY_BACKEND)
+        txRemove(scopeContext.transactionContext, 'value', current)
+      }),
+    has: (key) =>
+      memoryScopeOperation(scopeContext, MemoryOperation.has, key, (current) => {
+        assertStringStorageKey(current, STORAGE_MEMORY_BACKEND)
+        return txRead(scopeContext.transactionContext, 'value', current) !== undefined
+      }),
+    getMany: (keys) =>
+      memoryScopeBatchOperation(scopeContext, MemoryOperation.getMany, keys, (current) =>
+        readTextBatch(
+          scopeContext.transactionContext.namespaceContext,
+          current,
+          (key) => txRead(scopeContext.transactionContext, 'value', key) as string | undefined
+        )
+      ),
+    setMany: (entries) =>
+      memoryScopeBatchOperation(scopeContext, MemoryOperation.setMany, entries, (current) =>
+        scopeContext.transactionContext.textDraft.setMany(
+          captureTextEntries(scopeContext.transactionContext.namespaceContext, current)
+        )
+      ),
+    removeMany: (keys) =>
+      memoryScopeBatchOperation(scopeContext, MemoryOperation.removeMany, keys, (current) => {
+        /** Validate every key before applying the batch's first tombstone. */
+        const captured = snapshotStorageBatchKeys(current, STORAGE_MEMORY_BACKEND)
+          .filter(({ firstIndex }, index) => firstIndex === index)
+          .map(({ key }) => key)
+        return scopeContext.transactionContext.textDraft.removeMany(captured)
+      }),
+    removeByPrefix: (prefix) =>
+      memoryScopeOperation(scopeContext, MemoryOperation.removeByPrefix, prefix, (current) =>
+        observeBatch(
+          scopeContext.transactionContext.namespaceContext,
+          MemoryOperation.removeByPrefix,
+          undefined,
+          () => scopeContext.transactionContext.textDraft.removeByPrefix(current),
+          scopeContext.scope
+        )
+      )
+  }
+}
+/** Compose the current native view's bytes methods. */
+function createMemoryScopeBytes<T, R>(
+  scopeContext: IMemoryScopeContext<T, R>
+): Pick<IMemoryScope<T>, 'getBytes' | 'setBytes' | 'removeBytes'> {
+  return {
+    getBytes: (key) =>
+      memoryScopeOperation(scopeContext, MemoryOperation.getBytes, key, (current) => {
+        assertStringStorageKey(current, STORAGE_MEMORY_BACKEND)
+        return (
+          (txRead(scopeContext.transactionContext, 'bytes', current) as Uint8Array | undefined) ??
+          null
+        )
+      }),
+    setBytes: (key, value, options) =>
+      memoryScopeOperation(
+        scopeContext,
+        MemoryOperation.setBytes,
+        { key, value, options },
+        (current) => {
+          assertStringStorageKey(current.key, STORAGE_MEMORY_BACKEND)
+          txWrite(
+            scopeContext.transactionContext,
+            'bytes',
+            current.key,
+            current.value,
+            readTransactionConflictPolicy(current.options, STORAGE_MEMORY_BACKEND)
+          )
+        }
+      ),
+    removeBytes: (key) =>
+      memoryScopeOperation(scopeContext, MemoryOperation.removeBytes, key, (current) => {
+        assertStringStorageKey(current, STORAGE_MEMORY_BACKEND)
+        txRemove(scopeContext.transactionContext, 'bytes', current)
+      })
+  }
+}
+/** Compose the current native view's records methods. */
+function createMemoryScopeRecords<T, R>(
+  scopeContext: IMemoryScopeContext<T, R>
+): Pick<IMemoryScope<T>, 'getRecord' | 'putRecord' | 'deleteRecord' | 'iterateRecords'> {
+  return {
+    getRecord: (key) =>
+      memoryScopeOperation(
+        scopeContext,
+        MemoryOperation.getRecord,
+        key,
+        (current) => txRead(scopeContext.transactionContext, 'record', current) as T | undefined
+      ),
+    putRecord: (value, key, options) =>
+      memoryScopeOperation(
+        scopeContext,
+        MemoryOperation.putRecord,
+        { value, key, options },
+        (current) => {
+          /** Opaque generated record identities use the existing native entropy helper. */
+          const resolved = current.key ?? createStorageToken()
+          txWrite(
+            scopeContext.transactionContext,
+            'record',
+            resolved,
+            current.value,
+            readTransactionConflictPolicy(current.options, STORAGE_MEMORY_BACKEND)
+          )
+          return resolved
+        }
+      ),
+    deleteRecord: (key) =>
+      memoryScopeOperation(scopeContext, MemoryOperation.deleteRecord, key, (current) => {
+        txRemove(scopeContext.transactionContext, 'record', current)
+      }),
+    iterateRecords: (range) => {
+      /** Bounds are captured at construction; native rows are snapshotted at first advance. */
+      const captured = orderedRange(scopeContext.transactionContext.namespaceContext, range)
+      /** The actual native iterator is registered once with the original transaction owner. */
+      const iterator = (async function* () {
+        /** Snapshot values together with membership on the first actual native advance. */
+        const rows = txRows(scopeContext.transactionContext, 'record', captured).map(
+          (row) =>
+            [
+              clone(scopeContext.transactionContext.namespaceContext, row.key),
+              txRead(scopeContext.transactionContext, 'record', row.key) as T
+            ] as [IStorageKey, T]
+        )
+        for (const [key, value] of rows) {
+          scopeContext.transactionContext.namespaceContext.controller.assertLive()
+          throwIfAborted(scopeContext.transactionContext.ctx.signal)
+          yield [
+            clone(scopeContext.transactionContext.namespaceContext, key),
+            clone(scopeContext.transactionContext.namespaceContext, value)
+          ] as [IStorageKey, T]
+        }
+      })()
+      return scopeContext.transactionContext.namespaceContext.owner.registerIterator(
+        scopeContext.scope,
+        {
+          next: (current) =>
+            scopeContext.transactionContext.namespaceContext.core.execution.run(
+              {
+                operation: MemoryOperation.iterateRecords,
+                input: undefined,
+                scope: current,
+                ctx: scopeContext.transactionContext.ctx
+              },
+              () => iterator.next()
+            ),
+          close: async () => {
+            await iterator.return(undefined)
+          }
+        }
+      )
+    }
+  }
 }
 
 /** Preview the original business draft, excluding only journal's own planned victim facts. */
@@ -4239,9 +3676,7 @@ function createMemoryNamespaceKeyValue<T>(
           ctx,
           (input) => {
             /** Preparation precedes implicit lock derivation and the sole native transaction. */
-            const captured = captureBatch(namespaceContext, () =>
-              captureTextEntries(namespaceContext, input)
-            )
+            const captured = captureTextEntries(namespaceContext, input)
             return {
               keys: captured.map((entry) => lockKey.text(entry.key)),
               ranges: [],
@@ -4546,7 +3981,546 @@ function removeVector<T>(
   return true
 }
 
-/** Each collection borrows this namespace's original execution, data and resource lifetime. */
+/** A collection descriptor borrows namespace rows and keeps its validated query metadata. */
+type IMemoryVectorContext<T> = {
+  /** Namespace ports and physical rows remain owned by the original namespace. */ namespaceContext: IMemoryNamespaceContext<T>
+
+  /** Optional configuration capture performs no lookup or native operation by itself. */
+  captured: ReturnType<typeof snapshotStorageVectorCollection>
+
+  /** Repeated descriptors resolve the same metadata, while incompatible declarations reject. */
+  existing: IStorageVectorConfiguration | undefined
+
+  /** New collections require real dimensions and never infer them from a later write. */
+  configuration: IStorageVectorConfiguration
+
+  /** Prefix bytes localize only this collection in the existing physical vector radix. */
+  bounds: ReturnType<typeof snapshotStorageKeyPrefix>
+}
+/** Resolve collection metadata once without creating a second physical owner. */
+function createMemoryVectorCollection<T, TPayload>(
+  namespaceContext: IMemoryNamespaceContext<T>,
+  name: string,
+  options?: IStorageVectorConfiguration
+): IVectorCollection<TPayload> {
+  /** Initialization completes before the collection API publishes these facts. */
+  const vectorContext = { namespaceContext } as IMemoryVectorContext<T>
+
+  vectorContext.namespaceContext.controller.assertLive()
+
+  /** Optional configuration capture performs no lookup or native operation by itself. */
+  vectorContext.captured = snapshotStorageVectorCollection(name, options, STORAGE_MEMORY_BACKEND)
+
+  /** Repeated descriptors resolve the same metadata, while incompatible declarations reject. */
+  vectorContext.existing = vectorContext.namespaceContext.vectorCollections.get(
+    vectorContext.captured.name
+  )
+
+  /** New collections require real dimensions and never infer them from a later write. */
+  const configuration = vectorContext.existing ?? vectorContext.captured.options
+
+  if (
+    configuration === undefined ||
+    (vectorContext.existing !== undefined &&
+      vectorContext.captured.options !== undefined &&
+      (vectorContext.existing.dimensions !== vectorContext.captured.options.dimensions ||
+        vectorContext.existing.metric !== vectorContext.captured.options.metric))
+  )
+    invalidVector()
+
+  vectorContext.configuration = configuration
+
+  vectorContext.namespaceContext.vectorCollections.set(
+    vectorContext.captured.name,
+    vectorContext.configuration
+  )
+
+  /** Prefix bytes localize only this collection in the existing physical vector radix. */
+  vectorContext.bounds = snapshotStorageKeyPrefix(
+    [vectorContext.captured.name],
+    STORAGE_MEMORY_BACKEND
+  )
+  return {
+    near: (...args) => memoryVectorCollectionNear<T, TPayload>(vectorContext, ...args),
+    similarTo: (...args) => memoryVectorCollectionSimilarTo<T, TPayload>(vectorContext, ...args),
+    recommend: (...args) => memoryVectorCollectionRecommend<T, TPayload>(vectorContext, ...args),
+    upsert: (...args) => memoryVectorCollectionUpsert<T, TPayload>(vectorContext, ...args),
+    delete: (...args) => memoryVectorCollectionDelete<T, TPayload>(vectorContext, ...args),
+    deleteWhere: (...args) =>
+      memoryVectorCollectionDeleteWhere<T, TPayload>(vectorContext, ...args),
+    search: (...args) => memoryVectorCollectionSearch<T, TPayload>(vectorContext, ...args)
+  }
+}
+
+/** Stored point values are canonical snapshots and remain inaccessible to application code. */
+function memoryVectorPoint<T, TPayload>(
+  vectorContext: IMemoryVectorContext<T>,
+  id: string
+): IStorageVectorPoint<TPayload> | undefined {
+  const encoded = encodeFlatStorageKey(
+    vectorKey(vectorContext.namespaceContext, vectorContext.captured.name, id)
+  )
+  const entry = liveEntry(vectorContext.namespaceContext, 'vector', encoded)
+  if (entry !== undefined)
+    vectorContext.namespaceContext.capacityIndex?.touch(
+      identity(vectorContext.namespaceContext, 'vector', encoded)
+    )
+  return entry?.value as IStorageVectorPoint<TPayload> | undefined
+}
+
+/** Search removes expired rows before filtering/scoring; physical deleteWhere retains them. */
+function* memoryVectorPoints<T, TPayload>(
+  vectorContext: IMemoryVectorContext<T>,
+  physical = false
+): IterableIterator<IStorageVectorPoint<TPayload>> {
+  /** The original radix locates this collection without retaining all candidate references. */
+  let leaf = vectorContext.namespaceContext.ordered.vector.lowerBound(vectorContext.bounds.lower)
+  while (leaf !== undefined && compareRecordIndexKeys(leaf.key, vectorContext.bounds.upper) < 0) {
+    /** Expiry or a caller delete can unlink this leaf before the generator resumes. */
+    const next = leaf.next
+    /** Physical deletion includes expired matches; ranking reclaims them before scoring. */
+    const entry = physical
+      ? leaf.value
+      : liveEntry(vectorContext.namespaceContext, 'vector', encodeFlatStorageKey(leaf.value.key))
+    if (entry !== undefined) {
+      if (!physical)
+        vectorContext.namespaceContext.capacityIndex?.touch(
+          identity(vectorContext.namespaceContext, 'vector', encodeFlatStorageKey(entry.key))
+        )
+      yield entry.value as IStorageVectorPoint<TPayload>
+    }
+    leaf = next
+  }
+}
+
+/** Output payloads/vectors detach only for selected native hits, preserving bounded work. */
+function memoryVectorOutput<T, TPayload>(
+  vectorContext: IMemoryVectorContext<T>,
+  hit: ReturnType<typeof rankMemoryVectors<TPayload>>[number],
+  withVector: boolean,
+  withPayload: boolean
+): IVectorHit<TPayload, boolean> {
+  return {
+    id: hit.point.id,
+    score: hit.score,
+    ...(withPayload && hit.point.payload !== undefined
+      ? { payload: clone(vectorContext.namespaceContext, hit.point.payload) }
+      : {}),
+    ...(withVector ? { vector: [...hit.point.vector] } : {})
+  }
+}
+
+/** A source keeps one immutable resolver; canonical query nodes still own every refinement. */
+function memoryVectorQuery<T, TPayload>(
+  vectorContext: IMemoryVectorContext<T>,
+  resolve: (lookup: (id: string) => IStorageVectorPoint<TPayload> | undefined) => {
+    query: readonly number[]
+    exclude: ReadonlySet<string>
+  },
+  metric: IStorageVectorConfiguration['metric'],
+  origin: IVectorQueryOrigin
+) {
+  /** Native ranking is shared verbatim by reads and this original transaction draft. */
+  const select: IMemoryVectorSelection<TPayload> = (input, values, lookup) => {
+    /** Samples resolve once inside the actual read or write attempt. */
+    const selected = resolve(lookup)
+    if (input.topK === 0) return []
+    /** Canonical conditions retain the sole compiler and original membership Sets. */
+    const predicates = input.conditions.map((condition) =>
+      compileStorageQueryCondition<TPayload | undefined>(condition)
+    )
+    return rankMemoryVectors(
+      values,
+      selected.query,
+      metric,
+      input.topK,
+      input.minScore,
+      (point) =>
+        !selected.exclude.has(point.id) && predicates.every((predicate) => predicate(point.payload))
+    ).map((hit): readonly [IStorageKey, IVectorHit<TPayload, boolean>] => [
+      hit.point.id,
+      memoryVectorOutput<T, TPayload>(vectorContext, hit, input.withVector, true)
+    ])
+  }
+  return createVectorQuery<TPayload>(
+    {
+      asyncDisposeKey,
+      exact: true,
+      origin,
+      beginOperation: () => vectorContext.namespaceContext.controller.beginMutation(),
+      watch: ({ ctx }) => watchChanges(vectorContext.namespaceContext, 'all', ctx),
+      mutate: (request, run) =>
+        atomicEntry(
+          vectorContext.namespaceContext,
+          MemoryOperation.vectorQueryDelete,
+          () => ({ ...request }),
+          { ...request.ctx, concurrency: request.concurrency },
+          (input) => ({
+            invoke: (scope) =>
+              scope[queryDraft].vector(vectorContext.captured.name, input, run, select)
+          })
+        ),
+      pushdown: {
+        source: MemoryState.querySource,
+        operations: [QueryOperation.where, QueryOperation.topK, QueryOperation.minScore],
+        operators: Object.values(QueryOperator)
+      },
+      execute: (input) => {
+        vectorContext.namespaceContext.controller.assertLive()
+        return nativeIterator(
+          vectorContext.namespaceContext,
+          MemoryOperation.vectorSearch,
+          input.ctx,
+          () =>
+            select(input, memoryVectorPoints<T, TPayload>(vectorContext), (id: string) =>
+              memoryVectorPoint<T, TPayload>(vectorContext, id)
+            ),
+          (row) => row,
+          () => vectorContext.namespaceContext.controller.assertLive()
+        )
+      }
+    },
+    vectorContext.namespaceContext.core.getChainMethods('vector')
+  )
+}
+/** Execute the collection's original near against explicit collection facts. */
+function memoryVectorCollectionNear<T, TPayload>(
+  vectorContext: IMemoryVectorContext<T>,
+  ...args: Parameters<IVectorCollection<TPayload>['near']>
+): ReturnType<IVectorCollection<TPayload>['near']> {
+  const [input, options] = args
+  vectorContext.namespaceContext.controller.assertLive()
+  return (() => {
+    if (
+      options !== undefined &&
+      (typeof options !== 'object' || options === null || Array.isArray(options))
+    )
+      invalidVector()
+    /** Optional request fields are read once before the immutable source captures them. */
+    const inputMetric = options?.metric
+    const metric = inputMetric === undefined ? vectorContext.configuration.metric : inputMetric
+    /** Memory is exact for either request; malformed explicit options still reject. */
+    const exact = options?.exact
+    if (exact !== undefined && typeof exact !== 'boolean') invalidVector()
+    /** The original component owner snapshots the query and the requested metric. */
+    const components = snapshotStorageVector(
+      input,
+      { dimensions: vectorContext.configuration.dimensions, metric },
+      STORAGE_MEMORY_BACKEND
+    )
+    return memoryVectorQuery<T, TPayload>(
+      vectorContext,
+      () => ({ query: components, exclude: new Set<string>() }),
+      metric,
+      {
+        kind: VectorQueryOriginKind.near,
+        vector: components
+      }
+    )
+  })()
+}
+/** Execute the collection's original similarTo against explicit collection facts. */
+function memoryVectorCollectionSimilarTo<T, TPayload>(
+  vectorContext: IMemoryVectorContext<T>,
+  ...args: Parameters<IVectorCollection<TPayload>['similarTo']>
+): ReturnType<IVectorCollection<TPayload>['similarTo']> {
+  const [id] = args
+  vectorContext.namespaceContext.controller.assertLive()
+  assertStringStorageKey(id, STORAGE_MEMORY_BACKEND)
+  return memoryVectorQuery<T, TPayload>(
+    vectorContext,
+    (lookup) => {
+      /** A missing/expired sample is rejected before native candidates are ranked. */
+      const sample = lookup(id)
+      if (sample === undefined) invalidVector()
+      return {
+        query: snapshotStorageVector(
+          sample.vector,
+          vectorContext.configuration,
+          STORAGE_MEMORY_BACKEND
+        ),
+        exclude: new Set([id])
+      }
+    },
+    vectorContext.configuration.metric,
+    { kind: VectorQueryOriginKind.similarTo, id }
+  )
+}
+/** Execute the collection's original recommend against explicit collection facts. */
+function memoryVectorCollectionRecommend<T, TPayload>(
+  vectorContext: IMemoryVectorContext<T>,
+  ...args: Parameters<IVectorCollection<TPayload>['recommend']>
+): ReturnType<IVectorCollection<TPayload>['recommend']> {
+  const [input] = args
+  vectorContext.namespaceContext.controller.assertLive()
+  /** The original key batch owner detaches ID arrays before their asynchronous use. */
+  const samples = (() => {
+    if (typeof input !== 'object' || input === null || Array.isArray(input)) invalidVector()
+    const { positive, negative } = input
+    const positiveIds = vectorIds(vectorContext.namespaceContext, positive)
+    const negativeIds = vectorIds(
+      vectorContext.namespaceContext,
+      negative === undefined ? [] : negative
+    )
+    if (positiveIds.length === 0) invalidVector()
+    const exclude = new Set([...positiveIds, ...negativeIds])
+    if (exclude.size !== positiveIds.length + negativeIds.length) invalidVector()
+    return { positiveIds, negativeIds, exclude }
+  })()
+  return memoryVectorQuery<T, TPayload>(
+    vectorContext,
+    (lookup) => {
+      /** Every requested sample resolves against this collection and immutable organization. */
+      const load = (id: string): readonly number[] => {
+        const sample = lookup(id)
+        if (sample === undefined) invalidVector()
+        return sample.vector
+      }
+      const positive = samples.positiveIds.map(load)
+      const negative = samples.negativeIds.map(load)
+      const combined = recommendStorageVector(
+        positive as [readonly number[], ...(readonly number[])[]],
+        negative
+      )
+      return {
+        query: snapshotStorageVector(combined, vectorContext.configuration, STORAGE_MEMORY_BACKEND),
+        exclude: samples.exclude
+      }
+    },
+    vectorContext.configuration.metric,
+    {
+      kind: VectorQueryOriginKind.recommend,
+      positive: samples.positiveIds,
+      negative: samples.negativeIds
+    }
+  )
+}
+/** Execute the collection's original upsert against explicit collection facts. */
+function memoryVectorCollectionUpsert<T, TPayload>(
+  vectorContext: IMemoryVectorContext<T>,
+  ...args: Parameters<IVectorCollection<TPayload>['upsert']>
+): ReturnType<IVectorCollection<TPayload>['upsert']> {
+  const [points, ctx] = args
+  return vectorOperation(vectorContext.namespaceContext, () =>
+    mutationEntry(
+      vectorContext.namespaceContext,
+      MemoryOperation.vectorUpsert,
+      points,
+      ctx,
+      (input, context) => {
+        /** Full-batch capture occurs before any original lock wait or physical mutation. */
+        const prepared = snapshotStorageVectorUpsert(
+          input,
+          vectorContext.configuration,
+          STORAGE_MEMORY_BACKEND
+        )
+        /** Complete canonical payload encoding also finishes before the first native put. */
+        const sizes = prepared.map((point) =>
+          entryBytes(vectorContext.namespaceContext, 'vector', point)
+        )
+        /** Extension fields came from the original concurrency snapshot, never a second raw read. */
+        const ttlMs = Reflect.get(context, 'ttlMs') as number | undefined
+        if (ttlMs !== undefined) assertStorageTtlDuration(ttlMs, STORAGE_MEMORY_BACKEND)
+        return {
+          keys: prepared.map((point) => lockKey.vector(vectorContext.captured.name, point.id)),
+          invoke: (draft) =>
+            draft.upsertVector(vectorContext.captured.name, prepared, sizes, ttlMs),
+          capacityChanges:
+            vectorContext.namespaceContext.capacity === undefined
+              ? undefined
+              : () =>
+                  prepared.map((point, index) => {
+                    const key = vectorKey(
+                      vectorContext.namespaceContext,
+                      vectorContext.captured.name,
+                      point.id
+                    )
+                    const deadline =
+                      ttlMs === undefined
+                        ? vectorContext.namespaceContext.deadlines.get(
+                            identity(
+                              vectorContext.namespaceContext,
+                              'vector',
+                              encodeFlatStorageKey(key)
+                            )
+                          )
+                        : vectorContext.namespaceContext.scheduler.now() + ttlMs
+                    return capacityFact(
+                      vectorContext.namespaceContext,
+                      'vector',
+                      key,
+                      ttlMs !== undefined &&
+                        deadline !== undefined &&
+                        deadline <= vectorContext.namespaceContext.scheduler.now()
+                        ? undefined
+                        : sizes[index]
+                    )
+                  }),
+          run: () => {
+            /** One monotonic clock observation applies to this synchronous admitted batch. */
+            const now = vectorContext.namespaceContext.scheduler.now()
+            for (const [index, point] of prepared.entries()) {
+              const key = vectorKey(
+                vectorContext.namespaceContext,
+                vectorContext.captured.name,
+                point.id
+              )
+              const encoded = encodeFlatStorageKey(key)
+              const current = liveEntry(vectorContext.namespaceContext, 'vector', encoded)
+              const orderedKey =
+                current?.ordered ?? encodeOrderedStorageKey(key, STORAGE_MEMORY_BACKEND)
+              const deadline =
+                ttlMs === undefined
+                  ? vectorContext.namespaceContext.deadlines.get(
+                      identity(vectorContext.namespaceContext, 'vector', encoded)
+                    )
+                  : now + ttlMs
+              if (deadline !== undefined && deadline <= now) {
+                removeVector(vectorContext.namespaceContext, vectorContext.captured.name, point.id)
+                continue
+              }
+              const entry = { key, ordered: orderedKey, value: point, bytes: sizes[index] }
+              vectorContext.namespaceContext.data.vector.set(encoded, entry)
+              vectorContext.namespaceContext.ordered.vector.set(orderedKey, entry)
+              setDeadline(vectorContext.namespaceContext, 'vector', encoded, deadline)
+              vectorContext.namespaceContext.capacityIndex?.put({
+                ...capacityFact(vectorContext.namespaceContext, 'vector', key),
+                bytes: sizes[index]!
+              })
+              bump(vectorContext.namespaceContext, 'vector', encoded)
+            }
+            if (prepared.length > 0) publish(vectorContext.namespaceContext, 'vector', 'batch')
+          }
+        }
+      }
+    )
+  )
+}
+/** Execute the collection's original delete against explicit collection facts. */
+function memoryVectorCollectionDelete<T, TPayload>(
+  vectorContext: IMemoryVectorContext<T>,
+  ...args: Parameters<IVectorCollection<TPayload>['delete']>
+): ReturnType<IVectorCollection<TPayload>['delete']> {
+  const [ids, ctx] = args
+  return vectorOperation(vectorContext.namespaceContext, () =>
+    mutationEntry(
+      vectorContext.namespaceContext,
+      MemoryOperation.vectorDelete,
+      ids,
+      ctx,
+      (input) => {
+        const capturedIds = vectorIds(vectorContext.namespaceContext, input)
+        return {
+          keys: capturedIds.map((id) => lockKey.vector(vectorContext.captured.name, id)),
+          invoke: (draft) => {
+            for (const id of capturedIds)
+              draft.remove(
+                'vector',
+                vectorKey(vectorContext.namespaceContext, vectorContext.captured.name, id)
+              )
+          },
+          run: () => {
+            let count = 0
+            for (const id of capturedIds)
+              if (removeVector(vectorContext.namespaceContext, vectorContext.captured.name, id))
+                count++
+            if (count > 0) publish(vectorContext.namespaceContext, 'vector', 'batch')
+          }
+        }
+      }
+    )
+  )
+}
+/** Execute the collection's original deleteWhere against explicit collection facts. */
+function memoryVectorCollectionDeleteWhere<T, TPayload>(
+  vectorContext: IMemoryVectorContext<T>,
+  ...args: Parameters<IVectorCollection<TPayload>['deleteWhere']>
+): ReturnType<IVectorCollection<TPayload>['deleteWhere']> {
+  const [where, ctx] = args
+  return vectorOperation(vectorContext.namespaceContext, () =>
+    mutationEntry(
+      vectorContext.namespaceContext,
+      MemoryOperation.vectorDeleteWhere,
+      where,
+      ctx,
+      (input, context) => {
+        const count = Reflect.get(context, 'count')
+        if (
+          count !== undefined &&
+          count !== DeleteCountMode.precount &&
+          count !== DeleteCountMode.scroll
+        )
+          invalidVector()
+        const predicate = compileStorageWhere<TPayload | undefined>(input)
+        return {
+          keys: [],
+          invoke: (draft) =>
+            draft.deleteVector(vectorContext.captured.name, (point) =>
+              predicate(point.payload as TPayload | undefined)
+            ),
+          ranges: [
+            {
+              channel: 'vector',
+              ...snapshotConcurrencyLockRange({ channel: 'vector' }, STORAGE_MEMORY_BACKEND)
+            }
+          ],
+          run: () => {
+            let count = 0
+            for (const point of memoryVectorPoints<T, TPayload>(vectorContext, true))
+              if (
+                predicate(point.payload) &&
+                removeVector(vectorContext.namespaceContext, vectorContext.captured.name, point.id)
+              )
+                count++
+            if (count > 0) publish(vectorContext.namespaceContext, 'vector', 'batch')
+            return count
+          }
+        }
+      }
+    )
+  )
+}
+/** Execute the collection's original search against explicit collection facts. */
+function memoryVectorCollectionSearch<T, TPayload>(
+  vectorContext: IMemoryVectorContext<T>,
+  ...args: Parameters<IVectorCollection<TPayload>['search']>
+): ReturnType<IVectorCollection<TPayload>['search']> {
+  const [query, options, ctx] = args
+  return vectorOperation(vectorContext.namespaceContext, () =>
+    asyncEntry(
+      vectorContext.namespaceContext,
+      MemoryOperation.vectorSearch,
+      { query, options },
+      ctx,
+      (input) => {
+        vectorContext.namespaceContext.controller.assertLive()
+        const request = snapshotStorageVectorSearch(
+          input.query,
+          input.options,
+          vectorContext.configuration,
+          STORAGE_MEMORY_BACKEND
+        )
+        if (request.options.k === 0) return []
+        const filter =
+          request.options.filter === undefined
+            ? undefined
+            : compileStorageQueryCondition<TPayload | undefined>(
+                vectorCondition(request.options.filter)
+              )
+        return rankMemoryVectors(
+          memoryVectorPoints<T, TPayload>(vectorContext),
+          request.query,
+          vectorContext.configuration.metric,
+          request.options.k,
+          undefined,
+          (point) => filter === undefined || filter(point.payload)
+        ).map((hit) =>
+          memoryVectorOutput<T, TPayload>(vectorContext, hit, false, request.options.withPayload)
+        )
+      }
+    )
+  )
+}
 function createMemoryNamespaceVectors<T>(
   namespaceContext: IMemoryNamespaceContext<T>
 ): IMemoryNamespaceContext<T>['vectors'] {
@@ -4554,400 +4528,7 @@ function createMemoryNamespaceVectors<T>(
     collection: <TPayload>(
       name: string,
       options?: IStorageVectorConfiguration
-    ): IVectorCollection<TPayload> => {
-      namespaceContext.controller.assertLive()
-      /** Optional configuration capture performs no lookup or native operation by itself. */
-      const captured = snapshotStorageVectorCollection(name, options, STORAGE_MEMORY_BACKEND)
-      /** Repeated descriptors resolve the same metadata, while incompatible declarations reject. */
-      const existing = namespaceContext.vectorCollections.get(captured.name)
-      /** New collections require real dimensions and never infer them from a later write. */
-      const configuration = existing ?? captured.options
-      if (
-        configuration === undefined ||
-        (existing !== undefined &&
-          captured.options !== undefined &&
-          (existing.dimensions !== captured.options.dimensions ||
-            existing.metric !== captured.options.metric))
-      )
-        invalidVector()
-      namespaceContext.vectorCollections.set(captured.name, configuration)
-      /** Prefix bytes localize only this collection in the existing physical vector radix. */
-      const bounds = snapshotStorageKeyPrefix([captured.name], STORAGE_MEMORY_BACKEND)
-      /** Stored point values are canonical snapshots and remain inaccessible to application code. */
-      const point = (id: string): IStorageVectorPoint<TPayload> | undefined => {
-        const encoded = encodeFlatStorageKey(vectorKey(namespaceContext, captured.name, id))
-        const entry = liveEntry(namespaceContext, 'vector', encoded)
-        if (entry !== undefined)
-          namespaceContext.capacityIndex?.touch(identity(namespaceContext, 'vector', encoded))
-        return entry?.value as IStorageVectorPoint<TPayload> | undefined
-      }
-      /** Search removes expired rows before filtering/scoring; physical deleteWhere retains them. */
-      const points = function* (physical = false): IterableIterator<IStorageVectorPoint<TPayload>> {
-        /** The original radix locates this collection without retaining all candidate references. */
-        let leaf = namespaceContext.ordered.vector.lowerBound(bounds.lower)
-        while (leaf !== undefined && compareRecordIndexKeys(leaf.key, bounds.upper) < 0) {
-          /** Expiry or a caller delete can unlink this leaf before the generator resumes. */
-          const next = leaf.next
-          /** Physical deletion includes expired matches; ranking reclaims them before scoring. */
-          const entry = physical
-            ? leaf.value
-            : liveEntry(namespaceContext, 'vector', encodeFlatStorageKey(leaf.value.key))
-          if (entry !== undefined) {
-            if (!physical)
-              namespaceContext.capacityIndex?.touch(
-                identity(namespaceContext, 'vector', encodeFlatStorageKey(entry.key))
-              )
-            yield entry.value as IStorageVectorPoint<TPayload>
-          }
-          leaf = next
-        }
-      }
-      /** Output payloads/vectors detach only for selected native hits, preserving bounded work. */
-      const output = (
-        hit: ReturnType<typeof rankMemoryVectors<TPayload>>[number],
-        withVector: boolean,
-        withPayload: boolean
-      ): IVectorHit<TPayload, boolean> => ({
-        id: hit.point.id,
-        score: hit.score,
-        ...(withPayload && hit.point.payload !== undefined
-          ? { payload: clone(namespaceContext, hit.point.payload) }
-          : {}),
-        ...(withVector ? { vector: [...hit.point.vector] } : {})
-      })
-      /** A source keeps one immutable resolver; canonical query nodes still own every refinement. */
-      const query = (
-        resolve: (lookup: typeof point) => {
-          query: readonly number[]
-          exclude: ReadonlySet<string>
-        },
-        metric: IStorageVectorConfiguration['metric'],
-        origin: IVectorQueryOrigin
-      ) => {
-        /** Native ranking is shared verbatim by reads and this original transaction draft. */
-        const select: IMemoryVectorSelection<TPayload> = (input, values, lookup) => {
-          /** Samples resolve once inside the actual read or write attempt. */
-          const selected = resolve(lookup)
-          if (input.topK === 0) return []
-          /** Canonical conditions retain the sole compiler and original membership Sets. */
-          const predicates = input.conditions.map((condition) =>
-            compileStorageQueryCondition<TPayload | undefined>(condition)
-          )
-          return rankMemoryVectors(
-            values,
-            selected.query,
-            metric,
-            input.topK,
-            input.minScore,
-            (point) =>
-              !selected.exclude.has(point.id) &&
-              predicates.every((predicate) => predicate(point.payload))
-          ).map((hit): readonly [IStorageKey, IVectorHit<TPayload, boolean>] => [
-            hit.point.id,
-            output(hit, input.withVector, true)
-          ])
-        }
-        return createVectorQuery<TPayload>(
-          {
-            asyncDisposeKey,
-            exact: true,
-            origin,
-            beginOperation: () => namespaceContext.controller.beginMutation(),
-            watch: ({ ctx }) => watchChanges(namespaceContext, 'all', ctx),
-            mutate: (request, run) =>
-              atomicEntry(
-                namespaceContext,
-                MemoryOperation.vectorQueryDelete,
-                () => ({ ...request }),
-                { ...request.ctx, concurrency: request.concurrency },
-                (input) => ({
-                  invoke: (scope) => scope[queryDraft].vector(captured.name, input, run, select)
-                })
-              ),
-            pushdown: {
-              source: MemoryState.querySource,
-              operations: [QueryOperation.where, QueryOperation.topK, QueryOperation.minScore],
-              operators: Object.values(QueryOperator)
-            },
-            execute: (input) => {
-              namespaceContext.controller.assertLive()
-              return nativeIterator(
-                namespaceContext,
-                MemoryOperation.vectorSearch,
-                input.ctx,
-                () => select(input, points(), point),
-                (row) => row,
-                () => namespaceContext.controller.assertLive()
-              )
-            }
-          },
-          namespaceContext.core.getChainMethods('vector')
-        )
-      }
-      return {
-        near: (input, options) => {
-          namespaceContext.controller.assertLive()
-          return captureBatch(namespaceContext, () => {
-            if (
-              options !== undefined &&
-              (typeof options !== 'object' || options === null || Array.isArray(options))
-            )
-              invalidVector()
-            /** Optional request fields are read once before the immutable source captures them. */
-            const inputMetric = options?.metric
-            const metric = inputMetric === undefined ? configuration.metric : inputMetric
-            /** Memory is exact for either request; malformed explicit options still reject. */
-            const exact = options?.exact
-            if (exact !== undefined && typeof exact !== 'boolean') invalidVector()
-            /** The original component owner snapshots the query and the requested metric. */
-            const components = snapshotStorageVector(
-              input,
-              { dimensions: configuration.dimensions, metric },
-              STORAGE_MEMORY_BACKEND
-            )
-            return query(() => ({ query: components, exclude: new Set<string>() }), metric, {
-              kind: VectorQueryOriginKind.near,
-              vector: components
-            })
-          })
-        },
-        similarTo: (id) => {
-          namespaceContext.controller.assertLive()
-          assertStringStorageKey(id, STORAGE_MEMORY_BACKEND)
-          return query(
-            (lookup) => {
-              /** A missing/expired sample is rejected before native candidates are ranked. */
-              const sample = lookup(id)
-              if (sample === undefined) invalidVector()
-              return {
-                query: snapshotStorageVector(sample.vector, configuration, STORAGE_MEMORY_BACKEND),
-                exclude: new Set([id])
-              }
-            },
-            configuration.metric,
-            { kind: VectorQueryOriginKind.similarTo, id }
-          )
-        },
-        recommend: (input) => {
-          namespaceContext.controller.assertLive()
-          /** The original key batch owner detaches ID arrays before their asynchronous use. */
-          const samples = captureBatch(namespaceContext, () => {
-            if (typeof input !== 'object' || input === null || Array.isArray(input)) invalidVector()
-            const { positive, negative } = input
-            const positiveIds = vectorIds(namespaceContext, positive)
-            const negativeIds = vectorIds(namespaceContext, negative === undefined ? [] : negative)
-            if (positiveIds.length === 0) invalidVector()
-            const exclude = new Set([...positiveIds, ...negativeIds])
-            if (exclude.size !== positiveIds.length + negativeIds.length) invalidVector()
-            return { positiveIds, negativeIds, exclude }
-          })
-          return query(
-            (lookup) => {
-              /** Every requested sample resolves against this collection and immutable organization. */
-              const load = (id: string): readonly number[] => {
-                const sample = lookup(id)
-                if (sample === undefined) invalidVector()
-                return sample.vector
-              }
-              const positive = samples.positiveIds.map(load)
-              const negative = samples.negativeIds.map(load)
-              const combined = recommendStorageVector(
-                positive as [readonly number[], ...(readonly number[])[]],
-                negative
-              )
-              return {
-                query: snapshotStorageVector(combined, configuration, STORAGE_MEMORY_BACKEND),
-                exclude: samples.exclude
-              }
-            },
-            configuration.metric,
-            {
-              kind: VectorQueryOriginKind.recommend,
-              positive: samples.positiveIds,
-              negative: samples.negativeIds
-            }
-          )
-        },
-        upsert: (points, ctx) =>
-          vectorOperation(namespaceContext, () =>
-            mutationEntry(
-              namespaceContext,
-              MemoryOperation.vectorUpsert,
-              points,
-              ctx,
-              (input, context) => {
-                /** Full-batch capture occurs before any original lock wait or physical mutation. */
-                const prepared = snapshotStorageVectorUpsert(
-                  input,
-                  configuration,
-                  STORAGE_MEMORY_BACKEND
-                )
-                /** Complete canonical payload encoding also finishes before the first native put. */
-                const sizes = prepared.map((point) => entryBytes(namespaceContext, 'vector', point))
-                /**
-                 * Extension fields came from the original concurrency snapshot, never a second raw
-                 * read.
-                 */
-                const ttlMs = Reflect.get(context, 'ttlMs') as number | undefined
-                if (ttlMs !== undefined) assertStorageTtlDuration(ttlMs, STORAGE_MEMORY_BACKEND)
-                return {
-                  keys: prepared.map((point) => lockKey.vector(captured.name, point.id)),
-                  invoke: (draft) => draft.upsertVector(captured.name, prepared, sizes, ttlMs),
-                  capacityChanges:
-                    namespaceContext.capacity === undefined
-                      ? undefined
-                      : () =>
-                          prepared.map((point, index) => {
-                            const key = vectorKey(namespaceContext, captured.name, point.id)
-                            const deadline =
-                              ttlMs === undefined
-                                ? namespaceContext.deadlines.get(
-                                    identity(namespaceContext, 'vector', encodeFlatStorageKey(key))
-                                  )
-                                : namespaceContext.scheduler.now() + ttlMs
-                            return capacityFact(
-                              namespaceContext,
-                              'vector',
-                              key,
-                              ttlMs !== undefined &&
-                                deadline !== undefined &&
-                                deadline <= namespaceContext.scheduler.now()
-                                ? undefined
-                                : sizes[index]
-                            )
-                          }),
-                  run: () => {
-                    /** One monotonic clock observation applies to this synchronous admitted batch. */
-                    const now = namespaceContext.scheduler.now()
-                    for (const [index, point] of prepared.entries()) {
-                      const key = vectorKey(namespaceContext, captured.name, point.id)
-                      const encoded = encodeFlatStorageKey(key)
-                      const current = liveEntry(namespaceContext, 'vector', encoded)
-                      const orderedKey =
-                        current?.ordered ?? encodeOrderedStorageKey(key, STORAGE_MEMORY_BACKEND)
-                      const deadline =
-                        ttlMs === undefined
-                          ? namespaceContext.deadlines.get(
-                              identity(namespaceContext, 'vector', encoded)
-                            )
-                          : now + ttlMs
-                      if (deadline !== undefined && deadline <= now) {
-                        removeVector(namespaceContext, captured.name, point.id)
-                        continue
-                      }
-                      const entry = { key, ordered: orderedKey, value: point, bytes: sizes[index] }
-                      namespaceContext.data.vector.set(encoded, entry)
-                      namespaceContext.ordered.vector.set(orderedKey, entry)
-                      setDeadline(namespaceContext, 'vector', encoded, deadline)
-                      namespaceContext.capacityIndex?.put({
-                        ...capacityFact(namespaceContext, 'vector', key),
-                        bytes: sizes[index]!
-                      })
-                      bump(namespaceContext, 'vector', encoded)
-                    }
-                    if (prepared.length > 0) publish(namespaceContext, 'vector', 'batch')
-                  }
-                }
-              }
-            )
-          ),
-        delete: (ids, ctx) =>
-          vectorOperation(namespaceContext, () =>
-            mutationEntry(namespaceContext, MemoryOperation.vectorDelete, ids, ctx, (input) => {
-              const capturedIds = vectorIds(namespaceContext, input)
-              return {
-                keys: capturedIds.map((id) => lockKey.vector(captured.name, id)),
-                invoke: (draft) => {
-                  for (const id of capturedIds)
-                    draft.remove('vector', vectorKey(namespaceContext, captured.name, id))
-                },
-                run: () => {
-                  let count = 0
-                  for (const id of capturedIds)
-                    if (removeVector(namespaceContext, captured.name, id)) count++
-                  if (count > 0) publish(namespaceContext, 'vector', 'batch')
-                }
-              }
-            })
-          ),
-        deleteWhere: (where, ctx) =>
-          vectorOperation(namespaceContext, () =>
-            mutationEntry(
-              namespaceContext,
-              MemoryOperation.vectorDeleteWhere,
-              where,
-              ctx,
-              (input, context) => {
-                const count = Reflect.get(context, 'count')
-                if (
-                  count !== undefined &&
-                  count !== DeleteCountMode.precount &&
-                  count !== DeleteCountMode.scroll
-                )
-                  invalidVector()
-                const predicate = compileStorageWhere<TPayload | undefined>(input)
-                return {
-                  keys: [],
-                  invoke: (draft) =>
-                    draft.deleteVector(captured.name, (point) =>
-                      predicate(point.payload as TPayload | undefined)
-                    ),
-                  ranges: [
-                    {
-                      channel: 'vector',
-                      ...snapshotConcurrencyLockRange({ channel: 'vector' }, STORAGE_MEMORY_BACKEND)
-                    }
-                  ],
-                  run: () => {
-                    let count = 0
-                    for (const point of points(true))
-                      if (
-                        predicate(point.payload) &&
-                        removeVector(namespaceContext, captured.name, point.id)
-                      )
-                        count++
-                    if (count > 0) publish(namespaceContext, 'vector', 'batch')
-                    return count
-                  }
-                }
-              }
-            )
-          ),
-        search: (query, options, ctx) =>
-          vectorOperation(namespaceContext, () =>
-            asyncEntry(
-              namespaceContext,
-              MemoryOperation.vectorSearch,
-              { query, options },
-              ctx,
-              (input) => {
-                namespaceContext.controller.assertLive()
-                const request = snapshotStorageVectorSearch(
-                  input.query,
-                  input.options,
-                  configuration,
-                  STORAGE_MEMORY_BACKEND
-                )
-                if (request.options.k === 0) return []
-                const filter =
-                  request.options.filter === undefined
-                    ? undefined
-                    : compileStorageQueryCondition<TPayload | undefined>(
-                        vectorCondition(request.options.filter)
-                      )
-                return rankMemoryVectors(
-                  points(),
-                  request.query,
-                  configuration.metric,
-                  request.options.k,
-                  undefined,
-                  (point) => filter === undefined || filter(point.payload)
-                ).map((hit) => output(hit, false, request.options.withPayload))
-              }
-            )
-          )
-      }
-    }
+    ): IVectorCollection<TPayload> => createMemoryVectorCollection(namespaceContext, name, options)
   }
 }
 
@@ -5138,187 +4719,8 @@ function createMemoryNamespaceObjects<T>(
   namespaceContext: IMemoryNamespaceContext<T>
 ): IMemoryNamespaceContext<T>['objects'] {
   return {
-    async put(key, body, options) {
-      namespaceContext.controller.assertLive()
-      /** Caller-owned body/options are captured before the original operation pipeline can await. */
-      const input = snapshotStorageBlobPut(key, body, options, STORAGE_MEMORY_BACKEND)
-      /** Pipeline intervention receives owned writable fields without reviving caller getters. */
-      const pipelineInput = { ...input, options: { ...input.options } }
-      /** Pipeline-provided fields are captured once before upload starts or native admission waits. */
-      let prepared: ReturnType<typeof snapshotStorageBlobPut>
-      /** Complete content remains private through lock waits and the final generation recheck. */
-      let bytes: Uint8Array
-      /** Opaque generation metadata is prepared before capacity can remove any original entry. */
-      let info: IBlobInfo
-      /** Capacity uses the same shared physical tuple as this namespace's native object map. */
-      let physicalKey: IStorageKey
-      /** The original lock owner's final synchronous preflight selects the exact capacity victims. */
-      let plan: ReturnType<typeof planCapacity>
-      /** Selected preparation remains accepted original-controller work even when rejected. */
-      const preparing =
-        namespaceContext.core.journal === undefined
-          ? undefined
-          : namespaceContext.controller.beginMutation()
-      const pending = runWithConcurrency<IBlobInfo>(
-        {
-          store: namespaceContext.base,
-          options: input.options.ctx ?? {},
-          prepare:
-            namespaceContext.core.journal === undefined
-              ? undefined
-              : async () => {
-                  await namespaceContext.core.journal!.prepare()
-                  /**
-                   * Blob has no shared journal target; reject before taking upload reader
-                   * ownership.
-                   */
-                  if (namespaceContext.core.journal!.active())
-                    throw new StorageContractError(StorageContractErrorCode.unsupported)
-                },
-          execute: (context, invoke) =>
-            namespaceContext.core.execution.run(
-              { operation: MemoryOperation.blobPut, input: pipelineInput, ctx: context },
-              async (captured) => {
-                namespaceContext.controller.assertLive()
-                /** Accepted uploads drain through the existing controller's mutation lease. */
-                const release = namespaceContext.controller.beginMutation()
-                try {
-                  prepared = snapshotStorageBlobPut(
-                    captured.key,
-                    captured.body,
-                    captured.options,
-                    STORAGE_MEMORY_BACKEND
-                  )
-                  assertBlobCondition(namespaceContext, prepared)
-                  bytes = await loadBlobBody(namespaceContext, prepared, context.signal)
-                  throwIfAborted(context.signal)
-                  namespaceContext.controller.assertLive()
-                  physicalKey = prefixStorageOrgKey(namespaceContext.orgId, prepared.key)
-                  info = Object.freeze({
-                    key: prepared.key,
-                    size: bytes.byteLength,
-                    etag: createStorageToken(),
-                    contentType: prepared.options.contentType,
-                    metadata: prepared.options.metadata ?? Object.freeze({}),
-                    updatedAt: Date.now()
-                  })
-                  return await invoke()
-                } catch (cause) {
-                  throw blobFailure(namespaceContext, cause, input.key)
-                } finally {
-                  release()
-                }
-              }
-            ),
-          lock: () => []
-        },
-        {
-          attempt: (attempt) =>
-            namespaceContext.locks.attemptWrite(
-              attempt,
-              holding(namespaceContext),
-              () => {
-                assertBlobCondition(namespaceContext, prepared)
-                return commitCapacity(namespaceContext, plan, () => {
-                  /** All failure-prone input and body work precedes this final synchronous turn. */
-                  const entry = namespaceContext.blobs.put(bytes, info)
-                  namespaceContext.capacityIndex?.put({
-                    ...capacityFact(namespaceContext, 'blob', entry.key),
-                    bytes: bytes.byteLength
-                  })
-                  publish(namespaceContext, 'blob', 'put')
-                  return info
-                })
-              },
-              namespaceContext.core.stageBindings.concurrencyStages(namespaceContext.store),
-              namespaceContext.controller.closingSignal,
-              undefined,
-              undefined,
-              () => {
-                assertBlobCondition(namespaceContext, prepared)
-                plan =
-                  namespaceContext.capacity === undefined
-                    ? undefined
-                    : planCapacity(namespaceContext, [
-                        capacityFact(namespaceContext, 'blob', physicalKey, bytes.byteLength)
-                      ])
-                return plan?.identities ?? []
-              }
-            )
-        }
-      )
-      return preparing === undefined ? pending : pending.finally(preparing)
-    },
-    async get(key, options) {
-      namespaceContext.controller.assertLive()
-      /** Range and caller context are admitted before any native object snapshot is opened. */
-      const input = snapshotStorageBlobGet(key, options, STORAGE_MEMORY_BACKEND)
-      /** The original pipeline may replace or mutate this owned request before native admission. */
-      const pipelineInput = { ...input, options: { ...input.options } }
-      /** This original timeout/context lifetime transfers to the returned shared object resource. */
-      const merged = mergeSignals(input.options.ctx, namespaceContext.report)
-      /** A pipeline failure after opening content still disposes that exact original resource. */
-      let resource: IBlobObject | undefined
-      try {
-        throwIfAborted(merged.signal)
-        return await namespaceContext.core.execution.run(
-          { operation: MemoryOperation.blobGet, input: pipelineInput, ctx: merged.context },
-          async (captured) => {
-            namespaceContext.controller.assertLive()
-            throwIfAborted(merged.signal)
-            /** Re-capture pipeline changes even when it retained the same request object identity. */
-            const request = snapshotStorageBlobGet(
-              captured.key,
-              captured.options,
-              STORAGE_MEMORY_BACKEND
-            )
-            /** Native metadata and body come from the same immutable committed generation. */
-            const entry = namespaceContext.blobs.get(request.key)
-            if (entry === undefined) {
-              merged.dispose()
-              return undefined
-            }
-            namespaceContext.capacityIndex?.touch(identity(namespaceContext, 'blob', entry.encoded))
-            /** Inclusive public range bounds become a detached native slice. */
-            const range = request.options.range
-            /** A clipped endpoint also makes reads beyond EOF return an empty body. */
-            const end =
-              range?.end === undefined
-                ? entry.value.body.byteLength
-                : Math.min(entry.value.body.byteLength, range.end + 1)
-            /** Future overwrites, removal and capacity eviction cannot change returned content. */
-            const snapshot = entry.value.body.slice(range?.start ?? 0, end)
-            /** Native pull opens no second lifecycle or storage subscription. */
-            const source = new ReadableStream<Uint8Array>(
-              {
-                pull(native) {
-                  namespaceContext.controller.assertLive()
-                  throwIfAborted(merged.signal)
-                  native.enqueue(snapshot)
-                  native.close()
-                }
-              },
-              { highWaterMark: 0 }
-            )
-            resource = createStorageBlobObject(entry.value.info, source, {
-              close: () => merged.dispose(),
-              report: namespaceContext.report,
-              backend: STORAGE_MEMORY_BACKEND,
-              normalizeFailure: (cause) => blobFailure(namespaceContext, cause, request.key)
-            })
-            return resource
-          }
-        )
-      } catch (cause) {
-        try {
-          await resource?.dispose()
-        } catch (cleanup) {
-          reportCleanupError(namespaceContext.report, cleanup)
-        }
-        merged.dispose()
-        throw blobFailure(namespaceContext, cause, input.key)
-      }
-    },
+    put: (...args) => memoryBlobPut(namespaceContext, ...args),
+    get: (...args) => memoryBlobGet(namespaceContext, ...args),
     head: (key, ctx) =>
       asyncEntry(namespaceContext, MemoryOperation.blobHead, key, ctx, (captured) => {
         namespaceContext.controller.assertLive()
@@ -5525,3 +4927,1002 @@ export type IMemoryBackendStore<T = unknown> = Omit<
   ReturnType<typeof createMemoryBackend<T>>['store'],
   'undo'
 >
+
+/** Initialize one native attempt before any business or journal work is admitted. */
+function createMemoryTransactionContext<T, R>(
+  namespaceContext: IMemoryNamespaceContext<T>,
+  run: (scope: IMemoryScope<T>, draft: IMemoryTextDraft) => R,
+  ctx: IConcurrencyAttemptContext,
+  protectedRanges?: IMemoryRootMutation<unknown>['ranges'],
+  setCapacityIdentities?: (identities: readonly string[]) => void,
+  journaled = true,
+  observeKeys?: (keys: readonly ILockKey[]) => void
+): IMemoryTransactionContext<T, R> {
+  /** Initialize attempt-local facts before publishing its original native scope. */
+  const transactionContext = {
+    namespaceContext,
+    run,
+    ctx,
+    protectedRanges,
+    setCapacityIdentities,
+    journaled,
+    observeKeys
+  } as IMemoryTransactionContext<T, R>
+
+  transactionContext.namespaceContext.controller.assertLive()
+
+  throwIfAborted(transactionContext.ctx.signal)
+
+  transactionContext.setCapacityIdentities?.([])
+  transactionContext.draft = new Map<string, IMemoryDraft>()
+  transactionContext.clearAllRequested = false
+  transactionContext.clearChanged = false
+  transactionContext.draftOrdered = {
+    value: createOrderedRecordIndex<IMemoryDraft>(),
+    bytes: createOrderedRecordIndex<IMemoryDraft>(),
+    record: createOrderedRecordIndex<IMemoryDraft>(),
+    vector: createOrderedRecordIndex<IMemoryDraft>(),
+    rdf: createOrderedRecordIndex<IMemoryDraft>()
+  }
+  transactionContext.draftRdfIndex = createMemoryRdfIndex(transactionContext.draftOrdered.rdf)
+  transactionContext.snapshots = new Map<string, IMemorySnapshot | undefined>()
+  transactionContext.expected = new Map<
+    string,
+    { channel: IMemoryChannel; encoded: string; key: IStorageKey; revision: number }
+  >()
+  transactionContext.snapshotEpochs = new Map<IMemoryChannel, number>()
+  transactionContext.textDraft = createMemoryTransactionTextDraft(transactionContext)
+  transactionContext.scope = createScope(transactionContext)
+  transactionContext.control = transactionContext.namespaceContext.owner.register(
+    transactionContext.scope,
+    {
+      context: transactionContext.ctx,
+      createScope: () => createScope(transactionContext),
+      onFailure: (error) => {
+        transactionContext.failure ??= error
+      },
+      beforeCommit: (current) => {
+        transactionContext.namespaceContext.controller.assertLive()
+        throwIfAborted(transactionContext.ctx.signal)
+        void transactionContext.namespaceContext.core.stageBindings
+          .transactionStages(transactionContext.namespaceContext.store)
+          .forTransaction(current)
+          .beforeCommit?.()
+        if (transactionContext.journalAttempt === undefined) return
+        transactionContext.journalCapacity = draftCapacityPlan(transactionContext)
+        for (const victim of transactionContext.journalCapacity?.victims ?? []) {
+          /** Blob has no shared transaction target; never fabricate a logical blob lock/image. */
+          if (victim.channel === 'blob')
+            throw new StorageContractError(StorageContractErrorCode.unsupported)
+          const channel = victim.channel as IMemoryChannel
+          const current = txSnapshot(transactionContext, channel, victim.encoded, victim.key)
+          if (current === undefined) continue
+          ;(transactionContext.journalVictims ??= new Set()).add(victim.id)
+          stageDraft(transactionContext, {
+            ...current,
+            channel,
+            encoded: victim.encoded,
+            remove: true
+          })
+        }
+        return transactionContext.journalAttempt.record(current)
+      }
+    }
+  )
+  transactionContext.stage = transactionContext.namespaceContext.core.stageBindings
+    .transactionStages(transactionContext.namespaceContext.store)
+    .forTransaction(transactionContext.scope)
+
+  return transactionContext
+}
+/** Detect existing range, journal, key and epoch conflicts before native commit admission. */
+function memoryTransactionConflict<T, R>(
+  transactionContext: IMemoryTransactionContext<T, R>
+): IConcurrencyAttempt<never> | undefined {
+  if (transactionContext.protectedRanges !== undefined) {
+    /** Batch commits cannot bypass a holder admitted while this original draft was preparing. */
+    const held = transactionContext.namespaceContext.locks.probe(
+      readConcurrencyLockIdentities(transactionContext.ctx),
+      transactionContext.protectedRanges,
+      transactionContext.ctx
+    )
+    if (held !== undefined) {
+      void transactionContext.stage.afterRollback?.(StorageContractErrorCode.lockRejected)
+      return { status: 'conflict', phase: 'acquire', keys: [held.key], holder: held.holder }
+    }
+  }
+  /** Expiry after an observed read changes the same original revision before commit checks. */
+  for (const entry of transactionContext.expected.values())
+    liveEntry(transactionContext.namespaceContext, entry.channel, entry.encoded)
+  /** The same original retry owner handles concurrent private-head changes and drop/reopen. */
+  const journalConflict = transactionContext.journalDraft?.conflict()
+  if (journalConflict !== undefined) {
+    void transactionContext.stage.afterRollback?.(StorageContractErrorCode.writeConflict)
+    return { status: 'conflict', phase: 'commit', keys: [], holder: undefined }
+  }
+  /** Conflict identities are collected before the synchronous all-channel draft merge. */
+  const conflicts = [...transactionContext.expected.values()].filter(
+    (entry) =>
+      revision(transactionContext.namespaceContext, entry.channel, entry.encoded) !==
+        entry.revision ||
+      transactionContext.namespaceContext.revisions.epoch(
+        entry.channel === 'value' ? 'text' : entry.channel
+      ) !== transactionContext.snapshotEpochs.get(entry.channel)
+  )
+  if (
+    conflicts.length !== 0 ||
+    [...transactionContext.snapshotEpochs].some(
+      ([channel, epoch]) =>
+        transactionContext.namespaceContext.revisions.epoch(
+          channel === 'value' ? 'text' : channel
+        ) !== epoch
+    )
+  ) {
+    void transactionContext.stage.afterRollback?.(StorageContractErrorCode.writeConflict)
+    return {
+      status: 'conflict',
+      phase: 'commit',
+      keys: conflicts.map((entry) =>
+        entry.channel === 'value'
+          ? lockKey.text(entry.key)
+          : entry.channel === 'bytes'
+            ? lockKey.bytes(entry.key as string)
+            : entry.channel === 'vector'
+              ? lockKey.vector(
+                  (entry.key as readonly [string, string])[0],
+                  (entry.key as readonly [string, string])[1]
+                )
+              : entry.channel === 'rdf'
+                ? (transactionContext.draft.get(
+                    identity(transactionContext.namespaceContext, 'rdf', entry.encoded)
+                  ) ??
+                    transactionContext.snapshots.get(
+                      identity(transactionContext.namespaceContext, 'rdf', entry.encoded)
+                    ))!.rdfLock!
+                : lockKey.record(entry.key)
+      ),
+      holder: undefined,
+      cause: new Error(
+        conflicts[0] &&
+          revision(
+            transactionContext.namespaceContext,
+            conflicts[0].channel,
+            conflicts[0].encoded
+          ) !== conflicts[0].revision
+          ? StorageErrorText.memoryRevisionChanged(
+              conflicts[0].revision,
+              revision(
+                transactionContext.namespaceContext,
+                conflicts[0].channel,
+                conflicts[0].encoded
+              )
+            )
+          : StorageErrorText.memoryEpochChanged
+      )
+    }
+  }
+  return undefined
+}
+/** Check the finalized capacity proposal against the existing journal and lock owners. */
+function memoryTransactionCapacityConflict<T, R>(
+  transactionContext: IMemoryTransactionContext<T, R>,
+  capacityPlan: ReturnType<typeof draftCapacityPlan<T, R>>
+): IConcurrencyAttempt<never> | undefined {
+  if (
+    transactionContext.journalAttempt !== undefined &&
+    (capacityPlan?.expired.length !== transactionContext.journalCapacity?.expired.length ||
+      capacityPlan?.victims.length !== transactionContext.journalCapacity?.victims.length ||
+      capacityPlan?.expired.some(
+        (entry, index) => entry.id !== transactionContext.journalCapacity!.expired[index]!.id
+      ) ||
+      capacityPlan?.victims.some(
+        (entry, index) => entry.id !== transactionContext.journalCapacity!.victims[index]!.id
+      ))
+  ) {
+    void transactionContext.stage.afterRollback?.(StorageContractErrorCode.writeConflict)
+    return { status: 'conflict', phase: 'commit', keys: [], holder: undefined }
+  }
+  transactionContext.setCapacityIdentities?.(capacityPlan?.identities ?? [])
+  const capacityHeld =
+    capacityPlan === undefined
+      ? undefined
+      : transactionContext.namespaceContext.locks.probe(
+          capacityPlan.identities,
+          undefined,
+          transactionContext.ctx
+        )
+  if (capacityHeld !== undefined) {
+    void transactionContext.stage.afterRollback?.(StorageContractErrorCode.lockRejected)
+    return {
+      status: 'conflict',
+      phase: 'acquire',
+      keys: [capacityHeld.key],
+      holder: capacityHeld.holder
+    }
+  }
+  return undefined
+}
+/** Apply every draft row during the original synchronous capacity commit turn. */
+function applyMemoryTransactionDraft<T, R>(
+  transactionContext: IMemoryTransactionContext<T, R>,
+  capacityPlan: ReturnType<typeof draftCapacityPlan<T, R>>,
+  changed: Record<IMemoryChannel, IStorageKey[]>
+): void {
+  /** Clear's physical maps, revisions and accounting remain owned by their original turn. */
+  if (transactionContext.clearedChannels !== undefined) {
+    if (transactionContext.clearAllRequested) clearAll(transactionContext.namespaceContext, false)
+    else
+      clear(
+        transactionContext.namespaceContext,
+        transactionContext.clearedChannels[0] as IStorageChannel,
+        false
+      )
+  }
+  for (const proposed of transactionContext.draft.values()) {
+    if (transactionContext.clearedChannels?.includes(proposed.channel)) {
+      changed[proposed.channel].push(proposed.key)
+      continue
+    }
+    /** Policy eviction remains owned by commitCapacity, including revision and onEvict. */
+    if (
+      transactionContext.journalVictims?.has(
+        identity(transactionContext.namespaceContext, proposed.channel, proposed.encoded)
+      )
+    )
+      continue
+    /** Existing draft identities retain their already captured logical key. */
+    const encoded = proposed.encoded
+    /** New deadlines that elapsed within this draft commit as immediate absence. */
+    if (
+      proposed.remove ||
+      (proposed.deadline !== undefined &&
+        proposed.deadline <= transactionContext.namespaceContext.scheduler.now())
+    ) {
+      setDeadline(transactionContext.namespaceContext, proposed.channel, encoded, undefined)
+      transactionContext.namespaceContext.capacityIndex?.remove(
+        identity(transactionContext.namespaceContext, proposed.channel, encoded)
+      )
+      if (!transactionContext.namespaceContext.data[proposed.channel].delete(encoded)) continue
+      if (proposed.channel === 'rdf')
+        transactionContext.namespaceContext.rdfIndex.delete(proposed.rdfKeys!)
+      else transactionContext.namespaceContext.ordered[proposed.channel].delete(proposed.ordered)
+    } else {
+      /**
+       * An overwrite retains its original live ordered encoding instead of keeping duplicate key
+       * bytes.
+       */
+      const keyBytes =
+        transactionContext.namespaceContext.ordered[proposed.channel].get(proposed.ordered)?.key ??
+        proposed.ordered
+      const entry = {
+        key: proposed.key,
+        value: proposed.value,
+        ordered: keyBytes,
+        bytes: proposed.bytes,
+        rdfKeys: proposed.rdfKeys,
+        rdfLock: proposed.rdfLock
+      }
+      transactionContext.namespaceContext.data[proposed.channel].set(encoded, entry)
+      if (proposed.channel === 'rdf')
+        transactionContext.namespaceContext.rdfIndex.set(proposed.rdfKeys!, entry)
+      else transactionContext.namespaceContext.ordered[proposed.channel].set(keyBytes, entry)
+      setDeadline(transactionContext.namespaceContext, proposed.channel, encoded, proposed.deadline)
+      transactionContext.namespaceContext.capacityIndex?.put({
+        ...capacityFact(
+          transactionContext.namespaceContext,
+          proposed.channel,
+          proposed.key,
+          undefined,
+          proposed.rdfLock
+        ),
+        bytes: proposed.bytes ?? 0
+      })
+    }
+    bump(transactionContext.namespaceContext, proposed.channel, encoded)
+    changed[proposed.channel].push(proposed.key)
+  }
+  /** The original capacity buffer preserves batch-before-victim notification order. */
+  if (capacityPlan !== undefined)
+    for (const channel of transactionContext.namespaceContext.physicalChannels)
+      if (!transactionContext.clearedChannels?.includes(channel) && changed[channel].length !== 0)
+        publish(transactionContext.namespaceContext, channel, 'batch', changed[channel])
+}
+/** Publish journal completion and channel notifications after physical commit. */
+function completeMemoryTransactionDraft<T, R>(
+  transactionContext: IMemoryTransactionContext<T, R>,
+  capacityPlan: ReturnType<typeof draftCapacityPlan<T, R>>,
+  changed: Record<IMemoryChannel, IStorageKey[]>
+): void {
+  /** Actual data and capacity victims are final before private indexes become visible. */
+  transactionContext.journalDraft?.commit()
+  transactionContext.journalDraft?.complete(true)
+  if (transactionContext.clearChanged) {
+    if (transactionContext.clearAllRequested)
+      transactionContext.namespaceContext.controller.publish({
+        channel: 'all',
+        kind: 'clear',
+        orgId: transactionContext.namespaceContext.orgId
+      })
+    else
+      publish(transactionContext.namespaceContext, transactionContext.clearedChannels![0]!, 'clear')
+  }
+  if (capacityPlan === undefined)
+    for (const channel of transactionContext.namespaceContext.physicalChannels)
+      if (!transactionContext.clearedChannels?.includes(channel) && changed[channel].length !== 0)
+        publish(transactionContext.namespaceContext, channel, 'batch', changed[channel])
+}
+/** Commit channels and report the original count without admitting another operation. */
+function commitMemoryTransaction<T, R>(
+  transactionContext: IMemoryTransactionContext<T, R>,
+  capacityPlan: ReturnType<typeof draftCapacityPlan<T, R>>
+): void {
+  const changed = {
+    value: [] as IStorageKey[],
+    bytes: [] as IStorageKey[],
+    record: [] as IStorageKey[],
+    vector: [] as IStorageKey[],
+    rdf: [] as IStorageKey[]
+  }
+  commitCapacity(
+    transactionContext.namespaceContext,
+    capacityPlan,
+    () => applyMemoryTransactionDraft(transactionContext, capacityPlan, changed),
+    () => completeMemoryTransactionDraft(transactionContext, capacityPlan, changed)
+  )
+  void transactionContext.stage.afterCommit?.(
+    transactionContext.namespaceContext.physicalChannels.reduce(
+      (count, channel) => count + changed[channel].length,
+      0
+    ) +
+      (capacityPlan?.expired.length ?? 0) +
+      (capacityPlan?.victims.length ?? 0)
+  )
+}
+
+/** Construct synchronous native access without entering asynchronous concurrency. */
+function createMemoryNamespaceSync<T>(
+  namespaceContext: IMemoryNamespaceContext<T>
+): IMemoryNamespaceContext<T>['base']['sync'] {
+  return {
+    get: (key) =>
+      namespaceContext.core.execution.runSync(
+        { operation: MemoryOperation.get, input: key },
+        (captured) => {
+          assertStringStorageKey(captured, STORAGE_MEMORY_BACKEND)
+          return (read(namespaceContext, 'value', captured) as string | undefined) ?? null
+        }
+      ),
+    set: (key, value, options) =>
+      namespaceContext.core.execution.runSync(
+        { operation: MemoryOperation.set, input: { key, value, options } },
+        (captured) => {
+          assertStringStorageKey(captured.key, STORAGE_MEMORY_BACKEND)
+          /** Sync policy capture never calls the asynchronous concurrency callback. */
+          const options = snapshotSyncWriteOptions(captured.options)
+          /** Payload preparation precedes the final active-key probe. */
+          const mutation = prepareWrite(
+            namespaceContext,
+            'value',
+            captured.key,
+            captured.value,
+            options.conflictPolicy
+          )
+          assertUnlocked(namespaceContext, mutation.keys)
+          /**
+           * Synchronous writes share exact victim planning but reject a busy victim without
+           * waiting.
+           */
+          const plan =
+            mutation.capacityChanges === undefined
+              ? undefined
+              : planCapacity(namespaceContext, mutation.capacityChanges())
+          const held =
+            plan === undefined ? undefined : namespaceContext.locks.probe(plan.identities)
+          if (held !== undefined)
+            throw new StorageContractError(StorageContractErrorCode.lockRejected, {
+              backend: STORAGE_MEMORY_BACKEND,
+              keys: [held.key],
+              holder: held.holder
+            })
+          commitCapacity(namespaceContext, plan, mutation.run)
+        }
+      ),
+    remove: (key) =>
+      namespaceContext.core.execution.runSync(
+        { operation: MemoryOperation.remove, input: key },
+        (captured) => {
+          assertStringStorageKey(captured, STORAGE_MEMORY_BACKEND)
+          assertUnlocked(namespaceContext, [lockKey.text(captured)])
+          remove(namespaceContext, 'value', captured)
+        }
+      ),
+    has: (key) =>
+      namespaceContext.core.execution.runSync(
+        { operation: MemoryOperation.has, input: key },
+        (captured) => {
+          assertStringStorageKey(captured, STORAGE_MEMORY_BACKEND)
+          return read(namespaceContext, 'value', captured) !== undefined
+        }
+      ),
+    keys: () =>
+      namespaceContext.core.execution.runSync(
+        { operation: MemoryOperation.keys, input: undefined },
+        () => {
+          namespaceContext.controller.assertLive()
+          return [...namespaceContext.data.value.entries()]
+            .filter(([encoded]) => liveEntry(namespaceContext, 'value', encoded) !== undefined)
+            .map(([, entry]) => entry.key)
+            .filter((key): key is string => typeof key === 'string')
+        }
+      ),
+    clearValues: () =>
+      namespaceContext.core.execution.runSync(
+        { operation: MemoryOperation.clearValues, input: undefined },
+        () => {
+          namespaceContext.controller.assertLive()
+          assertUnlocked(namespaceContext, [], mutationRanges(namespaceContext, ['value']))
+          clear(namespaceContext, 'value')
+        }
+      )
+  }
+}
+/** Compose the namespace's original text operations. */
+function createMemoryNamespaceBaseText<T>(
+  namespaceContext: IMemoryNamespaceContext<T>
+): Pick<
+  IMemoryNamespaceContext<T>['base'],
+  'get' | 'set' | 'remove' | 'has' | 'keys' | 'clearValues' | 'clearAll'
+> {
+  return {
+    get: (key, ctx) =>
+      asyncEntry(
+        namespaceContext,
+        MemoryOperation.get,
+        key,
+        ctx,
+        (captured) => {
+          assertStringStorageKey(captured, STORAGE_MEMORY_BACKEND)
+          return (read(namespaceContext, 'value', captured) as string | undefined) ?? null
+        },
+        (captured) => [lockKey.text(captured)]
+      ),
+    set: (key, value, ctx) =>
+      mutationEntry(
+        namespaceContext,
+        MemoryOperation.set,
+        { key, value },
+        ctx,
+        (captured, context) => {
+          assertStringStorageKey(captured.key, STORAGE_MEMORY_BACKEND)
+          return prepareWrite(
+            namespaceContext,
+            'value',
+            captured.key,
+            captured.value,
+            context.conflictPolicy
+          )
+        }
+      ),
+    remove: (key, ctx) =>
+      mutationEntry(namespaceContext, MemoryOperation.remove, key, ctx, (captured) => {
+        assertStringStorageKey(captured, STORAGE_MEMORY_BACKEND)
+        return {
+          keys: [lockKey.text(captured)],
+          invoke: (draft) => {
+            draft.remove('value', captured)
+          },
+          run: () => remove(namespaceContext, 'value', captured)
+        }
+      }),
+    has: (key, ctx) =>
+      asyncEntry(
+        namespaceContext,
+        MemoryOperation.has,
+        key,
+        ctx,
+        (captured) => {
+          assertStringStorageKey(captured, STORAGE_MEMORY_BACKEND)
+          return read(namespaceContext, 'value', captured) !== undefined
+        },
+        (captured) => [lockKey.text(captured)]
+      ),
+    keys: (ctx) =>
+      asyncEntry(namespaceContext, MemoryOperation.keys, undefined, ctx, () => {
+        namespaceContext.controller.assertLive()
+        return [...namespaceContext.data.value.entries()]
+          .filter(([encoded]) => liveEntry(namespaceContext, 'value', encoded) !== undefined)
+          .map(([, entry]) => entry.key)
+          .filter((key): key is string => typeof key === 'string')
+      }),
+    clearValues: (ctx) => clearEntry(namespaceContext, MemoryOperation.clearValues, 'value', ctx),
+    clearAll: (ctx) => clearEntry(namespaceContext, MemoryOperation.clearAll, undefined, ctx)
+  }
+}
+/** Compose the namespace's original bytes operations. */
+function createMemoryNamespaceBaseBytes<T>(
+  namespaceContext: IMemoryNamespaceContext<T>
+): Pick<
+  IMemoryNamespaceContext<T>['base'],
+  'getBytes' | 'setBytes' | 'removeBytes' | 'clearBytes'
+> {
+  return {
+    getBytes: (key, ctx) =>
+      asyncEntry(
+        namespaceContext,
+        MemoryOperation.getBytes,
+        key,
+        ctx,
+        (captured) => {
+          assertStringStorageKey(captured, STORAGE_MEMORY_BACKEND)
+          return (read(namespaceContext, 'bytes', captured) as Uint8Array | undefined) ?? null
+        },
+        (captured) => [lockKey.bytes(captured)]
+      ),
+    setBytes: (key, value, ctx) =>
+      mutationEntry(
+        namespaceContext,
+        MemoryOperation.setBytes,
+        { key, value },
+        ctx,
+        (captured, context) => {
+          assertStringStorageKey(captured.key, STORAGE_MEMORY_BACKEND)
+          return prepareWrite(
+            namespaceContext,
+            'bytes',
+            captured.key,
+            captured.value,
+            context.conflictPolicy
+          )
+        }
+      ),
+    removeBytes: (key, ctx) =>
+      mutationEntry(namespaceContext, MemoryOperation.removeBytes, key, ctx, (captured) => {
+        assertStringStorageKey(captured, STORAGE_MEMORY_BACKEND)
+        return {
+          keys: [lockKey.bytes(captured)],
+          invoke: (draft) => {
+            draft.remove('bytes', captured)
+          },
+          run: () => remove(namespaceContext, 'bytes', captured)
+        }
+      }),
+    clearBytes: (ctx) => clearEntry(namespaceContext, MemoryOperation.clearBytes, 'bytes', ctx)
+  }
+}
+/** Compose the namespace's original records operations. */
+function createMemoryNamespaceBaseRecords<T>(
+  namespaceContext: IMemoryNamespaceContext<T>
+): Pick<
+  IMemoryNamespaceContext<T>['base'],
+  'getRecord' | 'putRecord' | 'deleteRecord' | 'clearRecords' | 'iterateRecords'
+> {
+  return {
+    getRecord: (key, ctx) =>
+      asyncEntry(
+        namespaceContext,
+        MemoryOperation.getRecord,
+        key,
+        ctx,
+        (captured) => read(namespaceContext, 'record', captured) as T | undefined,
+        (captured) => [lockKey.record(captured)]
+      ),
+    putRecord: (value, key, ctx) =>
+      mutationEntry(
+        namespaceContext,
+        MemoryOperation.putRecord,
+        { value, key },
+        ctx,
+        (captured, context) => {
+          /** Generated identity is fixed once for the logical write, including retries and waiting. */
+          const resolved = snapshotStorageKey(
+            captured.key ?? createStorageToken(),
+            STORAGE_MEMORY_BACKEND
+          )
+          /** The mutation retains the same detached identity that its implicit locks protect. */
+          const mutation = prepareWrite(
+            namespaceContext,
+            'record',
+            resolved,
+            captured.value,
+            context.conflictPolicy
+          )
+          return {
+            ...mutation,
+            invoke: (draft) => {
+              mutation.invoke!(draft)
+              return resolved
+            },
+            run: () => {
+              mutation.run()
+              return resolved
+            }
+          }
+        }
+      ),
+    deleteRecord: (key, ctx) =>
+      mutationEntry(namespaceContext, MemoryOperation.deleteRecord, key, ctx, (captured) => {
+        /** Mutable record identity detaches before the original policy can wait. */
+        const key = snapshotStorageKey(captured, STORAGE_MEMORY_BACKEND)
+        return {
+          keys: [lockKey.record(key)],
+          invoke: (draft) => {
+            draft.remove('record', key)
+          },
+          run: () => remove(namespaceContext, 'record', key)
+        }
+      }),
+    clearRecords: (ctx) =>
+      clearEntry(namespaceContext, MemoryOperation.clearRecords, 'record', ctx),
+    iterateRecords: (range, ctx) => rootIterator(namespaceContext, range, ctx)
+  }
+}
+/** Compose the namespace's original transactions operations. */
+function createMemoryNamespaceBaseTransactions<T>(
+  namespaceContext: IMemoryNamespaceContext<T>
+): Pick<IMemoryNamespaceContext<T>['base'], 'transaction' | 'tx'> {
+  return {
+    transaction: <R>(
+      run: (scope: IMemoryScope<T>) => R,
+      ctx?: ITransactionOptions
+    ): Promise<Awaited<R>> =>
+      atomicEntry(
+        namespaceContext,
+        MemoryOperation.transaction,
+        (context) => ({ run, ctx: context }),
+        ctx,
+        (input, admit) => {
+          assertTransactionCallback(input.run, STORAGE_MEMORY_BACKEND)
+          admit()
+          /**
+           * Keep the original second read before waiting, with no receiver or private draft
+           * argument.
+           */
+          const callback = input.run
+          return { invoke: (scope) => callback(scope) }
+        }
+      ),
+    tx: () =>
+      createTransactionBuilder(
+        namespaceContext.store,
+        undefined,
+        namespaceContext.core.getChainMethods('tx')
+      )
+  }
+}
+/** Compose the namespace's original observation operations. */
+function createMemoryNamespaceBaseObservation<T>(
+  namespaceContext: IMemoryNamespaceContext<T>
+): Pick<
+  IMemoryNamespaceContext<T>['base'],
+  'inspectLocks' | 'watch' | 'subscribeChanges' | 'dispose'
+> {
+  return {
+    inspectLocks: (ctx) =>
+      asyncEntry(namespaceContext, MemoryOperation.inspectLocks, undefined, ctx, () => {
+        namespaceContext.controller.assertLive()
+        return namespaceContext.locks.inspectLocks()
+      }),
+    watch: (key, ctx) => {
+      namespaceContext.controller.assertLive()
+      assertStringStorageKey(key, STORAGE_MEMORY_BACKEND)
+      return watchChanges(namespaceContext, 'value', ctx, key)
+    },
+    subscribeChanges: (listener) => {
+      namespaceContext.controller.assertLive()
+      return namespaceContext.controller.subscribe((change) => {
+        if (namespaceContext.root || change.orgId === namespaceContext.orgId)
+          return listener(change)
+      })
+    },
+    dispose: () => namespaceContext.controller.dispose()
+  }
+}
+/** Execute the native blob put with the original streaming and resource behavior. */
+async function memoryBlobPut<T>(
+  namespaceContext: IMemoryNamespaceContext<T>,
+  ...args: Parameters<IMemoryNamespaceContext<T>['objects']['put']>
+): ReturnType<IMemoryNamespaceContext<T>['objects']['put']> {
+  const [key, body, options] = args
+  namespaceContext.controller.assertLive()
+  /** Caller-owned body/options are captured before the original operation pipeline can await. */
+  const input = snapshotStorageBlobPut(key, body, options, STORAGE_MEMORY_BACKEND)
+  /** Pipeline intervention receives owned writable fields without reviving caller getters. */
+  const pipelineInput = { ...input, options: { ...input.options } }
+  /** Pipeline-provided fields are captured once before upload starts or native admission waits. */
+  let prepared: ReturnType<typeof snapshotStorageBlobPut>
+  /** Complete content remains private through lock waits and the final generation recheck. */
+  let bytes: Uint8Array
+  /** Opaque generation metadata is prepared before capacity can remove any original entry. */
+  let info: IBlobInfo
+  /** Capacity uses the same shared physical tuple as this namespace's native object map. */
+  let physicalKey: IStorageKey
+  /** The original lock owner's final synchronous preflight selects the exact capacity victims. */
+  let plan: ReturnType<typeof planCapacity>
+  /** Selected preparation remains accepted original-controller work even when rejected. */
+  const preparing =
+    namespaceContext.core.journal === undefined
+      ? undefined
+      : namespaceContext.controller.beginMutation()
+  const pending = runWithConcurrency<IBlobInfo>(
+    {
+      store: namespaceContext.base,
+      options: input.options.ctx ?? {},
+      prepare:
+        namespaceContext.core.journal === undefined
+          ? undefined
+          : async () => {
+              await namespaceContext.core.journal!.prepare()
+              /** Blob has no shared journal target; reject before taking upload reader ownership. */
+              if (namespaceContext.core.journal!.active())
+                throw new StorageContractError(StorageContractErrorCode.unsupported)
+            },
+      execute: (context, invoke) =>
+        namespaceContext.core.execution.run(
+          { operation: MemoryOperation.blobPut, input: pipelineInput, ctx: context },
+          async (captured) => {
+            namespaceContext.controller.assertLive()
+            /** Accepted uploads drain through the existing controller's mutation lease. */
+            const release = namespaceContext.controller.beginMutation()
+            try {
+              prepared = snapshotStorageBlobPut(
+                captured.key,
+                captured.body,
+                captured.options,
+                STORAGE_MEMORY_BACKEND
+              )
+              assertBlobCondition(namespaceContext, prepared)
+              bytes = await loadBlobBody(namespaceContext, prepared, context.signal)
+              throwIfAborted(context.signal)
+              namespaceContext.controller.assertLive()
+              physicalKey = prefixStorageOrgKey(namespaceContext.orgId, prepared.key)
+              info = {
+                key: prepared.key,
+                size: bytes.byteLength,
+                etag: createStorageToken(),
+                contentType: prepared.options.contentType,
+                metadata: prepared.options.metadata ?? {},
+                updatedAt: Date.now()
+              }
+              return await invoke()
+            } catch (cause) {
+              throw blobFailure(namespaceContext, cause, input.key)
+            } finally {
+              release()
+            }
+          }
+        ),
+      lock: () => []
+    },
+    {
+      attempt: (attempt) =>
+        namespaceContext.locks.attemptWrite(
+          attempt,
+          holding(namespaceContext),
+          () => {
+            assertBlobCondition(namespaceContext, prepared)
+            return commitCapacity(namespaceContext, plan, () => {
+              /** All failure-prone input and body work precedes this final synchronous turn. */
+              const entry = namespaceContext.blobs.put(bytes, info)
+              namespaceContext.capacityIndex?.put({
+                ...capacityFact(namespaceContext, 'blob', entry.key),
+                bytes: bytes.byteLength
+              })
+              publish(namespaceContext, 'blob', 'put')
+              return info
+            })
+          },
+          namespaceContext.core.stageBindings.concurrencyStages(namespaceContext.store),
+          namespaceContext.controller.closingSignal,
+          undefined,
+          undefined,
+          () => {
+            assertBlobCondition(namespaceContext, prepared)
+            plan =
+              namespaceContext.capacity === undefined
+                ? undefined
+                : planCapacity(namespaceContext, [
+                    capacityFact(namespaceContext, 'blob', physicalKey, bytes.byteLength)
+                  ])
+            return plan?.identities ?? []
+          }
+        )
+    }
+  )
+  return preparing === undefined ? pending : pending.finally(preparing)
+}
+/** Execute the native blob get with the original streaming and resource behavior. */
+async function memoryBlobGet<T>(
+  namespaceContext: IMemoryNamespaceContext<T>,
+  ...args: Parameters<IMemoryNamespaceContext<T>['objects']['get']>
+): ReturnType<IMemoryNamespaceContext<T>['objects']['get']> {
+  const [key, options] = args
+  namespaceContext.controller.assertLive()
+  /** Range and caller context are admitted before any native object snapshot is opened. */
+  const input = snapshotStorageBlobGet(key, options, STORAGE_MEMORY_BACKEND)
+  /** The original pipeline may replace or mutate this owned request before native admission. */
+  const pipelineInput = { ...input, options: { ...input.options } }
+  /** This original timeout/context lifetime transfers to the returned shared object resource. */
+  const merged = mergeSignals(input.options.ctx, namespaceContext.report)
+  /** A pipeline failure after opening content still disposes that exact original resource. */
+  let resource: IBlobObject | undefined
+  try {
+    throwIfAborted(merged.signal)
+    return await namespaceContext.core.execution.run(
+      { operation: MemoryOperation.blobGet, input: pipelineInput, ctx: merged.context },
+      async (captured) => {
+        namespaceContext.controller.assertLive()
+        throwIfAborted(merged.signal)
+        /** Re-capture pipeline changes even when it retained the same request object identity. */
+        const request = snapshotStorageBlobGet(
+          captured.key,
+          captured.options,
+          STORAGE_MEMORY_BACKEND
+        )
+        /** Native metadata and body come from the same immutable committed generation. */
+        const entry = namespaceContext.blobs.get(request.key)
+        if (entry === undefined) {
+          merged.dispose()
+          return undefined
+        }
+        namespaceContext.capacityIndex?.touch(identity(namespaceContext, 'blob', entry.encoded))
+        /** Inclusive public range bounds become a detached native slice. */
+        const range = request.options.range
+        /** A clipped endpoint also makes reads beyond EOF return an empty body. */
+        const end =
+          range?.end === undefined
+            ? entry.value.body.byteLength
+            : Math.min(entry.value.body.byteLength, range.end + 1)
+        /** Future overwrites, removal and capacity eviction cannot change returned content. */
+        const snapshot = entry.value.body.slice(range?.start ?? 0, end)
+        /** Native pull opens no second lifecycle or storage subscription. */
+        const source = new ReadableStream<Uint8Array>(
+          {
+            pull(native) {
+              namespaceContext.controller.assertLive()
+              throwIfAborted(merged.signal)
+              native.enqueue(snapshot)
+              native.close()
+            }
+          },
+          { highWaterMark: 0 }
+        )
+        resource = createStorageBlobObject(entry.value.info, source, {
+          close: () => merged.dispose(),
+          report: namespaceContext.report,
+          backend: STORAGE_MEMORY_BACKEND,
+          normalizeFailure: (cause) => blobFailure(namespaceContext, cause, request.key)
+        })
+        return resource
+      }
+    )
+  } catch (cause) {
+    try {
+      await resource?.dispose()
+    } catch (cleanup) {
+      reportCleanupError(namespaceContext.report, cleanup)
+    }
+    merged.dispose()
+    throw blobFailure(namespaceContext, cause, input.key)
+  }
+}
+/** Apply the original record query mutation to the same accepted scope draft. */
+function memoryScopeQueryRecord<T, R>(
+  scopeContext: IMemoryScopeContext<T, R>,
+  ...args: Parameters<IMemoryQueryDraft['record']>
+): ReturnType<IMemoryQueryDraft['record']> {
+  const [request, run] = args
+  assertTransactionOwner(scopeContext.transactionContext.namespaceContext.store, scopeContext.scope)
+  /** Pipeline-provided patches detach once before selection can touch any draft row. */
+  const patch =
+    request.operation === 'update'
+      ? clone(scopeContext.transactionContext.namespaceContext, request.patch)
+      : undefined
+  if (
+    request.operation !== 'delete' &&
+    (request.operation !== 'update' ||
+      typeof patch !== 'object' ||
+      patch === null ||
+      Array.isArray(patch))
+  )
+    throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
+      backend: STORAGE_MEMORY_BACKEND
+    })
+  return run({
+    execute: () =>
+      queryIterator(scopeContext.transactionContext, scopeContext.scope, function* () {
+        for (const row of txRows(scopeContext.transactionContext, 'record'))
+          yield [
+            clone(scopeContext.transactionContext.namespaceContext, row.key),
+            copyValue(
+              scopeContext.transactionContext.namespaceContext,
+              'record',
+              row.value,
+              row.key
+            )
+          ] as const
+      }),
+    accept: (key) => {
+      assertTransactionOwner(
+        scopeContext.transactionContext.namespaceContext.store,
+        scopeContext.scope
+      )
+      if (request.operation === 'delete')
+        return txRemove(scopeContext.transactionContext, 'record', key)
+      /** Query projections never become replacement values; patch the actual draft row. */
+      const current = txEntry(scopeContext.transactionContext, 'record', key)
+      if (current === undefined) return false
+      if (typeof current.value !== 'object' || current.value === null)
+        throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
+          backend: STORAGE_MEMORY_BACKEND
+        })
+      /** Existing native cloning preserves Date/Map values admitted by memory. */
+      const value = clone(scopeContext.transactionContext.namespaceContext, current.value, key)
+      for (const field of Object.keys(patch!)) {
+        /** Existing native fields such as Array.length retain their original descriptors. */
+        const descriptor = Object.getOwnPropertyDescriptor(value, field)
+        Object.defineProperty(
+          value,
+          field,
+          descriptor === undefined
+            ? {
+                value: patch![field],
+                enumerable: true,
+                configurable: true,
+                writable: true
+              }
+            : { ...descriptor, value: patch![field] }
+        )
+      }
+      txWrite(scopeContext.transactionContext, 'record', key, value, 'replace')
+      return true
+    }
+  })
+}
+/** Apply the original rdf query mutation to the same accepted scope draft. */
+function memoryScopeQueryRdf<T, R>(
+  scopeContext: IMemoryScopeContext<T, R>,
+  ...args: Parameters<IMemoryQueryDraft['rdf']>
+): ReturnType<IMemoryQueryDraft['rdf']> {
+  const [request, run] = args
+  assertTransactionOwner(scopeContext.transactionContext.namespaceContext.store, scopeContext.scope)
+  /** Replacement admission precedes selection or any draft tombstone. */
+  const replacement =
+    request.operation === 'replace'
+      ? captureRdfEntries(scopeContext.transactionContext.namespaceContext, [request.newQuad])[0]
+      : undefined
+  return run({
+    execute: (input) =>
+      queryIterator(scopeContext.transactionContext, scopeContext.scope, function* () {
+        for (const row of txRdfRows(scopeContext.transactionContext, input.pattern))
+          yield [
+            row.key,
+            logicalRdfQuad(scopeContext.transactionContext.namespaceContext, row)
+          ] as const
+      }),
+    accept: (_key, quad) => {
+      assertTransactionOwner(
+        scopeContext.transactionContext.namespaceContext.store,
+        scopeContext.scope
+      )
+      /** The original physical identity resolves actual draft membership and no-op replacement. */
+      const entry = captureRdfEntries(scopeContext.transactionContext.namespaceContext, [quad])[0]!
+      const proposed = scopeContext.transactionContext.draft.get(
+        identity(scopeContext.transactionContext.namespaceContext, 'rdf', entry.encoded)
+      )
+      const current = proposed
+        ? proposed.remove
+          ? undefined
+          : proposed
+        : txSnapshot(scopeContext.transactionContext, 'rdf', entry.encoded, entry.key)
+      if (current === undefined || replacement?.encoded === entry.encoded) return false
+      txRdfWrite(scopeContext.transactionContext, [quad], true)
+      if (replacement !== undefined)
+        txRdfWrite(
+          scopeContext.transactionContext,
+          [logicalRdfQuad(scopeContext.transactionContext.namespaceContext, replacement)],
+          false
+        )
+      return true
+    }
+  })
+}

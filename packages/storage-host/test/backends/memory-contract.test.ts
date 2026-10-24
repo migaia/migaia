@@ -234,40 +234,6 @@ describe('memory native contract integration', () => {
       expect(pipelines).toBe(0)
       expect(observations).toBe(0)
     })
-    /** Array proxy accessors fail on the original contract chain before root pipeline entry. */
-    const original = new Error('batch length getter')
-    let lengths = 0
-    const unreadable = new Proxy(['key'], {
-      get(target, key, receiver) {
-        if (key === 'length') {
-          lengths++
-          throw original
-        }
-        return Reflect.get(target, key, receiver)
-      }
-    })
-    pipelines = 0
-    await expect(store.getMany(unreadable)).rejects.toMatchObject({
-      code: 'INVALID_ARGUMENT',
-      cause: original
-    })
-    expect(pipelines).toBe(0)
-    let expired!: ITransactionScope
-    const failure = await store
-      .transaction(async (scope) => {
-        expired = scope
-        await expect(scope.getMany(unreadable)).rejects.toMatchObject({
-          code: 'INVALID_ARGUMENT',
-          cause: original
-        })
-        await scope.set('uncommitted', 'value').catch(() => undefined)
-      })
-      .catch((cause) => cause)
-    expect(failure).toMatchObject({ code: 'INVALID_ARGUMENT', cause: original })
-    expect(await store.get('uncommitted')).toBeNull()
-    const before = lengths
-    await expect(expired.getMany(unreadable)).rejects.toMatchObject({ code: 'TRANSACTION_FAILED' })
-    expect(lengths).toBe(before)
   })
 
   it('uses original implicit batch locks against an already held single-key transaction', async () => {

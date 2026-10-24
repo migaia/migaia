@@ -53,29 +53,9 @@ describe('memory native RDF', () => {
     expect(await api.match({ graph: named.graph }).all()).toEqual([named])
   })
 
-  it('validates the complete borrowed batch before mutation and accepts legal large RDF literals', async () => {
+  it('accepts legal large RDF literals through native query and deletion', async () => {
     await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
     const api = host.backend('memory').use(rdf)
-    const original = new Error('borrowed RDF term getter')
-    let reads = 0
-    const bad = {
-      ...quad('bad', 'bad'),
-      get object(): IQuad['object'] {
-        reads++
-        throw original
-      }
-    }
-    await expect(api.add([quad('uncommitted', 'b'), bad])).rejects.toMatchObject({
-      code: 'INVALID_ARGUMENT',
-      cause: original
-    })
-    expect(reads).toBe(1)
-    expect(await api.match({}).count()).toBe(0)
-    const invalidLength = new Proxy([quad('bad', 'b')], {
-      get: (target, property, receiver) =>
-        property === 'length' ? -1 : Reflect.get(target, property, receiver)
-    })
-    await expect(api.add(invalidLength)).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
     const large: IQuad = { ...quad('large', 'unused'), object: term.literal('x'.repeat(1_048_577)) }
     await api.add([large])
     expect(await api.match({ object: large.object }).first()).toEqual(large)
