@@ -14,7 +14,12 @@ import type {
   IText,
   ITypeDoc
 } from './contract.js'
-import { loggerCases, loggerIndexExample } from './logger-cases.js'
+import {
+  loggerCases,
+  loggerIndexExample,
+  loggerStoreExample,
+  loggerCommittedIndexExample
+} from './logger-cases.js'
 
 /** Builds one bilingual text. */
 const t = (en: string, zh: string): IText => ({ en, zh })
@@ -532,9 +537,27 @@ const loggerCoreMembers: Readonly<Record<string, IMemberDoc>> = Object.fromEntri
 )
 
 /** Member docs of the plugin `core` (`ILoggerPluginCore`): `onDispose` instead of `use` / `unUse`. */
-const pluginCoreMembers: Readonly<Record<string, IMemberDoc>> = Object.fromEntries(
-  Object.entries(coreMembers).filter(([name]) => name !== 'use' && name !== 'unUse')
-)
+const pluginCoreMembers: Readonly<Record<string, IMemberDoc>> = {
+  ...Object.fromEntries(
+    Object.entries(coreMembers).filter(([name]) => name !== 'use' && name !== 'unUse')
+  ),
+  reportFailure: {
+    summary: t(
+      'Report a durable observation or resource failure through the original Logger policy without adding a public instance method.',
+      '沿原 Logger 策略报告持久观察或资源失败，不增加普通实例方法。'
+    ),
+    params: {
+      failure: t(
+        'The original structured ILogFailure with its error and operation metadata.',
+        '保留原错误与操作元数据的结构化 ILogFailure。'
+      )
+    },
+    returns: t(
+      'Nothing; reporting retains the existing failure policy and does not authorize a commit.',
+      '无返回值；保持既有失败策略，不授予提交权限。'
+    )
+  }
+}
 
 /** Output rules and argument interpretation explained once per owning level-method surface. */
 const levelMessageArguments = t(
@@ -543,7 +566,14 @@ const levelMessageArguments = t(
 )
 
 /** Methods added by `level()`, with their call forms. */
-const levelExt: Readonly<Record<string, IMemberDoc & { call: string }>> = Object.fromEntries(
+const levelExt: Readonly<
+  Record<
+    string,
+    IMemberDoc & {
+      call: string
+    }
+  >
+> = Object.fromEntries(
   (
     [
       ['debug', '调试细节，生产环境通常被过滤'],
@@ -585,8 +615,14 @@ const levelMembers: Readonly<Record<string, IMemberDoc & { call: string }>> = {
       '让自带分类 tag 的普通 raw 条目经过同一原 level 门槛和过滤器，保留 payload 与原 Error 引用。'
     ),
     params: {
-      level: t('debug, info, warn, error or fatal.', 'debug、info、warn、error 或 fatal。'),
-      entry: t('The existing IRawEntryInput schema.', '既有 IRawEntryInput schema。')
+      level: t(
+        'debug, info, warn, error or fatal.',
+        '本次使用的标准级别：`debug`、`info`、`warn`、`error` 或 `fatal`，决定门槛判断。'
+      ),
+      entry: t(
+        'The existing IRawEntryInput schema.',
+        '本次要分发的 `IRawEntryInput`，含必填标签与消息，可保留附加参数及错误对象。'
+      )
     },
     returns: t(
       'Nothing; uses the original asyncOutput policy.',
@@ -1259,58 +1295,311 @@ await log.shutdown('manual')`,
 const durableStoreMembers: Readonly<Record<string, IMemberDoc>> = {
   append: {
     summary: t(
-      'Atomically commit a batch and create pending states; empty batches allocate no sequences. Inputs are captured immediately.',
-      '原子提交一批并创建 pending 状态；空批不分配序号，输入立即快照。'
-    )
+      'Capture portable JSON immediately, then atomically commit the entire batch as pending records. Empty batches allocate no sequences.',
+      '立即捕获可移植 JSON，然后将整批原子提交为待处理记录；空批不分配序号。'
+    ),
+    params: {
+      records: t(
+        'Ordered kind/payload inputs. Kinds are nonempty strings; payloads must be finite portable JSON without accessors, cycles or unsupported values.',
+        '按追加顺序排列的种类与载荷；种类必须是非空字符串，载荷须为有限、无访问器、无循环的可移植 JSON。'
+      )
+    },
+    returns: t(
+      'Committed sequence numbers in input order; no partial batch becomes visible.',
+      '按输入顺序返回已提交序号，不会暴露部分成功的批次。'
+    ),
+    example: loggerStoreExample
   },
   read: {
     summary: t(
-      'Read ascending retained snapshots from an inclusive sequence and an explicit nonnegative limit.',
-      '从包含边界的序号读取保留记录的升序快照，limit 为非负安全整数。'
-    )
+      'Read ascending retained snapshots without changing record state or consuming them.',
+      '升序读取保留记录的独立快照，不改变记录状态，也不消费记录。'
+    ),
+    params: {
+      fromSeq: t(
+        'Inclusive positive safe sequence, normally returned by append; a truncated prefix starts at the retained floor.',
+        '包含边界的正安全整数，通常取自 `append`；截断前缀自动从仍保留的下界开始。'
+      ),
+      limit: t(
+        'Maximum returned records, a nonnegative safe integer; zero returns an empty array.',
+        '本次最多返回的条数，必须为非负安全整数；零表示空数组。'
+      )
+    },
+    returns: t(
+      'Detached record and JSON payload snapshots in ascending sequence order.',
+      '按序号升序返回记录及其 JSON 载荷的独立快照。'
+    ),
+    example: loggerStoreExample
   },
   lastSeq: {
     summary: t(
-      'Read the committed high watermark, preserved after complete truncation.',
-      '读取已提交高水位，全部截断后仍保留。'
-    )
+      'Read the permanent committed high watermark, preserved after complete prefix truncation.',
+      '读取永久保留的已提交高水位，即使全部前缀记录被截断也不回退。'
+    ),
+    returns: t(
+      'Zero for a new resource, otherwise the highest committed sequence; it is never reused.',
+      '新资源返回零，否则返回已提交的最大序号；已使用序号不会复用。'
+    ),
+    example: loggerStoreExample
   },
   onAppend: {
     summary: t(
-      'Observe one frozen {lastSeq,count} notice per nonempty real commit; return an idempotent cancellation function.',
-      '每次非空真实提交只观察一次冻结的 {lastSeq,count}；返回幂等取消函数。'
-    )
+      'Observe one frozen notice after each nonempty real commit; listener failures only report.',
+      '每次非空真实提交后观察一个冻结通知；监听器失败只报告，不改变提交结果。'
+    ),
+    params: {
+      listener: t(
+        'Receives frozen lastSeq/count metadata and returns void. It runs only after commit; thrown or asynchronous failures are reported.',
+        '接收冻结的末尾序号与提交条数，返回空值；只在提交后调用，抛错或异步拒绝均只报告。'
+      )
+    },
+    returns: t(
+      'An idempotent cancellation function that removes this listener only.',
+      '幂等取消函数，只移除本次登记的监听器。'
+    ),
+    example: loggerStoreExample
   },
   truncate: {
     summary: t(
-      'Delete only seq < beforeSeq without reusing committed sequences.',
-      '只删除 seq < beforeSeq 的前缀，不复用已提交序号。'
-    )
+      'Delete only the prefix below the requested sequence while keeping sequence/time watermarks.',
+      '只删除指定序号之前的前缀，保留序号和时间高水位。'
+    ),
+    params: {
+      beforeSeq: t(
+        'Exclusive retained boundary, a positive safe integer at most lastSeq + 1; earlier floors are harmless no-ops.',
+        '不删除的首个序号，须为不超过 `lastSeq + 1` 的正安全整数；不推进现有下界时不写入。'
+      )
+    },
+    returns: t(
+      'Resolves after truncation commits; future appends keep increasing the original sequence.',
+      '截断提交后完成，后续追加继续递增原序号。'
+    ),
+    example: loggerStoreExample
   },
   setState: {
     summary: t(
-      'Only pending may advance to done or aborted; terminal and missing records reject WAL_RECORD_INVALID.',
-      '只允许 pending 进入 done 或 aborted；已结束或不存在的记录拒绝 WAL_RECORD_INVALID。'
-    )
+      'Advance an existing pending record to a terminal state; missing or terminal rows reject WAL_RECORD_INVALID.',
+      '将现有待处理记录推进至终态；不存在或已经结束的记录拒绝 `WAL_RECORD_INVALID`。'
+    ),
+    params: {
+      seq: t(
+        'Sequence issued by append for an existing pending record in this resource.',
+        '本资源 `append` 分配给现有待处理记录的序号。'
+      ),
+      state: t(
+        'LogRecordState.done or aborted ends the intent; pending leaves a still-pending row unchanged.',
+        '`LogRecordState.done` 或 `aborted` 结束意图；`pending` 仅对仍待处理的记录保持原样。'
+      )
+    },
+    returns: t(
+      'Resolves after the state change commits; terminal records cannot reopen.',
+      '状态变更提交后完成，终态记录不能重新打开。'
+    ),
+    example: loggerStoreExample
   },
   states: {
     summary: t(
-      'Return pending sequence numbers in creation order, excluding terminal history.',
-      '按创建顺序返回 pending 序号，不扫描已结束历史。'
-    )
+      'Return only active pending sequence numbers in creation order, excluding terminal history.',
+      '只按创建顺序返回仍待处理的序号，不返回已完成或中止的历史。'
+    ),
+    params: {
+      filter: t(
+        'Only LogRecordState.pending is supported; any other filter rejects INVALID_OPTION.',
+        '只接受 `LogRecordState.pending`，其他筛选值拒绝 `INVALID_OPTION`。'
+      )
+    },
+    returns: t(
+      'An ascending snapshot of the active pending sequences.',
+      '待处理序号的升序快照，后续状态变化不会修改此数组。'
+    ),
+    example: loggerStoreExample
   },
   dispose: {
     summary: t(
-      'Close admission, drain accepted work, and return one cached explicit cleanup Promise; failure rejects.',
-      '停止准入、排空已接纳工作，返回缓存的显式清理 Promise；失败拒绝。'
-    )
+      'Close admission immediately and drain accepted work before releasing the resource.',
+      '立即停止接纳新工作，在释放资源前排空已经接纳的操作。'
+    ),
+    returns: t(
+      'One cached explicit cleanup Promise; cleanup failure rejects and remains observable.',
+      '返回缓存的显式清理 Promise；清理失败时拒绝，调用方可观察原错误。'
+    ),
+    example: `import { memoryLogStore } from '@migaia/logger/plugins/durable'
+const store = memoryLogStore()
+await store.dispose()`
   },
   '[Symbol.asyncDispose]': {
     summary: t(
-      'Share the same cleanup using a separate cached Promise that reports failure and resolves.',
-      '共享同一次清理，以另一个缓存 Promise 报告失败后成功。'
+      'Share the same cleanup through a separate cached symbolic completion Promise.',
+      '通过另一个缓存的符号完成 Promise 共享同一次资源清理。'
+    ),
+    returns: t(
+      'Resolves after cleanup, reporting cleanup failure rather than rejecting this symbolic Promise.',
+      '清理后完成；失败交给报告器，符号 Promise 本身仍成功。'
+    ),
+    example: loggerStoreExample
+  }
+}
+/** Record identity fields reused by input, recovery and committed snapshots. */
+const durableRecordInputMembers: Readonly<Record<string, IMemberDoc>> = {
+  kind: {
+    summary: t(
+      'Caller-defined nonempty record discriminator, such as order.created; it is not a logger level.',
+      '调用方定义的非空记录种类，例如 `order.created`，不等同于日志输出级别。'
+    )
+  },
+  payload: {
+    summary: t(
+      'Payload captured as detached portable JSON before persistence; finite numbers and null are admitted.',
+      '持久化前捕获为独立可移植 JSON 的载荷；允许有限数字与空值，不支持的数据在写入前拒绝。'
     )
   }
+}
+/** Committed identity is assigned once by the original resource owner. */
+const durableRecordMembers: Readonly<Record<string, IMemberDoc>> = {
+  ...durableRecordInputMembers,
+  seq: {
+    summary: t(
+      'Positive safe sequence assigned at commit; the resource never reuses a committed sequence.',
+      '提交时分配的正安全整数序号；资源不会复用已经提交的序号。'
+    )
+  },
+  time: {
+    summary: t(
+      'Nonnegative millisecond timestamp, never decreasing within this resource, including reopened files.',
+      '非负毫秒时间戳，在同一资源中不递减，文件重开后也保留该水位。'
+    )
+  }
+}
+/** Pure index methods retain native persistence and publication with their caller. */
+const durableIndexMembers: Readonly<Record<string, IMemberDoc>> = {
+  lastSeq: {
+    summary: t(
+      'Permanent committed high watermark, zero for a new index.',
+      '永久已提交高水位，新索引的值为零。'
+    )
+  },
+  time: { summary: durableRecordMembers.time!.summary },
+  floor: {
+    summary: t(
+      'First retained sequence; survives empty storage and can equal lastSeq + 1 after full truncation.',
+      '首个仍保留的序号；全部截断后可等于 `lastSeq + 1`，空存储也保留此下界。'
+    )
+  },
+  read: {
+    ...durableStoreMembers.read!,
+    returns: t(
+      'Detached retained snapshots synchronously, without native I/O.',
+      '同步返回保留记录的独立快照，不执行原生输入输出。'
+    ),
+    example: loggerCommittedIndexExample
+  },
+  pending: {
+    summary: t(
+      'Visit only active pending entries in sequence order.',
+      '只遍历仍待处理的条目，并按原序号顺序输出。'
+    ),
+    returns: t('A fresh array of pending sequences.', '返回待处理序号的新数组，不包含终态记录。'),
+    example: loggerCommittedIndexExample
+  },
+  checkTruncate: {
+    summary: t(
+      'Check a proposed floor before native persistence without changing the index.',
+      '原生持久化前检查拟推进的下界，不改变索引数据。'
+    ),
+    params: durableStoreMembers.truncate!.params,
+    returns: t(
+      'True if the floor advances, false for a no-op; an excessive boundary rejects INVALID_OPTION.',
+      '推进下界时返回真，无变化时返回假；超出已提交尾部的边界拒绝 `INVALID_OPTION`。'
+    ),
+    example: loggerCommittedIndexExample
+  },
+  applyTruncate: {
+    summary: t(
+      'Apply an admitted floor only after the caller has committed native deletion.',
+      '仅在调用方完成原生删除提交后，应用已经检查过的新下界。'
+    ),
+    params: durableStoreMembers.truncate!.params,
+    returns: t(
+      'Removes the committed prefix and its pending links locally; performs no native I/O.',
+      '移除本地已提交前缀及待处理链接，不执行原生输入输出。'
+    ),
+    example: loggerCommittedIndexExample
+  },
+  checkState: {
+    summary: t(
+      'Check one original pending transition without applying it or writing native data.',
+      '检查原待处理记录的状态迁移，不应用变更，也不写入原生数据。'
+    ),
+    params: durableStoreMembers.setState!.params,
+    returns: t(
+      'True for a terminal transition, false for pending; missing or terminal rows reject WAL_RECORD_INVALID.',
+      '推进终态时返回真，保持待处理时返回假；记录缺失或已终结时拒绝 `WAL_RECORD_INVALID`。'
+    ),
+    example: loggerCommittedIndexExample
+  },
+  applyState: {
+    summary: t(
+      'Apply the admitted terminal state after the original native transaction commits.',
+      '原生事务提交后，应用已经通过检查的终态变更。'
+    ),
+    params: durableStoreMembers.setState!.params,
+    returns: t(
+      'Updates local state and removes the active pending link; it publishes no notice.',
+      '更新本地状态并移除活跃链接，不发布追加通知。'
+    ),
+    example: loggerCommittedIndexExample
+  },
+  applyAppend: {
+    summary: t(
+      'Apply the exact prepared batch after native commit; rollback must leave the index unchanged.',
+      '原生提交后应用原准备批次；回滚时必须保持索引不变。'
+    ),
+    params: {
+      records: t(
+        'The original prepared records whose native persistence has succeeded, in sequence order.',
+        '原生持久化已经成功的原准备记录，按序号顺序排列。'
+      )
+    },
+    returns: t(
+      'Advances local head/time and registers pending records without native I/O or publication.',
+      '推进本地序号与时间并登记待处理记录，不执行原生写入或发布通知。'
+    ),
+    example: loggerCommittedIndexExample
+  }
+}
+/** Observer options are captured once and never participate in a commit decision. */
+const durableObserveMember: IMemberDoc = {
+  summary: t(
+    'Receives metadata-only stage observations; throws, then-getter errors and late rejection only report.',
+    '接收只含元数据的阶段观察；抛错、读取 then 失败与迟到拒绝均只报告。'
+  ),
+  default: t('Omitted: no stage observer is called.', '省略时不调用阶段观察者。'),
+  whenToUse: t(
+    'Trace lifecycle and operation timing without receiving business payloads or intervening in commits.',
+    '观察生命周期及操作耗时，不读取业务载荷，也不介入提交。'
+  ),
+  example: `import { memoryLogStore } from '@migaia/logger/plugins/durable'
+await using store = memoryLogStore({ observe: event => console.log(event.stage) })
+await store.append([{ kind: 'audit', payload: null }])`
+}
+/** A plugin borrows one exact resource, and cannot close it through configuration. */
+const durablePluginOptionMembers: Readonly<Record<string, IMemberDoc>> = {
+  store: {
+    summary: t(
+      'Original caller-owned ILogStore, reserved for one installed durable plugin; plugin removal never closes it.',
+      '调用方拥有的原日志资源，只供一个已安装持久插件使用；移除插件不会关闭它。'
+    ),
+    example: `import { Logger } from '@migaia/logger'
+import { binlog, memoryLogStore } from '@migaia/logger/plugins/durable'
+await using store = memoryLogStore()
+const log = new Logger({
+  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+  plugins: [binlog({ store })]
+})
+try { await log.binlog.ready() }
+finally { await log.shutdown('manual'); await log.binlog.whenIdle() }`
+  },
+  observe: durableObserveMember
 }
 const durableBinlogMembers: Readonly<Record<string, IMemberDoc & { call: string }>> = {
   ready: {
@@ -1510,12 +1799,36 @@ ${create}
     }
   },
   symbols: {
+    LogRecordState: {
+      role: 'constant',
+      purpose: t(
+        'Stable intent states: pending may remain pending or advance once to done or aborted; terminal records cannot reopen.',
+        '稳定的意图状态：pending 可保持原状或一次推进为 done、aborted；终态记录不能重新打开。'
+      ),
+      example: loggerStoreExample
+    },
+    LogStage: {
+      role: 'constant',
+      purpose: t(
+        'Stable metadata-only lifecycle and operation observation names shared by the original durable resources and installed plugins.',
+        '原持久资源与已安装插件共用的稳定生命周期及操作观察名称，只传递元数据，不介入提交。'
+      ),
+      example: durableObserveMember.example
+    },
+
     assertLogInteger: {
       role: 'operation',
       purpose: t(
         'Assert the original safe-integer domain and preserve numeric error semantics.',
-        '校验原安全整数范围并保留数字错误语义。'
+        '校验原安全整数范围并保留原生数字错误语义，非法参数与序号耗尽分别带码拒绝。'
       ),
+      params: {
+        value: t('Unknown value to narrow to a safe integer.', '要收窄为安全整数的未知输入值。'),
+        minimum: t(
+          'Inclusive minimum, default one; pass zero for a high watermark.',
+          '包含边界的最小值，缺省为一；高水位允许显式传零。'
+        )
+      },
       returns: t(
         'Narrows unknown to number; the default minimum is one.',
         '将 unknown 收窄为 number；缺省最小值为一。'
@@ -1531,11 +1844,17 @@ console.log(input)`,
       role: 'factory',
       purpose: t(
         'Capture portable JSON before asynchronous admission without assigning sequence/time.',
-        '异步准入前捕获可移植 JSON，不分配序号和时间。'
+        '在异步准入之前捕获独立的可移植 JSON 记录，不分配序号和时间，也不执行持久化。'
       ),
+      params: {
+        records: t(
+          'Ordered kind/payload inputs captured before any asynchronous admission.',
+          '任何异步准入之前捕获的有序种类与载荷输入。'
+        )
+      },
       returns: t(
-        'Committed data only; native transaction and publication remain with the adapter.',
-        '仅处理已提交数据；原生事务和发布仍属于适配器。'
+        'Detached admitted inputs without assigned sequences, time or native I/O.',
+        '返回独立已准入输入，不分配序号、时间，也不执行原生访问。'
       ),
       example: loggerIndexExample,
       cases: loggerCases.committedIndex
@@ -1544,11 +1863,25 @@ console.log(input)`,
       role: 'factory',
       purpose: t(
         'Prepare sequence/time from a committed head without changing the index or performing I/O.',
-        '从已提交 head 准备序号和时间，不修改索引、不执行 I/O。'
+        '依据已提交头部准备新的序号与单调时间，不修改索引，不发布通知，也不执行原生访问。'
       ),
+      params: {
+        records: t(
+          'Already captured record snapshots in append order.',
+          '按追加顺序排列的已捕获记录快照。'
+        ),
+        head: t(
+          'Current committed lastSeq/time read under the original native transaction.',
+          '在原生事务内读取的当前已提交 lastSeq 与 time。'
+        ),
+        now: t(
+          'Optional nonnegative finite timestamp; omitted uses Date.now after admission.',
+          '可选非负有限时间戳；省略时在准入后读取 Date.now。'
+        )
+      },
       returns: t(
-        'Committed data only; native transaction and publication remain with the adapter.',
-        '仅处理已提交数据；原生事务和发布仍属于适配器。'
+        'A prepared batch with provisional sequence/time facts; apply it only after native commit.',
+        '返回带暂定序号与时间事实的准备批次；只在原生提交之后应用。'
       ),
       example: loggerIndexExample,
       cases: loggerCases.committedIndex
@@ -1559,9 +1892,23 @@ console.log(input)`,
         'Validate and detach native recovery rows with the original file-store corruption rules.',
         '用文件资源原有损坏规则校验并分离原生恢复行。'
       ),
+      params: {
+        head: t(
+          'Permanent native lastSeq/time/floor watermarks.',
+          '原生永久保存的序号、时间与保留下界水位。'
+        ),
+        rows: t(
+          'Contiguous retained rows in sequence order.',
+          '按序号顺序排列且连续保留的原生行。'
+        ),
+        decodePayload: t(
+          'Optional synchronous decoder; omitted uses the payload unchanged before JSON validation.',
+          '可选同步解码器；省略时先保留原载荷，再校验 JSON。'
+        )
+      },
       returns: t(
-        'Committed data only; native transaction and publication remain with the adapter.',
-        '仅处理已提交数据；原生事务和发布仍属于适配器。'
+        'An admitted detached recovery snapshot; malformed owned rows reject LOG_STORE_CORRUPT.',
+        '返回独立且已准入的恢复快照；所属行损坏时报 LOG_STORE_CORRUPT。'
       ),
       example: loggerIndexExample,
       cases: loggerCases.committedIndex
@@ -1572,9 +1919,15 @@ console.log(input)`,
         'Create the original committed map and pending list without another resource, queue or close authority.',
         '创建原已提交 Map 与 pending 链表，不引入资源、队列或关闭权。'
       ),
+      params: {
+        snapshot: t(
+          'Optional admitted recovery snapshot; omitted constructs an empty index.',
+          '可选的已准入恢复快照；省略时构造空索引。'
+        )
+      },
       returns: t(
-        'Committed data only; native transaction and publication remain with the adapter.',
-        '仅处理已提交数据；原生事务和发布仍属于适配器。'
+        'The original data-only committed index, without native resources, queue or close authority.',
+        '返回原数据索引，不创建原生资源、队列或关闭权限。'
       ),
       example: loggerIndexExample,
       cases: loggerCases.committedIndex
@@ -1583,25 +1936,43 @@ console.log(input)`,
       role: 'factory',
       purpose: t(
         'Create a process-local atomic log; the creator owns disposal.',
-        '创建进程内原子日志；创建者拥有释放权。'
+        '创建进程内原子日志资源，创建者负责最终释放；持久插件只借用，不接管资源关闭。'
       ),
+      params: {
+        options: t(
+          'Optional metadata observer and standalone reporter.',
+          '可选的元数据观察者与独立资源报告器。'
+        )
+      },
+      options: 'ILogStoreOptions',
       returns: t(
-        'Caller-owned resource or synchronous logger plugin; await ready before a native transaction.',
-        '调用方资源或同步 logger 插件；原生事务前等待 ready。'
+        'A synchronous caller-owned ILogStore; it has no plugin ready method.',
+        '同步返回调用方拥有的 ILogStore，不具有插件的 ready 方法。'
       ),
       example:
-        "import { memoryLogStore } from '@migaia/logger/plugins/durable'\nimport type { ILogStore } from '@migaia/logger/plugins/durable'\n\nconst delegate = memoryLogStore()\n// A custom implementation must preserve this single owner's atomic commit and notices.\nconst custom: ILogStore = {\n  append: records => delegate.append(records),\n  read: (fromSeq, limit) => delegate.read(fromSeq, limit),\n  lastSeq: () => delegate.lastSeq(),\n  onAppend: listener => delegate.onAppend(listener),\n  truncate: beforeSeq => delegate.truncate(beforeSeq),\n  setState: (seq, state) => delegate.setState(seq, state),\n  states: filter => delegate.states(filter),\n  dispose: () => delegate.dispose(),\n  [Symbol.asyncDispose]: () => delegate[Symbol.asyncDispose]()\n}\nawait custom.append([{ kind: 'custom', payload: null }])\nawait custom.dispose()",
+        "import { memoryLogStore } from '@migaia/logger/plugins/durable'\nimport type { ILogStore } from '@migaia/logger/plugins/durable'\n\nconst delegate = memoryLogStore()\nconst custom: ILogStore = {\n  append: records => delegate.append(records),\n  read: (fromSeq, limit) => delegate.read(fromSeq, limit),\n  lastSeq: () => delegate.lastSeq(),\n  onAppend: listener => delegate.onAppend(listener),\n  truncate: beforeSeq => delegate.truncate(beforeSeq),\n  setState: (seq, state) => delegate.setState(seq, state),\n  states: filter => delegate.states(filter),\n  dispose: () => delegate.dispose(),\n  [Symbol.asyncDispose]: () => delegate[Symbol.asyncDispose]()\n}\nawait custom.append([{ kind: 'custom', payload: null }])\nawait custom.dispose()",
       cases: loggerCases.memoryLogStore
     },
     fileLogStore: {
       role: 'factory',
       purpose: t(
         'Open builtin SQLite with a retained exclusive lock and native durable commits.',
-        '打开内置 SQLite，以连接排他锁和原生事务持久提交。'
+        '打开调用方指定的内置 SQLite 日志库，使用原资源排他锁和原生事务持久提交。'
       ),
+      params: {
+        path: t(
+          'Caller-selected SQLite filename; original resource locking rejects a competing live owner.',
+          '调用方选择的 SQLite 文件名；原资源锁拒绝竞争中的活跃拥有者。'
+        ),
+        options: t(
+          'Optional metadata observer and standalone reporter.',
+          '可选的元数据观察者与独立资源报告器。'
+        )
+      },
+      options: 'ILogStoreOptions',
       returns: t(
-        'Caller-owned resource or synchronous logger plugin; await ready before a native transaction.',
-        '调用方资源或同步 logger 插件；原生事务前等待 ready。'
+        'Resolves to a caller-owned SQLite ILogStore after opening and recovery; open failure keeps its cause.',
+        '打开与恢复后兑现调用方拥有的 SQLite ILogStore；打开失败保留 cause。'
       ),
       example:
         "import { fileLogStore } from '@migaia/logger/plugins/durable/file'\n\nawait using store = await fileLogStore('./orders.sqlite')\nawait store.append([{ kind: 'order.created', payload: { id: 'o1' } }])\nconsole.log(await store.lastSeq())",
@@ -1613,6 +1984,13 @@ console.log(input)`,
         'Install ordered append/read/subscribe methods; initialize once and borrow the original store.',
         '安装有序追加、读取与订阅方法；共享一次准备并借用原 store。'
       ),
+      params: {
+        options: t(
+          'Exact caller-owned log store, optional metadata observation and echo.',
+          '精确的调用方日志资源，以及可选元数据观察与回声输出。'
+        )
+      },
+      options: 'IBinlogOptions',
       returns: t(
         'Caller-owned resource or synchronous logger plugin; await ready before a native transaction.',
         '调用方资源或同步 logger 插件；原生事务前等待 ready。'
@@ -1625,8 +2003,15 @@ console.log(input)`,
       role: 'factory',
       purpose: t(
         'Install durable pending intent and forward-only complete/abort methods.',
-        '安装持久 pending 意图及只前进的 complete/abort 方法。'
+        '安装持久待处理意图，以及只能向终态推进的完成与中止方法；业务重放仍归消费方。'
       ),
+      params: {
+        options: t(
+          'Exact caller-owned intent store and optional metadata observation.',
+          '精确的调用方意图日志资源与可选元数据观察者。'
+        )
+      },
+      options: 'IDurablePluginOptions',
       returns: t(
         'Caller-owned resource or synchronous logger plugin; await ready before a native transaction.',
         '调用方资源或同步 logger 插件；原生事务前等待 ready。'
@@ -1641,6 +2026,13 @@ console.log(input)`,
         'Install undo image storage; business undo and conflict checks remain the consumer responsibility.',
         '安装 undo 镜像存储；业务撤销和冲突检查仍由消费方负责。'
       ),
+      params: {
+        options: t(
+          'Exact caller-owned image store and optional metadata observation.',
+          '精确的调用方镜像日志资源与可选元数据观察者。'
+        )
+      },
+      options: 'IDurablePluginOptions',
       returns: t(
         'Caller-owned resource or synchronous logger plugin; await ready before a native transaction.',
         '调用方资源或同步 logger 插件；原生事务前等待 ready。'
@@ -2016,55 +2408,219 @@ ${create}
       'Structural input admission retaining named shapes and readonly tuples.',
       '保留命名对象和 readonly 元组的结构输入准入。'
     ),
-    ILogRecordInput: alias(
-      'A caller kind and payload before sequence/time assignment.',
-      '分配序号与时间前的调用方 kind/payload。'
-    ),
+    ILogRecordInput: {
+      summary: t(
+        'Caller input before sequence/time assignment; append captures and validates portable JSON before writing.',
+        '序号与时间分配前的调用方输入；追加在写入前捕获并校验可移植 JSON。'
+      ),
+      members: durableRecordInputMembers
+    },
     ILogBatchInput: alias(
       'Per-record static JSON admission without losing tuple positions.',
       '逐条静态 JSON 准入，不丢失元组位置。'
     ),
-    ILogRecord: alias(
-      'Committed sequence, nondecreasing time, kind, and payload snapshot.',
-      '已提交序号、非递减时间、kind 与载荷快照。'
-    ),
-    ILogObservation: alias(
-      'Fixed identity statistics without payload or native resources.',
-      '固定身份统计，不包含载荷或原生资源。'
-    ),
+    ILogRecord: {
+      summary: t(
+        'Detached committed identity, monotonic time and portable JSON payload, without mutable store state.',
+        '独立的已提交身份、单调时间与可移植 JSON 载荷，不包含可变存储状态。'
+      ),
+      members: durableRecordMembers,
+      example: loggerStoreExample,
+      scenarios: [
+        t(
+          'Inspect a committed audit record without retaining or mutating its original storage.',
+          '检查已提交审计记录，无需持有或修改其原存储。'
+        )
+      ]
+    },
+    ILogObservation: {
+      summary: t(
+        'Fixed metadata-only operation observations; they never decide a commit or expose business payloads.',
+        '仅包含固定元数据的操作观察，不决定是否提交，也不暴露业务载荷。'
+      ),
+      members: {
+        stage: {
+          summary: t(
+            'Original LogStage name for open, operation, close, append or pending observation.',
+            '原 LogStage 名称，区分打开、操作、关闭、追加及待处理观察。'
+          ),
+          values: { enum: 'LogStage' }
+        },
+        owner: {
+          summary: t(
+            'Resource or installed plugin identity: store, binlog, wal or undo.',
+            '资源或已安装插件的身份：store、binlog、wal 或 undo。'
+          ),
+          values: {
+            store: t('Standalone native resource operation.', '独立原生资源执行的操作。'),
+            binlog: t(
+              'Installed ordered history plugin operation.',
+              '已安装有序历史日志插件的操作。'
+            ),
+            wal: t(
+              'Installed write-ahead intent plugin operation.',
+              '已安装预写意图插件执行的操作。'
+            ),
+            undo: t('Installed business image plugin operation.', '已安装业务镜像日志插件的操作。')
+          }
+        },
+        operation: {
+          summary: t(
+            'Original operation name within that owner, without a caller payload or native handle.',
+            '该拥有者内的原操作名称，不包含调用方载荷或原生句柄。'
+          )
+        },
+        seq: {
+          summary: t(
+            'Optional sequence associated with this actual operation.',
+            '与本次真实操作关联的可选日志序号。'
+          )
+        },
+        count: {
+          summary: t(
+            'Optional actual record or result count for this operation.',
+            '本次操作实际记录条数或结果条数，可省略。'
+          )
+        },
+        durationMs: {
+          summary: t(
+            'Optional elapsed operation time measured in milliseconds.',
+            '可选的真实操作耗时，单位为毫秒。'
+          )
+        }
+      }
+    },
     ILogObserver: alias(
       'Synchronous observation; asynchronous rejection is only reported.',
       '同步观察；异步拒绝只报告而不等待。'
     ),
-    ILogAppendNotice: alias(
-      'Frozen lastSeq/count of one actual nonempty append commit.',
-      '一次真实非空追加提交的冻结 lastSeq/count。'
-    ),
-    IUndoImage: alias(
-      'JSON target and before/after images; null is legitimate.',
-      'JSON target 与 before/after 镜像；null 是合法值。'
-    ),
-    ILogRecordSnapshot: alias(
-      'Portable JSON batch captured before sequence/time assignment.',
-      '分配序号与时间前捕获的可移植 JSON 批次。'
-    ),
-    ILogStoreSnapshot: alias(
-      'Detached retained rows and permanent sequence/time/floor watermarks.',
-      '分离的保留行及永久序号、时间和 floor 水位。'
-    ),
-    ILogStoreRecoveryRow: alias(
-      'Native row identity, state and undecoded payload before recovery validation.',
-      '恢复校验前的原生行身份、状态及未解码载荷。'
-    ),
-    ILogStoreIndex: alias(
-      'Committed reads and check/apply methods; native serialization, commit and notifications remain external.',
-      '已提交读取与 check/apply 方法；原生串行化、提交和通知仍由外部原拥有者负责。'
-    ),
+    ILogAppendNotice: {
+      summary: t(
+        'One frozen nonempty append commit notice, without records or business payloads.',
+        '一次非空追加提交的冻结通知，不包含记录或业务载荷。'
+      ),
+      members: {
+        lastSeq: {
+          summary: t('Highest sequence committed in this append.', '本次追加提交的最大日志序号。')
+        },
+        count: {
+          summary: t(
+            'Number of records committed in this nonempty batch.',
+            '本次非空批次实际提交的记录条数。'
+          )
+        }
+      }
+    },
+    IUndoImage: {
+      summary: t(
+        'Portable business target and before/after images; logger stores them but owns no business conflict check or replay.',
+        '可移植业务目标与前后镜像；Logger 保存它们，但不拥有业务冲突检查或重放。'
+      ),
+      members: {
+        target: {
+          summary: t(
+            'Portable JSON target interpreted only by the business consumer.',
+            '仅由业务消费方解释的可移植 JSON 目标。'
+          )
+        },
+        before: {
+          summary: t(
+            'Original business image; null remains a legitimate JSON value.',
+            '原业务镜像；null 仍然是合法 JSON 值。'
+          )
+        },
+        after: {
+          summary: t(
+            'Resulting business image; it is not a business replay instruction.',
+            '结果业务镜像；不是由 Logger 执行的业务重放指令。'
+          )
+        }
+      }
+    },
+    ILogRecordSnapshot: {
+      summary: t(
+        'Captured portable JSON input before sequence/time assignment, without native ownership.',
+        '序号与时间分配前已捕获的可移植 JSON 输入，不持有原生资源。'
+      ),
+      members: durableRecordInputMembers
+    },
+    ILogStoreSnapshot: {
+      summary: t(
+        'Detached retained rows and permanent sequence/time/floor watermarks used for native recovery.',
+        '原生恢复使用的独立保留行与永久序号、时间、保留下界水位。'
+      ),
+      members: {
+        lastSeq: {
+          summary: t(
+            'Permanent committed high watermark, zero for a new store.',
+            '永久已提交高水位，新存储的值为零。'
+          )
+        },
+        time: durableRecordMembers.time,
+        floor: durableIndexMembers.floor,
+        records: {
+          summary: t(
+            'Contiguous retained committed rows with their original state.',
+            '连续保留的已提交记录，包含各自原状态。'
+          )
+        }
+      },
+      example: loggerIndexExample,
+      scenarios: [
+        t(
+          'Recover a native snapshot before exposing committed data or constructing a cached exclusive index.',
+          '公开已提交数据或构造独占缓存索引前，先恢复原生快照。'
+        )
+      ]
+    },
+    ILogStoreRecoveryRow: {
+      summary: t(
+        'Native row fields with undecoded payload; original recovery validates identity/state before payload decoding.',
+        '携带未解码载荷的原生行；原恢复在解码载荷前校验身份与状态。'
+      ),
+      members: {
+        ...durableRecordMembers,
+        payload: {
+          summary: t(
+            'Native encoded payload passed to the caller decoder after row bounds validate.',
+            '行边界校验通过后，交给调用方解码器的原生编码载荷。'
+          )
+        },
+        state: {
+          summary: t(
+            'Original pending, done or aborted state retained by native persistence.',
+            '原生持久层保留的 pending、done 或 aborted 状态。'
+          ),
+          values: { enum: 'LogRecordState' }
+        }
+      }
+    },
+    ILogStoreIndex: {
+      summary: t(
+        'Original committed-data map and pending list; native serialization, persistence, commit and publication remain with the caller.',
+        '原已提交数据表与待处理链表；原生串行化、持久化、提交和发布仍归调用方。'
+      ),
+      members: durableIndexMembers,
+      example: loggerCommittedIndexExample,
+      scenarios: [
+        t(
+          'Prepare a native append from its current head and apply exactly that batch only after actual commit.',
+          '按原生当前头部准备追加，仅在真正提交之后应用同一批次。'
+        )
+      ]
+    },
     ILogStore: {
       summary: t(
         'Durable logger contract with explicit ownership and initialization.',
         '具有明确资源归属与准备顺序的持久日志契约。'
       ),
+      scenarios: [
+        t(
+          'Own a standalone atomic log while installed plugins only borrow it.',
+          '拥有独立原子日志资源，安装后的插件只借用它。'
+        )
+      ],
+      example: loggerStoreExample,
       members: durableStoreMembers
     },
     IBinlogExt: {
@@ -2086,7 +2642,14 @@ ${create}
         'Durable logger contract with explicit ownership and initialization.',
         '具有明确资源归属与准备顺序的持久日志契约。'
       ),
-      members: { wal: { summary: t('Installed persistent intent API.', '安装后的持久意图 API。') } }
+      members: {
+        wal: {
+          summary: t(
+            'Installed persistent intent API with pending, complete and abort operations.',
+            '安装后的持久意图 API，提供待处理读取与完成、中止操作。'
+          )
+        }
+      }
     },
     IUndoLogExt: {
       summary: t(
@@ -2107,20 +2670,7 @@ ${create}
         'Durable logger contract with explicit ownership and initialization.',
         '具有明确资源归属与准备顺序的持久日志契约。'
       ),
-      members: {
-        store: {
-          summary: t(
-            'The original caller-owned ILogStore; one installed plugin per object. It never enters plugin config.',
-            '调用方拥有的原 ILogStore；同一对象只能安装一个插件，不进入插件 config。'
-          )
-        },
-        observe: {
-          summary: t(
-            'Optional synchronous statistics observer; thrown, getter, and async failures only report.',
-            '可选同步统计观察者；同步抛错、then 读取失败和异步拒绝只报告。'
-          )
-        }
-      }
+      members: durablePluginOptionMembers
     },
     IBinlogOptions: {
       summary: t(
@@ -2128,23 +2678,28 @@ ${create}
         '具有明确资源归属与准备顺序的持久日志契约。'
       ),
       members: {
-        store: {
-          summary: t(
-            'The original caller-owned ILogStore; one installed plugin per object. It never enters plugin config.',
-            '调用方拥有的原 ILogStore；同一对象只能安装一个插件，不进入插件 config。'
-          )
-        },
-        observe: {
-          summary: t(
-            'Optional synchronous statistics observer; thrown, getter, and async failures only report.',
-            '可选同步统计观察者；同步抛错、then 读取失败和异步拒绝只报告。'
-          )
-        },
+        ...durablePluginOptionMembers,
         echo: {
           summary: t(
-            'Default false; true emits kind plus seq/time metadata without payload.',
-            '默认 false；true 输出 kind 与 seq/time 元数据，不输出 payload。'
-          )
+            'Emit kind and sequence/time metadata through ordinary logging, never business payloads.',
+            '通过普通日志输出种类与序号、时间元数据，不输出业务载荷。'
+          ),
+          default: t('false: no ordinary echo.', '缺省关闭普通输出回声。'),
+          example: `import { Logger } from '@migaia/logger'
+import { binlog, memoryLogStore } from '@migaia/logger/plugins/durable'
+await using store = memoryLogStore()
+const log = new Logger({
+  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+  plugins: [binlog({ store, echo: true })]
+})
+try {
+  await log.binlog.ready()
+  await log.binlog.append('audit', { count: 1 })
+  console.log(await log.binlog.lastSeq())
+} finally {
+  await log.shutdown('manual')
+  await log.binlog.whenIdle()
+}`
         }
       }
     },
@@ -2154,17 +2709,23 @@ ${create}
         '具有明确资源归属与准备顺序的持久日志契约。'
       ),
       members: {
-        observe: {
-          summary: t(
-            'Optional synchronous statistics observer; thrown, getter, and async failures only report.',
-            '可选同步统计观察者；同步抛错、then 读取失败和异步拒绝只报告。'
-          )
-        },
+        observe: durableObserveMember,
         report: {
           summary: t(
-            'Optional standalone store failure reporter; reporter failures use the original logger terminal channel.',
-            '可选独立 store 失败报告器；报告器失败走原 logger 终端通道。'
-          )
+            'Standalone failure reporter; a failing reporter uses the existing terminal diagnostics channel.',
+            '独立资源的失败报告器；报告器本身失败时走既有终端诊断通道。'
+          ),
+          default: t(
+            'The original logger terminal reporting channel.',
+            '使用原 Logger 终端报告通道。'
+          ),
+          whenToUse: t(
+            'Route resource cleanup and observation failures into application diagnostics.',
+            '需要将资源清理与观察失败转交应用诊断时使用。'
+          ),
+          example: `import { memoryLogStore } from '@migaia/logger/plugins/durable'
+await using store = memoryLogStore({ report: error => console.error(error) })
+console.log(await store.lastSeq())`
         }
       }
     },
@@ -2198,18 +2759,48 @@ ${create}
           summary: t(
             'Immediately append within the current native transaction; return provisional sequences.',
             '立即在当前原生事务追加，返回暂定序号。'
+          ),
+          params: {
+            records: t(
+              'Captured portable kind/payload records for this native transaction.',
+              '当前原生事务使用的已捕获可移植种类与载荷记录。'
+            )
+          },
+          returns: t(
+            'Provisional sequence numbers; they become committed only at the original native commit.',
+            '暂定序号；只有原生提交成功后才成为已提交序号。'
           )
         },
         onCommit: {
           summary: t(
             'Register one actual commit effect and return its cancellation function.',
             '登记真实提交观察并返回取消函数。'
+          ),
+          params: {
+            effect: t(
+              'Synchronous effect invoked only after a known native commit.',
+              '仅在原生提交结果已确认后调用的同步作用。'
+            )
+          },
+          returns: t(
+            'Cancellation function for this original terminal registration.',
+            '返回本次原终点登记的取消函数。'
           )
         },
         onRollback: {
           summary: t(
             'Register one actual rollback effect and return its cancellation function.',
             '登记真实回滚观察并返回取消函数。'
+          ),
+          params: {
+            effect: t(
+              'Synchronous effect invoked only after a known native rollback.',
+              '仅在原生回滚结果已确认后调用的同步作用。'
+            )
+          },
+          returns: t(
+            'Cancellation function for this original terminal registration.',
+            '返回本次原终点登记的取消函数。'
           )
         }
       }
@@ -3284,56 +3875,74 @@ log.endResponse()`,
   },
   enums: {
     LogRecordState: {
-      summary: t('Pending advances only to a terminal state.', 'pending 只前进至终态。'),
+      summary: t(
+        'A committed pending intent may advance once to done or aborted; terminal rows never reopen.',
+        '已提交待处理意图只能一次推进为完成或中止，终态记录不能重新打开。'
+      ),
       values: {
-        pending: t('Committed intent remains active.', '已提交意图仍活跃。'),
-        done: t('Completed; cannot reopen.', '已完成，不能重开。'),
-        aborted: t('Aborted; cannot reopen.', '已中止，不能重开。')
+        pending: t(
+          'Committed intent remains active and may still complete or abort.',
+          '已提交意图仍待处理，可以继续完成或中止。'
+        ),
+        done: t(
+          'Intent completed successfully; its terminal state cannot reopen.',
+          '意图已经成功完成，进入终态后不能重新打开。'
+        ),
+        aborted: t(
+          'Intent was explicitly aborted; its terminal state cannot reopen.',
+          '意图已经显式中止，进入终态后不能重新打开。'
+        )
       }
     },
     LogStage: {
-      summary: t('Fixed observer-only durable statistics.', '固定名称的持久日志统计，仅供观察。'),
+      summary: t(
+        'Fixed metadata-only durable lifecycle and operation stages; observations never intervene.',
+        '固定的持久生命周期与操作阶段，只观察元数据，不介入原工作。'
+      ),
       values: {
         beforeLogOpen: t(
-          'beforeLogOpen statistics; failures only report.',
-          'beforeLogOpen 统计；失败只报告。'
+          'Before the original durable resource opens; observers cannot change admission.',
+          '原持久资源打开之前的观察，不能改变准入决定。'
         ),
         afterLogOpen: t(
-          'afterLogOpen statistics; failures only report.',
-          'afterLogOpen 统计；失败只报告。'
+          'After the original durable resource opens and recovers successfully.',
+          '原持久资源成功打开并完成恢复之后的观察。'
         ),
         onLogOpenError: t(
-          'onLogOpenError statistics; failures only report.',
-          'onLogOpenError 统计；失败只报告。'
+          'Original open or recovery failed; an observer failure only reports separately.',
+          '原打开或恢复失败时的观察；观察者失败另外报告。'
         ),
         beforeLogOperation: t(
-          'beforeLogOperation statistics; failures only report.',
-          'beforeLogOperation 统计；失败只报告。'
+          'Before one admitted original log operation, without its business payload.',
+          '原日志操作准入之后、执行之前的观察，不携带业务载荷。'
         ),
         afterLogOperation: t(
-          'afterLogOperation statistics; failures only report.',
-          'afterLogOperation 统计；失败只报告。'
+          'After the original log operation succeeds, with its actual result metadata.',
+          '原日志操作成功完成之后的观察，携带实际结果元数据。'
         ),
         onLogOperationError: t(
-          'onLogOperationError statistics; failures only report.',
-          'onLogOperationError 统计；失败只报告。'
+          'The original log operation failed; observation cannot replace the original failure.',
+          '原日志操作失败时的观察，不替换原操作错误。'
         ),
         beforeLogClose: t(
-          'beforeLogClose statistics; failures only report.',
-          'beforeLogClose 统计；失败只报告。'
+          'Before draining and releasing the original durable resource.',
+          '排空并释放原持久资源之前的生命周期观察。'
         ),
         afterLogClose: t(
-          'afterLogClose statistics; failures only report.',
-          'afterLogClose 统计；失败只报告。'
+          'After the original durable resource has finished its successful cleanup.',
+          '原持久资源已经成功完成清理之后的观察。'
         ),
         onLogCloseError: t(
-          'onLogCloseError statistics; failures only report.',
-          'onLogCloseError 统计；失败只报告。'
+          'Original resource cleanup failed; symbolic disposal reports without rejecting.',
+          '原资源清理失败时的观察，符号释放只报告而不拒绝。'
         ),
-        onAppend: t('onAppend statistics; failures only report.', 'onAppend 统计；失败只报告。'),
+        onAppend: t(
+          'One original nonempty commit publishes append metadata after persistence.',
+          '一次原非空提交持久化完成后发布追加元数据。'
+        ),
         onWalPending: t(
-          'onWalPending statistics; failures only report.',
-          'onWalPending 统计；失败只报告。'
+          'The original WAL pending read reports its actual active intent count.',
+          '原 WAL 待处理读取报告真实活跃意图条数。'
         )
       }
     },
