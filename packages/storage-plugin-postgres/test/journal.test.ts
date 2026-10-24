@@ -3,7 +3,7 @@ import { Pool } from 'pg'
 import postgres from 'postgres'
 import { it, expect, onTestFinished, describe } from 'vitest'
 import { createStorageHost } from '@migaia/storage-host'
-import { storageLogStore } from '@migaia/storage-host/journal'
+import { storageJournalPlugin, storageLogStore } from '@migaia/storage-host/journal'
 import { Logger } from '@migaia/logger'
 import {
   binlog,
@@ -51,6 +51,7 @@ describe.each(['pg', 'postgres-js'] as const)('%s original global journal', (ada
     let logger: ReturnType<typeof makeLogger> | undefined
     const host = await createStorageHost({
       plugins: [
+        storageJournalPlugin(),
         postgresBackendPlugin({ driver, prefix: 'pg_atomic_' + randomUUID().slice(0, 8) })
       ] as const,
       journal: async ({ storageLogStore: open }) => {
@@ -117,7 +118,7 @@ describe.each(['pg', 'postgres-js'] as const)('%s original global journal', (ada
     const open = () =>
       createStorageHost({
         org,
-        plugins: [postgresBackendPlugin({ driver, prefix })] as const,
+        plugins: [storageJournalPlugin(), postgresBackendPlugin({ driver, prefix })] as const,
         journal: { logger, namespace: 'drop-undo' }
       })
     // The package can already have an older private revisions layout; user data is retained.
@@ -180,7 +181,10 @@ describe.each(['pg', 'postgres-js'] as const)('%s original global journal', (ada
       org = randomUUID()
     const host = await createStorageHost({
       org,
-      plugins: [postgresBackendPlugin({ driver, prefix }, { vector: pgvectorFeature() })] as const,
+      plugins: [
+        storageJournalPlugin(),
+        postgresBackendPlugin({ driver, prefix }, { vector: pgvectorFeature() })
+      ] as const,
       journal: { logger, namespace: 'external-undo' }
     })
     onTestFinished(async () => {
@@ -274,7 +278,7 @@ describe.each(['pg', 'postgres-js'] as const)('%s original global journal', (ada
     const open = () =>
       createStorageHost({
         org,
-        plugins: [postgresBackendPlugin({ driver, prefix })] as const,
+        plugins: [storageJournalPlugin(), postgresBackendPlugin({ driver, prefix })] as const,
         journal: { logger: borrowed, namespace: 'external-wal' },
         report: (error) => {
           reports.push(error)
@@ -327,6 +331,7 @@ describe.each(['pg', 'postgres-js'] as const)('%s original global journal', (ada
       }),
       host = await createStorageHost({
         plugins: [
+          storageJournalPlugin(),
           postgresBackendPlugin(
             { driver, prefix: 'pg_order_' + randomUUID().slice(0, 8) },
             { vector: pgvectorFeature() }
@@ -404,6 +409,7 @@ describe.each(['pg', 'postgres-js'] as const)('%s original global journal', (ada
     const host = await createStorageHost({
       org,
       plugins: [
+        storageJournalPlugin(),
         postgresBackendPlugin(
           { driver, prefix: 'pg_journal_' + randomUUID().slice(0, 8) },
           { vectors: pgvectorFeature() }
@@ -526,7 +532,7 @@ it('retains a pending WAL intent when lost COMMIT evidence leaves the native out
   })
   let host = await createStorageHost({
     org,
-    plugins: [postgresBackendPlugin({ driver, prefix })] as const,
+    plugins: [storageJournalPlugin(), postgresBackendPlugin({ driver, prefix })] as const,
     journal: { logger, namespace: 'unknown' }
   })
   onTestFinished(async () => {
@@ -550,7 +556,7 @@ it('retains a pending WAL intent when lost COMMIT evidence leaves the native out
   await host.dispose()
   host = await createStorageHost({
     org,
-    plugins: [postgresBackendPlugin({ driver: native, prefix })] as const,
+    plugins: [storageJournalPlugin(), postgresBackendPlugin({ driver: native, prefix })] as const,
     journal: { logger, namespace: 'unknown' }
   })
   expect(await host.backend('postgres').get('key')).toBe('committed')
@@ -583,6 +589,7 @@ it('awaits original external append settlement without replacing a committed res
   const prefix = 'pg_append_' + randomUUID().slice(0, 8)
   const host = await createStorageHost({
     plugins: [
+      storageJournalPlugin(),
       postgresBackendPlugin({
         driver: pgDriver(pool),
         prefix
@@ -620,11 +627,17 @@ it('serializes independent native journal instances and recovers current records
   const secondPool = new Pool({ connectionString })
   const oneHost = await createStorageHost({
     org,
-    plugins: [postgresBackendPlugin({ driver: pgDriver(firstPool), prefix })]
+    plugins: [
+      storageJournalPlugin(),
+      postgresBackendPlugin({ driver: pgDriver(firstPool), prefix })
+    ]
   })
   const twoHost = await createStorageHost({
     org,
-    plugins: [postgresBackendPlugin({ driver: pgDriver(secondPool), prefix })]
+    plugins: [
+      storageJournalPlugin(),
+      postgresBackendPlugin({ driver: pgDriver(secondPool), prefix })
+    ]
   })
   try {
     const [one, two] = await Promise.all([

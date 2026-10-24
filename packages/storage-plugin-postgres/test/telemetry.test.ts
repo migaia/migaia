@@ -4,6 +4,7 @@ import { it, expect, onTestFinished } from 'vitest'
 import { Logger, type ILogEntry } from '@migaia/logger'
 import { level } from '@migaia/logger/plugins'
 import { createStorageHost } from '@migaia/storage-host'
+import { storageJournalPlugin } from '@migaia/storage-host/journal'
 import { ConcurrencyPolicy, lockKey } from '@migaia/storage-host/authoring/concurrency'
 import { deferred } from '@migaia/utils/promise'
 import { postgresBackendPlugin } from '../src/index.js'
@@ -25,6 +26,7 @@ it('observes complete original retry loops once with canonical native keys and f
   })
   const host = await createStorageHost({
     plugins: [
+      storageJournalPlugin(),
       postgresBackendPlugin({
         driver: pgDriver(pool),
         prefix: 'pg_telemetry_' + randomUUID().slice(0, 8)
@@ -136,6 +138,7 @@ it('keeps disabled level methods unread and contains a closed logger failure', a
   }
   const disabled = await createStorageHost({
     plugins: [
+      storageJournalPlugin(),
       postgresBackendPlugin({
         driver: pgDriver(pool),
         prefix: 'pg_telemetry_off_' + randomUUID().slice(0, 8)
@@ -146,6 +149,7 @@ it('keeps disabled level methods unread and contains a closed logger failure', a
   const reports: unknown[] = []
   const enabled = await createStorageHost({
     plugins: [
+      storageJournalPlugin(),
       postgresBackendPlugin({
         driver: pgDriver(pool),
         prefix: 'pg_telemetry_closed_' + randomUUID().slice(0, 8)
