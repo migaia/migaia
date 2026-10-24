@@ -164,7 +164,7 @@ describe('cache policy composition', () => {
     try {
       const cache = host.backend('cache')
       await cache.getOrLoad('a', async () => 'A', { maxAgeMs: 400, ttlMs: 400 })
-      expect(JSON.parse((await host.backend('tier').get('cache:cache:a'))!).x).toBe(10200)
+      expect(JSON.parse((await host.backend('tier').get('cache:cache:a'))!).x).toBe(10100)
       expect(
         await host.backend('tier').use(ttl).remaining(lockKey.text('cache:cache:a'))
       ).toBeLessThanOrEqual(100)
@@ -194,6 +194,267 @@ describe('cache policy composition', () => {
       finish('new')
       expect(await Promise.all([first, second])).toEqual(['new', 'new'])
       expect(calls).toBe(1)
+    } finally {
+      await host.dispose()
+    }
+  })
+  it('skips every locked cache write when the tag index rejects', async () => {
+    const reports: unknown[] = [],
+      failure = new RangeError('tag storage failed')
+    const observer = definePlugin('tag-failure', (core) => ({
+      install() {
+        core.useAsyncPipeline((input, next) => {
+          if (input.backendId === 'tags' && input.operation === 'putRecord') throw failure
+          return next(input)
+        })
+        return {}
+      }
+    }))
+    const base = await createStorageHost({
+      report: (error) => {
+        reports.push(error)
+      },
+      plugins: [
+        memoryBackendPlugin({ id: 'shared' }),
+        memoryBackendPlugin({ id: 'tags' }),
+        observer
+      ]
+    })
+    const host = await base.use(
+      cachePlugin({
+        propagate: false,
+        tiers: [{ backend: 'shared', ttlMs: 10000 }],
+        tagIndex: { backend: 'tags' },
+        stampedeLock: { backend: 'shared' }
+      })
+    )
+    await host.detect()
+    try {
+      const cache = host.backend('cache')
+      expect(await cache.getOrLoad('a', async () => 'value', { tags: ['doc'] })).toBe('value')
+      expect(await host.backend('shared').get('cache:cache:a')).toBeNull()
+      expect(
+        await cache.getOrLoadMany(
+          ['b', 'c'],
+          async (keys) => new Map(keys.map((key) => [key, 'value'])),
+          { tags: ['doc'] }
+        )
+      ).toEqual(
+        new Map([
+          ['b', 'value'],
+          ['c', 'value']
+        ])
+      )
+      expect(await host.backend('shared').getMany(['cache:cache:b', 'cache:cache:c'])).toEqual([
+        undefined,
+        undefined
+      ])
+      expect(reports.length).toBeGreaterThan(0)
+    } finally {
+      await host.dispose()
+    }
+  })
+  it('preserves a lock-time batch hit without rewriting its original expiry or metadata', async () => {
+    const base = await createStorageHost({ plugins: [memoryBackendPlugin({ id: 'shared' })] })
+    const host = await base.use(
+      cachePlugin({
+        propagate: false,
+        tiers: [{ backend: 'shared', ttlMs: 10000 }],
+        stampedeLock: { backend: 'shared' }
+      })
+    )
+    await host.detect()
+    try {
+      const shared = host.backend('shared'),
+        cache = host.backend('cache')
+      let entered!: () => void, finish!: () => void
+      const began = new Promise<void>((resolve) => {
+          entered = resolve
+        }),
+        gate = new Promise<void>((resolve) => {
+          finish = resolve
+        })
+      const raw = JSON.stringify({
+        v: 1,
+        s: 'hit',
+        t: 's',
+        d: 'existing',
+        w: Date.now() - 100,
+        x: Date.now() + 1000,
+        m: { original: true },
+        g: []
+      })
+      const writer = shared
+        .tx()
+        .lock(lockKey.text('cache:cache:a'))
+        .run(async (tx) => {
+          await tx.set('cache:cache:a', raw)
+          entered()
+          await gate
+        })
+      await began
+      let loads = 0
+      const result = cache.getOrLoadMany(['a'], async () => {
+        loads++
+        return new Map([['a', 'wrong']])
+      })
+      await new Promise((resolve) => setTimeout(resolve, 10))
+      finish()
+      await writer
+      expect(await result).toEqual(new Map([['a', 'existing']]))
+      expect(loads).toBe(0)
+      expect(await shared.get('cache:cache:a')).toBe(raw)
+      expect(await cache.peek('a')).toMatchObject({
+        meta: { original: true },
+        ageMs: expect.any(Number)
+      })
+    } finally {
+      await host.dispose()
+    }
+  })
+  it('keeps the latest pending value readable until a paused back write settles', async () => {
+    let active = false,
+      entered!: () => void,
+      finish!: () => void
+    const began = new Promise<void>((resolve) => {
+        entered = resolve
+      }),
+      gate = new Promise<void>((resolve) => {
+        finish = resolve
+      })
+    const observer = definePlugin('paused-back', (core) => ({
+      install() {
+        core.useAsyncPipeline(async (input, next) => {
+          if (active && input.backendId === 'fast' && input.operation === 'set') {
+            entered()
+            await gate
+          }
+          return next(input)
+        })
+        return {}
+      }
+    }))
+    const base = await createStorageHost({
+      plugins: [memoryBackendPlugin({ id: 'fast' }), memoryBackendPlugin({ id: 'slow' }), observer]
+    })
+    const host = await base.use(
+      cachePlugin({
+        propagate: false,
+        writeBackIntervalMs: 10000,
+        tiers: [{ backend: 'fast', write: 'back', ttlMs: 10000 }, { backend: 'slow' }]
+      })
+    )
+    await host.detect()
+    try {
+      const cache = host.backend('cache')
+      await base
+        .backend('fast')
+        .set('cache:cache:a', JSON.stringify({ v: 1, s: 'hit', t: 's', d: 'old', w: Date.now() }))
+      await cache.set('a', 'latest')
+      active = true
+      const flushing = cache.flush()
+      await began
+      expect(await cache.get('a')).toBe('latest')
+      await cache.set('a', 'newest')
+      finish()
+      await flushing
+      expect(await cache.get('a')).toBe('newest')
+      await cache.flush()
+      expect(await base.backend('fast').get('cache:cache:a')).toContain('newest')
+    } finally {
+      finish()
+      await host.dispose()
+    }
+  })
+  it('bounds a cache copy even when the native expiry operation fails', async () => {
+    let now = 1000
+    const reports: unknown[] = []
+    const observer = definePlugin('failed-expiry', (core) => ({
+      install() {
+        core.useAsyncPipeline((input, next) => {
+          if (input.backendId === 'tier' && input.operation === 'ttl.expire')
+            throw new RangeError('native expiry failed')
+          return next(input)
+        })
+        return {}
+      }
+    }))
+    const base = await createStorageHost({
+      report: (error) => {
+        reports.push(error)
+      },
+      plugins: [memoryBackendPlugin({ id: 'tier' }), observer]
+    })
+    const host = await base.use(
+      cachePlugin({ propagate: false, clock: () => now, tiers: [{ backend: 'tier', ttlMs: 100 }] })
+    )
+    await host.detect()
+    try {
+      const cache = host.backend('cache'),
+        tier = base.backend('tier')
+      expect(await cache.getOrLoad('a', async () => 'value')).toBe('value')
+      expect(JSON.parse((await tier.get('cache:cache:a'))!).x).toBe(1100)
+      expect(await tier.use(ttl).remaining(lockKey.text('cache:cache:a'))).toBeUndefined()
+      expect(reports).toHaveLength(1)
+      now += 101
+      expect(await cache.peek('a')).toBeUndefined()
+      expect(await tier.get('cache:cache:a')).toBeNull()
+    } finally {
+      await host.dispose()
+    }
+  })
+  it('admits native batch immediate expiry without granting positive call TTL on a non-TTL tier', async () => {
+    const base = await createStorageHost({ plugins: [memoryBackendPlugin({ id: 'memory' })] })
+    const inner = await base.use(
+      cachePlugin({ id: 'inner', propagate: false, tiers: [{ backend: 'memory' }] })
+    )
+    const host = await inner.use(
+      cachePlugin({ id: 'outer', propagate: false, tiers: [{ backend: 'inner' }] })
+    )
+    await host.detect()
+    try {
+      const cache = host.backend('outer')
+      let loads = 0
+      expect(() =>
+        cache.getOrLoad(
+          'a',
+          async () => {
+            loads++
+            return 'wrong'
+          },
+          { ttlMs: 10 }
+        )
+      ).toThrowError(expect.objectContaining({ code: 'UNSUPPORTED_CAPABILITY' }))
+      expect(loads).toBe(0)
+      expect(await base.backend('memory').keys()).toEqual([])
+      await cache.set('a', 'value')
+      expect(await cache.get('a')).toBe('value')
+      await cache.setMany([{ key: 'a', value: 'ignored', ttlMs: 0 }])
+      expect(await cache.get('a')).toBeNull()
+    } finally {
+      await host.dispose()
+    }
+  })
+  it('clears an old tag deadline when a refreshed entry has no finite lifetime', async () => {
+    const base = await createStorageHost({
+      plugins: [memoryBackendPlugin({ id: 'tier' }), memoryBackendPlugin({ id: 'tags' })]
+    })
+    const host = await base.use(
+      cachePlugin({ propagate: false, tiers: [{ backend: 'tier' }], tagIndex: { backend: 'tags' } })
+    )
+    await host.detect()
+    try {
+      const cache = host.backend('cache'),
+        target = lockKey.record(['cache:cache:', 'doc', 'a'])
+      await cache.getOrLoad('a', async () => 'finite', { ttlMs: 10000, tags: ['doc'] })
+      expect(await base.backend('tags').use(ttl).remaining(target)).toBeGreaterThan(0)
+      await cache.getOrLoad('a', async () => 'unbounded', { mode: 'refresh', tags: ['doc'] })
+      expect(await base.backend('tags').use(ttl).remaining(target)).toBeUndefined()
+      expect(
+        await base.backend('tier').use(ttl).remaining(lockKey.text('cache:cache:a'))
+      ).toBeUndefined()
+      await cache.invalidate({ tag: 'doc' })
+      expect(await cache.peek('a')).toBeUndefined()
     } finally {
       await host.dispose()
     }

@@ -7,6 +7,7 @@ import {
   implement,
   provideCapabilities,
   assertStringStorageKey,
+  assertStorageTtlDuration,
   snapshotOperationContext,
   lockKey,
   ConcurrencyPolicy,
@@ -67,14 +68,26 @@ type IProjection = {
   pending(): boolean
   erase(key: string, prefix: boolean, upto?: number, strict?: boolean): Promise<number>
   propagation(change: IStorageChange, upto: number): Promise<void>
+  reset(index: number): Promise<void>
 }
 
-/** Pending entries retain a single coalesced value and selected target tiers. */
+/** A prepared write carries the original entry and the exact sampled per-tier deadlines. */
+type IWriteItem = {
+  key: string
+  entry: ICacheEntry
+  policy: ICachePolicy
+  upto?: number
+  expires?: readonly (number | undefined)[]
+  indexed?: boolean
+}
+
+/** Coalesced back facts remain readable while their original native write is pending. */
 type IPending = {
   entry: ICacheEntry
   policy: ICachePolicy
   tiers: Set<number>
   expires: readonly (number | undefined)[]
+  writing?: Promise<void>
 }
 
 /** Compose installed native storage without owning or reconfiguring any borrowed backend. */
@@ -159,6 +172,7 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
   /** Physical keys are scoped by the cache prefix while organization routing remains host-owned. */
   const physical = (key: string): string => {
     assertStringStorageKey(key, CacheText.backend)
+    if (key === CacheText.cursor) throw invalidArgument()
     return configuration.prefix + key
   }
   /** Each timer tick flushes the current coalesced table once, never retries a dropped write. */
@@ -237,7 +251,9 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
       controller.assertLive()
       const context = snapshotOperationContext(ctx),
         release = controller.beginMutation()
+      let started = false
       return withAbort(context, async (signal) => {
+        started = true
         const work = prepare()
           .then(() => ports.execution.run({ operation, input, ctx: context }, invoke))
           .finally(release)
@@ -252,7 +268,7 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
           throw error
         }
       }).catch((error) => {
-        release()
+        if (!started) release()
         throw error
       })
     }
@@ -260,12 +276,13 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
     const deadline = (
       index: number,
       entry: ICacheEntry,
-      policy: ICachePolicy
+      policy: ICachePolicy,
+      now: number
     ): number | undefined => {
       const milliseconds = Math.min(
         configuration.tiers[index]!.ttlMs ?? Infinity,
         policy.ttlMs ?? Infinity,
-        entry.x === undefined ? Infinity : Math.max(0, entry.x - configuration.clock())
+        entry.x === undefined ? Infinity : Math.max(0, entry.x - now)
       )
       return milliseconds === Infinity ? undefined : milliseconds
     }
@@ -273,7 +290,7 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
     const plan = (entry: ICacheEntry, policy: ICachePolicy): readonly (number | undefined)[] => {
       const now = configuration.clock()
       return configuration.tiers.map((_, index) => {
-        const ms = deadline(index, entry, policy)
+        const ms = deadline(index, entry, policy, now)
         return ms === undefined ? undefined : now + shorten(configuration, ms)
       })
     }
@@ -285,6 +302,32 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
       expires[index] === undefined
         ? undefined
         : Math.max(0, expires[index]! - configuration.clock())
+    /** A layer's exact sampled hard bound survives an unavailable native expiry endpoint. */
+    const bounded = (
+      entry: ICacheEntry,
+      expires: readonly (number | undefined)[],
+      index: number
+    ): ICacheEntry =>
+      expires[index] === undefined
+        ? entry
+        : { ...entry, x: Math.min(entry.x ?? Infinity, expires[index]!) }
+    /** Positive per-call native TTLs are admitted before any source call or tier modification. */
+    const admitPolicy = (policy: ICachePolicy): ICachePolicy => {
+      if (policy.ttlMs !== undefined && policy.ttlMs > 0)
+        for (const [index, tier] of tiers.entries())
+          if (!tier.borrowed.has(ttl)) missingCapability(index, ttl.name)
+      return policy
+    }
+    /** Shared batch TTL uses its original finite nonnegative domain, including immediate removal. */
+    const batchPolicy = (ttlMs: number | undefined): ICachePolicy => {
+      if (ttlMs !== undefined) assertStorageTtlDuration(ttlMs, CacheText.backend)
+      if (
+        ttlMs !== undefined &&
+        configuration.tiers.some((tier) => tier.ttlMs !== undefined && ttlMs > tier.ttlMs)
+      )
+        throw cacheError(CacheErrorCode.tierInvalid)
+      return admitPolicy(Object.freeze({ ...snapshotCachePolicy(configuration), ttlMs }))
+    }
     /** Object offload writes only encoded content and refreshes the native modification timestamp. */
     const stored = async (index: number, entry: ICacheEntry): Promise<string> => {
       let actual = entry
@@ -308,21 +351,30 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
       expires: readonly (number | undefined)[] = plan(entry, policy)
     ): Promise<boolean> => {
       try {
-        const maximum = configuration.tiers[index]!.maxEntryBytes
+        const ms = remaining(expires, index)
+        if (ms === 0) {
+          await apiAt(index).remove(physical(key))
+          return true
+        }
+        const actual = bounded(entry, expires, index),
+          maximum = configuration.tiers[index]!.maxEntryBytes
         if (
           maximum !== undefined &&
-          new TextEncoder().encode(JSON.stringify(entry)).byteLength > maximum
+          new TextEncoder().encode(JSON.stringify(actual)).byteLength > maximum
         ) {
           counts.skipped[index]!++
           return true
         }
-        const raw = await stored(index, entry),
-          ms = remaining(expires, index)
+        const raw = await stored(index, actual)
         await apiAt(index).set(physical(key), raw)
-        if (ms !== undefined)
+        if (ms !== undefined && tiers[index]!.borrowed.has(ttl))
           await route(tiers[index]!.borrowed)
             .use(ttl)
             .expire(lockKey.text(physical(key)), ms)
+        else if (ms === undefined && tiers[index]!.borrowed.has(ttl))
+          await route(tiers[index]!.borrowed)
+            .use(ttl)
+            .persist(lockKey.text(physical(key)))
         return true
       } catch (error) {
         tierError(index, CacheOperation.set, error)
@@ -352,6 +404,7 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
           const target = [configuration.prefix, tag, key]
           await native.putRecord({ key }, target)
           if (maximum !== undefined) await borrowed.use(ttl).expire(lockKey.record(target), maximum)
+          else await borrowed.use(ttl).persist(lockKey.record(target))
         }
         return true
       } catch (error) {
@@ -439,7 +492,12 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
         let found: ICacheFound | undefined
         if (configuration.tiers[index]!.write === CacheWriteMode.back && pending.has(key)) {
           const item = pending.get(key)!
-          found = await decode(index, key, JSON.stringify(item.entry), policy.staleAfterMs)
+          found = await decode(
+            index,
+            key,
+            JSON.stringify(bounded(item.entry, item.expires, index)),
+            policy.staleAfterMs
+          )
         } else {
           try {
             found = await decode(
@@ -512,7 +570,9 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
       const execute = async (): Promise<ICacheEntryInfo<ICodecValue>> => {
         let entry: ICacheEntry | undefined,
           value: ICodecValue | undefined,
-          locked = false
+          locked = false,
+          expires: readonly (number | undefined)[] | undefined,
+          lockedHit: ICacheFound | undefined
         if (lockIndex !== undefined) {
           const borrowed = route(tiers[lockIndex]!.borrowed),
             native = borrowed as IStorageBorrowedBackend & ICacheNative
@@ -530,29 +590,54 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
                 () => tx.remove(physical(key))
               )
               if (cached && !cached.info.stale)
-                return { entry: cached.entry, value: cached.info.value, hit: true }
+                return {
+                  entry: cached.entry,
+                  value: cached.info.value,
+                  cached,
+                  expires: plan(cached.entry, policy)
+                }
               const value = await callLoader(load),
                 entry = await encodeEntry(configuration, value, policy)
+              const expires = entry ? plan(entry, policy) : undefined
               if (entry && !row.superseded) {
-                const raw = await stored(lockIndex, entry),
-                  maximum = configuration.tiers[lockIndex]!.maxEntryBytes
-                if (maximum === undefined || new TextEncoder().encode(raw).byteLength <= maximum) {
-                  await tx.set(physical(key), raw)
-                  const ms = deadline(lockIndex, entry, policy)
-                  if (ms !== undefined) await tx.use(ttl).expire(lockKey.text(physical(key)), ms)
+                if (!(await indexTags(key, entry, policy, expires!)))
+                  return { entry: undefined, value, cached: undefined, expires }
+                const maximum = configuration.tiers[lockIndex]!.maxEntryBytes
+                if (
+                  maximum === undefined ||
+                  new TextEncoder().encode(JSON.stringify(entry)).byteLength <= maximum
+                ) {
+                  await tx.set(
+                    physical(key),
+                    await stored(lockIndex, bounded(entry, expires!, lockIndex))
+                  )
+                  const ms = remaining(expires!, lockIndex)
+                  if (ms !== undefined && tiers[lockIndex]!.borrowed.has(ttl))
+                    await tx.use(ttl).expire(lockKey.text(physical(key)), ms)
                 } else counts.skipped[lockIndex]!++
               }
-              return { entry, value, hit: false }
+              return { entry, value, cached: undefined, expires }
             })
           entry = result.entry
           value = result.value
           locked = true
+          expires = result.expires
+          lockedHit = result.cached
         } else {
           value = await callLoader(load)
           entry = await encodeEntry(configuration, value, policy)
         }
         if (entry && !row.superseded)
-          await write(key, entry, policy, tiers.length, locked ? lockIndex : undefined)
+          await write(
+            key,
+            entry,
+            policy,
+            lockedHit ? lockIndex : tiers.length,
+            locked ? lockIndex : undefined,
+            expires,
+            locked
+          )
+        if (lockedHit) return lockedHit.info
         return Object.freeze({
           value,
           tier: undefined,
@@ -631,17 +716,29 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
       core.emit(CacheHook.invalidate, () => ({ ...identity, tiers: upto, prefix }))
       return removed
     }
-    /** Pending facts are removed before sending; failures are reported and permanently dropped. */
+    /** The same coalesced facts remain readable until their native write settles or is replaced. */
     const flush = async (): Promise<void> => {
       const items = [...pending]
-      pending.clear()
-      for (const [key, item] of items)
-        for (const index of [...item.tiers].reverse())
-          if (!(await writeOne(index, key, item.entry, item.policy, item.expires))) {
-            counts.writeBackDropped++
-            core.emit(CacheHook.writeBackDropped, () => ({ ...identity, tier: index, count: 1 }))
+      for (const [key, item] of items) {
+        item.writing ??= (async () => {
+          try {
+            for (const index of [...item.tiers].reverse())
+              if (!(await writeOne(index, key, item.entry, item.policy, item.expires))) {
+                counts.writeBackDropped++
+                core.emit(CacheHook.writeBackDropped, () => ({
+                  ...identity,
+                  tier: index,
+                  count: 1
+                }))
+              }
+          } finally {
+            if (pending.get(key) === item) pending.delete(key)
           }
+        })()
+        await item.writing
+      }
     }
+
     const defaults = (): ICachePolicy => snapshotCachePolicy(configuration)
     /** Flat KV never exposes codec entries through text APIs. */
     const get = async (key: string): Promise<string | null> => {
@@ -649,6 +746,26 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
       return found?.entry.t === CacheText.string && typeof found.info.value === 'string'
         ? found.info.value
         : null
+    }
+    /** JavaScript batch admission detaches every entry before any pipeline or tier operation. */
+    const captureEntries = (entries: unknown): { key: string; value: string; ttlMs?: number }[] => {
+      try {
+        if (!Array.isArray(entries) || Object.keys(entries).length !== entries.length)
+          throw invalidArgument()
+        const seen = new Set<string>()
+        return entries.map((item) => {
+          if (!item || typeof item !== 'object') throw invalidArgument()
+          const { key, value, ttlMs } = item
+          assertStringStorageKey(key, CacheText.backend)
+          if (typeof value !== 'string' || seen.has(key)) throw invalidArgument()
+          batchPolicy(ttlMs)
+          seen.add(key)
+          return { key, value, ttlMs }
+        })
+      } catch (error) {
+        if (error instanceof Error && IdentifyError.identityOf(error)) throw error
+        throw invalidArgument(error)
+      }
     }
     const api: IKeyValueApi = {
       get: (key, ctx) => {
@@ -682,7 +799,11 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
           let keys: string[]
           try {
             keys = (await apiAt(0).keys())
-              .filter((key) => key.startsWith(configuration.prefix))
+              .filter(
+                (key) =>
+                  key.startsWith(configuration.prefix) &&
+                  key !== configuration.prefix + CacheText.cursor
+              )
               .map((key) => key.slice(configuration.prefix.length))
           } catch (error) {
             tierError(0, CacheOperation.keys, error)
@@ -725,21 +846,15 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
         })
       },
       setMany: (entries, ctx) => {
-        const captured = entries.map((item) => {
-          assertStringStorageKey(item.key, CacheText.backend)
-          if (typeof item.value !== 'string') throw invalidArgument()
-          return { key: item.key, value: item.value, ttlMs: item.ttlMs }
-        })
-        if (new Set(captured.map((item) => item.key)).size !== captured.length)
-          throw invalidArgument()
+        const captured = captureEntries(entries)
         return run(CacheOperation.setMany, captured, ctx, async (actual) => {
           const seen = new Set<string>(),
             items: { key: string; entry: ICacheEntry; policy: ICachePolicy }[] = []
-          for (const item of actual) {
+          for (const item of captureEntries(actual)) {
             physical(item.key)
             if (typeof item.value !== 'string' || seen.has(item.key)) throw invalidArgument()
             seen.add(item.key)
-            const policy = snapshotCachePolicy(configuration, { ttlMs: item.ttlMs })
+            const policy = batchPolicy(item.ttlMs)
             const entry = await encodeEntry(configuration, item.value, policy, true)
             items.push({ key: item.key, entry: entry!, policy })
           }
@@ -787,14 +902,14 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
         store.getOrLoadEntry(key, load, options).then((info) => info.value),
       getOrLoadEntry: (key, load, options) => {
         physical(key)
-        const policy = snapshotCachePolicy(configuration, options)
+        const policy = admitPolicy(snapshotCachePolicy(configuration, options))
         return run(CacheOperation.getOrLoad, { key, load }, policy.ctx, (actual) =>
           loadEntry(actual.key, actual.load, policy)
         )
       },
       getOrLoadMany: (keys, load, options) => {
         const captured = [...new Set(captureKeys(keys))],
-          policy = snapshotCachePolicy(configuration, options)
+          policy = admitPolicy(snapshotCachePolicy(configuration, options))
         return run(CacheOperation.getOrLoadMany, captured, policy.ctx, (actual) =>
           loadMany(captureKeys(actual), load, policy)
         )
@@ -884,14 +999,12 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
       }
     }
     /** All selected entries share one native batch per through tier, with per-key back coalescing. */
-    const writeBatch = async (
-      items: readonly { key: string; entry: ICacheEntry; policy: ICachePolicy; upto?: number }[],
-      skip?: number
-    ): Promise<void> => {
+    const writeBatch = async (items: readonly IWriteItem[], skip?: number): Promise<void> => {
       const accepted: ((typeof items)[number] & { expires: readonly (number | undefined)[] })[] = []
       for (const item of items) {
-        const expires = plan(item.entry, item.policy)
+        const expires = item.expires ?? plan(item.entry, item.policy)
         if (
+          item.indexed ||
           item.upto !== undefined ||
           (await indexTags(item.key, item.entry, item.policy, expires))
         )
@@ -916,15 +1029,21 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
             continue
           }
           try {
-            const maximum = configuration.tiers[index]!.maxEntryBytes
+            const ms = remaining(item.expires, index)
+            if (ms === 0) {
+              entries.push({ key: physical(item.key), value: '', ttlMs: 0 })
+              continue
+            }
+            const actual = bounded(item.entry, item.expires, index),
+              maximum = configuration.tiers[index]!.maxEntryBytes
             if (
               maximum !== undefined &&
-              new TextEncoder().encode(JSON.stringify(item.entry)).byteLength > maximum
+              new TextEncoder().encode(JSON.stringify(actual)).byteLength > maximum
             ) {
               counts.skipped[index]!++
               continue
             }
-            const value = await stored(index, item.entry)
+            const value = await stored(index, actual)
             entries.push({
               key: physical(item.key),
               value,
@@ -976,7 +1095,7 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
             match = await decode(
               index,
               key,
-              item ? JSON.stringify(item.entry) : nativeRows.get(key),
+              item ? JSON.stringify(bounded(item.entry, item.expires, index)) : nativeRows.get(key),
               policy.staleAfterMs
             )
           if (match) {
@@ -1061,15 +1180,14 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
               values: ReadonlyMap<string, T | undefined>,
               selected: readonly string[]
             ) => {
-              const items: { key: string; entry: ICacheEntry; policy: ICachePolicy }[] = []
+              const items: IWriteItem[] = []
               for (const key of selected) {
                 const entry = await encodeEntry(configuration, values.get(key), policy)
                 if (entry && !rows.get(key)!.superseded) items.push({ key, entry, policy })
               }
               return items
             }
-            let values: ReadonlyMap<string, T | undefined>,
-              items: { key: string; entry: ICacheEntry; policy: ICachePolicy }[]
+            let values: ReadonlyMap<string, T | undefined>, items: IWriteItem[]
             if (lockIndex !== undefined) {
               const native = route(tiers[lockIndex]!.borrowed) as IStorageBorrowedBackend &
                 ICacheNative
@@ -1082,16 +1200,17 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
                   ConcurrencyPolicy.wait({ timeoutMs: configuration.stampedeLock!.timeoutMs })
                 )
                 .run(async (tx) => {
-                  const existing = new Map<string, T | undefined>(),
+                  const existing = new Map<string, ICacheFound>(),
                     absent: string[] = []
                   for (const key of fresh) {
                     const hit = await decode(
                       lockIndex,
                       key,
                       await tx.get(physical(key)),
-                      policy.staleAfterMs
+                      policy.staleAfterMs,
+                      () => tx.remove(physical(key))
                     )
-                    if (hit && !hit.info.stale) existing.set(key, hit.info.value as T | undefined)
+                    if (hit && !hit.info.stale) existing.set(key, hit)
                     else absent.push(key)
                   }
                   const loaded = absent.length
@@ -1100,17 +1219,40 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
                   const combined = new Map(
                     fresh.map((key) => [
                       key,
-                      existing.has(key) ? existing.get(key) : loaded.get(key)
+                      existing.has(key)
+                        ? (existing.get(key)!.info.value as T | undefined)
+                        : loaded.get(key)
                     ])
                   )
-                  const entries = await prepare(combined, fresh)
+                  const entries = await prepare(loaded, absent)
+                  const accepted: IWriteItem[] = []
                   for (const item of entries) {
-                    await tx.set(physical(item.key), await stored(lockIndex, item.entry))
-                    const ms = deadline(lockIndex, item.entry, item.policy)
-                    if (ms !== undefined)
+                    const expires = plan(item.entry, item.policy)
+                    if (
+                      !(await indexTags(item.key, item.entry, item.policy, expires)) ||
+                      rows.get(item.key)!.superseded
+                    )
+                      continue
+                    accepted.push({ ...item, expires, indexed: true })
+                    const maximum = configuration.tiers[lockIndex]!.maxEntryBytes
+                    if (
+                      maximum !== undefined &&
+                      new TextEncoder().encode(JSON.stringify(item.entry)).byteLength > maximum
+                    ) {
+                      counts.skipped[lockIndex]!++
+                      continue
+                    }
+                    await tx.set(
+                      physical(item.key),
+                      await stored(lockIndex, bounded(item.entry, expires, lockIndex))
+                    )
+                    const ms = remaining(expires, lockIndex)
+                    if (ms !== undefined && tiers[lockIndex]!.borrowed.has(ttl))
                       await tx.use(ttl).expire(lockKey.text(physical(item.key)), ms)
                   }
-                  return { combined, entries }
+                  for (const [key, hit] of existing)
+                    accepted.push({ key, entry: hit.entry, policy, upto: lockIndex })
+                  return { combined, entries: accepted }
                 })
               values = result.combined
               items = result.entries
@@ -1173,6 +1315,10 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
       flush,
       pending: () => pending.size > 0,
       erase,
+      reset: async (index: number) => {
+        await erase('', true, index, true)
+        resetFeeds.add(index)
+      },
       propagation: async (change: IStorageChange, upto: number) => {
         if (change.channel !== CacheText.value && change.channel !== CacheText.all) return
         if (!change.keys) await erase('', true, upto, true)
@@ -1198,40 +1344,40 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
     })
   }
   const root = bind(core.defaultOrgId)
-  /** Ephemeral native feeds remain host-level and route their explicit organization facts. */
-  for (const index of feeds)
-    if (configuration.propagate && index > 0) {
-      const tier = tiers[index]!
-      if (!tier.borrowed.has(durableChangeFeed)) {
-        if (typeof tier.native.subscribeChanges !== 'function')
-          missingCapability(index, CacheText.changeFeed)
-        subscriptions.push(
-          tier.native.subscribeChanges((change) => {
-            const orgId = change.orgId ?? core.defaultOrgId
-            const release = controller.beginMutation()
-            return bind(orgId)
-              .propagation(change, index)
-              .catch((error) => {
-                report(error)
-              })
-              .finally(release)
-          })
-        )
-      }
-    }
   /** Durable consumers start in the original detect window after their earlier backends are ready. */
   core.registerDetect(async (signal) => {
     if (signal.aborted) return
+    /** Ephemeral native feeds remain host-level and route their explicit organization facts. */
+    for (const index of feeds)
+      if (configuration.propagate && index > 0) {
+        const tier = tiers[index]!
+        if (!tier.borrowed.has(durableChangeFeed)) {
+          if (typeof tier.native.subscribeChanges !== 'function')
+            missingCapability(index, CacheText.changeFeed)
+          subscriptions.push(
+            tier.native.subscribeChanges((change) => {
+              const orgId = change.orgId ?? core.defaultOrgId
+              const release = controller.beginMutation()
+              return bind(orgId)
+                .propagation(change, index)
+                .catch((error) => {
+                  report(error)
+                })
+                .finally(release)
+            })
+          )
+        }
+      }
     for (const index of feeds)
       if (configuration.propagate && index > 0 && tiers[index]!.borrowed.has(durableChangeFeed)) {
         const source = tiers[index]!.borrowed.use(durableChangeFeed),
           upper = tiers[index - 1]!.borrowed.use(kv)
         let current: Awaited<ReturnType<typeof source.tailChanges>> | undefined,
-          needsReset = false
+          needsReset = false,
+          restarting: Promise<void> | undefined
         const reset = async (): Promise<void> => {
           untrustedFeeds.add(index)
-          for (const projection of projections.values())
-            await projection.erase('', true, index, true)
+          for (const projection of projections.values()) await projection.reset(index)
         }
         const after = await upper.get(configuration.prefix + CacheText.cursor)
         if (after === null) await reset()
@@ -1253,16 +1399,36 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
             release()
           }
         }
+        /** Only native cursor expiry restarts from now; disconnects never create a retry timer. */
+        const onError = (error: unknown): void => {
+          needsReset = true
+          report(error)
+          if (
+            IdentifyError.identityOf(error)?.code !==
+              StorageContractErrorCode.changeCursorExpired ||
+            controller.closingSignal.aborted ||
+            restarting
+          )
+            return
+          const release = controller.beginMutation()
+          restarting = (async () => {
+            await reset()
+            await current?.[asyncDisposeKey]()
+            if (!controller.closingSignal.aborted) await start(CacheText.now)
+          })()
+            .catch(report)
+            .finally(() => {
+              restarting = undefined
+              release()
+            })
+        }
         const start = async (from: string) => {
           try {
             current = await source.tailChanges(
               {
                 from,
                 onChange,
-                onError: (error) => {
-                  needsReset = true
-                  report(error)
-                }
+                onError
               },
               { signal: controller.closingSignal }
             )
@@ -1276,17 +1442,17 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
               {
                 from: CacheText.now,
                 onChange,
-                onError: (error) => {
-                  needsReset = true
-                  report(error)
-                }
+                onError
               },
               { signal: controller.closingSignal }
             )
           }
         }
         await start(after ?? CacheText.now)
-        subscriptions.push(() => current?.dispose())
+        subscriptions.push(async () => {
+          await restarting
+          await current?.dispose()
+        })
       }
   })
   return {

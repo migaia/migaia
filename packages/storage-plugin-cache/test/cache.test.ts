@@ -51,7 +51,9 @@ describe('borrowed multi-tier cache', () => {
       expect(await cache.get('text')).toBe('hello')
       await fast.remove('cache:cache:text')
       expect(await cache.get('text')).toBe('hello')
-      expect(await fast.get('cache:cache:text')).toBe(await slow.get('cache:cache:text'))
+      expect(JSON.parse((await fast.get('cache:cache:text'))!).d).toBe(
+        JSON.parse((await slow.get('cache:cache:text'))!).d
+      )
       expect(await cache.keys()).toEqual(['text'])
       expect(await cache.removeMany(['text', 'text'])).toBe(1)
       expect(cache.has(kv)).toBe(true)
@@ -92,6 +94,41 @@ describe('borrowed multi-tier cache', () => {
       finish('shared')
       expect(await Promise.all(others)).toEqual(Array(29).fill('shared'))
       expect(loads).toBe(1)
+    } finally {
+      await host.dispose()
+    }
+  })
+  it('drains bypass work after its sole caller aborts', async () => {
+    const { host, cache } = await fixture()
+    try {
+      let finish!: (value: string) => void, started!: () => void
+      const began = new Promise<void>((resolve) => {
+        started = resolve
+      })
+      const abort = new AbortController()
+      const result = cache.getOrLoad(
+        'bypass',
+        async () => {
+          started()
+          return new Promise<string>((resolve) => {
+            finish = resolve
+          })
+        },
+        { mode: 'bypass', ctx: { signal: abort.signal } }
+      )
+      const failed = expect(result).rejects.toMatchObject({ code: 'ABORTED' })
+      await began
+      abort.abort('caller only')
+      await failed
+      let closed = false
+      const disposing = cache.dispose().then(() => {
+        closed = true
+      })
+      await new Promise((resolve) => setTimeout(resolve, 5))
+      expect(closed).toBe(false)
+      finish('late true value')
+      await disposing
+      expect(closed).toBe(true)
     } finally {
       await host.dispose()
     }
@@ -210,11 +247,29 @@ describe('borrowed multi-tier cache', () => {
     }
   })
   it('rejects configuration and non-string shared keys before native writes', async () => {
+    const original = new RangeError('cache identity accessor')
+    expect(() =>
+      cachePlugin({
+        get id(): string {
+          throw original
+        },
+        tiers: [{ backend: 'a' }]
+      })
+    ).toThrowError(expect.objectContaining({ code: 'CACHE_TIER_INVALID', cause: original }))
+    expect(() => cachePlugin(null as never)).toThrowError(
+      expect.objectContaining({ code: 'CACHE_TIER_INVALID' })
+    )
     expect(() => cachePlugin({ tiers: [{ backend: 'a', write: 'back' }] })).toThrowError()
     expect(() => cachePlugin({ tiers: [{ backend: 'a', ttlMs: 0 }] })).toThrowError()
     const { host, cache, fast } = await fixture()
     try {
       expect(() => cache.getMany([['tuple']])).toThrowError()
+      const sparse: unknown[] = []
+      sparse.length = 1
+      for (const input of [null, {}, [null], sparse])
+        expect(() => cache.setMany(input as never)).toThrowError(
+          expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+        )
       expect(await fast.keys()).toEqual([])
       expect(() => cache.getOrLoad('a', async () => 'x', { ttlMs: 20000 })).toThrowError()
     } finally {

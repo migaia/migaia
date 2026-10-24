@@ -55,3 +55,15 @@ try {
 观察事件为 `onCacheHit`、`onCacheMiss`、`onCacheLoad`、`onCacheInvalidate`、`onCacheTierError`、`onCacheWriteBackDropped`，只含数量与身份，不含键值。层失败降级为未命中或跳过写入，经宿主报告原诊断。组织视图把所有层路由到同一不可变宿主组织上下文。
 
 带计数的 KV `removeByPrefix` 仅单层可用；多层在 I/O 前报 `UNSUPPORTED_CAPABILITY`，因为原生计数无法识别跨层重复逻辑副本。多层无计数删除使用 `invalidate({ prefix })` 或清空方法。`removeMany` 按已给出的不同逻辑键计数，多个副本只计一次。
+
+各层条目同时以该层采样后的有效硬期限限制自身到期时间。原生 `expire` 失败会报告，不能留下可无限命中的副本。正数单次 TTL 在回源或写入前要求所有目标层具有 TTL 能力；共享 KV `setMany` 保留非负有限 TTL 域，零表示立即删除。
+
+传播仅在显式检测阶段订阅。可靠源的游标写入紧邻上层的缺省组织，`$cache.cursor` 为内部元数据保留键。游标缺失或过期时先清除所管上层前缀，再从 now 继续。删除或游标持久化失败不保留积压队列：下一原生批次先清上层，再于成功后推进游标。仅游标过期会替换原生 tail 资源，不为断线启动重连定时器。
+
+## 语义缓存
+
+从 `@migaia/storage-plugin-cache/features/semantic` 导入 `semanticCacheFeature`，在 `cachePlugin` 第二参数中选择 `{ semantic: semanticCacheFeature(options) }`。向量后端必须在更早批次发布。配置 collection、维度、原生 metric、最低分与调用方嵌入函数。候选顺序沿原向量引擎，逐个执行 `accept`；复核失败只报告并跳过，不在 JavaScript 中计算向量分数。
+
+`cache.api.semantic.set(prompt, value, { payload: { model: 'one' } })` 按 prompt 与模型元数据独立存储。`get` 可设置 `where`、`minScore`、一至十个 `candidates` 和异步 `accept`。`getOrLoad` 按组织、prompt 与规范 payload 合并回源，单调用取消不影响共享任务，并支持缩短 TTL 与 `cacheIf`。关闭时排空任务，不关闭借用的向量后端。`$cache.*` 为保留字段。
+
+`invalidate(where, { count: 'scroll' })` 返回原 `deleteWhere` 数字，缺省保留 `precount`。删除包含物理仍存在的过期匹配点；Qdrant 两策略继承原并发边界，不强制切换、不重新计数、不承诺全局快照。原 context 与 count 由该原生删除拥有者单次校验；向量 TTL 由原 `upsert` 设置。
