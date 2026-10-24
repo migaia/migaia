@@ -47,7 +47,9 @@ Unique entity writes require a real record transaction or the backend’s native
 
 ## Explicit IndexedDB assembly and migration
 
-`indexedDbBackendPlugin` installs basic text, bytes, records and native transactions. Native indexes/backfill, TTL, KV batches, journal images and undo, post-commit notifications, and change feeds each require their own Feature. Previously these capabilities were automatic. This intentional behavior change lets applications control browser output: an undeclared Feature is not imported by the basic backend entry. Migrate existing applications by selecting each capability they actually use. Basic reads and writes need no additional declaration.
+`indexedDbBackendPlugin` installs basic text, bytes, records and native transactions. Native indexes/backfill, TTL, KV batches, journal images and undo, post-commit notifications, and change feeds each require their own Feature.
+
+Previously these capabilities were automatic. This intentional behavior change lets applications control browser output: an undeclared Feature is not imported by the basic backend entry. Migrate existing applications by selecting each capability they actually use. Basic reads and writes need no additional declaration.
 
 ```ts
 import { createStorageHost } from '@migaia/storage-host'
@@ -85,7 +87,7 @@ try {
 
 Select only required entries. Change feeds require an explicitly selected notifications Feature; they never install that prerequisite implicitly. IndexedDB `.live()` through `reactiveFeature` also requires notifications and reports a coded missing-assembly error instead of switching to polling.
 
-Memory `.live()` likewise requires explicit `memoryNotificationsFeature()` and rejects with `@migaia/storage-host / CHANGE_CONTROLLER_NOT_ASSEMBLED` before allocating an adapter or query when absent. Calling an undeclared batch, journal, notification or change-feed entry reports `@migaia/storage-web / INDEXED_DB_FEATURE_NOT_INSTALLED` and identifies the required Feature.
+Memory `.live()` likewise requires explicit `memoryNotificationsFeature()` and rejects with `@migaia/storage-host` / `CHANGE_CONTROLLER_NOT_ASSEMBLED` before allocating an adapter or query when absent. Calling an undeclared batch, journal, notification or change-feed entry reports `@migaia/storage-web / INDEXED_DB_FEATURE_NOT_INSTALLED` and identifies the required Feature.
 
 Without TTL, the canonical capability owner rejects `store.use(ttl)` with `@migaia/storage-contract / UNSUPPORTED_CAPABILITY`, identifying `ttl`. Basic `capabilities.secondaryIndexes`, `capabilities.batch` and `capabilities.changeFeed` are false. Selected change feeds still require the original native realm/BroadcastChannel admission.
 
@@ -97,7 +99,9 @@ Journal images read and restore existing physical deadlines without enabling TTL
 
 ## KV batches
 
-`store.use(kv)` provides `getMany`, `setMany`, `removeMany`, and `removeByPrefix`. IndexedDB executes a batch in one native transaction and supports string, number, Date, binary, and tuple keys. String keys retain the same data as the original single-key methods. Reads preserve input order and duplicate positions, missing values are `undefined`, and deletion returns the actual count. Canonical duplicate write keys reject with `INVALID_ARGUMENT` before I/O. Empty batches enter neither the pipeline nor a native transaction.
+`store.use(kv)` provides `getMany`, `setMany`, `removeMany`, and `removeByPrefix`. IndexedDB executes a batch in one native transaction and supports string, number, Date, binary, and tuple keys. String keys retain the same data as the original single-key methods. Reads preserve input order and duplicate positions, missing values are `undefined`, and deletion returns the actual count.
+
+Canonical duplicate write keys reject with `INVALID_ARGUMENT` before I/O. Empty batches enter neither the pipeline nor a native transaction.
 
 localStorage, sessionStorage, and Cookie support batch reads. Multi-key writes require WAL and reject with `UNSUPPORTED_CAPABILITY` before mutation when it is absent. The default namespace codec retains the string `sw1` layout and uses a separate `sw2` layout for typed keys. `keys()` still lists strings; namespace cleanup covers both layouts. A custom codec must provide both `encodeStorageKey` and `decodeStorageKey` to read non-string batch keys; otherwise those keys reject before native I/O.
 
@@ -187,17 +191,33 @@ Browser sources retain eventual visibility: local storage is document-eventual, 
 
 See [the usage guide](./USEGUIDE.en.md) for options, native activity, and lifecycle details.
 
-With `indexedDbNotificationsFeature()` and `indexedDbChangeFeedFeature()` selected, IndexedDB exposes native text invalidation through `store.watch(key, ctx?)`. Its `capabilities.changeFeed` is `true` only after the instance admits this realm's IndexedDB and BroadcastChannel; an unadmitted watch throws `UNSUPPORTED_CAPABILITY`. Hints carry the original host organization UUID and tell the consumer to reread committed native data. They provide neither historical replay nor one event per write. Dispose the iterator after use through its original `dispose()` method.
+With `indexedDbNotificationsFeature()` and `indexedDbChangeFeedFeature()` selected, IndexedDB exposes native text invalidation through `store.watch(key, ctx?)`. Its `capabilities.changeFeed` is `true` only after the instance admits this realm's IndexedDB and BroadcastChannel; an unadmitted watch throws `UNSUPPORTED_CAPABILITY`.
 
-With `indexedDbTtlFeature()` selected, IndexedDB provides `ttl`: `store.use(ttl)` exposes `expire`, `remaining` and `persist` for text, bytes and record targets; transactions use `scope.use(ttl)`. A `setMany` entry's `ttlMs` commits or rolls back with its value in the same native transaction. Entries have no deadline by default. Expired point reads, enumeration and index queries return absence and lazily remove data through the original transaction, revision and change paths; no cleanup timer runs. Deadlines advance through the installed scheduler from one local epoch anchor captured at installation. Default-clock deadlines remain comparable across pages and reopening. IndexedDB has no vector channel, so vector TTL targets fail before I/O with `UNSUPPORTED_CAPABILITY`.
+Hints carry the original host organization UUID and tell the consumer to reread committed native data. They provide neither historical replay nor one event per write. Dispose the iterator after use through its original `dispose()` method.
 
-Text organization views use the configured namespace for the host default and namespace + "/" + orgId for every other organization. The same captured native client, namespace codec and Cookie scope remain in use. A configured namespace ending in "/" plus a canonical UUID rejects before native I/O; a bare UUID remains valid. dropOrg clears only that target, preserves other organizations and plugin prefixes, and leaves existing views reusable. Borrowed entities retain the original native atomic unique writer. IndexedDB maps dbName by the same rule. dropOrg makes the target connection close-pending, drains native transactions, and waits for that target's deleteDatabase request. New opens wait for the same request; existing views reopen afterward. Other instances close through their original versionchange handler. A foreign connection that refuses to close keeps native deletion pending; the host never resumes opening early and lets a late deletion destroy new data.
+With `indexedDbTtlFeature()` selected, IndexedDB provides `ttl`: `store.use(ttl)` exposes `expire`, `remaining` and `persist` for text, bytes and record targets; transactions use `scope.use(ttl)`. A `setMany` entry's `ttlMs` commits or rolls back with its value in the same native transaction. Entries have no deadline by default.
 
-localStorage declares changeFeed:true only after registering the actual localStorage and storage event source of the same Window. A Storage-like injection alone remains false. Original watch/subscribeChanges combine committed writes from this instance with native cross-document events, filtered by storageArea, namespace codec, and organization; host disposal releases the listener. The receiving controller numbers hints locally, without a native writer history sequence. Reread current data: delivery is neither per-write nor a native notification for other instances in the same page. Organization views retain watch with runtime capability admission and no backend close authority.
+Expired point reads, enumeration and index queries return absence and lazily remove data through the original transaction, revision and change paths; no cleanup timer runs.
+
+Deadlines advance through the installed scheduler from one local epoch anchor captured at installation. Default-clock deadlines remain comparable across pages and reopening. IndexedDB has no vector channel, so vector TTL targets fail before I/O with `UNSUPPORTED_CAPABILITY`.
+
+Text organization views use the configured namespace for the host default and namespace + "/" + orgId for every other organization. The same captured native client, namespace codec and Cookie scope remain in use. A configured namespace ending in "/" plus a canonical UUID rejects before native I/O; a bare UUID remains valid.
+
+dropOrg clears only that target, preserves other organizations and plugin prefixes, and leaves existing views reusable. Borrowed entities retain the original native atomic unique writer.
+
+IndexedDB maps dbName by the same rule. dropOrg makes the target connection close-pending, drains native transactions, and waits for that target's deleteDatabase request. New opens wait for the same request; existing views reopen afterward. Other instances close through their original versionchange handler.
+
+A foreign connection that refuses to close keeps native deletion pending; the host never resumes opening early and lets a late deletion destroy new data.
+
+localStorage declares changeFeed:true only after registering the actual localStorage and storage event source of the same Window. A Storage-like injection alone remains false. Original watch/subscribeChanges combine committed writes from this instance with native cross-document events, filtered by storageArea, namespace codec, and organization; host disposal releases the listener.
+
+The receiving controller numbers hints locally, without a native writer history sequence. Reread current data: delivery is neither per-write nor a native notification for other instances in the same page. Organization views retain watch with runtime capability admission and no backend close authority.
 
 ## Native Blob and File storage
 
-Select `indexedDbBlobFeature` from the dedicated subpath. It adds `store.api.blobs` and `scope.api.blobs`. Blob/File values use native structured clone; File name, type and lastModified survive reopening. The default store is `__migaia_blobs__`. Declare a different name with `{ storeName }`; declaration collisions fail before opening. Blob requests share the original record transaction, cancellation, quota normalization and rollback. Organization views use their actual database and original transaction owner. The Feature grants no database disposal method.
+Select `indexedDbBlobFeature` from the dedicated subpath. It adds `store.api.blobs` and `scope.api.blobs`. Blob/File values use native structured clone; File name, type and lastModified survive reopening. The default store is `__migaia_blobs__`. Declare a different name with `{ storeName }`; declaration collisions fail before opening.
+
+Blob requests share the original record transaction, cancellation, quota normalization and rollback. Organization views use their actual database and original transaction owner. The Feature grants no database disposal method.
 
 ```ts
 import { createStorageHost } from '@migaia/storage-host'
@@ -219,25 +239,49 @@ try {
 }
 ```
 
-With `indexedDbJournalFeature()` selected, IndexedDB supports `storageLogStore(hostOrOrg, 'indexed-db', { prefix })` from `@migaia/storage-host/journal`. Its private rows use an array-key namespace in the existing META store. Business `clearAll` leaves history intact; organization deletion invalidates old log handles, while the original business view can reopen. In cached mode, dispose a log before opening the same physical organization and prefix again. Native transactions commit head/state/records together and publish the cached index from the actual complete event.
+With `indexedDbJournalFeature()` selected, IndexedDB supports `storageLogStore(hostOrOrg, 'indexed-db', { prefix })` from `@migaia/storage-host/journal`. Its private rows use an array-key namespace in the existing META store. Business `clearAll` leaves history intact; organization deletion invalidates old log handles, while the original business view can reopen.
 
-Native Web Locks retain the original lifetime exclusion and cached path; a conflicting open reports LOCK_REJECTED. Without Web Locks or an actual private-factory declaration, the original namespace declares `indexExclusive:false`. storageLogStore remains available: each operation recovers/reads current lastSeq, state and records inside the original journal-store readwrite transaction, retaining no index across operations. Injected factories use the original cached path when Web Locks are available. `journalFactoryIsPrivate:true` applies only to an actual data universe confined to this realm without forwarding shared persistent storage; that path retains the original logical lock and cached owner. Object identity alone never proves isolation. This namespace support does not enable automatic global capture or opt-in undo by itself.
+In cached mode, dispose a log before opening the same physical organization and prefix again. Native transactions commit head/state/records together and publish the cached index from the actual complete event.
+
+Native Web Locks retain the original lifetime exclusion and cached path; a conflicting open reports LOCK_REJECTED. Without Web Locks or an actual private-factory declaration, the original namespace declares `indexExclusive:false`.
+
+storageLogStore remains available: each operation recovers/reads current lastSeq, state and records inside the original journal-store readwrite transaction, retaining no index across operations.
+
+Injected factories use the original cached path when Web Locks are available. `journalFactoryIsPrivate:true` applies only to an actual data universe confined to this realm without forwarding shared persistent storage; that path retains the original logical lock and cached owner.
+
+Object identity alone never proves isolation. This namespace support does not enable automatic global capture or opt-in undo by itself.
 
 ## IndexedDB global journal and explicit undo
 
 Inside the Host `journal` initializer, open native binlog and undo stores with the current org's `storageLogStore`, then pass those same objects to the logger plugins and `atomicBinlog` / `atomicUndo`. A logger with the undo plugin requires explicit `indexedDbUndo: true`; omission or false reports `UNSUPPORTED_CAPABILITY` before the business native transaction. The configured backend and org views expose `undo(txId)`, restored through the original transaction builder.
 
-Text, bytes, records, clear and absolute TTL metadata retain their actual write order in one native transaction, including repeated writes. Only native complete publishes the log index; rollback does not advance its sequence. A first org read also prepares that org's once-only configuration, and lazy expiry deletion commits with its log. All contract writers maintain native point revisions and retain tombstones after delete or clear, so clear/recreate by another non-journal contract handle also rejects stale undo with `UNDO_CONFLICT` before restoring any target. Undo compares physical images and restores the original absolute deadline without extending expiry.
+Text, bytes, records, clear and absolute TTL metadata retain their actual write order in one native transaction, including repeated writes. Only native complete publishes the log index; rollback does not advance its sequence. A first org read also prepares that org's once-only configuration, and lazy expiry deletion commits with its log.
 
-Native Features borrow IDBDatabase / IDBTransaction directly, beyond the current text, bytes and record image domain. An active commit journal rejects this combination with `UNSUPPORTED_CAPABILITY` before handing out the native handle. Blob and custom native Features remain available without a journal and with telemetry-only configuration. This limited combination awaits review of shared targets and codecs. Strict IndexedDB does not declare support for external WAL I/O after final image capture; that combination rejects before business I/O.
+All contract writers maintain native point revisions and retain tombstones after delete or clear, so clear/recreate by another non-journal contract handle also rejects stale undo with `UNDO_CONFLICT` before restoring any target. Undo compares physical images and restores the original absolute deadline without extending expiry.
 
-localStorage/sessionStorage/Cookie explicitly enable text transactions and multi-key writes with `redo: true` plus `journal.redoWal: logger.wal`. Native Web Locks are required. Every participant borrows the same actual WAL object with current pending visibility; matching targets or separate memoryLogStore caches do not establish sharing. A same-origin popup can directly borrow its opener's exact Logger/WAL. For persistence, one owner may hold an original storageLogStore on a separate IndexedDB backend; the enhanced text backend cannot carry its own WAL.
+Native Features borrow IDBDatabase / IDBTransaction directly, beyond the current text, bytes and record image domain. An active commit journal rejects this combination with `UNSUPPORTED_CAPABILITY` before handing out the native handle. Blob and custom native Features remain available without a journal and with telemetry-only configuration.
 
-The original transaction owner manages the text-only scope and read-own-draft behavior. It finishes encoding before wal.begin, then applies ordered assignments, binlog and complete, and finally publishes one invalidation and success. Apply/completion failure seals that instance and preserves pending; reopening or an already-open participating peer recovers under native protection before reading. Callback rollback applies nothing. Ordinary scalar/sync behavior remains when redo is absent; selected asynchronous journaling retains the original ASYNC_STAGE_IN_SYNC_ENTRY guard. Redo does not claim native atomicity. Undo/atomicBinlog/atomicUndo and raw native Feature handles reject before mutation in this combination. Automatic cross-page recovery between independent WAL caches is not promised.
+This limited combination awaits review of shared targets and codecs. Strict IndexedDB does not declare support for external WAL I/O after final image capture; that combination rejects before business I/O.
+
+localStorage/sessionStorage/Cookie explicitly enable text transactions and multi-key writes with `redo: true` plus `journal.redoWal: logger.wal`. Native Web Locks are required. Every participant borrows the same actual WAL object with current pending visibility; matching targets or separate memoryLogStore caches do not establish sharing. A same-origin popup can directly borrow its opener's exact Logger/WAL.
+
+For persistence, one owner may hold an original storageLogStore on a separate IndexedDB backend; the enhanced text backend cannot carry its own WAL.
+
+The original transaction owner manages the text-only scope and read-own-draft behavior. It finishes encoding before wal.begin, then applies ordered assignments, binlog and complete, and finally publishes one invalidation and success.
+
+Apply/completion failure seals that instance and preserves pending; reopening or an already-open participating peer recovers under native protection before reading. Callback rollback applies nothing.
+
+Ordinary scalar/sync behavior remains when redo is absent; selected asynchronous journaling retains the original ASYNC_STAGE_IN_SYNC_ENTRY guard.
+
+Redo does not claim native atomicity. Undo/atomicBinlog/atomicUndo and raw native Feature handles reject before mutation in this combination. Automatic cross-page recovery between independent WAL caches is not promised.
 
 While one instance has an active draft, its root reads, writes and other transactions immediately reject with `WRITE_CONFLICT`, including independent callers selecting `ConcurrencyPolicy.wait()`. Use the supplied scope inside the callback. This isolation prevents callback reentry from waiting on its own Web Lock; same-instance queued wait is not provided. Other instances still wait or cancel through native Web Locks. Behavior without redo remains unchanged.
 
-Cookie `redo: true` reuses this same transaction/WAL protocol. Ordinary and redo writes share the original cookie encoding, 4096-byte limit, fixed scope and visibility checks. Batch reads still parse one native visible header and merge the current draft. Redo resolves maxAge to an absolute expiresAt image during preparation, so replay never renews it. Values outside the native Date domain reject before mutation only in this new combination; ordinary Cookie maxAge and Max-Age precedence remain unchanged. Only JS-visible cookies participate; original HttpOnly/unknown-scope limits remain.
+Cookie `redo: true` reuses this same transaction/WAL protocol. Ordinary and redo writes share the original cookie encoding, 4096-byte limit, fixed scope and visibility checks. Batch reads still parse one native visible header and merge the current draft.
+
+Redo resolves maxAge to an absolute expiresAt image during preparation, so replay never renews it. Values outside the native Date domain reject before mutation only in this new combination; ordinary Cookie maxAge and Max-Age precedence remain unchanged.
+
+Only JS-visible cookies participate; original HttpOnly/unknown-scope limits remain.
 
 Ordinary localStorage, sessionStorage and Cookie stores declare `capabilities.batch: false`; IndexedDB with its batch Feature and explicit redo/WAL stores declare it true. Native IndexedDB handles are unavailable with commit journaling and reject with source `@migaia/storage-contract`, code `UNSUPPORTED_CAPABILITY`. IndexedDB does not provide a vector engine. The repository website stays on published storage-web 0.0.8 until the new host packages are published.
 
