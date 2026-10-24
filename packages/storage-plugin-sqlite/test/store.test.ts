@@ -957,6 +957,35 @@ describe('native SQLite installation', () => {
 })
 
 describe('native SQLite organizations', () => {
+  it('honors organization locks when the root supplies its existing organization context', async () => {
+    const { host, store } = await installed({ memory: true })
+    const orgId = createOrgId()
+    const organization = host.org(orgId).backend('sqlite')
+    const entered = deferred<void>()
+    const release = deferred<void>()
+    const holding = organization
+      .tx()
+      .lock(lockKey.text('held'))
+      .run(async (tx) => {
+        entered.resolve()
+        await release.promise
+        await tx.set('held', 'organization')
+      })
+    await entered.promise
+    try {
+      await expect(
+        store.set('held', 'root', {
+          orgId,
+          timeoutMs: 50,
+          concurrency: ConcurrencyPolicy.fail()
+        })
+      ).rejects.toMatchObject({ code: 'LOCK_REJECTED' })
+    } finally {
+      release.resolve()
+      await holding
+    }
+    expect(await organization.get('held')).toBe('organization')
+  })
   it('serializes root and organization attempts through one native connection', async () => {
     const native: string[] = []
     const { store, host } = await installed({ memory: true, native })

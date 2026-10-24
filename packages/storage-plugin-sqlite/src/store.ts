@@ -194,7 +194,12 @@ type ISqliteInternalScope<TValue> = ISqliteTransactionScope<TValue> & {
   readonly [counterOperations]: ITransactionCounterApi
 }
 /** Backend authoring state is supplied only by the original installation window. */
-export type ISqliteRuntime = { readonly core: IStoragePluginCore; readonly orgId: string }
+export type ISqliteRuntime = {
+  readonly core: IStoragePluginCore
+  readonly orgId: string
+  /** The original installation ensures a requested root context uses its existing org group. */
+  readonly ensureOrg?: (orgId: string) => void
+}
 /** Construction returns only exact provider/controller handles needed for original host admission. */
 export type ISqliteConstruction<TValue> = {
   readonly store: ISqliteStore<TValue>
@@ -447,8 +452,15 @@ export function createSqliteStore<TValue>(
       throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
         backend: SqliteNames.backend
       })
-    return orgId ?? runtime.orgId
+    const selected = orgId ?? runtime.orgId
+    if (shared === undefined && selected !== runtime.orgId) runtime.ensureOrg?.(selected)
+    return selected
   }
+  /** Every context uses the original physical file/table/org group, including root redirects. */
+  const localGroup = (orgId: string) =>
+    orgId === runtime.orgId
+      ? group!
+      : physicalGroups.get(physical)!.get(JSON.stringify([table, orgId]))!
   /** Root calls cannot borrow the connection while any actual native transaction owns it. */
   const assertRoot = (): void => {
     controller.assertLive()
@@ -534,7 +546,10 @@ export function createSqliteStore<TValue>(
             'get'
           )
         : undefined
-      state.baseline.set(id, wal ? Number(row?.revision ?? 0) : group!.revisions.read(channel, id))
+      state.baseline.set(
+        id,
+        wal ? Number(row?.revision ?? 0) : localGroup(state.orgId).revisions.read(channel, id)
+      )
     }
   }
   /** Every real mutation is tracked once for revision updates and post-commit publication. */
@@ -559,7 +574,8 @@ export function createSqliteStore<TValue>(
   const advanceRevisions = (state: INativeState): void => {
     if (wal) return
     for (const channel of ['text', 'bytes', 'record'] as const)
-      for (const id of state.changed.get(channel)?.keys() ?? []) group!.revisions.write(channel, id)
+      for (const id of state.changed.get(channel)?.keys() ?? [])
+        localGroup(state.orgId).revisions.write(channel, id)
   }
   /** One successful native COMMIT owns all ordinary and expiry change publication. */
   const publishChanges = (state: INativeState): void => {
@@ -1098,7 +1114,7 @@ export function createSqliteStore<TValue>(
                       value: write()
                     }))
                   )
-                : await group!.locks.attemptWrite(
+                : await localGroup(operationOrg(context)).locks.attemptWrite(
                     context,
                     {
                       owner: controller.origin,
@@ -1777,7 +1793,7 @@ export function createSqliteStore<TValue>(
     | { readonly keys: readonly ILockKey[]; readonly holder: IConcurrencyHolder | undefined }
     | undefined => {
     if (!wal) {
-      const holding = group!.locks.probe([], lockRanges(guard), current)
+      const holding = localGroup(orgId).locks.probe([], lockRanges(guard), current)
       return holding ? { keys: [holding.key], holder: holding.holder } : undefined
     }
     const conditions: string[] = []
@@ -2014,7 +2030,9 @@ export function createSqliteStore<TValue>(
                 )
               : undefined
             if (
-              (wal ? Number(row?.revision ?? 0) : group!.revisions.read(channel, id)) !== expected
+              (wal
+                ? Number(row?.revision ?? 0)
+                : localGroup(state.orgId).revisions.read(channel, id)) !== expected
             ) {
               rollbackNative()
               begun = false
@@ -2220,7 +2238,7 @@ export function createSqliteStore<TValue>(
           }
           return wal
             ? run()
-            : group!.locks.attempt(
+            : localGroup(operationOrg(context)).locks.attempt(
                 context,
                 {
                   owner: controller.origin,
@@ -2313,7 +2331,7 @@ export function createSqliteStore<TValue>(
             }
           }
         } else {
-          const held = group!.locks.probe(captured.identities, undefined, context)
+          const held = localGroup(orgId).locks.probe(captured.identities, undefined, context)
           if (held) conflict = { keys: [held.key], holder: held.holder }
         }
       }
@@ -2679,7 +2697,7 @@ export function createSqliteStore<TValue>(
           observe(concurrencyStages, 'beforeLockInspect')
           try {
             const inspect = () => {
-              if (!wal) return group!.locks.inspectLocks()
+              if (!wal) return localGroup(orgId).locks.inspectLocks()
               const rows = statement<readonly ISqliteRow[]>(
                 `SELECT key,owner,label,pid,since,expires_at FROM ${tables.locks} WHERE org_id=?`,
                 [orgId],
