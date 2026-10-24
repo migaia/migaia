@@ -73,11 +73,26 @@ memory 的记录过滤在客户端执行。换用数据库后端时，下推能�
 
 ## 使用实体仓储
 
+`/entity` 现在只包含定义、连接和基础读写。附加能力需从独立子路径显式装配；缺少装配时抛出 `source: @migaia/storage-host`、`code: ENTITY_FEATURE_REQUIRED`，消息写明所需导入。
+
+```ts
+import { defineEntity } from '@migaia/storage-host/entity'
+const users = defineEntity<{ id: string; name: string }>({ name: 'users', key: 'id' }).connect(
+  store
+)
+await users.put({ id: 'u1', name: 'Ada' })
+console.log(await users.get('u1'))
+```
+
+只在 `features` 中选择用到的单元：`/entity/query` 的 `entityQueryFeature()` 开启 query/list/stream；`/entity/indexes` 的 `entityIndexesFeature()` 开启索引声明和规划；`/entity/unique` 的 `entityUniqueFeature()` 开启唯一提交检查；`/entity/migration` 的 `entityMigrationFeature()` 开启版本计划和持久迁移；`/entity/keyset` 的 `entityKeysetFeature()` 准入 page/after。索引、unique 与持久迁移会复用查询操作，使用这些路径时也需声明 query；单元不会自动开启其他单元。
+
 `defineEntity<T>()({...})` 声明对象的主键与索引，`connect(store)` 连接实际后端。下面先写入，再用同一声明查询。
 
 ```ts doc-test=run
 import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
 import { defineEntity } from '@migaia/storage-host/entity'
+import { entityQueryFeature } from '@migaia/storage-host/entity/query'
+import { entityIndexesFeature } from '@migaia/storage-host/entity/indexes'
 
 type IOrder = { id: string; state: string; total: number }
 const host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
@@ -85,6 +100,7 @@ try {
   const orders = defineEntity<IOrder>()({
     name: 'orders',
     key: 'id',
+    features: [entityQueryFeature(), entityIndexesFeature()],
     indexes: { byState: { path: 'state' } }
   }).connect(host.backend('memory'))
   await orders.put({ id: 'o1', state: 'paid', total: 20 })
@@ -133,10 +149,10 @@ try {
 
 ```ts doc-test=run
 import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
-import { storageLogStore } from '@migaia/storage-host/journal'
+import { storageLogStore, storageJournalPlugin } from '@migaia/storage-host/journal'
 import { LogRecordState } from '@migaia/logger/plugins/durable'
 
-const host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+const host = await createStorageHost({ plugins: [storageJournalPlugin(), memoryBackendPlugin()] })
 try {
   const log = await storageLogStore(host, 'memory', { prefix: 'history' })
   try {
@@ -154,7 +170,7 @@ try {
 
 日志记录与业务键分开；业务枚举、clear 和容量限制不会操作日志。后端必须支持所需日志存储，打开时先恢复已确认状态。独占存储上的同一组织与前缀只允许一个打开句柄；支持共享事务的存储可允许多个句柄。序号不因截断而重用。写入是否提交无法确认时，日志停止接纳操作，应关闭后重新打开恢复。`dropOrg()` 后旧日志句柄报 `STORE_DISPOSED`。
 
-打开日志不等于开启自动业务日志。自动记录需要 `createStorageHost({ journal: ... })`；配置可以直接提供 `{ logger, namespace, ... }`，或用异步初始化函数为每个组织准备配置。初始化函数接收 `orgId` 和异步 `storageLogStore(id, { prefix })`。宿主借用 logger，不负责 shutdown。
+打开日志不等于开启自动业务日志。自动记录需要 `createStorageHost({ plugins: [storageJournalPlugin(), backend], journal: ... })`；配置可以直接提供 `{ logger, namespace, ... }`，或用异步初始化函数为每个组织准备配置。初始化函数接收 `orgId` 和异步 `storageLogStore(id, { prefix })`。宿主借用 logger，不负责 shutdown。
 
 根据需要选择 binlog、WAL、undo 与同事务日志对象。`atomicBinlog` / `atomicUndo` 按后端 ID 指定真实日志存储；需要它们与业务后端能在同一事务提交。其它组合是否可用由实际后端支持决定，不支持会在业务修改前拒绝。外置 binlog 追加失败会报告，已提交业务数据不回滚；结果未知不能通过盲目重放写入恢复。undo 先检查记录与修订，冲突为 `UNDO_CONFLICT`，缺失为 `UNDO_NOT_FOUND`。
 
@@ -175,3 +191,31 @@ try {
 显式 `host.dispose()` 等待已接纳工作，保留关闭错误，重复调用复用同一 Promise。`await using host = ...` 也可以释放；该入口把清理失败送到报告渠道，避免替换外层主错误。结束前先完成数据读取与迭代器消费，不在关闭后继续调用保存的句柄。
 
 后端实现者的运行时导入变更见 [README 迁移表](./README.md#后端作者入口迁移) 与 [contract 入口表](../storage-contract/README.md#入口与依赖方向)。
+
+## 显式装配可选能力
+
+基础宿主不导入 journal runtime、通知控制器或变更迭代器。此前 journal 选项会自动加载日志实现，memory 默认提供变更通知和 watch；现在这些能力由业务显式选择，避免基础存读包含未使用代码。
+
+使用 journal 选项或 `storageLogStore()` 前，在同一插件列表中把从 `@migaia/storage-host/journal` 导入的 `storageJournalPlugin()` 放到后端前。缺少插件时报 `JOURNAL_NOT_ASSEMBLED`。配置格式、日志内容和事务提交语义保持原契约。
+
+memory 通知和变更流分别由两个 Feature 装配：
+
+```ts
+import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { memoryNotificationsFeature } from '@migaia/storage-host/features/memory-notifications'
+import { memoryChangeFeedFeature } from '@migaia/storage-host/features/memory-change-feed'
+
+const host = await createStorageHost({
+  plugins: [
+    memoryBackendPlugin(undefined, {
+      notifications: memoryNotificationsFeature(),
+      changeFeed: memoryChangeFeedFeature()
+    })
+  ]
+})
+await host.dispose()
+```
+
+未选择变更流时，memory 的 `capabilities.changeFeed` 为 `false`；调用 watch 报 `CHANGE_ITERATOR_NOT_ASSEMBLED`。只选通知可调用 `subscribeChanges()`；变更流依赖通知，缺少通知时报 `CHANGE_CONTROLLER_NOT_ASSEMBLED`。基础读写与物理资源关闭仍由轻量生命周期 owner 负责。
+
+后端作者从 `/authoring/change-controller` 导入通知工厂，并显式传给 `core.createChangeController(options, createBackendChangeController)`。基础物理资源可使用同入口的 `createBackendLifecycleController`。变更迭代器改从 `/authoring/change-iterator` 导入，不再从 `/authoring/backend` 转出。

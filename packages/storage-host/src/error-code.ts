@@ -1,5 +1,11 @@
 /** Canonical host boundary codes. */
 export const StorageErrorCode = {
+  /** Journal configuration requires the explicit /journal plugin before backend installation. */
+  journalNotAssembled: 'JOURNAL_NOT_ASSEMBLED',
+  /** Notification construction requires an explicit controller factory or backend Feature. */
+  changeControllerNotAssembled: 'CHANGE_CONTROLLER_NOT_ASSEMBLED',
+  /** Change-feed calls require the explicit iterator Feature before creating an iterator. */
+  changeIteratorNotAssembled: 'CHANGE_ITERATOR_NOT_ASSEMBLED',
   /**
    * A backend definition contains an invalid identifier. Callers must correct the bounded backend
    * ID before retrying installation.
@@ -49,6 +55,11 @@ export const StorageErrorCode = {
   backendKindMismatch: 'BACKEND_KIND_MISMATCH',
   /** Schema or codec configuration is malformed; repair its descriptor before retrying. */
   invalidConfig: 'INVALID_CONFIG',
+  /**
+   * An entity optional operation or declaration lacks its explicit subpath Feature; install the
+   * named unit before retrying.
+   */
+  entityFeatureRequired: 'ENTITY_FEATURE_REQUIRED',
   /** A schema rejects a value or returns invalid output; inspect the original validation cause. */
   validationFailed: 'VALIDATION_FAILED',
   /** Encoding rejects the value before backend I/O; inspect the codec failure on cause. */

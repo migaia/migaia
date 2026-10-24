@@ -1,3 +1,4 @@
+import { storageJournalPlugin } from '../src/journal.js'
 import { describe, expect, it } from 'vitest'
 import { lockKey } from '../src/authoring/concurrency.js'
 import { rdf, vector, ttl, type IQuad } from '@migaia/storage-contract'
@@ -8,7 +9,9 @@ import { memoryJournalDeadlineTarget } from '../src/backends/memory-journal-imag
 
 describe('original memory journal images', () => {
   it('restores exact text, byte, record and deadline images through the same native draft', async () => {
-    await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+    await using host = await createStorageHost({
+      plugins: [storageJournalPlugin(), memoryBackendPlugin()]
+    })
     const store = host.backend('memory')
     const binding = resolveStorageJournalBinding(host, 'memory').binding
     const key = [new Date(0), new Uint8Array([7]).buffer]
@@ -61,7 +64,9 @@ describe('original memory journal images', () => {
   })
 
   it('uses logical RDF graphs and the existing collection configuration for native image restoration', async () => {
-    await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+    await using host = await createStorageHost({
+      plugins: [storageJournalPlugin(), memoryBackendPlugin()]
+    })
     const store = host.backend('memory')
     const binding = resolveStorageJournalBinding(host, 'memory').binding
     const collection = store.use(vector).collection('points', { dimensions: 2, metric: 'dot' })
@@ -98,7 +103,9 @@ describe('original memory journal images', () => {
   })
 
   it('keeps rollback, exact org authority and the ordinary structured-clone domain', async () => {
-    await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+    await using host = await createStorageHost({
+      plugins: [storageJournalPlugin(), memoryBackendPlugin()]
+    })
     const store = host.backend('memory')
     const binding = resolveStorageJournalBinding(host, 'memory').binding
     const foreign = resolveStorageJournalBinding(host.org(createOrgId()), 'memory').binding

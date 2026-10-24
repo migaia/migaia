@@ -1,3 +1,5 @@
+import { memoryNotificationsFeature } from '../../src/features/memory-notifications.js'
+import { memoryChangeFeedFeature } from '../../src/features/memory-change-feed.js'
 import { describe, expect, it, onTestFinished } from 'vitest'
 import { runConformance, type IConformanceHarness } from '@migaia/storage-contract/conformance'
 import { kv, records, ttl, counter, vector, rdf, blob } from '@migaia/storage-contract'
@@ -22,7 +24,14 @@ runConformance(harness, {
   },
   create: async () => {
     /** Every case receives an empty original host; its owner also releases registration resources. */
-    const host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+    const host = await createStorageHost({
+      plugins: [
+        memoryBackendPlugin(undefined, {
+          notifications: memoryNotificationsFeature(),
+          changeFeed: memoryChangeFeedFeature()
+        })
+      ]
+    })
     onTestFinished(() => host.dispose())
     return host.backend('memory')
   }

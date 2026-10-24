@@ -1,3 +1,5 @@
+import { memoryNotificationsFeature } from '../src/features/memory-notifications.js'
+import { memoryChangeFeedFeature } from '../src/features/memory-change-feed.js'
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import { assertTransactionOwner } from '../src/authoring/transaction.js'
@@ -59,12 +61,25 @@ const scopedFeature = () =>
 
 describe('Feature transaction methods on original native views', () => {
   it('binds exact operation views and preserves expiry without adding an API to unselected scopes', async () => {
-    await using plain = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+    await using plain = await createStorageHost({
+      plugins: [
+        memoryBackendPlugin(undefined, {
+          notifications: memoryNotificationsFeature(),
+          changeFeed: memoryChangeFeedFeature()
+        })
+      ]
+    })
     await plain
       .backend('memory')
       .transaction((scope) => expect(Object.hasOwn(scope, 'api')).toBe(false))
     await using host = await createStorageHost({
-      plugins: [memoryBackendPlugin(undefined, { scoped: scopedFeature() })]
+      plugins: [
+        memoryBackendPlugin(undefined, {
+          scoped: scopedFeature(),
+          notifications: memoryNotificationsFeature(),
+          changeFeed: memoryChangeFeedFeature()
+        })
+      ]
     })
     const store = host.backend('memory')
     expect(await store.api.identity()).toBe(store)
@@ -98,7 +113,13 @@ describe('Feature transaction methods on original native views', () => {
 
   it('drains unawaited Feature operations and keeps a caught method failure as the original first failure', async () => {
     await using host = await createStorageHost({
-      plugins: [memoryBackendPlugin(undefined, { scoped: scopedFeature() })]
+      plugins: [
+        memoryBackendPlugin(undefined, {
+          scoped: scopedFeature(),
+          notifications: memoryNotificationsFeature(),
+          changeFeed: memoryChangeFeedFeature()
+        })
+      ]
     })
     const store = host.backend('memory')
     /** The original operation owner admits the entire async method before the callback returns. */
@@ -133,7 +154,13 @@ describe('Feature transaction methods on original native views', () => {
 
   it('mixes selected fluent methods into original branches and guards saved endpoints after disposal', async () => {
     const host = await createStorageHost({
-      plugins: [memoryBackendPlugin(undefined, { scoped: scopedFeature() })]
+      plugins: [
+        memoryBackendPlugin(undefined, {
+          scoped: scopedFeature(),
+          notifications: memoryNotificationsFeature(),
+          changeFeed: memoryChangeFeedFeature()
+        })
+      ]
     })
     const store = host.backend('memory')
     const builder = store.tx()
@@ -169,7 +196,13 @@ describe('Feature transaction methods on original native views', () => {
         api: { store: {}, transaction: {} }
       }))
     const failure = await createStorageHost({
-      plugins: [memoryBackendPlugin(undefined, { duplicate: duplicate() })]
+      plugins: [
+        memoryBackendPlugin(undefined, {
+          duplicate: duplicate(),
+          notifications: memoryNotificationsFeature(),
+          changeFeed: memoryChangeFeedFeature()
+        })
+      ]
     }).catch((error: unknown) => error)
     expect(failure).toMatchObject({ code: 'BACKEND_INSTALL_FAILED' })
     /** Native installation adds finite original wrapper boundaries around the semantic rejection. */
@@ -194,7 +227,14 @@ describe('Feature transaction methods on original native views', () => {
       }
     }))
     await using host = await createStorageHost({
-      plugins: [memoryBackendPlugin(undefined, { scoped: scopedFeature() }), intervention]
+      plugins: [
+        memoryBackendPlugin(undefined, {
+          scoped: scopedFeature(),
+          notifications: memoryNotificationsFeature(),
+          changeFeed: memoryChangeFeedFeature()
+        }),
+        intervention
+      ]
     })
     const builder = host.backend('memory').tx()
     expect(builder.mark()).toBe(builder)
@@ -233,7 +273,16 @@ describe('Feature transaction methods on original native views', () => {
       }
     }
     await using host = await createStorageHost({
-      plugins: [definePlugin('left', factory, features), memoryBackendPlugin({ id: 'right' })]
+      plugins: [
+        definePlugin('left', factory, features),
+        memoryBackendPlugin(
+          { id: 'right' },
+          {
+            notifications: memoryNotificationsFeature(),
+            changeFeed: memoryChangeFeedFeature()
+          }
+        )
+      ]
     })
     await expect(
       host.backend('right').transaction(async (scope) => {
@@ -258,7 +307,13 @@ describe('Feature transaction methods on original native views', () => {
       }
     }))
     await using host = await createStorageHost({
-      plugins: [memoryBackendPlugin(undefined, { feature })]
+      plugins: [
+        memoryBackendPlugin(undefined, {
+          feature,
+          notifications: memoryNotificationsFeature(),
+          changeFeed: memoryChangeFeedFeature()
+        })
+      ]
     })
     const store = host.backend('memory')
     await store.transaction(async (scope) => {

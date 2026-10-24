@@ -1,3 +1,6 @@
+import { memoryNotificationsFeature } from '../src/features/memory-notifications.js'
+import { memoryChangeFeedFeature } from '../src/features/memory-change-feed.js'
+import { storageJournalPlugin } from '../src/journal.js'
 import { describe, expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import { lockKey } from '../src/authoring/concurrency.js'
@@ -102,7 +105,15 @@ function delayedCommittedPlugin(delay: {
 
 describe('original native log append port', () => {
   it('requires the original finite undo opt-in before opening a native terminal', async () => {
-    await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+    await using host = await createStorageHost({
+      plugins: [
+        storageJournalPlugin(),
+        memoryBackendPlugin(undefined, {
+          notifications: memoryNotificationsFeature(),
+          changeFeed: memoryChangeFeedFeature()
+        })
+      ]
+    })
     await using images = await storageLogStore(host, 'memory', { prefix: 'opt-in-images' })
     const logger = new Logger({
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
@@ -156,7 +167,9 @@ describe('original native log append port', () => {
       entered: deferred<void>(),
       release: deferred<void>()
     }
-    await using host = await createStorageHost({ plugins: [delayedCommittedPlugin(delay)] })
+    await using host = await createStorageHost({
+      plugins: [storageJournalPlugin(), delayedCommittedPlugin(delay)]
+    })
     await using external = memoryLogStore()
     await using intents = memoryLogStore()
     await using walRecords = memoryLogStore()
@@ -254,7 +267,9 @@ describe('original native log append port', () => {
       entered: deferred<void>(),
       release: deferred<void>()
     }
-    await using host = await createStorageHost({ plugins: [delayedCommittedPlugin(delay)] })
+    await using host = await createStorageHost({
+      plugins: [storageJournalPlugin(), delayedCommittedPlugin(delay)]
+    })
     await using log = await storageLogStore(host, 'data', { prefix: 'ordinary' })
     expect(await log.append([{ kind: 'ordinary', payload: null }])).toEqual([1])
     const native = resolveStorageLogNativeAccess(log)
@@ -267,7 +282,9 @@ describe('original native log append port', () => {
   })
   it('publishes ordinary committed indexes before a waiting native owner can commit the next head', async () => {
     const delay = { hold: false, entered: deferred<void>(), release: deferred<void>() }
-    await using host = await createStorageHost({ plugins: [delayedCommittedPlugin(delay)] })
+    await using host = await createStorageHost({
+      plugins: [storageJournalPlugin(), delayedCommittedPlugin(delay)]
+    })
     await using log = await storageLogStore(host, 'data', { prefix: 'history' })
     const native = resolveStorageLogNativeAccess(log)
     const notices: unknown[] = []
@@ -297,7 +314,15 @@ describe('original native log append port', () => {
   })
 
   it('shares one real attempt across fresh views, concurrent batches and one post-commit notice', async () => {
-    await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+    await using host = await createStorageHost({
+      plugins: [
+        storageJournalPlugin(),
+        memoryBackendPlugin(undefined, {
+          notifications: memoryNotificationsFeature(),
+          changeFeed: memoryChangeFeedFeature()
+        })
+      ]
+    })
     await using log = await storageLogStore(host, 'memory', { prefix: 'history' })
     const native = resolveStorageLogNativeAccess(log)
     const prepared = deferred<void>()
@@ -338,7 +363,15 @@ describe('original native log append port', () => {
   })
 
   it('bypasses an ordinary FIFO waiting for its head and leaves rollback and wrong org invisible', async () => {
-    await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+    await using host = await createStorageHost({
+      plugins: [
+        storageJournalPlugin(),
+        memoryBackendPlugin(undefined, {
+          notifications: memoryNotificationsFeature(),
+          changeFeed: memoryChangeFeedFeature()
+        })
+      ]
+    })
     await using log = await storageLogStore(host, 'memory', { prefix: 'history' })
     const native = resolveStorageLogNativeAccess(log)
     const notices: unknown[] = []

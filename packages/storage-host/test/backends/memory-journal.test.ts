@@ -1,3 +1,4 @@
+import { storageJournalPlugin } from '../../src/journal.js'
 import { describe, expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import { ConcurrencyPolicy } from '../../src/authoring/concurrency.js'
@@ -16,7 +17,7 @@ describe('memory private journal binding', () => {
     const defaultOrg = createOrgId()
     await using host = await createStorageHost({
       org: defaultOrg,
-      plugins: [memoryBackendPlugin({ namespace: 'configured' })]
+      plugins: [storageJournalPlugin(), memoryBackendPlugin({ namespace: 'configured' })]
     })
     const firstOrg = host.org(createOrgId())
     const secondOrg = host.org(createOrgId())
@@ -63,7 +64,9 @@ describe('memory private journal binding', () => {
   })
 
   it('holds the original fixed resource lease separately from ordinary head transactions', async () => {
-    await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+    await using host = await createStorageHost({
+      plugins: [storageJournalPlugin(), memoryBackendPlugin()]
+    })
     const store = host.backend('memory')
     const access = resolveStorageJournalBinding(host, 'memory')
     const namespace = await access.binding.openNamespace('owned')
@@ -83,7 +86,9 @@ describe('memory private journal binding', () => {
   })
 
   it('publishes private rows with business data only after the original commit and leaves rollback invisible', async () => {
-    await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+    await using host = await createStorageHost({
+      plugins: [storageJournalPlugin(), memoryBackendPlugin()]
+    })
     const store = host.backend('memory')
     await using namespace = await resolveStorageJournalBinding(
       host,
@@ -141,7 +146,9 @@ describe('memory private journal binding', () => {
   })
 
   it('uses original scope admission, optimistic conflict and complete accepted-terminal draining', async () => {
-    await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+    await using host = await createStorageHost({
+      plugins: [storageJournalPlugin(), memoryBackendPlugin()]
+    })
     const store = host.backend('memory')
     const access = resolveStorageJournalBinding(host, 'memory')
     const namespace = await access.binding.openNamespace('history')
@@ -214,7 +221,9 @@ describe('memory private journal binding', () => {
   })
 
   it('reports terminal listener failures without changing the actual data result', async () => {
-    await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+    await using host = await createStorageHost({
+      plugins: [storageJournalPlugin(), memoryBackendPlugin()]
+    })
     await using namespace = await resolveStorageJournalBinding(
       host,
       'memory'

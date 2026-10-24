@@ -1,3 +1,6 @@
+import { memoryNotificationsFeature } from '../src/features/memory-notifications.js'
+import { memoryChangeFeedFeature } from '../src/features/memory-change-feed.js'
+import { storageJournalPlugin } from '../src/journal.js'
 import { describe, expect, it, vi } from 'vitest'
 import { LogRecordState } from '@migaia/logger/plugins/durable'
 import { deferred } from '@migaia/utils/promise'
@@ -97,6 +100,7 @@ describe('private storage log resource', () => {
     const beforeRun = vi.fn()
     await using host = await createStorageHost({
       plugins: [
+        storageJournalPlugin(),
         nonAtomicPrivatePlugin({
           indexExclusive: false,
           beforeRun,
@@ -136,7 +140,15 @@ describe('private storage log resource', () => {
     expect(beforeRun.mock.calls.length).toBeGreaterThan(6)
   })
   it('attributes malformed owned payloads to the journal wire while retaining the canonical validator cause', async () => {
-    await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+    await using host = await createStorageHost({
+      plugins: [
+        storageJournalPlugin(),
+        memoryBackendPlugin(undefined, {
+          notifications: memoryNotificationsFeature(),
+          changeFeed: memoryChangeFeedFeature()
+        })
+      ]
+    })
     await using raw = await resolveStorageJournalBinding(host, 'memory').binding.openNamespace(
       'corrupt-payload'
     )
@@ -159,7 +171,15 @@ describe('private storage log resource', () => {
     })
   })
   it('preserves the original exhausted sequence error without sealing committed reads', async () => {
-    await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+    await using host = await createStorageHost({
+      plugins: [
+        storageJournalPlugin(),
+        memoryBackendPlugin(undefined, {
+          notifications: memoryNotificationsFeature(),
+          changeFeed: memoryChangeFeedFeature()
+        })
+      ]
+    })
     await using raw = await resolveStorageJournalBinding(host, 'memory').binding.openNamespace(
       'exhausted'
     )
@@ -184,7 +204,16 @@ describe('private storage log resource', () => {
   })
   it('isolates original organizations, survives business clear and preserves watermarks across reopening', async () => {
     const orgId = createOrgId()
-    await using host = await createStorageHost({ org: orgId, plugins: [memoryBackendPlugin()] })
+    await using host = await createStorageHost({
+      org: orgId,
+      plugins: [
+        storageJournalPlugin(),
+        memoryBackendPlugin(undefined, {
+          notifications: memoryNotificationsFeature(),
+          changeFeed: memoryChangeFeedFeature()
+        })
+      ]
+    })
     const first = host.org(createOrgId())
     const second = host.org(createOrgId())
     const log = await storageLogStore(host, 'memory', { prefix: 'history' })
@@ -228,7 +257,15 @@ describe('private storage log resource', () => {
   })
 
   it('holds one original resource lease and preserves main/symbolic cleanup identity', async () => {
-    const host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+    const host = await createStorageHost({
+      plugins: [
+        storageJournalPlugin(),
+        memoryBackendPlugin(undefined, {
+          notifications: memoryNotificationsFeature(),
+          changeFeed: memoryChangeFeedFeature()
+        })
+      ]
+    })
     const log = await storageLogStore(host, 'memory', { prefix: 'exclusive' })
     await expect(storageLogStore(host, 'memory', { prefix: 'exclusive' })).rejects.toMatchObject({
       code: 'LOCK_REJECTED'
@@ -258,7 +295,15 @@ describe('private storage log resource', () => {
   })
 
   it('retains original numeric and JSON admission and reports rejected append observers once', async () => {
-    await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+    await using host = await createStorageHost({
+      plugins: [
+        storageJournalPlugin(),
+        memoryBackendPlugin(undefined, {
+          notifications: memoryNotificationsFeature(),
+          changeFeed: memoryChangeFeedFeature()
+        })
+      ]
+    })
     await using log = await storageLogStore(host, 'memory', { prefix: 'admission' })
     await expect(log.read(0, 1)).rejects.toMatchObject({
       name: 'RangeError',
@@ -296,7 +341,7 @@ describe('private storage log resource', () => {
         }
       }
     })
-    await using host = await createStorageHost({ plugins: [plugin] })
+    await using host = await createStorageHost({ plugins: [storageJournalPlugin(), plugin] })
     const log = await storageLogStore(host, 'history', { prefix: 'head' })
     fail = true
     await expect(log.append([{ kind: 'uncertain', payload: 1 }])).rejects.toMatchObject({
@@ -344,7 +389,7 @@ describe('private storage log resource', () => {
         }
       }
     })
-    await using host = await createStorageHost({ plugins: [plugin] })
+    await using host = await createStorageHost({ plugins: [storageJournalPlugin(), plugin] })
     let log = await storageLogStore(host, 'history', { prefix: 'state' })
     await log.append([
       { kind: 'one', payload: null },
@@ -381,7 +426,7 @@ describe('private storage log resource', () => {
         }
       }
     })
-    const host = await createStorageHost({ plugins: [plugin] })
+    const host = await createStorageHost({ plugins: [storageJournalPlugin(), plugin] })
     const log = await storageLogStore(host, 'history', { prefix: 'drain' })
     hold = true
     const append = log.append([{ kind: 'accepted', payload: null }])

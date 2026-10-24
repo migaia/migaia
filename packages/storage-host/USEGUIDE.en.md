@@ -73,11 +73,26 @@ Strings, bytes and records have channel-conflict rules for the same logical key.
 
 ## Use an entity repository
 
+`/entity` provides definition, connection and basic reads/writes. Optional operations require explicit subpath units. Missing units throw `ENTITY_FEATURE_REQUIRED` with `source: @migaia/storage-host` and name the required import.
+
+```ts
+import { defineEntity } from '@migaia/storage-host/entity'
+const users = defineEntity<{ id: string; name: string }>({ name: 'users', key: 'id' }).connect(
+  store
+)
+await users.put({ id: 'u1', name: 'Ada' })
+console.log(await users.get('u1'))
+```
+
+Select only required units in `features`: `entityQueryFeature()` from `/entity/query` adds query/list/stream; `entityIndexesFeature()` from `/entity/indexes` adds index declaration/planning; `entityUniqueFeature()` from `/entity/unique` adds unique commit checks; `entityMigrationFeature()` from `/entity/migration` adds version plans and persisted migration; `entityKeysetFeature()` from `/entity/keyset` admits page/after. Index, unique and persisted migration paths reuse query operations, so also declare query for those paths. Units never enable another unit implicitly.
+
 `defineEntity<T>()({...})` declares an object's primary key and indexes. `connect(store)` attaches it to a backend. This example writes first, then queries through the same definition.
 
 ```ts doc-test=run
 import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
 import { defineEntity } from '@migaia/storage-host/entity'
+import { entityQueryFeature } from '@migaia/storage-host/entity/query'
+import { entityIndexesFeature } from '@migaia/storage-host/entity/indexes'
 
 type IOrder = { id: string; state: string; total: number }
 const host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
@@ -85,6 +100,7 @@ try {
   const orders = defineEntity<IOrder>()({
     name: 'orders',
     key: 'id',
+    features: [entityQueryFeature(), entityIndexesFeature()],
     indexes: { byState: { path: 'state' } }
   }).connect(host.backend('memory'))
   await orders.put({ id: 'o1', state: 'paid', total: 20 })
@@ -133,10 +149,10 @@ Install the optional `@migaia/logger` peer first. `storageLogStore()` is asynchr
 
 ```ts doc-test=run
 import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
-import { storageLogStore } from '@migaia/storage-host/journal'
+import { storageLogStore, storageJournalPlugin } from '@migaia/storage-host/journal'
 import { LogRecordState } from '@migaia/logger/plugins/durable'
 
-const host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+const host = await createStorageHost({ plugins: [storageJournalPlugin(), memoryBackendPlugin()] })
 try {
   const log = await storageLogStore(host, 'memory', { prefix: 'history' })
   try {
@@ -154,7 +170,7 @@ try {
 
 Log records are separate from business keys. Business enumeration, clear and capacity limits do not touch them. A backend must support the required log storage; opening it first recovers confirmed state. Exclusive storage permits one open handle for an organization and prefix, while shared transactional storage may permit several. Truncation does not reuse sequence numbers. An unconfirmed write stops further operations: close and reopen the log to recover. Old log handles reject with `STORE_DISPOSED` after `dropOrg()`.
 
-Opening a log does not enable automatic business logging. Configure `createStorageHost({ journal: ... })` for that. Supply `{ logger, namespace, ... }` directly, or use an asynchronous initializer for each organization. The initializer receives `orgId` and asynchronous `storageLogStore(id, { prefix })`. The host borrows the logger and does not shut it down.
+Opening a log does not enable automatic business logging. Configure `createStorageHost({ plugins: [storageJournalPlugin(), backend], journal: ... })` for that. Supply `{ logger, namespace, ... }` directly, or use an asynchronous initializer for each organization. The initializer receives `orgId` and asynchronous `storageLogStore(id, { prefix })`. The host borrows the logger and does not shut it down.
 
 Choose binlog, WAL, undo and same-transaction log stores as needed. `atomicBinlog` / `atomicUndo` select real log stores by backend ID and require a shared transaction with the business backend. Other combinations depend on backend support and reject before business mutation when unavailable. Failed external binlog appends are reported without rolling back committed business data. Do not recover unknown results by blindly replaying writes. Undo checks stored data and revisions first; conflicts use `UNDO_CONFLICT`, and missing history uses `UNDO_NOT_FOUND`.
 
@@ -175,3 +191,31 @@ Business failures reject the operation's Promise. Observer and reporting-callbac
 Explicit `host.dispose()` waits for work already started, preserves cleanup failures and reuses its Promise. `await using host = ...` also releases resources, but reports cleanup failures instead of replacing an outer primary error. Finish reading data and consuming iterators before shutdown; do not continue using saved handles afterwards.
 
 For backend implementations, see the [README migration table](./README.en.md#moving-backend-authoring-imports) and [contract entry table](../storage-contract/README.en.md#entries-and-dependency-direction).
+
+## Assemble optional capabilities explicitly
+
+The base host does not import journal runtime, notification controllers or change iterators. Previously journal options loaded logging automatically and memory enabled notifications and watch by default. Applications now select these capabilities so basic reads and writes do not include unused code.
+
+Before using journal options or `storageLogStore()`, import `storageJournalPlugin()` from `@migaia/storage-host/journal` and place it before the backend in the same plugin list. Missing assembly raises `JOURNAL_NOT_ASSEMBLED`. Journal configuration, stored records and transaction semantics retain their existing contract.
+
+Memory notifications and feeds use separate Feature roots:
+
+```ts
+import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { memoryNotificationsFeature } from '@migaia/storage-host/features/memory-notifications'
+import { memoryChangeFeedFeature } from '@migaia/storage-host/features/memory-change-feed'
+
+const host = await createStorageHost({
+  plugins: [
+    memoryBackendPlugin(undefined, {
+      notifications: memoryNotificationsFeature(),
+      changeFeed: memoryChangeFeedFeature()
+    })
+  ]
+})
+await host.dispose()
+```
+
+Without the feed Feature, memory reports `capabilities.changeFeed: false` and watch raises `CHANGE_ITERATOR_NOT_ASSEMBLED`. Notifications alone enable `subscribeChanges()`. The feed requires notifications; omitting them raises `CHANGE_CONTROLLER_NOT_ASSEMBLED`. A lightweight lifecycle owner still closes physical resources and drains accepted writes.
+
+Backend authors import the controller factory from `/authoring/change-controller` and pass it explicitly to `core.createChangeController(options, createBackendChangeController)`. Basic physical resources can use `createBackendLifecycleController` from that entry. Import change iterators from `/authoring/change-iterator`; `/authoring/backend` no longer re-exports them.

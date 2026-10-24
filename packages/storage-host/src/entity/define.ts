@@ -1,10 +1,9 @@
+import { EntityFeatureName } from './constants.js'
 import { EntityText } from './text.js'
 import { passthrough } from '../schema/passthrough.js'
 import { createRepository } from './repository.js'
 import type { IEntityConnectStore } from './types.js'
 import type { ISchemaAdapter } from '../entity.js'
-import { type IMigrationStep } from '@migaia/storage-contract'
-import { createMigrationPlan } from '../authoring/migration.js'
 import type {
   IEntityDefinition,
   IEntityIndex,
@@ -15,9 +14,9 @@ import type {
   IEntityStoreQueryMethods
 } from './types.js'
 import { StorageError, StorageErrorCode } from '../errors.js'
-import { StorageErrorText } from '../error-text.js'
 import { assertCodec } from '@migaia/storage-contract'
-import { snapshotEntityIndexes } from './index-projection.js'
+import type { IRepositoryConfig } from './repository-shared.js'
+import { missingEntityFeature } from './assembly.js'
 
 type IEntityOptionsWithoutIndexes<TDomain, TStored> = Omit<
   IEntityOptions<TDomain, TStored, undefined>,
@@ -84,21 +83,6 @@ function defaultDiagnostic(message: string): void {
   const runtime = globalThis as typeof globalThis & { console?: { warn(value: string): void } }
   runtime.console?.warn(message)
 }
-/** Migration graph admission uses the canonical owner and preserves the original failure cause. */
-function entityMigrationPlan(
-  version: number,
-  steps: Readonly<Record<number, IMigrationStep>> | undefined
-) {
-  try {
-    return createMigrationPlan({ version, steps })
-  } catch (cause) {
-    throw new StorageError(
-      StorageErrorCode.invalidConfig,
-      { cause },
-      StorageErrorText.entityMigrationGraphIncomplete
-    )
-  }
-}
 /** One reusable declaration owns configuration while each connected repository owns its work. */
 class EntityDefinition<TDomain, TStored> {
   /** The original repository config type prevents a parallel declaration contract. */
@@ -131,15 +115,53 @@ class EntityDefinition<TDomain, TStored> {
     const codec = options.codec
     if (codec !== undefined) assertCodec(codec)
     this.version = options.version === undefined ? 1 : options.version
+    validateDefinition(options as IEntityOptions<TDomain, TStored>, this.version)
+    if (options.features !== undefined && !Array.isArray(options.features))
+      invalidDefinition(EntityText.featuresMustBeArray)
     /** Index declaration errors retain their original precedence before scalar/migration admission. */
-    const indexes = snapshotEntityIndexes<TDomain>(options.indexes)
+    const features = [...(options.features ?? [])]
+    /** Reject malformed or repeated explicit units before any definition callback executes. */
+    const declaredFeatures = new Set<string>()
+    for (const feature of features) {
+      if (
+        feature === null ||
+        typeof feature !== 'object' ||
+        typeof feature.name !== 'string' ||
+        typeof feature.create !== 'function' ||
+        (feature.configure !== undefined && typeof feature.configure !== 'function') ||
+        declaredFeatures.has(feature.name)
+      )
+        invalidDefinition(EntityText.featuresMustBeArray)
+      declaredFeatures.add(feature.name)
+    }
+    if (
+      options.indexes !== undefined &&
+      !features.some((feature) => feature.name === EntityFeatureName.indexes)
+    )
+      missingEntityFeature(EntityFeatureName.indexes)
+    if (
+      (this.version !== 1 || options.migrations !== undefined) &&
+      !features.some((feature) => feature.name === EntityFeatureName.migration)
+    )
+      missingEntityFeature(EntityFeatureName.migration)
+    const configured: Partial<IRepositoryConfig<TDomain, TStored>> = Object.assign(
+      {},
+      ...features.map((feature) => feature.configure?.(options))
+    )
+    const indexes = configured.indexes ?? {}
+    if (
+      Object.values(indexes).some((index) => index.definition.unique) &&
+      !features.some((feature) => feature.name === EntityFeatureName.unique)
+    )
+      missingEntityFeature(EntityFeatureName.unique)
     validateDefinition(options as IEntityOptions<TDomain, TStored>, this.version)
     this.name = options.name
     this.#configuration = {
       name: this.name,
       key: options.key,
       version: this.version,
-      migrationPlan: entityMigrationPlan(this.version, options.migrations),
+      migrationPlan: configured.migrationPlan,
+      features,
       schema,
       codec,
       validateOnRead: options.validateOnRead ?? true,

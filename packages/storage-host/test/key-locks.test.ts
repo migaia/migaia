@@ -1,3 +1,4 @@
+import { createBackendChangeController } from '../src/core/change-controller.js'
 import { asyncDisposeKey } from '@migaia/plugin-host'
 import { describe, expect, it, vi } from 'vitest'
 import { deferred, type IAbortSignal } from '@migaia/utils/promise'
@@ -50,7 +51,10 @@ async function fixture(shared?: IBackendKeyLockPort) {
       state = catalog(core)
       /** Preserve the original map disposer while the actual controller acquires its lifetime. */
       const nativeDispose = state.store.dispose
-      controller = core.createChangeController({ backend: 'catalog', finalize: nativeDispose })
+      controller = core.createChangeController(
+        { backend: 'catalog', finalize: nativeDispose },
+        createBackendChangeController
+      )
       state.store.dispose = () => controller.dispose()
       createTransactionOwner(
         state.store,

@@ -1,3 +1,8 @@
+import { entityQueryFeature } from '../../src/entity/query-feature.js'
+import { entityUniqueFeature } from '../../src/entity/unique-feature.js'
+import { entityMigrationFeature } from '../../src/entity/migration-feature.js'
+import { entityIndexesFeature } from '../../src/entity/indexes-feature.js'
+import { entityKeysetFeature } from '../../src/entity/keyset.js'
 import { expect, it, vi } from 'vitest'
 import { asyncDisposeKey } from '@migaia/plugin-host'
 import { deferred } from '@migaia/utils/promise'
@@ -17,6 +22,13 @@ import { memoryBackend } from '../helpers/memory.js'
 /** One domain definition drives root and authentic transaction queries. */
 type IRow = { id: string; group: string; score: number }
 const rows = defineEntity<IRow>()({
+  features: [
+    entityQueryFeature(),
+    entityUniqueFeature(),
+    entityMigrationFeature(),
+    entityIndexesFeature(),
+    entityKeysetFeature()
+  ],
   name: 'query-rows',
   key: 'id',
   indexes: { group: { path: 'group' } },
@@ -70,6 +82,13 @@ it('rolls back failed query patches and refuses identity changes before any enti
   const store = await memoryBackend()
   const primary = new Error('entity patch validation')
   const definition = defineEntity<IRow>()({
+    features: [
+      entityQueryFeature(),
+      entityUniqueFeature(),
+      entityMigrationFeature(),
+      entityIndexesFeature(),
+      entityKeysetFeature()
+    ],
     name: 'query-patch',
     key: 'id',
     schema: {
@@ -103,6 +122,13 @@ it('rolls back failed query patches and refuses identity changes before any enti
 it('deletes the actual selected physical record when migration changes its logical id', async () => {
   const store = await memoryBackend()
   const definition = defineEntity<IRow>()({
+    features: [
+      entityQueryFeature(),
+      entityUniqueFeature(),
+      entityMigrationFeature(),
+      entityIndexesFeature(),
+      entityKeysetFeature()
+    ],
     name: 'query-migrated',
     key: 'id',
     version: 2,
@@ -381,6 +407,13 @@ it('inherits installed query methods through the same original storage cell', as
 it('applies the default bounded comparator before limit and projection', async () => {
   const compare = vi.fn((left: IRow, right: IRow) => right.score - left.score)
   const repo = defineEntity<IRow>({
+    features: [
+      entityQueryFeature(),
+      entityUniqueFeature(),
+      entityMigrationFeature(),
+      entityIndexesFeature(),
+      entityKeysetFeature()
+    ],
     name: 'default-order',
     key: 'id',
     defaultOrderBy: compare
@@ -446,6 +479,13 @@ it('applies one invalid-record policy to index projection failures in root and t
   const original = new Error('invalid projected row')
   let rejectProjection = false
   const entity = defineEntity<IRow>()({
+    features: [
+      entityQueryFeature(),
+      entityUniqueFeature(),
+      entityMigrationFeature(),
+      entityIndexesFeature(),
+      entityKeysetFeature()
+    ],
     name: 'invalid-projection',
     key: 'id',
     onDiagnostic: () => {},

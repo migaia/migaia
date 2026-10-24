@@ -1,7 +1,7 @@
 import { asyncDisposeKey } from '@migaia/plugin-host'
 import { createBackendRevisionPort } from './revisions.js'
 import { createBackendKeyLockPort } from './key-locks.js'
-import type { IBackendChangeController } from '../core/change-controller.js'
+import type { IBackendChangeController } from '../core/change-types.js'
 import {
   StorageContractError,
   StorageContractErrorCode,
@@ -169,7 +169,8 @@ import {
 } from '../core/operation.js'
 import { createStorageOperationReporter, reportCleanupError } from '../core/operation-reporter.js'
 import { observeStorageBatch } from '../core/batch-observation.js'
-import { createBackendChangeIterator } from '../core/change-iterator.js'
+import type { IMemoryAssembly } from './memory-assembly.js'
+import { createMemoryLifecycleController } from './memory-lifecycle.js'
 import { StorageHookName } from '../hook-names.js'
 import {
   snapshotMemoryCapacity,
@@ -247,7 +248,7 @@ type IMemoryScope<T> = ITransactionScope<
 type IMemoryBase<T> = Omit<ISyncCapableStore<IRecordStore<T>>, 'transaction'> &
   IChangeFeedStore & {
     /** The original native source already provides record, vector and RDF invalidation watchers. */
-    readonly capabilities: IRecordStore<T>['capabilities'] & { readonly changeFeed: true }
+    readonly capabilities: IRecordStore<T>['capabilities'] & { readonly changeFeed: boolean }
     transaction<R>(
       run: (scope: IMemoryScope<T>) => R,
       options?: ITransactionOptions
@@ -338,9 +339,10 @@ type IMemoryAtomicWork<T, R> = {
 export function createMemoryBackend<T = unknown>(
   core: IStoragePluginCore,
   options: IMemoryOptions,
-  capacity: IMemoryCapacity | undefined = snapshotMemoryCapacity(options)
+  capacity: IMemoryCapacity | undefined = snapshotMemoryCapacity(options),
+  assembly: IMemoryAssembly = {}
 ) {
-  return new MemoryBackendOwner<T>(core, options, capacity).construct()
+  return new MemoryBackendOwner<T>(core, options, capacity, assembly).construct()
 }
 
 /** One installed memory backend owns physical organization namespaces and their lifecycle. */
@@ -357,14 +359,18 @@ class MemoryBackendOwner<T> {
   readonly #namespaces = new Map<string, ReturnType<typeof createMemoryNamespace<T>>>()
   /** One original controller governs admission and cleanup across the physical namespaces. */
   readonly #controller: IBackendChangeController
+  /** Explicit Feature roots select optional notification and iterator owners. */
+  readonly #assembly: IMemoryAssembly
 
   /** Validate the physical namespace before allocating its original lifecycle controller. */
   constructor(
     core: IStoragePluginCore,
     options: IMemoryOptions,
-    capacity: IMemoryCapacity | undefined
+    capacity: IMemoryCapacity | undefined,
+    assembly: IMemoryAssembly
   ) {
     this.#core = core
+    this.#assembly = assembly
     this.#options = options
     this.#capacity = capacity
     this.#namespace = resolveStorageNamespace(
@@ -372,11 +378,22 @@ class MemoryBackendOwner<T> {
       core.defaultOrgId,
       core.defaultOrgId
     )
-    this.#controller = core.createChangeController({
+    /** Base memory has no event channel; selected roots opt into the original notification owner. */
+    const controllerOptions = {
       backend: STORAGE_MEMORY_BACKEND,
       options: { namespace: this.#namespace },
       finalize: () => this.#finalize()
-    })
+    }
+    if (assembly.iterator !== undefined && assembly.controller === undefined)
+      throw new StorageError(
+        StorageErrorCode.changeControllerNotAssembled,
+        {},
+        StorageErrorText.changeControllerNotAssembled
+      )
+    this.#controller =
+      assembly.controller === undefined
+        ? createMemoryLifecycleController(controllerOptions)
+        : core.createChangeController(controllerOptions, assembly.controller)
   }
 
   /** Construct the default view and publish only the original native registration ports. */
@@ -412,7 +429,8 @@ class MemoryBackendOwner<T> {
       this.#controller,
       orgId,
       orgId === this.#core.defaultOrgId,
-      this.#capacity
+      this.#capacity,
+      this.#assembly
     )
     this.#namespaces.set(target, physical)
     return physical
@@ -544,6 +562,8 @@ type IMemoryNamespaceContext<T> = {
   readonly options: IMemoryOptions
   /** Original controller belongs to this physical namespace. */
   readonly controller: IBackendChangeController
+  /** Optional Feature owners were captured before native construction. */
+  readonly assembly: IMemoryAssembly
   /** Original orgId belongs to this physical namespace. */
   readonly orgId: string
   /** Original root belongs to this physical namespace. */
@@ -687,7 +707,8 @@ function createMemoryNamespace<T>(
   controller: IBackendChangeController,
   orgId: string,
   root: boolean,
-  capacity: IMemoryCapacity | undefined
+  capacity: IMemoryCapacity | undefined,
+  assembly: IMemoryAssembly
 ) {
   /** Initialize in the original order before the completed store can escape. */
   const namespaceContext = {
@@ -696,7 +717,8 @@ function createMemoryNamespace<T>(
     controller,
     orgId,
     root,
-    capacity
+    capacity,
+    assembly
   } as IMemoryNamespaceContext<T>
   namespaceContext.data = {
     value: new Map<string, IMemoryEntry>(),
@@ -1607,7 +1629,13 @@ function watchChanges<T>(
   ctx: IOperationContext | undefined,
   key?: string
 ): IStorageIterator<IStorageChange> {
-  return createBackendChangeIterator(namespaceContext.controller, {
+  if (namespaceContext.assembly.iterator === undefined)
+    throw new StorageError(
+      StorageErrorCode.changeIteratorNotAssembled,
+      {},
+      StorageErrorText.changeIteratorNotAssembled
+    )
+  return namespaceContext.assembly.iterator(namespaceContext.controller, {
     orgId: namespaceContext.orgId,
     channel,
     key,
@@ -1799,7 +1827,7 @@ function createMemoryNamespaceBase<T>(
       transactions: true,
       iteration: true,
       secondaryIndexes: false,
-      changeFeed: true,
+      changeFeed: namespaceContext.assembly.iterator !== undefined,
       maxValueBytes: undefined,
       opaqueEntries: false
     },

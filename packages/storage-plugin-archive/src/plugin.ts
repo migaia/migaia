@@ -1,3 +1,4 @@
+import { createBackendChangeController } from '@migaia/storage-host/authoring/change-controller'
 import {
   definePlugin,
   type IStorageBackendPluginHandle,
@@ -176,7 +177,7 @@ export function archivePlugin<const N extends string, T = ICollectionsCodecValue
           unsupported(cause)
         }
       })
-      const controller = core.createChangeController({ backend: Archive.backend })
+      const controller = core.createChangeController({ backend: Archive.backend }, createBackendChangeController)
       /** One named archive owns the borrowed backends; each flat function receives its org. */
       const archive = new ArchiveOperations(
         configuration,

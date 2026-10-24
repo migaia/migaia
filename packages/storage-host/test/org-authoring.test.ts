@@ -1,3 +1,4 @@
+import { createBackendChangeController } from '../src/core/change-controller.js'
 import { describe, expect, it } from 'vitest'
 import {
   createStorageHost,
@@ -35,7 +36,7 @@ function lazyBackend() {
         core.registerStore(root.store)
         core.registerChangeController(
           root.store,
-          core.createChangeController({ backend: 'catalog' })
+          core.createChangeController({ backend: 'catalog' }, createBackendChangeController)
         )
         core.registerOrgBinding(root.store, {
           backend: (orgId) => {
@@ -44,14 +45,17 @@ function lazyBackend() {
             if (existing !== undefined) return existing.store
             const ports = core.getOrgContext(orgId)
             const child = catalog({ ...core, ...ports })
-            const controller = port.createChangeController({
-              backend: 'catalog',
-              finalize: async () => {
-                finalized.push(orgId)
-                await child.store.dispose()
-                if (finalizeFailures.has(orgId)) throw finalizeFailures.get(orgId)
-              }
-            })
+            const controller = port.createChangeController(
+              {
+                backend: 'catalog',
+                finalize: async () => {
+                  finalized.push(orgId)
+                  await child.store.dispose()
+                  if (finalizeFailures.has(orgId)) throw finalizeFailures.get(orgId)
+                }
+              },
+              createBackendChangeController
+            )
             port.registerChangeController(child.store, controller)
             controllers.set(orgId, controller)
             children.set(orgId, child)
@@ -121,7 +125,9 @@ describe('installation-captured organization authoring', () => {
     await using host = await createStorageHost({ plugins: [fixture.plugin] })
     expect(host.backend('lazy').backend).toBe('catalog')
     expect(() => fixture.core().createOrgAuthoringPort()).toThrow()
-    expect(() => fixture.core().createChangeController({ backend: 'catalog' })).toThrow()
+    expect(() =>
+      fixture.core().createChangeController({ backend: 'catalog' }, createBackendChangeController)
+    ).toThrow()
     expect(() => fixture.core().createKeyLockPort()).toThrow()
     expect(() => fixture.core().createRevisionPort()).toThrow()
   })

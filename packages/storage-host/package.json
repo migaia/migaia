@@ -105,6 +105,42 @@
     "./authoring/capability": {
       "types": "./dist/authoring/capability.d.ts",
       "default": "./dist/authoring/capability.js"
+    },
+    "./entity/query": {
+      "types": "./dist/entity/query.d.ts",
+      "default": "./dist/entity/query.js"
+    },
+    "./entity/unique": {
+      "types": "./dist/entity/unique.d.ts",
+      "default": "./dist/entity/unique.js"
+    },
+    "./entity/migration": {
+      "types": "./dist/entity/migration.d.ts",
+      "default": "./dist/entity/migration.js"
+    },
+    "./entity/indexes": {
+      "types": "./dist/entity/indexes.d.ts",
+      "default": "./dist/entity/indexes.js"
+    },
+    "./entity/keyset": {
+      "types": "./dist/entity/keyset.d.ts",
+      "default": "./dist/entity/keyset.js"
+    },
+    "./authoring/change-controller": {
+      "types": "./dist/authoring/change-controller.d.ts",
+      "default": "./dist/authoring/change-controller.js"
+    },
+    "./authoring/change-iterator": {
+      "types": "./dist/authoring/change-iterator.d.ts",
+      "default": "./dist/authoring/change-iterator.js"
+    },
+    "./features/memory-notifications": {
+      "types": "./dist/features/memory-notifications.d.ts",
+      "default": "./dist/features/memory-notifications.js"
+    },
+    "./features/memory-change-feed": {
+      "types": "./dist/features/memory-change-feed.d.ts",
+      "default": "./dist/features/memory-change-feed.js"
     }
   },
   "publishConfig": {

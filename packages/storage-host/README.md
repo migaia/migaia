@@ -127,3 +127,32 @@ pnpm add --workspace @migaia/logger
 | SQL、SPARQL 与数据通道工具 | `/authoring/sql`、`/authoring/sparql`、相应通道入口           |
 
 完整路径和依赖说明见 [storage-contract](../storage-contract/README.md#入口与依赖方向)。旧 contract 根入口不保留这些运行时导出。
+
+实体装配变更：`/entity` 提供基础读写。旧版自动包含的查询、索引、unique 检查、迁移和 keyset，现需在 `features` 中声明对应 `/entity/*` 单元；业务只导入需要的单元。缺少时抛出 `ENTITY_FEATURE_REQUIRED`。迁移方式见[实体仓储](./USEGUIDE.md#使用实体仓储)。
+## 显式装配可选能力
+
+基础宿主不导入 journal runtime、通知控制器或变更迭代器。此前 journal 选项会自动加载日志实现，memory 默认提供变更通知和 watch；现在这些能力由业务显式选择，避免基础存读包含未使用代码。
+
+使用 journal 选项或 `storageLogStore()` 前，在同一插件列表中把从 `@migaia/storage-host/journal` 导入的 `storageJournalPlugin()` 放到后端前。缺少插件时报 `JOURNAL_NOT_ASSEMBLED`。配置格式、日志内容和事务提交语义保持原契约。
+
+memory 通知和变更流分别由两个 Feature 装配：
+
+```ts
+import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { memoryNotificationsFeature } from '@migaia/storage-host/features/memory-notifications'
+import { memoryChangeFeedFeature } from '@migaia/storage-host/features/memory-change-feed'
+
+const host = await createStorageHost({
+  plugins: [
+    memoryBackendPlugin(undefined, {
+      notifications: memoryNotificationsFeature(),
+      changeFeed: memoryChangeFeedFeature()
+    })
+  ]
+})
+await host.dispose()
+```
+
+未选择变更流时，memory 的 `capabilities.changeFeed` 为 `false`；调用 watch 报 `CHANGE_ITERATOR_NOT_ASSEMBLED`。只选通知可调用 `subscribeChanges()`；变更流依赖通知，缺少通知时报 `CHANGE_CONTROLLER_NOT_ASSEMBLED`。基础读写与物理资源关闭仍由轻量生命周期 owner 负责。
+
+后端作者从 `/authoring/change-controller` 导入通知工厂，并显式传给 `core.createChangeController(options, createBackendChangeController)`。基础物理资源可使用同入口的 `createBackendLifecycleController`。变更迭代器改从 `/authoring/change-iterator` 导入，不再从 `/authoring/backend` 转出。

@@ -1,3 +1,5 @@
+import { memoryNotificationsFeature } from '../../src/features/memory-notifications.js'
+import { memoryChangeFeedFeature } from '../../src/features/memory-change-feed.js'
 import { asyncDisposeKey } from '@migaia/plugin-host'
 import {
   kv,
@@ -14,7 +16,10 @@ import { composeRepositoryKey } from '../../src/entity/key.js'
 const hosts: IStorageResource[] = []
 /** Construct through the actual public plugin and original host installation path. */
 async function memoryBackend() {
-  const plugin = memoryBackendPlugin()
+  const plugin = memoryBackendPlugin(undefined, {
+    notifications: memoryNotificationsFeature(),
+    changeFeed: memoryChangeFeedFeature()
+  })
   const host = await createStorageHost({ plugins: [plugin] })
   hosts.push(host)
   return host.backend('memory')
