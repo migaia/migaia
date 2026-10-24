@@ -777,7 +777,8 @@ describe('host and release boundary', () => {
         consumerDirectory,
         installedPackages
       )
-      assertExactRetainedModules(retained)
+      /** Keep the exact-set failure while still recording required size and module attribution. */
+      expect.soft(() => assertExactRetainedModules(retained)).not.toThrow()
       const semanticRetained = normalizeSemanticRetainedGraph(
         retainedOutputs,
         consumerDirectory,
@@ -828,13 +829,13 @@ describe('host and release boundary', () => {
         'utf8'
       )
       console.info('browser-bundle-sizes', measurement)
-      /** Integer cross-products enforce the accepted raw ratios without a rounding allowance. */
-      expect(
-        currentBytes.minified * browserBundleHardCeiling.minified.baseline
-      ).toBeLessThanOrEqual(browserBundleHardCeiling.minified.current * baselineBytes.minified)
-      expect(currentBytes.gzip * browserBundleHardCeiling.gzip.baseline).toBeLessThanOrEqual(
-        browserBundleHardCeiling.gzip.current * baselineBytes.gzip
-      )
+      /** Record both failed ceilings without suppressing the remaining original bundle checks. */
+      expect
+        .soft(currentBytes.minified * browserBundleHardCeiling.minified.baseline)
+        .toBeLessThanOrEqual(browserBundleHardCeiling.minified.current * baselineBytes.minified)
+      expect
+        .soft(currentBytes.gzip * browserBundleHardCeiling.gzip.baseline)
+        .toBeLessThanOrEqual(browserBundleHardCeiling.gzip.current * baselineBytes.gzip)
       const bundle = readFileSync(join(bundleDirectory, 'consumer.js'), 'utf8')
       expect(bundle).not.toMatch(/(?:from\s*|import\()['"]@migaia\//)
       expect(bundle).toContain('indexedDB')
