@@ -176,4 +176,6 @@ localStorage/sessionStorage/Cookie 可用 `redo: true` 显式启用文本事务�
 
 原 transaction owner 管理 text-only scope，读取自身 draft；先完整编码，再 wal.begin，顺序应用、binlog、complete，之后发布一次失效提示和成功。应用或 complete 失败会停止该实例准入并保留 pending，重开或已打开的参与 peer 在物理保护内先恢复再读取。回调失败不应用 draft。未选 redo 时原标量与同步行为保持；选中异步 journal 后同步入口沿原 ASYNC_STAGE_IN_SYNC_ENTRY 拒绝。redo 不宣称原生原子提交；undo/atomicBinlog/atomicUndo 与 raw 原生 Feature 句柄在该组合中修改前拒绝。独立 WAL 缓存之间的自动跨页恢复不作保证。
 
+同一实例的 draft 活跃时，该实例根入口的读取、写入与另一事务立即报 `WRITE_CONFLICT`；独立调用方显式指定 `ConcurrencyPolicy.wait()` 也不会排队。回调内使用已提供的 scope。该隔离避免回调重入等待自身持有的 Web Lock；同实例排队 wait 尚未兑现。其它实例仍沿原 Web Locks 等待或取消，未选 redo 的原有行为保持。
+
 Cookie 的 `redo: true` 复用同一原事务/WAL 协议；普通和 redo 写入共用原 cookie 编码、4096-byte 校验、固定 scope 与可见性检查。批量读取仍由同一原解析器读取一次可见 header，再合入当前 draft。redo 模式把 maxAge 在准备时转换为绝对 expiresAt 镜像，重放不续期；超过原生 Date 域的 maxAge 只在该新组合修改前拒绝，普通 Cookie maxAge 域和 Max-Age 优先级不变。该模式仅记录 JS 可见 cookie，HttpOnly/未知 scope 的原限制保持。

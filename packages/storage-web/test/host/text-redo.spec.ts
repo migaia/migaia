@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Logger, type ILogEntry } from '@migaia/logger'
 import { level } from '@migaia/logger/plugins'
 import { binlog, memoryLogStore, wal } from '@migaia/logger/plugins/durable'
-import { kv, lockKey } from '@migaia/storage-contract'
+import { ConcurrencyPolicy, kv, lockKey } from '@migaia/storage-contract'
 import { createStorageHost, createOrgId, definePlugin } from '@migaia/storage-host'
 import {
   decodeStorageJournalImage,
@@ -154,6 +154,45 @@ describe('text redo through the original host and WAL owners', () => {
     } finally {
       failure.mockRestore()
       await peer.dispose()
+      await host.dispose()
+      await logger.shutdown('manual')
+    }
+  })
+
+  it('isolates independent same-instance root callers while a redo draft is active, including wait policy', async () => {
+    vi.stubGlobal('navigator', { locks })
+    const logger = createLogger()
+    const storage = fakeWebStorage()
+    const host = await createStorageHost({
+      plugins: [localStorageBackendPlugin({ storage, namespace: 'same-instance', redo: true })],
+      journal: { logger, namespace: 'text-redo', redoWal: logger.wal }
+    })
+    const store = host.backend('local')
+    const entered = deferred<void>()
+    const release = deferred<void>()
+    const assigned = vi.spyOn(storage, 'setItem')
+    const transaction = store.transaction(async (scope) => {
+      await scope.set('a', 'draft')
+      expect(await scope.get('a')).toBe('draft')
+      entered.resolve()
+      await release.promise
+    })
+    try {
+      await entered.promise
+      await expect(store.get('a')).rejects.toMatchObject({ code: 'WRITE_CONFLICT' })
+      await expect(
+        store.set('b', 'independent caller', { concurrency: ConcurrencyPolicy.wait() })
+      ).rejects.toMatchObject({ code: 'WRITE_CONFLICT' })
+      expect(assigned).not.toHaveBeenCalled()
+      expect(await logger.wal.pending()).toHaveLength(0)
+      expect(await logger.binlog.read(1)).toHaveLength(0)
+      release.resolve()
+      await transaction
+      expect(await store.get('a')).toBe('draft')
+      expect(await store.get('b')).toBeNull()
+    } finally {
+      release.resolve()
+      await transaction
       await host.dispose()
       await logger.shutdown('manual')
     }
