@@ -83,9 +83,17 @@ try {
 }
 ```
 
-Select only required entries. Change feeds require an explicitly selected notifications Feature; they never install that prerequisite implicitly. IndexedDB `.live()` through `reactiveFeature` also requires notifications and reports a coded missing-assembly error instead of switching to polling. Memory `.live()` likewise requires explicit `memoryNotificationsFeature()` and rejects with `@migaia/storage-host / CHANGE_CONTROLLER_NOT_ASSEMBLED` before allocating an adapter or query when absent. Calling an undeclared batch, journal, notification or change-feed entry reports `@migaia/storage-web / INDEXED_DB_FEATURE_NOT_INSTALLED` and identifies the required Feature. Without TTL, the canonical capability owner rejects `store.use(ttl)` with `@migaia/storage-contract / UNSUPPORTED_CAPABILITY`, identifying `ttl`. Basic `capabilities.secondaryIndexes`, `capabilities.batch` and `capabilities.changeFeed` are false. Selected change feeds still require the original native realm/BroadcastChannel admission. Keep the TTL Feature when reopening a database that uses deadlines; basic reads do not interpret expiry metadata. A client without TTL clears inherited deadlines in the same native transaction when overwriting, deleting or clearing targets. Replacement values remain unlimited and another TTL client cannot remove them using the old deadlines.
+Select only required entries. Change feeds require an explicitly selected notifications Feature; they never install that prerequisite implicitly. IndexedDB `.live()` through `reactiveFeature` also requires notifications and reports a coded missing-assembly error instead of switching to polling.
 
-`indexedDbJournalFeature()` supplies native images, private log namespaces and undo. Global capture additionally requires `storageJournalPlugin()` from `@migaia/storage-host/journal`, explicitly installed before the backend in the same plugin list, plus the original `journal` configuration. Journal images read and restore existing physical deadlines without enabling TTL expiry policy. Basic writes retain physical mutation versions and tombstones so another journal-enabled instance can detect update/delete/recreate conflicts; they capture no images and create no log.
+Memory `.live()` likewise requires explicit `memoryNotificationsFeature()` and rejects with `@migaia/storage-host / CHANGE_CONTROLLER_NOT_ASSEMBLED` before allocating an adapter or query when absent. Calling an undeclared batch, journal, notification or change-feed entry reports `@migaia/storage-web / INDEXED_DB_FEATURE_NOT_INSTALLED` and identifies the required Feature.
+
+Without TTL, the canonical capability owner rejects `store.use(ttl)` with `@migaia/storage-contract / UNSUPPORTED_CAPABILITY`, identifying `ttl`. Basic `capabilities.secondaryIndexes`, `capabilities.batch` and `capabilities.changeFeed` are false. Selected change feeds still require the original native realm/BroadcastChannel admission.
+
+Keep the TTL Feature when reopening a database that uses deadlines; basic reads do not interpret expiry metadata. A client without TTL clears inherited deadlines in the same native transaction when overwriting, deleting or clearing targets. Replacement values remain unlimited and another TTL client cannot remove them using the old deadlines.
+
+`indexedDbJournalFeature()` supplies native images, private log namespaces and undo. Global capture additionally requires `storageJournalPlugin()` from `@migaia/storage-host/journal`, explicitly installed before the backend in the same plugin list, plus the original `journal` configuration.
+
+Journal images read and restore existing physical deadlines without enabling TTL expiry policy. Basic writes retain physical mutation versions and tombstones so another journal-enabled instance can detect update/delete/recreate conflicts; they capture no images and create no log.
 
 ## KV batches
 
@@ -93,7 +101,9 @@ Select only required entries. Change feeds require an explicitly selected notifi
 
 localStorage, sessionStorage, and Cookie support batch reads. Multi-key writes require WAL and reject with `UNSUPPORTED_CAPABILITY` before mutation when it is absent. The default namespace codec retains the string `sw1` layout and uses a separate `sw2` layout for typed keys. `keys()` still lists strings; namespace cleanup covers both layouts. A custom codec must provide both `encodeStorageKey` and `decodeStorageKey` to read non-string batch keys; otherwise those keys reject before native I/O.
 
-Raw `store.use(records).query().page()` and `.after()` additionally require `indexedDbKeysetFeature()` from `@migaia/storage-web/features/indexed-db-keyset` in the backend Feature record. Basic `.all()` remains available. This unit borrows the canonical host cursor implementation without enabling native indexes. Omitted raw pagination rejects with `@migaia/storage-web / INDEXED_DB_FEATURE_NOT_INSTALLED` and names the missing factory before opening a reader. Entity pagination has its own `entityKeysetFeature()` declaration and does not require this raw-query Feature.
+Raw `store.use(records).query().page()` and `.after()` additionally require `indexedDbKeysetFeature()` from `@migaia/storage-web/features/indexed-db-keyset` in the backend Feature record. Basic `.all()` remains available. This unit borrows the canonical host cursor implementation without enabling native indexes.
+
+Omitted raw pagination rejects with `@migaia/storage-web / INDEXED_DB_FEATURE_NOT_INSTALLED` and names the missing factory before opening a reader. Entity pagination has its own `entityKeysetFeature()` declaration and does not require this raw-query Feature.
 
 ## IndexedDB transactions
 
