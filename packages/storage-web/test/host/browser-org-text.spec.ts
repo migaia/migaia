@@ -116,23 +116,18 @@ describe('physical organizations in text browser backends', () => {
     }
   )
 
-  it('captures original options once and uses the configured prefix plus organization UUID', async () => {
+  it('uses the configured prefix plus organization UUID', async () => {
     const storage = fakeWebStorage()
-    let reads = 0
     await using host = await createStorageHost({
       plugins: [
         localStorageBackendPlugin({
           storage,
-          get namespace() {
-            reads += 1
-            return 'preferences'
-          }
+          namespace: 'preferences'
         })
       ]
     })
     const org = createOrgId()
     await host.org(org).backend('local').set('key', 'value')
-    expect(reads).toBe(1)
     expect(storage.getItem(lengthPrefixedNamespaceCodec.encode('preferences/' + org, 'key'))).toBe(
       'value'
     )

@@ -1,7 +1,7 @@
 import type { ITextRedoStore } from './text-redo.js'
 import {
   createWebStorageBackend,
-  snapshotWebStorageOptions,
+  assertWebStorageOptions,
   type IWebStorageOptions
 } from './web-storage.js'
 import type { IKeyValueStore, ISyncCapableStore, IWebStorageLike } from '../types/storage.js'
@@ -34,17 +34,9 @@ export const localStorageHost = (
   IWebStorageLike
 > => {
   /** Capture namespace configuration before admitting either an injected or ambient port. */
-  const optionsSnapshot = snapshotWebStorageOptions(options, StorageBackend.local)
-  /** Keep option-getter failure distinct from the host refusing access to its default port. */
-  let storage: IWebStorageLike | undefined
-  try {
-    storage = options.storage
-  } catch (cause) {
-    throw new StorageError(StorageErrorCode.invalidConfig, {
-      backend: StorageBackend.local,
-      cause
-    })
-  }
+  assertWebStorageOptions(options)
+  /** The native port stays borrowed; ambient access may be denied by browser policy. */
+  let storage = options.storage
   try {
     storage ??= globalThis.localStorage
   } catch (cause) {
@@ -53,5 +45,5 @@ export const localStorageHost = (
       cause
     })
   }
-  return createWebStorageBackend(StorageBackend.local, storage, optionsSnapshot, runtime)
+  return createWebStorageBackend(StorageBackend.local, storage, options, runtime)
 }

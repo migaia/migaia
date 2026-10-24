@@ -4,7 +4,7 @@ import {
   lengthPrefixedNamespaceCodec,
   namespacedKey,
   namespacedStorageKey,
-  snapshotNamespaceCodec,
+  admitNamespaceCodec,
   stripNamespace,
   stripStorageNamespace
 } from '../../src/utils/key.js'
@@ -53,98 +53,51 @@ describe('namespacedKey / stripNamespace', () => {
     )
   })
 
-  it('captures optional typed codec functions once while retaining the original snapshot receiver', () => {
-    /** Existing encode/decode reads remain first; the new pair follows under the same boundary. */
-    const reads: string[] = []
-    /** Receiver observation proves that no bound function or alternate codec object is introduced. */
-    const receivers: unknown[] = []
-    const captured = snapshotNamespaceCodec(
-      {
-        get encode() {
-          reads.push('encode')
-          return () => 'old'
-        },
-        get decode() {
-          reads.push('decode')
-          return () => undefined
-        },
-        get encodeStorageKey() {
-          reads.push('encodeStorageKey')
-          return function (this: unknown) {
-            receivers.push(this)
-            return 'typed'
-          }
-        },
-        get decodeStorageKey() {
-          reads.push('decodeStorageKey')
-          return () => 1
-        }
+  it('retains the original typed codec receiver and requires typed extensions before I/O', () => {
+    /** Receiver-backed methods remain on the caller's codec after constructor admission. */
+    const codec = {
+      typed: 'typed',
+      encode: () => 'old',
+      decode: () => undefined,
+      encodeStorageKey() {
+        return this.typed
       },
-      'local-storage'
+      decodeStorageKey: () => 1
+    }
+    const admitted = admitNamespaceCodec(codec, 'local-storage')
+    expect(admitted).toBe(codec)
+    expect(namespacedStorageKey('app', 1, admitted, 'local-storage')).toBe('typed')
+    expect(stripStorageNamespace('app', 'typed', admitted, 'local-storage')).toBe(1)
+    expect(() => admitNamespaceCodec({ encode: 1, decode: () => undefined })).toThrow(
+      expect.objectContaining({ code: 'INVALID_CONFIG' })
     )
-    expect(reads).toEqual(['encode', 'decode', 'encodeStorageKey', 'decodeStorageKey'])
-    expect(namespacedStorageKey('app', 1, captured, 'local-storage')).toBe('typed')
-    expect(receivers[0]).toBe(captured)
-    expect(stripStorageNamespace('app', 'typed', captured, 'local-storage')).toBe(1)
-    expect(reads).toHaveLength(4)
-    /** Original invalid string codecs reject before any newly optional typed getter runs. */
-    let typedRead = false
-    expect(() =>
-      snapshotNamespaceCodec({
-        encode: 1,
-        decode: () => undefined,
-        get encodeStorageKey() {
-          typedRead = true
-          return () => 'unread'
-        }
-      })
-    ).toThrow(
-      expect.objectContaining({
-        code: 'INVALID_CONFIG',
-        cause: expect.objectContaining({
-          message: 'namespace codec must provide callable encode and decode methods'
-        })
-      })
-    )
-    expect(typedRead).toBe(false)
     expect(() =>
       namespacedStorageKey(
         'app',
         1,
-        snapshotNamespaceCodec({ encode: () => 'old', decode: () => undefined }),
+        admitNamespaceCodec({ encode: () => 'old', decode: () => undefined }),
         'local-storage'
       )
     ).toThrow(expect.objectContaining({ code: 'UNSUPPORTED_CAPABILITY' }))
   })
 
-  it('rejects incomplete typed codec pairs and preserves typed getter failures', () => {
+  it('rejects incomplete typed codec pairs', () => {
     for (const decodeStorageKey of [undefined, 1])
       expect(() =>
-        snapshotNamespaceCodec({
+        admitNamespaceCodec({
           encode: () => 'old',
           decode: () => undefined,
           encodeStorageKey: () => 'typed',
           decodeStorageKey
         })
       ).toThrow(expect.objectContaining({ code: 'INVALID_CONFIG' }))
-    /** Extension getter failures retain the original instance on the existing config boundary. */
-    const original = new Error('typed-getter')
-    expect(() =>
-      snapshotNamespaceCodec({
-        encode: () => 'old',
-        decode: () => undefined,
-        get encodeStorageKey() {
-          throw original
-        }
-      })
-    ).toThrow(expect.objectContaining({ code: 'INVALID_CONFIG', cause: original }))
   })
 
   it('codes typed extension failures and rejects invalid decoded keys', () => {
     /** Custom encode and decode failures preserve the original cause in both directions. */
     const original = new Error('typed-extension')
     /** The captured pair invokes the caller's real throwing functions in both directions. */
-    const failed = snapshotNamespaceCodec({
+    const failed = admitNamespaceCodec({
       encode: () => 'old',
       decode: () => undefined,
       encodeStorageKey: () => {
@@ -161,7 +114,7 @@ describe('namespacedKey / stripNamespace', () => {
       expect.objectContaining({ code: 'EXTENSION_FAILED', cause: original })
     )
     /** A custom codec cannot admit an invalid native key or a non-string physical identity. */
-    const invalid = snapshotNamespaceCodec({
+    const invalid = admitNamespaceCodec({
       encode: () => 'old',
       decode: () => undefined,
       encodeStorageKey: () => 1,

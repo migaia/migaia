@@ -88,11 +88,8 @@ export const lengthPrefixedNamespaceCodec: INamespaceCodec = Object.freeze({
   }
 })
 
-/**
- * Snapshot a namespace codec descriptor so backend lifetime behavior cannot follow accessor
- * changes.
- */
-export const snapshotNamespaceCodec = (
+/** Admit the original namespace-codec receiver; its methods remain owned by the caller. */
+export const admitNamespaceCodec = (
   codec: unknown,
   backend: IBackendKind = 'local'
 ): INamespaceCodec => {
@@ -101,43 +98,23 @@ export const snapshotNamespaceCodec = (
       backend,
       cause: new TypeError(StorageErrorText.namespaceCodecInvalid)
     })
-  const candidate = codec as Record<string, unknown>
-  let encode: unknown
-  let decode: unknown
-  /** Optional typed functions are borrowed once after the original string codec pair. */
-  let encodeStorageKey: unknown
-  /** Cleanup captures the matching decoder before admitting typed physical writes. */
-  let decodeStorageKey: unknown
-  try {
-    encode = candidate.encode
-    decode = candidate.decode
-  } catch (cause) {
-    throw new StorageError(StorageErrorCode.invalidConfig, { backend, cause })
-  }
-  if (typeof encode !== 'function' || typeof decode !== 'function')
+  /** Method validation keeps the original object so class private fields retain their receiver. */
+  const candidate = codec as INamespaceCodec
+  if (typeof candidate.encode !== 'function' || typeof candidate.decode !== 'function')
     throw new StorageError(StorageErrorCode.invalidConfig, {
       backend,
       cause: new TypeError(StorageErrorText.namespaceCodecInvalid)
     })
-  try {
-    encodeStorageKey = candidate.encodeStorageKey
-    decodeStorageKey = candidate.decodeStorageKey
-  } catch (cause) {
-    throw new StorageError(StorageErrorCode.invalidConfig, { backend, cause })
-  }
   if (
-    (encodeStorageKey !== undefined || decodeStorageKey !== undefined) &&
-    (typeof encodeStorageKey !== 'function' || typeof decodeStorageKey !== 'function')
+    (candidate.encodeStorageKey !== undefined || candidate.decodeStorageKey !== undefined) &&
+    (typeof candidate.encodeStorageKey !== 'function' ||
+      typeof candidate.decodeStorageKey !== 'function')
   )
     throw new StorageError(StorageErrorCode.invalidConfig, {
       backend,
       cause: new TypeError(StorageErrorText.namespaceTypedCodecInvalid)
     })
-  return {
-    encode,
-    decode,
-    ...(encodeStorageKey === undefined ? {} : { encodeStorageKey, decodeStorageKey })
-  } as INamespaceCodec
+  return candidate
 }
 
 /** Typed batches preserve old string identities and reject unsupported custom codecs before I/O. */

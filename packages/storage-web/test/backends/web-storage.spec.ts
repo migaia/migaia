@@ -88,91 +88,6 @@ describe('createWebStorageBackend', () => {
         await expectNativeInstallationFailure(factory(options as never), { code: 'INVALID_CONFIG' })
   })
 
-  it('local/session wrapper 归一化 storage getter 异常', async () => {
-    for (const factory of [createLocalTestStore, createSessionTestStore])
-      await expectNativeInstallationFailure(
-        factory({
-          get storage(): ReturnType<typeof fakeWebStorage> {
-            throw new Error('hostile storage getter')
-          }
-        }),
-        { code: 'INVALID_CONFIG' }
-      )
-  })
-
-  it('local/session wrapper 对三个构造字段各读取一次', async () => {
-    for (const factory of [createLocalTestStore, createSessionTestStore]) {
-      let reads = 0
-      const store = await factory({
-        get namespace() {
-          reads += 1
-          return 'getter-options'
-        },
-        get namespaceCodec() {
-          reads += 1
-          return undefined
-        },
-        get storage() {
-          reads += 1
-          return fakeWebStorage()
-        }
-      })
-      expect(store.sync.get('missing')).toBeNull()
-      expect(reads).toBe(3)
-    }
-  })
-
-  it('namespace getter 异常统一返回 INVALID_CONFIG', async () => {
-    await expectNativeInstallationFailure(
-      createLocalTestStore({
-        get namespace(): string {
-          throw new Error('hostile namespace')
-        }
-      }),
-      { code: 'INVALID_CONFIG' }
-    )
-  })
-
-  it('namespace codec 描述符只读取一次并固定后续行为', async () => {
-    let reads = 0
-    const codec = {
-      get encode() {
-        reads += 1
-        return (namespace: string, key: string) => `${namespace}:${key}`
-      },
-      get decode() {
-        reads += 1
-        return (namespace: string, physicalKey: string) =>
-          physicalKey.startsWith(`${namespace}:`)
-            ? physicalKey.slice(namespace.length + 1)
-            : undefined
-      }
-    }
-    const store = await createLocalTestStore({
-      storage: fakeWebStorage(),
-      namespace: 'codec-snapshot',
-      namespaceCodec: codec
-    })
-    await store.set('key', 'value')
-    await expect(store.get('key')).resolves.toBe('value')
-    expect(reads).toBe(2)
-  })
-
-  it('namespace codec getter 异常统一返回 INVALID_CONFIG', async () => {
-    await expectNativeInstallationFailure(
-      createLocalTestStore({
-        storage: fakeWebStorage(),
-        namespaceCodec: {
-          get encode(): never {
-            throw new Error('hostile codec getter')
-          },
-          decode: () => undefined
-        }
-      }),
-      { code: 'INVALID_CONFIG', backend: 'local-storage' }
-    )
-  })
-
   it('构造期拒绝非法 namespace 与 namespace codec 形状', async () => {
     await expectNativeInstallationFailure(
       createLocalTestStore({ storage: fakeWebStorage(), namespace: '' }),
@@ -211,31 +126,7 @@ describe('createWebStorageBackend', () => {
       })
     }
   })
-  it('构造校验只读取 storage length 一次', async () => {
-    const storage = fakeWebStorage()
-    let reads = 0
-    Object.defineProperty(storage, 'length', {
-      get: () => {
-        reads += 1
-        if (reads > 1) throw new Error('length read twice during construction')
-        return 0
-      }
-    })
-    const store = await createLocalTestStore({ storage: storage })
-    expect(store.sync!.get('missing')).toBeNull()
-    expect(reads).toBe(1)
-  })
-  it('storage surface getter 异常统一返回 INVALID_CONFIG', async () => {
-    const storage = fakeWebStorage()
-    Object.defineProperty(storage, 'getItem', {
-      get: () => {
-        throw new Error('hostile storage method getter')
-      }
-    })
-    await expectNativeInstallationFailure(createLocalTestStore({ storage: storage }), {
-      code: 'INVALID_CONFIG'
-    })
-  })
+
   it('不可用时始终抛 BACKEND_UNAVAILABLE', async () => {
     await expectNativeInstallationFailure(createLocalTestStore({ storage: unavailableStorage }), {
       code: 'BACKEND_UNAVAILABLE'
@@ -276,21 +167,7 @@ describe('createWebStorageBackend', () => {
     })
     await expect(store.keys()).rejects.toMatchObject({ code: 'BACKEND_UNAVAILABLE' })
   })
-  it('keys 对运行期 length 只读取一次，扫描边界不会漂移', async () => {
-    const storage = fakeWebStorage()
-    const store = await createLocalTestStore({ storage: storage, namespace: 'bounded-keys' })
-    await store.set('key', 'value')
-    let reads = 0
-    Object.defineProperty(storage, 'length', {
-      get: () => {
-        reads += 1
-        if (reads > 1) throw new Error('runtime length read twice')
-        return 1
-      }
-    })
-    await expect(store.keys()).resolves.toEqual(['key'])
-    expect(reads).toBe(1)
-  })
+
   it('clearValues 删除枚举到的物理键，不依赖 codec decode→encode 可逆', async () => {
     const storage = fakeWebStorage()
     const codec = {
