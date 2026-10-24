@@ -150,3 +150,24 @@ boundedQuery.skip(1).all()
 boundedQuery.orderBy((row) => row.name)
 // @ts-expect-error a bounded comparator cannot introduce another comparator.
 boundedQuery.orderByComparator((left, right) => left.score - right.score)
+
+/**
+ * Only an actual root native feed exposes invalidation watch, including genuine organization
+ * borrows.
+ */
+repo.query().watch()
+orgRepository.query().watch()
+// @ts-expect-error scoped entity reads cannot subscribe outside their transaction's lifetime.
+repo.batch((scope) => scope.query().watch())
+/** The raw legacy type has no literal true feed fact and cannot advertise a native record watcher. */
+declare const unknownFeedStore: import('@migaia/storage-contract').IKeyValueStore
+// @ts-expect-error a runtime-unknown feed flag cannot publish the root native watcher.
+users.connect(unknownFeedStore).query().watch()
+/** An explicitly false feed remains unavailable even if other legacy methods exist. */
+declare const noFeedStore: import('@migaia/storage-contract').IKeyValueStore & {
+  readonly capabilities: import('@migaia/storage-contract').IStorageCapabilities & {
+    readonly changeFeed: false
+  }
+}
+// @ts-expect-error false feed capability never grants watch.
+users.connect(noFeedStore).query().watch()

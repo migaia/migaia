@@ -5,6 +5,11 @@ import {
   snapshotKeyValueStoreDetailed,
   isSecondaryIndexRecordStore,
   assertTransactionOwner,
+  hasStorageCapability,
+  useStorageCapability,
+  records,
+  type IOperationContext,
+  type IStorageIterator,
   type IBackendKind,
   type IStorageBase,
   type IStorageChange,
@@ -101,7 +106,24 @@ export type IBackendEntityAccess = {
   secondaryStore(): IEntitySecondaryMethods | undefined
   assertScope(scope: object): ITransactionInfo
   assertCurrent(): void
+  /** Borrow only the original native record-query watcher; it grants no store or resource authority. */
+  readonly watchRecords?: (ctx?: IOperationContext) => IStorageIterator<IStorageChange>
   readonly valueCommit?: IBackendValueCommit
+}
+
+/**
+ * Capture a genuine native query method through the original token Map, without mutating or
+ * unwrapping it.
+ */
+export function snapshotBackendEntityRecordWatcher(
+  native: IStorageBase
+): IBackendEntityAccess['watchRecords'] {
+  if (native.capabilities.changeFeed !== true || !hasStorageCapability(native, records)) return
+  /** Query construction is pure; every invocation below still returns its original fresh iterator. */
+  const query = useStorageCapability(native, records).query()
+  const watch = Reflect.get(query, 'watch')
+  if (typeof watch !== 'function') return
+  return (ctx) => Reflect.apply(watch, query, [ctx]) as IStorageIterator<IStorageChange>
 }
 
 /** Bind only an original host-authenticated alias, keeping its native owner private in a closure. */
@@ -115,6 +137,8 @@ export function registerBackendEntityAccess(
   if (!keyValue.valid) return () => undefined
   /** Atomic text writes remain the original native endpoint, without exposing its registration. */
   const valueCommit = controllerRegistry.get(native)?.valueCommit
+  /** A borrowed alias captures only this finite callback, retaining its exact original native owner. */
+  const watchRecords = snapshotBackendEntityRecordWatcher(native)
   /** The host's borrowed view forwards exactly these admitted native methods without close access. */
   const access: IBackendEntityAccess = Object.freeze({
     store: view as IEntityKeyValueMethods,
@@ -123,6 +147,14 @@ export function registerBackendEntityAccess(
     secondaryStore: () =>
       isSecondaryIndexRecordStore(native) ? (view as IEntitySecondaryMethods) : undefined,
     assertCurrent,
+    ...(watchRecords === undefined
+      ? {}
+      : {
+          watchRecords: (ctx?: IOperationContext) => {
+            assertCurrent()
+            return watchRecords(ctx)
+          }
+        }),
     ...(valueCommit === undefined
       ? {}
       : {

@@ -7,6 +7,7 @@ import {
   getBackendValueCommit,
   getBackendEntityQueryMethods,
   getBackendEntityAccess,
+  snapshotBackendEntityRecordWatcher,
   type IBackendEntityAccess,
   type IEntitySecondaryMethods
 } from '../core/change-controller.js'
@@ -285,7 +286,8 @@ const snapshotEntityStore = (store: IEntityConnectStore): IBackendEntityAccess =
     recordStore: () => snapshotRecordStore(store)?.store,
     secondaryStore: () => (isSecondaryIndexRecordStore(store) ? store : undefined),
     assertScope: (scope) => assertTransactionOwner(snapshot.store, scope),
-    assertCurrent: () => undefined
+    assertCurrent: () => undefined,
+    watchRecords: snapshotBackendEntityRecordWatcher(snapshot.store)
   }
 }
 /** Entity extensions preserve the original neutral family and use this package's error owner. */
@@ -1938,6 +1940,12 @@ export const createRepository = <
         // A uniform author container permits terminal-local index selection without shrinking key budgets.
         tieBreakByKey: { direction: 'next', parts: true },
         pushdown: { source: EntityState.querySource, operations: [], operators: [] },
+        ...(scope !== undefined || backend.watchRecords === undefined
+          ? {}
+          : {
+              watch: ({ ctx }: import('@migaia/storage-contract').IRecordQueryInput) =>
+                backend.watchRecords!(ctx)
+            }),
         plan: (conditions) => {
           /** Explicit source choice precedes automatic static condition selection. */
           const explicit = selectedSource.index !== undefined || selectedSource.range !== undefined
@@ -2239,7 +2247,11 @@ export const createRepository = <
   }
 
   const repository: IRepository<TDomain, TIndexes, TChangeFeed, TAugmentMethods> = {
-    query: () => queryFor<IOperationContext>(),
+    // Runtime source.watch is installed only for the genuine native feed captured above.
+    query: () =>
+      queryFor<IOperationContext>() as ReturnType<
+        IRepository<TDomain, TIndexes, TChangeFeed, TAugmentMethods>['query']
+      >,
     get: async (id, ctx) => {
       const context = snapshotOperationContext(ctx)
       const runtime = createStorageOperationRuntime()

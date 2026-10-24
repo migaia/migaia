@@ -294,6 +294,16 @@ export function createEntityQuery<
       ),
       where,
       select,
+      ...(typeof Reflect.get(query, 'watch') !== 'function'
+        ? {}
+        : {
+            watch: (ctx?: TContext) => {
+              const prepared = prepare(query, limit, explicit, skip, compared)
+              const watch = Reflect.get(prepared, 'watch')
+              if (typeof watch !== 'function') return input.invalidState()
+              return Reflect.apply(watch, prepared, [ctx])
+            }
+          }),
       explain: () => prepare(query, limit, explicit, skip, compared).explain(),
       delete: (ctx) =>
         input.run(

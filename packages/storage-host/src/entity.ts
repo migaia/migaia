@@ -34,6 +34,7 @@ export type {
   IEntityQueryComparedCore,
   IEntityQueryNeedsLimit,
   IEntityQueryFinal,
+  IEntityQueryAccess,
   IEntityConnectOptions,
   IEntityConnectStore,
   IEntityStoreQueryMethods,
