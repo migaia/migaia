@@ -9,6 +9,8 @@ import {
   snapshotStorageDeleteCountMode,
   snapshotStorageWhere,
   createVectorQuery,
+  VectorQueryOriginKind,
+  type IVectorQueryOrigin,
   createStorageIteratorLifetime,
   assertStorageTtlDuration,
   lockKey,
@@ -48,6 +50,7 @@ export type IPgVectorRuntime = {
   readonly tables: IPgTables
   readonly orgId: string
   assertLive(): void
+  beginOperation(): () => void
   run<R>(
     operation: string,
     ctx: ITransactionOptions | undefined,
@@ -375,7 +378,8 @@ export function createPgVectors(runtime: IPgVectorRuntime) {
         resolve: (state: IPgState) => Promise<readonly number[]>,
         metric?: IStorageVectorConfiguration['metric'],
         exact = false,
-        excluded: readonly string[] = []
+        excluded: readonly string[] = [],
+        origin?: IVectorQueryOrigin
       ) => {
         const source: import('@migaia/storage-contract').IVectorQuerySource<T, true> = {
           pushdown: {
@@ -399,6 +403,8 @@ export function createPgVectors(runtime: IPgVectorRuntime) {
           asyncDisposeKey,
           groupBy: true as const,
           exact,
+          origin,
+          beginOperation: () => runtime.beginOperation(),
           execute: (input: IVectorQueryInput) =>
             vectorRows(() =>
               runtime.run('vector.search', input.ctx, async (state) =>
@@ -464,7 +470,10 @@ export function createPgVectors(runtime: IPgVectorRuntime) {
             { ...captured.options, ...(metric === undefined ? {} : { metric }) },
             PgNames.backend
           )
-          return build(async () => direction, metric, exact)
+          return build(async () => direction, metric, exact, [], {
+            kind: VectorQueryOriginKind.near,
+            vector: direction
+          })
         },
         similarTo(id) {
           if (typeof id !== 'string') throw invalidArgument()
@@ -472,7 +481,8 @@ export function createPgVectors(runtime: IPgVectorRuntime) {
             async (state) => (await sample(state, name, captured.options, [id]))[0]!,
             undefined,
             false,
-            [id]
+            [id],
+            { kind: VectorQueryOriginKind.similarTo, id }
           )
         },
         recommend(examples) {
@@ -489,7 +499,8 @@ export function createPgVectors(runtime: IPgVectorRuntime) {
             },
             undefined,
             false,
-            [...positives, ...negatives]
+            [...positives, ...negatives],
+            { kind: VectorQueryOriginKind.recommend, positive: positives, negative: negatives }
           )
         },
         async upsert(points, ctx) {

@@ -15,6 +15,8 @@ import {
   assertStorageTtlDuration,
   QueryOperator,
   QueryOperation,
+  VectorQueryOriginKind,
+  type IVectorQueryOrigin,
   type ICapabilityImpl,
   type IVectorApi,
   type IVectorCollection,
@@ -167,13 +169,16 @@ function createRedisVectorBinding(resolve: () => IRedisNativeFeaturePort): IRedi
     ) => Promise<{ query: readonly number[]; exclude: readonly string[] }>,
     exact: boolean,
     metric?: IStorageVectorConfiguration['metric'],
-    initial: readonly IQueryCondition[] = []
+    initial: readonly IQueryCondition[] = [],
+    origin?: IVectorQueryOrigin
   ) => {
     const port = resolve()
     return createVectorQuery<TPayload, false>(
       {
         asyncDisposeKey,
         exact,
+        origin,
+        beginOperation: () => port.beginOperation(),
         pushdown: {
           source: RedisText.backend,
           operators: Object.values(QueryOperator),
@@ -440,7 +445,9 @@ function createRedisVectorBinding(resolve: () => IRedisNativeFeaturePort): IRedi
             current,
             async () => ({ query: direction, exclude: [] }),
             exact,
-            metric
+            metric,
+            [],
+            { kind: VectorQueryOriginKind.near, vector: direction }
           )
         },
         similarTo(id) {
@@ -451,7 +458,10 @@ function createRedisVectorBinding(resolve: () => IRedisNativeFeaturePort): IRedi
               query: (await samples(connection, current, configuration, [captured]))[0]!,
               exclude: [captured]
             }),
-            false
+            false,
+            undefined,
+            [],
+            { kind: VectorQueryOriginKind.similarTo, id: captured }
           )
         },
         recommend(examples) {
@@ -472,7 +482,10 @@ function createRedisVectorBinding(resolve: () => IRedisNativeFeaturePort): IRedi
                 exclude: [...pos, ...neg]
               }
             },
-            false
+            false,
+            undefined,
+            [],
+            { kind: VectorQueryOriginKind.recommend, positive: pos, negative: neg }
           )
         },
         upsert(points, ctx) {

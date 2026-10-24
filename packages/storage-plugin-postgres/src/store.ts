@@ -1208,6 +1208,7 @@ export async function createPostgresStore<T>(
           tables,
           orgId: runtime.orgId,
           assertLive: () => controller.assertLive(),
+          beginOperation: () => controller.beginMutation(),
           run: (operation, ctx, work) =>
             root(
               operation,

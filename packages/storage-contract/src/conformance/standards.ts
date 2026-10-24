@@ -143,6 +143,120 @@ export function standardConformance(
     })
   }
   if (capabilities.includes(vector)) {
+    check(
+      'vector · portable rerank preserves engine scores, stable ties and bounded grouping',
+      async (store) => {
+        const collection = conformanceApi(store, vector).collection<{ group: string }>(
+          'conformance-rerank',
+          { dimensions: 2, metric: 'dot' }
+        )
+        await collection.upsert([
+          { id: 'a', vector: [4, 1], payload: { group: 'one' } },
+          { id: 'b', vector: [3, 2], payload: { group: 'two' } },
+          { id: 'c', vector: [2, 3], payload: { group: 'one' } },
+          { id: 'd', vector: [1, 4], payload: { group: 'two' } }
+        ])
+        const query = collection.near([1, 0], { exact: true }).withVector().topK(4)
+        const ranked = query.rerank(
+          ({ origin, hits }) => {
+            expect(origin).toEqual({ kind: 'near', vector: [1, 0] })
+            expect(hits.map((hit) => hit.id)).toEqual(['a', 'b', 'c', 'd'])
+            expect(hits.map((hit) => hit.score)).toEqual([4, 3, 2, 1])
+            expect(hits[0]!.vector).toEqual([4, 1])
+            return [0, 2, 2, 1]
+          },
+          { topN: 2 }
+        )
+        await expect(ranked.all()).resolves.toMatchObject([
+          { id: 'b', score: 3, rerankScore: 2 },
+          { id: 'c', score: 2, rerankScore: 2 }
+        ])
+        expect('delete' in ranked).toBe(false)
+        expect('watch' in ranked).toBe(false)
+        expect('requirePushdown' in ranked).toBe(false)
+        if ('groupBy' in ranked && typeof ranked.groupBy === 'function')
+          await expect(ranked.groupBy('group', { perGroup: 1 }).all()).resolves.toMatchObject([
+            { group: 'two', hits: [{ id: 'b', rerankScore: 2 }] },
+            { group: 'one', hits: [{ id: 'c', rerankScore: 2 }] }
+          ])
+        expect((await query.rerank(({ hits }) => hits.map((hit) => hit.score)).all()).length).toBe(
+          4
+        )
+        await collection
+          .similarTo('a')
+          .topK(2)
+          .rerank(({ origin, hits }) => {
+            expect(origin).toEqual({ kind: 'similarTo', id: 'a' })
+            return hits.map((hit) => hit.score)
+          })
+          .all()
+        await collection
+          .recommend({ positive: ['a'], negative: ['d'] })
+          .topK(2)
+          .rerank(({ origin, hits }) => {
+            expect(origin).toEqual({ kind: 'recommend', positive: ['a'], negative: ['d'] })
+            return hits.map((hit) => hit.score)
+          })
+          .all()
+      }
+    )
+    check(
+      'vector · rerank rejects invalid bounds, scorer failures and invalid score arrays',
+      async (store) => {
+        const collection = conformanceApi(store, vector).collection('conformance-rerank-errors', {
+          dimensions: 1,
+          metric: 'dot'
+        })
+        const query = collection.near([1], { exact: true }).topK(1)
+        for (const topN of [0, -1, 1.5, 2, Infinity, NaN])
+          await expect(invocation(() => query.rerank(() => [1], { topN }))).rejects.toMatchObject({
+            code: 'INVALID_ARGUMENT'
+          })
+        await collection.upsert([{ id: 'one', vector: [1] }])
+        const cause = new Error('conformance scorer failure')
+        await expect(
+          query
+            .rerank(() => {
+              throw cause
+            })
+            .all()
+        ).rejects.toMatchObject({ code: 'RERANK_FAILED', cause })
+        await expect(
+          query
+            .rerank(async () => {
+              throw cause
+            })
+            .all()
+        ).rejects.toMatchObject({ code: 'RERANK_FAILED', cause })
+        for (const result of [[], [1, 2], [NaN], [Infinity], 'not scores'])
+          await expect(query.rerank(() => result as never).all()).rejects.toMatchObject({
+            code: 'RERANK_RESULT_INVALID'
+          })
+      }
+    )
+    check(
+      'vector · rerank receives the original signal and preserves its abort reason',
+      async (store) => {
+        const collection = conformanceApi(store, vector).collection('conformance-rerank-abort', {
+          dimensions: 1,
+          metric: 'dot'
+        })
+        await collection.upsert([{ id: 'one', vector: [1] }])
+        const abort = new AbortController()
+        const reason = new Error('conformance rerank abort')
+        await expect(
+          collection
+            .near([1], { exact: true })
+            .topK(1)
+            .rerank(({ hits }, ctx) => {
+              expect(ctx.signal).toBe(abort.signal)
+              abort.abort(reason)
+              return hits.map(() => 1)
+            })
+            .all({ signal: abort.signal })
+        ).rejects.toMatchObject({ code: 'ABORTED', cause: reason })
+      }
+    )
     check('vector · native rank, payload, vector and deletion', async (store) => {
       const collection = conformanceApi(store, vector).collection<{ label: string }>(
         'conformance',

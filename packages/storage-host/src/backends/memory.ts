@@ -62,6 +62,8 @@ import {
   compileStorageQueryCondition,
   QueryOperator,
   QueryOperation,
+  VectorQueryOriginKind,
+  type IVectorQueryOrigin,
   DeleteCountMode,
   snapshotStorageVectorCollection,
   snapshotStorageVector,
@@ -3505,7 +3507,8 @@ function createMemoryNamespace<T>(
           query: readonly number[]
           exclude: ReadonlySet<string>
         },
-        metric: IStorageVectorConfiguration['metric']
+        metric: IStorageVectorConfiguration['metric'],
+        origin: IVectorQueryOrigin
       ) => {
         /** Native ranking is shared verbatim by reads and this original transaction draft. */
         const select: IMemoryVectorSelection<TPayload> = (input, values, lookup) => {
@@ -3534,6 +3537,8 @@ function createMemoryNamespace<T>(
           {
             asyncDisposeKey,
             exact: true,
+            origin,
+            beginOperation: () => controller.beginMutation(),
             watch: ({ ctx }) => watchChanges('all', ctx),
             mutate: (request, run) =>
               atomicEntry(
@@ -3584,21 +3589,28 @@ function createMemoryNamespace<T>(
               { dimensions: configuration.dimensions, metric },
               STORAGE_MEMORY_BACKEND
             )
-            return query(() => ({ query: components, exclude: new Set<string>() }), metric)
+            return query(() => ({ query: components, exclude: new Set<string>() }), metric, {
+              kind: VectorQueryOriginKind.near,
+              vector: components
+            })
           })
         },
         similarTo: (id) => {
           controller.assertLive()
           assertStringStorageKey(id, STORAGE_MEMORY_BACKEND)
-          return query((lookup) => {
-            /** A missing/expired sample is rejected before native candidates are ranked. */
-            const sample = lookup(id)
-            if (sample === undefined) invalidVector()
-            return {
-              query: snapshotStorageVector(sample.vector, configuration, STORAGE_MEMORY_BACKEND),
-              exclude: new Set([id])
-            }
-          }, configuration.metric)
+          return query(
+            (lookup) => {
+              /** A missing/expired sample is rejected before native candidates are ranked. */
+              const sample = lookup(id)
+              if (sample === undefined) invalidVector()
+              return {
+                query: snapshotStorageVector(sample.vector, configuration, STORAGE_MEMORY_BACKEND),
+                exclude: new Set([id])
+              }
+            },
+            configuration.metric,
+            { kind: VectorQueryOriginKind.similarTo, id }
+          )
         },
         recommend: (input) => {
           controller.assertLive()
@@ -3613,24 +3625,32 @@ function createMemoryNamespace<T>(
             if (exclude.size !== positiveIds.length + negativeIds.length) invalidVector()
             return { positiveIds, negativeIds, exclude }
           })
-          return query((lookup) => {
-            /** Every requested sample resolves against this collection and immutable organization. */
-            const load = (id: string): readonly number[] => {
-              const sample = lookup(id)
-              if (sample === undefined) invalidVector()
-              return sample.vector
+          return query(
+            (lookup) => {
+              /** Every requested sample resolves against this collection and immutable organization. */
+              const load = (id: string): readonly number[] => {
+                const sample = lookup(id)
+                if (sample === undefined) invalidVector()
+                return sample.vector
+              }
+              const positive = samples.positiveIds.map(load)
+              const negative = samples.negativeIds.map(load)
+              const combined = recommendStorageVector(
+                positive as [readonly number[], ...(readonly number[])[]],
+                negative
+              )
+              return {
+                query: snapshotStorageVector(combined, configuration, STORAGE_MEMORY_BACKEND),
+                exclude: samples.exclude
+              }
+            },
+            configuration.metric,
+            {
+              kind: VectorQueryOriginKind.recommend,
+              positive: samples.positiveIds,
+              negative: samples.negativeIds
             }
-            const positive = samples.positiveIds.map(load)
-            const negative = samples.negativeIds.map(load)
-            const combined = recommendStorageVector(
-              positive as [readonly number[], ...(readonly number[])[]],
-              negative
-            )
-            return {
-              query: snapshotStorageVector(combined, configuration, STORAGE_MEMORY_BACKEND),
-              exclude: samples.exclude
-            }
-          }, configuration.metric)
+          )
         },
         upsert: (points, ctx) =>
           vectorOperation(() =>

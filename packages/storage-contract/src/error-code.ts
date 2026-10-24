@@ -69,6 +69,11 @@ export const StorageContractErrorCode = Object.freeze({
   /** FirstOrThrow exhausted the query; use first or maybe when absence is expected. */
   queryEmptyResult: 'QUERY_EMPTY_RESULT',
 
+  /** A bounded vector scorer threw or rejected; inspect its unchanged original cause. */
+  rerankFailed: 'RERANK_FAILED',
+  /** A scorer must return one finite numeric score per actual hit; correct its result. */
+  rerankResultInvalid: 'RERANK_RESULT_INVALID',
+
   /** A durable replay cursor was evicted; invalidate the full cache and subscribe from now. */
   changeCursorExpired: 'CHANGE_CURSOR_EXPIRED',
 

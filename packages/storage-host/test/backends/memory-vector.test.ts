@@ -17,6 +17,39 @@ import { createStorageHost, createOrgId, memoryBackendPlugin } from '../../src/i
 type IPayload = { group: string; order: number }
 /** Every scenario enters through an actually installed native memory backend. */
 describe('memory native vectors', () => {
+  it('drains an accepted asynchronous reranker before host disposal completes', async () => {
+    const host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+    const collection = host.backend('memory').use(vector).collection('rerank-drain', {
+      dimensions: 1,
+      metric: 'dot'
+    })
+    await collection.upsert([{ id: 'one', vector: [1] }])
+    const entered = deferred<void>()
+    const finish = deferred<void>()
+    const read = collection
+      .near([1])
+      .topK(1)
+      .rerank(async () => {
+        entered.resolve()
+        await finish.promise
+        return [2]
+      })
+      .all()
+    await entered.promise
+    let disposed = false
+    const closing = host.dispose().then(() => {
+      disposed = true
+    })
+    try {
+      await new Promise<void>((resolve) => setTimeout(resolve, 0))
+      expect(disposed).toBe(false)
+    } finally {
+      finish.resolve()
+    }
+    await expect(read).resolves.toEqual([{ id: 'one', score: 1, rerankScore: 2 }])
+    await closing
+    expect(disposed).toBe(true)
+  })
   it('ranks exact finite scores with UTF-16 ties and detached payload/vector output', async () => {
     await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
     const store = host.backend('memory')

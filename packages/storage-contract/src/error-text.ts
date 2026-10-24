@@ -60,6 +60,14 @@ export const StorageContractErrorText = {
   /** Vector callbacks inspect only original engine hits and never trigger replacement searches. */
   queryVectorFunction:
     'JavaScript payload predicate applies only to engine hits and may return fewer than topK',
+  /** Reranking is always client work on the original bounded native result. */
+  queryRerank: 'vector reranking applies to the original engine hits on the client',
+  /** Invalid scorer options reject before any native cursor or callback is admitted. */
+  queryRerankArgument: 'vector rerank requires a scorer, origin and positive topN within topK',
+  /** A scorer failure retains the original thrown or rejected value as its immediate cause. */
+  queryRerankFailed: 'vector rerank scorer failed',
+  /** Dense finite scores must correspond one for one with the captured actual hits. */
+  queryRerankResult: 'vector rerank scorer must return one finite number per hit',
   /** Native equality cannot promise JavaScript opaque object identity. */
   queryIdentity: 'object identity comparison requires client execution',
   /** Native admission explicitly lists each supported operation and field operator. */

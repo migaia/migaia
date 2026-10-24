@@ -33,6 +33,8 @@ describe('StorageContractError 家族', () => {
       'migrationGap',
       'queryEmptyResult',
       'queryNotPushable',
+      'rerankFailed',
+      'rerankResultInvalid',
       'unsupported',
       'versionUnsupported',
       'writeConflict'
