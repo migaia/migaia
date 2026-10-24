@@ -1881,6 +1881,7 @@
       "./pg": ["pgDriver"],
       "./postgres-js": ["postgresJsDriver"],
       "./bun": ["bunSqlDriver"],
+      "./features/quantized": ["pgQuantizedFeature"],
       "./features/pgvector": ["pgvectorFeature"],
       "./features/listen": ["pgListenFeature"],
       "./features/copy": ["pgCopyFeature"],

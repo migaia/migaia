@@ -63,7 +63,7 @@ const hits = await embeddings
 const deleted = await embeddings.deleteWhere({ category: 'guide' }, { count: 'scroll' })
 ```
 
-cosine/dot/euclid use `<=>`/`<#>`/`<->` with scores 1-distance/-distance/-distance. Native vector(d) stores float32, with its corresponding precision and tied-order limits. Create a logical collection once; other organizations may use collection('documents') with the shared physical configuration. `api.pgvector.search({table:['app_vectors'],idColumn:'id',vectorColumn:'embedding',payloadColumn:'payload'}, q, {metric:'cosine',limit:10,efSearch:64})` queries caller-owned tables. The package creates no ANN index.
+cosine/dot/euclid use `<=>`/`<#>`/`<->` with scores 1-distance/-distance/-distance. Native vector(d) stores float32, with its corresponding precision and tied-order limits. Create a logical collection once; other organizations may use collection('documents') with the shared physical configuration. `api.pgvector.search({table:['app_vectors'],idColumn:'id',vectorColumn:'embedding',payloadColumn:'payload'}, q, {metric:'cosine',limit:10,efSearch:64})` queries caller-owned tables. Without the quantized Feature the package creates no ANN index.
 
 ## COPY and notifications
 
@@ -121,3 +121,25 @@ PostgreSQL storageLogStore uses indexExclusive:false and reads current journal s
 Every native commit writes its marker in the same transaction. A lost COMMIT acknowledgement is accepted only when that original marker is visible. Missing or unreadable evidence does not prove zero writes: the original physical controller seals, the original error chain survives, and no blind replay occurs. Known settlement removes the marker; cleanup failure reports and retains evidence.
 
 Selected journals retain every actual native mutation in execution order, including repeated writes to one target and intermediate values. The original SQL RETURNING row supplies each exact raw after value and absolute deadline; no later read substitutes the final value. Undo keeps the host's existing first-before/final-after merge and complete final revision checks. Unselected operations keep their original SQL and native path.
+
+## Quantized recall and native exact rescoring
+
+```ts
+import { pgQuantizedFeature } from '@migaia/storage-plugin-postgres/features/quantized'
+// postgresBackendPlugin({ driver }, {
+//   vector: pgvectorFeature(), quantized: pgQuantizedFeature({ mode: 'halfvec' })
+// })
+const selected = await embeddings
+  .near([1, 0, 0])
+  .where({ category: 'guide' })
+  .topK(20)
+  .rescore({ topN: 5 })
+  .rerank(({ hits }) => hits.map((hit) => hit.score))
+  .all()
+```
+
+Choose `halfvec` or `binary_quantize` once at installation. `topN` defaults to k and must be a positive safe integer at most k; invalid bounds reject before I/O. The read-only result supports original `withVector`, selection, grouping and generic rerank, with unchanged engine scores; it cannot delete, watch or acquire a second native rescore. No extra vector retrieval is implicit.
+
+The original schema owner prepares expression HNSW indexes, using the metric's halfvec opclass or `bit_hamming_ops`. Existing collection metadata is locked in the same native transaction so two hosts prepare one index safely. Layout checks/index preparation are separate native statements; the business query is one `MATERIALIZED` recall of k followed by exact original-vector ordering and topN. A metric override prepares its matching index. Sample-based origins retain their original sample-loading statements before the recall/rescore statement. This explicit quantized stage selects quantized recall even if its near call specified exact; plain `near(...,{exact:true})` keeps its original behavior.
+
+Recall includes organization, expiry and pushed payload conditions. HNSW filters do not promise physical prefiltering or k surviving candidates. JavaScript predicates run on the outer hits without refill; a following generic reranker receives those actual hits. Opt-in expression ANN indexes are the exception to the ordinary org-leading index layout. Original vectors remain float32; halfvec indexing supports at most 4000 dimensions, binary indexing at most 64000 but the original vector column at most 16000. Native casts may lose precision or reject values outside halfvec range with `SQL_FAILED` and the native cause. Quantization is not lossless. No dependencies or background workers are added.
