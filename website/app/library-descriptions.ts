@@ -43,7 +43,7 @@ export const LIBRARY_REFERENCE_DESCRIPTIONS_ZH = {
   'storage-plugin-postgres':
     '把 PostgreSQL 接到统一存储接口，避免文本、记录、过期时间和应用 SQL 分别提交时出现一半更新成功的情况。将已有客户端或连接池交给对应驱动，再把插件安装到 host，就能在同一数据库事务中组合这些操作；通知、逻辑复制和向量等能力按需选择，客户端仍由应用负责关闭。',
   'storage-plugin-sqlite':
-    '用运行时内置的 SQLite 保存本地设置、离线记录和缓存，让文本、记录、过期时间与应用 SQL 可以在同一个数据库事务内提交。选择运行时对应的驱动和数据库文件或内存库，再把插件安装到 host，无需另装 npm 原生数据库扩展；连接由应用创建和关闭，根入口不自动选择或加载驱动。',
+    '当本地设置、离线记录和缓存需要一起保存时，本包把文本、记录、过期时间与应用 SQL 统一放进运行时内置的 SQLite 事务，避免多个更新只成功一部分。选择 Node 或 Bun 对应的驱动和数据库文件，再把插件安装到 host；无需另装 npm 原生数据库扩展，连接由应用创建和关闭。',
   'storage-plugin-qdrant':
     '在真实 Qdrant 服务中保存向量及属性，并提供近邻搜索、筛选和支持的重排。业务代码不必在每次请求中重新拼接组织筛选条件。先配置服务地址，把插件安装到存储宿主，再选择向量能力与集合；标准查询在排名前筛选组织和期限，过期数据由应用显式删除。',
   'storage-plugin-sparql':
@@ -118,7 +118,7 @@ export const LIBRARY_REFERENCE_DESCRIPTIONS_EN = {
   'storage-plugin-postgres':
     'Use PostgreSQL through one storage API when text, records, expiry and application SQL must commit together rather than leave half an update saved. Pass an existing client or pool to its driver and install the plugin in a host, then combine these operations in the same database transaction. Select notifications, logical replication or vectors separately when needed; your application still closes the client.',
   'storage-plugin-sqlite':
-    "Store local settings, offline records and caches with the runtime's built-in SQLite, combining text, records, expiry and application SQL in one database transaction. Select the driver for your runtime and a database file or in-memory database, then install the plugin in a host without adding an npm native database extension. Your application creates and closes the connection; the root import does not choose or load a driver automatically.",
+    "When local settings, offline records and caches must be saved together, this package combines text, records, expiry and application SQL in the runtime's built-in SQLite transaction, avoiding partially saved updates. Choose the Node or Bun driver and a database file, then install the plugin in a host. No npm native database extension is needed; your application creates and closes the connection.",
   'storage-plugin-qdrant':
     'Store vectors and their payloads in a real Qdrant service, then use query chains for nearest-neighbor search, filtering and supported reranking instead of repeating native requests and organization filters throughout the application. Configure the service URL, install the plugin in a host, and select the vector capability and a collection. Standard queries apply organization and expiry filters before ranking; physically removing expired points is an explicit application operation.',
   'storage-plugin-sparql':
