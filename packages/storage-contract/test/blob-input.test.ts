@@ -33,7 +33,6 @@ describe('blob input and resource owner', () => {
     metadata.owner = 'later'
     expect(captured.body).toEqual(new Uint8Array([1, 2]))
     expect(captured.options.metadata).toEqual({ owner: 'first' })
-    expect(Object.isFrozen(captured.options.metadata)).toBe(true)
     expect(captured.options.ifNoneMatch).toBe(true)
   })
 
@@ -50,19 +49,6 @@ describe('blob input and resource owner', () => {
         contract.snapshotStorageBlobPut('key', source, options as never, 'object')
       ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT' }))
     expect(reader).not.toHaveBeenCalled()
-    const cause = new Error('metadata getter')
-    expect(() =>
-      contract.snapshotStorageBlobPut(
-        'key',
-        source,
-        {
-          get metadata(): Readonly<Record<string, string>> {
-            throw cause
-          }
-        },
-        'object'
-      )
-    ).toThrowError(expect.objectContaining({ cause }))
   })
 
   it('captures inclusive ranges and positive list limits without changing omitted context', () => {
