@@ -1778,6 +1778,7 @@
         "asyncDisposeKey",
         "collectUniqueIndexOwners",
         "createBackendChangeIterator",
+        "createBackendJournalNamespace",
         "createStorageOperationReporter",
         "createStorageOperationRuntime",
         "createStorageToken",

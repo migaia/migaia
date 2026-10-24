@@ -136,6 +136,25 @@ console.log(host.extensions.label('draft'))`
       example: storageHostCases.createBackendChangeIterator![0]!.example,
       cases: storageHostCases.createBackendChangeIterator
     },
+    createBackendJournalNamespace: {
+      role: 'operation',
+      purpose: t(
+        'Reuse the original private namespace resource lifetime; backend owners retain data and actual native terminal decisions.',
+        '复用原私有 namespace 资源生命周期，数据与实际原生终态仍归后端拥有者。'
+      ),
+      params: {
+        options: t(
+          'Original assertLive/closingSignal/report, native facts, reservation, authenticated private transaction and native transaction entry.',
+          '原 assertLive/closingSignal/report、native 事实、reservation、认证私有事务与原生事务入口。'
+        )
+      },
+      returns: t(
+        'Promise of IStorageJournalNamespace. run and terminal subscriptions retain accepted work until actual onEnd; transactionInfo is a pure authenticated fact. No raw client, installer or backend close rights.',
+        'Promise<IStorageJournalNamespace>；run 与终态订阅保留已接纳工作直到实际 onEnd，transactionInfo 仅返回认证事实，不外露 raw client、installer 或后端关闭权。'
+      ),
+      example: storageHostCases.storageLogStore![0]!.example,
+      cases: storageHostCases.storageLogStore
+    },
     observeStorageBatch: {
       role: 'operation',
       purpose: t(

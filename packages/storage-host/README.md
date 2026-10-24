@@ -250,3 +250,5 @@ PENDING-USER-REVIEW：dropOrg 遇到存活的全局 journal 时，原私有 name
 `journal.telemetry:true` 要求真实 `level()` 的 `atLevel` 接点。普通操作沿原 logger schema 输出 tag 为 `storage` 的条目，成功按 debug、失败按 error 经过原门槛与 filters；meta 含 backend/orgId/operation、原后端提供的 keys、durationMs/outcome/source/code/level 和正常 payload，args 保留原错误，不增加字段屏蔽或脱敏。失败与关闭的 logger 只走宿主 report，不改变存储结果；宿主不关闭借用 logger。关闭 telemetry 不读取 atLevel、不生成日志数据。
 
 后端作者的原 `execution` 接点可用 `keys?:()=>readonly ILockKey[]` 提供已规范的原生身份，`internal?:true` 排除私有日志及已由外层覆盖的执行；orgId 由原不可变闭包补入。需要多次原 attempt 的终点用可选 `execution.observe(describe, invoke)` 包住原完整循环，invoke 的 boolean 仅表示是否需要采集观察事实，未启用时直接调用原工作；内层原 pipeline 保持且标 internal。memory 已验证一次真实重试只输出一个事务条目、无子操作重复。其它后端继续由各自原 owner 提供完整事实。
+
+`@migaia/storage-host/authoring/backend` 的 `createBackendJournalNamespace(options)` 复用原 namespace 资源 reservation、quiescence 排空和双释放 Promise；memory 的私有 namespace 已直接消费。`IBackendJournalNamespaceOptions` 只借用原 assertLive/closingSignal/report、nativeAtomic/indexExclusive、reserve、authenticate(scope) 和原 transaction。`IBackendJournalTransaction` 仅有私有 run(viewWork) 与 onCommit/onRollback/onEnd 观察，无原生句柄、commit 或后端关闭权；onEnd 在结果未知时也仅排空，不冒充 rollback。数据、代际、跨实例独占和实际终态仍归原后端。
