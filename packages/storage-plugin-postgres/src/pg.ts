@@ -1,4 +1,4 @@
-import type { Pool, PoolClient } from 'pg'
+import type { Pool, PoolClient, ClientBase } from 'pg'
 import { from as copyFrom } from 'pg-copy-streams'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
@@ -19,7 +19,7 @@ import {
 } from '@migaia/storage-host/authoring/backend'
 /** Each query opts into raw text locally; the caller's pool and global parsers remain unchanged. */
 async function query(
-  client: Pool | PoolClient,
+  client: Pool | ClientBase,
   text: string,
   params: readonly IPgNativeParameter[]
 ): Promise<IPgResult> {

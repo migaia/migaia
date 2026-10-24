@@ -1,4 +1,4 @@
-import type { Pool, PoolClient } from 'pg'
+import type { Pool, ClientBase } from 'pg'
 import type { Pgoutput } from 'pg-logical-replication'
 import { deferred, sleep } from '@migaia/utils/promise'
 import { attachSecondaryErrors } from '@migaia/utils/error'
@@ -140,7 +140,7 @@ function accumulator(route: IPgLogicalReplicationRoute) {
 export function createPgReplication(
   pool: Pool,
   query: (
-    client: Pool | PoolClient,
+    client: Pool | ClientBase,
     text: string,
     params: readonly IPgNativeParameter[]
   ) => Promise<IPgResult>
@@ -325,8 +325,8 @@ export function createPgReplication(
       let stopAbort = () => {}
       let streaming: Promise<unknown> | undefined
       /**
-       * Native slot ownership identifies only this connection, so cleanup never waits on a
-       * successor.
+       * The original peer start port identifies this backend before readiness can fail; cleanup
+       * never waits for a successor consuming the same slot.
        */
       let nativePid: number | undefined
       const resource = pgResource(async () => {
@@ -335,11 +335,8 @@ export function createPgReplication(
         await streaming
         while (
           nativePid !== undefined &&
-          (
-            await query(pool, 'SELECT active_pid FROM pg_replication_slots WHERE slot_name=$1', [
-              options.slot
-            ])
-          ).rows[0]?.active_pid === nativePid
+          (await query(pool, 'SELECT pid FROM pg_stat_activity WHERE pid=$1', [nativePid])).rows
+            .length !== 0
         )
           await sleep(1)
         service.removeAllListeners()
@@ -371,7 +368,7 @@ export function createPgReplication(
               options.slot
             ])
           ).rows[0]
-          if (typeof row?.active_pid === 'number') nativePid = row.active_pid
+          if (row?.active_pid !== nativePid) throw unsupported()
           ready.resolve()
         })().catch(fail)
       })
@@ -411,16 +408,20 @@ export function createPgReplication(
             ? cursor.end
             : facts.confirmed
       if (typeof from !== 'string') throw unsupported()
-      streaming = service
-        .subscribe(
-          new PgoutputPlugin({
-            protoVersion: 1,
-            publicationNames: [quotePgIdentifier(options.publication).replaceAll("'", "''")]
-          }),
-          options.slot,
-          from
-        )
-        .catch(fail)
+      /** The public peer start port supplies the exact native client before COPY starts. */
+      const decoder = new PgoutputPlugin({
+        protoVersion: 1,
+        publicationNames: [quotePgIdentifier(options.publication).replaceAll("'", "''")]
+      })
+      /** Preserve the original decoder, receiver and replication start implementation. */
+      const start = decoder.start
+      decoder.start = async (client, slot, lastLsn) => {
+        const row = (await query(client, 'SELECT pg_backend_pid() AS native_pid', [])).rows[0]
+        if (typeof row?.native_pid !== 'number') throw unsupported()
+        nativePid = row.native_pid
+        return Reflect.apply(start, decoder, [client, slot, lastLsn])
+      }
+      streaming = service.subscribe(decoder, options.slot, from).catch(fail)
       try {
         stopAbort = subscribeToAbort(
           ctx?.signal,

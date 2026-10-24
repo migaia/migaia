@@ -8,7 +8,6 @@ import { postgresBackendPlugin } from '../src/index.js'
 import { pgDriver } from '../src/pg.js'
 import { pgLogicalReplicationFeature } from '../src/features/logical-replication.js'
 import { pgKey, encodePgText } from '../src/codec.js'
-import { createPgReplication } from '../src/pg-replication.js'
 
 /** Deployment owns a unique fixture slot; the Feature never creates it or removes it on disposal. */
 it('replays partial multi-org commits and confirms only complete caller-processed positions', async () => {
@@ -145,18 +144,37 @@ for (const mode of ['pid-query', 'abort'] as const) {
         'Run through scripts/storage-services.mts run -- to provide PostgreSQL replication'
       )
     const pool = new Pool({ connectionString })
-    const native = pgDriver(pool)
     const slot = 'pg_startup_' + randomUUID().replaceAll('-', '')
     await pool.query('SELECT pg_create_logical_replication_slot($1,$2)', [slot, 'pgoutput'])
     const original = new Error('replication-startup-original')
     const cancellation = new AbortController()
     let reported: unknown
-    const port = createPgReplication(pool, async (_client, text, params) => {
-      if (mode === 'pid-query' && text.includes('SELECT active_pid')) throw original
-      const result = await native.query(text, params)
-      if (mode === 'abort' && text.includes('FROM pg_database')) cancellation.abort(original)
-      return result
+    /** Intercept only the pool readiness query; original native clients keep their real receiver. */
+    const observedPool = new Proxy(pool, {
+      get(target, key, receiver) {
+        if (key !== 'query') return Reflect.get(target, key, receiver)
+        return async (...args: unknown[]) => {
+          const input = args[0]
+          const text =
+            typeof input === 'string'
+              ? input
+              : input !== null && typeof input === 'object'
+                ? Reflect.get(input, 'text')
+                : undefined
+          if (
+            mode === 'pid-query' &&
+            typeof text === 'string' &&
+            text.includes('SELECT active_pid')
+          )
+            throw original
+          const result = await Reflect.apply(target.query, target, args)
+          if (mode === 'abort' && typeof text === 'string' && text.includes('FROM pg_database'))
+            cancellation.abort(original)
+          return result
+        }
+      }
     })
+    const port = pgDriver(observedPool).logicalReplication!
     try {
       await expect(
         port.open(
