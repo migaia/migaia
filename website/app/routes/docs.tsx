@@ -2158,6 +2158,7 @@ function ClassMemberReference({
   members,
   nestedDocs,
   parameterTypeDoc,
+  shownExample,
   strict = false,
   symbol
 }: {
@@ -2187,6 +2188,8 @@ function ClassMemberReference({
   readonly members: readonly IApiMember[]
   /** Resolves the reference doc of a parameter's object type so its fields render in place. */
   readonly parameterTypeDoc?: (typeName: string) => ILocalizedTypeDoc | undefined
+  /** The primary program already rendered above remains the single owner of identical code. */
+  readonly shownExample?: string
   /** Lists documented nested fields (`restart.mode`) of one member, keyed by dotted path. */
   readonly nestedDocs?: (name: string) => readonly (readonly [string, ILocalizedMemberDoc])[]
   /** True for audited libraries: never substitute declaration comments for reference text. */
@@ -2240,7 +2243,7 @@ function ClassMemberReference({
               </ul>
             </>
           ) : null}
-          {guide.example ? (
+          {guide.example && guide.example !== shownExample ? (
             <CodeBlock
               code={guide.example}
               label={label(`${symbol.name} usage example`, `${symbol.name} 用法示例`)}
@@ -3837,6 +3840,7 @@ function SingleApiReference({
           members={ownSurface.members}
           nestedDocs={nestedDocResolver(reference, api.module, [symbol.name, ...ownSurface.owners])}
           parameterTypeDoc={(typeName) => instanceGuideFor(reference, api.module, typeName)}
+          shownExample={rawQuickExample}
           strict={Boolean(reference)}
           symbol={symbol}
         />
@@ -3863,6 +3867,7 @@ function SingleApiReference({
           members={surface.members}
           nestedDocs={nestedDocResolver(reference, api.module, [symbol.name, ...surface.owners])}
           parameterTypeDoc={(typeName) => instanceGuideFor(reference, api.module, typeName)}
+          shownExample={rawQuickExample}
           strict={Boolean(reference)}
           symbol={symbol}
         />

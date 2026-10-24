@@ -5,13 +5,13 @@ import { storageHostCases } from './storage-host-cases.js'
 const t = (en: string, zh: string): IText => ({ en, zh })
 /** These examples create an actual public memory installation and release its original host. */
 const hostExample = (statement: string): string =>
-  `import { createStorageHost, memoryBackendPlugin, createOrgId } from '@migaia/storage-host'\n\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })\n${statement}`
+  `import { createStorageHost, memoryBackendPlugin${statement.includes('createOrgId') ? ', createOrgId' : ''} } from '@migaia/storage-host'\n\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })\n${statement}`
 /** Memory examples keep native configuration separate from Feature selection. */
 const memoryExample = (options: string): string =>
   `import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nawait using host = await createStorageHost({\n  plugins: [memoryBackendPlugin(${options})]\n})\nawait host.backend('memory').set('theme', 'dark')\nconsole.log(await host.backend('memory').get('theme'))`
 /** Host construction examples never retain a global client or close another owner. */
 const hostOptionsExample = (options: string): string =>
-  `import { createStorageHost, createOrgId } from '@migaia/storage-host'\n\nawait using host = await createStorageHost(${options})\nawait host.detect()`
+  `import { createStorageHost${options.includes('createOrgId') ? ', createOrgId' : ''} } from '@migaia/storage-host'\n\nawait using host = await createStorageHost(${options})\nawait host.detect()`
 /** Options are captured once before initial plugin installation or native acquisition. */
 const hostOptions: Readonly<Record<string, IMemberDoc>> = {
   journal: {
