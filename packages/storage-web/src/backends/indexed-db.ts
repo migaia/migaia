@@ -857,386 +857,26 @@ export function indexedDbHost<TValue = unknown>(
     bindOrganizations
   } as IIndexedDbContext<TValue>
 
-  if (
-    indexedDbContext.options === null ||
-    typeof indexedDbContext.options !== 'object' ||
-    Array.isArray(indexedDbContext.options)
-  )
-    throw new StorageError(StorageErrorCode.invalidConfig, {
-      backend: StorageBackend.indexedDb,
-      cause: new TypeError('IndexedDB options must be an object')
-    })
+  captureIndexedDbConfiguration(indexedDbContext)
 
-  try {
-    indexedDbContext.configuredDbName = indexedDbContext.options.dbName
-    indexedDbContext.configuredKvStoreName = indexedDbContext.options.kvStoreName
-    indexedDbContext.configuredBytesStoreName = indexedDbContext.options.bytesStoreName
-    indexedDbContext.configuredRecordsStoreName = indexedDbContext.options.recordsStoreName
-    indexedDbContext.configuredCleanupLegacyRecords = indexedDbContext.options.cleanupLegacyRecords
-    indexedDbContext.configuredFactory = indexedDbContext.options.factory
-    indexedDbContext.journalFactoryIsPrivate = indexedDbContext.options.journalFactoryIsPrivate
-    if (
-      indexedDbContext.journalFactoryIsPrivate !== undefined &&
-      indexedDbContext.journalFactoryIsPrivate !== true
-    )
-      throw new TypeError(StorageErrorText.indexedDbJournalFactoryIsolationInvalid)
-    indexedDbContext.configuredKeyRange = indexedDbContext.options.keyRange
-    /** Read the optional owner and its label only once during this store's construction. */
-    const owner = indexedDbContext.options.owner
-    if (
-      owner !== undefined &&
-      (typeof owner !== 'object' || owner === null || Array.isArray(owner))
-    )
-      throw new TypeError(StorageErrorText.indexedDbOwnerInvalid)
-    indexedDbContext.ownerLabel = owner?.label ?? StorageBrowserOwnerLabel
-    if (typeof indexedDbContext.ownerLabel !== 'string')
-      throw new TypeError(StorageErrorText.indexedDbOwnerInvalid)
-  } catch (cause) {
-    throw new StorageError(StorageErrorCode.invalidConfig, {
-      backend: StorageBackend.indexedDb,
-      cause
-    })
-  }
-
-  try {
-    indexedDbContext.realmDefaultFactory = (globalThis as { indexedDB?: IDBFactory }).indexedDB
-  } catch {
-    indexedDbContext.realmDefaultFactory = undefined
-  }
-
-  try {
-    indexedDbContext.broadcastChannel = (
-      globalThis as { BroadcastChannel?: typeof BroadcastChannel }
-    ).BroadcastChannel
-  } catch {
-    indexedDbContext.broadcastChannel = undefined
-  }
-
-  try {
-    indexedDbContext.webLocks = globalThis.navigator?.locks
-  } catch {
-    indexedDbContext.webLocks = undefined
-  }
-
-  indexedDbContext.dbName =
-    indexedDbContext.configuredDbName === undefined
-      ? 'storage-web'
-      : indexedDbContext.configuredDbName
-
-  indexedDbContext.kvStoreName =
-    indexedDbContext.configuredKvStoreName === undefined
-      ? 'kv'
-      : indexedDbContext.configuredKvStoreName
-
-  indexedDbContext.bytesStoreName =
-    indexedDbContext.configuredBytesStoreName === undefined
-      ? 'bytes'
-      : indexedDbContext.configuredBytesStoreName
-
-  indexedDbContext.recordsStoreName =
-    indexedDbContext.configuredRecordsStoreName === undefined
-      ? 'records'
-      : indexedDbContext.configuredRecordsStoreName
-
-  indexedDbContext.cleanupLegacyRecords =
-    indexedDbContext.configuredCleanupLegacyRecords === undefined
-      ? false
-      : indexedDbContext.configuredCleanupLegacyRecords
-
-  indexedDbContext.factory = (
-    indexedDbContext.configuredFactory === undefined
-      ? indexedDbContext.realmDefaultFactory
-      : indexedDbContext.configuredFactory
-  ) as IDBFactory
-
-  indexedDbContext.keyRange =
-    indexedDbContext.configuredKeyRange === undefined
-      ? (globalThis as { IDBKeyRange?: typeof IDBKeyRange }).IDBKeyRange
-      : indexedDbContext.configuredKeyRange
-
-  if (
-    indexedDbContext.journalFactoryIsPrivate === true &&
-    (indexedDbContext.configuredFactory === undefined ||
-      indexedDbContext.factory === indexedDbContext.realmDefaultFactory)
-  )
-    throw new StorageError(StorageErrorCode.invalidConfig, {
-      backend: StorageBackend.indexedDb,
-      cause: new TypeError(StorageErrorText.indexedDbJournalFactoryMustBeInjected)
-    })
-
-  if (typeof indexedDbContext.cleanupLegacyRecords !== 'boolean')
-    throw new StorageError(StorageErrorCode.invalidConfig, {
-      backend: StorageBackend.indexedDb,
-      cause: new TypeError('cleanupLegacyRecords must be a boolean')
-    })
-
-  if (!indexedDbContext.factory)
-    throw new StorageError(StorageErrorCode.unavailable, { backend: StorageBackend.indexedDb })
-
-  if (
-    (typeof indexedDbContext.factory !== 'object' &&
-      typeof indexedDbContext.factory !== 'function') ||
-    indexedDbContext.factory === null ||
-    typeof (indexedDbContext.factory as { open?: unknown }).open !== 'function'
-  )
-    throw new StorageError(StorageErrorCode.invalidConfig, {
-      backend: StorageBackend.indexedDb,
-      cause: new TypeError('IndexedDB factory must provide open()')
-    })
-
-  if (
-    indexedDbContext.keyRange !== undefined &&
-    (typeof indexedDbContext.keyRange !== 'function' ||
-      typeof (indexedDbContext.keyRange as typeof IDBKeyRange).bound !== 'function' ||
-      typeof (indexedDbContext.keyRange as typeof IDBKeyRange).lowerBound !== 'function' ||
-      typeof (indexedDbContext.keyRange as typeof IDBKeyRange).upperBound !== 'function')
-  )
-    throw new StorageError(StorageErrorCode.invalidConfig, {
-      backend: StorageBackend.indexedDb,
-      cause: new TypeError('IDBKeyRange must provide bound/lowerBound/upperBound')
-    })
-
-  indexedDbContext.configuredStoreNames = [
-    indexedDbContext.kvStoreName,
-    indexedDbContext.bytesStoreName,
-    indexedDbContext.recordsStoreName
-  ]
-
-  /** Schema requirements are captured once before the existing opener can perform any I/O. */
-  indexedDbContext.featureStoreNames = [...indexedDbContext.declaredObjectStores]
-
-  if (
-    !isValidStoreName(indexedDbContext.dbName) ||
-    indexedDbContext.configuredStoreNames.some((storeName) => !isValidStoreName(storeName)) ||
-    new Set(indexedDbContext.configuredStoreNames).size !==
-      indexedDbContext.configuredStoreNames.length ||
-    indexedDbContext.configuredStoreNames.some((storeName) =>
-      INTERNAL_STORE_NAMES.has(storeName)
-    ) ||
-    indexedDbContext.featureStoreNames.some(
-      (name) =>
-        !isValidStoreName(name) ||
-        INTERNAL_STORE_NAMES.has(name) ||
-        indexedDbContext.configuredStoreNames.includes(name)
-    ) ||
-    new Set(indexedDbContext.featureStoreNames).size !== indexedDbContext.featureStoreNames.length
-  )
-    throw new StorageError(StorageErrorCode.invalidConfig, {
-      backend: StorageBackend.indexedDb,
-      cause: new TypeError(
-        'IndexedDB channel store names must be non-empty, unique, and non-reserved'
-      )
-    })
-
-  /** Preserve original name validation, then reject reserved org suffixes before native I/O. */
-  if (indexedDbContext.bindOrganizations)
-    resolveStorageNamespace(
-      indexedDbContext.dbName,
-      indexedDbContext.runtime.defaultOrgId,
-      indexedDbContext.runtime.defaultOrgId
-    )
+  resolveIndexedDbLayout(indexedDbContext)
 
   /** One local monotonic clock shared by all private sessions in this store instance. */
-  indexedDbContext.backfillMonotonicNow = createMonotonicClock()
-
-  /**
-   * Context-local observations cannot cross realms because `performance.now()` origins are
-   * incomparable.
-   */
-  indexedDbContext.backfillTakeoverObservations = new Map<string, number>()
-
-  /** Physical deletion invalidates cached private log indexes without replacing the borrowed view. */
-  indexedDbContext.journalGeneration = Object.freeze({})
-  indexedDbContext.controller = createIndexedDbController(indexedDbContext)
-
-  /** The original installation owns the physical database's default organization identity. */
-  indexedDbContext.orgId = indexedDbContext.runtime.defaultOrgId
-
-  /** One native epoch anchor retains the original installed scheduler as the elapsed-time owner. */
-  indexedDbContext.ttlNow = captureIndexedDbTtlClock(
-    indexedDbContext.runtime.featureExpose.getScheduler()
-  )
-
-  /** Report-only owner for malformed or unavailable coordination transport behavior. */
-  indexedDbContext.coordinationReporter = createStorageOperationReporter()
-
-  /** One private registry member shared by every exact store in this physical data universe. */
-  indexedDbContext.coordination = acquireIndexedDbCoordination({
-    factory: indexedDbContext.factory,
-    realmDefaultFactory: indexedDbContext.realmDefaultFactory,
-    broadcastChannel: indexedDbContext.broadcastChannel,
-    dbName: indexedDbContext.dbName,
-    layoutFingerprint: indexedDbLayoutFingerprint(
-      indexedDbContext.kvStoreName,
-      indexedDbContext.bytesStoreName,
-      indexedDbContext.recordsStoreName
-    ),
-    ownOrigin: indexedDbContext.controller.origin,
-    orgId: indexedDbContext.orgId,
-    onChange: (change) => indexedDbContext.controller.publishExternal(change),
-    report: (error) => reportCleanupError(indexedDbContext.coordinationReporter, error),
-    createKeyLockPort: () => indexedDbContext.runtime.createKeyLockPort()
-  })
-
-  /** Immutable capabilities reflect construction-time transport admission and never mutate later. */
-  indexedDbContext.capabilities = Object.freeze({
-    ...CAPABILITIES,
-    changeFeed: indexedDbContext.coordination.admitted
-  })
-
-  /** Brands the private context that an already-admitted logical operation may reuse. */
-  indexedDbContext.mutationLeaseBrand = Symbol('indexeddb-mutation-lease')
-
-  /** Shared preparation state; callers await the same attempt but own cancellation locally. */
-  indexedDbContext.prepareState = 'idle'
-
-  /** Native handles are indexed only after contract ownership has authorized their live views. */
-  indexedDbContext.nativeTransactions = new Map<
-    string,
-    {
-      readonly native: IDBTransaction
-      readonly journal: (
-        scope: Omit<ITransactionScope, 'use'>,
-        prefix: string
-      ) => IBackendJournalTransaction
-      readonly images: {
-        readonly changes: ReturnType<typeof createIndexedDbJournalImages>['changes']
-        readImage(target: IStorageJournalTarget): Promise<IStorageJournalImage>
-        writeImage(target: IStorageJournalTarget, image: IStorageJournalImage): Promise<void>
-        readonly readRevision: (
-          target: IStorageJournalTarget
-        ) => ReturnType<ReturnType<typeof createIndexedDbJournalImages>['revision']>
-      }
-      readonly abort: () => void
-      readonly clearRoot: (channel: 'value' | 'bytes' | 'record' | undefined) => Promise<void>
-      readonly readKeys: () => Promise<string[]>
-      readonly ttl: (scope: ITransactionScope) => ITransactionTtlApi
-      readonly expiredRecord: (key: IStorageKey) => Promise<boolean>
-      readonly recordEpoch: (
-        scope: string
-      ) => Promise<{ readonly global: number; readonly scope: number }>
-      readonly removeRecordsByPrefix: (
-        scope: ITransactionScope<unknown>,
-        prefix: IStorageKey
-      ) => Promise<number>
-    }
-  >()
-
-  /**
-   * Iterator pages reuse the same optional backend journal port without shadowing operation
-   * runtime.
-   */
-  indexedDbContext.runtimeJournal = indexedDbContext.runtime.journal
+  initializeIndexedDbNativeState(indexedDbContext)
   indexedDbContext.store = createIndexedDbStore(indexedDbContext)
 
-  registerRecordIndexBackfillStore(indexedDbContext.store, {
-    prepare: async () => {
-      await open(indexedDbContext, createStorageOperationRuntime())
-    },
-    ensureRecordIndexes: (
-      scope: string,
-      definitions: readonly IRecordIndexDefinition[],
-      _ctx?: IOperationContext
-    ) => ensureRecordIndexes(indexedDbContext, scope, definitions, _ctx),
-    getRecordIndexReadiness: indexedDbContext.store.getRecordIndexReadiness,
-    openBackfillSession: (
-      handle: IRecordIndexHandle,
-      options: {
-        readonly range: IKeyRange
-        readonly legacyRange?: IKeyRange
-        readonly includeLegacy?: boolean
-        readonly allowComplete: boolean
-        readonly batchSize?: number
-        readonly leaseMs?: number
-      },
-      ctx?: IOperationContext
-    ) => openBackfillSession(indexedDbContext, handle, options, ctx)
-  })
+  registerIndexedDbBackfill(indexedDbContext)
   indexedDbContext.recordApi = createIndexedDbRecordApi(indexedDbContext)
   indexedDbContext.ttlApi = createIndexedDbTtlApi(indexedDbContext)
   indexedDbContext.batchApi = createIndexedDbBatchApi(indexedDbContext)
 
-  indexedDbContext.construction = provideBackendConstruction(
-    bindBrowserExecution(indexedDbContext.store, indexedDbContext.runtime, [
-      'set',
-      'remove',
-      'setBytes',
-      'removeBytes',
-      'putRecord',
-      'deleteRecord',
-      'clearValues',
-      'clearAll',
-      'clearBytes',
-      'clearRecords',
-      'putIndexedRecord',
-      ...(indexedDbContext.runtime.journal === undefined
-        ? []
-        : ['get', 'has', 'keys', 'getBytes', 'getRecord'])
-    ]),
-    [
-      implement(kv, browserKeyValueApi(indexedDbContext.store, indexedDbContext.batchApi), {
-        forTransaction: (scope) => scope
-      }),
-      implement(records, indexedDbContext.recordApi, {
-        forTransaction: (scope: ITransactionScope) => transactionRecordApi(indexedDbContext, scope)
-      }),
-      implement(ttl, indexedDbContext.ttlApi, {
-        forTransaction: (scope: ITransactionScope) => transactionTtlApi(indexedDbContext, scope)
-      })
-    ],
-    indexedDbContext.controller,
-    () => {
-      if (indexedDbContext.activeDatabase === undefined)
-        throw new StorageError(StorageErrorCode.unavailable, { backend: StorageBackend.indexedDb })
-      return indexedDbContext.activeDatabase
-    },
-    async () => {
-      await open(indexedDbContext, createStorageOperationRuntime())
-    }
-  )
+  indexedDbContext.construction = createIndexedDbConstruction(indexedDbContext)
 
-  indexedDbContext.transactionOwner = createTransactionOwner<TValue>(
-    indexedDbContext.construction.store,
-    normalizeIndexedDbOperationError,
-    {
-      activityMode: TransactionActivityMode.native,
-      asyncDisposeKey,
-      concurrencyStages: indexedDbContext.runtime.stageBindings.concurrencyStages(
-        indexedDbContext.construction.store
-      )
-    }
-  )
+  indexedDbContext.transactionOwner = createIndexedDbTransactionOwner(indexedDbContext)
   indexedDbContext.physical = createIndexedDbPhysical(indexedDbContext)
 
   /** Original organization constructions also supply exact native Feature clients. */
-  indexedDbContext.orgBinding = indexedDbContext.bindOrganizations
-    ? createBrowserOrgBinding<
-        IIndexedDbProvidedStore<TValue>,
-        IDBDatabase,
-        IIndexedDbPhysical<TValue>
-      >(
-        indexedDbContext.runtime,
-        indexedDbContext.dbName,
-        indexedDbContext.physical,
-        (target, ports) =>
-          indexedDbHost<TValue>(
-            {
-              dbName: target,
-              kvStoreName: indexedDbContext.kvStoreName,
-              bytesStoreName: indexedDbContext.bytesStoreName,
-              recordsStoreName: indexedDbContext.recordsStoreName,
-              cleanupLegacyRecords: indexedDbContext.cleanupLegacyRecords,
-              factory: indexedDbContext.factory,
-              journalFactoryIsPrivate: indexedDbContext.journalFactoryIsPrivate,
-              keyRange: indexedDbContext.keyRange,
-              owner: { label: indexedDbContext.ownerLabel }
-            },
-            ports,
-            indexedDbContext.featureStoreNames,
-            false
-          )
-      )
-    : undefined
+  indexedDbContext.orgBinding = createIndexedDbOrgBinding(indexedDbContext)
   return {
     ...indexedDbContext.physical,
     ...(indexedDbContext.orgBinding === undefined
@@ -6282,4 +5922,399 @@ function createIndexedDbPhysical<TValue>(
       return native.native
     }
   }
+}
+
+/** Capture construction options and the supported realm ports before any native acquisition. */
+function captureIndexedDbConfiguration<TValue>(indexedDbContext: IIndexedDbContext<TValue>): void {
+  if (
+    indexedDbContext.options === null ||
+    typeof indexedDbContext.options !== 'object' ||
+    Array.isArray(indexedDbContext.options)
+  )
+    throw new StorageError(StorageErrorCode.invalidConfig, {
+      backend: StorageBackend.indexedDb,
+      cause: new TypeError('IndexedDB options must be an object')
+    })
+
+  try {
+    indexedDbContext.configuredDbName = indexedDbContext.options.dbName
+    indexedDbContext.configuredKvStoreName = indexedDbContext.options.kvStoreName
+    indexedDbContext.configuredBytesStoreName = indexedDbContext.options.bytesStoreName
+    indexedDbContext.configuredRecordsStoreName = indexedDbContext.options.recordsStoreName
+    indexedDbContext.configuredCleanupLegacyRecords = indexedDbContext.options.cleanupLegacyRecords
+    indexedDbContext.configuredFactory = indexedDbContext.options.factory
+    indexedDbContext.journalFactoryIsPrivate = indexedDbContext.options.journalFactoryIsPrivate
+    if (
+      indexedDbContext.journalFactoryIsPrivate !== undefined &&
+      indexedDbContext.journalFactoryIsPrivate !== true
+    )
+      throw new TypeError(StorageErrorText.indexedDbJournalFactoryIsolationInvalid)
+    indexedDbContext.configuredKeyRange = indexedDbContext.options.keyRange
+    /** Read the optional owner and its label only once during this store's construction. */
+    const owner = indexedDbContext.options.owner
+    if (
+      owner !== undefined &&
+      (typeof owner !== 'object' || owner === null || Array.isArray(owner))
+    )
+      throw new TypeError(StorageErrorText.indexedDbOwnerInvalid)
+    indexedDbContext.ownerLabel = owner?.label ?? StorageBrowserOwnerLabel
+    if (typeof indexedDbContext.ownerLabel !== 'string')
+      throw new TypeError(StorageErrorText.indexedDbOwnerInvalid)
+  } catch (cause) {
+    throw new StorageError(StorageErrorCode.invalidConfig, {
+      backend: StorageBackend.indexedDb,
+      cause
+    })
+  }
+
+  try {
+    indexedDbContext.realmDefaultFactory = (globalThis as { indexedDB?: IDBFactory }).indexedDB
+  } catch {
+    indexedDbContext.realmDefaultFactory = undefined
+  }
+
+  try {
+    indexedDbContext.broadcastChannel = (
+      globalThis as { BroadcastChannel?: typeof BroadcastChannel }
+    ).BroadcastChannel
+  } catch {
+    indexedDbContext.broadcastChannel = undefined
+  }
+
+  try {
+    indexedDbContext.webLocks = globalThis.navigator?.locks
+  } catch {
+    indexedDbContext.webLocks = undefined
+  }
+}
+/** Resolve and validate the original database layout before opening or binding resources. */
+function resolveIndexedDbLayout<TValue>(indexedDbContext: IIndexedDbContext<TValue>): void {
+  indexedDbContext.dbName =
+    indexedDbContext.configuredDbName === undefined
+      ? 'storage-web'
+      : indexedDbContext.configuredDbName
+
+  indexedDbContext.kvStoreName =
+    indexedDbContext.configuredKvStoreName === undefined
+      ? 'kv'
+      : indexedDbContext.configuredKvStoreName
+
+  indexedDbContext.bytesStoreName =
+    indexedDbContext.configuredBytesStoreName === undefined
+      ? 'bytes'
+      : indexedDbContext.configuredBytesStoreName
+
+  indexedDbContext.recordsStoreName =
+    indexedDbContext.configuredRecordsStoreName === undefined
+      ? 'records'
+      : indexedDbContext.configuredRecordsStoreName
+
+  indexedDbContext.cleanupLegacyRecords =
+    indexedDbContext.configuredCleanupLegacyRecords === undefined
+      ? false
+      : indexedDbContext.configuredCleanupLegacyRecords
+
+  indexedDbContext.factory = (
+    indexedDbContext.configuredFactory === undefined
+      ? indexedDbContext.realmDefaultFactory
+      : indexedDbContext.configuredFactory
+  ) as IDBFactory
+
+  indexedDbContext.keyRange =
+    indexedDbContext.configuredKeyRange === undefined
+      ? (globalThis as { IDBKeyRange?: typeof IDBKeyRange }).IDBKeyRange
+      : indexedDbContext.configuredKeyRange
+
+  if (
+    indexedDbContext.journalFactoryIsPrivate === true &&
+    (indexedDbContext.configuredFactory === undefined ||
+      indexedDbContext.factory === indexedDbContext.realmDefaultFactory)
+  )
+    throw new StorageError(StorageErrorCode.invalidConfig, {
+      backend: StorageBackend.indexedDb,
+      cause: new TypeError(StorageErrorText.indexedDbJournalFactoryMustBeInjected)
+    })
+
+  if (typeof indexedDbContext.cleanupLegacyRecords !== 'boolean')
+    throw new StorageError(StorageErrorCode.invalidConfig, {
+      backend: StorageBackend.indexedDb,
+      cause: new TypeError('cleanupLegacyRecords must be a boolean')
+    })
+
+  if (!indexedDbContext.factory)
+    throw new StorageError(StorageErrorCode.unavailable, { backend: StorageBackend.indexedDb })
+
+  if (
+    (typeof indexedDbContext.factory !== 'object' &&
+      typeof indexedDbContext.factory !== 'function') ||
+    indexedDbContext.factory === null ||
+    typeof (indexedDbContext.factory as { open?: unknown }).open !== 'function'
+  )
+    throw new StorageError(StorageErrorCode.invalidConfig, {
+      backend: StorageBackend.indexedDb,
+      cause: new TypeError('IndexedDB factory must provide open()')
+    })
+
+  if (
+    indexedDbContext.keyRange !== undefined &&
+    (typeof indexedDbContext.keyRange !== 'function' ||
+      typeof (indexedDbContext.keyRange as typeof IDBKeyRange).bound !== 'function' ||
+      typeof (indexedDbContext.keyRange as typeof IDBKeyRange).lowerBound !== 'function' ||
+      typeof (indexedDbContext.keyRange as typeof IDBKeyRange).upperBound !== 'function')
+  )
+    throw new StorageError(StorageErrorCode.invalidConfig, {
+      backend: StorageBackend.indexedDb,
+      cause: new TypeError('IDBKeyRange must provide bound/lowerBound/upperBound')
+    })
+
+  indexedDbContext.configuredStoreNames = [
+    indexedDbContext.kvStoreName,
+    indexedDbContext.bytesStoreName,
+    indexedDbContext.recordsStoreName
+  ]
+
+  /** Schema requirements are captured once before the existing opener can perform any I/O. */
+  indexedDbContext.featureStoreNames = [...indexedDbContext.declaredObjectStores]
+
+  if (
+    !isValidStoreName(indexedDbContext.dbName) ||
+    indexedDbContext.configuredStoreNames.some((storeName) => !isValidStoreName(storeName)) ||
+    new Set(indexedDbContext.configuredStoreNames).size !==
+      indexedDbContext.configuredStoreNames.length ||
+    indexedDbContext.configuredStoreNames.some((storeName) =>
+      INTERNAL_STORE_NAMES.has(storeName)
+    ) ||
+    indexedDbContext.featureStoreNames.some(
+      (name) =>
+        !isValidStoreName(name) ||
+        INTERNAL_STORE_NAMES.has(name) ||
+        indexedDbContext.configuredStoreNames.includes(name)
+    ) ||
+    new Set(indexedDbContext.featureStoreNames).size !== indexedDbContext.featureStoreNames.length
+  )
+    throw new StorageError(StorageErrorCode.invalidConfig, {
+      backend: StorageBackend.indexedDb,
+      cause: new TypeError(
+        'IndexedDB channel store names must be non-empty, unique, and non-reserved'
+      )
+    })
+
+  /** Preserve original name validation, then reject reserved org suffixes before native I/O. */
+  if (indexedDbContext.bindOrganizations)
+    resolveStorageNamespace(
+      indexedDbContext.dbName,
+      indexedDbContext.runtime.defaultOrgId,
+      indexedDbContext.runtime.defaultOrgId
+    )
+}
+/** Allocate the original connection, coordination and transaction registries in construction order. */
+function initializeIndexedDbNativeState<TValue>(indexedDbContext: IIndexedDbContext<TValue>): void {
+  indexedDbContext.backfillMonotonicNow = createMonotonicClock()
+
+  /**
+   * Context-local observations cannot cross realms because `performance.now()` origins are
+   * incomparable.
+   */
+  indexedDbContext.backfillTakeoverObservations = new Map<string, number>()
+
+  /** Physical deletion invalidates cached private log indexes without replacing the borrowed view. */
+  indexedDbContext.journalGeneration = Object.freeze({})
+  indexedDbContext.controller = createIndexedDbController(indexedDbContext)
+
+  /** The original installation owns the physical database's default organization identity. */
+  indexedDbContext.orgId = indexedDbContext.runtime.defaultOrgId
+
+  /** One native epoch anchor retains the original installed scheduler as the elapsed-time owner. */
+  indexedDbContext.ttlNow = captureIndexedDbTtlClock(
+    indexedDbContext.runtime.featureExpose.getScheduler()
+  )
+
+  /** Report-only owner for malformed or unavailable coordination transport behavior. */
+  indexedDbContext.coordinationReporter = createStorageOperationReporter()
+
+  /** One private registry member shared by every exact store in this physical data universe. */
+  indexedDbContext.coordination = acquireIndexedDbCoordination({
+    factory: indexedDbContext.factory,
+    realmDefaultFactory: indexedDbContext.realmDefaultFactory,
+    broadcastChannel: indexedDbContext.broadcastChannel,
+    dbName: indexedDbContext.dbName,
+    layoutFingerprint: indexedDbLayoutFingerprint(
+      indexedDbContext.kvStoreName,
+      indexedDbContext.bytesStoreName,
+      indexedDbContext.recordsStoreName
+    ),
+    ownOrigin: indexedDbContext.controller.origin,
+    orgId: indexedDbContext.orgId,
+    onChange: (change) => indexedDbContext.controller.publishExternal(change),
+    report: (error) => reportCleanupError(indexedDbContext.coordinationReporter, error),
+    createKeyLockPort: () => indexedDbContext.runtime.createKeyLockPort()
+  })
+
+  /** Immutable capabilities reflect construction-time transport admission and never mutate later. */
+  indexedDbContext.capabilities = Object.freeze({
+    ...CAPABILITIES,
+    changeFeed: indexedDbContext.coordination.admitted
+  })
+
+  /** Brands the private context that an already-admitted logical operation may reuse. */
+  indexedDbContext.mutationLeaseBrand = Symbol('indexeddb-mutation-lease')
+
+  /** Shared preparation state; callers await the same attempt but own cancellation locally. */
+  indexedDbContext.prepareState = 'idle'
+
+  /** Native handles are indexed only after contract ownership has authorized their live views. */
+  indexedDbContext.nativeTransactions = new Map<
+    string,
+    {
+      readonly native: IDBTransaction
+      readonly journal: (
+        scope: Omit<ITransactionScope, 'use'>,
+        prefix: string
+      ) => IBackendJournalTransaction
+      readonly images: {
+        readonly changes: ReturnType<typeof createIndexedDbJournalImages>['changes']
+        readImage(target: IStorageJournalTarget): Promise<IStorageJournalImage>
+        writeImage(target: IStorageJournalTarget, image: IStorageJournalImage): Promise<void>
+        readonly readRevision: (
+          target: IStorageJournalTarget
+        ) => ReturnType<ReturnType<typeof createIndexedDbJournalImages>['revision']>
+      }
+      readonly abort: () => void
+      readonly clearRoot: (channel: 'value' | 'bytes' | 'record' | undefined) => Promise<void>
+      readonly readKeys: () => Promise<string[]>
+      readonly ttl: (scope: ITransactionScope) => ITransactionTtlApi
+      readonly expiredRecord: (key: IStorageKey) => Promise<boolean>
+      readonly recordEpoch: (
+        scope: string
+      ) => Promise<{ readonly global: number; readonly scope: number }>
+      readonly removeRecordsByPrefix: (
+        scope: ITransactionScope<unknown>,
+        prefix: IStorageKey
+      ) => Promise<number>
+    }
+  >()
+
+  /**
+   * Iterator pages reuse the same optional backend journal port without shadowing operation
+   * runtime.
+   */
+  indexedDbContext.runtimeJournal = indexedDbContext.runtime.journal
+}
+/** Construct the original construction after its prerequisite native ports exist. */
+function createIndexedDbConstruction<TValue>(
+  indexedDbContext: IIndexedDbContext<TValue>
+): IIndexedDbContext<TValue>['construction'] {
+  return provideBackendConstruction(
+    bindBrowserExecution(indexedDbContext.store, indexedDbContext.runtime, [
+      'set',
+      'remove',
+      'setBytes',
+      'removeBytes',
+      'putRecord',
+      'deleteRecord',
+      'clearValues',
+      'clearAll',
+      'clearBytes',
+      'clearRecords',
+      'putIndexedRecord',
+      ...(indexedDbContext.runtime.journal === undefined
+        ? []
+        : ['get', 'has', 'keys', 'getBytes', 'getRecord'])
+    ]),
+    [
+      implement(kv, browserKeyValueApi(indexedDbContext.store, indexedDbContext.batchApi), {
+        forTransaction: (scope) => scope
+      }),
+      implement(records, indexedDbContext.recordApi, {
+        forTransaction: (scope: ITransactionScope) => transactionRecordApi(indexedDbContext, scope)
+      }),
+      implement(ttl, indexedDbContext.ttlApi, {
+        forTransaction: (scope: ITransactionScope) => transactionTtlApi(indexedDbContext, scope)
+      })
+    ],
+    indexedDbContext.controller,
+    () => {
+      if (indexedDbContext.activeDatabase === undefined)
+        throw new StorageError(StorageErrorCode.unavailable, { backend: StorageBackend.indexedDb })
+      return indexedDbContext.activeDatabase
+    },
+    async () => {
+      await open(indexedDbContext, createStorageOperationRuntime())
+    }
+  )
+}
+/** Construct the original transactionOwner after its prerequisite native ports exist. */
+function createIndexedDbTransactionOwner<TValue>(
+  indexedDbContext: IIndexedDbContext<TValue>
+): IIndexedDbContext<TValue>['transactionOwner'] {
+  return createTransactionOwner<TValue>(
+    indexedDbContext.construction.store,
+    normalizeIndexedDbOperationError,
+    {
+      activityMode: TransactionActivityMode.native,
+      asyncDisposeKey,
+      concurrencyStages: indexedDbContext.runtime.stageBindings.concurrencyStages(
+        indexedDbContext.construction.store
+      )
+    }
+  )
+}
+/** Construct the original orgBinding after its prerequisite native ports exist. */
+function createIndexedDbOrgBinding<TValue>(
+  indexedDbContext: IIndexedDbContext<TValue>
+): IIndexedDbContext<TValue>['orgBinding'] {
+  return indexedDbContext.bindOrganizations
+    ? createBrowserOrgBinding<
+        IIndexedDbProvidedStore<TValue>,
+        IDBDatabase,
+        IIndexedDbPhysical<TValue>
+      >(
+        indexedDbContext.runtime,
+        indexedDbContext.dbName,
+        indexedDbContext.physical,
+        (target, ports) =>
+          indexedDbHost<TValue>(
+            {
+              dbName: target,
+              kvStoreName: indexedDbContext.kvStoreName,
+              bytesStoreName: indexedDbContext.bytesStoreName,
+              recordsStoreName: indexedDbContext.recordsStoreName,
+              cleanupLegacyRecords: indexedDbContext.cleanupLegacyRecords,
+              factory: indexedDbContext.factory,
+              journalFactoryIsPrivate: indexedDbContext.journalFactoryIsPrivate,
+              keyRange: indexedDbContext.keyRange,
+              owner: { label: indexedDbContext.ownerLabel }
+            },
+            ports,
+            indexedDbContext.featureStoreNames,
+            false
+          )
+      )
+    : undefined
+}
+/** Register backfill operations on the same native record store before capability publication. */
+function registerIndexedDbBackfill<TValue>(indexedDbContext: IIndexedDbContext<TValue>): void {
+  registerRecordIndexBackfillStore(indexedDbContext.store, {
+    prepare: async () => {
+      await open(indexedDbContext, createStorageOperationRuntime())
+    },
+    ensureRecordIndexes: (
+      scope: string,
+      definitions: readonly IRecordIndexDefinition[],
+      _ctx?: IOperationContext
+    ) => ensureRecordIndexes(indexedDbContext, scope, definitions, _ctx),
+    getRecordIndexReadiness: indexedDbContext.store.getRecordIndexReadiness,
+    openBackfillSession: (
+      handle: IRecordIndexHandle,
+      options: {
+        readonly range: IKeyRange
+        readonly legacyRange?: IKeyRange
+        readonly includeLegacy?: boolean
+        readonly allowComplete: boolean
+        readonly batchSize?: number
+        readonly leaseMs?: number
+      },
+      ctx?: IOperationContext
+    ) => openBackfillSession(indexedDbContext, handle, options, ctx)
+  })
 }
