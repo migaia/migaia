@@ -2385,6 +2385,85 @@ function nativeIterator<T, V, R>(
 }
 
 /** Execute one isolated native attempt; the contract alone decides policy and retry. */
+/** One accepted native attempt owns its draft, repeatable reads and original scope controls. */
+type IMemoryTransactionContext<T, R> = {
+  /** Original namespaceContext belongs to this accepted transaction attempt. */
+  readonly namespaceContext: IMemoryNamespaceContext<T>
+  /** Original run belongs to this accepted transaction attempt. */
+  readonly run: (scope: IMemoryScope<T>, draft: IMemoryTextDraft) => R
+  /** Original ctx belongs to this accepted transaction attempt. */
+  readonly ctx: IConcurrencyAttemptContext
+  /** Original protectedRanges belongs to this accepted transaction attempt. */
+  readonly protectedRanges: IMemoryRootMutation<unknown>['ranges']
+  /** Original setCapacityIdentities belongs to this accepted transaction attempt. */
+  readonly setCapacityIdentities: (identities: readonly string[]) => void
+  /** Original journaled belongs to this accepted transaction attempt. */
+  readonly journaled: boolean
+  /** Original observeKeys belongs to this accepted transaction attempt. */
+  readonly observeKeys: (keys: readonly ILockKey[]) => void
+
+  /** Private log writes and terminal effects belong to this exact original native attempt. */
+  journalDraft: ReturnType<IMemoryNamespaceContext<T>['journal']['draft']> | undefined
+
+  /** Only touched identities retain draft entries; rollback never rewrites committed maps. */
+  draft: Map<string, IMemoryDraft>
+
+  /** Opt-in ordered facts exist only for this authentic attempt, never for ordinary memory work. */
+  journalChanges: Array<Omit<IStorageJournalChange, 'afterRevision'>> | undefined
+
+  /** Only journal-selected policy victims gain draft tombstones before the same final commit. */
+  journalVictims: Set<string> | undefined
+
+  /** The original capacity plan must still select these same rows after asynchronous append. */
+  journalCapacity: ReturnType<typeof planCapacity>
+
+  /** Root clear keeps the original coarse epoch transition, without exposing a new scope method. */
+  clearedChannels: readonly IMemoryChannel[] | undefined
+
+  /** The original all-channel clear publishes one broad event instead of per-channel batches. */
+  clearAllRequested: boolean
+
+  /** Preserve whether the original physical clear has an event, even if capture prunes expiry. */
+  clearChanged: boolean
+
+  /** Each channel draft reuses the same compressed radix implementation, including tombstones. */
+  draftOrdered: Record<IMemoryChannel, ReturnType<typeof createOrderedRecordIndex<IMemoryDraft>>>
+
+  /** Proposed RDF entries and tombstones use the same six native permutations. */
+  draftRdfIndex: ReturnType<typeof createMemoryRdfIndex<IMemoryDraft>>
+
+  /** First reads are repeatable until a write in this attempt replaces their snapshot. */
+  snapshots: Map<string, IMemorySnapshot | undefined>
+
+  /** Per-key tombstone revisions detect delete/reinsert and other ABA writes. */
+  expected: Map<
+    string,
+    { channel: IMemoryChannel; encoded: string; key: IStorageKey; revision: number }
+  >
+
+  /** A clear invalidates only channels already observed by this native attempt. */
+  snapshotEpochs: Map<IMemoryChannel, number>
+
+  /** The original owner retains the first asynchronous operation failure. */
+  failure: (Error & { readonly source: string; readonly code: string }) | undefined
+
+  /** Native text batches stage only into this attempt's existing draft and revision baseline. */
+  textDraft: IMemoryTextDraft
+
+  /** The initial callback view is created and registered by the original owner exactly once. */
+  scope: IMemoryScope<T>
+
+  /** Original registration authenticates this same scope before any journal capture is enabled. */
+  journalAttempt: ReturnType<NonNullable<IStoragePluginCore['journal']>['begin']>
+
+  /** Final checks receive fresh complete native views under the same transaction identity. */
+  control: ReturnType<IMemoryNamespaceContext<T>['owner']['register']>
+
+  /** Terminal observations retain identity captured while the original scope was valid. */
+  stage: ReturnType<
+    ReturnType<IStoragePluginCore['stageBindings']['transactionStages']>['forTransaction']
+  >
+}
 async function transact<T, R>(
   namespaceContext: IMemoryNamespaceContext<T>,
   run: (scope: IMemoryScope<T>, draft: IMemoryTextDraft) => R,
@@ -2394,1234 +2473,136 @@ async function transact<T, R>(
   journaled = true,
   observeKeys?: (keys: readonly ILockKey[]) => void
 ): Promise<IConcurrencyAttempt<Awaited<R>>> {
-  namespaceContext.controller.assertLive()
-  throwIfAborted(ctx.signal)
-  setCapacityIdentities?.([])
-  /** Private log writes and terminal effects belong to this exact original native attempt. */
-  let journalDraft: ReturnType<typeof namespaceContext.journal.draft> | undefined
-  /** Ordinary transactions allocate no private metadata rows or terminal channels until used. */
-  const privateJournal = () => (journalDraft ??= namespaceContext.journal.draft())
-  /** Only touched identities retain draft entries; rollback never rewrites committed maps. */
-  const draft = new Map<string, IMemoryDraft>()
-  /** Opt-in ordered facts exist only for this authentic attempt, never for ordinary memory work. */
-  let journalChanges: Array<Omit<IStorageJournalChange, 'afterRevision'>> | undefined
-  /** Only journal-selected policy victims gain draft tombstones before the same final commit. */
-  let journalVictims: Set<string> | undefined
-  /** The original capacity plan must still select these same rows after asynchronous append. */
-  let journalCapacity: ReturnType<typeof planCapacity>
-  /** Root clear keeps the original coarse epoch transition, without exposing a new scope method. */
-  let clearedChannels: readonly IMemoryChannel[] | undefined
-  /** The original all-channel clear publishes one broad event instead of per-channel batches. */
-  let clearAllRequested = false
-  /** Preserve whether the original physical clear has an event, even if capture prunes expiry. */
-  let clearChanged = false
-  /** Each channel draft reuses the same compressed radix implementation, including tombstones. */
-  const draftOrdered = {
+  /** Initialize attempt-local facts before publishing its original native scope. */
+  const transactionContext = {
+    namespaceContext,
+    run,
+    ctx,
+    protectedRanges,
+    setCapacityIdentities,
+    journaled,
+    observeKeys
+  } as IMemoryTransactionContext<T, R>
+
+  transactionContext.namespaceContext.controller.assertLive()
+
+  throwIfAborted(transactionContext.ctx.signal)
+
+  transactionContext.setCapacityIdentities?.([])
+  transactionContext.draft = new Map<string, IMemoryDraft>()
+  transactionContext.clearAllRequested = false
+  transactionContext.clearChanged = false
+  transactionContext.draftOrdered = {
     value: createOrderedRecordIndex<IMemoryDraft>(),
     bytes: createOrderedRecordIndex<IMemoryDraft>(),
     record: createOrderedRecordIndex<IMemoryDraft>(),
     vector: createOrderedRecordIndex<IMemoryDraft>(),
     rdf: createOrderedRecordIndex<IMemoryDraft>()
   }
-  /** Proposed RDF entries and tombstones use the same six native permutations. */
-  const draftRdfIndex = createMemoryRdfIndex(draftOrdered.rdf)
-  /** First reads are repeatable until a write in this attempt replaces their snapshot. */
-  const snapshots = new Map<string, IMemorySnapshot | undefined>()
-  /** Per-key tombstone revisions detect delete/reinsert and other ABA writes. */
-  const expected = new Map<
+  transactionContext.draftRdfIndex = createMemoryRdfIndex(transactionContext.draftOrdered.rdf)
+  transactionContext.snapshots = new Map<string, IMemorySnapshot | undefined>()
+  transactionContext.expected = new Map<
     string,
     { channel: IMemoryChannel; encoded: string; key: IStorageKey; revision: number }
   >()
-  /** A clear invalidates only channels already observed by this native attempt. */
-  const snapshotEpochs = new Map<IMemoryChannel, number>()
-  /** The original owner retains the first asynchronous operation failure. */
-  let failure: (Error & { readonly source: string; readonly code: string }) | undefined
-  /** Capture the real revision once, before any draft read or write. */
-  const track = (channel: IMemoryChannel, encoded: string, key: IStorageKey): string => {
-    if (!snapshotEpochs.has(channel))
-      snapshotEpochs.set(
-        channel,
-        namespaceContext.revisions.epoch(channel === 'value' ? 'text' : channel)
-      )
-    /** Channel plus original flat key identifies one actual native row. */
-    const id = identity(namespaceContext, channel, encoded)
-    if (!expected.has(id))
-      expected.set(id, {
-        channel,
-        encoded,
-        key,
-        revision: revision(namespaceContext, channel, encoded)
-      })
-    return id
-  }
-  /** First access captures value, deadline and revision once; later reads retain that snapshot. */
-  const txSnapshot = (
-    channel: IMemoryChannel,
-    encoded: string,
-    key: IStorageKey
-  ): IMemorySnapshot | undefined => {
-    /** Existing observations are never refreshed from a later clock or physical mutation. */
-    const id = identity(namespaceContext, channel, encoded)
-    if (!snapshots.has(id)) {
-      /** Expiry removes the physical row before its revision baseline is observed. */
-      const current = liveEntry(namespaceContext, channel, encoded)
-      track(channel, encoded, key)
-      snapshots.set(
-        id,
-        current === undefined
-          ? undefined
-          : {
-              key,
-              value: copyValue(namespaceContext, channel, current.value, key),
-              ordered: current.ordered,
-              bytes: current.bytes,
-              rdfKeys: current.rdfKeys,
-              rdfLock: current.rdfLock,
-              deadline: namespaceContext.deadlines.get(id)
-            }
-      )
-    }
-    return snapshots.get(id)
-  }
-  /** Read own writes first; otherwise retain the first committed value in this attempt. */
-  const txEntry = (channel: IMemoryChannel, key: IStorageKey): IMemorySnapshot | undefined => {
-    /** Caller-owned keys detach before contributing to revision or draft identity. */
-    const captured = snapshotStorageKey(key, STORAGE_MEMORY_BACKEND)
-    /** Every channel uses the same canonical logical-key wire. */
-    const encoded = encodeFlatStorageKey(captured)
-    /** A draft row replaces the previous read snapshot immediately. */
-    const proposed = draft.get(identity(namespaceContext, channel, encoded))
-    return proposed
-      ? proposed.remove
-        ? undefined
-        : proposed
-      : txSnapshot(channel, encoded, captured)
-  }
-  /** Every mutable value returned from a retained native snapshot has independent ownership. */
-  const txRead = (channel: IMemoryChannel, key: IStorageKey): unknown => {
-    /** Membership and an undefined-valued record remain separate facts. */
-    const current = txEntry(channel, key)
-    if (current !== undefined)
-      namespaceContext.capacityIndex?.touch(
-        identity(namespaceContext, channel, encodeFlatStorageKey(current.key))
-      )
-    return current === undefined
-      ? undefined
-      : copyValue(namespaceContext, channel, current.value, current.key)
-  }
-  /** Membership shares the same first snapshot, including undefined-valued records. */
-  const txHas = (channel: IMemoryChannel, encoded: string, key: IStorageKey): boolean => {
-    /** A tombstone masks physical membership until the attempt commits. */
-    const proposed = draft.get(identity(namespaceContext, channel, encoded))
-    return proposed ? !proposed.remove : txSnapshot(channel, encoded, key) !== undefined
-  }
-  /** Draft hash and ordered range lookup retain one actual proposed row reference. */
-  const stageDraft = (entry: IMemoryDraft, metadataOnly = false): void => {
-    captureJournalStage(entry, metadataOnly)
-    /** Replacing one draft value keeps its original independently owned key encoding. */
-    const proposed = {
-      ...entry,
-      ordered: draftOrdered[entry.channel].get(entry.ordered)?.key ?? entry.ordered
-    }
-    draft.set(track(proposed.channel, proposed.encoded, proposed.key), proposed)
-    if (proposed.channel === 'rdf') draftRdfIndex.set(proposed.rdfKeys!, proposed)
-    else draftOrdered[proposed.channel].set(proposed.ordered, proposed)
-  }
-  /** Prepare first, then stage eviction and put atomically within this native draft. */
-  const txWrite = (
-    channel: IStorageChannel,
-    key: IStorageKey,
-    value: unknown,
-    policy: IConflictPolicy,
-    ttlMs?: number
-  ): void => {
-    /** Preparation can reject before any prior channel loses draft membership. */
-    const captured = snapshotStorageKey(key, STORAGE_MEMORY_BACKEND)
-    /** One logical-key encoding serves all affected channels. */
-    const encoded = encodeFlatStorageKey(captured)
-    /** Clone caller-owned payload before mutating the draft. */
-    const prepared = prepare(namespaceContext, channel, value, captured)
-    /** Explicit byte-domain failure happens before staging any replacement or native victim. */
-    const bytes = entryBytes(namespaceContext, channel, prepared)
-    /** Channel conflict semantics are owned by the same shared plan as root writes. */
-    const existing = new Set(
-      MemoryState.channels.filter((current) => txHas(current, encoded, captured))
-    )
-    /** The canonical plan retains eviction order and the existing duplicate-key diagnostic. */
-    const plan = planChannelWrite(captured, channel, existing, policy, STORAGE_MEMORY_BACKEND)
-    /** Encode this logical key once for all affected channel draft entries. */
-    const keyBytes = encodeOrderedStorageKey(captured, STORAGE_MEMORY_BACKEND)
-    for (const previous of plan.remove)
-      stageDraft({
-        channel: previous,
-        key: captured,
-        value: undefined,
-        remove: true,
-        encoded,
-        ordered: keyBytes
-      })
-    /** Overwriting a live row retains its deadline unless this batch supplies a new duration. */
-    const current = txEntry(channel, captured)
-    stageDraft({
-      channel,
-      key: captured,
-      value: prepared,
-      bytes,
-      remove: false,
-      encoded,
-      ordered: keyBytes,
-      deadline: ttlMs === undefined ? current?.deadline : namespaceContext.scheduler.now() + ttlMs
-    })
-  }
-  /** Delete returns actual draft membership, so repeated keys count at most once. */
-  const txRemove = (channel: IStorageChannel | 'vector', key: IStorageKey): boolean => {
-    /** Delete keys follow the same detached canonical domain as reads and writes. */
-    const captured = snapshotStorageKey(key, STORAGE_MEMORY_BACKEND)
-    /** One encoding serves membership and the resulting tombstone. */
-    const encoded = encodeFlatStorageKey(captured)
-    if (!txHas(channel, encoded, captured)) return false
-    /** Existing physical or proposed membership already owns this exact ordered identity. */
-    const current =
-      draft.get(identity(namespaceContext, channel, encoded)) ??
-      txSnapshot(channel, encoded, captured)!
-    stageDraft({
-      channel,
-      key: captured,
-      value: undefined,
-      remove: true,
-      encoded,
-      ordered: current.ordered
-    })
-    return true
-  }
-  /** Localize both physical and draft trees, then merge only their actual range candidates. */
-  const txRows = (channel: IStorageChannel, range?: IOrderedRecordRange): IMemoryEntry[] => {
-    if (!snapshotEpochs.has(channel))
-      snapshotEpochs.set(
-        channel,
-        namespaceContext.revisions.epoch(channel === 'value' ? 'text' : channel)
-      )
-    /** Independent owner iterators begin at the same lower bound, without scanning other draft keys. */
-    const physical = namespaceContext.ordered[channel].range(range)
-    const proposed = draftOrdered[channel].range(range)
-    /** The native scan captures only candidates selected by these actual bounds. */
-    const rows: IMemoryEntry[] = []
-    let left = physical.next()
-    let right = proposed.next()
-    while (!left.done || !right.done) {
-      /** Equal canonical identities are decided by the draft, including its tombstone. */
-      const comparison = left.done
-        ? 1
-        : right.done
-          ? -1
-          : compareRecordIndexKeys(left.value.key, right.value.key)
-      if (comparison < 0) {
-        /** First range access uses the same repeatable membership and deadline as point reads. */
-        const row = left.value!.value
-        /** Expiry unlinks this leaf, so retain the next original candidate before pruning it. */
-        left = physical.next()
-        const current = txSnapshot(channel, encodeFlatStorageKey(row.key), row.key)
-        if (current !== undefined) rows.push(current)
-      } else {
-        if (!right.value!.value.remove) rows.push(right.value!.value)
-        if (comparison === 0) left = physical.next()
-        right = proposed.next()
-      }
-    }
-    return rows
-  }
-  /** RDF writes retain the same original draft, first-read revisions and logical lock facts. */
-  const txRdfWrite = (input: readonly IQuad[], remove: boolean): void => {
-    /** Admission of the entire batch precedes even the first draft tombstone. */
-    const entries = captureRdfEntries(namespaceContext, input)
-    for (const entry of entries) {
-      /** Draft and first-read membership share the original channel identity. */
-      const id = identity(namespaceContext, 'rdf', entry.encoded)
-      /** Own writes mask physical membership without introducing another transaction owner. */
-      const proposed = draft.get(id)
-      /** The original first-read owner records even absence for ABA conflict checks. */
-      const current = proposed
-        ? proposed.remove
-          ? undefined
-          : proposed
-        : txSnapshot('rdf', entry.encoded, entry.key)
-      if (remove ? current === undefined : current !== undefined) continue
-      stageDraft({ ...entry, channel: 'rdf', remove })
-    }
-  }
-  /** Physical and proposed prefix scans merge by identity without materializing complete results. */
-  function* txRdfRows(pattern: Readonly<Partial<IQuad>>): IterableIterator<IMemoryEntry> {
-    if (!snapshotEpochs.has('rdf'))
-      snapshotEpochs.set('rdf', namespaceContext.revisions.epoch('rdf'))
-    /** Both trees receive one identical bound graph envelope and access-path choice. */
-    const physical = physicalRdfPattern(namespaceContext, pattern)
-    for (const row of namespaceContext.rdfIndex.match(physical)) {
-      /** The original physical key remains a string even for a large literal. */
-      const encoded = row.key as string
-      if (draft.has(identity(namespaceContext, 'rdf', encoded))) continue
-      /** Repeat reads retain the first physical snapshot and original revision. */
-      const current = txSnapshot('rdf', encoded, row.key)
-      if (current !== undefined) {
-        namespaceContext.capacityIndex?.touch(identity(namespaceContext, 'rdf', encoded))
-        yield current
-      }
-    }
-    for (const row of draftRdfIndex.match(physical)) if (!row.remove) yield row
-  }
-  /** The original transaction owner admits each native advance and closes the actual generator. */
-  function rdfQuery(
-    pattern: Partial<IQuad>,
-    scope: ITransactionScope<T>,
-    mutate: NonNullable<IRdfQuerySource<ITransactionScope<T>>['mutate']>
-  ): ReturnType<ITransactionRdfApi['match']> {
-    /** The shared planner owns subsequent query snapshots and operation-scope rebinding. */
-    const captured = snapshotStorageRdfPattern(pattern, STORAGE_MEMORY_BACKEND)
-    return createRdfQuery<undefined, Record<never, never>, ITransactionScope<T>>(
-      {
-        asyncDisposeKey,
-        cursorSource: scope,
-        mutate,
-        pushdown: {
-          source: MemoryState.querySource,
-          index: namespaceContext.rdfIndex.select(physicalRdfPattern(namespaceContext, captured))
-            .name,
-          operations: [],
-          operators: []
-        },
-        execute: (input) => {
-          /** This actual generator, including client traversal children, has one native owner. */
-          const iterator = (async function* () {
-            for (const row of txRdfRows(input.pattern)) {
-              namespaceContext.controller.assertLive()
-              throwIfAborted(ctx.signal)
-              yield [row.key, logicalRdfQuad(namespaceContext, row)] as const
-            }
-          })()
-          return namespaceContext.owner.registerIterator(input.operationScope ?? scope, {
-            next: (current) =>
-              namespaceContext.core.execution.run(
-                {
-                  operation: MemoryOperation.rdfMatch,
-                  input: input.pattern,
-                  scope: current,
-                  ctx
-                },
-                () => iterator.next()
-              ),
-            close: async () => {
-              await iterator.return(undefined)
-            }
+  transactionContext.snapshotEpochs = new Map<IMemoryChannel, number>()
+  transactionContext.textDraft = createMemoryTransactionTextDraft(transactionContext)
+  transactionContext.scope = createScope(transactionContext)
+  transactionContext.control = transactionContext.namespaceContext.owner.register(
+    transactionContext.scope,
+    {
+      context: transactionContext.ctx,
+      createScope: () => createScope(transactionContext),
+      onFailure: (error) => {
+        transactionContext.failure ??= error
+      },
+      beforeCommit: (current) => {
+        transactionContext.namespaceContext.controller.assertLive()
+        throwIfAborted(transactionContext.ctx.signal)
+        void transactionContext.namespaceContext.core.stageBindings
+          .transactionStages(transactionContext.namespaceContext.store)
+          .forTransaction(current)
+          .beforeCommit?.()
+        if (transactionContext.journalAttempt === undefined) return
+        transactionContext.journalCapacity = draftCapacityPlan(transactionContext)
+        for (const victim of transactionContext.journalCapacity?.victims ?? []) {
+          /** Blob has no shared transaction target; never fabricate a logical blob lock/image. */
+          if (victim.channel === 'blob')
+            throw new StorageContractError(StorageContractErrorCode.unsupported)
+          const channel = victim.channel as IMemoryChannel
+          const current = txSnapshot(transactionContext, channel, victim.encoded, victim.key)
+          if (current === undefined) continue
+          ;(transactionContext.journalVictims ??= new Set()).add(victim.id)
+          stageDraft(transactionContext, {
+            ...current,
+            channel,
+            encoded: victim.encoded,
+            remove: true
           })
         }
-      },
-      captured,
-      namespaceContext.core.getChainMethods('rdf')
-    )
-  }
-  /** Query selection borrows the original iterator owner without a second operation pipeline. */
-  function queryIterator<V>(
-    scope: ITransactionScope<T>,
-    rows: () => Iterable<readonly [IStorageKey, V]>
-  ): IStorageIterator<readonly [IStorageKey, V]> {
-    assertTransactionOwner(namespaceContext.store, scope)
-    /** The actual generator is drained and closed by this existing native transaction owner. */
-    const iterator = (async function* () {
-      for (const row of rows()) {
-        namespaceContext.controller.assertLive()
-        throwIfAborted(ctx.signal)
-        yield row
-      }
-    })()
-    return namespaceContext.owner.registerIterator(scope, {
-      next: () => iterator.next(),
-      close: async () => {
-        await iterator.return(undefined)
-      }
-    })
-  }
-  /** A vector write attempt streams native candidates while retaining the original read set. */
-  function* txVectorPoints<P>(collection: string): IterableIterator<IStorageVectorPoint<P>> {
-    if (!snapshotEpochs.has('vector'))
-      snapshotEpochs.set('vector', namespaceContext.revisions.epoch('vector'))
-    /** Physical and proposed rows use the same canonical collection tuple prefix. */
-    const bounds = snapshotStorageKeyPrefix([collection], STORAGE_MEMORY_BACKEND)
-    let leaf = namespaceContext.ordered.vector.lowerBound(bounds.lower)
-    while (leaf !== undefined && compareRecordIndexKeys(leaf.key, bounds.upper) < 0) {
-      /** Expiry can unlink this row before the generator advances again. */
-      const next = leaf.next
-      const key = leaf.value.key
-      const encoded = encodeFlatStorageKey(key)
-      if (!draft.has(identity(namespaceContext, 'vector', encoded))) {
-        const current = txSnapshot('vector', encoded, key)
-        if (current !== undefined) yield current.value as IStorageVectorPoint<P>
-      }
-      leaf = next
-    }
-    for (const row of draftOrdered.vector.range({
-      lower: bounds.lower,
-      upper: bounds.upper,
-      upperOpen: true
-    }))
-      if (!row.value.remove) yield row.value.value as IStorageVectorPoint<P>
-  }
-  /** Native text batches stage only into this attempt's existing draft and revision baseline. */
-  const textDraft: IMemoryTextDraft = {
-    write: txWrite,
-    remove: txRemove,
-    clear: (channel) => {
-      /** Blob has no shared image target, so an all-channel clear must not silently delete it. */
-      if (channel === undefined && namespaceContext.blobs.size !== 0)
-        throw new StorageContractError(StorageContractErrorCode.unsupported)
-      clearedChannels = channel === undefined ? namespaceContext.physicalChannels : [channel]
-      clearAllRequested = channel === undefined
-      clearChanged = clearedChannels.some((current) => namespaceContext.data[current].size !== 0)
-      for (const current of clearedChannels) {
-        if (!snapshotEpochs.has(current))
-          snapshotEpochs.set(
-            current,
-            namespaceContext.revisions.epoch(current === 'value' ? 'text' : current)
-          )
-        /** Native Map iteration advances safely when the original TTL owner prunes an entry. */
-        for (const [encoded, entry] of namespaceContext.data[current]) {
-          const snapshot = txSnapshot(current, encoded, entry.key)
-          if (snapshot !== undefined)
-            stageDraft({ ...snapshot, channel: current, encoded, remove: true })
-        }
-      }
-    },
-    ttl: (target, ms, persist) => txTtl(target, ms, persist),
-    increment: (key, increment) => {
-      const result = increment(txRead('value', key) as string | undefined)
-      txWrite('value', key, String(result), 'conflict')
-      return result
-    },
-    upsertVector: (collection, points, sizes, ttlMs) => {
-      /** Captured vector inputs enter the existing native draft without a second public pipeline. */
-      const now = namespaceContext.scheduler.now()
-      for (const [index, point] of points.entries()) {
-        const key = vectorKey(namespaceContext, collection, point.id)
-        const encoded = encodeFlatStorageKey(key)
-        const current = txEntry('vector', key)
-        const deadline = ttlMs === undefined ? current?.deadline : now + ttlMs
-        if (deadline !== undefined && deadline <= now) {
-          txRemove('vector', key)
-          continue
-        }
-        stageDraft({
-          channel: 'vector',
-          key,
-          encoded,
-          value: point,
-          remove: false,
-          ordered: current?.ordered ?? encodeOrderedStorageKey(key, STORAGE_MEMORY_BACKEND),
-          bytes: sizes[index],
-          deadline
-        })
-      }
-    },
-    deleteVector: (collection, predicate) => {
-      let count = 0
-      for (const point of txVectorPoints(collection))
-        if (
-          predicate(point) &&
-          txRemove('vector', vectorKey(namespaceContext, collection, point.id))
-        )
-          count++
-      return count
-    },
-    rdf: txRdfWrite,
-    setMany: (entries) => {
-      for (const entry of entries) txWrite('value', entry.key, entry.value, 'conflict', entry.ttlMs)
-    },
-    removeMany: (keys) => {
-      /** Duplicate identities can only remove the first still-present draft entry. */
-      let count = 0
-      for (const key of keys) if (txRemove('value', key)) count++
-      return count
-    },
-    removeByPrefix: (prefix, channel = 'value') => {
-      /** Native prefix localization reuses the original canonical bounds and ordered draft merge. */
-      const captured = snapshotStorageKeyPrefix(prefix, STORAGE_MEMORY_BACKEND)
-      /** Count only actual removals in this channel and this native attempt. */
-      let count = 0
-      for (const row of txRows(channel, {
-        lower: captured.lower,
-        upper: captured.upper,
-        upperOpen: true
-      }))
-        if (captured.matches(row.key) && txRemove(channel, row.key)) count++
-      return count
-    }
-  }
-  /** TTL metadata changes stage beside the original value and never create a second draft. */
-  const txTtl = (target: IMemoryTtlTarget, ms: number | undefined, persist: boolean): boolean => {
-    /** A TTL target has already been captured by the original contract lock owner. */
-    const channel = ttlChannel(namespaceContext, target)
-    const current = txEntry(channel, ttlKey(namespaceContext, target))
-    if (current === undefined || (persist && current.deadline === undefined)) return false
-    stageDraft(
-      {
-        ...current,
-        channel,
-        encoded: encodeFlatStorageKey(current.key),
-        remove: ms === 0,
-        deadline: persist ? undefined : namespaceContext.scheduler.now() + ms!
-      },
-      true
-    )
-    return true
-  }
-  /** Remaining duration observes the same retained transaction value and captured deadline. */
-  const txRemaining = (target: IMemoryTtlTarget): number | undefined => {
-    /** Missing and unlimited rows share the documented undefined result. */
-    const current = txEntry(ttlChannel(namespaceContext, target), ttlKey(namespaceContext, target))
-    return current?.deadline === undefined
-      ? undefined
-      : Math.max(0, current.deadline - namespaceContext.scheduler.now())
-  }
-  /** Resolve logical journal identities through this exact org's existing physical key mapping. */
-  const journalRow = (input: IStorageJournalTarget) => {
-    const captured = snapshotMemoryJournalTarget(input)
-    const target = captured.lock
-    const channel: IMemoryChannel = target.channel === 'text' ? 'value' : target.channel
-    const key =
-      target.channel === 'rdf'
-        ? captureRdfEntries(namespaceContext, [target.quad])[0]!.key
-        : target.channel === 'vector'
-          ? vectorKey(namespaceContext, target.collection, target.id)
-          : target.key
-    const encoded = target.channel === 'rdf' ? (key as string) : encodeFlatStorageKey(key)
-    const proposed = draft.get(identity(namespaceContext, channel, encoded))
-    const current =
-      target.channel === 'rdf'
-        ? proposed
-          ? proposed.remove
-            ? undefined
-            : proposed
-          : txSnapshot(channel, encoded, key)
-        : txEntry(channel, key)
-    return { ...captured, channel, key, encoded, current }
-  }
-  /** Images observe the same draft and deadline as this native transaction's final physical row. */
-  const readJournalImage = (input: IStorageJournalTarget): IStorageJournalImage => {
-    const row = journalRow(input)
-    const current = row.current
-    const present =
-      current !== undefined &&
-      (current.deadline === undefined || current.deadline > namespaceContext.scheduler.now())
-    return row.metadata
-      ? encodeStorageJournalImage(present && current!.deadline !== undefined, current?.deadline)
-      : encodeStorageJournalImage(
-          present,
-          row.channel === 'rdf' ? true : current?.value,
-          row.channel === 'bytes'
-        )
-  }
-  /** Restore through original staging, cloning, channel-conflict, TTL and RDF admission owners. */
-  const writeJournalImage = (input: IStorageJournalTarget, image: IStorageJournalImage): void => {
-    const row = journalRow(input)
-    const captured = decodeStorageJournalImage(image, row.channel === 'bytes' && !row.metadata)
-    const value = captured.value
-    if (row.metadata) {
-      if (value !== undefined && (typeof value !== 'number' || !Number.isFinite(value)))
-        throw new StorageContractError(StorageContractErrorCode.invalidArgument)
-      if (row.current === undefined) {
-        if (value === undefined) return
-        throw new StorageContractError(StorageContractErrorCode.invalidArgument)
-      }
-      stageDraft(
-        {
-          ...row.current,
-          channel: row.channel,
-          encoded: row.encoded,
-          remove: value !== undefined && value <= namespaceContext.scheduler.now(),
-          deadline: value as number | undefined
-        },
-        true
-      )
-      return
-    }
-    if (row.lock.channel === 'rdf') {
-      if (captured.present && value !== true)
-        throw new StorageContractError(StorageContractErrorCode.invalidArgument)
-      txRdfWrite([row.lock.quad], !captured.present)
-      return
-    }
-    if (!captured.present) {
-      txRemove(row.channel as IStorageChannel | 'vector', row.key)
-      return
-    }
-    if (row.lock.channel === 'vector') {
-      const configuration = namespaceContext.vectorCollections.get(row.lock.collection)
-      if (configuration === undefined)
-        throw new StorageContractError(StorageContractErrorCode.unsupported)
-      /** The canonical upsert capture validates this decoded wire before any row is staged. */
-      const point = snapshotStorageVectorUpsert(
-        [value as IStorageVectorPoint<unknown>],
-        configuration,
-        STORAGE_MEMORY_BACKEND
-      )[0]!
-      if (point.id !== row.lock.id)
-        throw new StorageContractError(StorageContractErrorCode.invalidArgument)
-      stageDraft({
-        channel: 'vector',
-        key: row.key,
-        encoded: row.encoded,
-        ordered: row.current?.ordered ?? encodeOrderedStorageKey(row.key, STORAGE_MEMORY_BACKEND),
-        value: point,
-        bytes: entryBytes(namespaceContext, 'vector', point),
-        remove: false,
-        deadline: row.current?.deadline
-      })
-      return
-    }
-    txWrite(row.channel as IStorageChannel, row.key, value, 'replace')
-  }
-  /** Full revisions include the original clear generation and the final draft's tombstone effect. */
-  const readJournalRevision = (input: IStorageJournalTarget) => {
-    const row = journalRow(input)
-    const id = identity(namespaceContext, row.channel, row.encoded)
-    const proposed = draft.get(id)
-    const removes =
-      proposed?.remove === true ||
-      (proposed?.deadline !== undefined && proposed.deadline <= namespaceContext.scheduler.now())
-    const changed = proposed !== undefined && (!removes || snapshots.get(id) !== undefined)
-    if (clearedChannels?.includes(row.channel))
-      return Object.freeze({ epoch: snapshotEpochs.get(row.channel)! + 1, revision: 0 })
-    return Object.freeze({
-      epoch: snapshotEpochs.get(row.channel)!,
-      revision: expected.get(id)!.revision + (changed ? 1 : 0)
-    })
-  }
-  /** Capture each actual native staging step before it changes this attempt's existing draft. */
-  const captureJournalStage = (entry: IMemoryDraft, metadataOnly: boolean): void => {
-    if (journalChanges === undefined) return
-    const id = identity(namespaceContext, entry.channel, entry.encoded)
-    const previous = draft.get(id)
-    const before = previous
-      ? previous.remove
-        ? undefined
-        : previous
-      : txSnapshot(entry.channel, entry.encoded, entry.key)
-    const target =
-      entry.channel === 'value'
-        ? lockKey.text(entry.key)
-        : entry.channel === 'bytes'
-          ? lockKey.bytes(entry.key as string)
-          : entry.channel === 'record'
-            ? lockKey.record(entry.key)
-            : entry.channel === 'vector'
-              ? lockKey.vector(
-                  (entry.key as readonly [string, string])[0],
-                  (entry.key as readonly [string, string])[1]
-                )
-              : entry.rdfLock!
-    const after = entry.remove ? undefined : entry
-    /** All image encoding finishes before either a draft row or the ordered fact list changes. */
-    const proposed: Array<Omit<IStorageJournalChange, 'afterRevision'>> = []
-    if (!metadataOnly || entry.remove) {
-      const beforeImage = encodeStorageJournalImage(
-        before !== undefined,
-        entry.channel === 'rdf' ? true : before?.value,
-        entry.channel === 'bytes'
-      )
-      const afterImage = encodeStorageJournalImage(
-        after !== undefined,
-        entry.channel === 'rdf' ? true : after?.value,
-        entry.channel === 'bytes'
-      )
-      if (beforeImage.present || afterImage.present)
-        proposed.push(Object.freeze({ target, before: beforeImage, after: afterImage }))
-    }
-    if (target.channel !== 'rdf' && before?.deadline !== after?.deadline)
-      proposed.push(
-        Object.freeze({
-          target: memoryJournalDeadlineTarget(target),
-          before: encodeStorageJournalImage(before?.deadline !== undefined, before?.deadline),
-          after: encodeStorageJournalImage(after?.deadline !== undefined, after?.deadline)
-        })
-      )
-    journalChanges.push(...proposed)
-  }
-  /** Begin capture before the first write, then return detached ordered facts with final revisions. */
-  const changes = (): readonly IStorageJournalChange[] => {
-    if (journalChanges === undefined) {
-      if (draft.size !== 0) throw new StorageContractError(StorageContractErrorCode.unsupported)
-      journalChanges = []
-    }
-    const result: IStorageJournalChange[] = []
-    for (const change of journalChanges) {
-      const row = journalRow(change.target)
-      const afterRevision = readJournalRevision(change.target)
-      /** A new row removed again leaves no physical mutation or storage.commit to describe. */
-      if (
-        afterRevision.revision ===
-        expected.get(identity(namespaceContext, row.channel, row.encoded))!.revision
-      )
-        continue
-      result.push(Object.freeze({ ...change, afterRevision }))
-    }
-    return Object.freeze(result)
-  }
-  /** The same physical scope factory serves callbacks, nested operations and final checks. */
-  const createScope = (): IMemoryScope<T> => {
-    /** Each method closes over its own authentic view, never an independently registered guard. */
-    const scope: IMemoryScope<T> = {
-      [journalOperations]: {
-        changes: () => {
-          assertTransactionOwner(namespaceContext.store, scope)
-          return changes()
-        },
-        readImage: (target) => runTransactionOperation(scope, () => readJournalImage(target)),
-        writeImage: (target, image) =>
-          runTransactionOperation(scope, () => writeJournalImage(target, image)),
-        readRevision: (target) => runTransactionOperation(scope, () => readJournalRevision(target)),
-        run: (prefix, work) =>
-          runTransactionOperation(scope, (current) =>
-            privateJournal().port.run(prefix, work, (run) => runTransactionOperation(current, run))
-          ),
-        onCommit: (effect) => {
-          assertTransactionOwner(namespaceContext.store, scope)
-          return privateJournal().port.onCommit(effect)
-        },
-        onRollback: (effect) => {
-          assertTransactionOwner(namespaceContext.store, scope)
-          return privateJournal().port.onRollback(effect)
-        }
-      },
-      [queryDraft]: {
-        record: (request, run) => {
-          assertTransactionOwner(namespaceContext.store, scope)
-          /** Pipeline-provided patches detach once before selection can touch any draft row. */
-          const patch =
-            request.operation === 'update' ? clone(namespaceContext, request.patch) : undefined
-          if (
-            request.operation !== 'delete' &&
-            (request.operation !== 'update' ||
-              typeof patch !== 'object' ||
-              patch === null ||
-              Array.isArray(patch))
-          )
-            throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
-              backend: STORAGE_MEMORY_BACKEND
-            })
-          return run({
-            execute: () =>
-              queryIterator(scope, function* () {
-                for (const row of txRows('record'))
-                  yield [
-                    clone(namespaceContext, row.key),
-                    copyValue(namespaceContext, 'record', row.value, row.key)
-                  ] as const
-              }),
-            accept: (key) => {
-              assertTransactionOwner(namespaceContext.store, scope)
-              if (request.operation === 'delete') return txRemove('record', key)
-              /** Query projections never become replacement values; patch the actual draft row. */
-              const current = txEntry('record', key)
-              if (current === undefined) return false
-              if (typeof current.value !== 'object' || current.value === null)
-                throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
-                  backend: STORAGE_MEMORY_BACKEND
-                })
-              /** Existing native cloning preserves Date/Map values admitted by memory. */
-              const value = clone(namespaceContext, current.value, key)
-              for (const field of Object.keys(patch!)) {
-                /** Existing native fields such as Array.length retain their original descriptors. */
-                const descriptor = Object.getOwnPropertyDescriptor(value, field)
-                Object.defineProperty(
-                  value,
-                  field,
-                  descriptor === undefined
-                    ? {
-                        value: patch![field],
-                        enumerable: true,
-                        configurable: true,
-                        writable: true
-                      }
-                    : { ...descriptor, value: patch![field] }
-                )
-              }
-              txWrite('record', key, value, 'replace')
-              return true
-            }
-          })
-        },
-        rdf: (request, run) => {
-          assertTransactionOwner(namespaceContext.store, scope)
-          /** Replacement admission precedes selection or any draft tombstone. */
-          const replacement =
-            request.operation === 'replace'
-              ? captureRdfEntries(namespaceContext, [request.newQuad])[0]
-              : undefined
-          return run({
-            execute: (input) =>
-              queryIterator(scope, function* () {
-                for (const row of txRdfRows(input.pattern))
-                  yield [row.key, logicalRdfQuad(namespaceContext, row)] as const
-              }),
-            accept: (_key, quad) => {
-              assertTransactionOwner(namespaceContext.store, scope)
-              /**
-               * The original physical identity resolves actual draft membership and no-op
-               * replacement.
-               */
-              const entry = captureRdfEntries(namespaceContext, [quad])[0]!
-              const proposed = draft.get(identity(namespaceContext, 'rdf', entry.encoded))
-              const current = proposed
-                ? proposed.remove
-                  ? undefined
-                  : proposed
-                : txSnapshot('rdf', entry.encoded, entry.key)
-              if (current === undefined || replacement?.encoded === entry.encoded) return false
-              txRdfWrite([quad], true)
-              if (replacement !== undefined)
-                txRdfWrite([logicalRdfQuad(namespaceContext, replacement)], false)
-              return true
-            }
-          })
-        },
-        vector: <P>(
-          collection: string,
-          _request: IQueryDelete,
-          run: Parameters<NonNullable<IVectorQuerySource<P>['mutate']>>[1],
-          select: IMemoryVectorSelection<P>
-        ) => {
-          assertTransactionOwner(namespaceContext.store, scope)
-          return run({
-            execute: (input) =>
-              queryIterator(scope, () =>
-                select(
-                  input,
-                  txVectorPoints<P>(collection),
-                  (id) =>
-                    txRead('vector', vectorKey(namespaceContext, collection, id)) as
-                      | IStorageVectorPoint<P>
-                      | undefined
-                )
-              ),
-            accept: (_key, hit) => {
-              assertTransactionOwner(namespaceContext.store, scope)
-              return txRemove('vector', vectorKey(namespaceContext, collection, hit.id))
-            }
-          })
-        }
-      },
-      [recordQueries]: <R>() =>
-        createRecordQuery<R>(
-          {
-            asyncDisposeKey,
-            cursorSource: scope,
-            pushdown: { source: MemoryState.querySource, operations: [], operators: [] },
-            execute: () => scope.iterateRecords(),
-            mutate: (request, run) =>
-              operation(
-                request.operation === 'delete'
-                  ? MemoryOperation.recordQueryDelete
-                  : MemoryOperation.recordQueryUpdate,
-                request,
-                (captured) => scope[queryDraft].record(captured, run),
-                true
-              )
-          },
-          namespaceContext.core.getChainMethods('query')
-        ),
-      [ttlOperations]: {
-        expire: (target, ms) =>
-          acceptedOperation(
-            MemoryOperation.ttlExpire,
-            { target, ms },
-            (input) => {
-              /** Validation stays inside the one operation already admitted by tx.use(ttl). */
-              const target = captureTtlTarget(namespaceContext, input.target)
-              /** Preserve this pipeline-provided duration while the native operation settles. */
-              const ms = input.ms
-              assertStorageTtlDuration(ms, STORAGE_MEMORY_BACKEND)
-              return txTtl(target, ms, false)
-            },
-            scope
-          ),
-        remaining: (target) =>
-          acceptedOperation(
-            MemoryOperation.ttlRemaining,
-            target,
-            (input) => txRemaining(captureTtlTarget(namespaceContext, input)),
-            scope
-          ),
-        persist: (target) =>
-          acceptedOperation(
-            MemoryOperation.ttlPersist,
-            target,
-            (input) => txTtl(captureTtlTarget(namespaceContext, input), undefined, true),
-            scope
-          )
-      },
-      [counterOperations]: {
-        increment: (key, by) =>
-          acceptedOperation(
-            MemoryOperation.counterIncrement,
-            { key, by },
-            (input) => {
-              /** Snapshot pipeline-provided identity before any native text access. */
-              const key = input.key
-              assertStringStorageKey(key, STORAGE_MEMORY_BACKEND)
-              /** The pure contract calculation runs against this native text draft only. */
-              const increment = snapshotStorageCounterIncrement(input.by, STORAGE_MEMORY_BACKEND)
-              const result = increment(txRead('value', key) as string | undefined)
-              txWrite('value', key, String(result), 'conflict')
-              return result
-            },
-            scope
-          )
-      },
-      [rdfOperations]: {
-        add: (quads) =>
-          acceptedOperation(
-            MemoryOperation.rdfAdd,
-            quads,
-            (input) => txRdfWrite(input, false),
-            scope
-          ),
-        delete: (quads) =>
-          acceptedOperation(
-            MemoryOperation.rdfDelete,
-            quads,
-            (input) => txRdfWrite(input, true),
-            scope
-          ),
-        match: (pattern) =>
-          rdfQuery(pattern, scope, (request, run) =>
-            operation(
-              request.operation === 'delete'
-                ? MemoryOperation.rdfQueryDelete
-                : MemoryOperation.rdfQueryReplace,
-              request,
-              (captured) => scope[queryDraft].rdf(captured, run),
-              true
-            )
-          )
-      },
-      [recordPrefix]: (prefix) =>
-        operation(MemoryOperation.recordRemoveByPrefix, prefix, (current) => {
-          /** Native record prefix deletion uses the same bounded draft merge as record iteration. */
-          const captured = snapshotStorageKeyPrefix(current, STORAGE_MEMORY_BACKEND)
-          let count = 0
-          for (const row of txRows('record', {
-            lower: captured.lower,
-            upper: captured.upper,
-            upperOpen: true
-          }))
-            if (txRemove('record', row.key)) count++
-          return count
-        }),
-      use: (capability) => useTransactionCapability(scope, capability),
-      get: (key) =>
-        operation(MemoryOperation.get, key, (current) => {
-          assertStringStorageKey(current, STORAGE_MEMORY_BACKEND)
-          return (txRead('value', current) as string | undefined) ?? null
-        }),
-      set: (key, value, options) =>
-        operation(MemoryOperation.set, { key, value, options }, (current) => {
-          assertStringStorageKey(current.key, STORAGE_MEMORY_BACKEND)
-          txWrite(
-            'value',
-            current.key,
-            current.value,
-            readTransactionConflictPolicy(current.options, STORAGE_MEMORY_BACKEND)
-          )
-        }),
-      remove: (key) =>
-        operation(MemoryOperation.remove, key, (current) => {
-          assertStringStorageKey(current, STORAGE_MEMORY_BACKEND)
-          txRemove('value', current)
-        }),
-      has: (key) =>
-        operation(MemoryOperation.has, key, (current) => {
-          assertStringStorageKey(current, STORAGE_MEMORY_BACKEND)
-          return txRead('value', current) !== undefined
-        }),
-      getMany: (keys) =>
-        batchOperation(MemoryOperation.getMany, keys, (current) =>
-          readTextBatch(
-            namespaceContext,
-            current,
-            (key) => txRead('value', key) as string | undefined
-          )
-        ),
-      setMany: (entries) =>
-        batchOperation(MemoryOperation.setMany, entries, (current) =>
-          textDraft.setMany(captureTextEntries(namespaceContext, current))
-        ),
-      removeMany: (keys) =>
-        batchOperation(MemoryOperation.removeMany, keys, (current) => {
-          /** Validate every key before applying the batch's first tombstone. */
-          const captured = snapshotStorageBatchKeys(current, STORAGE_MEMORY_BACKEND)
-            .filter(({ firstIndex }, index) => firstIndex === index)
-            .map(({ key }) => key)
-          return textDraft.removeMany(captured)
-        }),
-      removeByPrefix: (prefix) =>
-        operation(MemoryOperation.removeByPrefix, prefix, (current) =>
-          observeBatch(
-            namespaceContext,
-            MemoryOperation.removeByPrefix,
-            undefined,
-            () => textDraft.removeByPrefix(current),
-            scope
-          )
-        ),
-      getBytes: (key) =>
-        operation(MemoryOperation.getBytes, key, (current) => {
-          assertStringStorageKey(current, STORAGE_MEMORY_BACKEND)
-          return (txRead('bytes', current) as Uint8Array | undefined) ?? null
-        }),
-      setBytes: (key, value, options) =>
-        operation(MemoryOperation.setBytes, { key, value, options }, (current) => {
-          assertStringStorageKey(current.key, STORAGE_MEMORY_BACKEND)
-          txWrite(
-            'bytes',
-            current.key,
-            current.value,
-            readTransactionConflictPolicy(current.options, STORAGE_MEMORY_BACKEND)
-          )
-        }),
-      removeBytes: (key) =>
-        operation(MemoryOperation.removeBytes, key, (current) => {
-          assertStringStorageKey(current, STORAGE_MEMORY_BACKEND)
-          txRemove('bytes', current)
-        }),
-      getRecord: (key) =>
-        operation(
-          MemoryOperation.getRecord,
-          key,
-          (current) => txRead('record', current) as T | undefined
-        ),
-      putRecord: (value, key, options) =>
-        operation(MemoryOperation.putRecord, { value, key, options }, (current) => {
-          /** Opaque generated record identities use the existing native entropy helper. */
-          const resolved = current.key ?? createStorageToken()
-          txWrite(
-            'record',
-            resolved,
-            current.value,
-            readTransactionConflictPolicy(current.options, STORAGE_MEMORY_BACKEND)
-          )
-          return resolved
-        }),
-      deleteRecord: (key) =>
-        operation(MemoryOperation.deleteRecord, key, (current) => {
-          txRemove('record', current)
-        }),
-      iterateRecords: (range) => {
-        /** Bounds are captured at construction; native rows are snapshotted at first advance. */
-        const captured = orderedRange(namespaceContext, range)
-        /** The actual native iterator is registered once with the original transaction owner. */
-        const iterator = (async function* () {
-          /** Snapshot values together with membership on the first actual native advance. */
-          const rows = txRows('record', captured).map(
-            (row) =>
-              [clone(namespaceContext, row.key), txRead('record', row.key) as T] as [IStorageKey, T]
-          )
-          for (const [key, value] of rows) {
-            namespaceContext.controller.assertLive()
-            throwIfAborted(ctx.signal)
-            yield [clone(namespaceContext, key), clone(namespaceContext, value)] as [IStorageKey, T]
-          }
-        })()
-        return namespaceContext.owner.registerIterator(scope, {
-          next: (current) =>
-            namespaceContext.core.execution.run(
-              {
-                operation: MemoryOperation.iterateRecords,
-                input: undefined,
-                scope: current,
-                ctx
-              },
-              () => iterator.next()
-            ),
-          close: async () => {
-            await iterator.return(undefined)
-          }
-        })
+        return transactionContext.journalAttempt.record(current)
       }
     }
-    /** One real operation is admitted before its pipeline, stage observations and native draft work. */
-    function operation<I, V>(
-      name: string,
-      input: I,
-      invoke: (captured: I) => V,
-      settle?: true
-    ): Promise<Awaited<V>> {
-      return runTransactionOperation(scope, (current) =>
-        acceptedOperation(name, input, invoke, current, settle)
-      )
-    }
-    /** An already-admitted operation uses the same sole pipeline and native draft body. */
-    function acceptedOperation<I, V>(
-      name: string,
-      input: I,
-      invoke: (captured: I) => V,
-      current: ITransactionScope,
-      settle?: true
-    ): Promise<V> {
-      return namespaceContext.core.execution.run(
-        { operation: name, input, scope: current, ctx },
-        async (captured) => {
-          namespaceContext.controller.assertLive()
-          throwIfAborted(ctx.signal)
-          /** This current scope is authentic for exactly this operation's original lifetime. */
-          const stage = namespaceContext.core.stageBindings
-            .transactionStages(namespaceContext.store)
-            .forTransaction(current)
-          void stage.beforeTxOperation?.(name)
-          /** Native memory operations mutate only the private isolated draft. */
-          const result = invoke(captured)
-          if (settle) {
-            /** Query writes finish their existing asynchronous reader before the after stage. */
-            const completed = await result
-            void stage.afterTxOperation?.(name)
-            return completed
-          }
-          void stage.afterTxOperation?.(name)
-          return result
-        }
-      )
-    }
-    /** Existing scopes retain owner admission for empty batches without entering the pipeline. */
-    function batchOperation<I extends readonly unknown[], V>(
-      name: string,
-      input: I,
-      invoke: (captured: I) => V
-    ): Promise<Awaited<V>> {
-      return runTransactionOperation(scope, (current) => {
-        if (batchSize(namespaceContext, input) === 0) return invoke(input)
-        return acceptedOperation(
-          name,
-          input,
-          (captured) =>
-            observeBatch(
-              namespaceContext,
-              name,
-              captureBatch(namespaceContext, () => captured.length),
-              () => invoke(captured),
-              scope
-            ),
-          current
-        )
-      })
-    }
-    /** Feature methods belong to this exact original view, before its owner admission/freeze. */
-    const api = namespaceContext.core.createTransactionApi(scope)
-    if (api !== undefined) Object.defineProperty(scope, 'api', { value: api, enumerable: true })
-    return Object.freeze(scope)
-  }
-  /** Preview the original business draft, excluding only journal's own planned victim facts. */
-  const draftCapacityPlan = () =>
-    namespaceContext.capacity === undefined
-      ? undefined
-      : planCapacity(
-          namespaceContext,
-          [...draft.values()]
-            .filter(
-              (proposed) =>
-                !journalVictims?.has(identity(namespaceContext, proposed.channel, proposed.encoded))
-            )
-            .map((proposed) =>
-              capacityFact(
-                namespaceContext,
-                proposed.channel,
-                proposed.key,
-                proposed.remove ||
-                  (proposed.deadline !== undefined &&
-                    proposed.deadline <= namespaceContext.scheduler.now())
-                  ? undefined
-                  : (proposed.bytes ?? 0),
-                proposed.rdfLock
-              )
-            )
-        )
-  /** The initial callback view is created and registered by the original owner exactly once. */
-  const scope = createScope()
-  /** Original registration authenticates this same scope before any journal capture is enabled. */
-  let journalAttempt: ReturnType<NonNullable<IStoragePluginCore['journal']>['begin']>
-  /** Final checks receive fresh complete native views under the same transaction identity. */
-  const control = namespaceContext.owner.register(scope, {
-    context: ctx,
-    createScope,
-    onFailure: (error) => {
-      failure ??= error
-    },
-    beforeCommit: (current) => {
-      namespaceContext.controller.assertLive()
-      throwIfAborted(ctx.signal)
-      void namespaceContext.core.stageBindings
-        .transactionStages(namespaceContext.store)
-        .forTransaction(current)
-        .beforeCommit?.()
-      if (journalAttempt === undefined) return
-      journalCapacity = draftCapacityPlan()
-      for (const victim of journalCapacity?.victims ?? []) {
-        /** Blob has no shared transaction target; never fabricate a logical blob lock/image. */
-        if (victim.channel === 'blob')
-          throw new StorageContractError(StorageContractErrorCode.unsupported)
-        const channel = victim.channel as IMemoryChannel
-        const current = txSnapshot(channel, victim.encoded, victim.key)
-        if (current === undefined) continue
-        ;(journalVictims ??= new Set()).add(victim.id)
-        stageDraft({ ...current, channel, encoded: victim.encoded, remove: true })
-      }
-      return journalAttempt.record(current)
-    }
-  })
-  /** Terminal observations retain identity captured while the original scope was valid. */
-  const stage = namespaceContext.core.stageBindings
-    .transactionStages(namespaceContext.store)
-    .forTransaction(scope)
+  )
+  transactionContext.stage = transactionContext.namespaceContext.core.stageBindings
+    .transactionStages(transactionContext.namespaceContext.store)
+    .forTransaction(transactionContext.scope)
+
   try {
-    if (journaled) journalAttempt = namespaceContext.core.journal?.begin(scope)
-    void stage.beforeTransaction?.()
-    void stage.onTransactionStart?.()
+    if (transactionContext.journaled)
+      transactionContext.journalAttempt = transactionContext.namespaceContext.core.journal?.begin(
+        transactionContext.scope
+      )
+    void transactionContext.stage.beforeTransaction?.()
+    void transactionContext.stage.onTransactionStart?.()
     /** The callback itself is an accepted operation, so its failure cannot bypass first-error state. */
-    const value = await runTransactionOperation(scope, (current) => run(current, textDraft))
-    control.stopAdmission()
-    await control.runFinalizers()
-    namespaceContext.controller.assertLive()
-    throwIfAborted(ctx.signal)
-    if (protectedRanges !== undefined) {
+    const value = await runTransactionOperation(transactionContext.scope, (current) =>
+      transactionContext.run(current, transactionContext.textDraft)
+    )
+    transactionContext.control.stopAdmission()
+    await transactionContext.control.runFinalizers()
+    transactionContext.namespaceContext.controller.assertLive()
+    throwIfAborted(transactionContext.ctx.signal)
+    if (transactionContext.protectedRanges !== undefined) {
       /** Batch commits cannot bypass a holder admitted while this original draft was preparing. */
-      const held = namespaceContext.locks.probe(
-        readConcurrencyLockIdentities(ctx),
-        protectedRanges,
-        ctx
+      const held = transactionContext.namespaceContext.locks.probe(
+        readConcurrencyLockIdentities(transactionContext.ctx),
+        transactionContext.protectedRanges,
+        transactionContext.ctx
       )
       if (held !== undefined) {
-        void stage.afterRollback?.(StorageContractErrorCode.lockRejected)
+        void transactionContext.stage.afterRollback?.(StorageContractErrorCode.lockRejected)
         return { status: 'conflict', phase: 'acquire', keys: [held.key], holder: held.holder }
       }
     }
     /** Expiry after an observed read changes the same original revision before commit checks. */
-    for (const entry of expected.values()) liveEntry(namespaceContext, entry.channel, entry.encoded)
+    for (const entry of transactionContext.expected.values())
+      liveEntry(transactionContext.namespaceContext, entry.channel, entry.encoded)
     /** The same original retry owner handles concurrent private-head changes and drop/reopen. */
-    const journalConflict = journalDraft?.conflict()
+    const journalConflict = transactionContext.journalDraft?.conflict()
     if (journalConflict !== undefined) {
-      void stage.afterRollback?.(StorageContractErrorCode.writeConflict)
+      void transactionContext.stage.afterRollback?.(StorageContractErrorCode.writeConflict)
       return { status: 'conflict', phase: 'commit', keys: [], holder: undefined }
     }
     /** Conflict identities are collected before the synchronous all-channel draft merge. */
-    const conflicts = [...expected.values()].filter(
+    const conflicts = [...transactionContext.expected.values()].filter(
       (entry) =>
-        revision(namespaceContext, entry.channel, entry.encoded) !== entry.revision ||
-        namespaceContext.revisions.epoch(entry.channel === 'value' ? 'text' : entry.channel) !==
-          snapshotEpochs.get(entry.channel)
+        revision(transactionContext.namespaceContext, entry.channel, entry.encoded) !==
+          entry.revision ||
+        transactionContext.namespaceContext.revisions.epoch(
+          entry.channel === 'value' ? 'text' : entry.channel
+        ) !== transactionContext.snapshotEpochs.get(entry.channel)
     )
     if (
       conflicts.length !== 0 ||
-      [...snapshotEpochs].some(
+      [...transactionContext.snapshotEpochs].some(
         ([channel, epoch]) =>
-          namespaceContext.revisions.epoch(channel === 'value' ? 'text' : channel) !== epoch
+          transactionContext.namespaceContext.revisions.epoch(
+            channel === 'value' ? 'text' : channel
+          ) !== epoch
       )
     ) {
-      void stage.afterRollback?.(StorageContractErrorCode.writeConflict)
+      void transactionContext.stage.afterRollback?.(StorageContractErrorCode.writeConflict)
       return {
         status: 'conflict',
         phase: 'commit',
@@ -3636,46 +2617,61 @@ async function transact<T, R>(
                     (entry.key as readonly [string, string])[1]
                   )
                 : entry.channel === 'rdf'
-                  ? (draft.get(identity(namespaceContext, 'rdf', entry.encoded)) ??
-                      snapshots.get(identity(namespaceContext, 'rdf', entry.encoded)))!.rdfLock!
+                  ? (transactionContext.draft.get(
+                      identity(transactionContext.namespaceContext, 'rdf', entry.encoded)
+                    ) ??
+                      transactionContext.snapshots.get(
+                        identity(transactionContext.namespaceContext, 'rdf', entry.encoded)
+                      ))!.rdfLock!
                   : lockKey.record(entry.key)
         ),
         holder: undefined,
         cause: new Error(
           conflicts[0] &&
-            revision(namespaceContext, conflicts[0].channel, conflicts[0].encoded) !==
-              conflicts[0].revision
+            revision(
+              transactionContext.namespaceContext,
+              conflicts[0].channel,
+              conflicts[0].encoded
+            ) !== conflicts[0].revision
             ? StorageErrorText.memoryRevisionChanged(
                 conflicts[0].revision,
-                revision(namespaceContext, conflicts[0].channel, conflicts[0].encoded)
+                revision(
+                  transactionContext.namespaceContext,
+                  conflicts[0].channel,
+                  conflicts[0].encoded
+                )
               )
             : StorageErrorText.memoryEpochChanged
         )
       }
     }
     /** Final capacity admission shares the same original attempt, locks and no-await commit turn. */
-    const capacityPlan = draftCapacityPlan()
+    const capacityPlan = draftCapacityPlan(transactionContext)
     if (
-      journalAttempt !== undefined &&
-      (capacityPlan?.expired.length !== journalCapacity?.expired.length ||
-        capacityPlan?.victims.length !== journalCapacity?.victims.length ||
+      transactionContext.journalAttempt !== undefined &&
+      (capacityPlan?.expired.length !== transactionContext.journalCapacity?.expired.length ||
+        capacityPlan?.victims.length !== transactionContext.journalCapacity?.victims.length ||
         capacityPlan?.expired.some(
-          (entry, index) => entry.id !== journalCapacity!.expired[index]!.id
+          (entry, index) => entry.id !== transactionContext.journalCapacity!.expired[index]!.id
         ) ||
         capacityPlan?.victims.some(
-          (entry, index) => entry.id !== journalCapacity!.victims[index]!.id
+          (entry, index) => entry.id !== transactionContext.journalCapacity!.victims[index]!.id
         ))
     ) {
-      void stage.afterRollback?.(StorageContractErrorCode.writeConflict)
+      void transactionContext.stage.afterRollback?.(StorageContractErrorCode.writeConflict)
       return { status: 'conflict', phase: 'commit', keys: [], holder: undefined }
     }
-    setCapacityIdentities?.(capacityPlan?.identities ?? [])
+    transactionContext.setCapacityIdentities?.(capacityPlan?.identities ?? [])
     const capacityHeld =
       capacityPlan === undefined
         ? undefined
-        : namespaceContext.locks.probe(capacityPlan.identities, undefined, ctx)
+        : transactionContext.namespaceContext.locks.probe(
+            capacityPlan.identities,
+            undefined,
+            transactionContext.ctx
+          )
     if (capacityHeld !== undefined) {
-      void stage.afterRollback?.(StorageContractErrorCode.lockRejected)
+      void transactionContext.stage.afterRollback?.(StorageContractErrorCode.lockRejected)
       return {
         status: 'conflict',
         phase: 'acquire',
@@ -3692,21 +2688,31 @@ async function transact<T, R>(
       rdf: [] as IStorageKey[]
     }
     commitCapacity(
-      namespaceContext,
+      transactionContext.namespaceContext,
       capacityPlan,
       () => {
         /** Clear's physical maps, revisions and accounting remain owned by their original turn. */
-        if (clearedChannels !== undefined) {
-          if (clearAllRequested) clearAll(namespaceContext, false)
-          else clear(namespaceContext, clearedChannels[0] as IStorageChannel, false)
+        if (transactionContext.clearedChannels !== undefined) {
+          if (transactionContext.clearAllRequested)
+            clearAll(transactionContext.namespaceContext, false)
+          else
+            clear(
+              transactionContext.namespaceContext,
+              transactionContext.clearedChannels[0] as IStorageChannel,
+              false
+            )
         }
-        for (const proposed of draft.values()) {
-          if (clearedChannels?.includes(proposed.channel)) {
+        for (const proposed of transactionContext.draft.values()) {
+          if (transactionContext.clearedChannels?.includes(proposed.channel)) {
             changed[proposed.channel].push(proposed.key)
             continue
           }
           /** Policy eviction remains owned by commitCapacity, including revision and onEvict. */
-          if (journalVictims?.has(identity(namespaceContext, proposed.channel, proposed.encoded)))
+          if (
+            transactionContext.journalVictims?.has(
+              identity(transactionContext.namespaceContext, proposed.channel, proposed.encoded)
+            )
+          )
             continue
           /** Existing draft identities retain their already captured logical key. */
           const encoded = proposed.encoded
@@ -3714,23 +2720,26 @@ async function transact<T, R>(
           if (
             proposed.remove ||
             (proposed.deadline !== undefined &&
-              proposed.deadline <= namespaceContext.scheduler.now())
+              proposed.deadline <= transactionContext.namespaceContext.scheduler.now())
           ) {
-            setDeadline(namespaceContext, proposed.channel, encoded, undefined)
-            namespaceContext.capacityIndex?.remove(
-              identity(namespaceContext, proposed.channel, encoded)
+            setDeadline(transactionContext.namespaceContext, proposed.channel, encoded, undefined)
+            transactionContext.namespaceContext.capacityIndex?.remove(
+              identity(transactionContext.namespaceContext, proposed.channel, encoded)
             )
-            if (!namespaceContext.data[proposed.channel].delete(encoded)) continue
-            if (proposed.channel === 'rdf') namespaceContext.rdfIndex.delete(proposed.rdfKeys!)
-            else namespaceContext.ordered[proposed.channel].delete(proposed.ordered)
+            if (!transactionContext.namespaceContext.data[proposed.channel].delete(encoded))
+              continue
+            if (proposed.channel === 'rdf')
+              transactionContext.namespaceContext.rdfIndex.delete(proposed.rdfKeys!)
+            else
+              transactionContext.namespaceContext.ordered[proposed.channel].delete(proposed.ordered)
           } else {
             /**
              * An overwrite retains its original live ordered encoding instead of keeping duplicate
              * key bytes.
              */
             const keyBytes =
-              namespaceContext.ordered[proposed.channel].get(proposed.ordered)?.key ??
-              proposed.ordered
+              transactionContext.namespaceContext.ordered[proposed.channel].get(proposed.ordered)
+                ?.key ?? proposed.ordered
             const entry = {
               key: proposed.key,
               value: proposed.value,
@@ -3739,13 +2748,19 @@ async function transact<T, R>(
               rdfKeys: proposed.rdfKeys,
               rdfLock: proposed.rdfLock
             }
-            namespaceContext.data[proposed.channel].set(encoded, entry)
-            if (proposed.channel === 'rdf') namespaceContext.rdfIndex.set(proposed.rdfKeys!, entry)
-            else namespaceContext.ordered[proposed.channel].set(keyBytes, entry)
-            setDeadline(namespaceContext, proposed.channel, encoded, proposed.deadline)
-            namespaceContext.capacityIndex?.put({
+            transactionContext.namespaceContext.data[proposed.channel].set(encoded, entry)
+            if (proposed.channel === 'rdf')
+              transactionContext.namespaceContext.rdfIndex.set(proposed.rdfKeys!, entry)
+            else transactionContext.namespaceContext.ordered[proposed.channel].set(keyBytes, entry)
+            setDeadline(
+              transactionContext.namespaceContext,
+              proposed.channel,
+              encoded,
+              proposed.deadline
+            )
+            transactionContext.namespaceContext.capacityIndex?.put({
               ...capacityFact(
-                namespaceContext,
+                transactionContext.namespaceContext,
                 proposed.channel,
                 proposed.key,
                 undefined,
@@ -3754,36 +2769,47 @@ async function transact<T, R>(
               bytes: proposed.bytes ?? 0
             })
           }
-          bump(namespaceContext, proposed.channel, encoded)
+          bump(transactionContext.namespaceContext, proposed.channel, encoded)
           changed[proposed.channel].push(proposed.key)
         }
         /** The original capacity buffer preserves batch-before-victim notification order. */
         if (capacityPlan !== undefined)
-          for (const channel of namespaceContext.physicalChannels)
-            if (!clearedChannels?.includes(channel) && changed[channel].length !== 0)
-              publish(namespaceContext, channel, 'batch', changed[channel])
+          for (const channel of transactionContext.namespaceContext.physicalChannels)
+            if (
+              !transactionContext.clearedChannels?.includes(channel) &&
+              changed[channel].length !== 0
+            )
+              publish(transactionContext.namespaceContext, channel, 'batch', changed[channel])
       },
       () => {
         /** Actual data and capacity victims are final before private indexes become visible. */
-        journalDraft?.commit()
-        journalDraft?.complete(true)
-        if (clearChanged) {
-          if (clearAllRequested)
-            namespaceContext.controller.publish({
+        transactionContext.journalDraft?.commit()
+        transactionContext.journalDraft?.complete(true)
+        if (transactionContext.clearChanged) {
+          if (transactionContext.clearAllRequested)
+            transactionContext.namespaceContext.controller.publish({
               channel: 'all',
               kind: 'clear',
-              orgId: namespaceContext.orgId
+              orgId: transactionContext.namespaceContext.orgId
             })
-          else publish(namespaceContext, clearedChannels![0]!, 'clear')
+          else
+            publish(
+              transactionContext.namespaceContext,
+              transactionContext.clearedChannels![0]!,
+              'clear'
+            )
         }
         if (capacityPlan === undefined)
-          for (const channel of namespaceContext.physicalChannels)
-            if (!clearedChannels?.includes(channel) && changed[channel].length !== 0)
-              publish(namespaceContext, channel, 'batch', changed[channel])
+          for (const channel of transactionContext.namespaceContext.physicalChannels)
+            if (
+              !transactionContext.clearedChannels?.includes(channel) &&
+              changed[channel].length !== 0
+            )
+              publish(transactionContext.namespaceContext, channel, 'batch', changed[channel])
       }
     )
-    void stage.afterCommit?.(
-      namespaceContext.physicalChannels.reduce(
+    void transactionContext.stage.afterCommit?.(
+      transactionContext.namespaceContext.physicalChannels.reduce(
         (count, channel) => count + changed[channel].length,
         0
       ) +
@@ -3793,40 +2819,1376 @@ async function transact<T, R>(
     return { status: 'committed', value }
   } catch (cause) {
     /** The original owner combines cleanup after the first failure without replacing its cause. */
-    let primary = failure ?? normalize(namespaceContext, cause)
+    let primary =
+      transactionContext.failure ?? normalize(transactionContext.namespaceContext, cause)
     try {
-      await control.closeIterators()
+      await transactionContext.control.closeIterators()
     } catch (cleanup) {
-      primary = normalize(namespaceContext, cleanup)
+      primary = normalize(transactionContext.namespaceContext, cleanup)
     }
-    void stage.afterRollback?.(primary.code)
+    void transactionContext.stage.afterRollback?.(primary.code)
     throw primary
   } finally {
-    journalDraft?.complete(false)
-    if (journalAttempt?.settle !== undefined) await journalAttempt.settle()
-    control.close()
-    if (observeKeys !== undefined)
-      observeKeys(
-        [...expected.values()]
+    transactionContext.journalDraft?.complete(false)
+    if (transactionContext.journalAttempt?.settle !== undefined)
+      await transactionContext.journalAttempt.settle()
+    transactionContext.control.close()
+    if (transactionContext.observeKeys !== undefined)
+      transactionContext.observeKeys(
+        [...transactionContext.expected.values()]
           .map((entry) => {
             const physical =
-              draft.get(identity(namespaceContext, entry.channel, entry.encoded)) ??
-              namespaceContext.data[entry.channel].get(entry.encoded)
+              transactionContext.draft.get(
+                identity(transactionContext.namespaceContext, entry.channel, entry.encoded)
+              ) ?? transactionContext.namespaceContext.data[entry.channel].get(entry.encoded)
             return capacityLock(
-              namespaceContext,
-              capacityFact(namespaceContext, entry.channel, entry.key, undefined, physical?.rdfLock)
+              transactionContext.namespaceContext,
+              capacityFact(
+                transactionContext.namespaceContext,
+                entry.channel,
+                entry.key,
+                undefined,
+                physical?.rdfLock
+              )
             )
           })
           .filter((key): key is ILockKey => key !== undefined)
       )
-    draft.clear()
-    snapshots.clear()
-    expected.clear()
-    snapshotEpochs.clear()
-    for (const channel of namespaceContext.physicalChannels) draftOrdered[channel].clear()
-    draftRdfIndex.clear()
-    void stage.onTransactionClose?.()
+    transactionContext.draft.clear()
+    transactionContext.snapshots.clear()
+    transactionContext.expected.clear()
+    transactionContext.snapshotEpochs.clear()
+    for (const channel of transactionContext.namespaceContext.physicalChannels)
+      transactionContext.draftOrdered[channel].clear()
+    transactionContext.draftRdfIndex.clear()
+    void transactionContext.stage.onTransactionClose?.()
   }
+}
+
+/** Ordinary transactions allocate no private metadata rows or terminal channels until used. */
+function privateJournal<T, R>(transactionContext: IMemoryTransactionContext<T, R>) {
+  return (transactionContext.journalDraft ??= transactionContext.namespaceContext.journal.draft())
+}
+
+/** Capture the real revision once, before any draft read or write. */
+function track<T, R>(
+  transactionContext: IMemoryTransactionContext<T, R>,
+  channel: IMemoryChannel,
+  encoded: string,
+  key: IStorageKey
+): string {
+  if (!transactionContext.snapshotEpochs.has(channel))
+    transactionContext.snapshotEpochs.set(
+      channel,
+      transactionContext.namespaceContext.revisions.epoch(channel === 'value' ? 'text' : channel)
+    )
+  /** Channel plus original flat key identifies one actual native row. */
+  const id = identity(transactionContext.namespaceContext, channel, encoded)
+  if (!transactionContext.expected.has(id))
+    transactionContext.expected.set(id, {
+      channel,
+      encoded,
+      key,
+      revision: revision(transactionContext.namespaceContext, channel, encoded)
+    })
+  return id
+}
+
+/** First access captures value, deadline and revision once; later reads retain that snapshot. */
+function txSnapshot<T, R>(
+  transactionContext: IMemoryTransactionContext<T, R>,
+  channel: IMemoryChannel,
+  encoded: string,
+  key: IStorageKey
+): IMemorySnapshot | undefined {
+  /** Existing observations are never refreshed from a later clock or physical mutation. */
+  const id = identity(transactionContext.namespaceContext, channel, encoded)
+  if (!transactionContext.snapshots.has(id)) {
+    /** Expiry removes the physical row before its revision baseline is observed. */
+    const current = liveEntry(transactionContext.namespaceContext, channel, encoded)
+    track(transactionContext, channel, encoded, key)
+    transactionContext.snapshots.set(
+      id,
+      current === undefined
+        ? undefined
+        : {
+            key,
+            value: copyValue(transactionContext.namespaceContext, channel, current.value, key),
+            ordered: current.ordered,
+            bytes: current.bytes,
+            rdfKeys: current.rdfKeys,
+            rdfLock: current.rdfLock,
+            deadline: transactionContext.namespaceContext.deadlines.get(id)
+          }
+    )
+  }
+  return transactionContext.snapshots.get(id)
+}
+
+/** Read own writes first; otherwise retain the first committed value in this attempt. */
+function txEntry<T, R>(
+  transactionContext: IMemoryTransactionContext<T, R>,
+  channel: IMemoryChannel,
+  key: IStorageKey
+): IMemorySnapshot | undefined {
+  /** Caller-owned keys detach before contributing to revision or draft identity. */
+  const captured = snapshotStorageKey(key, STORAGE_MEMORY_BACKEND)
+  /** Every channel uses the same canonical logical-key wire. */
+  const encoded = encodeFlatStorageKey(captured)
+  /** A draft row replaces the previous read snapshot immediately. */
+  const proposed = transactionContext.draft.get(
+    identity(transactionContext.namespaceContext, channel, encoded)
+  )
+  return proposed
+    ? proposed.remove
+      ? undefined
+      : proposed
+    : txSnapshot(transactionContext, channel, encoded, captured)
+}
+
+/** Every mutable value returned from a retained native snapshot has independent ownership. */
+function txRead<T, R>(
+  transactionContext: IMemoryTransactionContext<T, R>,
+  channel: IMemoryChannel,
+  key: IStorageKey
+): unknown {
+  /** Membership and an undefined-valued record remain separate facts. */
+  const current = txEntry(transactionContext, channel, key)
+  if (current !== undefined)
+    transactionContext.namespaceContext.capacityIndex?.touch(
+      identity(transactionContext.namespaceContext, channel, encodeFlatStorageKey(current.key))
+    )
+  return current === undefined
+    ? undefined
+    : copyValue(transactionContext.namespaceContext, channel, current.value, current.key)
+}
+
+/** Membership shares the same first snapshot, including undefined-valued records. */
+function txHas<T, R>(
+  transactionContext: IMemoryTransactionContext<T, R>,
+  channel: IMemoryChannel,
+  encoded: string,
+  key: IStorageKey
+): boolean {
+  /** A tombstone masks physical membership until the attempt commits. */
+  const proposed = transactionContext.draft.get(
+    identity(transactionContext.namespaceContext, channel, encoded)
+  )
+  return proposed
+    ? !proposed.remove
+    : txSnapshot(transactionContext, channel, encoded, key) !== undefined
+}
+
+/** Draft hash and ordered range lookup retain one actual proposed row reference. */
+function stageDraft<T, R>(
+  transactionContext: IMemoryTransactionContext<T, R>,
+  entry: IMemoryDraft,
+  metadataOnly = false
+): void {
+  captureJournalStage(transactionContext, entry, metadataOnly)
+  /** Replacing one draft value keeps its original independently owned key encoding. */
+  const proposed = {
+    ...entry,
+    ordered: transactionContext.draftOrdered[entry.channel].get(entry.ordered)?.key ?? entry.ordered
+  }
+  transactionContext.draft.set(
+    track(transactionContext, proposed.channel, proposed.encoded, proposed.key),
+    proposed
+  )
+  if (proposed.channel === 'rdf') transactionContext.draftRdfIndex.set(proposed.rdfKeys!, proposed)
+  else transactionContext.draftOrdered[proposed.channel].set(proposed.ordered, proposed)
+}
+
+/** Prepare first, then stage eviction and put atomically within this native draft. */
+function txWrite<T, R>(
+  transactionContext: IMemoryTransactionContext<T, R>,
+  channel: IStorageChannel,
+  key: IStorageKey,
+  value: unknown,
+  policy: IConflictPolicy,
+  ttlMs?: number
+): void {
+  /** Preparation can reject before any prior channel loses draft membership. */
+  const captured = snapshotStorageKey(key, STORAGE_MEMORY_BACKEND)
+  /** One logical-key encoding serves all affected channels. */
+  const encoded = encodeFlatStorageKey(captured)
+  /** Clone caller-owned payload before mutating the draft. */
+  const prepared = prepare(transactionContext.namespaceContext, channel, value, captured)
+  /** Explicit byte-domain failure happens before staging any replacement or native victim. */
+  const bytes = entryBytes(transactionContext.namespaceContext, channel, prepared)
+  /** Channel conflict semantics are owned by the same shared plan as root writes. */
+  const existing = new Set(
+    MemoryState.channels.filter((current) => txHas(transactionContext, current, encoded, captured))
+  )
+  /** The canonical plan retains eviction order and the existing duplicate-key diagnostic. */
+  const plan = planChannelWrite(captured, channel, existing, policy, STORAGE_MEMORY_BACKEND)
+  /** Encode this logical key once for all affected channel draft entries. */
+  const keyBytes = encodeOrderedStorageKey(captured, STORAGE_MEMORY_BACKEND)
+  for (const previous of plan.remove)
+    stageDraft(transactionContext, {
+      channel: previous,
+      key: captured,
+      value: undefined,
+      remove: true,
+      encoded,
+      ordered: keyBytes
+    })
+  /** Overwriting a live row retains its deadline unless this batch supplies a new duration. */
+  const current = txEntry(transactionContext, channel, captured)
+  stageDraft(transactionContext, {
+    channel,
+    key: captured,
+    value: prepared,
+    bytes,
+    remove: false,
+    encoded,
+    ordered: keyBytes,
+    deadline:
+      ttlMs === undefined
+        ? current?.deadline
+        : transactionContext.namespaceContext.scheduler.now() + ttlMs
+  })
+}
+
+/** Delete returns actual draft membership, so repeated keys count at most once. */
+function txRemove<T, R>(
+  transactionContext: IMemoryTransactionContext<T, R>,
+  channel: IStorageChannel | 'vector',
+  key: IStorageKey
+): boolean {
+  /** Delete keys follow the same detached canonical domain as reads and writes. */
+  const captured = snapshotStorageKey(key, STORAGE_MEMORY_BACKEND)
+  /** One encoding serves membership and the resulting tombstone. */
+  const encoded = encodeFlatStorageKey(captured)
+  if (!txHas(transactionContext, channel, encoded, captured)) return false
+  /** Existing physical or proposed membership already owns this exact ordered identity. */
+  const current =
+    transactionContext.draft.get(identity(transactionContext.namespaceContext, channel, encoded)) ??
+    txSnapshot(transactionContext, channel, encoded, captured)!
+  stageDraft(transactionContext, {
+    channel,
+    key: captured,
+    value: undefined,
+    remove: true,
+    encoded,
+    ordered: current.ordered
+  })
+  return true
+}
+
+/** Localize both physical and draft trees, then merge only their actual range candidates. */
+function txRows<T, R>(
+  transactionContext: IMemoryTransactionContext<T, R>,
+  channel: IStorageChannel,
+  range?: IOrderedRecordRange
+): IMemoryEntry[] {
+  if (!transactionContext.snapshotEpochs.has(channel))
+    transactionContext.snapshotEpochs.set(
+      channel,
+      transactionContext.namespaceContext.revisions.epoch(channel === 'value' ? 'text' : channel)
+    )
+  /** Independent owner iterators begin at the same lower bound, without scanning other draft keys. */
+  const physical = transactionContext.namespaceContext.ordered[channel].range(range)
+  const proposed = transactionContext.draftOrdered[channel].range(range)
+  /** The native scan captures only candidates selected by these actual bounds. */
+  const rows: IMemoryEntry[] = []
+  let left = physical.next()
+  let right = proposed.next()
+  while (!left.done || !right.done) {
+    /** Equal canonical identities are decided by the draft, including its tombstone. */
+    const comparison = left.done
+      ? 1
+      : right.done
+        ? -1
+        : compareRecordIndexKeys(left.value.key, right.value.key)
+    if (comparison < 0) {
+      /** First range access uses the same repeatable membership and deadline as point reads. */
+      const row = left.value!.value
+      /** Expiry unlinks this leaf, so retain the next original candidate before pruning it. */
+      left = physical.next()
+      const current = txSnapshot(
+        transactionContext,
+        channel,
+        encodeFlatStorageKey(row.key),
+        row.key
+      )
+      if (current !== undefined) rows.push(current)
+    } else {
+      if (!right.value!.value.remove) rows.push(right.value!.value)
+      if (comparison === 0) left = physical.next()
+      right = proposed.next()
+    }
+  }
+  return rows
+}
+
+/** RDF writes retain the same original draft, first-read revisions and logical lock facts. */
+function txRdfWrite<T, R>(
+  transactionContext: IMemoryTransactionContext<T, R>,
+  input: readonly IQuad[],
+  remove: boolean
+): void {
+  /** Admission of the entire batch precedes even the first draft tombstone. */
+  const entries = captureRdfEntries(transactionContext.namespaceContext, input)
+  for (const entry of entries) {
+    /** Draft and first-read membership share the original channel identity. */
+    const id = identity(transactionContext.namespaceContext, 'rdf', entry.encoded)
+    /** Own writes mask physical membership without introducing another transaction owner. */
+    const proposed = transactionContext.draft.get(id)
+    /** The original first-read owner records even absence for ABA conflict checks. */
+    const current = proposed
+      ? proposed.remove
+        ? undefined
+        : proposed
+      : txSnapshot(transactionContext, 'rdf', entry.encoded, entry.key)
+    if (remove ? current === undefined : current !== undefined) continue
+    stageDraft(transactionContext, { ...entry, channel: 'rdf', remove })
+  }
+}
+
+/** Physical and proposed prefix scans merge by identity without materializing complete results. */
+function* txRdfRows<T, R>(
+  transactionContext: IMemoryTransactionContext<T, R>,
+  pattern: Readonly<Partial<IQuad>>
+): IterableIterator<IMemoryEntry> {
+  if (!transactionContext.snapshotEpochs.has('rdf'))
+    transactionContext.snapshotEpochs.set(
+      'rdf',
+      transactionContext.namespaceContext.revisions.epoch('rdf')
+    )
+  /** Both trees receive one identical bound graph envelope and access-path choice. */
+  const physical = physicalRdfPattern(transactionContext.namespaceContext, pattern)
+  for (const row of transactionContext.namespaceContext.rdfIndex.match(physical)) {
+    /** The original physical key remains a string even for a large literal. */
+    const encoded = row.key as string
+    if (transactionContext.draft.has(identity(transactionContext.namespaceContext, 'rdf', encoded)))
+      continue
+    /** Repeat reads retain the first physical snapshot and original revision. */
+    const current = txSnapshot(transactionContext, 'rdf', encoded, row.key)
+    if (current !== undefined) {
+      transactionContext.namespaceContext.capacityIndex?.touch(
+        identity(transactionContext.namespaceContext, 'rdf', encoded)
+      )
+      yield current
+    }
+  }
+  for (const row of transactionContext.draftRdfIndex.match(physical)) if (!row.remove) yield row
+}
+
+/** The original transaction owner admits each native advance and closes the actual generator. */
+function rdfQuery<T, R>(
+  transactionContext: IMemoryTransactionContext<T, R>,
+  pattern: Partial<IQuad>,
+  scope: ITransactionScope<T>,
+  mutate: NonNullable<IRdfQuerySource<ITransactionScope<T>>['mutate']>
+): ReturnType<ITransactionRdfApi['match']> {
+  /** The shared planner owns subsequent query snapshots and operation-scope rebinding. */
+  const captured = snapshotStorageRdfPattern(pattern, STORAGE_MEMORY_BACKEND)
+  return createRdfQuery<undefined, Record<never, never>, ITransactionScope<T>>(
+    {
+      asyncDisposeKey,
+      cursorSource: scope,
+      mutate,
+      pushdown: {
+        source: MemoryState.querySource,
+        index: transactionContext.namespaceContext.rdfIndex.select(
+          physicalRdfPattern(transactionContext.namespaceContext, captured)
+        ).name,
+        operations: [],
+        operators: []
+      },
+      execute: (input) => {
+        /** This actual generator, including client traversal children, has one native owner. */
+        const iterator = (async function* () {
+          for (const row of txRdfRows(transactionContext, input.pattern)) {
+            transactionContext.namespaceContext.controller.assertLive()
+            throwIfAborted(transactionContext.ctx.signal)
+            yield [row.key, logicalRdfQuad(transactionContext.namespaceContext, row)] as const
+          }
+        })()
+        return transactionContext.namespaceContext.owner.registerIterator(
+          input.operationScope ?? scope,
+          {
+            next: (current) =>
+              transactionContext.namespaceContext.core.execution.run(
+                {
+                  operation: MemoryOperation.rdfMatch,
+                  input: input.pattern,
+                  scope: current,
+                  ctx: transactionContext.ctx
+                },
+                () => iterator.next()
+              ),
+            close: async () => {
+              await iterator.return(undefined)
+            }
+          }
+        )
+      }
+    },
+    captured,
+    transactionContext.namespaceContext.core.getChainMethods('rdf')
+  )
+}
+
+/** Query selection borrows the original iterator owner without a second operation pipeline. */
+function queryIterator<T, R, V>(
+  transactionContext: IMemoryTransactionContext<T, R>,
+  scope: ITransactionScope<T>,
+  rows: () => Iterable<readonly [IStorageKey, V]>
+): IStorageIterator<readonly [IStorageKey, V]> {
+  assertTransactionOwner(transactionContext.namespaceContext.store, scope)
+  /** The actual generator is drained and closed by this existing native transaction owner. */
+  const iterator = (async function* () {
+    for (const row of rows()) {
+      transactionContext.namespaceContext.controller.assertLive()
+      throwIfAborted(transactionContext.ctx.signal)
+      yield row
+    }
+  })()
+  return transactionContext.namespaceContext.owner.registerIterator(scope, {
+    next: () => iterator.next(),
+    close: async () => {
+      await iterator.return(undefined)
+    }
+  })
+}
+
+/** A vector write attempt streams native candidates while retaining the original read set. */
+function* txVectorPoints<T, R, P>(
+  transactionContext: IMemoryTransactionContext<T, R>,
+  collection: string
+): IterableIterator<IStorageVectorPoint<P>> {
+  if (!transactionContext.snapshotEpochs.has('vector'))
+    transactionContext.snapshotEpochs.set(
+      'vector',
+      transactionContext.namespaceContext.revisions.epoch('vector')
+    )
+  /** Physical and proposed rows use the same canonical collection tuple prefix. */
+  const bounds = snapshotStorageKeyPrefix([collection], STORAGE_MEMORY_BACKEND)
+  let leaf = transactionContext.namespaceContext.ordered.vector.lowerBound(bounds.lower)
+  while (leaf !== undefined && compareRecordIndexKeys(leaf.key, bounds.upper) < 0) {
+    /** Expiry can unlink this row before the generator advances again. */
+    const next = leaf.next
+    const key = leaf.value.key
+    const encoded = encodeFlatStorageKey(key)
+    if (
+      !transactionContext.draft.has(
+        identity(transactionContext.namespaceContext, 'vector', encoded)
+      )
+    ) {
+      const current = txSnapshot(transactionContext, 'vector', encoded, key)
+      if (current !== undefined) yield current.value as IStorageVectorPoint<P>
+    }
+    leaf = next
+  }
+  for (const row of transactionContext.draftOrdered.vector.range({
+    lower: bounds.lower,
+    upper: bounds.upper,
+    upperOpen: true
+  }))
+    if (!row.value.remove) yield row.value.value as IStorageVectorPoint<P>
+}
+
+/** Native text batches stage only into this attempt's existing draft and revision baseline. */
+function createMemoryTransactionTextDraft<T, R>(
+  transactionContext: IMemoryTransactionContext<T, R>
+): IMemoryTransactionContext<T, R>['textDraft'] {
+  return {
+    write: (
+      channel: IStorageChannel,
+      key: IStorageKey,
+      value: unknown,
+      policy: IConflictPolicy,
+      ttlMs?: number
+    ) => txWrite(transactionContext, channel, key, value, policy, ttlMs),
+    remove: (channel: IStorageChannel | 'vector', key: IStorageKey) =>
+      txRemove(transactionContext, channel, key),
+    clear: (channel) => {
+      /** Blob has no shared image target, so an all-channel clear must not silently delete it. */
+      if (channel === undefined && transactionContext.namespaceContext.blobs.size !== 0)
+        throw new StorageContractError(StorageContractErrorCode.unsupported)
+      transactionContext.clearedChannels =
+        channel === undefined ? transactionContext.namespaceContext.physicalChannels : [channel]
+      transactionContext.clearAllRequested = channel === undefined
+      transactionContext.clearChanged = transactionContext.clearedChannels.some(
+        (current) => transactionContext.namespaceContext.data[current].size !== 0
+      )
+      for (const current of transactionContext.clearedChannels) {
+        if (!transactionContext.snapshotEpochs.has(current))
+          transactionContext.snapshotEpochs.set(
+            current,
+            transactionContext.namespaceContext.revisions.epoch(
+              current === 'value' ? 'text' : current
+            )
+          )
+        /** Native Map iteration advances safely when the original TTL owner prunes an entry. */
+        for (const [encoded, entry] of transactionContext.namespaceContext.data[current]) {
+          const snapshot = txSnapshot(transactionContext, current, encoded, entry.key)
+          if (snapshot !== undefined)
+            stageDraft(transactionContext, { ...snapshot, channel: current, encoded, remove: true })
+        }
+      }
+    },
+    ttl: (target, ms, persist) => txTtl(transactionContext, target, ms, persist),
+    increment: (key, increment) => {
+      const result = increment(txRead(transactionContext, 'value', key) as string | undefined)
+      txWrite(transactionContext, 'value', key, String(result), 'conflict')
+      return result
+    },
+    upsertVector: (collection, points, sizes, ttlMs) => {
+      /** Captured vector inputs enter the existing native draft without a second public pipeline. */
+      const now = transactionContext.namespaceContext.scheduler.now()
+      for (const [index, point] of points.entries()) {
+        const key = vectorKey(transactionContext.namespaceContext, collection, point.id)
+        const encoded = encodeFlatStorageKey(key)
+        const current = txEntry(transactionContext, 'vector', key)
+        const deadline = ttlMs === undefined ? current?.deadline : now + ttlMs
+        if (deadline !== undefined && deadline <= now) {
+          txRemove(transactionContext, 'vector', key)
+          continue
+        }
+        stageDraft(transactionContext, {
+          channel: 'vector',
+          key,
+          encoded,
+          value: point,
+          remove: false,
+          ordered: current?.ordered ?? encodeOrderedStorageKey(key, STORAGE_MEMORY_BACKEND),
+          bytes: sizes[index],
+          deadline
+        })
+      }
+    },
+    deleteVector: (collection, predicate) => {
+      let count = 0
+      for (const point of txVectorPoints(transactionContext, collection))
+        if (
+          predicate(point) &&
+          txRemove(
+            transactionContext,
+            'vector',
+            vectorKey(transactionContext.namespaceContext, collection, point.id)
+          )
+        )
+          count++
+      return count
+    },
+    rdf: (input: readonly IQuad[], remove: boolean) =>
+      txRdfWrite(transactionContext, input, remove),
+    setMany: (entries) => {
+      for (const entry of entries)
+        txWrite(transactionContext, 'value', entry.key, entry.value, 'conflict', entry.ttlMs)
+    },
+    removeMany: (keys) => {
+      /** Duplicate identities can only remove the first still-present draft entry. */
+      let count = 0
+      for (const key of keys) if (txRemove(transactionContext, 'value', key)) count++
+      return count
+    },
+    removeByPrefix: (prefix, channel = 'value') => {
+      /** Native prefix localization reuses the original canonical bounds and ordered draft merge. */
+      const captured = snapshotStorageKeyPrefix(prefix, STORAGE_MEMORY_BACKEND)
+      /** Count only actual removals in this channel and this native attempt. */
+      let count = 0
+      for (const row of txRows(transactionContext, channel, {
+        lower: captured.lower,
+        upper: captured.upper,
+        upperOpen: true
+      }))
+        if (captured.matches(row.key) && txRemove(transactionContext, channel, row.key)) count++
+      return count
+    }
+  }
+}
+
+/** TTL metadata changes stage beside the original value and never create a second draft. */
+function txTtl<T, R>(
+  transactionContext: IMemoryTransactionContext<T, R>,
+  target: IMemoryTtlTarget,
+  ms: number | undefined,
+  persist: boolean
+): boolean {
+  /** A TTL target has already been captured by the original contract lock owner. */
+  const channel = ttlChannel(transactionContext.namespaceContext, target)
+  const current = txEntry(
+    transactionContext,
+    channel,
+    ttlKey(transactionContext.namespaceContext, target)
+  )
+  if (current === undefined || (persist && current.deadline === undefined)) return false
+  stageDraft(
+    transactionContext,
+    {
+      ...current,
+      channel,
+      encoded: encodeFlatStorageKey(current.key),
+      remove: ms === 0,
+      deadline: persist ? undefined : transactionContext.namespaceContext.scheduler.now() + ms!
+    },
+    true
+  )
+  return true
+}
+
+/** Remaining duration observes the same retained transaction value and captured deadline. */
+function txRemaining<T, R>(
+  transactionContext: IMemoryTransactionContext<T, R>,
+  target: IMemoryTtlTarget
+): number | undefined {
+  /** Missing and unlimited rows share the documented undefined result. */
+  const current = txEntry(
+    transactionContext,
+    ttlChannel(transactionContext.namespaceContext, target),
+    ttlKey(transactionContext.namespaceContext, target)
+  )
+  return current?.deadline === undefined
+    ? undefined
+    : Math.max(0, current.deadline - transactionContext.namespaceContext.scheduler.now())
+}
+
+/** Resolve logical journal identities through this exact org's existing physical key mapping. */
+function journalRow<T, R>(
+  transactionContext: IMemoryTransactionContext<T, R>,
+  input: IStorageJournalTarget
+) {
+  const captured = snapshotMemoryJournalTarget(input)
+  const target = captured.lock
+  const channel: IMemoryChannel = target.channel === 'text' ? 'value' : target.channel
+  const key =
+    target.channel === 'rdf'
+      ? captureRdfEntries(transactionContext.namespaceContext, [target.quad])[0]!.key
+      : target.channel === 'vector'
+        ? vectorKey(transactionContext.namespaceContext, target.collection, target.id)
+        : target.key
+  const encoded = target.channel === 'rdf' ? (key as string) : encodeFlatStorageKey(key)
+  const proposed = transactionContext.draft.get(
+    identity(transactionContext.namespaceContext, channel, encoded)
+  )
+  const current =
+    target.channel === 'rdf'
+      ? proposed
+        ? proposed.remove
+          ? undefined
+          : proposed
+        : txSnapshot(transactionContext, channel, encoded, key)
+      : txEntry(transactionContext, channel, key)
+  return { ...captured, channel, key, encoded, current }
+}
+
+/** Images observe the same draft and deadline as this native transaction's final physical row. */
+function readJournalImage<T, R>(
+  transactionContext: IMemoryTransactionContext<T, R>,
+  input: IStorageJournalTarget
+): IStorageJournalImage {
+  const row = journalRow(transactionContext, input)
+  const current = row.current
+  const present =
+    current !== undefined &&
+    (current.deadline === undefined ||
+      current.deadline > transactionContext.namespaceContext.scheduler.now())
+  return row.metadata
+    ? encodeStorageJournalImage(present && current!.deadline !== undefined, current?.deadline)
+    : encodeStorageJournalImage(
+        present,
+        row.channel === 'rdf' ? true : current?.value,
+        row.channel === 'bytes'
+      )
+}
+
+/** Restore through original staging, cloning, channel-conflict, TTL and RDF admission owners. */
+function writeJournalImage<T, R>(
+  transactionContext: IMemoryTransactionContext<T, R>,
+  input: IStorageJournalTarget,
+  image: IStorageJournalImage
+): void {
+  const row = journalRow(transactionContext, input)
+  const captured = decodeStorageJournalImage(image, row.channel === 'bytes' && !row.metadata)
+  const value = captured.value
+  if (row.metadata) {
+    if (value !== undefined && (typeof value !== 'number' || !Number.isFinite(value)))
+      throw new StorageContractError(StorageContractErrorCode.invalidArgument)
+    if (row.current === undefined) {
+      if (value === undefined) return
+      throw new StorageContractError(StorageContractErrorCode.invalidArgument)
+    }
+    stageDraft(
+      transactionContext,
+      {
+        ...row.current,
+        channel: row.channel,
+        encoded: row.encoded,
+        remove: value !== undefined && value <= transactionContext.namespaceContext.scheduler.now(),
+        deadline: value as number | undefined
+      },
+      true
+    )
+    return
+  }
+  if (row.lock.channel === 'rdf') {
+    if (captured.present && value !== true)
+      throw new StorageContractError(StorageContractErrorCode.invalidArgument)
+    txRdfWrite(transactionContext, [row.lock.quad], !captured.present)
+    return
+  }
+  if (!captured.present) {
+    txRemove(transactionContext, row.channel as IStorageChannel | 'vector', row.key)
+    return
+  }
+  if (row.lock.channel === 'vector') {
+    const configuration = transactionContext.namespaceContext.vectorCollections.get(
+      row.lock.collection
+    )
+    if (configuration === undefined)
+      throw new StorageContractError(StorageContractErrorCode.unsupported)
+    /** The canonical upsert capture validates this decoded wire before any row is staged. */
+    const point = snapshotStorageVectorUpsert(
+      [value as IStorageVectorPoint<unknown>],
+      configuration,
+      STORAGE_MEMORY_BACKEND
+    )[0]!
+    if (point.id !== row.lock.id)
+      throw new StorageContractError(StorageContractErrorCode.invalidArgument)
+    stageDraft(transactionContext, {
+      channel: 'vector',
+      key: row.key,
+      encoded: row.encoded,
+      ordered: row.current?.ordered ?? encodeOrderedStorageKey(row.key, STORAGE_MEMORY_BACKEND),
+      value: point,
+      bytes: entryBytes(transactionContext.namespaceContext, 'vector', point),
+      remove: false,
+      deadline: row.current?.deadline
+    })
+    return
+  }
+  txWrite(transactionContext, row.channel as IStorageChannel, row.key, value, 'replace')
+}
+
+/** Full revisions include the original clear generation and the final draft's tombstone effect. */
+function readJournalRevision<T, R>(
+  transactionContext: IMemoryTransactionContext<T, R>,
+  input: IStorageJournalTarget
+) {
+  const row = journalRow(transactionContext, input)
+  const id = identity(transactionContext.namespaceContext, row.channel, row.encoded)
+  const proposed = transactionContext.draft.get(id)
+  const removes =
+    proposed?.remove === true ||
+    (proposed?.deadline !== undefined &&
+      proposed.deadline <= transactionContext.namespaceContext.scheduler.now())
+  const changed =
+    proposed !== undefined && (!removes || transactionContext.snapshots.get(id) !== undefined)
+  if (transactionContext.clearedChannels?.includes(row.channel))
+    return Object.freeze({
+      epoch: transactionContext.snapshotEpochs.get(row.channel)! + 1,
+      revision: 0
+    })
+  return Object.freeze({
+    epoch: transactionContext.snapshotEpochs.get(row.channel)!,
+    revision: transactionContext.expected.get(id)!.revision + (changed ? 1 : 0)
+  })
+}
+
+/** Capture each actual native staging step before it changes this attempt's existing draft. */
+function captureJournalStage<T, R>(
+  transactionContext: IMemoryTransactionContext<T, R>,
+  entry: IMemoryDraft,
+  metadataOnly: boolean
+): void {
+  if (transactionContext.journalChanges === undefined) return
+  const id = identity(transactionContext.namespaceContext, entry.channel, entry.encoded)
+  const previous = transactionContext.draft.get(id)
+  const before = previous
+    ? previous.remove
+      ? undefined
+      : previous
+    : txSnapshot(transactionContext, entry.channel, entry.encoded, entry.key)
+  const target =
+    entry.channel === 'value'
+      ? lockKey.text(entry.key)
+      : entry.channel === 'bytes'
+        ? lockKey.bytes(entry.key as string)
+        : entry.channel === 'record'
+          ? lockKey.record(entry.key)
+          : entry.channel === 'vector'
+            ? lockKey.vector(
+                (entry.key as readonly [string, string])[0],
+                (entry.key as readonly [string, string])[1]
+              )
+            : entry.rdfLock!
+  const after = entry.remove ? undefined : entry
+  /** All image encoding finishes before either a draft row or the ordered fact list changes. */
+  const proposed: Array<Omit<IStorageJournalChange, 'afterRevision'>> = []
+  if (!metadataOnly || entry.remove) {
+    const beforeImage = encodeStorageJournalImage(
+      before !== undefined,
+      entry.channel === 'rdf' ? true : before?.value,
+      entry.channel === 'bytes'
+    )
+    const afterImage = encodeStorageJournalImage(
+      after !== undefined,
+      entry.channel === 'rdf' ? true : after?.value,
+      entry.channel === 'bytes'
+    )
+    if (beforeImage.present || afterImage.present)
+      proposed.push(Object.freeze({ target, before: beforeImage, after: afterImage }))
+  }
+  if (target.channel !== 'rdf' && before?.deadline !== after?.deadline)
+    proposed.push(
+      Object.freeze({
+        target: memoryJournalDeadlineTarget(target),
+        before: encodeStorageJournalImage(before?.deadline !== undefined, before?.deadline),
+        after: encodeStorageJournalImage(after?.deadline !== undefined, after?.deadline)
+      })
+    )
+  transactionContext.journalChanges.push(...proposed)
+}
+
+/** Begin capture before the first write, then return detached ordered facts with final revisions. */
+function changes<T, R>(
+  transactionContext: IMemoryTransactionContext<T, R>
+): readonly IStorageJournalChange[] {
+  if (transactionContext.journalChanges === undefined) {
+    if (transactionContext.draft.size !== 0)
+      throw new StorageContractError(StorageContractErrorCode.unsupported)
+    transactionContext.journalChanges = []
+  }
+  const result: IStorageJournalChange[] = []
+  for (const change of transactionContext.journalChanges) {
+    const row = journalRow(transactionContext, change.target)
+    const afterRevision = readJournalRevision(transactionContext, change.target)
+    /** A new row removed again leaves no physical mutation or storage.commit to describe. */
+    if (
+      afterRevision.revision ===
+      transactionContext.expected.get(
+        identity(transactionContext.namespaceContext, row.channel, row.encoded)
+      )!.revision
+    )
+      continue
+    result.push(Object.freeze({ ...change, afterRevision }))
+  }
+  return Object.freeze(result)
+}
+
+/** The same physical scope factory serves callbacks, nested operations and final checks. */
+function createScope<T, R>(transactionContext: IMemoryTransactionContext<T, R>): IMemoryScope<T> {
+  /** Each method closes over its own authentic view, never an independently registered guard. */
+  const scope: IMemoryScope<T> = {
+    [journalOperations]: {
+      changes: () => {
+        assertTransactionOwner(transactionContext.namespaceContext.store, scope)
+        return changes(transactionContext)
+      },
+      readImage: (target) =>
+        runTransactionOperation(scope, () => readJournalImage(transactionContext, target)),
+      writeImage: (target, image) =>
+        runTransactionOperation(scope, () => writeJournalImage(transactionContext, target, image)),
+      readRevision: (target) =>
+        runTransactionOperation(scope, () => readJournalRevision(transactionContext, target)),
+      run: (prefix, work) =>
+        runTransactionOperation(scope, (current) =>
+          privateJournal(transactionContext).port.run(prefix, work, (run) =>
+            runTransactionOperation(current, run)
+          )
+        ),
+      onCommit: (effect) => {
+        assertTransactionOwner(transactionContext.namespaceContext.store, scope)
+        return privateJournal(transactionContext).port.onCommit(effect)
+      },
+      onRollback: (effect) => {
+        assertTransactionOwner(transactionContext.namespaceContext.store, scope)
+        return privateJournal(transactionContext).port.onRollback(effect)
+      }
+    },
+    [queryDraft]: {
+      record: (request, run) => {
+        assertTransactionOwner(transactionContext.namespaceContext.store, scope)
+        /** Pipeline-provided patches detach once before selection can touch any draft row. */
+        const patch =
+          request.operation === 'update'
+            ? clone(transactionContext.namespaceContext, request.patch)
+            : undefined
+        if (
+          request.operation !== 'delete' &&
+          (request.operation !== 'update' ||
+            typeof patch !== 'object' ||
+            patch === null ||
+            Array.isArray(patch))
+        )
+          throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
+            backend: STORAGE_MEMORY_BACKEND
+          })
+        return run({
+          execute: () =>
+            queryIterator(transactionContext, scope, function* () {
+              for (const row of txRows(transactionContext, 'record'))
+                yield [
+                  clone(transactionContext.namespaceContext, row.key),
+                  copyValue(transactionContext.namespaceContext, 'record', row.value, row.key)
+                ] as const
+            }),
+          accept: (key) => {
+            assertTransactionOwner(transactionContext.namespaceContext.store, scope)
+            if (request.operation === 'delete') return txRemove(transactionContext, 'record', key)
+            /** Query projections never become replacement values; patch the actual draft row. */
+            const current = txEntry(transactionContext, 'record', key)
+            if (current === undefined) return false
+            if (typeof current.value !== 'object' || current.value === null)
+              throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
+                backend: STORAGE_MEMORY_BACKEND
+              })
+            /** Existing native cloning preserves Date/Map values admitted by memory. */
+            const value = clone(transactionContext.namespaceContext, current.value, key)
+            for (const field of Object.keys(patch!)) {
+              /** Existing native fields such as Array.length retain their original descriptors. */
+              const descriptor = Object.getOwnPropertyDescriptor(value, field)
+              Object.defineProperty(
+                value,
+                field,
+                descriptor === undefined
+                  ? {
+                      value: patch![field],
+                      enumerable: true,
+                      configurable: true,
+                      writable: true
+                    }
+                  : { ...descriptor, value: patch![field] }
+              )
+            }
+            txWrite(transactionContext, 'record', key, value, 'replace')
+            return true
+          }
+        })
+      },
+      rdf: (request, run) => {
+        assertTransactionOwner(transactionContext.namespaceContext.store, scope)
+        /** Replacement admission precedes selection or any draft tombstone. */
+        const replacement =
+          request.operation === 'replace'
+            ? captureRdfEntries(transactionContext.namespaceContext, [request.newQuad])[0]
+            : undefined
+        return run({
+          execute: (input) =>
+            queryIterator(transactionContext, scope, function* () {
+              for (const row of txRdfRows(transactionContext, input.pattern))
+                yield [row.key, logicalRdfQuad(transactionContext.namespaceContext, row)] as const
+            }),
+          accept: (_key, quad) => {
+            assertTransactionOwner(transactionContext.namespaceContext.store, scope)
+            /**
+             * The original physical identity resolves actual draft membership and no-op
+             * replacement.
+             */
+            const entry = captureRdfEntries(transactionContext.namespaceContext, [quad])[0]!
+            const proposed = transactionContext.draft.get(
+              identity(transactionContext.namespaceContext, 'rdf', entry.encoded)
+            )
+            const current = proposed
+              ? proposed.remove
+                ? undefined
+                : proposed
+              : txSnapshot(transactionContext, 'rdf', entry.encoded, entry.key)
+            if (current === undefined || replacement?.encoded === entry.encoded) return false
+            txRdfWrite(transactionContext, [quad], true)
+            if (replacement !== undefined)
+              txRdfWrite(
+                transactionContext,
+                [logicalRdfQuad(transactionContext.namespaceContext, replacement)],
+                false
+              )
+            return true
+          }
+        })
+      },
+      vector: <P>(
+        collection: string,
+        _request: IQueryDelete,
+        run: Parameters<NonNullable<IVectorQuerySource<P>['mutate']>>[1],
+        select: IMemoryVectorSelection<P>
+      ) => {
+        assertTransactionOwner(transactionContext.namespaceContext.store, scope)
+        return run({
+          execute: (input) =>
+            queryIterator(transactionContext, scope, () =>
+              select(
+                input,
+                txVectorPoints<T, R, P>(transactionContext, collection),
+                (id) =>
+                  txRead(
+                    transactionContext,
+                    'vector',
+                    vectorKey(transactionContext.namespaceContext, collection, id)
+                  ) as IStorageVectorPoint<P> | undefined
+              )
+            ),
+          accept: (_key, hit) => {
+            assertTransactionOwner(transactionContext.namespaceContext.store, scope)
+            return txRemove(
+              transactionContext,
+              'vector',
+              vectorKey(transactionContext.namespaceContext, collection, hit.id)
+            )
+          }
+        })
+      }
+    },
+    [recordQueries]: <R>() =>
+      createRecordQuery<R>(
+        {
+          asyncDisposeKey,
+          cursorSource: scope,
+          pushdown: { source: MemoryState.querySource, operations: [], operators: [] },
+          execute: () => scope.iterateRecords(),
+          mutate: (request, run) =>
+            operation(
+              request.operation === 'delete'
+                ? MemoryOperation.recordQueryDelete
+                : MemoryOperation.recordQueryUpdate,
+              request,
+              (captured) => scope[queryDraft].record(captured, run),
+              true
+            )
+        },
+        transactionContext.namespaceContext.core.getChainMethods('query')
+      ),
+    [ttlOperations]: {
+      expire: (target, ms) =>
+        acceptedOperation(
+          MemoryOperation.ttlExpire,
+          { target, ms },
+          (input) => {
+            /** Validation stays inside the one operation already admitted by tx.use(ttl). */
+            const target = captureTtlTarget(transactionContext.namespaceContext, input.target)
+            /** Preserve this pipeline-provided duration while the native operation settles. */
+            const ms = input.ms
+            assertStorageTtlDuration(ms, STORAGE_MEMORY_BACKEND)
+            return txTtl(transactionContext, target, ms, false)
+          },
+          scope
+        ),
+      remaining: (target) =>
+        acceptedOperation(
+          MemoryOperation.ttlRemaining,
+          target,
+          (input) =>
+            txRemaining(
+              transactionContext,
+              captureTtlTarget(transactionContext.namespaceContext, input)
+            ),
+          scope
+        ),
+      persist: (target) =>
+        acceptedOperation(
+          MemoryOperation.ttlPersist,
+          target,
+          (input) =>
+            txTtl(
+              transactionContext,
+              captureTtlTarget(transactionContext.namespaceContext, input),
+              undefined,
+              true
+            ),
+          scope
+        )
+    },
+    [counterOperations]: {
+      increment: (key, by) =>
+        acceptedOperation(
+          MemoryOperation.counterIncrement,
+          { key, by },
+          (input) => {
+            /** Snapshot pipeline-provided identity before any native text access. */
+            const key = input.key
+            assertStringStorageKey(key, STORAGE_MEMORY_BACKEND)
+            /** The pure contract calculation runs against this native text draft only. */
+            const increment = snapshotStorageCounterIncrement(input.by, STORAGE_MEMORY_BACKEND)
+            const result = increment(txRead(transactionContext, 'value', key) as string | undefined)
+            txWrite(transactionContext, 'value', key, String(result), 'conflict')
+            return result
+          },
+          scope
+        )
+    },
+    [rdfOperations]: {
+      add: (quads) =>
+        acceptedOperation(
+          MemoryOperation.rdfAdd,
+          quads,
+          (input) => txRdfWrite(transactionContext, input, false),
+          scope
+        ),
+      delete: (quads) =>
+        acceptedOperation(
+          MemoryOperation.rdfDelete,
+          quads,
+          (input) => txRdfWrite(transactionContext, input, true),
+          scope
+        ),
+      match: (pattern) =>
+        rdfQuery(transactionContext, pattern, scope, (request, run) =>
+          operation(
+            request.operation === 'delete'
+              ? MemoryOperation.rdfQueryDelete
+              : MemoryOperation.rdfQueryReplace,
+            request,
+            (captured) => scope[queryDraft].rdf(captured, run),
+            true
+          )
+        )
+    },
+    [recordPrefix]: (prefix) =>
+      operation(MemoryOperation.recordRemoveByPrefix, prefix, (current) => {
+        /** Native record prefix deletion uses the same bounded draft merge as record iteration. */
+        const captured = snapshotStorageKeyPrefix(current, STORAGE_MEMORY_BACKEND)
+        let count = 0
+        for (const row of txRows(transactionContext, 'record', {
+          lower: captured.lower,
+          upper: captured.upper,
+          upperOpen: true
+        }))
+          if (txRemove(transactionContext, 'record', row.key)) count++
+        return count
+      }),
+    use: (capability) => useTransactionCapability(scope, capability),
+    get: (key) =>
+      operation(MemoryOperation.get, key, (current) => {
+        assertStringStorageKey(current, STORAGE_MEMORY_BACKEND)
+        return (txRead(transactionContext, 'value', current) as string | undefined) ?? null
+      }),
+    set: (key, value, options) =>
+      operation(MemoryOperation.set, { key, value, options }, (current) => {
+        assertStringStorageKey(current.key, STORAGE_MEMORY_BACKEND)
+        txWrite(
+          transactionContext,
+          'value',
+          current.key,
+          current.value,
+          readTransactionConflictPolicy(current.options, STORAGE_MEMORY_BACKEND)
+        )
+      }),
+    remove: (key) =>
+      operation(MemoryOperation.remove, key, (current) => {
+        assertStringStorageKey(current, STORAGE_MEMORY_BACKEND)
+        txRemove(transactionContext, 'value', current)
+      }),
+    has: (key) =>
+      operation(MemoryOperation.has, key, (current) => {
+        assertStringStorageKey(current, STORAGE_MEMORY_BACKEND)
+        return txRead(transactionContext, 'value', current) !== undefined
+      }),
+    getMany: (keys) =>
+      batchOperation(MemoryOperation.getMany, keys, (current) =>
+        readTextBatch(
+          transactionContext.namespaceContext,
+          current,
+          (key) => txRead(transactionContext, 'value', key) as string | undefined
+        )
+      ),
+    setMany: (entries) =>
+      batchOperation(MemoryOperation.setMany, entries, (current) =>
+        transactionContext.textDraft.setMany(
+          captureTextEntries(transactionContext.namespaceContext, current)
+        )
+      ),
+    removeMany: (keys) =>
+      batchOperation(MemoryOperation.removeMany, keys, (current) => {
+        /** Validate every key before applying the batch's first tombstone. */
+        const captured = snapshotStorageBatchKeys(current, STORAGE_MEMORY_BACKEND)
+          .filter(({ firstIndex }, index) => firstIndex === index)
+          .map(({ key }) => key)
+        return transactionContext.textDraft.removeMany(captured)
+      }),
+    removeByPrefix: (prefix) =>
+      operation(MemoryOperation.removeByPrefix, prefix, (current) =>
+        observeBatch(
+          transactionContext.namespaceContext,
+          MemoryOperation.removeByPrefix,
+          undefined,
+          () => transactionContext.textDraft.removeByPrefix(current),
+          scope
+        )
+      ),
+    getBytes: (key) =>
+      operation(MemoryOperation.getBytes, key, (current) => {
+        assertStringStorageKey(current, STORAGE_MEMORY_BACKEND)
+        return (txRead(transactionContext, 'bytes', current) as Uint8Array | undefined) ?? null
+      }),
+    setBytes: (key, value, options) =>
+      operation(MemoryOperation.setBytes, { key, value, options }, (current) => {
+        assertStringStorageKey(current.key, STORAGE_MEMORY_BACKEND)
+        txWrite(
+          transactionContext,
+          'bytes',
+          current.key,
+          current.value,
+          readTransactionConflictPolicy(current.options, STORAGE_MEMORY_BACKEND)
+        )
+      }),
+    removeBytes: (key) =>
+      operation(MemoryOperation.removeBytes, key, (current) => {
+        assertStringStorageKey(current, STORAGE_MEMORY_BACKEND)
+        txRemove(transactionContext, 'bytes', current)
+      }),
+    getRecord: (key) =>
+      operation(
+        MemoryOperation.getRecord,
+        key,
+        (current) => txRead(transactionContext, 'record', current) as T | undefined
+      ),
+    putRecord: (value, key, options) =>
+      operation(MemoryOperation.putRecord, { value, key, options }, (current) => {
+        /** Opaque generated record identities use the existing native entropy helper. */
+        const resolved = current.key ?? createStorageToken()
+        txWrite(
+          transactionContext,
+          'record',
+          resolved,
+          current.value,
+          readTransactionConflictPolicy(current.options, STORAGE_MEMORY_BACKEND)
+        )
+        return resolved
+      }),
+    deleteRecord: (key) =>
+      operation(MemoryOperation.deleteRecord, key, (current) => {
+        txRemove(transactionContext, 'record', current)
+      }),
+    iterateRecords: (range) => {
+      /** Bounds are captured at construction; native rows are snapshotted at first advance. */
+      const captured = orderedRange(transactionContext.namespaceContext, range)
+      /** The actual native iterator is registered once with the original transaction owner. */
+      const iterator = (async function* () {
+        /** Snapshot values together with membership on the first actual native advance. */
+        const rows = txRows(transactionContext, 'record', captured).map(
+          (row) =>
+            [
+              clone(transactionContext.namespaceContext, row.key),
+              txRead(transactionContext, 'record', row.key) as T
+            ] as [IStorageKey, T]
+        )
+        for (const [key, value] of rows) {
+          transactionContext.namespaceContext.controller.assertLive()
+          throwIfAborted(transactionContext.ctx.signal)
+          yield [
+            clone(transactionContext.namespaceContext, key),
+            clone(transactionContext.namespaceContext, value)
+          ] as [IStorageKey, T]
+        }
+      })()
+      return transactionContext.namespaceContext.owner.registerIterator(scope, {
+        next: (current) =>
+          transactionContext.namespaceContext.core.execution.run(
+            {
+              operation: MemoryOperation.iterateRecords,
+              input: undefined,
+              scope: current,
+              ctx: transactionContext.ctx
+            },
+            () => iterator.next()
+          ),
+        close: async () => {
+          await iterator.return(undefined)
+        }
+      })
+    }
+  }
+  /** One real operation is admitted before its pipeline, stage observations and native draft work. */
+  function operation<I, V>(
+    name: string,
+    input: I,
+    invoke: (captured: I) => V,
+    settle?: true
+  ): Promise<Awaited<V>> {
+    return runTransactionOperation(scope, (current) =>
+      acceptedOperation(name, input, invoke, current, settle)
+    )
+  }
+  /** An already-admitted operation uses the same sole pipeline and native draft body. */
+  function acceptedOperation<I, V>(
+    name: string,
+    input: I,
+    invoke: (captured: I) => V,
+    current: ITransactionScope,
+    settle?: true
+  ): Promise<V> {
+    return transactionContext.namespaceContext.core.execution.run(
+      { operation: name, input, scope: current, ctx: transactionContext.ctx },
+      async (captured) => {
+        transactionContext.namespaceContext.controller.assertLive()
+        throwIfAborted(transactionContext.ctx.signal)
+        /** This current scope is authentic for exactly this operation's original lifetime. */
+        const stage = transactionContext.namespaceContext.core.stageBindings
+          .transactionStages(transactionContext.namespaceContext.store)
+          .forTransaction(current)
+        void stage.beforeTxOperation?.(name)
+        /** Native memory operations mutate only the private isolated draft. */
+        const result = invoke(captured)
+        if (settle) {
+          /** Query writes finish their existing asynchronous reader before the after stage. */
+          const completed = await result
+          void stage.afterTxOperation?.(name)
+          return completed
+        }
+        void stage.afterTxOperation?.(name)
+        return result
+      }
+    )
+  }
+  /** Existing scopes retain owner admission for empty batches without entering the pipeline. */
+  function batchOperation<I extends readonly unknown[], V>(
+    name: string,
+    input: I,
+    invoke: (captured: I) => V
+  ): Promise<Awaited<V>> {
+    return runTransactionOperation(scope, (current) => {
+      if (batchSize(transactionContext.namespaceContext, input) === 0) return invoke(input)
+      return acceptedOperation(
+        name,
+        input,
+        (captured) =>
+          observeBatch(
+            transactionContext.namespaceContext,
+            name,
+            captureBatch(transactionContext.namespaceContext, () => captured.length),
+            () => invoke(captured),
+            scope
+          ),
+        current
+      )
+    })
+  }
+  /** Feature methods belong to this exact original view, before its owner admission/freeze. */
+  const api = transactionContext.namespaceContext.core.createTransactionApi(scope)
+  if (api !== undefined) Object.defineProperty(scope, 'api', { value: api, enumerable: true })
+  return Object.freeze(scope)
+}
+
+/** Preview the original business draft, excluding only journal's own planned victim facts. */
+function draftCapacityPlan<T, R>(transactionContext: IMemoryTransactionContext<T, R>) {
+  return transactionContext.namespaceContext.capacity === undefined
+    ? undefined
+    : planCapacity(
+        transactionContext.namespaceContext,
+        [...transactionContext.draft.values()]
+          .filter(
+            (proposed) =>
+              !transactionContext.journalVictims?.has(
+                identity(transactionContext.namespaceContext, proposed.channel, proposed.encoded)
+              )
+          )
+          .map((proposed) =>
+            capacityFact(
+              transactionContext.namespaceContext,
+              proposed.channel,
+              proposed.key,
+              proposed.remove ||
+                (proposed.deadline !== undefined &&
+                  proposed.deadline <= transactionContext.namespaceContext.scheduler.now())
+                ? undefined
+                : (proposed.bytes ?? 0),
+              proposed.rdfLock
+            )
+          )
+      )
 }
 
 /** Records capability binding composes only the supplied original transaction's real methods. */
