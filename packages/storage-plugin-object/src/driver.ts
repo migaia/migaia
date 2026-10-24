@@ -11,7 +11,8 @@ export function defineObjectDriver(
   kind: ObjectDriverKind,
   open: (context: IObjectOpenContext) => Promise<IObjectNative>
 ): IObjectDriver {
-  const driver = Object.freeze({ kind }) as IObjectDriver
+  /** Brand identity is private; the descriptor itself requires no instance freeze. */
+  const driver = { kind } as IObjectDriver
   drivers.set(driver, open)
   return driver
 }

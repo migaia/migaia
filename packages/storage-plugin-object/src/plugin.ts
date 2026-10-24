@@ -16,7 +16,7 @@ import {
 import { ObjectDriverKind, ObjectNames } from './constants.js'
 import { readObjectDriver } from './driver.js'
 import { createObjectBackend } from './store.js'
-import { invalidArgument, captureObjectOptions } from './errors.js'
+import { invalidArgument } from './errors.js'
 import type { IObjectAddress, IObjectDriver, IObjectStore } from './types.js'
 /** Kind identity selects exactly the object backend and its two real native driver families. */
 export const objectBackendKind = defineStorageBackendKind<
@@ -36,36 +36,53 @@ export function objectBackendPlugin<
   options: { readonly id?: TId; readonly driver: IObjectDriver },
   features?: F & IStorageFeatureStoreCompatibility<typeof objectBackendKind, NoInfer<F>>
 ): IStorageBackendPlugin<typeof objectBackendKind, NoInfer<TId>, F> {
-  const driver = captureObjectOptions(() => options?.driver)
+  const driver = options?.driver
   readObjectDriver(driver)
-  const id = captureObjectOptions(() => options.id ?? ObjectNames.backend) as TId
+  const id = (options.id ?? ObjectNames.backend) as TId
   if (typeof id !== 'string') throw invalidArgument()
-  const descriptor = (core: IStoragePluginCore<F>) => {
-    let construction!: Awaited<ReturnType<typeof createObjectBackend>>
-    return {
-      kind: objectBackendKind,
-      async install() {
-        construction = await createObjectBackend(driver, core)
-        core.registerStore(construction.store)
-        core.registerChangeController(construction.store, construction.controller)
-        core.registerOrgBinding(construction.store, construction.orgBinding)
-        core.registerDetect((signal) => construction.native.detect(signal))
-        return {}
-      },
-      capabilityInstaller: (_store: IObjectStore): ICapabilityInstallPort => construction.installer,
-      featureExpose: () => ({
-        getClient: () => construction.native.client,
-        getDriverKind: () => driver.kind,
-        getS3Client: () => {
-          if (!construction.native.client)
-            throw new StorageContractError(StorageContractErrorCode.unsupported, {
-              backend: ObjectNames.backend
-            })
-          return construction.native.client
-        },
-        getObjectAddress: (key: string, ctx?: IOperationContext) => construction.address(key, ctx)
-      })
-    }
-  }
+  /** Installation receives immutable driver identity and allocates its own named lifecycle state. */
+  const descriptor = (core: IStoragePluginCore<F>) => new ObjectBackendInstallation(driver, core)
   return definePlugin<TId, typeof descriptor, F>(id, descriptor, features)
+}
+
+/** One plugin installation publishes exactly one physical object backend into its original host. */
+class ObjectBackendInstallation<F extends IStorageFeatureRecord> {
+  /** Backend identity selects the existing capability contract. */
+  readonly kind = objectBackendKind
+  /** Lazy native construction uses the validated descriptor selected by the caller. */
+  readonly #driver: IObjectDriver
+  /** Original host owns registration, stages and resource shutdown. */
+  readonly #core: IStoragePluginCore<F>
+  /** Construction becomes available only after install succeeds. */
+  #construction!: Awaited<ReturnType<typeof createObjectBackend>>
+  /** Bind installation inputs without opening native resources. */
+  constructor(driver: IObjectDriver, core: IStoragePluginCore<F>) {
+    this.#driver = driver
+    this.#core = core
+  }
+  /** Open native storage once and publish the same store, controller and org binding. */
+  install = async () => {
+    this.#construction = await createObjectBackend(this.#driver, this.#core)
+    this.#core.registerStore(this.#construction.store)
+    this.#core.registerChangeController(this.#construction.store, this.#construction.controller)
+    this.#core.registerOrgBinding(this.#construction.store, this.#construction.orgBinding)
+    this.#core.registerDetect((signal) => this.#construction.native.detect(signal))
+    return {}
+  }
+  /** Capabilities use the installation port captured during original store publication. */
+  capabilityInstaller = (_store: IObjectStore): ICapabilityInstallPort =>
+    this.#construction.installer
+  /** Native features borrow addresses and clients without acquiring driver shutdown authority. */
+  featureExpose = () => ({
+    getClient: () => this.#construction.native.client,
+    getDriverKind: () => this.#driver.kind,
+    getS3Client: () => {
+      if (!this.#construction.native.client)
+        throw new StorageContractError(StorageContractErrorCode.unsupported, {
+          backend: ObjectNames.backend
+        })
+      return this.#construction.native.client
+    },
+    getObjectAddress: (key: string, ctx?: IOperationContext) => this.#construction.address(key, ctx)
+  })
 }

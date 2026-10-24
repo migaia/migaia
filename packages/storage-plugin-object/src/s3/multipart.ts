@@ -39,169 +39,243 @@ export async function uploadMultipart(
   concurrency: number,
   report: (error: unknown) => void
 ): Promise<string> {
-  if (isUint8Array(body) && Math.ceil(body.byteLength / partBytes) > ObjectNames.maximumParts)
-    throw invalidArgument()
-  const reader = createStorageBlobBodyReader(body, {
-    backend: ObjectNames.backend,
-    report,
-    normalizeFailure: normalizeObjectError
-  })
-  let chunk: Uint8Array = new Uint8Array(0)
-  let offset = 0
-  let uploadId: string | undefined
-  let completed = false
-  let failure: unknown
-  let failed = false
-  const jobs = new Set<Promise<void>>()
-  const parts: { PartNumber: number; ETag: string }[] = []
-  const stop = subscribeToAbort(
-    options.ctx?.signal,
-    () => {
-      // Symbolic disposal below reports the original cached cleanup failure exactly once.
-      void reader.return?.(readAbortReason(options.ctx?.signal))
-    },
+  /** One upload owns bounded buffers, admission and cleanup state. */
+  const upload = new ObjectMultipartUpload(
+    send,
+    bucket,
+    key,
+    body,
+    options,
+    partBytes,
+    concurrency,
     report
   )
-  /** Read each source chunk once and assemble only the next bounded native part. */
-  const nextPart = async (): Promise<Uint8Array | undefined> => {
-    const part = new Uint8Array(partBytes)
+  return upload.run()
+}
+
+/** One multipart transfer owns its buffers and native upload lifetime. */
+class ObjectMultipartUpload {
+  /** Native command execution preserves original retries and error classification. */
+  readonly #send: ReturnType<typeof createObjectSender>
+  /** The installation selects one bucket for every issued upload command. */
+  readonly #bucket: string
+  /** One physical object key remains fixed until completion or abort. */
+  readonly #key: string
+  /** Accepted conditions and metadata remain stable across issued parts. */
+  readonly #options: NonNullable<Parameters<IBlobApi['put']>[2]>
+  /** The configured part bound caps each assembled native buffer. */
+  readonly #partBytes: number
+  /** Only this many native part requests may be outstanding. */
+  readonly #concurrency: number
+  /** Cleanup failures use the original host report channel. */
+  readonly #report: (error: unknown) => void
+  /** Exactly one canonical body reader owns input consumption and cancellation. */
+  readonly #reader: ReturnType<typeof createStorageBlobBodyReader>
+  /** The current source chunk supplies bytes to the next native part. */
+  #chunk: Uint8Array = new Uint8Array(0)
+  /** Bytes before this offset have already entered an issued part. */
+  #offset: number = 0
+  /** A created upload must be aborted unless completion is confirmed. */
+  #uploadId: string | undefined
+  /** Confirmed completion prevents aborting committed content. */
+  #completed: boolean = false
+  /** The first part failure remains the primary failure after draining. */
+  #failure: unknown
+  /** A failed part seals admission of additional native requests. */
+  #failed: boolean = false
+  /** Issued requests drain before abort or return. */
+  #jobs: Set<Promise<void>> = new Set<Promise<void>>()
+  /** Native ETags retain their part-number positions for completion. */
+  #parts: { PartNumber: number; ETag: string }[] = []
+  /** Cancellation subscription ends when the transfer finally settles. */
+  readonly #stop: () => void
+  /**
+   * Validate supported limits before taking the source reader, then retain original cancellation
+   * ownership.
+   */
+  constructor(
+    send: ReturnType<typeof createObjectSender>,
+    bucket: string,
+    key: string,
+    body: Parameters<IBlobApi['put']>[1],
+    options: NonNullable<Parameters<IBlobApi['put']>[2]>,
+    partBytes: number,
+    concurrency: number,
+    report: (error: unknown) => void
+  ) {
+    if (isUint8Array(body) && Math.ceil(body.byteLength / partBytes) > ObjectNames.maximumParts)
+      throw invalidArgument()
+    this.#send = send
+    this.#bucket = bucket
+    this.#key = key
+    this.#options = options
+    this.#partBytes = partBytes
+    this.#concurrency = concurrency
+    this.#report = report
+    this.#reader = createStorageBlobBodyReader(body, {
+      backend: ObjectNames.backend,
+      report: this.#report,
+      normalizeFailure: normalizeObjectError
+    })
+    this.#stop = subscribeToAbort(
+      this.#options.ctx?.signal,
+      () => {
+        // Symbolic disposal below reports the original cached cleanup failure exactly once.
+        void this.#reader.return?.(readAbortReason(this.#options.ctx?.signal))
+      },
+      this.#report
+    )
+  }
+  /** Assemble only the next native part, consuming each source chunk once. */
+  #nextPart = async (): Promise<Uint8Array | undefined> => {
+    const part = new Uint8Array(this.#partBytes)
     let size = 0
-    while (size < partBytes) {
-      throwIfAborted(options.ctx?.signal)
-      if (offset === chunk.byteLength) {
-        const next = await reader.next()
-        throwIfAborted(options.ctx?.signal)
+    while (size < this.#partBytes) {
+      throwIfAborted(this.#options.ctx?.signal)
+      if (this.#offset === this.#chunk.byteLength) {
+        const next = await this.#reader.next()
+        throwIfAborted(this.#options.ctx?.signal)
         if (next.done) {
           break
         }
-        chunk = next.value
-        offset = 0
+        this.#chunk = next.value
+        this.#offset = 0
       }
-      const count = Math.min(partBytes - size, chunk.byteLength - offset)
-      part.set(chunk.subarray(offset, offset + count), size)
-      offset += count
+      const count = Math.min(this.#partBytes - size, this.#chunk.byteLength - this.#offset)
+      part.set(this.#chunk.subarray(this.#offset, this.#offset + count), size)
+      this.#offset += count
       size += count
     }
-    return size === 0 ? undefined : size === partBytes ? part : part.subarray(0, size)
+    return size === 0 ? undefined : size === this.#partBytes ? part : part.subarray(0, size)
   }
-  try {
-    let part = await nextPart()
-    if (!part) {
-      const result = await send<PutObjectCommandOutput>(
-        new PutObjectCommand({
-          Bucket: bucket,
-          Key: key,
-          Body: new Uint8Array(0),
-          ContentType: options.contentType,
-          Metadata: options.metadata,
-          IfMatch: options.ifMatch,
-          IfNoneMatch: options.ifNoneMatch ? '*' : undefined
+  /**
+   * Admit bounded native requests, preserve the first failure, and perform original completion/abort
+   * cleanup.
+   */
+  async run(): Promise<string> {
+    try {
+      let part = await this.#nextPart()
+      if (!part) {
+        const result = await this.#send<PutObjectCommandOutput>(
+          new PutObjectCommand({
+            Bucket: this.#bucket,
+            Key: this.#key,
+            Body: new Uint8Array(0),
+            ContentType: this.#options.contentType,
+            Metadata: this.#options.metadata,
+            IfMatch: this.#options.ifMatch,
+            IfNoneMatch: this.#options.ifNoneMatch ? '*' : undefined
+          }),
+          this.#options.ctx,
+          true,
+          true,
+          this.#options.ifMatch !== undefined || this.#options.ifNoneMatch === true
+        )
+        this.#completed = true
+        return result.ETag as string
+      }
+      const created = await this.#send<CreateMultipartUploadCommandOutput>(
+        new CreateMultipartUploadCommand({
+          Bucket: this.#bucket,
+          Key: this.#key,
+          ContentType: this.#options.contentType,
+          Metadata: this.#options.metadata
         }),
-        options.ctx,
-        true,
-        true,
-        options.ifMatch !== undefined || options.ifNoneMatch === true
-      )
-      completed = true
-      return result.ETag as string
-    }
-    const created = await send<CreateMultipartUploadCommandOutput>(
-      new CreateMultipartUploadCommand({
-        Bucket: bucket,
-        Key: key,
-        ContentType: options.contentType,
-        Metadata: options.metadata
-      }),
-      options.ctx,
-      true
-    )
-    uploadId = created.UploadId
-    if (typeof uploadId !== 'string') throw objectError(ObjectErrorCode.dataInvalid)
-    let number = 0
-    while (part && !failed) {
-      if (++number > ObjectNames.maximumParts) throw invalidArgument()
-      const partNumber = number
-      const pending = send<UploadPartCommandOutput>(
-        new UploadPartCommand({
-          Bucket: bucket,
-          Key: key,
-          UploadId: uploadId,
-          PartNumber: partNumber,
-          Body: part
-        }),
-        options.ctx,
+        this.#options.ctx,
         true
       )
-        .then((result) => {
-          if (typeof result.ETag !== 'string') throw objectError(ObjectErrorCode.dataInvalid)
-          parts[partNumber - 1] = { PartNumber: partNumber, ETag: result.ETag }
-        })
-        .catch((error) => {
-          if (!failed) {
-            failure = error
-            failed = true
-            void reader.return?.(error)
-          }
-        })
-        .finally(() => {
-          jobs.delete(pending)
-        })
-      jobs.add(pending)
-      if (jobs.size >= concurrency) await Promise.race(jobs)
-      if (failed) break
-      part = await nextPart()
-    }
-    await Promise.all(jobs)
-    if (failed) throw failure
-    throwIfAborted(options.ctx?.signal)
-    const result = await send<CompleteMultipartUploadCommandOutput>(
-      new CompleteMultipartUploadCommand({
-        Bucket: bucket,
-        Key: key,
-        UploadId: uploadId,
-        MultipartUpload: { Parts: parts },
-        IfMatch: options.ifMatch,
-        IfNoneMatch: options.ifNoneMatch ? '*' : undefined
-      }),
-      options.ctx,
-      true,
-      true,
-      options.ifMatch !== undefined || options.ifNoneMatch === true
-    )
-    completed = true
-    return result.ETag as string
-  } catch (error) {
-    let primary = normalizeObjectError(error)
-    void reader.return?.(primary)
-    await reader[Symbol.asyncDispose]()
-    await Promise.all(jobs)
-    if (uploadId && !completed)
-      try {
-        await send(
-          new AbortMultipartUploadCommand({ Bucket: bucket, Key: key, UploadId: uploadId }),
-          undefined,
+      this.#uploadId = created.UploadId
+      if (typeof this.#uploadId !== 'string') throw objectError(ObjectErrorCode.dataInvalid)
+      let number = 0
+      while (part && !this.#failed) {
+        if (++number > ObjectNames.maximumParts) throw invalidArgument()
+        const partNumber = number
+        const pending = this.#send<UploadPartCommandOutput>(
+          new UploadPartCommand({
+            Bucket: this.#bucket,
+            Key: this.#key,
+            UploadId: this.#uploadId,
+            PartNumber: partNumber,
+            Body: part
+          }),
+          this.#options.ctx,
           true
         )
-      } catch (cleanup) {
-        const aggregate = new AggregateError([primary, cleanup], ObjectErrorText.failed)
-        Object.defineProperty(aggregate, 'uploadId', { value: uploadId, enumerable: true })
-        report(normalizeObjectError(cleanup))
-        primary =
-          primary instanceof StorageContractError
-            ? new StorageContractError(primary.code, {
-                backend: ObjectNames.backend,
-                cause: aggregate
-              })
-            : objectError(
-                'source' in primary && primary.source === ERROR_SOURCE && 'code' in primary
-                  ? (primary.code as IObjectErrorCode)
-                  : ObjectErrorCode.failed,
-                aggregate
-              )
+          .then((result) => {
+            if (typeof result.ETag !== 'string') throw objectError(ObjectErrorCode.dataInvalid)
+            this.#parts[partNumber - 1] = { PartNumber: partNumber, ETag: result.ETag }
+          })
+          .catch((error) => {
+            if (!this.#failed) {
+              this.#failure = error
+              this.#failed = true
+              void this.#reader.return?.(error)
+            }
+          })
+          .finally(() => {
+            this.#jobs.delete(pending)
+          })
+        this.#jobs.add(pending)
+        if (this.#jobs.size >= this.#concurrency) await Promise.race(this.#jobs)
+        if (this.#failed) break
+        part = await this.#nextPart()
       }
-    throw primary
-  } finally {
-    stop()
-    await reader[Symbol.asyncDispose]()
+      await Promise.all(this.#jobs)
+      if (this.#failed) throw this.#failure
+      throwIfAborted(this.#options.ctx?.signal)
+      const result = await this.#send<CompleteMultipartUploadCommandOutput>(
+        new CompleteMultipartUploadCommand({
+          Bucket: this.#bucket,
+          Key: this.#key,
+          UploadId: this.#uploadId,
+          MultipartUpload: { Parts: this.#parts },
+          IfMatch: this.#options.ifMatch,
+          IfNoneMatch: this.#options.ifNoneMatch ? '*' : undefined
+        }),
+        this.#options.ctx,
+        true,
+        true,
+        this.#options.ifMatch !== undefined || this.#options.ifNoneMatch === true
+      )
+      this.#completed = true
+      return result.ETag as string
+    } catch (error) {
+      let primary = normalizeObjectError(error)
+      void this.#reader.return?.(primary)
+      await this.#reader[Symbol.asyncDispose]()
+      await Promise.all(this.#jobs)
+      if (this.#uploadId && !this.#completed)
+        try {
+          await this.#send(
+            new AbortMultipartUploadCommand({
+              Bucket: this.#bucket,
+              Key: this.#key,
+              UploadId: this.#uploadId
+            }),
+            undefined,
+            true
+          )
+        } catch (cleanup) {
+          const aggregate = new AggregateError([primary, cleanup], ObjectErrorText.failed)
+          Object.defineProperty(aggregate, 'uploadId', { value: this.#uploadId, enumerable: true })
+          this.#report(normalizeObjectError(cleanup))
+          primary =
+            primary instanceof StorageContractError
+              ? new StorageContractError(primary.code, {
+                  backend: ObjectNames.backend,
+                  cause: aggregate
+                })
+              : objectError(
+                  'source' in primary && primary.source === ERROR_SOURCE && 'code' in primary
+                    ? (primary.code as IObjectErrorCode)
+                    : ObjectErrorCode.failed,
+                  aggregate
+                )
+        }
+      throw primary
+    } finally {
+      this.#stop()
+      await this.#reader[Symbol.asyncDispose]()
+    }
   }
 }

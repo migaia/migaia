@@ -17,14 +17,14 @@ export function responseInfo(
     !Number.isFinite(updatedAt)
   )
     throw objectError(ObjectErrorCode.dataInvalid)
-  return Object.freeze({
+  return {
     key,
     size: size!,
     etag: value.ETag,
     contentType: value.ContentType,
-    metadata: Object.freeze({ ...value.Metadata }),
+    metadata: { ...value.Metadata },
     updatedAt
-  })
+  }
 }
 /** HTTP status is an explicit service response; absence cannot establish a commit outcome. */
 export function responseStatus(error: unknown): number | undefined {

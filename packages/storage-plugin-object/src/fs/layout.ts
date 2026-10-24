@@ -84,7 +84,7 @@ async function readCurrent(
     return {
       generation: pointer.generation,
       physicalKey: stored.physicalKey,
-      info: Object.freeze({ ...info, metadata: Object.freeze({ ...info.metadata }) })
+      info: { ...info, metadata: { ...info.metadata } }
     }
   } catch (error) {
     throw objectError(ObjectErrorCode.dataInvalid, error)
@@ -103,270 +103,347 @@ export async function openFileObjects(
   io: IObjectFileIo,
   context: IObjectOpenContext
 ): Promise<IObjectNative> {
-  /** Native realpath makes aliases share the same process-local installation identity. */
+  /** Real paths make aliases share one existing single-writer identity. */
   const root = await io.root(path)
   if (occupiedRoots.has(root)) throw invalidArgument(new Error(ObjectErrorText.rootOccupied))
   occupiedRoots.add(root)
-  /** Only generations with active native readers need retention metadata. */
-  const readers = new Map<
+  /** One named owner retains native state after interrupted files are reclaimed. */
+  const objects = new FileObjectNative(root, io, context)
+  await objects.reclaim()
+  return objects
+}
+
+/** Native filesystem storage owns generation pins and one single-writer directory. */
+class FileObjectNative implements IObjectNative {
+  /** Native family controls supported object features. */
+  readonly kind = ObjectDriverKind.fs
+  /** Canonical directory identity is held until all admitted reads drain. */
+  readonly #root: string
+  /** The adapter owns platform I/O; this class owns storage semantics. */
+  readonly #io: IObjectFileIo
+  /** Original host ports supply key locks and cleanup reporting. */
+  readonly #context: IObjectOpenContext
+  /** Only generations with live readers retain retirement state. */
+  readonly #readers = new Map<
     string,
     { count: number; retired: boolean; directory: string; generation: string }
   >()
-  /** Native close has original per-resource Promise identity even when called repeatedly. */
-  let primary: Promise<void> | undefined
-  /** Symbolic cleanup reports independently without replacing the primary cleanup Promise. */
-  let symbolic: Promise<void> | undefined
-  /** Resolve a physical key to one fixed hash directory; original keys never become paths. */
-  const hashOf = physicalDigest
-  /** Only a fixed hex digest enters the filesystem path. */
-  const directoryOf = (key: string): string => join(root, hashOf(key))
-  /** Cleanup after a confirmed mutation reports failure and never changes its successful result. */
-  const cleanup = async (directory: string, generation: string): Promise<void> => {
+  /** Ordinary disposal preserves its original shared promise. */
+  #primary: Promise<void> | undefined
+  /** Symbol disposal reports once without replacing the primary promise. */
+  #symbolic: Promise<void> | undefined
+  /** Bind state without changing the original installation order. */
+  constructor(root: string, io: IObjectFileIo, context: IObjectOpenContext) {
+    this.#root = root
+    this.#io = io
+    this.#context = context
+  }
+
+  /** Resolve only a fixed digest into the native directory. */
+  #directoryOf = (key: string): string => join(this.#root, physicalDigest(key))
+
+  /** Report retired-generation cleanup without changing a committed result. */
+  #cleanup = async (directory: string, generation: string): Promise<void> => {
     try {
-      await io.remove(join(directory, generation + ObjectNames.data))
-      await io.remove(join(directory, generation + ObjectNames.metadata))
+      await this.#io.remove(join(directory, generation + ObjectNames.data))
+      await this.#io.remove(join(directory, generation + ObjectNames.metadata))
     } catch (error) {
-      context.report(normalizeObjectError(error))
+      this.#context.report(normalizeObjectError(error))
     }
   }
-  /** Retire only an immutable old generation after its current pointer has changed or disappeared. */
-  const retire = async (directory: string, generation: string): Promise<void> => {
-    const pin = readers.get(join(directory, generation))
+
+  /** Defer old-generation cleanup until its last reader releases. */
+  #retire = async (directory: string, generation: string): Promise<void> => {
+    const pin = this.#readers.get(join(directory, generation))
     if (pin) pin.retired = true
-    else await cleanup(directory, generation)
+    else await this.#cleanup(directory, generation)
   }
-  /** Interrupted uploads and old generations are reclaimed once at installation, never by a daemon. */
-  try {
-    for (const entry of await io.entries(root)) {
-      if (!entry.directory || !hashPattern.test(entry.name)) continue
-      const directory = join(root, entry.name)
-      const current = await readCurrent(io, directory)
-      for (const file of await io.entries(directory)) {
-        if (
-          file.name === ObjectNames.pointer ||
-          (current &&
-            (file.name === current.generation + ObjectNames.data ||
-              file.name === current.generation + ObjectNames.metadata))
-        )
-          continue
-        try {
-          await io.remove(join(directory, file.name))
-        } catch (error) {
-          context.report(normalizeObjectError(error))
-        }
-      }
-    }
-  } catch (error) {
-    occupiedRoots.delete(root)
-    throw normalizeObjectError(error)
-  }
-  /** Every file mutation and snapshot acquisition uses the original shared key-lock owner. */
-  const locked = <T>(
+
+  /** Reuse the existing host key-lock owner for one native operation. */
+  #locked = <T>(
     key: string,
     ctx: IOperationContext | undefined,
     run: () => Promise<T>
-  ): Promise<T> => context.lock(hashOf(key), ctx, run)
-  /** Release installation ownership only after the enclosing original resource owner drains reads. */
-  const dispose = (): Promise<void> =>
-    (primary ??= Promise.resolve().then(() => {
-      occupiedRoots.delete(root)
-    }))
-  return {
-    kind: ObjectDriverKind.fs,
-    detect: async () => undefined,
-    address: () => {
-      throw new StorageContractError(StorageContractErrorCode.unsupported, {
-        backend: ObjectNames.backend
-      })
-    },
-    put: (key, logicalKey, body, options) =>
-      locked(key, options.ctx, async () => {
-        const directory = directoryOf(key)
-        const previous = await readCurrent(io, directory, key)
-        if (
-          (options.ifNoneMatch && previous) ||
-          (options.ifMatch !== undefined && previous?.info.etag !== options.ifMatch)
-        )
-          throw new StorageContractError(
-            StorageContractErrorCode.writeConflict,
-            { backend: ObjectNames.backend },
-            ObjectErrorText.conflict
+  ): Promise<T> => this.#context.lock(physicalDigest(key), ctx, run)
+
+  /** Reclaim interrupted uploads once during installation; failed installation releases ownership. */
+  async reclaim() {
+    try {
+      for (const entry of await this.#io.entries(this.#root)) {
+        if (!entry.directory || !hashPattern.test(entry.name)) continue
+        const directory = join(this.#root, entry.name)
+        const current = await readCurrent(this.#io, directory)
+        for (const file of await this.#io.entries(directory)) {
+          if (
+            file.name === ObjectNames.pointer ||
+            (current &&
+              (file.name === current.generation + ObjectNames.data ||
+                file.name === current.generation + ObjectNames.metadata))
           )
-        const generation = crypto.randomUUID()
-        const data = join(directory, generation + ObjectNames.data)
-        const temporary = data + ObjectNames.temporary
-        const metadata = join(directory, generation + ObjectNames.metadata)
-        const pointer = join(directory, generation + ObjectNames.temporary)
-        const hash = createHash('sha256')
-        let size = 0
-        let committed = false
-        let dispatched = false
-        const reader = createStorageBlobBodyReader(body, {
-          backend: ObjectNames.backend,
-          report: context.report,
-          normalizeFailure: normalizeObjectError
-        })
-        const unsubscribe = subscribeToAbort(
-          options.ctx?.signal,
-          () => {
-            // The original resource owner observes cleanup once in the final symbolic disposal.
-            void reader.return?.(readAbortReason(options.ctx?.signal))
-          },
-          context.report
-        )
-        const hashing = new ReadableStream<Uint8Array>(
-          {
-            async pull(controller) {
-              throwIfAborted(options.ctx?.signal)
-              const next = await reader.next()
-              throwIfAborted(options.ctx?.signal)
-              if (next.done) {
-                controller.close()
-                return
-              }
-              hash.update(next.value)
-              size += next.value.byteLength
-              controller.enqueue(next.value)
-            }
-          },
-          { highWaterMark: 0 }
-        )
-        try {
-          await io.mkdir(directory)
-          await io.write(temporary, hashing)
-          await io.rename(temporary, data)
-          const info: IBlobInfo = Object.freeze({
-            key: logicalKey,
-            size,
-            etag: hash.digest('hex'),
-            contentType: options.contentType,
-            metadata: options.metadata ?? Object.freeze({}),
-            updatedAt: Date.now()
-          })
-          await io.writeText(
-            metadata + ObjectNames.temporary,
-            JSON.stringify({ version: ObjectNames.version, physicalKey: key, info })
-          )
-          await io.rename(metadata + ObjectNames.temporary, metadata)
-          await io.writeText(pointer, JSON.stringify({ version: ObjectNames.version, generation }))
-          if (options.ctx?.signal?.aborted)
-            throw new StorageContractError(StorageContractErrorCode.aborted, {
-              backend: ObjectNames.backend,
-              cause: options.ctx.signal.reason
-            })
-          dispatched = true
-          await io.rename(pointer, join(directory, ObjectNames.pointer))
-          committed = true
-          if (previous) await retire(directory, previous.generation)
-          return info
-        } catch (error) {
-          if (dispatched && !committed) throw objectError(ObjectErrorCode.commitUnknown, error)
-          throw normalizeObjectError(error)
-        } finally {
-          unsubscribe()
-          await reader[Symbol.asyncDispose]()
-          if (!committed && !dispatched)
-            for (const file of [
-              temporary,
-              data,
-              metadata + ObjectNames.temporary,
-              metadata,
-              pointer
-            ]) {
-              try {
-                await io.remove(file)
-              } catch (error) {
-                context.report(normalizeObjectError(error))
-              }
-            }
-        }
-      }),
-    get: (key, _logicalKey, options) =>
-      locked(key, options.ctx, async (): Promise<IObjectRead | undefined> => {
-        const directory = directoryOf(key)
-        const current = await readCurrent(io, directory, key)
-        if (!current) return undefined
-        const start = options.range?.start ?? 0
-        const end = Math.min(options.range?.end ?? current.info.size - 1, current.info.size - 1)
-        if (start >= current.info.size || current.info.size === 0)
-          return {
-            info: current.info,
-            source: new ReadableStream({
-              start(controller) {
-                controller.close()
-              }
-            }),
-            close: async () => undefined
+            continue
+          try {
+            await this.#io.remove(join(directory, file.name))
+          } catch (error) {
+            this.#context.report(normalizeObjectError(error))
           }
-        const native = await io.read(
-          join(directory, current.generation + ObjectNames.data),
-          start,
-          end
-        )
-        const identity = join(directory, current.generation)
-        const pin = readers.get(identity) ?? {
-          count: 0,
-          retired: false,
-          directory,
-          generation: current.generation
         }
-        pin.count++
-        readers.set(identity, pin)
-        let close: Promise<void> | undefined
+      }
+    } catch (error) {
+      occupiedRoots.delete(this.#root)
+      throw normalizeObjectError(error)
+    }
+  }
+
+  /** Execute the original detect operation with this owner's native state. */
+  detect: IObjectNative['detect'] = async () => undefined
+
+  /** Execute the original address operation with this owner's native state. */
+  address: IObjectNative['address'] = () => {
+    throw new StorageContractError(StorageContractErrorCode.unsupported, {
+      backend: ObjectNames.backend
+    })
+  }
+
+  /** Execute the original put operation with this owner's native state. */
+  put: IObjectNative['put'] = (key, logicalKey, body, options) =>
+    this.#locked(key, options.ctx, async () => {
+      const directory = this.#directoryOf(key)
+      const previous = await readCurrent(this.#io, directory, key)
+      if (
+        (options.ifNoneMatch && previous) ||
+        (options.ifMatch !== undefined && previous?.info.etag !== options.ifMatch)
+      )
+        throw new StorageContractError(
+          StorageContractErrorCode.writeConflict,
+          { backend: ObjectNames.backend },
+          ObjectErrorText.conflict
+        )
+      const generation = crypto.randomUUID()
+      const data = join(directory, generation + ObjectNames.data)
+      const temporary = data + ObjectNames.temporary
+      const metadata = join(directory, generation + ObjectNames.metadata)
+      const pointer = join(directory, generation + ObjectNames.temporary)
+      const hash = createHash('sha256')
+      let size = 0
+      let committed = false
+      let dispatched = false
+      const reader = createStorageBlobBodyReader(body, {
+        backend: ObjectNames.backend,
+        report: this.#context.report,
+        normalizeFailure: normalizeObjectError
+      })
+      const unsubscribe = subscribeToAbort(
+        options.ctx?.signal,
+        () => {
+          // The original resource owner observes cleanup once in the final symbolic disposal.
+          void reader.return?.(readAbortReason(options.ctx?.signal))
+        },
+        this.#context.report
+      )
+      const hashing = new ReadableStream<Uint8Array>(
+        {
+          async pull(controller) {
+            throwIfAborted(options.ctx?.signal)
+            const next = await reader.next()
+            throwIfAborted(options.ctx?.signal)
+            if (next.done) {
+              controller.close()
+              return
+            }
+            hash.update(next.value)
+            size += next.value.byteLength
+            controller.enqueue(next.value)
+          }
+        },
+        { highWaterMark: 0 }
+      )
+      try {
+        await this.#io.mkdir(directory)
+        await this.#io.write(temporary, hashing)
+        await this.#io.rename(temporary, data)
+        const info: IBlobInfo = {
+          key: logicalKey,
+          size,
+          etag: hash.digest('hex'),
+          contentType: options.contentType,
+          metadata: options.metadata ?? {},
+          updatedAt: Date.now()
+        }
+        await this.#io.writeText(
+          metadata + ObjectNames.temporary,
+          JSON.stringify({ version: ObjectNames.version, physicalKey: key, info })
+        )
+        await this.#io.rename(metadata + ObjectNames.temporary, metadata)
+        await this.#io.writeText(
+          pointer,
+          JSON.stringify({ version: ObjectNames.version, generation })
+        )
+        if (options.ctx?.signal?.aborted)
+          throw new StorageContractError(StorageContractErrorCode.aborted, {
+            backend: ObjectNames.backend,
+            cause: options.ctx.signal.reason
+          })
+        dispatched = true
+        await this.#io.rename(pointer, join(directory, ObjectNames.pointer))
+        committed = true
+        if (previous) await this.#retire(directory, previous.generation)
+        return info
+      } catch (error) {
+        if (dispatched && !committed) throw objectError(ObjectErrorCode.commitUnknown, error)
+        throw normalizeObjectError(error)
+      } finally {
+        unsubscribe()
+        await reader[Symbol.asyncDispose]()
+        if (!committed && !dispatched)
+          for (const file of [
+            temporary,
+            data,
+            metadata + ObjectNames.temporary,
+            metadata,
+            pointer
+          ]) {
+            try {
+              await this.#io.remove(file)
+            } catch (error) {
+              this.#context.report(normalizeObjectError(error))
+            }
+          }
+      }
+    })
+
+  /** Execute the original get operation with this owner's native state. */
+  get: IObjectNative['get'] = (key, _logicalKey, options) =>
+    this.#locked(key, options.ctx, async (): Promise<IObjectRead | undefined> => {
+      const directory = this.#directoryOf(key)
+      const current = await readCurrent(this.#io, directory, key)
+      if (!current) return undefined
+      const start = options.range?.start ?? 0
+      const end = Math.min(options.range?.end ?? current.info.size - 1, current.info.size - 1)
+      if (start >= current.info.size || current.info.size === 0)
         return {
           info: current.info,
-          source: native.source,
-          close: () =>
-            (close ??= (async () => {
-              try {
-                await native.close()
-              } finally {
-                pin.count--
-                if (pin.count === 0) {
-                  readers.delete(identity)
-                  if (pin.retired) await cleanup(directory, current.generation)
-                }
-              }
-            })())
+          source: new ReadableStream({
+            start(controller) {
+              controller.close()
+            }
+          }),
+          close: async () => undefined
         }
-      }),
-    head: (key, _logicalKey, ctx) =>
-      locked(key, ctx, async () => (await readCurrent(io, directoryOf(key), key))?.info),
-    remove: (key, ctx) =>
-      locked(key, ctx, async () => {
-        const directory = directoryOf(key)
-        const current = await readCurrent(io, directory, key)
-        if (!current) return false
-        await io.remove(join(directory, ObjectNames.pointer))
-        await retire(directory, current.generation)
-        return true
-      }),
-    async list(prefix, after, limit, ctx) {
-      const candidates: { wireKey: string; info: IBlobInfo; encoded: Uint8Array }[] = []
-      for (const entry of await io.entries(root)) {
-        if (!entry.directory || !hashPattern.test(entry.name)) continue
-        const current = await context.lock(entry.name, ctx, () =>
-          readCurrent(io, join(root, entry.name))
-        )
-        if (
-          current &&
-          current.physicalKey.startsWith(prefix) &&
-          (after === undefined || current.physicalKey > after)
-        )
-          candidates.push({
-            wireKey: current.physicalKey,
-            info: current.info,
-            encoded: wireBytes(current.physicalKey)
-          })
+      const native = await this.#io.read(
+        join(directory, current.generation + ObjectNames.data),
+        start,
+        end
+      )
+      const identity = join(directory, current.generation)
+      const pin = this.#readers.get(identity) ?? {
+        count: 0,
+        retired: false,
+        directory,
+        generation: current.generation
       }
-      const ordered = orderStorageKeysByBytes(candidates, (entry) => entry.encoded)
-      const items = ordered.slice(0, limit).map(({ wireKey, info }) => ({ wireKey, info }))
-      return {
-        items,
-        ...(ordered.length > limit ? { next: items[items.length - 1]!.wireKey } : {})
-      }
-    },
-    dispose,
-    [Symbol.asyncDispose]: () => (symbolic ??= dispose().then(undefined, context.report))
+      pin.count++
+      this.#readers.set(identity, pin)
+      return new FileObjectRead(current.info, native, () => this.#releaseRead(identity))
+    })
+
+  /** The last reader releases its generation only after native handle cleanup settles. */
+  async #releaseRead(identity: string): Promise<void> {
+    /** Every opened reader registers its generation before publication. */
+    const pin = this.#readers.get(identity)!
+    pin.count--
+    if (pin.count === 0) {
+      this.#readers.delete(identity)
+      if (pin.retired) await this.#cleanup(pin.directory, pin.generation)
+    }
+  }
+
+  /** Execute the original head operation with this owner's native state. */
+  head: IObjectNative['head'] = (key, _logicalKey, ctx) =>
+    this.#locked(
+      key,
+      ctx,
+      async () => (await readCurrent(this.#io, this.#directoryOf(key), key))?.info
+    )
+
+  /** Execute the original remove operation with this owner's native state. */
+  remove: IObjectNative['remove'] = (key, ctx) =>
+    this.#locked(key, ctx, async () => {
+      const directory = this.#directoryOf(key)
+      const current = await readCurrent(this.#io, directory, key)
+      if (!current) return false
+      await this.#io.remove(join(directory, ObjectNames.pointer))
+      await this.#retire(directory, current.generation)
+      return true
+    })
+
+  /** List committed generations in the canonical physical-key order. */
+  list: IObjectNative['list'] = async (prefix, after, limit, ctx) => {
+    const candidates: { wireKey: string; info: IBlobInfo; encoded: Uint8Array }[] = []
+    for (const entry of await this.#io.entries(this.#root)) {
+      if (!entry.directory || !hashPattern.test(entry.name)) continue
+      const current = await this.#context.lock(entry.name, ctx, () =>
+        readCurrent(this.#io, join(this.#root, entry.name))
+      )
+      if (
+        current &&
+        current.physicalKey.startsWith(prefix) &&
+        (after === undefined || current.physicalKey > after)
+      )
+        candidates.push({
+          wireKey: current.physicalKey,
+          info: current.info,
+          encoded: wireBytes(current.physicalKey)
+        })
+    }
+    const ordered = orderStorageKeysByBytes(candidates, (entry) => entry.encoded)
+    const items = ordered.slice(0, limit).map(({ wireKey, info }) => ({ wireKey, info }))
+    return {
+      items,
+      ...(ordered.length > limit ? { next: items[items.length - 1]!.wireKey } : {})
+    }
+  }
+
+  /** Release single-writer ownership after the enclosing resource owner drains reads. */
+  dispose = (): Promise<void> =>
+    (this.#primary ??= Promise.resolve().then(() => {
+      occupiedRoots.delete(this.#root)
+    }));
+  /** Symbol cleanup reports once without replacing the ordinary disposal promise. */
+  [Symbol.asyncDispose] = () =>
+    (this.#symbolic ??= this.dispose().then(undefined, this.#context.report))
+}
+
+/** One native read owns its close promise and the generation pin released after native cleanup. */
+class FileObjectRead implements IObjectRead {
+  /** Metadata belongs to the same committed generation as this stream. */
+  readonly info: IBlobInfo
+  /** The outer blob resource owns consumption and cancellation. */
+  readonly source: ReadableStream<Uint8Array>
+  /** Native cleanup must settle before the generation pin can be released. */
+  readonly #native: Awaited<ReturnType<IObjectFileIo['read']>>
+  /** The filesystem owner alone maintains generation retention. */
+  readonly #release: () => Promise<void>
+  /** Repeated closes preserve the exact original cleanup promise. */
+  #primary: Promise<void> | undefined
+  /** Bind a confirmed generation and the already-open native handle. */
+  constructor(
+    info: IBlobInfo,
+    native: Awaited<ReturnType<IObjectFileIo['read']>>,
+    release: () => Promise<void>
+  ) {
+    this.info = info
+    this.source = native.source
+    this.#native = native
+    this.#release = release
+  }
+  /** Native failure still releases the pin while remaining the primary read-close error. */
+  close = (): Promise<void> => (this.#primary ??= this.#closeNative())
+  /** Release in the original finally order so obsolete generations cannot outlive their reader. */
+  async #closeNative(): Promise<void> {
+    try {
+      await this.#native.close()
+    } finally {
+      await this.#release()
+    }
   }
 }

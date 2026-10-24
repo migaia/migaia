@@ -77,12 +77,3 @@ export function isMissing(error: unknown): boolean {
       ('name' in error && (error.name === 'NotFound' || error.name === 'NoSuchKey')))
   )
 }
-/** Public option getters fail in the original argument family before native side effects. */
-export function captureObjectOptions<T>(capture: () => T): T {
-  try {
-    return capture()
-  } catch (cause) {
-    if (cause instanceof StorageContractError) throw cause
-    throw invalidArgument(cause)
-  }
-}
