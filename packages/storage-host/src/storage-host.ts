@@ -334,6 +334,8 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
     | IStorageJournalConfigurationSnapshot
     | Extract<IStorageJournalConfiguration, Function>
     | undefined
+  /** Resolved optional code is reused directly inside native transaction activity windows. */
+  #journalRuntime: Awaited<ReturnType<typeof loadStorageJournalRuntime>> | undefined
   /**
    * Concurrent first endpoints share one exact initializer and per-registration preparation
    * Promise.
@@ -736,6 +738,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
       }
       /** Load optional logging only when this organization initializes its journal. */
       const runtime = await loadStorageJournalRuntime()
+      this.#journalRuntime = runtime
       const configured = await source({
         orgId,
         storageLogStore: (id: string, options: { readonly prefix: string }) => {
@@ -798,8 +801,9 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
         if (typeof undo !== 'function')
           throw new StorageContractError(StorageContractErrorCode.unsupported)
       }
-      /** Journal preparation is the only runtime dependency on the optional logger peer. */
+      /** Load optional code before preparing the native journal transaction resources. */
       const runtime = await loadStorageJournalRuntime()
+      this.#journalRuntime = runtime
       entry.value = await runtime.prepareStorageJournalConfiguration(
         configured,
         this.#journalContextAccess(context, orgId),
@@ -890,6 +894,28 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
         return undo(txId, run)
       }
     }
+  }
+
+  /** Observe prepared operations synchronously so native I/O starts in its original active task. */
+  #observeJournalExecution<R>(
+    orgId: string,
+    describe: () => IStoragePipelineInput,
+    invoke: (observing: boolean) => Promise<R>
+  ): Promise<R> {
+    /** The initial install path may observe before preparation loads the optional module. */
+    const observe = (runtime: Awaited<ReturnType<typeof loadStorageJournalRuntime>>) =>
+      runtime.observeStorageTelemetry(
+        () => this.#journalOrgs?.get(orgId)?.configuration,
+        describe,
+        invoke,
+        () => this.#scheduler.now(),
+        this.#report
+      )
+    if (this.#journalRuntime !== undefined) return observe(this.#journalRuntime)
+    return loadStorageJournalRuntime().then((runtime) => {
+      this.#journalRuntime = runtime
+      return observe(runtime)
+    })
   }
 
   /** Resolve native organization data through its original registration, then remove ownership. */
@@ -1432,16 +1458,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
               orgId: string,
               describe: () => IStoragePipelineInput,
               invoke: (observing: boolean) => Promise<R>
-            ) =>
-              loadStorageJournalRuntime().then((runtime) =>
-                runtime.observeStorageTelemetry(
-                  () => this.#journalOrgs?.get(orgId)?.configuration,
-                  describe,
-                  invoke,
-                  () => this.#scheduler.now(),
-                  this.#report
-                )
-              )
+            ) => this.#observeJournalExecution(orgId, describe, invoke)
           }),
       getJournal: (orgId) => this.#journalPort(entryState.context, orgId),
       id: entryState.native.id,
