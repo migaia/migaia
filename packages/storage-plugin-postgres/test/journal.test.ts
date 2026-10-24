@@ -13,6 +13,7 @@ import { pgDriver } from '../src/pg.js'
 import { postgresJsDriver } from '../src/postgres-js.js'
 import { pgvectorFeature } from '../src/features/pgvector.js'
 import { decodePgJournalImage } from '../src/journal.js'
+import { decodePgText } from '../src/codec.js'
 /** The original borrowed logger owns append/index/cleanup; PostgreSQL owns only native changes. */
 const loggerOptions = {
   execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
@@ -248,6 +249,88 @@ describe.each(['pg', 'postgres-js'] as const)('%s original global journal', (ada
     expect(await logger.binlog.read(1)).toHaveLength(2)
     expect(await logger.wal.pending()).toEqual([])
   })
+  it('retains native cross-channel order and every intermediate value while undo merges targets', async () => {
+    const pool = new Pool({ connectionString }),
+      client = postgres(connectionString!, { max: 8 }),
+      driver = adapter === 'pg' ? pgDriver(pool) : postgresJsDriver(client),
+      logger = new Logger({
+        ...loggerOptions,
+        plugins: [
+          binlog({ store: memoryLogStore() }),
+          wal({ store: memoryLogStore() }),
+          undoLog({ store: memoryLogStore() })
+        ]
+      }),
+      host = await createStorageHost({
+        plugins: [
+          postgresBackendPlugin(
+            { driver, prefix: 'pg_order_' + randomUUID().slice(0, 8) },
+            { vector: pgvectorFeature() }
+          )
+        ] as const,
+        journal: { logger, namespace: 'ordered', binlogValues: true }
+      }),
+      store = host.backend('postgres'),
+      points = store.use(vector).collection('points', { dimensions: 1, metric: 'dot' })
+    onTestFinished(async () => {
+      await host.dispose()
+      await logger.shutdown('manual')
+      await pool.end()
+      await client.end()
+    })
+    await store.set('a', 'before')
+    await points.upsert([{ id: 'v', vector: [0] }])
+    const start = await logger.binlog.lastSeq()
+    await store.transaction(async (scope) => {
+      await scope.set('a', 'first')
+      await scope.putRecord({ value: 'record' }, 'b')
+      await scope.set('c', 'third')
+      await scope.set('a', 'last')
+    })
+    const entry = (await logger.binlog.read(start + 1))[0]!.payload as {
+      txId: string
+      changes: Array<{ target: { channel: 'text' | 'record' | 'vector' }; value: string }>
+    }
+    expect(entry.changes.map((change) => change.target.channel)).toEqual([
+      'text',
+      'record',
+      'text',
+      'text'
+    ])
+    expect(
+      entry.changes
+        .filter((change) => change.target.channel === 'text')
+        .map((change) =>
+          decodePgText(decodePgJournalImage({ present: true, value: change.value }, 'text').value)
+        )
+    ).toEqual(['first', 'third', 'last'])
+    expect((await logger.undo.get(entry.txId))!).toHaveLength(3)
+    await store.undo(entry.txId)
+    expect(await store.get('a')).toBe('before')
+    expect(await store.get('c')).toBeNull()
+    expect(await store.getRecord('b')).toBeUndefined()
+    const vectorStart = await logger.binlog.lastSeq()
+    await points.upsert([{ id: 'v', vector: [1] }])
+    await points.upsert([{ id: 'v', vector: [2] }])
+    const vectorEntries = await logger.binlog.read(vectorStart + 1)
+    expect(
+      vectorEntries.map((item) => {
+        const value = item.payload as typeof entry
+        return decodePgJournalImage({ present: true, value: value.changes[0]!.value }, 'vector')
+          .value
+      })
+    ).toEqual(['[1]', '[2]'])
+    const concurrentStart = await logger.binlog.lastSeq()
+    await store.transaction((scope) =>
+      Promise.all([scope.set('parallel', 'first'), scope.set('parallel', 'last')])
+    )
+    const concurrent = (await logger.binlog.read(concurrentStart + 1))[0]!.payload as typeof entry
+    expect(
+      concurrent.changes.map((change) =>
+        decodePgText(decodePgJournalImage({ present: true, value: change.value }, 'text').value)
+      )
+    ).toEqual(['first', 'last'])
+  })
   it('captures exact native changes once and appends only after the real original COMMIT', async () => {
     const pool = new Pool({ connectionString })
     const client = postgres(connectionString!, { max: 8 })
@@ -290,7 +373,7 @@ describe.each(['pg', 'postgres-js'] as const)('%s original global journal', (ada
       !Array.isArray(payload.changes)
     )
       throw new Error('missing original commit payload')
-    expect(payload.changes).toHaveLength(3)
+    expect(payload.changes).toHaveLength(4)
     for (const change of payload.changes) {
       if (
         change === null ||
