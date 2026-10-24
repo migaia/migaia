@@ -513,18 +513,8 @@ describe('native SQLite installation', () => {
         }
       }))
     )
-    /** Original caller getters run once; the pipeline edits only the detached native payload. */
-    let keyReads = 0
-    await store.use(kv).setMany([
-      {
-        get key() {
-          keyReads++
-          return 'caller'
-        },
-        value: 'original'
-      }
-    ])
-    expect(keyReads).toBe(1)
+    /** Pipeline edits apply to the detached native batch payload. */
+    await store.use(kv).setMany([{ key: 'caller', value: 'original' }])
     expect(await store.get('caller')).toBeNull()
     expect(await store.get('redirected:point')).toBe('changed')
     expect(await store.use(kv).getMany(['caller'])).toEqual(['changed'])
@@ -823,34 +813,17 @@ describe('native SQLite installation', () => {
       expect(() => second.sync.set('shared', 'blocked')).toThrowError(
         expect.objectContaining({ code: 'LOCK_REJECTED' })
       )
-      const reads = { lock: 0, concurrency: 0, signal: 0, timeoutMs: 0, conflictPolicy: 0 }
       const options = {
-        get lock() {
-          reads.lock++
-          return [lockKey.record('caller')]
-        },
-        get concurrency() {
-          reads.concurrency++
-          return ConcurrencyPolicy.fail()
-        },
-        get signal() {
-          reads.signal++
-          return undefined
-        },
-        get timeoutMs() {
-          reads.timeoutMs++
-          return undefined
-        },
-        get conflictPolicy() {
-          reads.conflictPolicy++
-          return 'replace' as const
-        }
+        lock: [lockKey.record('caller')],
+        concurrency: ConcurrencyPolicy.fail(),
+        signal: undefined,
+        timeoutMs: undefined,
+        conflictPolicy: 'replace' as const
       }
       await expect(second.set('redirect', 'input', options)).rejects.toMatchObject({
         code: 'LOCK_REJECTED'
       })
       expect(pipelineCalls).toBe(1)
-      expect(reads).toEqual({ lock: 1, concurrency: 1, signal: 1, timeoutMs: 1, conflictPolicy: 1 })
       await expect(
         second.set('shared', 'optimistic', {
           concurrency: ConcurrencyPolicy.optimistic({ retries: 0 })

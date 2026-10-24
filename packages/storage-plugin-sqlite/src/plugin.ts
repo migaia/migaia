@@ -26,6 +26,102 @@ export const sqliteBackendKind = defineStorageBackendKind<
   ISqliteDriver,
   { getTransactionClient(scope: ISqliteTransactionScope): ISqliteDriver }
 >()(SqliteNames.backend)
+/** One native installation owns its organization registry and exact provider authority. */
+class SqliteInstallation<TValue, F extends IStorageFeatureRecord> {
+  /** Captured deployment fields stay fixed while installation or later org creation can await. */
+  readonly #options: ISqliteOptions
+  /** Only the original installation window can register root and child resources. */
+  readonly #core: IStoragePluginCore<F>
+  /** Root construction retains the one physical connection, limiter and native layout. */
+  #construction!: ISqliteConstruction<TValue>
+  /** Late authoring authority ensures children drain before their original root resource. */
+  #author!: ReturnType<IStoragePluginCore['createOrgAuthoringPort']>
+  /** Explicit organization views retain one authentic transaction owner each. */
+  readonly #organizations = new Map<string, ISqliteConstruction<TValue>>()
+  /** Definition remains pure; native construction starts only from the own install port. */
+  constructor(options: ISqliteOptions, core: IStoragePluginCore<F>) {
+    this.#options = options
+    this.#core = core
+  }
+  /** Reuse the original connection, admission limiter and schema for each authenticated route. */
+  #organization(orgId: string): ISqliteConstruction<TValue> {
+    this.#construction.controller.assertLive()
+    const existing = this.#organizations.get(orgId)
+    if (existing !== undefined) return existing
+    const ports = this.#core.getOrgContext(orgId)
+    const child = this.#construction.createOrg(orgId, { ...this.#core, ...this.#author, ...ports })
+    this.#author.registerChangeController(child.store, child.controller)
+    this.#organizations.set(orgId, child)
+    return child
+  }
+  /** Borrow one native client only after authenticating the exact ordinary or explicit org owner. */
+  #transactionClient(scope: object, orgId: string): ISqliteDriver {
+    if (orgId === this.#core.defaultOrgId) {
+      try {
+        return this.#construction.getTransactionClient(scope as ISqliteTransactionScope)
+      } catch (error) {
+        if (
+          !(error instanceof StorageContractError) ||
+          error.code !== StorageContractErrorCode.invalidArgument
+        )
+          throw error
+      }
+    }
+    return this.#organization(orgId).getTransactionClient(scope as ISqliteTransactionScope)
+  }
+  /** Every journal route borrows the same original organization construction. */
+  #journalBinding(orgId: string): IStorageJournalBackendBinding {
+    return {
+      ...(orgId === this.#core.defaultOrgId ? this.#construction : this.#organization(orgId))
+        .journal,
+      forOrg: (current) => this.#journalBinding(current)
+    }
+  }
+  /** Register native resources and organization authority in their original order. */
+  #install() {
+    this.#construction = createSqliteStore<TValue>(this.#options, {
+      core: this.#core,
+      orgId: this.#core.defaultOrgId,
+      ensureOrg: (orgId) => {
+        this.#organization(orgId)
+      }
+    })
+    this.#core.registerStore(this.#construction.store)
+    this.#core.registerChangeController(this.#construction.store, this.#construction.controller)
+    this.#author = this.#core.createOrgAuthoringPort()
+    this.#core.registerOrgBinding(this.#construction.store, {
+      backend: (orgId) => this.#organization(orgId).store,
+      drop: (orgId) => this.#organization(orgId).dropOrg()
+    })
+    this.#core.registerFeatureClientResolver(this.#construction.store, {
+      getClient: (orgId) =>
+        orgId === this.#core.defaultOrgId
+          ? this.#construction.client
+          : this.#organization(orgId).client,
+      getTransactionClient: (scope, orgId) => this.#transactionClient(scope, orgId)
+    })
+    this.#core.registerDetect(async (signal) => {
+      if (signal.aborted) return
+      this.#options.driver.prepare('SELECT 1').get()
+    })
+    return {}
+  }
+  /** Plugin projection receives own callbacks; native class methods are invoked directly. */
+  open() {
+    return {
+      kind: sqliteBackendKind,
+      install: () => this.#install(),
+      journalBinding: () => this.#journalBinding(this.#core.defaultOrgId),
+      capabilityInstaller: (_store: ISqliteStore<TValue>): ICapabilityInstallPort =>
+        this.#construction.installer,
+      featureExpose: () => ({
+        getClient: () => this.#construction.client,
+        getTransactionClient: (scope: ISqliteTransactionScope) =>
+          this.#construction.getTransactionClient(scope)
+      })
+    }
+  }
+}
 /** Define an install-time SQLite backend; the injected connection remains caller-owned. */
 export function sqliteBackendPlugin<
   TValue = unknown,
@@ -36,7 +132,7 @@ export function sqliteBackendPlugin<
   features?: F &
     IStorageFeatureStoreCompatibility<typeof sqliteBackendKind, NoInfer<F>, ISqliteStore<TValue>>
 ): IStorageBackendPlugin<typeof sqliteBackendKind, NoInfer<TId>, F, ISqliteStore<TValue>> {
-  /** Public option getters are captured once while the plugin definition remains pure. */
+  /** Deployment fields remain stable when installation is deferred after plugin definition. */
   const captured = {
     driver: options.driver,
     table: options.table,
@@ -47,90 +143,7 @@ export function sqliteBackendPlugin<
   }
   /** Literal default ids survive host-context inference. */
   const id = (options.id ?? SqliteNames.backend) as TId
-  const descriptorFactory = (core: IStoragePluginCore<F>) => {
-    /** Each actual host installation gets its own store/owner, never a module singleton. */
-    let construction: ISqliteConstruction<TValue>
-    /** Context redirects reuse the same organization constructor installed below. */
-    let ensureOrg: (orgId: string) => void
-    /** The existing physical organization constructor also supplies exact private journal ports. */
-    let organization: (orgId: string) => ISqliteConstruction<TValue>
-    return {
-      kind: sqliteBackendKind,
-      install() {
-        construction = createSqliteStore<TValue>(captured, {
-          core,
-          orgId: core.defaultOrgId,
-          ensureOrg: (orgId) => ensureOrg(orgId)
-        })
-        core.registerStore(construction.store)
-        core.registerChangeController(construction.store, construction.controller)
-        /** Capture late construction authority after the root resource so children drain first. */
-        const author = core.createOrgAuthoringPort()
-        /**
-         * Root remains the ordinary native endpoint; every explicit org receives its own scope
-         * owner.
-         */
-        const organizations = new Map<string, ISqliteConstruction<TValue>>()
-        /** Reuse the one physical connection, original limiter and already-created schema. */
-        const forOrg = (orgId: string): ISqliteConstruction<TValue> => {
-          construction.controller.assertLive()
-          const existing = organizations.get(orgId)
-          if (existing !== undefined) return existing
-          const ports = core.getOrgContext(orgId)
-          const child = construction.createOrg(orgId, { ...core, ...author, ...ports })
-          author.registerChangeController(child.store, child.controller)
-          organizations.set(orgId, child)
-          return child
-        }
-        organization = forOrg
-        ensureOrg = (orgId) => {
-          forOrg(orgId)
-        }
-        core.registerOrgBinding(construction.store, {
-          backend: (orgId) => forOrg(orgId).store,
-          drop: (orgId) => forOrg(orgId).dropOrg()
-        })
-        core.registerFeatureClientResolver(construction.store, {
-          getClient: (orgId) =>
-            orgId === core.defaultOrgId ? construction.client : forOrg(orgId).client,
-          getTransactionClient: (scope, orgId) => {
-            /** Ordinary and explicit default-org scopes have distinct owners on the same client. */
-            if (orgId === core.defaultOrgId) {
-              try {
-                return construction.getTransactionClient(scope as ISqliteTransactionScope)
-              } catch (error) {
-                /** Only an ownership mismatch can try the explicit default-org owner. */
-                if (
-                  !(error instanceof StorageContractError) ||
-                  error.code !== StorageContractErrorCode.invalidArgument
-                )
-                  throw error
-              }
-            }
-            return forOrg(orgId).getTransactionClient(scope as ISqliteTransactionScope)
-          }
-        })
-        core.registerDetect(async (signal) => {
-          if (signal.aborted) return
-          captured.driver.prepare('SELECT 1').get()
-        })
-        return {}
-      },
-      journalBinding: () => {
-        const binding = (orgId: string): IStorageJournalBackendBinding => ({
-          ...(orgId === core.defaultOrgId ? construction : organization(orgId)).journal,
-          forOrg: binding
-        })
-        return binding(core.defaultOrgId)
-      },
-      capabilityInstaller: (_store: ISqliteStore<TValue>): ICapabilityInstallPort =>
-        construction.installer,
-      featureExpose: () => ({
-        getClient: () => construction.client,
-        getTransactionClient: (scope: ISqliteTransactionScope) =>
-          construction.getTransactionClient(scope)
-      })
-    }
-  }
+  const descriptorFactory = (core: IStoragePluginCore<F>) =>
+    new SqliteInstallation<TValue, F>(captured, core).open()
   return definePlugin<TId, typeof descriptorFactory, F>(id, descriptorFactory, features)
 }

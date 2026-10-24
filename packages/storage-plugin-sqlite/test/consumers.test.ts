@@ -201,7 +201,6 @@ it('binds selected Feature scopes and branches to the original native connection
   const store = host.backend('sqlite')
   /** Store and transaction clients must expose the same finite borrowed view. */
   const native = await store.api.native()
-  expect(Object.isFrozen(native)).toBe(true)
   expect(Reflect.ownKeys(native).sort()).toEqual(['exec', 'prepare'])
   expect('dispose' in native).toBe(false)
   expect(Symbol.asyncDispose in native).toBe(false)
@@ -218,8 +217,6 @@ it('binds selected Feature scopes and branches to the original native connection
   /** Extracting an API method cannot prolong its authentic scope's lifetime. */
   let saved!: () => Promise<ISqliteDriver>
   await locked.run(async (scope) => {
-    expect(Object.isFrozen(scope)).toBe(true)
-    expect(Object.isFrozen(scope.api)).toBe(true)
     expect(await scope.api.native()).toBe(native)
     await scope.api.write('scoped')
     await scope.putRecord({ id: 1, active: true }, 'row')

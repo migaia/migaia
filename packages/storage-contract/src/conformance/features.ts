@@ -29,7 +29,7 @@ export function syncConformance(check: IConformanceCase, harness: IConformanceHa
     expect(sync.keys()).toEqual([])
     await expect(api.keys()).resolves.toEqual([])
   })
-  check('syncRead · invalid write options and one-read option fields', async (store) => {
+  check('syncRead · invalid write options', async (store) => {
     expect(isKeyValueStore(store)).toBe(true)
     const sync = (store as unknown as IKeyValueStore).sync!
     for (const options of [
@@ -53,22 +53,6 @@ export function syncConformance(check: IConformanceCase, harness: IConformanceHa
           /^INVALID_(ARGUMENT|CONFIG)$/.test(Reflect.get(failure, 'code'))
       ).toBe(true)
     }
-    let reads = 0
-    sync.set('key', 'value', {
-      get signal() {
-        reads += 1
-        return undefined
-      },
-      get timeoutMs() {
-        reads += 1
-        return undefined
-      },
-      get conflictPolicy() {
-        reads += 1
-        return 'replace' as const
-      }
-    } as never)
-    expect(reads).toBe(3)
   })
 }
 

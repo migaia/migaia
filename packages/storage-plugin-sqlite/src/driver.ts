@@ -44,71 +44,93 @@ function row(value: Record<string, unknown>): ISqliteRow {
   for (const key of Object.keys(value)) result[key] = scalar(value[key])
   return result
 }
-/** Both explicit and symbolic cleanup share one native close and retain distinct cached promises. */
-export function connection(database: INativeDatabase): ISqliteConnection {
-  /** Closing synchronously seals calls before deferred native cleanup starts. */
-  let closed = false
-  /** Explicit cleanup preserves its original failure. */
-  let disposal: Promise<void> | undefined
-  /** Symbol cleanup reports rather than rejecting. */
-  let symbolic: Promise<void> | undefined
-  /** One final reporting boundary covers symbolic connection cleanup. */
-  const report = createStorageOperationReporter()
-  /** Using a disposed connection never revives captured statements. */
-  const assertOpen = (): void => {
-    if (closed) throw sqliteError(SqliteErrorCode.sqliteFailed, new Error(SqliteErrorText.closed))
+/** One native connection owns logical closure and its original cached disposal promises. */
+class SqliteConnection {
+  /** Only this connection owner can close the native database. */
+  readonly #database: INativeDatabase
+  /** Calls are sealed synchronously before deferred native close begins. */
+  #closed = false
+  /** Explicit cleanup preserves native failure and its original Promise identity. */
+  #disposal: Promise<void> | undefined
+  /** Symbol cleanup reports once through its independent cached Promise. */
+  #symbolic: Promise<void> | undefined
+  /** Existing nonfatal diagnostics own symbolic cleanup failures. */
+  readonly #report = createStorageOperationReporter()
+  /** Retain the original native database without exposing its close authority. */
+  constructor(database: INativeDatabase) {
+    this.#database = database
   }
-  /** All driver failures keep the native object reachable. */
-  const execute = <T>(run: () => T): T => {
+  /** Every current or retained statement checks the original connection lifetime. */
+  execute<T>(run: () => T): T {
     try {
-      assertOpen()
+      if (this.#closed)
+        throw sqliteError(SqliteErrorCode.sqliteFailed, new Error(SqliteErrorText.closed))
       return run()
     } catch (error) {
       throw normalizeSqliteFailure(error)
     }
   }
-  /** Native close is the connection owner's sole mutation after logical closure. */
-  const dispose = (): Promise<void> => {
-    if (disposal) return disposal
-    closed = true
-    return (disposal = Promise.resolve().then(() => {
+  /** Seal native calls once and preserve explicit native close failure. */
+  readonly dispose = (): Promise<void> => {
+    if (this.#disposal) return this.#disposal
+    this.#closed = true
+    return (this.#disposal = Promise.resolve().then(() => {
       try {
-        database.close()
+        this.#database.close()
       } catch (error) {
         throw normalizeSqliteFailure(error)
       }
     }))
   }
-  return {
-    exec: (text) =>
-      execute(() => {
-        database.exec(text)
-      }),
-    prepare: (text) =>
-      execute(() => {
-        /** Actual native statement remains borrowed until the connection closes. */
-        const statement = database.prepare(text)
-        /** Every entry checks connection lifetime, including old retained statements. */
-        const adapted: ISqliteStatement = {
-          run: (...values) =>
-            execute(() => {
-              const result = statement.run(...values)
-              return {
-                changes: scalar(result.changes) as number | bigint,
-                lastInsertRowid: scalar(result.lastInsertRowid) as number | bigint
-              } satisfies ISqliteRunResult
-            }),
-          get: (...values) =>
-            execute(() => {
-              const result = statement.get(...values)
-              return result == null ? undefined : row(result)
-            }),
-          all: (...values) => execute(() => statement.all(...values).map(row))
-        }
-        return adapted
-      }),
-    dispose,
-    [asyncDisposeKey]: () =>
-      (symbolic ??= dispose().catch((error) => reportCleanupError(report, error)))
+  /** Own connection ports keep detached calls bound to this exact native lifetime. */
+  open(): ISqliteConnection {
+    return {
+      exec: (text) =>
+        this.execute(() => {
+          this.#database.exec(text)
+        }),
+      prepare: (text) =>
+        this.execute(() => new SqliteStatement(this, this.#database.prepare(text)).open()),
+      dispose: this.dispose,
+      [asyncDisposeKey]: () =>
+        (this.#symbolic ??= this.dispose().catch((error) =>
+          reportCleanupError(this.#report, error)
+        ))
+    }
   }
+}
+/** One adapted statement borrows its original native statement and connection lifetime. */
+class SqliteStatement {
+  /** The connection remains the sole native lifetime and error-normalization owner. */
+  readonly #connection: SqliteConnection
+  /** This adapter adds no second statement cache or native finalizer. */
+  readonly #statement: INativeStatement
+  /** Bind one actual statement to its original connection. */
+  constructor(connection: SqliteConnection, statement: INativeStatement) {
+    this.#connection = connection
+    this.#statement = statement
+  }
+  /** Keep exact integer normalization, missing-row semantics and detached output bytes. */
+  open(): ISqliteStatement {
+    return {
+      run: (...values) =>
+        this.#connection.execute(() => {
+          const result = this.#statement.run(...values)
+          return {
+            changes: scalar(result.changes) as number | bigint,
+            lastInsertRowid: scalar(result.lastInsertRowid) as number | bigint
+          } satisfies ISqliteRunResult
+        }),
+      get: (...values) =>
+        this.#connection.execute(() => {
+          const result = this.#statement.get(...values)
+          return result == null ? undefined : row(result)
+        }),
+      all: (...values) => this.#connection.execute(() => this.#statement.all(...values).map(row))
+    }
+  }
+}
+/** Both cleanup ports retain their original promise identities and share one native close. */
+export function connection(database: INativeDatabase): ISqliteConnection {
+  return new SqliteConnection(database).open()
 }

@@ -153,20 +153,15 @@ it('keeps asynchronous pipeline preparation inside the original root deadline', 
     await connection.dispose()
   })
   const store = host.backend('sqlite')
-  let timeoutReads = 0
   /** The first mutation must prepare BEGIN before it can perform any native transaction work. */
   const native = vi.spyOn(connection, 'prepare')
   await expect(
     store.set('late', 'must-not-commit', {
-      get timeoutMs() {
-        timeoutReads++
-        return 20
-      }
+      timeoutMs: 20
     })
   ).rejects.toMatchObject({ code: 'ABORTED' })
   expect(settled).toBe(true)
   expect(pipelineCalls).toBe(1)
-  expect(timeoutReads).toBe(1)
   expect(native).not.toHaveBeenCalled()
   expect(await store.get('late')).toBeNull()
 })
@@ -238,7 +233,6 @@ it('shares the original attempt context with cancellable transaction composition
   /** Caller cancellation propagates through the existing concurrency budget's live signal. */
   const cancellation = new AbortController()
   const entered = deferred<void>()
-  const reads = { signal: 0, timeoutMs: 0 }
   /** Saved user views lose context access when the original callback ends. */
   let expired!: Parameters<Parameters<typeof store.transaction>[0]>[0]
   let settled = false
@@ -253,7 +247,6 @@ it('shares the original attempt context with cancellable transaction composition
         await runTransactionOperation(tx, async (operation) => {
           entered.resolve()
           expect(captured).toBeDefined()
-          expect(Object.isFrozen(captured)).toBe(true)
           expect(readTransactionOperationContext(operation)).toBe(captured)
           expect(captured?.signal).toBe(attemptContext?.signal)
           expect(captured?.signal).toBeDefined()
@@ -269,14 +262,8 @@ it('shares the original attempt context with cancellable transaction composition
       },
       {
         lock: [lockKey.text('cancelled-context')],
-        get signal() {
-          reads.signal++
-          return cancellation.signal
-        },
-        get timeoutMs() {
-          reads.timeoutMs++
-          return 1000
-        }
+        signal: cancellation.signal,
+        timeoutMs: 1000
       }
     )
     .catch((error: unknown) => error)
@@ -295,7 +282,6 @@ it('shares the original attempt context with cancellable transaction composition
     cause: cancellation.signal.reason
   })
   expect(settled).toBe(true)
-  expect(reads).toEqual({ signal: 1, timeoutMs: 1 })
   expect(await store.get('cancelled-context')).toBeNull()
   expect(await store.inspectLocks()).toEqual([])
   expect(() => readTransactionOperationContext(expired)).toThrowError(

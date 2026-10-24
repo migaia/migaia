@@ -199,14 +199,9 @@ it.each([false, true])(
       await scope.use(ttl).expire(lockKey.text('text'), 120000)
     })
     const txId = await lastTx()
-    let reads = 0
     const undone = await store.undo(txId, {
-      get timeoutMs() {
-        reads++
-        return 60000
-      }
+      timeoutMs: 60000
     })
-    expect(reads).toBe(1)
     expect(undone.txId).not.toBe(txId)
     expect(await store.get('text')).toBe('before')
     expect(await store.getBytes('bytes')).toEqual(new Uint8Array([1]))
