@@ -192,3 +192,5 @@ try {
 `host.dropOrg(orgId)` 也通过原 WATCH/draft/EXEC 删除该组织既定 Streams、有序集合及限流物理键；重启后未选择这些 Feature 仍生效。只匹配原 layout 的合法字符串名称，保留其它组织与调用方非托管键。PubSub 无持久业务值；共享可靠变更历史保留原 retention/cursor，不按组织改写。普通 `clearAll()` 保留原标准通道范围。删除成本包含原生 SCAN 实际候选。
 
 普通宿主遥测通过 `journal: { logger, namespace, telemetry: true }` 显式启用，并使用原 Logger level 插件。根读写记录规范逻辑键与实际 pipeline 载荷。公开事务跨原有重试只记录一个完成终点；事务 scope 与私有 journal 操作不重复记录。logger 仍为借用，原有 pipeline/hook 次数保持。
+
+提交 binlog 按原跨通道顺序保留已接纳的 draft 修改，包括重复写入与中间新值。原始值与绝对期限在每次 staging 时捕获，最终原生修订由同一 attempt 补齐。undo 合并仍归宿主；Redis 的 WAL/undo 准入仍明确不支持。

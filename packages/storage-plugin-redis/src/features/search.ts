@@ -147,10 +147,8 @@ function createRedisVectorBinding(resolve: () => IRedisNativeFeaturePort): IRedi
     await draft.guardVector(target)
     const point = await hash(draft, target.collection, target.id)
     if (!point.fields.size || (ms === undefined && point.deadline === 0)) return false
-    point.deadline = ms === undefined ? 0 : (await draft.now()) + Math.ceil(ms)
-    if (ms === 0) point.fields = new Map()
-    else point.fields = vectorExpiry(point.fields, point.deadline)
-    point.changed = true
+    const deadline = ms === undefined ? 0 : (await draft.now()) + Math.ceil(ms)
+    draft.changeHash(point, ms === 0 ? new Map() : vectorExpiry(point.fields, deadline), deadline)
     return true
   }
   /** Exact physical HASH TTL remains authoritative even when projection fields are malformed. */
@@ -418,8 +416,7 @@ function createRedisVectorBinding(resolve: () => IRedisNativeFeaturePort): IRedi
               await draft.guardVector(lock(name, id))
               const point = await hash(draft, name, id)
               if (point.fields.size) {
-                point.fields = new Map()
-                point.changed = true
+                draft.changeHash(point, new Map())
               }
             }
           },
@@ -527,7 +524,8 @@ function createRedisVectorBinding(resolve: () => IRedisNativeFeaturePort): IRedi
               for (const [index, { point, bytes, projection, payload }] of actual.entries()) {
                 await draft.guardVector(lock(name, point.id))
                 const entry = await hash(draft, name, point.id)
-                if (ttlMs !== undefined) entry.deadline = (await draft.now()) + Math.ceil(ttlMs)
+                const deadline =
+                  ttlMs === undefined ? entry.deadline : (await draft.now()) + Math.ceil(ttlMs)
                 const fields = new Map(projection)
                 fields.set(RedisVector.org, vectorString(draft.layout.orgId))
                 fields.set(RedisVector.id, payloadBytes(point.id))
@@ -536,8 +534,11 @@ function createRedisVectorBinding(resolve: () => IRedisNativeFeaturePort): IRedi
                 fields.set(RedisVector.approximate, bytes)
                 fields.set(RedisVector.exact, bytes)
                 if (payload !== undefined) fields.set(RedisVector.payload, payload)
-                entry.fields = ttlMs === 0 ? new Map() : vectorExpiry(fields, entry.deadline)
-                entry.changed = true
+                draft.changeHash(
+                  entry,
+                  ttlMs === 0 ? new Map() : vectorExpiry(fields, deadline),
+                  deadline
+                )
               }
             },
             policy
@@ -600,8 +601,7 @@ function createRedisVectorBinding(resolve: () => IRedisNativeFeaturePort): IRedi
                 await draft.guardVector(lock(name, id))
                 const point = await draft.hash(physical, lock(name, id))
                 if (point.fields.size) {
-                  point.fields = new Map()
-                  point.changed = true
+                  draft.changeHash(point, new Map())
                   count++
                 }
               }
