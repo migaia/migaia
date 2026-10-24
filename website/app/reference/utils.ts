@@ -1466,7 +1466,7 @@ isEmptyValue(0) // false`
       role: 'operation',
       purpose: t(
         'Narrow to present values without treating undefined as absence.',
-        '收窄到存在值，不把 undefined 当成缺失。'
+        '按 some 标签收窄到存在值分支，不把有效载荷中的 undefined 误认为缺失。'
       ),
       params: {
         value: t(
@@ -1484,7 +1484,7 @@ isEmptyValue(0) // false`
       role: 'operation',
       purpose: t(
         'Narrow to the absent branch without reading a payload.',
-        '收窄到缺失分支，不读取值。'
+        '按 some 标签收窄到缺失分支，无需读取或复制任何应用有效载荷。'
       ),
       params: {
         value: t(
@@ -1502,7 +1502,7 @@ isEmptyValue(0) // false`
       role: 'operation',
       purpose: t(
         'Return the exact present value or a fallback in the same value domain.',
-        '返回原存在值，或同值域的缺省值。'
+        '有值时保持原有效载荷身份，缺失时返回调用方提供的同值域后备值，不扩大类型。'
       ),
       params: {
         value: t(
@@ -1524,7 +1524,7 @@ isEmptyValue(0) // false`
       role: 'operation',
       purpose: t(
         'Map one present payload synchronously and retain the exact mapped result.',
-        '同步映射一个存在值并保留结果身份。'
+        '仅对存在分支同步调用映射一次，保留映射结果身份，不等待可能返回的承诺。'
       ),
       params: {
         value: t(
@@ -1547,7 +1547,7 @@ isEmptyValue(0) // false`
       role: 'operation',
       purpose: t(
         'Convert an optional value when collapsing absence and present undefined is intentional.',
-        '有意合并缺失与存在的 undefined 时转换可选值。'
+        '仅在应用有意合并缺失与存在的 undefined 时，将带标签结果转换为可选值。'
       ),
       params: {
         value: t(
@@ -1566,7 +1566,7 @@ isEmptyValue(0) // false`
       cases: utilsCases.jitter,
       purpose: t(
         'Shortens a finite non-negative deadline by a bounded random fraction without extending it.',
-        '以有界随机比例缩短有限非负期限，绝不延长。'
+        '使用一次随机采样，按有界比例缩短有限非负期限，结果不超过原期限，也不延长期限。'
       ),
       params: {
         value: t('Finite non-negative starting value.', '有限且非负的原始值。'),
@@ -1589,7 +1589,7 @@ const ttlMs = jitter(60_000, 0.2)`
       cases: utilsCases.detectServerRuntime,
       purpose: t(
         'Identifies the server runtime without importing host APIs, checking Deno before Bun before Node.',
-        '不导入宿主 API，按 Deno、Bun、Node 的优先级识别服务端运行时。'
+        '不导入平台宿主接口，按 Deno、Bun、Node 的固定优先级检查全局身份并识别服务端运行时。'
       ),
       returns: t(
         '`deno`, `bun` or `node`; `undefined` in browsers without server globals.',
@@ -3083,6 +3083,13 @@ const text = converted.threw ? '[无法显示]' : converted.value`
   },
   types: {
     IMaybe: {
+      scenarios: [
+        t(
+          'Preserve the distinction between an absent result and a present undefined payload.',
+          '保留没有结果与存在但有效载荷为 undefined 的区别。'
+        )
+      ],
+      example: utilsCases.mapMaybe![0]!.example,
       summary: t(
         'Presence union that distinguishes absent values from a present undefined.',
         '区分缺失与存在 undefined 的判别联合。'
@@ -3097,7 +3104,7 @@ const text = converted.threw ? '[无法显示]' : converted.value`
         value: {
           summary: t(
             'Exact T payload, available only on the some:true variant.',
-            '精确 T 值，仅 some:true 分支可用。'
+            '原始且精确的应用有效载荷，仅 some:true 分支允许读取。'
           )
         }
       }
