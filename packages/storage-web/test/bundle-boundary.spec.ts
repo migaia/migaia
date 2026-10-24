@@ -1,6 +1,8 @@
 import { execFileSync } from 'node:child_process'
 import { mkdirSync, realpathSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
+import { createRequire } from 'node:module'
+import { pathToFileURL } from 'node:url'
 import { gzipSync } from 'node:zlib'
 import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -328,12 +330,47 @@ async function measureMainBrowserBaseline(smokeDirectory: string) {
         '  const host = await createStorageHost({ plugins: [indexedDbBackendPlugin(options)] })',
         '  try {',
         "    const store = host.backend('indexed-db')",
-        "    const users = defineEntity({ name: 'users', key: 'id', features: [entityQueryFeature()] }).connect(store)",
+        "    const users = defineEntity({ name: 'users', key: 'id' }).connect(store)",
         '    return (await users.list()).filter((user) => user.active === true).map((user) => ({ name: user.name }))',
         '  } finally { await host.dispose() }',
         '}'
       ].join('\n'),
       'utf8'
+    )
+    /** Execute this exact fixed-main entry against records written through its original API. */
+    const runtimeOutput = execFileSync(
+      process.execPath,
+      [
+        '--input-type=module',
+        '-e',
+        [
+          "import assert from 'node:assert/strict'",
+          `import { IDBFactory, IDBKeyRange } from ${JSON.stringify(pathToFileURL(createRequire(import.meta.url).resolve('fake-indexeddb')).href)}`,
+          "import { createStorageHost } from '@migaia/storage-web/host'",
+          "import { indexedDbBackendPlugin } from '@migaia/storage-web/plugins/indexed-db'",
+          "import { defineEntity } from '@migaia/storage-web/entity'",
+          "import { loadActiveUsers } from './bundle-entry.js'",
+          "const options = { factory: new IDBFactory(), keyRange: IDBKeyRange, dbName: 'fixed-main-runtime' }",
+          'const host = await createStorageHost({ plugins: [indexedDbBackendPlugin(options)] })',
+          'try {',
+          "  const users = defineEntity({ name: 'users', key: 'id' }).connect(host.backend('indexed-db'))",
+          "  await users.put({ id: 'a', name: 'Ada', active: true })",
+          "  await users.put({ id: 'b', name: 'Grace', active: false })",
+          '} finally { await host.dispose() }',
+          'const result = await loadActiveUsers(options)',
+          "assert.deepEqual(result, [{ name: 'Ada' }])",
+          'console.info(JSON.stringify(result))'
+        ].join('\n')
+      ],
+      { cwd: consumer, encoding: 'utf8' }
+    )
+    writeFileSync(
+      join(repositoryRoot, 'node_modules/.cache/storage-browser-baseline-runtime.json'),
+      JSON.stringify(
+        { baseline: browserBaselineCommit, result: JSON.parse(runtimeOutput) },
+        null,
+        2
+      ) + '\n'
     )
     const modules = new Set<string>()
     /** Baseline chunks retain the same native metadata and emitted code as the candidate. */
