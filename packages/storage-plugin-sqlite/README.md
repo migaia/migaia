@@ -114,9 +114,7 @@ Feature 的 `query` 和 `tx` 链方法保留在实际派生链上。Feature 借�
 
 原生日志通过 `@migaia/storage-host/journal` 的 `storageLogStore(host, 'sqlite',
 { prefix })` 使用。调用方拥有的内存连接在原进程锁中独占该日志 namespace，私有行
-与业务键隔离，业务 clear 不清日志；释放日志后可用同一 prefix 重开。文件连接没有
-资源整个生存期的可靠独占保证，因此此缓存索引组合在读取日志前报
-`UNSUPPORTED_CAPABILITY`。它不影响文件连接的普通原生事务。
+与业务键隔离，业务 clear 不清日志；释放日志后可用同一 prefix 重开。文件连接使用 indexExclusive:false，无跨操作索引；每次日志读写在原 BEGIN IMMEDIATE 事务内读取当前 head、records 与 states，多个连接可共用同一日志 namespace。
 
 ## 维护与错误
 
@@ -146,7 +144,7 @@ TRANSACTION_FAILED、DUPLICATE_KEY 或 DECODE_FAILED。原生/codec 错误保留
 
 全局 `journal` 配置按真实原生修改顺序记录日志，保留同键多写。SQLite 在原事务内保留完整原始值与绝对期限；undo 复用原键锁事务，先核对全部完整修订与 after 镜像，再恢复任一值。外置 binlog 与 undo 可使用既有 WAL；恢复只核对与数据同提交的 marker，不重放已提交的业务修改。文件 WAL 修订行保留不可变 birth，组织删除后重建不会让旧 undo 再次有效。`wal: false` 的修订身份归原存活本地 group，重开 group 会拒绝旧镜像。metadata 写入推进原私有 guard，不作为业务日志。
 
-内存连接可通过 initializer 的 `storageLogStore` 提供同库 binlog 与 undo；文件缓存日志索引仍拒绝，文件数据应配外置 Logger。raw SQL 没有完整共享镜像目标，启用提交日志时在原生执行前拒绝。全局 journal 配置沿宿主既有异步管线边界，所有同步入口报 `ASYNC_STAGE_IN_SYNC_ENTRY`；普通宿主仍保留同步 API。Logger 及日志载体继续归调用方释放。`UNDO_CONFLICT` 等宿主日志错误保留原 source 与 cause。
+内存和文件连接均可通过 initializer 的 `storageLogStore` 打开同库日志；文件路径每次在原生事务内读取当前索引，不缓存跨操作状态。raw SQL 没有完整共享镜像目标，启用提交日志时在原生执行前拒绝。全局 journal 配置沿宿主既有异步管线边界，所有同步入口报 `ASYNC_STAGE_IN_SYNC_ENTRY`；普通宿主仍保留同步 API。Logger 及日志载体继续归调用方释放。`UNDO_CONFLICT` 等宿主日志错误保留原 source 与 cause。
 
 启用全局 journal 遥测时，每个异步根操作与完整事务各发一条 storage 事件，键来自原生读写实际观察；短效事务操作与私有日志、元数据工作不重复发业务事件。重试仍由原并发循环负责。
 
