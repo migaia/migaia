@@ -1915,6 +1915,10 @@ function declarationEnd(source: string, start: number, kind: string): number {
   let parentheses = 0
   let brackets = 0
   let braces = 0
+  /** Generic defaults can contain braces before a class or interface body begins. */
+  let headerGenerics = 0
+  /** Once the real body starts, runtime comparison operators are not generic delimiters. */
+  let bodyStarted = !['class', 'interface'].includes(kind)
   let quote: string | null = null
   let lineComment = false
   let blockComment = false
@@ -1954,15 +1958,22 @@ function declarationEnd(source: string, start: number, kind: string): number {
       quote = character
       continue
     }
-    if (character === '(') parentheses += 1
+    if (!bodyStarted && character === '<') headerGenerics += 1
+    else if (!bodyStarted && character === '>' && source[index - 1] !== '=')
+      headerGenerics = Math.max(0, headerGenerics - 1)
+    else if (character === '(') parentheses += 1
     else if (character === ')') parentheses = Math.max(0, parentheses - 1)
     else if (character === '[') brackets += 1
     else if (character === ']') brackets = Math.max(0, brackets - 1)
-    else if (character === '{') braces += 1
-    else if (character === '}') {
+    else if (character === '{') {
+      if (headerGenerics === 0 && braces === 0 && parentheses === 0 && brackets === 0)
+        bodyStarted = true
+      braces += 1
+    } else if (character === '}') {
       braces = Math.max(0, braces - 1)
       if (
         braces === 0 &&
+        bodyStarted &&
         parentheses === 0 &&
         brackets === 0 &&
         ['class', 'interface', 'namespace'].includes(kind)
