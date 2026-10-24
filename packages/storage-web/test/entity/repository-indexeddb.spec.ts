@@ -760,19 +760,13 @@ describe('repository over real indexedDbHost backend', () => {
         value: unknown,
         key?: IDBValidKey
       ) {
-        const request = Reflect.apply(put, this, [value, key])
         if (
           failPersistence &&
           this.name === 'storage-web:meta' &&
           (value as { readiness?: { status?: string } })?.readiness?.status === 'failed'
         )
-          Object.defineProperty(this.transaction, 'oncomplete', {
-            configurable: true,
-            set: () => {
-              throw persistenceFailure
-            }
-          })
-        return request
+          throw persistenceFailure
+        return Reflect.apply(put, this, [value, key])
       })
       try {
         const cleanup = await captureOperationCleanup(async () => {
@@ -791,7 +785,8 @@ describe('repository over real indexedDbHost backend', () => {
           return capability.getRecordIndexReadiness(handle)
         })
         expect(cleanup.result).toMatchObject({ status: failPersistence ? 'running' : 'failed' })
-        expect(cleanup.reports).toEqual([selectorFailure])
+        /** Rejected native put never reaches the post-admission report; both failures still reject. */
+        expect(cleanup.reports).toEqual(failPersistence ? [] : [selectorFailure])
         if (failPersistence) return
         const freshHandle = await capability.ensureRecordIndexes('failed-selector-backfill', [
           { name: 'email', unique: false, multiEntry: true, revision: 1 }

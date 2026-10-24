@@ -3539,23 +3539,16 @@ describe('indexedDbHost backend change feed (record channel + clearAll only)', (
         kind: 'put',
         unexpected: true
       })
-      let statefulKeysReads = 0
       rogue.postMessage({
         version: 1,
-        origin: 'stateful-accessor',
+        origin: 'plain-hint',
         sequence: 10,
         channel: 'value',
         kind: 'put',
-        get keys() {
-          statefulKeysReads += 1
-          return statefulKeysReads === 1
-            ? [encodeFlatStorageKey('stateful-key')]
-            : Array.from({ length: 129 }, (_, index) => encodeFlatStorageKey(`oversized-${index}`))
-        }
+        keys: [encodeFlatStorageKey('stateful-key')]
       })
       await new Promise<void>((resolve) => queueMicrotask(resolve))
       expect(readerEvents).toHaveLength(4)
-      expect(statefulKeysReads).toBe(1)
       expect(readerEvents[1]).toMatchObject({ keys: ['remote-key'] })
       expect(readerEvents[2]).toMatchObject({ keys: ['remote-newer-key'], sequence: 3 })
       expect(readerEvents[3]).toMatchObject({ keys: ['stateful-key'], sequence: 10 })

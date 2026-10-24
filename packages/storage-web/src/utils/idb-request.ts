@@ -5,7 +5,7 @@ import type { IStorageOperationRuntime } from '@migaia/storage-host/authoring/ba
 import { StorageError, StorageErrorCode } from '../types/errors.js'
 import { normalizeStorageException } from './quota.js'
 import { readAbortReason } from '@migaia/storage-host/authoring/backend'
-import { snapshotOperationContext } from '@migaia/storage-host/authoring/context'
+import { assertOperationContext } from '@migaia/storage-contract'
 import { subscribeToAbort } from '../backends/errors.js'
 import { StorageBackend } from '../constants.js'
 
@@ -99,7 +99,9 @@ export function fromIdbRequest<T>(
   runtime: IStorageOperationRuntime
 ): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    const signal = snapshotOperationContext(context)?.signal
+    assertOperationContext(context)
+    /** The supported signal is borrowed immediately; no operation context survives this setup. */
+    const signal = context?.signal
     /** Owns the active abort listener and remains a no-op before subscription returns. */
     let disposeAbort = (): void => {}
     const onAbort = (): void => {
@@ -138,9 +140,33 @@ export function fromIdbRequest<T>(
   })
 }
 
+/** One native commit bridge owns only terminal selection and its original abort listener. */
+type IIdbCommitState = {
+  /** The native transaction is the sole physical commit or rollback owner. */
+  readonly transaction: IDBTransaction
+  /** Cancellation borrows the original supported signal without copying its native state. */
+  readonly signal: IAbortSignal | undefined
+  /** Cleanup diagnostics use the existing per-operation reporter. */
+  readonly runtime: IStorageOperationRuntime
+  /** Native completion settles this one original bridge promise. */
+  readonly resolve: () => void
+  /** Native failure and cancellation reject this same original bridge promise. */
+  readonly reject: (error: unknown) => void
+  /** Caller cancellation is distinct from subsequent native transaction abort events. */
+  cancelled: boolean
+  /** The first selected caller cancellation reason stays reachable as the storage cause. */
+  abortReason: unknown
+  /** The original abort subscription detaches at native terminal selection. */
+  disposeAbort: () => void
+  /** Complete and abort events select only one result. */
+  settled: boolean
+  /** A bubbled request failure remains primary until actual native termination. */
+  firstFailure: IStorageErrorFamily | undefined
+}
+
 /**
- * Waits for transaction commit before reporting write success. `request.onsuccess` only confirms
- * request acceptance, not persistence.
+ * Wait for actual transaction commit. A successful request only confirms acceptance; the native
+ * transaction remains the sole owner of persistence, quota failure and rollback.
  */
 export function idbTransactionCommit(
   transaction: IDBTransaction,
@@ -148,82 +174,101 @@ export function idbTransactionCommit(
   runtime: IStorageOperationRuntime
 ): Promise<void> {
   return new Promise<void>((resolve, reject) => {
-    const signal = snapshotOperationContext(context)?.signal
-    /** Records caller cancellation independently from later transaction abort events. */
-    let cancelled = false
-    /** Preserve the cancellation cause that selected the terminal outcome. */
-    let abortReason: unknown
-    /** Owns the active abort listener and remains a no-op before subscription returns. */
-    let disposeAbort = (): void => {}
-    /** Complete/error events can race cancellation; terminal selection happens once. */
-    let settled = false
-    /** Request errors are not terminal; retain their first diagnostic until native completion. */
-    let firstFailure: IStorageErrorFamily | undefined
-    /** Only successfully installed native terminal handlers can own asynchronous rollback. */
-    let terminalHandlersInstalled = false
-    /** Caller cancellation wins while preserving its captured original reason. */
-    const cancellationFailure = (): StorageContractError =>
-      new StorageContractError(StorageContractErrorCode.aborted, {
-        backend: StorageBackend.indexedDb,
-        cause: abortReason
-      })
-    const onAbort = (): void => {
-      cancelled = true
-      abortReason = readAbortReason(signal)
-      try {
-        transaction.abort()
-      } catch {
-        // Transaction may already be completed; result still settles through IDB events.
-      }
+    assertOperationContext(context)
+    /** Terminal state belongs to this one original native transaction and its caller signal. */
+    const commitState: IIdbCommitState = {
+      transaction,
+      signal: context?.signal,
+      runtime,
+      resolve,
+      reject,
+      cancelled: false,
+      abortReason: undefined,
+      disposeAbort: () => {},
+      settled: false,
+      firstFailure: undefined
     }
-    const finish = (settle: () => void): void => {
-      if (settled) return
-      settled = true
-      disposeAbort()
-      settle()
-    }
+    installIdbCommitHandlers(commitState)
     try {
-      installIdbTransactionHandlers(
-        transaction,
-        () =>
-          finish(() => {
-            if (cancelled) reject(cancellationFailure())
-            else if (firstFailure !== undefined) reject(firstFailure)
-            else resolve()
-          }),
-        (event) => {
-          /** Request errors bubble before transaction.error is populated on native abort. */
-          const target = event?.target
-          const cause =
-            target !== undefined && target !== null && target !== transaction
-              ? readIdbRequestError(target as IDBRequest)
-              : readIdbTransactionError(transaction)
-          firstFailure ??= new StorageError(StorageErrorCode.transactionFailed, {
-            backend: StorageBackend.indexedDb,
-            cause
-          })
-        },
-        () =>
-          finish(() =>
-            reject(
-              cancelled
-                ? cancellationFailure()
-                : (firstFailure ?? normalizeTransactionAbort(readIdbTransactionError(transaction)))
-            )
-          )
+      commitState.disposeAbort = subscribeToAbort(
+        commitState.signal,
+        () => cancelIdbCommit(commitState),
+        runtime.reporter
       )
-      terminalHandlersInstalled = true
-      disposeAbort = subscribeToAbort(signal, onAbort, runtime.reporter)
     } catch (cause) {
-      firstFailure ??= normalizeIdbRequestFailure(cause)
+      commitState.firstFailure ??= normalizeIdbRequestFailure(cause)
       try {
         transaction.abort()
       } catch {
-        /* setup failure already owns the result; transaction may already be settled */
+        /* The existing terminal handlers still settle an already-ended transaction. */
       }
-      // A rejected handler setter acquired no usable terminal bridge. Signal setup failures did,
-      // so their rollback must still drain through the original native abort/complete handlers.
-      if (!terminalHandlersInstalled) finish(() => reject(firstFailure))
     }
   })
+}
+
+/** Native property handlers retain the actual complete/error/abort event order. */
+function installIdbCommitHandlers(commitState: IIdbCommitState): void {
+  installIdbTransactionHandlers(
+    commitState.transaction,
+    () =>
+      finishIdbCommit(
+        commitState,
+        commitState.cancelled ? cancellationFailure(commitState) : commitState.firstFailure
+      ),
+    (event) => observeIdbCommitFailure(commitState, event),
+    () =>
+      finishIdbCommit(
+        commitState,
+        commitState.cancelled
+          ? cancellationFailure(commitState)
+          : (commitState.firstFailure ??
+              normalizeTransactionAbort(readIdbTransactionError(commitState.transaction)))
+      )
+  )
+}
+
+/** Cancellation chooses the original caller reason before requesting native rollback. */
+function cancelIdbCommit(commitState: IIdbCommitState): void {
+  commitState.cancelled = true
+  commitState.abortReason = readAbortReason(commitState.signal)
+  try {
+    commitState.transaction.abort()
+  } catch {
+    /* Native completion/abort still selects the actual physical terminal. */
+  }
+}
+
+/** Request errors can bubble before transaction.error receives its native abort diagnostic. */
+function observeIdbCommitFailure(commitState: IIdbCommitState, event: Event | undefined): void {
+  /** The original event target distinguishes a request error from transaction-level failure. */
+  const target = event?.target
+  /** Preserve that native error as the cause until physical completion. */
+  const cause =
+    target !== undefined && target !== null && target !== commitState.transaction
+      ? readIdbRequestError(target as IDBRequest)
+      : readIdbTransactionError(commitState.transaction)
+  commitState.firstFailure ??= new StorageError(StorageErrorCode.transactionFailed, {
+    backend: StorageBackend.indexedDb,
+    cause
+  })
+}
+
+/** The caller's cancellation reason retains the existing coded storage boundary. */
+function cancellationFailure(commitState: IIdbCommitState): StorageContractError {
+  return new StorageContractError(StorageContractErrorCode.aborted, {
+    backend: StorageBackend.indexedDb,
+    cause: commitState.abortReason
+  })
+}
+
+/** Select the original terminal once, removing the abort listener before settling its promise. */
+function finishIdbCommit(
+  commitState: IIdbCommitState,
+  failure: IStorageErrorFamily | undefined
+): void {
+  if (commitState.settled) return
+  commitState.settled = true
+  commitState.disposeAbort()
+  if (failure === undefined) commitState.resolve()
+  else commitState.reject(failure)
 }

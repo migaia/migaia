@@ -63,10 +63,9 @@ describe('fromIdbRequest', () => {
     controller.abort('mid-flight')
     await expect(pending).rejects.toMatchObject({ code: 'ABORTED' })
   })
-  it('context.signal 只读取一次且不会丢失 check-subscribe 窗口内的 abort', async () => {
+  it('不会丢失 check-subscribe 窗口内的 abort', async () => {
     const db = await openDb()
     let aborted = false
-    let contextReads = 0
     const signal = {
       get aborted() {
         return aborted
@@ -81,15 +80,11 @@ describe('fromIdbRequest', () => {
       fromIdbRequest(
         db.transaction('kv').objectStore('kv').get('k'),
         {
-          get signal() {
-            contextReads += 1
-            return signal as never
-          }
+          signal: signal as never
         },
         createStorageOperationRuntime()
       )
     ).rejects.toMatchObject({ code: 'ABORTED' })
-    expect(contextReads).toBe(1)
   })
   it('listener setup/cleanup 异常遵循共享 operation 协议', async () => {
     const db = await openDb()
@@ -245,12 +240,11 @@ describe('idbTransactionCommit', () => {
       )
     ).toBe('committed')
   })
-  it('context.signal 只读取一次且不会丢失 check-subscribe 窗口内的 abort', async () => {
+  it('不会丢失 check-subscribe 窗口内的 abort', async () => {
     const db = await openDb()
     const tx = db.transaction('kv', 'readwrite')
     tx.objectStore('kv').put('v', 'k')
     let aborted = false
-    let contextReads = 0
     const signal = {
       get aborted() {
         return aborted
@@ -265,15 +259,11 @@ describe('idbTransactionCommit', () => {
       idbTransactionCommit(
         tx,
         {
-          get signal() {
-            contextReads += 1
-            return signal as never
-          }
+          signal: signal as never
         },
         createStorageOperationRuntime()
       )
     ).rejects.toMatchObject({ code: 'ABORTED' })
-    expect(contextReads).toBe(1)
   })
   it('transaction listener setup/cleanup 异常遵循共享 operation 协议', async () => {
     const db = await openDb()

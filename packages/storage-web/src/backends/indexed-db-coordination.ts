@@ -6,7 +6,10 @@ import {
 } from '@migaia/event-subscriber'
 import { isPlainObject } from '@migaia/utils/object'
 import { decodeFlatStorageKey, encodeFlatStorageKey } from '@migaia/storage-host/authoring/backend'
-import { safeJsonPayloadByteLength } from '@migaia/storage-host/authoring/backend'
+import {
+  safeJsonPayloadByteLength,
+  reportCleanupError
+} from '@migaia/storage-host/authoring/backend'
 import type { IBackendKeyLockPort } from '@migaia/storage-host/authoring/backend'
 import { StorageErrorText } from '../error-text.js'
 import { StorageErrorCode, createStorageTypeError } from '../types/errors.js'
@@ -122,30 +125,6 @@ type IIndexedDbWireSnapshot = {
   readonly keys?: unknown
 }
 
-/** Capture every wire accessor once into immutable plain data for both sizing and decoding. */
-const snapshotWireHint = (value: object): IIndexedDbWireSnapshot => {
-  /** Reads the untrusted DTO through one stable source object. */
-  const source = value as Record<string, unknown>
-  /** Captures the optional key collection before any size or decode pass. */
-  const sourceKeys = source.keys
-  /** Copies key arrays so nested mutable values cannot change between consumers. */
-  const keys = Array.isArray(sourceKeys) ? sourceKeys.map((encodedKey) => encodedKey) : sourceKeys
-  /** Captures optional scope once while omitting absent fields from the snapshot. */
-  const scope = source.scope
-  /** Organization is metadata and shares the same single-read wire snapshot. */
-  const orgId = source.orgId
-  return {
-    version: source.version,
-    origin: source.origin,
-    ...(orgId === undefined ? {} : { orgId }),
-    sequence: source.sequence,
-    channel: source.channel,
-    kind: source.kind,
-    ...(scope === undefined ? {} : { scope }),
-    ...(keys === undefined ? {} : { keys })
-  }
-}
-
 /** Validate one metadata-only message and decode its bounded canonical storage keys. */
 const decodeWireHint = (
   value: unknown,
@@ -157,7 +136,8 @@ const decodeWireHint = (
     if (!isPlainObject(value)) return
     const keys = Reflect.ownKeys(value)
     if (!keys.every((key) => typeof key === 'string' && isAllowedWireKey(key))) return
-    const snapshot = snapshotWireHint(value)
+    /** Native structured-clone messages are already detached; decoding remains synchronous. */
+    const snapshot = value as IIndexedDbWireSnapshot
     if (safeJsonPayloadByteLength(snapshot) > MAX_HINT_BYTES) return
     const { version, origin, orgId, sequence, channel, kind, scope, keys: encodedKeys } = snapshot
     if (
@@ -300,11 +280,7 @@ const scheduleDrain = (entry: IIndexedDbCoordinationEntry): void => {
 
 /** Report transport/listener failures without allowing diagnostics to affect committed writes. */
 const reportCoordinationError = (entry: IIndexedDbCoordinationEntry, error: unknown): void => {
-  try {
-    entry.report(error)
-  } catch {
-    // A hostile reporter cannot make a transport failure escape the committed operation.
-  }
+  reportCleanupError(entry.report, error)
 }
 
 /** Enqueue one validated hint, collapsing pending-scope overflow to a global invalidation. */
@@ -339,11 +315,7 @@ const createEntry = (
   const fanout = createEventChannel<IQueuedIndexedDbHint>({
     dispatchPolicy: EventDispatchPolicy.queued,
     report: ({ error }) => {
-      try {
-        options.report(error)
-      } catch {
-        // A hostile reporter cannot make fanout failure escape coordination.
-      }
+      reportCleanupError(options.report, error)
     }
   })
   const entry = {
@@ -380,84 +352,159 @@ const createEntry = (
   return entry
 }
 
-/** Acquire one exact store member from the realm-local coordination registry. */
-export const acquireIndexedDbCoordination = (
-  options: IIndexedDbCoordinationOptions
-): {
+/** A member borrows one shared physical key port and owns only its native subscription. */
+type IIndexedDbCoordinationMember = {
   readonly admitted: boolean
   readonly keyPort: IBackendKeyLockPort
-  readonly publish: (change: IStorageChange) => void
-  readonly dispose: () => Promise<void>
-} => {
-  const factoryObject = options.factory as unknown as object
-  let registry = factoryRegistries.get(factoryObject)
-  if (registry === undefined) {
-    registry = new Map()
-    factoryRegistries.set(factoryObject, registry)
-  }
-  factoryTokenOf(options.factory)
+  publish(change: IStorageChange): void
+  dispose(): Promise<void>
+}
+
+/** Acquire one exact store member from the realm-local coordination registry. */
+
+/** One coordination member owns only its existing registry row, subscription and cleanup result. */
+type IIndexedDbCoordinationMemberContext = {
+  /** Original options is captured before native construction begins. */
+  readonly options: IIndexedDbCoordinationOptions
+
+  /** Original factory identity selects the existing realm-local coordination registry. */
+  factoryObject: object
+
+  /** The factory registry retains only live physical database groups. */
+  registry: Map<string, IIndexedDbCoordinationGroup> | undefined
+
   /** Database identity governs locks even when two layouts share only some native stores. */
-  let group = registry.get(options.dbName)
-  if (group === undefined) {
-    group = { keyPort: options.createKeyLockPort(), layouts: new Map() }
-    registry.set(options.dbName, group)
-  }
+  /** This original database group shares one canonical key-lock port across layouts. */
+  group: IIndexedDbCoordinationGroup | undefined
+
   /** Notification isolation retains the original layout fingerprint unchanged. */
-  const registryKey = options.layoutFingerprint
-  let entry = group.layouts.get(registryKey)
-  if (entry === undefined) {
-    entry = createEntry(options, registryKey)
-    group.layouts.set(registryKey, entry)
-  }
-  const memberId = Symbol('indexed-db-coordination-member')
+  /** The original layout fingerprint isolates notification transports. */
+  registryKey: string
+
+  /** This same live entry owns native fanout, duplicate observations and transport state. */
+  entry: IIndexedDbCoordinationEntry | undefined
+
+  /** Only this member is excluded from its own local transport fanout. */
+  memberId: symbol
+
   /** Exact event-subscriber handle retained by this coordination member until its own disposal. */
-  const subscription = entry.fanout.subscribe((event) => {
-    const queued = event.value
-    if (queued.exclude === memberId) return
-    options.onChange(queued.change)
-  })
-  entry.memberCount += 1
-  let released = false
+  /** The original event-channel disposer releases this exact member subscription. */
+  subscription: () => void
+
+  /** Member cleanup seals only this projection before shared ownership can be released. */
+  released: boolean
+
   /** Each member waits for its original cleanup without closing a still-shared physical port. */
-  let disposal: Promise<void> | undefined
+  /** Every cleanup caller waits for the original shared-port release result. */
+  disposal: Promise<void> | undefined
+}
+/** Acquire one physical member without adding a second lock or notification lifetime. */
+export function acquireIndexedDbCoordination(
+  options: IIndexedDbCoordinationOptions
+): IIndexedDbCoordinationMember {
+  /** Initialize native facts in original construction order before publishing any port. */
+  const memberState = { options } as IIndexedDbCoordinationMemberContext
+
+  memberState.factoryObject = memberState.options.factory as unknown as object
+
+  memberState.registry = factoryRegistries.get(memberState.factoryObject)
+
+  if (memberState.registry === undefined) {
+    memberState.registry = new Map()
+    factoryRegistries.set(memberState.factoryObject, memberState.registry)
+  }
+
+  factoryTokenOf(memberState.options.factory)
+
+  /** Database identity governs locks even when two layouts share only some native stores. */
+  memberState.group = memberState.registry.get(memberState.options.dbName)
+
+  if (memberState.group === undefined) {
+    memberState.group = { keyPort: memberState.options.createKeyLockPort(), layouts: new Map() }
+    memberState.registry.set(memberState.options.dbName, memberState.group)
+  }
+
+  /** Notification isolation retains the original layout fingerprint unchanged. */
+  memberState.registryKey = memberState.options.layoutFingerprint
+
+  memberState.entry = memberState.group.layouts.get(memberState.registryKey)
+
+  if (memberState.entry === undefined) {
+    memberState.entry = createEntry(memberState.options, memberState.registryKey)
+    memberState.group.layouts.set(memberState.registryKey, memberState.entry)
+  }
+
+  memberState.memberId = Symbol('indexed-db-coordination-member')
+
+  /** Exact event-subscriber handle retained by this coordination member until its own disposal. */
+  memberState.subscription = memberState.entry.fanout.subscribe((event) => {
+    const queued = event.value
+    if (queued.exclude === memberState.memberId) return
+    memberState.options.onChange(queued.change)
+  })
+
+  memberState.entry.memberCount += 1
+
+  memberState.released = false
+  return createCoordinationMemberMethods(memberState)
+}
+/** Publish one member over its original shared physical coordination entry. */
+function createCoordinationMemberMethods(
+  memberState: IIndexedDbCoordinationMemberContext
+): IIndexedDbCoordinationMember {
   return {
-    keyPort: group.keyPort,
-    admitted: entry.channel !== undefined && options.factory === options.realmDefaultFactory,
-    publish: (change) => {
-      if (released || entry!.disposed || !rememberHint(entry!, change)) return
-      enqueueHint(entry!, change, memberId)
-      const wire = encodeWireHint(change, options.report)
-      if (wire === undefined || entry!.channel === undefined) return
-      try {
-        entry!.channel.postMessage(wire)
-      } catch (error) {
-        options.report(error)
-      }
-    },
-    dispose: () => {
-      if (disposal !== undefined) return disposal
-      released = true
-      subscription()
-      entry!.memberCount -= 1
-      if (entry!.memberCount > 0) return (disposal = Promise.resolve())
-      entry!.disposed = true
-      entry!.pending.length = 0
-      entry!.pendingScopes.clear()
-      entry!.fanout.clear()
-      if (entry!.channel !== undefined) {
-        try {
-          if (typeof entry!.channel.removeEventListener === 'function')
-            entry!.channel.removeEventListener('message', entry!.onMessage)
-          else entry!.channel.onmessage = null
-          entry!.channel.close()
-        } catch (error) {
-          options.report(error)
-        }
-      }
-      group!.layouts.delete(entry!.registryKey)
-      if (group!.layouts.size > 0) return (disposal = Promise.resolve())
-      registry!.delete(options.dbName)
-      return (disposal = group!.keyPort.dispose())
+    keyPort: memberState.group!.keyPort,
+    admitted:
+      memberState.entry!.channel !== undefined &&
+      memberState.options.factory === memberState.options.realmDefaultFactory,
+    publish: (change) => coordinationMemberPublish(memberState, change),
+    dispose: () => coordinationMemberDispose(memberState)
+  }
+}
+
+/** Perform publish on this owner's original physical coordination member state. */
+function coordinationMemberPublish(
+  memberState: IIndexedDbCoordinationMemberContext,
+  change: IStorageChange
+) {
+  if (
+    memberState.released ||
+    memberState.entry!.disposed ||
+    !rememberHint(memberState.entry!, change)
+  )
+    return
+  enqueueHint(memberState.entry!, change, memberState.memberId)
+  const wire = encodeWireHint(change, memberState.options.report)
+  if (wire === undefined || memberState.entry!.channel === undefined) return
+  try {
+    memberState.entry!.channel.postMessage(wire)
+  } catch (error) {
+    memberState.options.report(error)
+  }
+}
+/** Perform dispose on this owner's original physical coordination member state. */
+function coordinationMemberDispose(memberState: IIndexedDbCoordinationMemberContext) {
+  if (memberState.disposal !== undefined) return memberState.disposal
+  memberState.released = true
+  memberState.subscription()
+  memberState.entry!.memberCount -= 1
+  if (memberState.entry!.memberCount > 0) return (memberState.disposal = Promise.resolve())
+  memberState.entry!.disposed = true
+  memberState.entry!.pending.length = 0
+  memberState.entry!.pendingScopes.clear()
+  memberState.entry!.fanout.clear()
+  if (memberState.entry!.channel !== undefined) {
+    try {
+      if (typeof memberState.entry!.channel.removeEventListener === 'function')
+        memberState.entry!.channel.removeEventListener('message', memberState.entry!.onMessage)
+      else memberState.entry!.channel.onmessage = null
+      memberState.entry!.channel.close()
+    } catch (error) {
+      memberState.options.report(error)
     }
   }
+  memberState.group!.layouts.delete(memberState.entry!.registryKey)
+  if (memberState.group!.layouts.size > 0) return (memberState.disposal = Promise.resolve())
+  memberState.registry!.delete(memberState.options.dbName)
+  return (memberState.disposal = memberState.group!.keyPort.dispose())
 }
