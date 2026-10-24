@@ -67,6 +67,8 @@ import type {
   IStorageJournalNamespaceView
 } from '@migaia/storage-host'
 import {
+  createBackendJournalNamespace,
+  type IBackendJournalTransaction,
   createStorageOperationReporter,
   reportCleanupError,
   throwIfAborted,
@@ -104,7 +106,7 @@ import { SqliteErrorCode } from './error-code.js'
 import { SqliteErrorText } from './error-text.js'
 import { decodeKey, decodeHexKey, keyHex } from './key-codec.js'
 import { createSqliteStatements, createSqliteExecutor } from './sql.js'
-import { createSqliteJournalNamespace, type ISqliteJournalTerminal } from './journal.js'
+import type { ISqliteJournalTerminal } from './journal.js'
 import type {
   ISqliteOptions,
   ISqliteStore,
@@ -3176,7 +3178,24 @@ export function createSqliteStore<TValue>(
         }
         /** Cached native indexes must never survive an actual deletion of their private rows. */
         const openedGeneration = journalGeneration.value
-        return createSqliteJournalNamespace({
+        /** Native terminal sets stay on this exact original transaction, not the shared resource. */
+        const project = (scope: Omit<ITransactionScope, 'use'>): IBackendJournalTransaction => {
+          const terminal = journalScope(scope).terminal
+          const listen = (effects: Set<() => void>, effect: () => void) => {
+            effects.add(effect)
+            return () => {
+              effects.delete(effect)
+            }
+          }
+          return {
+            run: (work) => work(view(scope)),
+            onCommit: (effect) => listen(terminal.committed, effect),
+            onRollback: (effect) => listen(terminal.rolledBack, effect),
+            onEnd: (effect) => listen(terminal.ended, effect)
+          }
+        }
+        const exclusive = !wal && typeof physical !== 'string'
+        return createBackendJournalNamespace({
           assertLive: () => {
             controller.assertLive()
             if (openedGeneration !== journalGeneration.value)
@@ -3187,38 +3206,41 @@ export function createSqliteStore<TValue>(
           closingSignal: controller.closingSignal,
           report: (error) => reportCleanupError(report, error),
           /** Only this caller-owned memory connection has reliable lifetime exclusivity. */
-          exclusive: !wal && typeof physical !== 'string',
+          nativeAtomic: true,
+          ...(exclusive ? {} : { indexExclusive: false as const }),
+          backend: SqliteNames.backend,
           reserve: (hold) =>
-            runWithConcurrency(
-              {
-                store,
-                options: { lock: [lockKey.record([SqliteNames.journalOwner, prefix])] },
-                policy: ConcurrencyPolicy.fail()
-              },
-              {
-                attempt: (context) =>
-                  localGroup(runtime.orgId).locks.attemptMetadata(
-                    context,
-                    {
-                      owner: controller.origin,
-                      since: Date.now(),
-                      status: 'held',
-                      scope: 'local'
-                    },
-                    {
-                      attempt: async () => {
-                        await hold()
-                        return { status: 'committed', value: undefined }
-                      }
-                    },
-                    concurrencyStages,
-                    controller.closingSignal
-                  )
-              }
-            ),
-          authenticate: journalScope,
-          view,
-          transaction: (work) => transact((scope) => work(scope))
+            !exclusive
+              ? hold()
+              : runWithConcurrency(
+                  {
+                    store,
+                    options: { lock: [lockKey.record([SqliteNames.journalOwner, prefix])] },
+                    policy: ConcurrencyPolicy.fail()
+                  },
+                  {
+                    attempt: (context) =>
+                      localGroup(runtime.orgId).locks.attemptMetadata(
+                        context,
+                        {
+                          owner: controller.origin,
+                          since: Date.now(),
+                          status: 'held',
+                          scope: 'local'
+                        },
+                        {
+                          attempt: async () => {
+                            await hold()
+                            return { status: 'committed', value: undefined }
+                          }
+                        },
+                        concurrencyStages,
+                        controller.closingSignal
+                      )
+                  }
+                ),
+          authenticate: (scope) => ({ info: journalScope(scope).info, port: project(scope) }),
+          transaction: (work) => transact((scope) => work(project(scope)))
         })
       }
     }
