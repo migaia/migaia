@@ -91,6 +91,7 @@
     "@migaia/utils": "workspace:^"
   },
   "devDependencies": {
+    "@migaia/logger": "workspace:*",
     "@migaia/rpc-contract": "workspace:*",
     "@migaia/store-persist": "workspace:*",
     "@vitest/coverage-v8": "4.1.10",

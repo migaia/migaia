@@ -990,6 +990,9 @@ importers:
         specifier: workspace:^
         version: link:../utils
     devDependencies:
+      '@migaia/logger':
+        specifier: workspace:^
+        version: link:../logger
       '@migaia/store-light':
         specifier: workspace:^
         version: link:../store-light
@@ -1027,6 +1030,9 @@ importers:
         specifier: workspace:^
         version: link:../utils
     devDependencies:
+      '@migaia/logger':
+        specifier: workspace:*
+        version: link:../logger
       '@migaia/rpc-contract':
         specifier: workspace:*
         version: link:../rpc-contract

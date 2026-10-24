@@ -74,6 +74,30 @@ try {
   ],
   indexedDbBackendPlugin: [
     {
+      title: t('Keep private history across business clear', '业务清理后保留私有历史'),
+      problem: t(
+        'A persistent log needs its own native metadata namespace and a lifetime-exclusive cached index.',
+        '持久日志需要原生私有元数据命名空间与整个资源期间独占的缓存索引。'
+      ),
+      example: `import { createStorageHost } from '@migaia/storage-host'
+import { storageLogStore } from '@migaia/storage-host/journal'
+import { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'
+
+const host = await createStorageHost({ plugins: [indexedDbBackendPlugin({ dbName: 'history' })] })
+try {
+  const log = await storageLogStore(host, 'indexed-db', { prefix: 'audit' })
+  try {
+    await log.append([{ kind: 'saved', payload: { id: 'draft' } }])
+    await host.backend('indexed-db').clearAll()
+    console.log(await log.lastSeq())
+  } finally { await log.dispose() }
+} finally { await host.dispose() }`,
+      result: t(
+        'Prints 1. Native Web Locks protect the resource across participating pages; a conflicting open reports LOCK_REJECTED. Without this persistent exclusion the log combination reports UNSUPPORTED_CAPABILITY before recovery I/O.',
+        '输出 1；原生 Web Locks 在参与页面间保护资源，冲突打开报 LOCK_REJECTED。缺少此持久独占能力时，日志组合在恢复 I/O 前报 UNSUPPORTED_CAPABILITY。'
+      )
+    },
+    {
       title: t('Commit text, bytes and records together', '一起提交文本、字节与记录'),
       problem: t(
         'A saved document and its attachment must share one rollback boundary. Use the supplied native transaction scope for every participating write.',
