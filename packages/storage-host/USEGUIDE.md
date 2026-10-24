@@ -263,3 +263,5 @@ PENDING-USER-REVIEW：dropOrg 遇到存活的全局 journal 时，原私有 name
 `/authoring/backend` 的 `encodeStorageJournalImage(present, value?, bytes?)` 与 `decodeStorageJournalImage(image, bytes?)` 为原生 adapter 复用原 memory 可移植镜像 codec。缺失与存在的 null 保持区分；字节镜像沿既有 base64 拥有者处理。codec id/version 与原 serialize 错误均不变。Memory 消费同一实现；调用方不获得原生、提交或安装权限。
 
 原生 binding 可声明 `requiresIndexedDbUndo?: true`，原 descriptor 快照单读并冻结该事实。当借用 logger 含 undo 时，同一配置拥有者要求 `indexedDbUndo: true`，缺省或 false 在打开原生终点前报 UNSUPPORTED_CAPABILITY。其它后端 binding 保持原缺省语义，仅 binlog 或仅遥测的配置不要求 undo 选择。
+
+原生作者的 `core.emit` 在宿主 closing 期间跳过可选诊断，且不执行延迟 payload 工厂，避免用 HOST_DISPOSING 替换已准入原生操作的结算结果。open 期间仍复用原 registration 检查和原事件通道；完全 closed 或失效 registration 的旧句柄继续拒绝。宿主关闭事件本身仍由原宿主拥有者发布。

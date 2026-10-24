@@ -346,10 +346,7 @@ export function createStoragePluginHost(options: IPluginHostOptions): IStoragePl
               return release
             }
           }) satisfies IStorageHooks,
-        emit: ((name, payload) => {
-          context.assertCurrent()
-          context.emit(name, payload)
-        }) satisfies IStorageHookEmitter,
+        emit: ((name, payload) => context.emit(name, payload)) satisfies IStorageHookEmitter,
         setStorageKind: context.setKind,
         execution: forwardStorageExecution(
           host,
@@ -944,7 +941,12 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
             registrationCore = core
           },
           hooks: this.#events.hooks,
-          emit: this.#events.emit,
+          emit: (name, payload) => {
+            /** Accepted native work may settle during close; optional diagnostics cannot mask it. */
+            if (this.#state === 'closing') return
+            assertRegistration()
+            this.#events.emit(name, payload)
+          },
           getObservers: (store, orgId) =>
             createStorageObservers(
               orgId === undefined
