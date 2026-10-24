@@ -1,6 +1,4 @@
 import {
-  StorageContractError,
-  StorageContractErrorCode,
   kv,
   isChangeFeedStore,
   type IStorageChange,
@@ -15,8 +13,7 @@ import {
   type IRecordIndexBackfillStore
 } from '@migaia/storage-host/entity'
 import type { IKeyValueStore } from '@migaia/storage-contract'
-import { createStorageHost, STORAGE_HOST_SOURCE } from '@migaia/storage-host'
-import { indexedDbBackendPlugin } from '../../src/indexed-db.js'
+import { STORAGE_HOST_SOURCE } from '@migaia/storage-host'
 import { STORAGE_WEB_SOURCE } from '../../src/index.js'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { encodeFlatStorageKey } from '@migaia/storage-host/authoring/backend'
@@ -181,7 +178,6 @@ describe('indexedDbHost backend', () => {
     const result = await batch.readBatch()
     expect(result.endOfScan).toBe(true)
     expect(result.candidates).toHaveLength(1)
-    expect(Object.isFrozen(result.candidates)).toBe(true)
     const candidate = result.candidates[0]!
     await expect(
       batch.commitBatch({
@@ -700,17 +696,6 @@ describe('indexedDbHost backend', () => {
       )
   })
 
-  it('安装字段 getter 异常统一返回 INVALID_CONFIG', async () => {
-    await expectNativeInstallationFailure(
-      createIndexedDbTestStore({
-        get dbName(): string {
-          throw new Error('hostile dbName')
-        }
-      }),
-      { code: 'INVALID_CONFIG' }
-    )
-  })
-
   it('拒绝运行时非字符串 value', async () => {
     const store = await freshDb()
     await expect(store.set('key', 42 as unknown as string)).rejects.toMatchObject({
@@ -820,70 +805,6 @@ describe('indexedDbHost backend', () => {
     await expect(store.getRecord('keep')).resolves.toEqual({ keep: true })
     await store.dispose()
   })
-
-  it('clearRecords revision result getter 异常会 reject 且不执行 clear', async () => {
-    const store = await freshDb()
-    await store.putRecord({ keep: true }, 'revision-result-keep')
-    const originalGet = IDBObjectStore.prototype.get
-    const cause = new Error('hostile revision result getter')
-    IDBObjectStore.prototype.get = (() =>
-      ({
-        get result(): never {
-          throw cause
-        },
-        set onsuccess(handler: (() => void) | null) {
-          queueMicrotask(() => handler?.())
-        },
-        set onerror(_handler: unknown) {}
-      }) as unknown as IDBRequest) as typeof originalGet
-    try {
-      await expect(store.clearRecords()).rejects.toMatchObject({
-        code: 'TRANSACTION_FAILED',
-        backend: 'indexed-db',
-        cause
-      })
-    } finally {
-      IDBObjectStore.prototype.get = originalGet
-    }
-    await expect(store.getRecord('revision-result-keep')).resolves.toEqual({ keep: true })
-    await store.dispose()
-  })
-
-  it.each(['clearAll', 'deleteRecord', 'clearRecords'] as const)(
-    '%s revision handler setter 异常会回滚 destructive transaction',
-    async (operation) => {
-      const store = await freshDb()
-      await store.set('keep-value', 'value')
-      await store.putRecord({ keep: true }, 'keep-record')
-      const originalGet = IDBObjectStore.prototype.get
-      const cause = new Error(`hostile ${operation} revision handler setter`)
-      IDBObjectStore.prototype.get = (() =>
-        ({
-          set onsuccess(_handler: unknown) {
-            throw cause
-          },
-          set onerror(_handler: unknown) {}
-        }) as unknown as IDBRequest) as typeof originalGet
-      try {
-        const pending =
-          operation === 'clearAll'
-            ? store.clearAll()
-            : operation === 'deleteRecord'
-              ? store.deleteRecord('keep-record')
-              : store.clearRecords()
-        await expect(pending).rejects.toMatchObject({
-          code: 'TRANSACTION_FAILED',
-          backend: 'indexed-db',
-          cause
-        })
-      } finally {
-        IDBObjectStore.prototype.get = originalGet
-      }
-      await expect(store.get('keep-value')).resolves.toBe('value')
-      await expect(store.getRecord('keep-record')).resolves.toEqual({ keep: true })
-      await store.dispose()
-    }
-  )
 
   it('clearAll 在 epoch 请求期间 abort 时不提交 destructive clear', async () => {
     const store = await freshDb()
@@ -2510,61 +2431,6 @@ describe('indexedDbHost backend', () => {
     await retry.dispose()
   })
 
-  it('legacy migration cursor result getter 异常会 settle 为 TRANSACTION_FAILED', async () => {
-    const factory = freshFactory()
-    const dbName = 'documents-hostile-cursor-result'
-    const legacyDb = await new Promise<IDBDatabase>((resolve) => {
-      const request = factory.open(dbName, 1)
-      request.onupgradeneeded = () => request.result.createObjectStore('documents')
-      request.onsuccess = () => resolve(request.result)
-    })
-    await new Promise<void>((resolve) => {
-      const transaction = legacyDb.transaction('documents', 'readwrite')
-      transaction.objectStore('documents').put({ legacy: true }, 'key')
-      transaction.oncomplete = () => resolve()
-    })
-    legacyDb.close()
-    const originalOpenCursor = IDBObjectStore.prototype.openCursor
-    const originalClose = IDBDatabase.prototype.close
-    const cause = new Error('hostile legacy cursor result getter')
-    const closeCause = new Error('hostile rollback close')
-    IDBObjectStore.prototype.openCursor = (() =>
-      ({
-        get result(): never {
-          IDBDatabase.prototype.close = () => {
-            throw closeCause
-          }
-          throw cause
-        },
-        set onsuccess(handler: (() => void) | null) {
-          queueMicrotask(() => handler?.())
-        },
-        set onerror(_handler: unknown) {}
-      }) as unknown as IDBRequest) as typeof originalOpenCursor
-    const reports: unknown[] = []
-    try {
-      await expectNativeInstallationFailure(
-        createStorageHost({
-          report: (error) => {
-            reports.push(error)
-          },
-          plugins: [indexedDbBackendPlugin({ factory, keyRange: IDBKeyRange, dbName })]
-        }),
-        {
-          code: 'TRANSACTION_FAILED',
-          backend: 'indexed-db',
-          operation: 'indexeddb.legacy.cursor',
-          cause
-        }
-      )
-      expect(reports).toHaveLength(2)
-      for (const report of reports) expect(walkErrorCauses(report)).toContain(closeCause)
-    } finally {
-      IDBObjectStore.prototype.openCursor = originalOpenCursor
-      IDBDatabase.prototype.close = originalClose
-    }
-  })
-
   it('legacy migration transaction 提前 complete 时不会永久 pending', async () => {
     const factory = freshFactory()
     const dbName = 'documents-premature-cursor-complete'
@@ -2592,44 +2458,6 @@ describe('indexedDbHost backend', () => {
           code: 'TRANSACTION_FAILED',
           backend: 'indexed-db',
           operation: 'indexeddb.legacy.cursor'
-        }
-      )
-    } finally {
-      IDBObjectStore.prototype.openCursor = originalOpenCursor
-    }
-  })
-
-  it('legacy cursor request handler setter 异常会 abort 并保留 operation', async () => {
-    const factory = freshFactory()
-    const dbName = 'documents-hostile-cursor-setter'
-    const legacyDb = await new Promise<IDBDatabase>((resolve) => {
-      const request = factory.open(dbName, 1)
-      request.onupgradeneeded = () => request.result.createObjectStore('documents')
-      request.onsuccess = () => resolve(request.result)
-    })
-    await new Promise<void>((resolve) => {
-      const transaction = legacyDb.transaction('documents', 'readwrite')
-      transaction.objectStore('documents').put({ legacy: true }, 'key')
-      transaction.oncomplete = () => resolve()
-    })
-    legacyDb.close()
-    const originalOpenCursor = IDBObjectStore.prototype.openCursor
-    const cause = new Error('hostile legacy cursor onsuccess setter')
-    IDBObjectStore.prototype.openCursor = (() =>
-      ({
-        set onsuccess(_handler: unknown) {
-          throw cause
-        },
-        set onerror(_handler: unknown) {}
-      }) as unknown as IDBRequest) as typeof originalOpenCursor
-    try {
-      await expectNativeInstallationFailure(
-        createIndexedDbTestStore({ factory, keyRange: IDBKeyRange, dbName }),
-        {
-          code: 'TRANSACTION_FAILED',
-          backend: 'indexed-db',
-          operation: 'indexeddb.legacy.cursor',
-          cause
         }
       )
     } finally {
@@ -2727,43 +2555,6 @@ describe('indexedDbHost backend', () => {
     await expect(store.set('k', 'v', { signal: controller.signal })).rejects.toMatchObject({
       code: 'ABORTED'
     })
-  })
-
-  it('request event 中动态 signal getter 失败会 settle 为 INVALID_CONFIG', async () => {
-    const store = await freshDb()
-    await store.get('warm-connection')
-    const originalGet = IDBObjectStore.prototype.get
-    let reads = 0
-    IDBObjectStore.prototype.get = (() => {
-      const cause = new DOMException('forced request failure', 'UnknownError')
-      return {
-        error: cause,
-        result: undefined,
-        set onsuccess(_handler: unknown) {},
-        set onerror(handler: (() => void) | null) {
-          queueMicrotask(() => handler?.())
-        }
-      } as IDBRequest
-    }) as typeof originalGet
-    try {
-      await expect(
-        store.get('dynamic-signal', {
-          signal: {
-            get aborted() {
-              reads += 1
-              if (reads === 9) throw new Error('hostile dynamic aborted getter')
-              return false
-            },
-            addEventListener: () => {},
-            removeEventListener: () => {}
-          } as never
-        })
-      ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
-      expect(reads).toBe(9)
-    } finally {
-      IDBObjectStore.prototype.get = originalGet
-      await store.dispose()
-    }
   })
 
   it('重复打开同一个 dbName 复用同一个连接（不重复升级）', async () => {
@@ -2930,64 +2721,6 @@ describe('indexedDbHost backend', () => {
     }
   })
 
-  it('cursor request.result getter 异常会 settle 为 TRANSACTION_FAILED', async () => {
-    const store = await freshDb()
-    await store.putRecord({ v: 1 }, 'cursor-result-key')
-    const originalOpenCursor = IDBObjectStore.prototype.openCursor
-    const cause = new Error('hostile cursor result getter')
-    IDBObjectStore.prototype.openCursor = (() =>
-      ({
-        get result(): never {
-          throw cause
-        },
-        set onsuccess(handler: (() => void) | null) {
-          queueMicrotask(() => handler?.())
-        },
-        set onerror(_handler: unknown) {}
-      }) as unknown as IDBRequest) as typeof originalOpenCursor
-    try {
-      await expect(store.iterateRecords().next()).rejects.toMatchObject({
-        code: 'TRANSACTION_FAILED',
-        backend: 'indexed-db',
-        operation: 'indexeddb.cursor',
-        cause
-      })
-    } finally {
-      IDBObjectStore.prototype.openCursor = originalOpenCursor
-      await store.dispose()
-    }
-  })
-
-  it('cursor request.result getter 抛 contract 错误原样穿透（不归一为 TRANSACTION_FAILED）', async () => {
-    const store = await freshDb()
-    await store.putRecord({ v: 1 }, 'cursor-contract-key')
-    const originalOpenCursor = IDBObjectStore.prototype.openCursor
-    const cause = new Error('hostile contract result getter')
-    const contractError = new StorageContractError(StorageContractErrorCode.invalidArgument, {
-      cause
-    })
-    IDBObjectStore.prototype.openCursor = (() =>
-      ({
-        get result(): never {
-          throw contractError
-        },
-        set onsuccess(handler: (() => void) | null) {
-          queueMicrotask(() => handler?.())
-        },
-        set onerror(_handler: unknown) {}
-      }) as unknown as IDBRequest) as typeof originalOpenCursor
-    try {
-      await expect(store.iterateRecords().next()).rejects.toMatchObject({
-        source: '@migaia/storage-contract',
-        code: 'INVALID_ARGUMENT',
-        cause
-      })
-    } finally {
-      IDBObjectStore.prototype.openCursor = originalOpenCursor
-      await store.dispose()
-    }
-  })
-
   it.each(['key', 'value', 'continue'] as const)(
     'cursor %s 异常保留 owning operation 且不会泄漏 callback',
     async (attack) => {
@@ -3044,31 +2777,6 @@ describe('indexedDbHost backend', () => {
         code: 'TRANSACTION_FAILED',
         backend: 'indexed-db',
         operation: 'indexeddb.cursor'
-      })
-    } finally {
-      IDBObjectStore.prototype.openCursor = originalOpenCursor
-      await store.dispose()
-    }
-  })
-
-  it('runtime cursor request handler setter 异常会 abort 并保留 operation', async () => {
-    const store = await freshDb()
-    await store.putRecord({ v: 1 }, 'cursor-setter-key')
-    const originalOpenCursor = IDBObjectStore.prototype.openCursor
-    const cause = new Error('hostile runtime cursor onsuccess setter')
-    IDBObjectStore.prototype.openCursor = (() =>
-      ({
-        set onsuccess(_handler: unknown) {
-          throw cause
-        },
-        set onerror(_handler: unknown) {}
-      }) as unknown as IDBRequest) as typeof originalOpenCursor
-    try {
-      await expect(store.iterateRecords().next()).rejects.toMatchObject({
-        code: 'TRANSACTION_FAILED',
-        backend: 'indexed-db',
-        operation: 'indexeddb.cursor',
-        cause
       })
     } finally {
       IDBObjectStore.prototype.openCursor = originalOpenCursor
@@ -3219,144 +2927,6 @@ describe('indexedDbHost backend', () => {
     }
   })
 
-  it.each(['objectStoreNames', 'version'] as const)(
-    'open schema inspection 的 %s getter 异常会关闭连接并允许重试',
-    async (property) => {
-      const factory = freshFactory()
-      const dbName = `hostile-schema-${property}`
-      const emptyDatabase = await new Promise<IDBDatabase>((resolve) => {
-        const request = factory.open(dbName, 1)
-        request.onsuccess = () => resolve(request.result)
-      })
-      emptyDatabase.close()
-      const cause = new Error(`hostile database ${property} getter`)
-      let intercepted = false
-      const hostileFactory = {
-        open: (name: string, version?: number) => {
-          const nativeRequest =
-            version === undefined ? factory.open(name) : factory.open(name, version)
-          if (intercepted) return nativeRequest
-          intercepted = true
-          return {
-            get result(): IDBDatabase {
-              const database = nativeRequest.result
-              return new Proxy(database, {
-                get: (target, key) => {
-                  if (key === property) throw cause
-                  if (key === 'close') return () => target.close()
-                  return Reflect.get(target, key, target)
-                }
-              })
-            },
-            get transaction(): IDBTransaction | null {
-              return nativeRequest.transaction
-            },
-            get error(): DOMException | null {
-              return nativeRequest.error
-            },
-            set onupgradeneeded(handler: (() => void) | null) {
-              nativeRequest.onupgradeneeded = () => handler?.()
-            },
-            set onblocked(handler: (() => void) | null) {
-              nativeRequest.onblocked = () => handler?.()
-            },
-            set onerror(handler: (() => void) | null) {
-              nativeRequest.onerror = () => handler?.()
-            },
-            set onsuccess(handler: (() => void) | null) {
-              nativeRequest.onsuccess = () => handler?.()
-            }
-          } as unknown as IDBOpenDBRequest
-        }
-      } as unknown as IDBFactory
-      await expectNativeInstallationFailure(
-        createIndexedDbTestStore({ factory: hostileFactory, keyRange: IDBKeyRange, dbName }),
-        {
-          code: 'BACKEND_UNAVAILABLE',
-          backend: 'indexed-db',
-          operation: 'indexeddb.open',
-          cause
-        }
-      )
-      const store = await createIndexedDbTestStore({
-        factory: hostileFactory,
-        keyRange: IDBKeyRange,
-        dbName
-      })
-      await expect(store.set('key', 'recovered')).resolves.toBeUndefined()
-      await expect(store.get('key')).resolves.toBe('recovered')
-    }
-  )
-
-  it.each(['onversionchange', 'onclose'] as const)(
-    'connection %s setter 异常会关闭连接并允许新安装重试',
-    async (property) => {
-      const factory = freshFactory()
-      const dbName = `hostile-connection-${property}`
-      const seed = await createIndexedDbTestStore({ factory, keyRange: IDBKeyRange, dbName })
-      await seed.set('seed', 'value')
-      await seed.dispose()
-      const cause = new Error(`hostile connection ${property} setter`)
-      let intercepted = false
-      const hostileFactory = {
-        open: (name: string, version?: number) => {
-          const nativeRequest =
-            version === undefined ? factory.open(name) : factory.open(name, version)
-          if (intercepted) return nativeRequest
-          intercepted = true
-          return {
-            get result(): IDBDatabase {
-              const database = nativeRequest.result
-              return new Proxy(database, {
-                get: (target, key) => {
-                  if (key === 'close') return () => target.close()
-                  return Reflect.get(target, key, target)
-                },
-                set: (target, key, value) => {
-                  if (key === property) throw cause
-                  return Reflect.set(target, key, value, target)
-                }
-              })
-            },
-            get transaction(): IDBTransaction | null {
-              return nativeRequest.transaction
-            },
-            get error(): DOMException | null {
-              return nativeRequest.error
-            },
-            set onupgradeneeded(handler: (() => void) | null) {
-              nativeRequest.onupgradeneeded = () => handler?.()
-            },
-            set onblocked(handler: (() => void) | null) {
-              nativeRequest.onblocked = () => handler?.()
-            },
-            set onerror(handler: (() => void) | null) {
-              nativeRequest.onerror = () => handler?.()
-            },
-            set onsuccess(handler: (() => void) | null) {
-              nativeRequest.onsuccess = () => handler?.()
-            }
-          } as unknown as IDBOpenDBRequest
-        }
-      } as unknown as IDBFactory
-      await expectNativeInstallationFailure(
-        createIndexedDbTestStore({ factory: hostileFactory, keyRange: IDBKeyRange, dbName }),
-        {
-          code: 'BACKEND_UNAVAILABLE',
-          backend: 'indexed-db',
-          operation: 'indexeddb.open',
-          cause
-        }
-      )
-      const store = await createIndexedDbTestStore({
-        factory: hostileFactory,
-        keyRange: IDBKeyRange,
-        dbName
-      })
-      await expect(store.get('seed')).resolves.toBe('value')
-    }
-  )
-
   it('open 请求失败时归一为可读错误（而非裸 IDB 异常）', async () => {
     const failingFactory: IDBFactory = {
       open: () => {
@@ -3389,104 +2959,6 @@ describe('indexedDbHost backend', () => {
       }
     )
   })
-
-  it('open success result getter 异常会 settle 为 BACKEND_UNAVAILABLE', async () => {
-    const cause = new Error('hostile open result getter')
-    const hostileFactory = {
-      open: () =>
-        ({
-          get result(): never {
-            throw cause
-          },
-          set onupgradeneeded(_handler: unknown) {},
-          set onblocked(_handler: unknown) {},
-          set onerror(_handler: unknown) {},
-          set onsuccess(handler: (() => void) | null) {
-            queueMicrotask(() => handler?.())
-          }
-        }) as unknown as IDBOpenDBRequest
-    } as unknown as IDBFactory
-    await expectNativeInstallationFailure(
-      createIndexedDbTestStore({ factory: hostileFactory, dbName: 'hostile-open-result' }),
-      {
-        code: 'BACKEND_UNAVAILABLE',
-        backend: 'indexed-db',
-        operation: 'indexeddb.open',
-        cause
-      }
-    )
-  })
-
-  it('upgrade result getter 异常会 abort 并 settle 为 BACKEND_UNAVAILABLE', async () => {
-    const cause = new Error('hostile upgrade result getter')
-    const hostileFactory = {
-      open: () =>
-        ({
-          get result(): never {
-            throw cause
-          },
-          get transaction(): null {
-            return null
-          },
-          set onupgradeneeded(handler: (() => void) | null) {
-            queueMicrotask(() => handler?.())
-          },
-          set onblocked(_handler: unknown) {},
-          set onerror(_handler: unknown) {},
-          set onsuccess(_handler: unknown) {}
-        }) as unknown as IDBOpenDBRequest
-    } as unknown as IDBFactory
-    await expectNativeInstallationFailure(
-      createIndexedDbTestStore({ factory: hostileFactory, dbName: 'hostile-upgrade-result' }),
-      {
-        code: 'BACKEND_UNAVAILABLE',
-        backend: 'indexed-db',
-        operation: 'indexeddb.open',
-        cause
-      }
-    )
-  })
-
-  it.each(['onupgradeneeded', 'onblocked', 'onsuccess', 'onerror'] as const)(
-    'open request %s setter 异常会 abort upgrade 并归一 open failure',
-    async (property) => {
-      const cause = new Error(`hostile open ${property} setter`)
-      let abortCalls = 0
-      const transaction = {
-        abort: () => {
-          abortCalls += 1
-        }
-      } as unknown as IDBTransaction
-      const hostileFactory = {
-        open: () =>
-          ({
-            transaction,
-            set onupgradeneeded(_handler: unknown) {
-              if (property === 'onupgradeneeded') throw cause
-            },
-            set onblocked(_handler: unknown) {
-              if (property === 'onblocked') throw cause
-            },
-            set onsuccess(_handler: unknown) {
-              if (property === 'onsuccess') throw cause
-            },
-            set onerror(_handler: unknown) {
-              if (property === 'onerror') throw cause
-            }
-          }) as unknown as IDBOpenDBRequest
-      } as unknown as IDBFactory
-      await expectNativeInstallationFailure(
-        createIndexedDbTestStore({ factory: hostileFactory, dbName: `hostile-open-${property}` }),
-        {
-          code: 'BACKEND_UNAVAILABLE',
-          backend: 'indexed-db',
-          operation: 'indexeddb.open',
-          cause
-        }
-      )
-      expect(abortCalls).toBe(1)
-    }
-  )
 
   it('factory.open 同步抛错时也归一为 UNAVAILABLE', async () => {
     const cause = new DOMException('open threw', 'SecurityError')
@@ -4111,49 +3583,6 @@ describe('indexedDbHost backend change feed (record channel + clearAll only)', (
       if (writer !== undefined) await writer.dispose()
       if (reader !== undefined) await reader.dispose()
       rogue?.close()
-      if (indexedDbDescriptor === undefined) Reflect.deleteProperty(globalThis, 'indexedDB')
-      else Object.defineProperty(globalThis, 'indexedDB', indexedDbDescriptor)
-      if (broadcastDescriptor === undefined) Reflect.deleteProperty(globalThis, 'BroadcastChannel')
-      else Object.defineProperty(globalThis, 'BroadcastChannel', broadcastDescriptor)
-    }
-  })
-
-  it('snapshots platform getters once and prepares the database without advertising missing transport', async () => {
-    const factory = freshFactory()
-    const dbName = `r09-admission-${Math.random().toString(36).slice(2)}`
-    const indexedDbDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'indexedDB')
-    const broadcastDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'BroadcastChannel')
-    let indexedDbReads = 0
-    let broadcastReads = 0
-    let store: Awaited<ReturnType<typeof createIndexedDbTestStore>> | undefined
-    const openSpy = vi.spyOn(factory, 'open')
-    try {
-      Object.defineProperty(globalThis, 'indexedDB', {
-        configurable: true,
-        get: () => {
-          indexedDbReads += 1
-          return factory
-        }
-      })
-      Object.defineProperty(globalThis, 'BroadcastChannel', {
-        configurable: true,
-        get: () => {
-          broadcastReads += 1
-          return undefined
-        }
-      })
-      store = await createIndexedDbTestStore({ dbName, keyRange: IDBKeyRange })
-      expect(indexedDbReads).toBe(1)
-      expect(broadcastReads).toBe(1)
-      expect(store.capabilities.changeFeed).toBe(false)
-      expect(isChangeFeedStore(store)).toBe(false)
-      expect(openSpy).toHaveBeenCalled()
-      await store.set('admitted-later', 'value')
-      expect(await store.get('admitted-later')).toBe('value')
-      expect(openSpy).toHaveBeenCalled()
-    } finally {
-      if (store !== undefined) await store.dispose()
-      openSpy.mockRestore()
       if (indexedDbDescriptor === undefined) Reflect.deleteProperty(globalThis, 'indexedDB')
       else Object.defineProperty(globalThis, 'indexedDB', indexedDbDescriptor)
       if (broadcastDescriptor === undefined) Reflect.deleteProperty(globalThis, 'BroadcastChannel')

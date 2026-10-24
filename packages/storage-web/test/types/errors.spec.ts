@@ -24,13 +24,7 @@ describe('StorageError', () => {
     expect(error.backend).toBe('local')
     expect(error.key).toBe('k')
   })
-  it('StorageError 实例字段在运行时不可变', () => {
-    const error = new StorageError(StorageErrorCode.invalidConfig)
-    expect(() => {
-      ;(error as { code: string }).code = 'changed'
-    }).toThrow(TypeError)
-    expect(error.code).toBe('INVALID_CONFIG')
-  })
+
   it('原始异常进 cause，不改写自身 message', () => {
     const cause = new Error('原始信息')
     const error = new StorageError(StorageErrorCode.unavailable, { cause })

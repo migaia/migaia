@@ -184,6 +184,5 @@ export class StorageError extends Error {
     this.extensionStage = details.extensionStage
     this.operation = details.operation
     this.stage = stage
-    Object.freeze(this)
   }
 }

@@ -106,6 +106,6 @@ export function mmr(options: IStorageMmrOptions): IVectorReranker<unknown, true>
     let tail = hits.length - bound
     for (let index = 0; index < hits.length; index++) if (!selected[index]) scores[index] = tail--
     throwIfAborted(ctx.signal)
-    return Object.freeze(scores)
+    return scores
   }
 }

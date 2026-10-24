@@ -43,70 +43,39 @@ export const normalizeIdbRequestFailure = (error: unknown): IStorageErrorFamily 
       })
 }
 
-/** Read a host transaction error without letting a getter escape its event callback. */
-export const readIdbTransactionError = (transaction: IDBTransaction): unknown => {
-  try {
-    return transaction.error
-  } catch (cause) {
-    return cause
-  }
-}
+/** Read the native transaction diagnostic selected by its terminal event. */
+export const readIdbTransactionError = (transaction: IDBTransaction): unknown => transaction.error
 
-/** Read a host request result and normalize getter failures at the canonical bridge boundary. */
-export const readIdbRequestResult = <T>(request: IDBRequest<T>): T => {
-  try {
-    return request.result
-  } catch (cause) {
-    throw normalizeIdbRequestFailure(cause)
-  }
-}
+/** Read the native result after the request has reported success. */
+export const readIdbRequestResult = <T>(request: IDBRequest<T>): T => request.result
 
-/** Read a host request error without allowing its getter to escape a DOM event callback. */
-export const readIdbRequestError = (request: IDBRequest): unknown => {
-  try {
-    return request.error
-  } catch (cause) {
-    return cause
-  }
-}
+/** Read the native request diagnostic selected by its error event. */
+export const readIdbRequestError = (request: IDBRequest): unknown => request.error
 
-/** Read the versionchange transaction without allowing a host getter to escape upgrade handling. */
-export const readIdbOpenTransaction = (request: IDBOpenDBRequest): IDBTransaction | null => {
-  try {
-    return request.transaction
-  } catch (cause) {
-    throw normalizeIdbRequestFailure(cause)
-  }
-}
+/** Read the native versionchange transaction while processing the upgrade event. */
+export const readIdbOpenTransaction = (request: IDBOpenDBRequest): IDBTransaction | null =>
+  request.transaction
 
-/** Install the two request handlers as one normalized host setup boundary. */
+/** Connect the native request's success and failure events. */
 export const installIdbRequestHandlers = (
   request: IDBRequest,
   onSuccess: () => void,
   onError: () => void
 ): void => {
-  try {
-    request.onsuccess = onSuccess
-    request.onerror = onError
-  } catch (cause) {
-    throw normalizeIdbRequestFailure(cause)
-  }
+  request.onsuccess = onSuccess
+  request.onerror = onError
 }
 
-/** Install all transaction terminal handlers as one normalized host setup boundary. */
+/** Connect the native transaction's completion, failure and abort events. */
 export const installIdbTransactionHandlers = (
   transaction: IDBTransaction,
   onComplete: () => void,
   onError: (event?: Event) => void,
   onAbort: () => void
 ): void => {
-  try {
-    transaction.oncomplete = onComplete
-    transaction.onerror = onError
-    transaction.onabort = onAbort
-  } catch (cause) {
-    throw normalizeIdbRequestFailure(cause)
-  }
+  transaction.oncomplete = onComplete
+  transaction.onerror = onError
+  transaction.onabort = onAbort
 }
 
 /** Observe physical rollback when a transaction's property-handler installation failed. */
@@ -120,7 +89,7 @@ export function afterIdbTransactionAbort(transaction: IDBTransaction): Promise<v
   })
 }
 
-/** Install the complete open-request lifecycle as one normalized host setup boundary. */
+/** Connect the native database-open lifecycle before its first asynchronous event. */
 export const installIdbOpenRequestHandlers = (
   request: IDBOpenDBRequest,
   onUpgradeNeeded: () => void,
@@ -128,14 +97,10 @@ export const installIdbOpenRequestHandlers = (
   onSuccess: () => void,
   onError: () => void
 ): void => {
-  try {
-    request.onupgradeneeded = onUpgradeNeeded
-    request.onblocked = onBlocked
-    request.onsuccess = onSuccess
-    request.onerror = onError
-  } catch (cause) {
-    throw normalizeIdbRequestFailure(cause)
-  }
+  request.onupgradeneeded = onUpgradeNeeded
+  request.onblocked = onBlocked
+  request.onsuccess = onSuccess
+  request.onerror = onError
 }
 
 /** Wraps an `IDBRequest` in a promise and connects its cancellation signal. */
@@ -197,11 +162,11 @@ export function idbTransactionCommit(
     const signal = snapshotOperationContext(context)?.signal
     /** Records caller cancellation independently from later transaction abort events. */
     let cancelled = false
-    /** Snapshots cancellation cause before a hostile reason getter can drift. */
+    /** Preserve the cancellation cause that selected the terminal outcome. */
     let abortReason: unknown
     /** Owns the active abort listener and remains a no-op before subscription returns. */
     let disposeAbort = (): void => {}
-    /** Prevents hostile or duplicated transaction events from changing bridge ownership twice. */
+    /** Complete/error events can race cancellation; terminal selection happens once. */
     let settled = false
     /** Request errors are not terminal; retain their first diagnostic until native completion. */
     let firstFailure: IStorageErrorFamily | undefined

@@ -248,7 +248,7 @@ export async function createStorageExternalWal(options: {
     options.onRecoverError?.(failure)
     throw failure
   }
-  return Object.freeze({
+  return {
     /** A durable intent precedes the marker staged in the original native data transaction. */
     begin: async (
       scope: Omit<ITransactionScope, 'use'>,
@@ -281,7 +281,7 @@ export async function createStorageExternalWal(options: {
         }
         throw cause
       }
-      return Object.freeze({
+      return {
         /** Known rollback aborts its intent without producing a false commit record. */
         abort: async () => {
           try {
@@ -300,7 +300,7 @@ export async function createStorageExternalWal(options: {
             reportCleanupError(report, cleanup)
           }
         }
-      })
+      }
     }
-  })
+  }
 }

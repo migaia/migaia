@@ -350,9 +350,4 @@ describe('defineEntity runtime contract', () => {
       defineEntity({ name: 'prototype-migration', key: 'id', version: 2, migrations })
     ).not.toThrow()
   })
-
-  it('freezes the returned definition', () => {
-    const definition = defineEntity<{ id: string }>({ name: 'frozen', key: 'id' })
-    expect(Object.isFrozen(definition)).toBe(true)
-  })
 })

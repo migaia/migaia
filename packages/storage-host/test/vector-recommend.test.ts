@@ -78,7 +78,6 @@ describe('native vector recommendation synthesis', () => {
     const result = recommendStorageVector(samples, samples)
     expectTypeOf(result).toEqualTypeOf<readonly number[]>()
     expect(result).toEqual([0, 0])
-    expect(Object.isFrozen(result)).toBe(true)
     expect(() => snapshotStorageVector(result, { dimensions: 2, metric: 'cosine' })).toThrowError(
       expect.objectContaining({ code: 'INVALID_ARGUMENT' })
     )

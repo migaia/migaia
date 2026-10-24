@@ -62,11 +62,11 @@ export async function createStorageNativeJournal(options: {
   )
     throw new StorageContractError(StorageContractErrorCode.unsupported)
   /** Stable target fields come only from the host's original fixed-org access closure. */
-  const target = Object.freeze({
+  const target = {
     namespace,
     backendInstanceId: access.backendInstanceId,
     orgId: access.orgId
-  })
+  }
   /** Certify original registration identity before any selected native log scope can be opened. */
   const selected = (store: ILogStore | undefined) => {
     if (store === undefined) return undefined
@@ -141,7 +141,7 @@ export async function createStorageNativeJournal(options: {
     [binlogNative?.headLock, undoNative?.headLock].filter((key) => key !== undefined),
     options.backend
   ).keys
-  return Object.freeze({
+  return {
     headLocks,
     undo: undoExecution,
     /** Only the native owner's authentic callback view may activate capture for this attempt. */
@@ -151,7 +151,7 @@ export async function createStorageNativeJournal(options: {
       access.binding.changes!(scope)
       /** Only the actual original terminal starts external I/O; rollback leaves it absent. */
       let external: Promise<void> | undefined
-      return Object.freeze({
+      return {
         txId: info.id,
         ...((binlog !== undefined && binlogNative === undefined) ||
         (undo !== undefined && undoNative === undefined)
@@ -238,7 +238,7 @@ export async function createStorageNativeJournal(options: {
               transaction: undoNative.createPort(current)
             })
         }
-      })
+      }
     }
-  })
+  }
 }

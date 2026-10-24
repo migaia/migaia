@@ -156,10 +156,6 @@ export function installStorageFeatures(input: {
       }
     }
   }
-  if (chain !== undefined) {
-    for (const methods of Object.values(chain)) Object.freeze(methods)
-    Object.freeze(chain)
-  }
   if (implementations.length !== 0) {
     if (input.installer === undefined) invalid()
     /** The original provider owns capability preparation, visibility and release. */
@@ -169,7 +165,7 @@ export function installStorageFeatures(input: {
   }
   if ('api' in input.store) duplicate(input.name, 'api')
   Object.defineProperty(input.store, 'api', {
-    value: Object.freeze(storeApi),
+    value: storeApi,
     enumerable: true,
     configurable: true
   })
@@ -180,7 +176,7 @@ export function installStorageFeatures(input: {
       const api = Object.create(null) as Record<string, unknown>
       for (const [key, value] of Object.entries(storeApiDefinitions))
         api[key] = bindApi(value, key, undefined, store, context, execution)
-      return Object.freeze(api)
+      return api
     },
     ...(transactionApi === undefined
       ? {}
@@ -195,7 +191,7 @@ export function installStorageFeatures(input: {
             const api = Object.create(null) as Record<string, unknown>
             for (const [key, value] of Object.entries(transactionApi))
               api[key] = bindApi(value, key, scope, store, context, execution)
-            return Object.freeze(api)
+            return api
           }
         }),
     ...(chain === undefined ? {} : { chain })
@@ -207,7 +203,7 @@ export function installStorageFeatures(input: {
     /** Capture nested groups now so mutation/getters cannot alter a later registered native view. */
     const group = Object.create(null) as Record<string, unknown>
     for (const [key, member] of entries(value)) group[key] = snapshotApi(member)
-    return Object.freeze(group)
+    return group
   }
 
   /** Every nested API leaf performs canonical registration admission before touching a client. */
@@ -268,6 +264,6 @@ export function installStorageFeatures(input: {
     const group = Object.create(null) as Record<string, unknown>
     for (const [key, member] of entries(value))
       group[key] = bindApi(member, `${path}.${key}`, scope, store, context, execution)
-    return Object.freeze(group)
+    return group
   }
 }

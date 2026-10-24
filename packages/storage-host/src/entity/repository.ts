@@ -371,10 +371,8 @@ export const createRepository = <
   const recordStore = backend.recordStore()
   const records = recordStore !== undefined
   /** Non-unique selectors retain their existing write call counts; only constraints need scans. */
-  const uniqueIndexes: ISnapshotEntityIndexes<TDomain> = Object.freeze(
-    Object.fromEntries(
-      Object.entries(config.indexes).filter(([, index]) => index.definition.unique)
-    )
+  const uniqueIndexes: ISnapshotEntityIndexes<TDomain> = Object.fromEntries(
+    Object.entries(config.indexes).filter(([, index]) => index.definition.unique)
   )
   /** Native and fallback commits share the same canonical unique-key ownership rule. */
   const uniqueDefinitions = Object.values(uniqueIndexes).map((index) => index.definition)
@@ -838,7 +836,7 @@ export const createRepository = <
         cause: new TypeError(EntityText.listDirectionMustBeNextOrPrev)
       })
     validateInvalidHandler(onInvalid)
-    return Object.freeze({ range: rangeSnapshot, limit, orderBy, direction, onInvalid })
+    return { range: rangeSnapshot, limit, orderBy, direction, onInvalid }
   }
 
   /** Immutable indexed-query input captured before any query route consumes it. */
@@ -882,10 +880,8 @@ export const createRepository = <
         backend: store.backend,
         cause: new TypeError(EntityText.indexedListIndexMustBeANonEmptyString)
       })
-    const normalized = normalizeListOptions(
-      Object.freeze({ range, limit, orderBy, direction, onInvalid })
-    )
-    return Object.freeze({ index, range: normalized?.range, options: normalized })
+    const normalized = normalizeListOptions({ range, limit, orderBy, direction, onInvalid })
+    return { index, range: normalized?.range, options: normalized }
   }
 
   /** Build an indexed snapshot for the findManyBy/findBy/streamBy APIs. */
@@ -899,7 +895,7 @@ export const createRepository = <
   ): IIndexedListSnapshot => {
     const normalized = normalizeListOptions(options)
     const rangeSnapshot = snapshotKeyRange(range, store.backend)
-    return Object.freeze({ index, range: rangeSnapshot, options: normalized })
+    return { index, range: rangeSnapshot, options: normalized }
   }
 
   /** Snapshot migration options once before checkpoint or record work begins. */
@@ -1952,9 +1948,9 @@ export const createRepository = <
           const automatic = explicit
             ? undefined
             : chooseEntityQueryIndex(config.indexes, conditions, store.backend)
-          const selection = Object.freeze({ ...(automatic?.selection ?? selectedSource) })
+          const selection = { ...(automatic?.selection ?? selectedSource) }
           const index = selection.index === undefined ? undefined : config.indexes[selection.index]
-          return Object.freeze({
+          return {
             fullScan: true,
             selection,
             pushdown: {
@@ -1971,13 +1967,12 @@ export const createRepository = <
             },
             sourceReason: explicit ? EntityText.queryIndexExplicit : automatic!.sourceReason,
             sourceCandidates: explicit
-              ? Object.freeze(
-                  Object.keys(config.indexes).map((index) =>
-                    Object.freeze({ index, reason: EntityText.queryIndexExplicit })
-                  )
-                )
+              ? Object.keys(config.indexes).map((index) => ({
+                  index,
+                  reason: EntityText.queryIndexExplicit
+                }))
               : automatic!.sourceCandidates
-          })
+          }
         },
         mutate: (request, run) => {
           if (recordStore === undefined)
@@ -2139,7 +2134,7 @@ export const createRepository = <
      * reference.
      */
     const activeChanges = stateReference
-    return Object.freeze({
+    return {
       query: () => queryFor<undefined>(scope),
       get: (id: IStorageKey) =>
         runTransactionOperation(scope, async (current) => {
@@ -2243,7 +2238,7 @@ export const createRepository = <
             (values) => values.length
           )
         })
-    })
+    }
   }
 
   const repository: IRepository<TDomain, TIndexes, TChangeFeed, TAugmentMethods> = {

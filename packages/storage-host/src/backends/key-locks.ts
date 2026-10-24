@@ -106,7 +106,7 @@ export function createBackendKeyLockPort(): IBackendKeyLockPort {
   /** The original lifecycle tracker seals and drains complete attempts, including native cleanup. */
   const lifetime = createQuiescenceTracker<object>()
   /** A single private key groups this provider's resource lifetime without another state machine. */
-  const owner = Object.freeze({})
+  const owner = {}
   /** Both resource entries cache their own original Promise. */
   let disposal: Promise<void> | undefined
   /** Symbol cleanup reports the primary failure rather than rejecting a second time. */
@@ -188,7 +188,7 @@ export function createBackendKeyLockPort(): IBackendKeyLockPort {
     /** Each waiting admission observes this exact signal only after all entries are released. */
     const released = deferred<void>()
     /** Preserve primitive holder metadata independently from caller-owned objects. */
-    const capturedHolder = Object.freeze({ ...holder })
+    const capturedHolder = { ...holder }
     /** Original resource entries each cache their own cleanup Promise. */
     let disposal: Promise<void> | undefined
     /** Symbol cleanup derives from the same primary release, with no second table mutation. */
@@ -486,17 +486,17 @@ export function createBackendKeyLockPort(): IBackendKeyLockPort {
         return snapshotConcurrencyLockHoldings([
           { key: held.key, holder: held.holder, expired: false }
         ])[0]
-      return Object.freeze({
+      return {
         key:
           held.key.channel === 'bytes'
             ? held.key
-            : Object.freeze({
+            : {
                 channel: held.key.channel,
                 key: snapshotStorageKey(held.key.key, undefined)
-              }),
+              },
         holder: held.holder,
         expired: false
-      })
+      }
     },
     inspectLocks: () => {
       assertOpen()

@@ -64,6 +64,5 @@ describe('physical backend revision facts', () => {
       expect.objectContaining({ code: 'RESOURCE_OUTSIDE_INSTALL' })
     )
     expect(first.revisions).not.toHaveProperty('dispose')
-    expect(Object.isFrozen(first.revisions)).toBe(true)
   })
 })

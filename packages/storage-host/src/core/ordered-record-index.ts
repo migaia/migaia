@@ -173,7 +173,7 @@ export function createOrderedRecordIndex<T>(): IOrderedRecordIndex<T> {
       ? result.next
       : result
   }
-  return Object.freeze({
+  return {
     get size() {
       return size
     },
@@ -298,5 +298,5 @@ export function createOrderedRecordIndex<T>(): IOrderedRecordIndex<T> {
       root.count = 0
       size = 0
     }
-  })
+  }
 }

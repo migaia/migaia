@@ -38,7 +38,7 @@ export function readStorageJournalTarget(
     if (value.channel === 'metadata') {
       if (typeof value.key !== 'string' || decodeFlatStorageKey(value.key) === undefined)
         invalidStorageJournalRecord()
-      return Object.freeze({ channel: 'metadata', key: value.key })
+      return { channel: 'metadata', key: value.key }
     }
     /** Flat key decoding happens only for the three existing key-bearing physical channels. */
     const candidate =

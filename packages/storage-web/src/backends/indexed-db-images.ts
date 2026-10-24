@@ -153,7 +153,7 @@ export function createIndexedDbJournalImages(input: {
           key,
           lock,
           revisionKey,
-          revision: Object.freeze(revision),
+          revision: revision,
           current:
             stored === undefined
               ? undefined
@@ -168,10 +168,10 @@ export function createIndexedDbJournalImages(input: {
   /** One point advances once per native attempt; all later operations share the staged revision. */
   const revise = (entry: IIndexedDbImageEntry): Promise<void> => {
     if (entry.writing !== undefined) return entry.writing
-    const revision = Object.freeze({
+    const revision = {
       birth: entry.revision.birth ?? createStorageToken(),
       version: entry.revision.version + 1
-    })
+    }
     if (!Number.isSafeInteger(revision.version)) throw invalid()
     entry.revision = revision
     return (entry.writing = input
@@ -261,9 +261,7 @@ export function createIndexedDbJournalImages(input: {
         if (mutated) throw new StorageContractError(StorageContractErrorCode.unsupported)
         steps = []
       }
-      return steps.map(({ entry, ...step }) =>
-        Object.freeze({ ...step, afterRevision: entry.revision })
-      )
+      return steps.map(({ entry, ...step }) => ({ ...step, afterRevision: entry.revision }))
     }
   }
 }

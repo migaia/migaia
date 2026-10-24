@@ -337,7 +337,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
   /** Registry is swapped only after the complete inner batch has committed. */
   #registry: IStorageRegistry = new Map()
   /** Native PluginHost extension projection published only with the matching Store registry. */
-  #extensions: Readonly<Record<PropertyKey, unknown>> = Object.freeze({})
+  #extensions: Readonly<Record<PropertyKey, unknown>> = {}
   /** Single-flight state prevents a second feature graph from racing the first admission. */
   #state: IStorageHostState = 'open'
   /** Current batch promise, retained only while the facade is installing. */
@@ -434,12 +434,12 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
     }
 
     this.#events = createStorageHooks(this.#report)
-    this.#publicHooks = Object.freeze({
+    this.#publicHooks = {
       on: (name, handler) => {
         this.#assertOpen()
         return this.#events.hooks.on(name, handler)
       }
-    })
+    }
     if (hooks !== undefined) {
       if (typeof hooks !== 'object' || hooks === null || Array.isArray(hooks))
         throw createStorageTypeError(StorageErrorCode.invalidConfig, StorageErrorText.invalidHooks)
@@ -602,17 +602,16 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
          * Each call context closes over its organization and only installation-captured
          * dependencies.
          */
-        const callContext = (orgId: string): IStoragePluginCallContext =>
-          Object.freeze({
-            orgId,
-            backend: (view) => {
-              assertRegistration()
-              const source = borrowed?.get(view)
-              if (source === undefined)
-                throw new StorageContractError(StorageContractErrorCode.invalidArgument)
-              return this.#projectBackend(source, orgId) as typeof view
-            }
-          })
+        const callContext = (orgId: string): IStoragePluginCallContext => ({
+          orgId,
+          backend: (view) => {
+            assertRegistration()
+            const source = borrowed?.get(view)
+            if (source === undefined)
+              throw new StorageContractError(StorageContractErrorCode.invalidArgument)
+            return this.#projectBackend(source, orgId) as typeof view
+          }
+        })
         /** Bind the next domain core to its matching entry in this install batch. */
         const context: IStorageNativeRegistrationContext = {
           ...(this.#journal === undefined
@@ -658,7 +657,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
             )
             const contextForOrg = callContext(orgId)
             const observe = (store: IStorageBase) => createStorageObservers(binding, () => store)
-            return Object.freeze({
+            return {
               journal: context.getJournal(orgId),
               orgId,
               execution,
@@ -679,7 +678,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
                   contextForOrg,
                   execution
                 )
-            })
+            }
           },
           assertCurrent: assertRegistration,
           assertExecution: () => {
@@ -1019,7 +1018,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
         }
       }
       this.#registry = new Map(nextRegistry)
-      this.#extensions = Object.freeze(nextExtensions)
+      this.#extensions = nextExtensions
       if (!this.#detectRunning) this.#detectPromise = undefined
     })
     this.#installing = batch
@@ -1171,7 +1170,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
     /** This detached namespace grants no installation authority or new method lifetime. */
     const api = Object.create(null) as Record<string, unknown>
     for (const [id, store] of this.#registry) api[id] = 'api' in store ? store.api : undefined
-    return Object.freeze(api) as IStorageHost<P>['api']
+    return api as IStorageHost<P>['api']
   }
 
   /** Internal journal consumers resolve one admitted registration without exposing the native store. */
@@ -1204,7 +1203,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
     this.#assertOpen()
     context.assertExecution()
     const binding = context.storeCell.journalForOrg(orgId)
-    return Object.freeze({
+    return {
       registration: context.storeCell.journalIdentity,
       orgId,
       backendInstanceId: context.id,
@@ -1214,7 +1213,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
         context.assertExecution()
         return context.storeCell.retainJournalResource(resource)
       }
-    })
+    }
   }
 
   /** Both native installs and the final bootstrap consume the same original batch deadline. */
@@ -1242,31 +1241,29 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
       }
       /** Load optional logging only when this organization initializes its journal. */
       const runtime = await loadStorageJournalRuntime()
-      const configured = await source(
-        Object.freeze({
-          orgId,
-          storageLogStore: (id: string, options: { readonly prefix: string }) => {
-            this.#assertOpen()
-            const candidate = candidates?.find(
-              (context) => context.id === id && context.getKind() !== undefined
+      const configured = await source({
+        orgId,
+        storageLogStore: (id: string, options: { readonly prefix: string }) => {
+          this.#assertOpen()
+          const candidate = candidates?.find(
+            (context) => context.id === id && context.getKind() !== undefined
+          )
+          const published = this.#registry.get(id)
+          const context =
+            candidate ??
+            (published === undefined ? undefined : this.#storeContexts.get(published)?.context)
+          if (context === undefined)
+            throw new StorageError(
+              StorageErrorCode.backendNotInstalled,
+              {},
+              StorageErrorText.backendNotInstalled
             )
-            const published = this.#registry.get(id)
-            const context =
-              candidate ??
-              (published === undefined ? undefined : this.#storeContexts.get(published)?.context)
-            if (context === undefined)
-              throw new StorageError(
-                StorageErrorCode.backendNotInstalled,
-                {},
-                StorageErrorText.backendNotInstalled
-              )
-            return runtime.openStorageLogStore(
-              this.#journalContextAccess(context, orgId),
-              runtime.snapshotStorageLogPrefix(options)
-            )
-          }
-        })
-      )
+          return runtime.openStorageLogStore(
+            this.#journalContextAccess(context, orgId),
+            runtime.snapshotStorageLogPrefix(options)
+          )
+        }
+      })
       this.#assertOpen()
       const snapshot = snapshotStorageJournalConfiguration(configured)
       this.#journalOrgs!.get(orgId)!.configuration = snapshot
@@ -1374,7 +1371,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
       if (!entry?.complete) throw new StorageContractError(StorageContractErrorCode.unsupported)
       return entry.value
     }
-    return Object.freeze({
+    return {
       prepare: () => this.#prepareJournalBackend(context, orgId).promise,
       runRedo: (run, signal) => {
         const value = prepared()
@@ -1397,7 +1394,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
           return Promise.reject(new StorageContractError(StorageContractErrorCode.unsupported))
         return undo(txId, run)
       }
-    })
+    }
   }
 
   /** Resolve native organization data through its original registration, then remove ownership. */
@@ -1478,14 +1475,14 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
       return this.#projectBackend(store, orgId)
     }
     /** Root hooks retain one subscriber; each view filters invocation identities at delivery. */
-    const hooks: IStorageHooks = Object.freeze({
+    const hooks: IStorageHooks = {
       on: (name, handler) => {
         this.#assertOpen()
         return this.#events.hooks.on(name, (payload) => {
           if ('orgId' in payload && payload.orgId === orgId) handler(payload)
         })
       }
-    })
+    }
     /** Original cells retain selected outputs while this getter retains only immutable org identity. */
     const projectExtensions = () => {
       this.#assertOpen()
@@ -1498,7 +1495,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
             context.assertCurrent
           )
         )
-      return Object.freeze(result)
+      return result
     }
     /** The view shell has no dispose, drop, installation or mutable registration methods. */
     const view = {
@@ -1517,7 +1514,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
         const result = Object.create(null)
         for (const [id, store] of view.backends())
           result[id] = 'api' in store ? store.api : undefined
-        return Object.freeze(result)
+        return result
       },
       get extensions() {
         return projectExtensions()
@@ -1541,7 +1538,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
         operation: Readonly<{ operation: string; targetVersion: number }>
       ) => this.envelopeStages(store, operation)
     }
-    return Object.freeze(view) as unknown as IStorageOrgView<P>
+    return view as unknown as IStorageOrgView<P>
   }
 
   /** Attempt every native target independently and retain every original deletion failure. */
@@ -1629,7 +1626,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
     if (this.#installing !== undefined) this.#installing = undefined
     this.#registry = new Map()
     this.#detectContexts.clear()
-    this.#extensions = Object.freeze({})
+    this.#extensions = {}
     void mergeCleanupResults([this.#inner.dispose()])
       .then(({ cleanupErrors }) => {
         if (cleanupErrors.length !== 0) {
@@ -1767,7 +1764,7 @@ function createStorageNativeAuthoringPorts(registration: IStorageRegistrationAss
     createOrgAuthoringPort: (() => {
       /** Only this original installation can capture late child construction authority. */
       registration.registrationCore!.onDispose(context.storeCell.releaseOrgBindings)
-      return Object.freeze({
+      return {
         createChangeController: (options) => {
           context.assertExecution()
           const controller = createBackendChangeController(options)
@@ -1796,7 +1793,7 @@ function createStorageNativeAuthoringPorts(registration: IStorageRegistrationAss
           context.assertExecution()
           context.storeCell.retainOrgBinding(registerBackendValueCommit(store, commit))
         }
-      }) satisfies ReturnType<IStoragePluginCore['createOrgAuthoringPort']>
+      } satisfies ReturnType<IStoragePluginCore['createOrgAuthoringPort']>
     }) satisfies IStoragePluginCore['createOrgAuthoringPort'],
     createRevisionPort: (() => {
       /** Window admission belongs to the original owner; physical backends retain the facts. */

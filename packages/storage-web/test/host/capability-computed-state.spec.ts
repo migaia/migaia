@@ -68,14 +68,12 @@ describe('Host capability and computed state', () => {
     })
     await query.ready
     const state = query.state
-    expect(Object.isFrozen(state)).toBe(true)
     expect(state.runtime).toBe(runtime)
     expect(state.value).toMatchObject({ status: 'ready', value: 'computed' })
     expect(state.peek()).toBe(state.value)
     expect(state.observed).toBeTypeOf('boolean')
     expect(state).not.toHaveProperty('dispose')
     expect(query.consistency).toEqual({ mode: 'push', visibility: 'instance' })
-    expect(Object.isFrozen(query.consistency)).toBe(true)
     expect('pollIntervalMs' in query.consistency).toBe(false)
     expect(Reflect.set(state, 'value', 'forged')).toBe(false)
     expect(query.state.value.value).toBe('computed')

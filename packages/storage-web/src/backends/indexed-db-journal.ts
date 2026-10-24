@@ -63,7 +63,7 @@ export function createIndexedDbJournalView(input: {
     runTransactionOperation(input.scope, async () => {
       await input.request(() => input.metadata.delete(range))
     })
-  return Object.freeze({
+  return {
     get: (value: string) =>
       runTransactionOperation(
         input.scope,
@@ -94,5 +94,5 @@ export function createIndexedDbJournalView(input: {
       ),
     clearValues: clear,
     clearAll: clear
-  })
+  }
 }

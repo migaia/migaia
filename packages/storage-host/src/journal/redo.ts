@@ -42,11 +42,11 @@ export async function createStorageRedoJournal(options: {
   const binlog = logger.binlog
   if (binding === undefined || wal === undefined)
     throw new StorageContractError(StorageContractErrorCode.unsupported)
-  const target = Object.freeze({
+  const target = {
     namespace: options.namespace,
     backendInstanceId: access.backendInstanceId,
     orgId: access.orgId
-  })
+  }
   await Promise.all([wal.ready(), binlog?.ready()])
   /** A possibly applied draft or durable completion never becomes a false rollback. */
   const failed = (cause: unknown): never => {
@@ -106,8 +106,8 @@ export async function createStorageRedoJournal(options: {
   }
   /** Initial recovery finishes before the original host publishes this selected configuration. */
   await binding.protect(recover)
-  return Object.freeze({
-    headLocks: Object.freeze([]) as readonly ILockKey[],
+  return {
+    headLocks: [] as readonly ILockKey[],
     undo: undefined,
     /** There is no second admission queue: native protection encloses recovery plus original work. */
     runRedo: <R>(run: () => Promise<R>, signal?: IOperationContext['signal']): Promise<R> =>
@@ -118,7 +118,7 @@ export async function createStorageRedoJournal(options: {
     begin: (scope: object) => {
       const info = binding.transactionInfo(scope)
       binding.changes(scope)
-      return Object.freeze({
+      return {
         txId: info.id,
         record: async (current: object): Promise<void> => {
           if (binding.transactionInfo(current).id !== info.id)
@@ -166,7 +166,7 @@ export async function createStorageRedoJournal(options: {
             failed(cause)
           }
         }
-      })
+      }
     }
-  })
+  }
 }

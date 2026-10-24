@@ -205,7 +205,7 @@ const recordQueryPushdown = {
   operators: []
 } as const
 
-const CAPABILITIES: IStorageCapabilities = Object.freeze({
+const CAPABILITIES: IStorageCapabilities = {
   batch: true,
   syncRead: false,
   binary: true,
@@ -221,7 +221,7 @@ const CAPABILITIES: IStorageCapabilities = Object.freeze({
   changeFeed: false,
   maxValueBytes: undefined,
   opaqueEntries: false
-})
+}
 
 /** Convert current cancellation state into an IndexedDB-owned error without throwing from events. */
 const indexedDbSignalFailure = (
@@ -1050,11 +1050,11 @@ function rotateIndexGeneration<TValue>(
   if (state === undefined) return undefined
   const oldHandle = state.handle as IRecordIndexHandle | undefined
   if (oldHandle === undefined) return undefined
-  const newHandle = Object.freeze({
+  const newHandle = {
     scope: oldHandle.scope,
     generation: createIndexGeneration(),
     fingerprint: oldHandle.fingerprint
-  })
+  }
   archiveIndexGeneration(indexedDbContext, metaStore, state, newHandle.generation)
   metaStore.put(
     {
@@ -1210,7 +1210,7 @@ async function ensureRecordIndexes<TValue>(
         return existing.handle
       }
       const generation = createIndexGeneration()
-      const handle = Object.freeze({ scope, generation, fingerprint })
+      const handle = { scope, generation, fingerprint }
       if (existing?.handle !== undefined)
         archiveIndexGeneration(indexedDbContext, metadata, existing, generation)
       metadata.put(
@@ -1472,14 +1472,12 @@ async function readBatch<TValue>(
       readRuntime
     )) as number | undefined
     const raw = snapshotWriteValue(values[index], key)
-    rawCandidates.push(
-      Object.freeze({
-        key,
-        raw,
-        revision: revision ?? 0,
-        phase: sessionState.currentPhase
-      })
-    )
+    rawCandidates.push({
+      key,
+      raw,
+      revision: revision ?? 0,
+      phase: sessionState.currentPhase
+    })
   }
   /** Candidate projection ownership finishes before publishing the original issued manifest. */
   const { candidates, preparations } = await prepareIndexedDbBackfillCandidates(
@@ -1539,13 +1537,13 @@ async function readBatch<TValue>(
     indexMetadataKey(sessionState.handle.scope)
   )
   await idbTransactionCommit(metadataTransaction, { signal: readOperation?.signal }, readRuntime)
-  return Object.freeze({
+  return {
     phase: sessionState.currentPhase,
     checkpoint: sessionState.checkpoint,
     endOfScan,
-    candidates: Object.freeze(candidates),
-    preparations: readOptions?.prepare === undefined ? undefined : Object.freeze(preparations)
-  })
+    candidates: candidates,
+    preparations: readOptions?.prepare === undefined ? undefined : preparations
+  }
 }
 /** Publish this acquired native session's original maintenance methods. */
 function createIndexedDbBackfillMethods<TValue>(
@@ -1578,12 +1576,12 @@ function createIndexedDbController<TValue>(
   return indexedDbContext.runtime.createChangeController({
     backend: StorageBackend.indexedDb,
     platform: indexedDbContext.factory,
-    options: Object.freeze({
+    options: {
       dbName: indexedDbContext.dbName,
       kvStoreName: indexedDbContext.kvStoreName,
       bytesStoreName: indexedDbContext.bytesStoreName,
       recordsStoreName: indexedDbContext.recordsStoreName
-    }),
+    },
     origin: `indexeddb:${createStorageToken()}`,
     finalize: async () => {
       /** Cleanup keeps transport and native connection failures in their original order. */
@@ -2295,7 +2293,7 @@ function open<TValue>(
         try {
           // 别的标签页要升级时必须让路，否则对方会一直 blocked。
           connected.onversionchange = () => {
-            indexedDbContext.journalGeneration = Object.freeze({})
+            indexedDbContext.journalGeneration = {}
             try {
               connected.close()
             } catch {
@@ -3399,7 +3397,7 @@ function dropData<TValue>(indexedDbContext: IIndexedDbContext<TValue>): Promise<
           StorageOperation.indexedDbDelete
         )
       })
-      indexedDbContext.journalGeneration = Object.freeze({})
+      indexedDbContext.journalGeneration = {}
       publishChange(indexedDbContext, { channel: 'all', kind: 'clear' })
     })
     .finally(() => {
@@ -3648,7 +3646,7 @@ function initializeIndexedDbNativeState<TValue>(indexedDbContext: IIndexedDbCont
   indexedDbContext.backfillTakeoverObservations = new Map<string, number>()
 
   /** Physical deletion invalidates cached private log indexes without replacing the borrowed view. */
-  indexedDbContext.journalGeneration = Object.freeze({})
+  indexedDbContext.journalGeneration = {}
   indexedDbContext.controller = createIndexedDbController(indexedDbContext)
 
   /** The original installation owns the physical database's default organization identity. */
@@ -3681,10 +3679,10 @@ function initializeIndexedDbNativeState<TValue>(indexedDbContext: IIndexedDbCont
   })
 
   /** Immutable capabilities reflect construction-time transport admission and never mutate later. */
-  indexedDbContext.capabilities = Object.freeze({
+  indexedDbContext.capabilities = {
     ...CAPABILITIES,
     changeFeed: indexedDbContext.coordination.admitted
-  })
+  }
 
   /** Brands the private context that an already-admitted logical operation may reuse. */
   indexedDbContext.mutationLeaseBrand = Symbol('indexeddb-mutation-lease')
@@ -4517,7 +4515,7 @@ function createScope<TValue, T>(
     )
   if (api !== undefined)
     Object.defineProperty(scopeState.scope, 'api', { value: api, enumerable: true })
-  return Object.freeze(scopeState.scope)
+  return scopeState.scope
 }
 /** Compose this authentic native scope's batch operations. */
 function createIndexedDbScopeBatch<TValue, T>(

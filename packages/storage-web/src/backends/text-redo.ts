@@ -340,7 +340,7 @@ export function createTextRedo(input: ITextRedoInput) {
                         const api = runtime.createTransactionApi(scope)
                         if (api !== undefined)
                           Object.defineProperty(scope, 'api', { value: api, enumerable: true })
-                        return Object.freeze(scope)
+                        return scope
                       }
                       const scope = createScope()
                       let failure: unknown

@@ -57,7 +57,7 @@ import {
   type IKeyValueBackendStore
 } from './construction.js'
 
-const CAPABILITIES: IStorageCapabilities = Object.freeze({
+const CAPABILITIES: IStorageCapabilities = {
   batch: false,
   syncRead: true,
   binary: false,
@@ -69,7 +69,7 @@ const CAPABILITIES: IStorageCapabilities = Object.freeze({
   maxValueBytes: 4096,
   // HttpOnly cookie 对 JS 不可见：has() 返回 false 不代表不存在，remove() 也不保证生效。
   opaqueEntries: true
-})
+}
 
 /**
  * Minimal document surface borrowed by cookiesHost; reads and assignments must keep native cookie
@@ -291,7 +291,7 @@ export const cookiesHost = (
   const controller = runtime.createChangeController({
     backend: StorageBackend.cookie,
     platform: doc,
-    options: Object.freeze({ namespace, namespaceCodec, scope })
+    options: { namespace, namespaceCodec, scope }
   })
   /** Symbol cleanup reports failure while explicit disposal retains the primary rejection. */
   let symbolicDispose: Promise<void> | undefined
@@ -756,9 +756,7 @@ export const cookiesHost = (
 
   const store: ISyncCapableStore<ICookieStore> & ITextRedoStore = {
     backend: StorageBackend.cookie,
-    capabilities: redoEnabled
-      ? Object.freeze({ ...CAPABILITIES, batch: true, transactions: true })
-      : CAPABILITIES,
+    capabilities: redoEnabled ? { ...CAPABILITIES, batch: true, transactions: true } : CAPABILITIES,
     sync,
     transaction: redo.transaction,
     tx: redo.tx,

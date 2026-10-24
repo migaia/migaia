@@ -14,15 +14,15 @@ export function encodeStorageJournalImage(
   value?: unknown,
   bytes = false
 ): IStorageJournalImage {
-  if (!present) return Object.freeze({ present: false })
-  return Object.freeze({
+  if (!present) return { present: false }
+  return {
     present: true,
     value: codec.encode({
       codec: codec.id,
       version: codec.version,
       value: bytes ? bytesToBase64(value as Uint8Array) : asCodecValue(value)
     })
-  })
+  }
 }
 
 /** Decode only this owner's declared wire; original parse/codec failures remain reachable. */

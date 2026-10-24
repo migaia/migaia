@@ -177,7 +177,7 @@ export function defineStorageBackendKind<
   return <const N extends string>(name: N): IStorageBackendKind<N, S, C, E> => {
     assertStorageBackendId(name)
     /** Capture this registration kind before backend construction or publication. */
-    const kind = Object.freeze({ name })
+    const kind = { name }
     kinds.add(kind)
     return kind as IStorageBackendKind<N, S, C, E>
   }
@@ -194,7 +194,7 @@ function requireTargets(target: unknown): readonly object[] {
       StorageErrorCode.backendKindMismatch,
       StorageErrorText.backendKindMismatch
     )
-  return Object.freeze([...selected])
+  return [...selected]
 }
 /** Storage annotates original native Feature identities; PluginHost still compiles their graph. */
 export const defineFeature: IStorageDefineFeature = ((
@@ -491,9 +491,9 @@ export const definePlugin: IStorageDefinePlugin = ((
     features as never
   )
   /** Expose an immutable id while the native definition stays private. */
-  const handle = Object.freeze({ id: name })
+  const handle = { id: name }
   nativePluginDefinitions.set(handle, definition)
-  nativePluginMetadata.set(handle, Object.freeze({ id: name }))
+  nativePluginMetadata.set(handle, { id: name })
   return handle
 }) as IStorageDefinePlugin
 /** Resolve trusted definition identity without exposing its mutable registration authority. */

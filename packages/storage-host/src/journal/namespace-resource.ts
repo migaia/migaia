@@ -57,7 +57,7 @@ export async function createBackendJournalNamespace(
   await acquired.promise
   /** Accepted I/O and native terminals share lifecycle's original drain owner. */
   const lifetime = createQuiescenceTracker<object>()
-  const resource = Object.freeze({})
+  const resource = {}
   const attempts = new Map<string, () => void>()
   let main: Promise<void> | undefined
   let symbolic: Promise<void> | undefined
@@ -136,7 +136,7 @@ export async function createBackendJournalNamespace(
     const port = transaction(scope)
     return success ? port.onCommit(effect) : port.onRollback(effect)
   }
-  return Object.freeze({
+  return {
     nativeAtomic: options.nativeAtomic,
     ...(options.indexExclusive === undefined ? {} : { indexExclusive: options.indexExclusive }),
     assertLive: assertOpen,
@@ -159,5 +159,5 @@ export async function createBackendJournalNamespace(
       listen(scope, effect, false),
     dispose,
     [asyncDisposeKey]: () => (symbolic ??= dispose().catch(options.report))
-  })
+  }
 }

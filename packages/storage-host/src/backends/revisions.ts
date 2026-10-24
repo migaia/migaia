@@ -24,7 +24,7 @@ export function createBackendRevisionPort(): IBackendRevisionPort {
     }
     return state
   }
-  return Object.freeze({
+  return {
     read: (channel: ILockKey['channel'], encodedKey: string): number =>
       channels.get(channel)?.entries.get(encodedKey) ?? 0,
     write: (channel: ILockKey['channel'], encodedKey: string): void => {
@@ -39,5 +39,5 @@ export function createBackendRevisionPort(): IBackendRevisionPort {
       state.entries.clear()
       state.epoch++
     }
-  })
+  }
 }

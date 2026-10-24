@@ -129,13 +129,13 @@ export function createMemoryBlobData(orgId: string) {
       const items: IBlobInfo[] = []
       for (const entry of rows(prefix, last)) {
         if (items.length === limit)
-          return Object.freeze({
-            items: Object.freeze(items),
+          return {
+            items: items,
             next: cursor(prefix, items[items.length - 1]!.key)
-          })
+          }
         items.push(entry.value.info)
       }
-      return Object.freeze({ items: Object.freeze(items) })
+      return { items: items }
     },
     /** Original namespace cleanup releases both references to every owned body. */
     clear: (): void => {

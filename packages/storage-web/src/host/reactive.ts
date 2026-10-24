@@ -162,13 +162,13 @@ export const createStorageReactiveService = (
       )
 
     /** Frozen adapter admission facts exposed to every query as actual consistency. */
-    const actualConsistency = Object.freeze({
+    const actualConsistency = {
       mode: input.consistency.mode,
       visibility: input.consistency.visibility,
       ...(input.consistency.pollIntervalMs === undefined
         ? {}
         : { pollIntervalMs: input.consistency.pollIntervalMs })
-    }) as IStorageReactiveFeatureMetadata
+    } as IStorageReactiveFeatureMetadata
 
     const adapterScope = createSyncLifecycleScope({
       errorPolicy: 'collect',
@@ -782,16 +782,16 @@ export const createStorageReactiveService = (
       }
       const queryResource = resource!
       /** Immutable actual adapter consistency captured at query admission. */
-      const consistency = Object.freeze({
+      const consistency = {
         mode: adapter.consistency.mode,
         visibility: adapter.consistency.visibility,
         ...(adapter.consistency.pollIntervalMs === undefined
           ? {}
           : { pollIntervalMs: adapter.consistency.pollIntervalMs })
-      }) as IReactiveConsistency
+      } as IReactiveConsistency
 
       /** Public state view delegates to the computed owner without exposing disposal authority. */
-      const publicState = Object.freeze({
+      const publicState = {
         get runtime() {
           return input.runtime
         },
@@ -821,7 +821,7 @@ export const createStorageReactiveService = (
             )
           return computedState!.peek()
         }
-      }) as ILiveQueryStateView<T>
+      } as ILiveQueryStateView<T>
 
       /** Starts one Resource generation or joins its canonical current promise while fetching. */
       const request = (): Promise<T> => {

@@ -74,7 +74,7 @@ export function snapshotMemoryCapacity(options: {
         throw new TypeError(StorageErrorText.memoryCapacityArgument)
     if (eviction !== MemoryEviction.lru && eviction !== MemoryEviction.lfu)
       throw new TypeError(StorageErrorText.memoryCapacityArgument)
-    return Object.freeze({ maxEntries, maxBytes, eviction })
+    return { maxEntries, maxBytes, eviction }
   } catch (cause) {
     throw new StorageContractError(
       StorageContractErrorCode.invalidArgument,

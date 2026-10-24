@@ -9,7 +9,6 @@ import {
   type IConcurrencyStageObserver,
   type IOperationContext
 } from '@migaia/storage-contract'
-import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
 import { raceWithAbort, type IAbortSignal } from '@migaia/utils/promise'
 import {
   reportCleanupError,
@@ -41,12 +40,12 @@ export function observeIndexedDbStage(
 ): void {
   if (observer === undefined) return
   try {
-    /** Accessor failures are contained at the same boundary as callback failures. */
-    const callback = Reflect.get(observer, action)
-    if (callback === undefined) return
-    /** Captured then inspection observes rejection without inserting an await into IDB activity. */
-    const result = Reflect.apply(callback, observer, args)
-    observeThenableRejection(result, inspectThenable(result), (error) =>
+    /** Observation rejection is reported without yielding the native activity window. */
+    const callbacks = observer as unknown as Record<
+      string,
+      ((...values: unknown[]) => unknown) | undefined
+    >
+    void Promise.resolve(callbacks[action]?.(...args)).catch((error) =>
       reportCleanupError(runtime.reporter, error)
     )
   } catch (cause) {

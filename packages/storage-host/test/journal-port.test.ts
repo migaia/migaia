@@ -122,7 +122,6 @@ describe('original native log append port', () => {
       }
       const binding = snapshotStorageJournalBinding(original)
       expect(reads).toBe(1)
-      expect(Object.isFrozen(binding)).toBe(true)
       for (const indexedDbUndo of [undefined, false])
         await expect(
           prepareStorageJournalConfiguration(

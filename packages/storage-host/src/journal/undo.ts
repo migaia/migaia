@@ -68,10 +68,9 @@ function image(input: unknown): IStorageJournalImage {
     invalidStorageJournalRecord()
   /** Presence is copied once; the backend retains ownership of the encoded value string. */
   const value = input as Record<string, unknown>
-  if (value.present === false && !Object.hasOwn(value, 'value'))
-    return Object.freeze({ present: false })
+  if (value.present === false && !Object.hasOwn(value, 'value')) return { present: false }
   if (value.present === true && typeof value.value === 'string')
-    return Object.freeze({ present: true, value: value.value })
+    return { present: true, value: value.value }
   return invalidStorageJournalRecord()
 }
 /** Complete undo targets survive the original logger's target/before/after projection. */
@@ -220,7 +219,7 @@ export function createStorageJournalUndo(options: {
           throw new StorageError(StorageErrorCode.undoConflict, {}, StorageErrorText.undoConflict)
       }
       for (const row of rows) await binding.writeImage!(scope, row.target, row.before)
-      return Object.freeze({ txId: info.id })
+      return { txId: info.id }
     })
   }
 }

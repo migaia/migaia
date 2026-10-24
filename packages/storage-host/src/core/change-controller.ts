@@ -140,7 +140,7 @@ export function registerBackendEntityAccess(
   /** A borrowed alias captures only this finite callback, retaining its exact original native owner. */
   const watchRecords = snapshotBackendEntityRecordWatcher(native)
   /** The host's borrowed view forwards exactly these admitted native methods without close access. */
-  const access: IBackendEntityAccess = Object.freeze({
+  const access: IBackendEntityAccess = {
     store: view as IEntityKeyValueMethods,
     recordStore: () =>
       snapshotRecordStore(native) === undefined ? undefined : (view as IEntityRecordMethods),
@@ -167,7 +167,7 @@ export function registerBackendEntityAccess(
       assertCurrent()
       return assertTransactionOwner(native, scope)
     }
-  })
+  }
   /** This is the same original registry row as controller, envelope and query projection. */
   const row = controllerRegistry.get(view) ?? {}
   if (row.entity !== undefined)
@@ -223,11 +223,11 @@ export const createBackendChangeController = (
   )
     throw new StorageContractError(StorageContractErrorCode.invalidArgument)
   /** Native platform and captured construction options remain original borrowed references. */
-  const snapshot: IBackendChangeSnapshot = Object.freeze({
+  const snapshot: IBackendChangeSnapshot = {
     backend: options.backend,
     platform: options.platform,
     options: options.options
-  })
+  }
   /** Existing origins preserve native transport identity or a unique same-realm fallback. */
   const origin =
     options.origin ?? `${options.backend}:${(controllerOriginSequence += 1).toString(36)}`

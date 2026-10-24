@@ -17,7 +17,7 @@ export function memoryJournalDeadlineTarget(
   target: ILockKey
 ): Extract<IStorageJournalTarget, { readonly channel: 'metadata' }> {
   if (target.channel === 'rdf') throw new StorageContractError(StorageContractErrorCode.unsupported)
-  return Object.freeze({
+  return {
     channel: 'metadata',
     key: encodeFlatStorageKey([
       deadlineTag,
@@ -26,7 +26,7 @@ export function memoryJournalDeadlineTarget(
         target.channel === 'vector' ? [target.collection, target.id] : target.key
       )
     ])
-  })
+  }
 }
 
 /** Resolve one finite metadata mapping or borrow the original canonical lock snapshot unchanged. */
@@ -57,7 +57,7 @@ export function snapshotMemoryJournalTarget(target: IStorageJournalTarget): {
         : { channel: wire[1], key: decoded }
     const lock = snapshotConcurrencyLockKeys([candidate], STORAGE_MEMORY_BACKEND).keys[0]!
     if (lock.channel === 'rdf' || memoryJournalDeadlineTarget(lock).key !== key) throw invalid()
-    return { target: Object.freeze({ channel: 'metadata', key }), lock, metadata: true }
+    return { target: { channel: 'metadata', key }, lock, metadata: true }
   } catch (cause) {
     if (cause instanceof StorageError && cause.code === StorageErrorCode.journalRecordInvalid)
       throw cause

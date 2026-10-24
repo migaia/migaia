@@ -209,7 +209,7 @@ export function defineEntity<TDomain, TStored = TDomain>(
   const onDiagnostic = (configuredOnDiagnostic ?? defaultDiagnostic) as (message: string) => void
   const defaultOrderBy = configuredDefaultOrderBy as IEntityOptions<TDomain>['defaultOrderBy']
 
-  return Object.freeze({
+  return {
     name,
     version,
     connect: <S extends IEntityConnectStore>(
@@ -243,5 +243,5 @@ export function defineEntity<TDomain, TStored = TDomain>(
         store,
         connectOptions
       )
-  })
+  }
 }

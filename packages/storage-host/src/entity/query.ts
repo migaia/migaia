@@ -190,7 +190,7 @@ export function createEntityQuery<
     invalid: IInvalidRecordAction | IInvalidRecordHandler<T> | undefined,
     prepareResult: (first?: true) => IQueryResult<R, TContext, true, TMethods> = () => query
   ): IQueryResult<R, TContext, true, TMethods> =>
-    Object.freeze({
+    ({
       ...query,
       ...reads(prepareResult, plan, invalid, () => query),
       // Hidden type-state methods reject dynamic JavaScript use before any source is opened.
@@ -284,7 +284,7 @@ export function createEntityQuery<
         return Reflect.apply(prepared.select, prepared, captured)
       })
     }) as IEntityQueryNarrowed<T, TIndexes, TContext, TMethods>['select']
-    return Object.freeze({
+    return {
       ...query,
       ...reads(
         (first) => prepare(query, limit, explicit, skip, compared, first),
@@ -375,7 +375,7 @@ export function createEntityQuery<
         } catch (cause) {
           return input.invalidState(cause)
         }
-        return Object.freeze({
+        return {
           ...input.methods,
           first: (ctx?: TContext) =>
             input.run(
@@ -400,7 +400,7 @@ export function createEntityQuery<
               captured
             )
           }
-        })
+        }
       },
       onInvalid: (action: IInvalidRecordAction | IInvalidRecordHandler<T>) => {
         input.invalid(action)
@@ -408,7 +408,7 @@ export function createEntityQuery<
       },
       requirePushdown: () =>
         wrap(query.requirePushdown(), limit, explicit, plan, invalid, skip, compared)
-    }) as IEntityQueryNarrowed<T, TIndexes, TContext, TMethods>
+    } as IEntityQueryNarrowed<T, TIndexes, TContext, TMethods>
   }
   /** The root alone can select a source; every later immutable adapter retains its guarded state. */
   return wrap(

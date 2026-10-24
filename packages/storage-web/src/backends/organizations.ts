@@ -38,9 +38,9 @@ export function createBrowserOrgBinding<
     physical.set(target, child)
     return child
   }
-  return Object.freeze({
+  return {
     resolve: forOrg,
     backend: (orgId: string) => forOrg(orgId).store,
     drop: (orgId: string) => drop(forOrg(orgId))
-  })
+  }
 }

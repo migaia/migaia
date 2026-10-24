@@ -192,7 +192,6 @@ describe('private storage log resource', () => {
     await using two = await storageLogStore(second, 'memory', { prefix: 'history' })
     const notices: unknown[] = []
     log.onAppend((notice) => {
-      expect(Object.isFrozen(notice)).toBe(true)
       notices.push(notice)
     })
     const payload = { count: 1 }

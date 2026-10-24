@@ -50,10 +50,10 @@ const normalizeProjection = (
       assertStorageKey(key, backend, `entity index "${label}" projection`)
       return key
     })
-    return Object.freeze({ kind: 'multiple', keys: Object.freeze(keys) })
+    return { kind: 'multiple', keys: keys }
   }
   assertStorageKey(value, backend, `entity index "${label}" projection`)
-  return Object.freeze({ kind: 'single', key: value })
+  return { kind: 'single', key: value }
 }
 
 /** Validate the explicit custom projection shape without falling back to legacy return conventions. */
@@ -78,7 +78,7 @@ const normalizeCustomProjection = (
   }
   if (kind === 'single') {
     assertStorageKey(key, backend, `entity index "${label}" projection`)
-    return Object.freeze({ kind, key })
+    return { kind, key }
   }
   if (kind === 'multiple') {
     if (!Array.isArray(keys))
@@ -90,7 +90,7 @@ const normalizeCustomProjection = (
       assertStorageKey(item, backend, `entity index "${label}" projection`)
       return item
     })
-    return Object.freeze({ kind, keys: Object.freeze(normalizedKeys) })
+    return { kind, keys: normalizedKeys }
   }
   throw new StorageError(StorageErrorCode.invalidConfig, {
     backend,
@@ -102,7 +102,7 @@ const normalizeCustomProjection = (
 export const snapshotEntityIndexes = <TDomain>(
   configured: unknown
 ): ISnapshotEntityIndexes<TDomain> => {
-  if (configured === undefined) return Object.freeze({})
+  if (configured === undefined) return {}
   if (configured === null || typeof configured !== 'object' || Array.isArray(configured))
     throw new StorageError(StorageErrorCode.invalidConfig, {
       cause: new TypeError(EntityText.entityIndexesMustBeAnObject)
@@ -168,8 +168,8 @@ export const snapshotEntityIndexes = <TDomain>(
     const parsedPaths =
       paths === undefined
         ? undefined
-        : Object.freeze((paths as IObjectPathTuple[]).map((item) => parseObjectPath(item)))
-    const definition = Object.freeze({
+        : (paths as IObjectPathTuple[]).map((item) => parseObjectPath(item))
+    const definition = {
       name,
       unique: unique === true,
       // Custom selectors declare multiplicity in each explicit projection. The
@@ -177,14 +177,14 @@ export const snapshotEntityIndexes = <TDomain>(
       // with a `{ kind: 'multiple' }` result instead of collapsing it to false.
       multiEntry: select !== undefined || multiEntry === true,
       revision: normalizedRevision as number
-    })
-    indexes[name] = Object.freeze({
+    }
+    indexes[name] = {
       definition,
       ...(parsedPath !== undefined
-        ? { paths: Object.freeze([Object.freeze(parsedPath.map(String))]) }
+        ? { paths: [parsedPath.map(String)] }
         : parsedPaths === undefined
           ? {}
-          : { paths: Object.freeze(parsedPaths.map((path) => Object.freeze(path.map(String)))) }),
+          : { paths: parsedPaths.map((path) => path.map(String)) }),
       project: (value: TDomain, backend: IStorageBackend) => {
         const selected =
           parsedPath !== undefined
@@ -196,9 +196,9 @@ export const snapshotEntityIndexes = <TDomain>(
           ? normalizeProjection(selected, definition.multiEntry, backend, name)
           : normalizeCustomProjection(selected, backend, name)
       }
-    })
+    }
   }
-  return Object.freeze(indexes)
+  return indexes
 }
 
 /** Project every declared index exactly once for one normalized domain value. */
@@ -207,10 +207,8 @@ export const projectEntityIndexes = <TDomain>(
   value: TDomain,
   backend: IStorageBackend
 ): IRecordIndexProjection =>
-  Object.freeze(
-    Object.fromEntries(
-      Object.entries(indexes).map(([name, index]) => [name, index.project(value, backend)])
-    )
+  Object.fromEntries(
+    Object.entries(indexes).map(([name, index]) => [name, index.project(value, backend)])
   )
 
 /** A source candidate is only a canonical range and static priority, never a cursor or ready handle. */
@@ -278,29 +276,29 @@ const indexQueryCandidate = <T>(
       if (key === undefined) return
       keys.push(key)
     }
-    const key = Object.freeze(keys)
-    return Object.freeze({
+    const key = keys
+    return {
       index: name,
-      range: Object.freeze({ lower: key, upper: key }),
+      range: { lower: key, upper: key },
       rank: index.definition.unique
         ? EntityQueryIndexRank.uniqueEquality
         : EntityQueryIndexRank.equality,
       size: 0
-    })
+    }
   }
   const matching = fields.filter((field) => sameIndexPath(field.path, paths[0]!))
   for (const field of matching)
     if (field.operator === QueryOperator.eq) {
       const key = queryIndexKey(field.value, backend)
       if (key !== undefined)
-        return Object.freeze({
+        return {
           index: name,
-          range: Object.freeze({ lower: key, upper: key }),
+          range: { lower: key, upper: key },
           rank: index.definition.unique
             ? EntityQueryIndexRank.uniqueEquality
             : EntityQueryIndexRank.equality,
           size: 0
-        })
+        }
     }
   let membership: IEntityIndexQueryCandidate | undefined
   for (const field of matching)
@@ -314,12 +312,12 @@ const indexQueryCandidate = <T>(
         if (upper === undefined || compareStorageKeys(key, upper) > 0) upper = key
       }
       if (membership === undefined || keys.length < membership.size)
-        membership = Object.freeze({
+        membership = {
           index: name,
-          range: lower === undefined ? undefined : Object.freeze({ lower, upper }),
+          range: lower === undefined ? undefined : { lower, upper },
           rank: EntityQueryIndexRank.equality,
           size: keys.length
-        })
+        }
     }
   if (membership !== undefined) return membership
   let lower: IStorageKey | undefined
@@ -359,27 +357,27 @@ const indexQueryCandidate = <T>(
     }
   }
   if (lower !== undefined || upper !== undefined)
-    return Object.freeze({
+    return {
       index: name,
       range:
         lower !== undefined && upper !== undefined && compareStorageKeys(lower, upper) > 0
           ? undefined
-          : Object.freeze({ lower, upper, lowerOpen, upperOpen }),
+          : { lower, upper, lowerOpen, upperOpen },
       rank:
         lower !== undefined && upper !== undefined
           ? EntityQueryIndexRank.bounded
           : EntityQueryIndexRank.oneSided,
       size: 0
-    })
+    }
   const prefix = matching.find((field) => field.operator === QueryOperator.startsWith)
   if (prefix !== undefined && typeof prefix.value === 'string')
     // A lower-only prefix candidate is conservative for every UTF-16 tail; the original AST checks it exactly.
-    return Object.freeze({
+    return {
       index: name,
-      range: Object.freeze({ lower: prefix.value }),
+      range: { lower: prefix.value },
       rank: EntityQueryIndexRank.oneSided,
       size: 0
-    })
+    }
   return
 }
 /**
@@ -405,29 +403,22 @@ export const chooseEntityQueryIndex = <T>(
         (candidate.rank === chosen.rank && candidate.size < chosen.size))
     )
       chosen = candidate
-  return Object.freeze({
-    selection:
-      chosen === undefined
-        ? undefined
-        : Object.freeze({ index: chosen.index, range: chosen.range }),
+  return {
+    selection: chosen === undefined ? undefined : { index: chosen.index, range: chosen.range },
     sourceReason:
       chosen === undefined
         ? EntityText.queryIndexNoCandidate
         : EntityText.queryIndexChosen(chosen.rank),
-    sourceCandidates: Object.freeze(
-      candidates.map(({ name, candidate }) =>
-        Object.freeze({
-          index: name,
-          reason:
-            candidate === undefined
-              ? EntityText.queryIndexNotEligible
-              : name === chosen?.index
-                ? EntityText.queryIndexChosen(candidate.rank)
-                : EntityText.queryIndexLowerPriority
-        })
-      )
-    )
-  })
+    sourceCandidates: candidates.map(({ name, candidate }) => ({
+      index: name,
+      reason:
+        candidate === undefined
+          ? EntityText.queryIndexNotEligible
+          : name === chosen?.index
+            ? EntityText.queryIndexChosen(candidate.rank)
+            : EntityText.queryIndexLowerPriority
+    }))
+  }
 }
 /**
  * Canonical residual predicates may use other declared scalar paths after the chosen candidate

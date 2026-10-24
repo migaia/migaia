@@ -149,7 +149,7 @@ export function createMemoryJournalData(options: {
           clearValues: clear,
           clearAll: clear
         }
-        return work(Object.freeze(view))
+        return work(view)
       },
       onCommit: (effect: () => void) => committed.subscribe(() => effect()),
       onRollback: (effect: () => void) => rolledBack.subscribe(() => effect())

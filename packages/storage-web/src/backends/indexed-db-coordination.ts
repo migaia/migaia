@@ -129,14 +129,12 @@ const snapshotWireHint = (value: object): IIndexedDbWireSnapshot => {
   /** Captures the optional key collection before any size or decode pass. */
   const sourceKeys = source.keys
   /** Copies key arrays so nested mutable values cannot change between consumers. */
-  const keys = Array.isArray(sourceKeys)
-    ? Object.freeze(sourceKeys.map((encodedKey) => encodedKey))
-    : sourceKeys
+  const keys = Array.isArray(sourceKeys) ? sourceKeys.map((encodedKey) => encodedKey) : sourceKeys
   /** Captures optional scope once while omitting absent fields from the snapshot. */
   const scope = source.scope
   /** Organization is metadata and shares the same single-read wire snapshot. */
   const orgId = source.orgId
-  return Object.freeze({
+  return {
     version: source.version,
     origin: source.origin,
     ...(orgId === undefined ? {} : { orgId }),
@@ -145,7 +143,7 @@ const snapshotWireHint = (value: object): IIndexedDbWireSnapshot => {
     kind: source.kind,
     ...(scope === undefined ? {} : { scope }),
     ...(keys === undefined ? {} : { keys })
-  })
+  }
 }
 
 /** Validate one metadata-only message and decode its bounded canonical storage keys. */

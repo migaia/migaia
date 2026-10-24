@@ -215,7 +215,6 @@ describe('neutral storage installation', () => {
     })
     /** This immutable projection contains only the original committed registration. */
     const before = host.api
-    expect(Object.isFrozen(before)).toBe(true)
     expect(Object.getPrototypeOf(before)).toBeNull()
     expect(before.left).toBe(host.backend('left').api)
     expect(await before.left.identity()).toBe(host.backend('left'))

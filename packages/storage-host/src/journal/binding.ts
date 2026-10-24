@@ -41,7 +41,7 @@ export function snapshotStorageJournalBinding(
           throw new StorageContractError(StorageContractErrorCode.invalidArgument)
         captured[key] = (...args: unknown[]) => Reflect.apply(method, redo, args)
       }
-      result.redo = Object.freeze(captured)
+      result.redo = captured
     }
     /** Native authors declare this finite opt-in fact; backend names do not imply it. */
     const requiresIndexedDbUndo = input?.requiresIndexedDbUndo
@@ -75,7 +75,7 @@ export function snapshotStorageJournalBinding(
         throw new StorageContractError(StorageContractErrorCode.invalidArgument)
       result[key] = (...args: unknown[]) => Reflect.apply(method, input, args)
     }
-    return Object.freeze(result) as IStorageJournalBackendBinding
+    return result as IStorageJournalBackendBinding
   } catch (cause) {
     if (isStorageErrorFamily(cause)) throw cause
     throw new StorageContractError(StorageContractErrorCode.invalidArgument, { cause })

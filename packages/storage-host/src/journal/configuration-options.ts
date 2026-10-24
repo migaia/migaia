@@ -24,7 +24,7 @@ function snapshotSelections(input: Readonly<Record<string, ILogStore>> | undefin
     throw new StorageContractError(StorageContractErrorCode.invalidArgument)
   const result: Record<string, ILogStore> = Object.create(null)
   for (const key of Object.keys(input)) result[key] = input[key]!
-  return Object.freeze(result)
+  return result
 }
 
 /** Snapshot public options without invoking native I/O or revisiting caller getters later. */
@@ -62,18 +62,18 @@ export function snapshotStorageJournalConfiguration(
     const wal = Reflect.get(logger, 'wal') as IWalExt['wal'] | undefined
     if (redoWal !== undefined && redoWal !== wal)
       throw new StorageContractError(StorageContractErrorCode.unsupported)
-    return Object.freeze({
+    return {
       ...(typeof atLevel === 'function'
         ? {
             atLevel: (...args: Parameters<ILevelPluginExt['atLevel']>) =>
               Reflect.apply(atLevel, logger, args)
           }
         : {}),
-      logger: Object.freeze({
+      logger: {
         binlog,
         undo,
         wal
-      }),
+      },
       namespace,
       binlogValues,
       atomicBinlog: snapshotSelections(atomicBinlog),
@@ -81,7 +81,7 @@ export function snapshotStorageJournalConfiguration(
       indexedDbUndo,
       redoWal,
       telemetry
-    })
+    }
   } catch (cause) {
     if (isStorageErrorFamily(cause)) throw cause
     throw new StorageContractError(StorageContractErrorCode.invalidArgument, { cause })

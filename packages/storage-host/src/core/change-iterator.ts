@@ -153,7 +153,7 @@ export function createBackendChangeIterator(
       slot =
         slot === undefined
           ? change
-          : Object.freeze({ ...change, channel: broadChannel, keys: undefined, scope: undefined })
+          : { ...change, channel: broadChannel, keys: undefined, scope: undefined }
       wake?.resolve()
     })
     stopContext = subscribeToAbort(

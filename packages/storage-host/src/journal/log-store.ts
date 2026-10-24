@@ -215,7 +215,7 @@ export async function openStorageLogStore(
     }
     if (count === 0) return
     try {
-      appended.publish(Object.freeze({ lastSeq, count }))
+      appended.publish({ lastSeq, count })
     } catch (cause) {
       reportCleanupError(report, cause)
     }
@@ -226,7 +226,7 @@ export async function openStorageLogStore(
     if (!nativeAtomic || runCommitted === undefined)
       throw new StorageContractError(StorageContractErrorCode.unsupported)
     const info = namespace.transactionInfo(scope)
-    return Object.freeze({
+    return {
       store,
       append: (input: Parameters<ILogAppendPort['append']>[0]) => {
         try {
@@ -283,7 +283,7 @@ export async function openStorageLogStore(
       },
       onCommit: (effect: () => void) => namespace.onCommit(scope, effect),
       onRollback: (effect: () => void) => namespace.onRollback(scope, effect)
-    })
+    }
   }
   const store: ILogStore = {
     append: (input) => {
@@ -438,7 +438,7 @@ export async function openStorageLogStore(
     }
   }
   /** The closure verifies this exact object even if a caller copies an enumerable symbol manually. */
-  const nativeAccess: IStorageLogNativeAccess = Object.freeze({
+  const nativeAccess: IStorageLogNativeAccess = {
     matches: (candidate: IStorageJournalBackendAccess) =>
       candidate.registration === access.registration &&
       candidate.orgId === access.orgId &&
@@ -447,7 +447,7 @@ export async function openStorageLogStore(
     backendInstanceId: access.backendInstanceId,
     headLock: storageJournalLockKey(prefix, StorageJournalLock.head),
     createPort
-  })
+  }
   Object.defineProperty(store, storageLogNativeAccess, {
     value: (candidate: ILogStore) => {
       if (candidate !== store) throw new StorageContractError(StorageContractErrorCode.unsupported)

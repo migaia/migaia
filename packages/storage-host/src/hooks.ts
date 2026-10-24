@@ -24,7 +24,7 @@ export function createStorageHooks(report: (error: unknown) => void): {
     terminalReport: report
   })
   return {
-    hooks: Object.freeze({
+    hooks: {
       on(name, handler) {
         if (typeof handler !== 'function')
           throw createStorageTypeError(
@@ -48,7 +48,7 @@ export function createStorageHooks(report: (error: unknown) => void): {
           { delivery: EventDelivery.value }
         )
       }
-    }),
+    },
     hasListeners: (name) => hub.size(name) !== 0,
     emit(name, payload) {
       if (hub.size(name) === 0) return

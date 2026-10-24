@@ -57,7 +57,7 @@ import {
   type IKeyValueBackendStore
 } from './construction.js'
 
-const CAPABILITIES: IStorageCapabilities = Object.freeze({
+const CAPABILITIES: IStorageCapabilities = {
   batch: false,
   syncRead: true,
   binary: false,
@@ -68,7 +68,7 @@ const CAPABILITIES: IStorageCapabilities = Object.freeze({
   changeFeed: false,
   maxValueBytes: 5 * 1024 * 1024,
   opaqueEntries: false
-})
+}
 
 /**
  * Namespace configuration shared by local and session storage; changing the codec changes the
@@ -199,7 +199,7 @@ export const createWebStorageBackend = (
   const controller = runtime.createChangeController({
     backend,
     platform: live,
-    options: Object.freeze({ namespace, namespaceCodec }),
+    options: { namespace, namespaceCodec },
     finalize: () => releaseNativeEvents?.()
   })
   /** Explicit and language cleanup keep separate stable promises for the same controller cleanup. */
@@ -235,12 +235,12 @@ export const createWebStorageBackend = (
       }
     })
   /** A native source must actually register before the immutable capability can become true. */
-  const capabilities = Object.freeze({
+  const capabilities = {
     ...CAPABILITIES,
     changeFeed: releaseNativeEvents !== undefined,
     transactions: redoEnabled,
     batch: redoEnabled
-  })
+  }
 
   const assertLive = (): void => {
     controller.assertLive()
