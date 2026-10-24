@@ -5,6 +5,29 @@ const t = (en: string, zh: string): IText => ({ en, zh })
 export const storagePluginSqliteCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
   sqliteBackendPlugin: [
     {
+      title: t('Isolate organizations on one native connection', '同一原生连接隔离组织'),
+      problem: t(
+        'Organization data must share the existing tables without sharing its logical keys.',
+        '组织数据需要共用既有表，同时隔离逻辑键。'
+      ),
+      example: `import { createStorageHost, createOrgId } from '@migaia/storage-host'
+import { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'
+import { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'
+
+await using connection = nodeSqliteDriver(':memory:')
+await using host = await createStorageHost({ plugins: [sqliteBackendPlugin({ driver: connection })] as const })
+const orgId = createOrgId()
+const organization = host.org(orgId).backend('sqlite')
+await organization.set('theme', 'dark')
+console.log(await organization.get('theme'), await host.backend('sqlite').get('theme'))
+await host.dropOrg(orgId)
+console.log(await organization.get('theme'))`,
+      result: t(
+        'Prints dark null, then null. No new connection or organization schema is created; root SQL remains caller-owned and explicit organization views reject it.',
+        '输出 dark null，随后输出 null。不新建连接或组织 schema；根 SQL 归调用方，显式组织视图拒绝 SQL。'
+      )
+    },
+    {
       title: t('Commit SQL with a snapshot key', '同事务提交 SQL 与快照键'),
       problem: t(
         'A database row and its application counter must either both commit or both roll back.',

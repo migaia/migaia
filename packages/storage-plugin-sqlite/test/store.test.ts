@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, it, expect, onTestFinished, vi } from 'vitest'
-import { createStorageHost, definePlugin } from '@migaia/storage-host'
+import { createStorageHost, createOrgId, definePlugin } from '@migaia/storage-host'
 import { deferred } from '@migaia/utils/promise'
 import {
   kv,
@@ -21,7 +21,9 @@ import { sqliteBackendPlugin, type ISqliteValue } from '../src/index.js'
 import { nodeSqliteDriver } from '../src/node.js'
 
 /** Each case owns its actual file and disposes host before the borrowed native connection. */
-async function installed(options: { wal?: boolean; memory?: boolean; native?: string[] } = {}) {
+async function installed(
+  options: { wal?: boolean; memory?: boolean; native?: string[]; org?: string } = {}
+) {
   const directory = mkdtempSync(join(tmpdir(), 'migaia-sqlite-'))
   const path = options.memory ? ':memory:' : join(directory, 'data.sqlite')
   const connection = nodeSqliteDriver(path)
@@ -52,6 +54,7 @@ async function installed(options: { wal?: boolean; memory?: boolean; native?: st
       }
     : connection
   const host = await createStorageHost({
+    org: options.org,
     plugins: [sqliteBackendPlugin({ driver, wal: options.wal })] as const
   })
   onTestFinished(async () => {
@@ -951,4 +954,103 @@ describe('native SQLite installation', () => {
       release.resolve()
     }
   })
+})
+
+describe('native SQLite organizations', () => {
+  it('serializes root and organization attempts through one native connection', async () => {
+    const native: string[] = []
+    const { store, host } = await installed({ memory: true, native })
+    const first = host.org(createOrgId()).backend('sqlite')
+    const second = host.org(createOrgId()).backend('sqlite')
+    const entered = deferred<void>()
+    const release = deferred<void>()
+    const initial = first.transaction(async (tx) => {
+      await tx.set('shared-key', 'first')
+      entered.resolve()
+      await release.promise
+    })
+    await entered.promise
+    try {
+      expect(() => store.sync.get('shared-key')).toThrowError(
+        expect.objectContaining({ code: 'TRANSACTION_FAILED' })
+      )
+      const rootWrite = store.set('shared-key', 'root')
+      const following = second.transaction((tx) => tx.set('shared-key', 'second'))
+      await new Promise<void>((resolve) => setImmediate(resolve))
+      release.resolve()
+      await Promise.all([initial, rootWrite, following])
+      expect(await store.get('shared-key')).toBe('root')
+      expect(await first.get('shared-key')).toBe('first')
+      expect(await second.get('shared-key')).toBe('second')
+      expect(native.filter((text) => text.startsWith('BEGIN'))).toHaveLength(3)
+    } finally {
+      release.resolve()
+      await initial
+    }
+  })
+  for (const memory of [true, false])
+    for (const configured of [false, true]) {
+      it(
+        'keeps the configured default, two organizations and physical deletion isolated (' +
+          memory +
+          ',' +
+          configured +
+          ')',
+        async () => {
+          const org = configured ? createOrgId() : '00000000-0000-0000-0000-000000000000'
+          const native: string[] = []
+          const { host, connection } = await installed({ memory, org, native })
+          const root = host.backend('sqlite')
+          const same = host.org(org).backend('sqlite')
+          const first = createOrgId()
+          const second = createOrgId()
+          const left = host.org(first).backend('sqlite')
+          const right = host.org(second).backend('sqlite')
+          native.length = 0
+          await root.set('key', 'root')
+          expect(await same.get('key')).toBe('root')
+          await same.set('key', 'default')
+          expect(await root.get('key')).toBe('default')
+          await left.set('key', 'left')
+          await right.set('key', 'right')
+          await left.setBytes('bytes', new Uint8Array([1]))
+          await left.putRecord({ owner: 'left' }, 'row')
+          await left.use(kv).setMany([{ key: ['batch', 1], value: 'left' }])
+          await left.use(ttl).expire(lockKey.text('key'), 60_000)
+          await left.use(counter).increment('count', 2)
+          expect(await right.getRecord('row')).toBeUndefined()
+          expect(await right.use(kv).getMany([['batch', 1]])).toEqual([undefined])
+          expect(await right.use(ttl).remaining(lockKey.text('key'))).toBeUndefined()
+          expect(await right.get('count')).toBeNull()
+          expect(native.some((text) => /CREATE|PRAGMA/i.test(text))).toBe(false)
+          const countBeforeMismatch = native.length
+          await expect(left.set('escape', 'blocked', { orgId: second })).rejects.toMatchObject({
+            code: 'INVALID_ARGUMENT'
+          })
+          expect(native.length).toBe(countBeforeMismatch)
+          expect(await right.get('escape')).toBeNull()
+          const owners = connection
+            .prepare('SELECT DISTINCT org_id FROM migaia_text')
+            .all()
+            .map((row) => row.org_id)
+          expect(new Set(owners)).toEqual(new Set([org, first, second]))
+          await host.dropOrg(first)
+          expect(await left.get('key')).toBeNull()
+          expect(await left.getRecord('row')).toBeUndefined()
+          expect(await left.use(kv).getMany([['batch', 1]])).toEqual([undefined])
+          expect(await right.get('key')).toBe('right')
+          expect(await root.get('key')).toBe('default')
+          await host.dropOrg(first)
+          await left.set('key', 'reused')
+          expect(await left.get('key')).toBe('reused')
+          expect(host.org(first).backend('sqlite')).toBe(left)
+          await host.dropOrg(org)
+          expect(await root.get('key')).toBeNull()
+          expect(await same.get('key')).toBeNull()
+          expect(await left.get('key')).toBe('reused')
+          expect(await right.get('key')).toBe('right')
+          expect(native.some((text) => /CREATE|PRAGMA/i.test(text))).toBe(false)
+        }
+      )
+    }
 })
