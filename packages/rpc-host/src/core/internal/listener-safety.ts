@@ -4,6 +4,7 @@
  * cannot replace this resource boundary without changing reporting or cleanup semantics.
  */
 import { RpcAuxiliaryErrorText } from './auxiliary-error-text.js'
+import { orderStringKeys } from '@migaia/utils/string'
 import {
   type IRpcCoreErrorCode,
   RPC_CORE_ERROR_SOURCE,
@@ -121,12 +122,17 @@ function listenerFailureStates(
 
 /** Removes and returns settled reporter failures in state and invocation order. */
 function takeListenerFailures(boundary: IListenerFailureBoundary): unknown[] {
-  return listenerFailureStates(boundary).flatMap((state) =>
-    state.failures
-      .splice(0)
-      .sort((left, right) => left.order - right.order)
-      .map(({ error }) => error)
-  )
+  /** Async settlements can arrive out of invocation order; fixed-width keys retain numeric order. */
+  const failures: unknown[] = []
+  for (const state of listenerFailureStates(boundary)) {
+    /** Fourteen hexadecimal digits cover every precisely representable nonnegative JS counter. */
+    const entries = new Map(
+      state.failures.splice(0).map((entry) => [entry.order.toString(16).padStart(14, '0'), entry])
+    )
+    /** Shared UTF-16 ordering visits constant-width keys in O(failures), independent of timing. */
+    for (const key of orderStringKeys([...entries.keys()])) failures.push(entries.get(key)!.error)
+  }
+  return failures
 }
 
 /** Returns whether an error already owns a complete canonical WebRPC identity. */

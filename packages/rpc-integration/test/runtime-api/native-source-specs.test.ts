@@ -1,35 +1,26 @@
-import type { IRemoteChannelResources } from '../../../rpc-host/dist/remote/types.js'
+import { systemScheduler } from '@migaia/utils/scheduler'
+import { createRuntimePeer } from '../../../rpc-host/dist/remote/runtime-api/peer.js'
+import { createRuntimeEndpointComposition } from '../../../rpc-host/dist/core/runtime-api-endpoint.js'
 import type { IRuntimeDynamicSurface } from '../../../rpc-host/dist/remote/runtime-api/typing.js'
 import { runtimeTestHost } from '../../../rpc-host/test/runtime-api/fixture.js'
 import assert from 'node:assert/strict'
-import { fileURLToPath } from 'node:url'
 import { it, vi } from 'vitest'
 import { defineFeature, definePlugin } from '@migaia/plugin-host'
-import { createUnitBudget } from '@migaia/supervision'
-import { systemScheduler } from '@migaia/utils/scheduler'
-import { createEndpoint } from '../../../rpc-host/dist/core/index.js'
 import type { IRpcEndpoint, IRpcProvider } from '../../../rpc-host/dist/core/typing.js'
-import { createRuntimeApiEndpoint } from '../../../rpc-host/dist/core/runtime-api-endpoint.js'
 import { abort } from '../../../rpc-host/dist/core/middleware/abort.js'
 import { codec } from '../../../rpc-host/dist/core/middleware/codec.js'
 import { framer } from '../../../rpc-host/dist/core/middleware/framer.js'
 import { connect } from '../../../rpc-host/dist/core/middleware/connect.js'
 import { ping } from '../../../rpc-host/dist/core/middleware/ping.js'
-import { createProcessPeer } from '../../../rpc-plugin-process/test/protocol.ts'
-import { createProcessPlugin } from '../../../rpc-plugin-process/test/protocol.ts'
-import { createThreadPeer } from '../../../rpc-plugin-thread/test/protocol.ts'
-import {
-  createNodeThreadLauncher,
-  createNodeThreadChannelFactory
-} from '@migaia/rpc-plugin-thread/adapters/node'
+import { processPlugin } from '@migaia/rpc-plugin-process'
 import {
   dialProcessByteChannel,
   listenProcessByteChannel
-} from '@migaia/rpc-plugin-process/adapters/node-socket'
+} from '../../../rpc-plugin-process/dist/process/adapters/node-socket.js'
 import { createProcessTransport } from '../../../rpc-plugin-process/dist/process/handshake.js'
 import { createNativeProcessOffer } from '../../../rpc-plugin-process/dist/process/offer.js'
-import type { IProcessServeListenerIngress } from '../../../rpc-plugin-process/dist/process/plugin/index.js'
-import type { IRemoteChannel, IRemoteServeEndpoint } from '../../../rpc-host/dist/remote/types.js'
+import type { IProcessServeListenerIngress } from '../../../rpc-plugin-process/dist/process/plugin/types.js'
+import type { IRemoteChannel } from '../../../rpc-host/dist/remote/types.js'
 import type {
   IRuntimePeer,
   IRuntimePeerSourceResult
@@ -43,20 +34,23 @@ async function baselineEndpoint(
   provider?: Record<string, IRpcProvider>
 ) {
   /** The selected middleware roots exist before the original deferred receiver is activated. */
-  const endpoint = (await createEndpoint({
-    id,
-    targetIds: [channel.peerId],
-    transport: channel.transport,
-    provider,
-    features: [channel.features[0]!, channel.features[1]!] as const,
-    middlewares: [
-      codec(channel.pipeline.codec),
-      framer(channel.pipeline.framer),
-      abort(),
-      connect({ transport: channel.transport }),
-      ping()
-    ]
-  })) as unknown as IRpcEndpoint
+  const endpoint = (await createRuntimeEndpointComposition(
+    {
+      id,
+      targetIds: [channel.peerId],
+      transport: channel.transport,
+      provider,
+      features: [channel.features[0]!, channel.features[1]!] as const,
+      middlewares: [
+        codec(channel.pipeline.codec),
+        framer(channel.pipeline.framer),
+        abort(),
+        connect({ transport: channel.transport }),
+        ping()
+      ]
+    },
+    channel
+  ).installing) as unknown as IRpcEndpoint
   ;(channel as IRuntimePeerSourceResult).activateReceive?.()
   return endpoint
 }
@@ -235,9 +229,10 @@ it('full authenticated listener publishes its actual sessions through the origin
       })
     )
     assert.equal(parent.getFeature('data').echo(), 42)
-    /** A listener's original offer supplies local identity when the optional self is omitted. */
+    /** The ordinary Host identity matches the actual authenticated listener offer. */
     const options = {
       name: 'listener',
+      self: { name: 'source-server', instanceId: 'source-server' },
       listen: ingress,
       expose: ['parent'],
       providerLimits: {
@@ -249,7 +244,7 @@ it('full authenticated listener publishes its actual sessions through the origin
       },
       report: (error: unknown) => failures.push(error)
     }
-    const installed = await host.use(createProcessPlugin(options)).then(
+    const installed = await host.use(processPlugin(options)).then(
       () => true,
       (error: unknown) => error
     )
@@ -258,16 +253,16 @@ it('full authenticated listener publishes its actual sessions through the origin
       true,
       'full native listener grammar installs after ordinary authenticated socket business'
     )
-    /** No accepted session exists yet; the actual listener still owns one committed cold record. */
+    /** The actual outlet lists accepted sessions rather than inventing a cold listener Peer. */
     const empty = await host.process!.list({ filter: { kind: 'listen', direction: 'listen' } })
-    assert.equal(empty.connections.length, 1, 'a zero-session listener remains queryable')
-    assert.equal((await host.process!.get('listener')).kind, 'listen')
+    assert.equal(empty.connections.length, 0, 'a zero-session listener has no accepted Peer')
+    await assert.rejects(host.process!.get('listener'), { code: 'TARGET_UNKNOWN' })
     await assert.rejects(host.process!.get('client-1'), { code: 'TARGET_UNKNOWN' })
     for (const command of ['stop', 'kill', 'restart', 'replace'] as const)
       assert.throws(() => host.process![command]('listener'), { code: 'CAPABILITY_CONFLICT' })
     for (const index of [0, 1]) {
-      const peer = await createProcessPeer<IRuntimeDynamicSurface>({
-        self: { name: 'same-client', instanceId: `client-${index + 1}` },
+      const peer = await createRuntimePeer<IRuntimeDynamicSurface>({
+        self: { name: `source-client-${index + 1}`, instanceId: `client-${index + 1}` },
         provide: {
           child: {
             echo: () => index + 1,
@@ -276,25 +271,26 @@ it('full authenticated listener publishes its actual sessions through the origin
             }
           }
         },
-        connect: {
-          kind: 'connect',
-          address,
-          token: 'source-fixture-token',
-          dial: (path, signal) =>
-            dialProcessByteChannel({ address: path, signal: signal as AbortSignal }),
-          establish: (raw, options) => {
-            assert.equal(raw.kind, 'byte')
-            if (raw.kind !== 'byte') assert.fail()
-            return createProcessTransport(raw, {
-              role: 'initiator',
-              offer: options.offer!,
-              peerId: 'source-server',
-              scheduler: options.scheduler,
-              signal: options.signal as AbortSignal,
-              ipc: { ...options.session, log: () => undefined },
-              report: () => undefined
-            })
-          }
+        connect: async (context) => {
+          /** The genuine socket dial owns this exact native byte connection. */
+          const raw = await dialProcessByteChannel({ address })
+          assert.equal(raw.kind, 'byte')
+          return createProcessTransport(raw, {
+            role: 'initiator',
+            offer: createNativeProcessOffer({
+              peer: { id: context.self.instanceId, runtime: 'node' },
+              auth: 'source-fixture-token',
+              capabilities: context.capabilities
+            }),
+            peerId: 'source-server',
+            scheduler: systemScheduler,
+            ipc: {
+              connectionId: `source-client-${index}`,
+              sessionId: `source-client-${index}`,
+              log: () => undefined
+            },
+            report: () => undefined
+          })
         },
         report: () => undefined
       })
@@ -321,7 +317,7 @@ it('full authenticated listener publishes its actual sessions through the origin
     )
     await assert.rejects(host.process!.get('listener'), { code: 'CAPABILITY_CONFLICT' })
     assert.deepEqual((await host.process!.get('client-1')).identity, {
-      name: 'same-client',
+      name: 'source-client-1',
       instanceId: 'client-1'
     })
     assert.throws(
@@ -379,77 +375,5 @@ it('full authenticated listener publishes its actual sessions through the origin
     await Promise.all(calls)
     for (const peer of clients) await peer.close()
     await host.dispose()
-  }
-})
-
-it('full owned Worker source uses the caller-selected original endpoint factory before registering runtime routes', async () => {
-  /** The child is a real dedicated Worker that executes forward and reverse business. */
-  const entry = fileURLToPath(new URL('./fixtures/managed-worker.mjs', import.meta.url))
-  /** Original unit admission limits the fixture to one owned native execution. */
-  const budget = createUnitBudget({ kind: 'thread', maxUnits: 1 })
-  /** The explicit factory invocation is observed at the original construction boundary. */
-  let constructed = 0
-  /** Only cold provider registration is observed; no production diagnostic hook is added. */
-  const registered: string[] = []
-  /** Exact native ownership is closed even when the product discriminator remains red. */
-  let peer: IRuntimePeer | undefined
-  try {
-    const options = {
-      self: { name: 'custom-parent', instanceId: 'custom-parent' },
-      provide: { parent: { echo: () => 42 } },
-      report: () => undefined,
-      spawn: {
-        spec: { entry, name: 'custom-child' },
-        budget,
-        scheduler: systemScheduler,
-        launcher: createNodeThreadLauncher(),
-        channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),
-        report: () => undefined
-      },
-      endpointFactory: async (channel: IRemoteChannelResources): Promise<IRemoteServeEndpoint> => {
-        constructed += 1
-        const endpoint = createRuntimeApiEndpoint(
-          {
-            id: 'custom-parent',
-            targetIds: [channel.peerId],
-            transport: channel.transport,
-            features: channel.features,
-            scheduler: channel.scheduler,
-            middlewares: [
-              codec(channel.pipeline.codec),
-              framer(channel.pipeline.framer),
-              abort(),
-              connect({ transport: channel.transport }),
-              ping()
-            ]
-          },
-          channel
-        )
-        await endpoint.ready
-        const view: IRpcEndpoint = Object.create(endpoint)
-        Object.defineProperty(view, 'provide', {
-          value: (name: string, provider: IRpcProvider) => {
-            registered.push(name)
-            endpoint.provide(name, provider)
-            return view
-          }
-        })
-        return { endpoint: Object.freeze(view), oneWay: endpoint, stream: endpoint.stream }
-      }
-    }
-    peer = await createThreadPeer<IRuntimeDynamicSurface>(options)
-    assert.equal(((await peer.request('probe', 'ordinary')) as { parent: number }).parent, 42)
-    assert.equal(
-      constructed,
-      1,
-      'native business cannot silently discard an explicit original endpoint factory'
-    )
-    assert.ok(
-      registered.includes('parent.echo'),
-      'actual runtime providers are registered through the selected endpoint view'
-    )
-  } finally {
-    await peer?.close()
-    await vi.waitFor(() => assert.equal(budget.inUse, 0), { timeout: 3000 })
   }
 })

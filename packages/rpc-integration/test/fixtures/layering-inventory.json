@@ -2968,5 +2968,5 @@
       "packages/rpc/test/core/errors.test.ts"
     ]
   },
-  "browserOnlyErrorTextKeys": ["rtcSubscriptionCleanupFailed", "webTransportCleanupFailed"]
+  "browserOnlyErrorTextKeys": ["rtcSubscriptionCleanupFailed"]
 }

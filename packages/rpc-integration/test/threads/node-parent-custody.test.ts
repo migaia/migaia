@@ -14,7 +14,7 @@ describe('Node child-port lazy replay ownership', () => {
       parentPort: port1
     }))
     try {
-      await import('@migaia/rpc-plugin-thread/adapters/node')
+      await import('../../../rpc-plugin-thread/dist/threads/adapters/node.js')
       expect(port1.listenerCount('close')).toBe(0)
       expect(port1.listenerCount('message')).toBe(0)
       /** The real canonical channel consumes the adapter's private lazy registration. */

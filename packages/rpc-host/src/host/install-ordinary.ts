@@ -42,86 +42,112 @@ const ordinaryRuntimeFamily = Object.freeze({})
  * Install into the original native Host reservation, preserving its slot and replacement
  * transaction.
  */
-export async function installOrdinaryRpcTransport(
-  core: IPluginHostCore,
-  definition: IRpcTransportPluginDefinition
-): Promise<Record<never, never>> {
-  /** Forged cores cannot acquire runtime slots or observe another Host's Feature outputs. */
-  const integration = getPluginRuntimeIntegration(core)
-  /** The token is checked before an actual source can be invoked. */
-  const deployment = readAdapterDeployment(definition.deployment)
-  if (!deployment)
-    throw createRpcError(RpcCoreErrorCode.invalidConfig, HostErrorText.deploymentInvalid)
-  /** Original physical families retain the existing process/thread publication location. */
-  const key = deployment.runtimeKey ?? RuntimePluginKey.process
-  /** Native slot admission remains the sole owner of pending candidates and committed visibility. */
-  const slot = integration.acquireSharedSlot<IRuntimeOutlet>(
-    key,
-    deployment.runtimeFamily ?? ordinaryRuntimeFamily,
-    (shared) =>
-      createRuntimeOutlet(
-        shared,
-        {
-          name: integration.identity.name,
-          instanceId: integration.identity.id
-        },
-        key
-      )
-  )
-  /** One install gate keeps explicitly exposed local methods behind the original commit boundary. */
-  const gate = createCommitGate(core.lifecycle.signal)
-  /** Forward entries remain original canonical catalog entries, never wrapper calls to another host. */
-  const forwards = new Map<string, IRuntimeForwardMethodEntry>()
-  /** Local output availability is read through native Host guards on every invocation. */
-  const provide = exposedProvide(
-    definition.expose ?? [],
-    (name) => integration.readFeatureOutputs(name),
-    (target) => resolveRuntimePluginConnection(integration, target),
-    forwards,
-    integration.nodeId,
-    gate
-  )
-  registerRuntimePluginMethods(provide, [
-    ...compileRuntimeMethods(deployment.runtimeOptions?.provide),
-    ...forwards.values()
-  ])
-  /** Read exact registered objects before the native source observes transport feature settings. */
-  const features = readOrdinaryRpcFeatures(core)
-  /** Explicit deployment-local configuration retains its ordinary Host behavior. */
-  const options: IRpcHostOptions = {
-    ...deployment.runtimeOptions,
-    plugins: features.map((feature) => feature.plugin),
-    self: deployment.runtimeOptions?.self ?? {
-      name: integration.identity.name,
-      instanceId: integration.identity.id
-    },
-    provide,
-    report: deployment.runtimeOptions?.report,
-    signal: core.lifecycle.signal
+/** Own one ordinary native transport installation through its actual shared-slot transaction. */
+class OrdinaryRpcTransportInstallation {
+  /** The genuine installation core remains the sole native lifecycle/mutation authority. */
+  #core: IPluginHostCore
+  /** The cold definition retains original exposure and native source policy. */
+  #definition: IRpcTransportPluginDefinition
+  /** Host integration owns shared slots, output guards and the native node identity. */
+  #integration: ReturnType<typeof getPluginRuntimeIntegration>
+  /** Only the original privately registered deployment may acquire a physical source. */
+  #deployment: NonNullable<ReturnType<typeof readAdapterDeployment>>
+  /** Pending/committed publication and replacement remain owned by the native Host slot. */
+  #slot: import('@migaia/plugin-host').IPluginRuntimeSharedSlot<IRuntimeOutlet>
+  /** Exposed Feature calls wait on this original installation's commit boundary. */
+  #gate: ReturnType<typeof createCommitGate>
+  /** Original compiled methods retain their native output guards and forwarding entries. */
+  #provide: ReturnType<typeof exposedProvide>
+  /** Exactly registered Features are read before the native source observes configuration. */
+  #features: ReturnType<typeof readOrdinaryRpcFeatures>
+  /** One actual runtime configuration retains its private preparation provenance. */
+  #options: IRpcHostOptions
+  /** The existing shared outlet alone owns lifecycle subscriptions. */
+  #events: ReturnType<typeof readRuntimeOutletEvents>
+  /** A pending reservation cannot publish ready events before its native registration commits. */
+  #record: IRuntimePluginRegistration | undefined
+  /** Only a genuinely managed prepared Peer lends original execution/generation commands. */
+  #managedPeer: IRuntimePeer | undefined
+  /** One actual Host endpoint owns the installed native sources and final resource close. */
+  #runtime: ReturnType<typeof createRuntimeHost>
+  /** The original managed registration is selected once after genuine startup readiness. */
+  #registration: import('../remote/proxy.js').IRemoteRuntimeRegistration | undefined
+
+  /** Admit genuine Host/deployment ports and capture cold configuration before native startup. */
+  constructor(core: IPluginHostCore, definition: IRpcTransportPluginDefinition) {
+    this.#core = core
+    this.#definition = definition
+    this.#integration = getPluginRuntimeIntegration(this.#core)
+    /** Admission checks the original token before retaining a usable deployment. */
+    const deployment = readAdapterDeployment(this.#definition.deployment)
+    if (!deployment)
+      throw createRpcError(RpcCoreErrorCode.invalidConfig, HostErrorText.deploymentInvalid)
+    this.#deployment = deployment
+    const key = this.#deployment.runtimeKey ?? RuntimePluginKey.process
+    this.#slot = this.#integration.acquireSharedSlot<IRuntimeOutlet>(
+      key,
+      this.#deployment.runtimeFamily ?? ordinaryRuntimeFamily,
+      (shared) =>
+        createRuntimeOutlet(
+          shared,
+          {
+            name: this.#integration.identity.name,
+            instanceId: this.#integration.identity.id
+          },
+          key
+        )
+    )
+    this.#gate = createCommitGate(this.#core.lifecycle.signal)
+    const forwards = new Map<string, IRuntimeForwardMethodEntry>()
+    this.#provide = exposedProvide(
+      this.#definition.expose ?? [],
+      (name) => this.#integration.readFeatureOutputs(name),
+      (target) => resolveRuntimePluginConnection(this.#integration, target),
+      forwards,
+      this.#integration.nodeId,
+      this.#gate
+    )
+    registerRuntimePluginMethods(this.#provide, [
+      ...compileRuntimeMethods(this.#deployment.runtimeOptions?.provide),
+      ...forwards.values()
+    ])
+    this.#features = readOrdinaryRpcFeatures(this.#core)
+    this.#options = {
+      ...this.#deployment.runtimeOptions,
+      plugins: this.#features.map((feature) => feature.plugin),
+      self: this.#deployment.runtimeOptions?.self ?? {
+        name: this.#integration.identity.name,
+        instanceId: this.#integration.identity.id
+      },
+      provide: this.#provide,
+      report: this.#deployment.runtimeOptions?.report,
+      signal: this.#core.lifecycle.signal
+    }
+    this.#events = readRuntimeOutletEvents(this.#slot.facade)
+    this.#runtime = createRuntimeHost(
+      this.#options,
+      this.#definition,
+      this.#features.map((feature) => feature.definition),
+      this.#integration.nodeId,
+      this.#publish,
+      this.#deployment.runtimeOptions?.self === undefined
+    )
+    core.onDispose(() => this.#runtime.close())
   }
-  /**
-   * Fixed feature configuration is captured for this installation without hot-reconfiguring live
-   * peers.
-   */
-  /** The existing outlet owns lifecycle observation; this record is published only on native commit. */
-  const events = readRuntimeOutletEvents(slot.facade)
-  /** A pending native reservation cannot publish its ready event before its registration commits. */
-  let record: IRuntimePluginRegistration | undefined
-  /** The published genuine facade lends its original holder; no native execution is synthesized. */
-  let managedPeer: IRuntimePeer | undefined
-  /** Each canonical session contributes one exact withdraw receipt owned by its source retirement. */
-  const publish = (connection: IRuntimePluginConnection): (() => void) => {
+
+  /** Each canonical session contributes its exact native withdrawal receipt. */
+  #publish = (connection: IRuntimePluginConnection): (() => void) => {
     /** Only the original managed factory can supply native generation and command authority. */
     const holder = readManagedRuntimeHolder(connection.peer)
-    if (holder) managedPeer = connection.peer
+    if (holder) this.#managedPeer = connection.peer
     /** Registration name and remote self identity remain distinct fields. */
-    const registered = Object.freeze({ ...connection, name: definition.name })
+    const registered = Object.freeze({ ...connection, name: this.#definition.name })
     /** Native shared-slot publication automatically stages this receipt until successful commit. */
-    const withdraw = slot.contribute(registered, registered.instanceId)
-    if (record && slot.registered().includes(record))
-      events.publish(
+    const withdraw = this.#slot.contribute(registered, registered.instanceId)
+    if (this.#record && this.#slot.registered().includes(this.#record))
+      this.#events.publish(
         runtimeReadyEvent(
-          definition.name,
+          this.#definition.name,
           connection.peer,
           holder?.registration.events.current().generation
         ),
@@ -129,81 +155,89 @@ export async function installOrdinaryRpcTransport(
       )
     return withdraw
   }
-  /** This creates the one host endpoint over raw sources, never a complete Peer used as a source. */
-  const runtime = createRuntimeHost(
-    options,
-    definition,
-    features.map((feature) => feature.definition),
-    integration.nodeId,
-    publish,
-    deployment.runtimeOptions?.self === undefined
-  )
-  core.onDispose(() => runtime.close())
-  /** Shared provider reservations reuse the original cross-transport Host admission owner. */
-  const admission = acquireRuntimeProviderAdmission(integration)
-  for (const feature of features)
-    await feature.setup(runtime.featureContext((dispose) => core.onDispose(dispose)))
-  await withRuntimePreparationContext(
-    options,
-    {
-      host: integration,
-      ...admission,
-      initialSignal: core.operation.signal,
-      lifecycleSignal: core.lifecycle.signal,
-      own: (dispose) => core.onDispose(dispose),
-      readProvide: () => provide
-    },
-    () => runtime.start()
-  )
-  /** Original readiness coalescing remains with the same holder used by native event observation. */
-  const holder = managedPeer && readManagedRuntimeHolder(managedPeer)
-  /** Borrowed connect bindings deliberately retain no execution authority. */
-  const registration = holder?.registration
-  record = Object.freeze({
-    name: definition.name,
-    peer: managedPeer ?? { describe: runtime.host.describe },
-    execution: registration?.execution,
-    prepareReplacement: readManagedRuntimeReplacement(managedPeer),
-    whenReady: holder ? () => holder.prepareRebind(core.lifecycle.signal) : undefined,
-    instanceIds: () =>
-      registration
-        ? registration.runtimeInstanceIds()
-        : (slot.values() as readonly IRuntimePluginConnection[])
-            .filter((connection) => connection.name === definition.name)
-            .map((connection) => connection.instanceId)
-  })
-  slot.register(record, () => {
-    gate.open()
-    for (const connection of slot.values() as readonly IRuntimePluginConnection[])
-      if (connection.name === definition.name)
-        events.publish(
-          runtimeReadyEvent(
-            definition.name,
-            connection.peer,
-            registration?.events.current().generation
-          ),
-          connection.report
-        )
-  })
-  /** Logical owner close settles idle watches only after the original shared slot becomes empty. */
-  const closeEvents = (): void => {
-    if (slot.registered().length === 0) events.close()
-  }
-  core.lifecycle.signal.addEventListener('abort', closeEvents, { once: true })
-  core.onDispose(() => core.lifecycle.signal.removeEventListener('abort', closeEvents))
-  if (registration)
-    core.onDispose(
-      registration.supervisor.subscribe((event) => {
-        if (!slot.registered().includes(record!)) return
-        /** The original projector preserves native exit, restart and degradation classification. */
-        const observation = runtimeSupervisorEvent(
-          definition.name,
-          registration,
-          event,
-          options.report ?? defaultRpcReporter
-        )
-        if (observation) events.publish(observation, options.report ?? defaultRpcReporter)
-      })
+
+  /** Start through the existing native Feature and Host provider admission owners. */
+  async install(): Promise<Record<never, never>> {
+    const admission = acquireRuntimeProviderAdmission(this.#integration)
+    for (const feature of this.#features)
+      await feature.setup(this.#runtime.featureContext((dispose) => this.#core.onDispose(dispose)))
+    await withRuntimePreparationContext(
+      this.#options,
+      {
+        host: this.#integration,
+        ...admission,
+        initialSignal: this.#core.operation.signal,
+        lifecycleSignal: this.#core.lifecycle.signal,
+        own: (dispose) => this.#core.onDispose(dispose),
+        readProvide: () => this.#provide
+      },
+      () => this.#runtime.start()
     )
-  return {}
+    this.#register()
+    return {}
+  }
+
+  /** Preserve native readiness coalescing and only then register the original slot receipt. */
+  #register(): void {
+    const holder = this.#managedPeer && readManagedRuntimeHolder(this.#managedPeer)
+    this.#registration = holder?.registration
+    this.#record = Object.freeze({
+      name: this.#definition.name,
+      peer: this.#managedPeer ?? { describe: this.#runtime.host.describe },
+      execution: this.#registration?.execution,
+      prepareReplacement: readManagedRuntimeReplacement(this.#managedPeer),
+      whenReady: holder ? () => holder.prepareRebind(this.#core.lifecycle.signal) : undefined,
+      instanceIds: () =>
+        this.#registration
+          ? this.#registration.runtimeInstanceIds()
+          : (this.#slot.values() as readonly IRuntimePluginConnection[])
+              .filter((connection) => connection.name === this.#definition.name)
+              .map((connection) => connection.instanceId)
+    })
+    this.#slot.register(this.#record, () => {
+      this.#gate.open()
+      for (const connection of this.#slot.values() as readonly IRuntimePluginConnection[])
+        if (connection.name === this.#definition.name)
+          this.#events.publish(
+            runtimeReadyEvent(
+              this.#definition.name,
+              connection.peer,
+              this.#registration?.events.current().generation
+            ),
+            connection.report
+          )
+    })
+    this.#core.lifecycle.signal.addEventListener('abort', this.#closeEvents, { once: true })
+    this.#core.onDispose(() =>
+      this.#core.lifecycle.signal.removeEventListener('abort', this.#closeEvents)
+    )
+    if (this.#registration)
+      this.#core.onDispose(
+        this.#registration.supervisor.subscribe((event) => {
+          if (!this.#slot.registered().includes(this.#record!)) return
+          /** The original projector preserves native exit, restart and degradation classification. */
+          const observation = runtimeSupervisorEvent(
+            this.#definition.name,
+            this.#registration!,
+            event,
+            this.#options.report ?? defaultRpcReporter
+          )
+          if (observation)
+            this.#events.publish(observation, this.#options.report ?? defaultRpcReporter)
+        })
+      )
+  }
+
+  /** Idle watchers settle only when the original shared slot has become empty. */
+  #closeEvents = (): void => {
+    if (this.#slot.registered().length === 0) this.#events.close()
+  }
+}
+
+/** Install into the original native Host reservation without another publication transaction. */
+export async function installOrdinaryRpcTransport(
+  core: IPluginHostCore,
+  definition: IRpcTransportPluginDefinition
+): Promise<Record<never, never>> {
+  return new OrdinaryRpcTransportInstallation(core, definition).install()
 }

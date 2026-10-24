@@ -44,13 +44,15 @@ registerHooks({
           'binding.trackRequest(() => registration.invokeRequest(method, payload, callTimeout(callOptions)))',
           '(globalThis.__rpcFacadeCounters.requestClosure++, binding.trackRequest(() => registration.invokeRequest(method, payload, callTimeout(callOptions))))'
         )
-      else
-        assert.ok(
-          source.includes(
-            'binding.trackRequest(request, method, payload, callTimeout(callOptions))'
-          ),
+      else {
+        /** The named owner captures one dispatcher before any logical request is admitted. */
+        assert.match(source, /#request\s*=\s*\(method, payload, callOptions\)\s*=>/)
+        assert.match(
+          source,
+          /this\.#binding\.trackRequest\(\s*this\.#request,\s*method,\s*payload,/,
           'managed request must load the original cold dispatcher'
         )
+      }
     if (url.endsWith('/rpc-contract/dist/contract/runtime-api/normalize-envelope.js')) {
       /** Strict and decoded inbound admission share this canonical union owner. */
       const pattern =

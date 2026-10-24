@@ -1,18 +1,20 @@
+import { createRuntimeEndpointComposition } from '../../dist/core/runtime-api-endpoint.js'
+import { RpcCapability } from '@migaia/rpc-contract'
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { parseSync, Visitor } from 'oxc-parser'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { createManualScheduler } from '@migaia/utils/testing'
-import { createEndpoint } from '../../dist/core/index.js'
+
 import { RpcConfigurationError, RpcTimeoutError } from '../../dist/core/errors.js'
-import { createMemoryTransportPair } from '@migaia/rpc-host/adapters/memory'
-import { abort } from '../../dist/core/index.js'
-import { defineMiddleware } from '../../dist/core/index.js'
-import { connect } from '../../dist/core/index.js'
-import { timeout } from '../../dist/core/index.js'
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
+import { abort } from '../../dist/core/middleware/abort.js'
+import { defineMiddleware } from '../../dist/core/middleware.js'
+import { connect } from '../../dist/core/middleware/connect.js'
+import { timeout } from '../../dist/core/middleware/timeout.js'
 import { createEndpointTimePort } from '../../dist/core/internal/time-port.js'
-import type { IRpcTransport } from '../../dist/core/index.js'
+import type { IRpcTransport } from '../../dist/core/transport.js'
 
 /** Captures scheduler identity at all three ownership boundaries. */
 const schedulerCalls = vi.hoisted(() => ({
@@ -118,12 +120,15 @@ describe('endpoint scheduler ownership', () => {
   it('injects manual time into an endpoint deadline and rejects malformed schedulers', async () => {
     const scheduler = createManualScheduler()
     const transport = silentTransport()
-    const endpoint = await createEndpoint({
-      id: 'manual-time-client',
-      transport,
-      scheduler,
-      middlewares: [connect({ transport }), timeout()]
-    })
+    const endpoint = await createRuntimeEndpointComposition(
+      {
+        id: 'manual-time-client',
+        transport,
+        scheduler,
+        middlewares: [connect({ transport }), timeout()]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     const pending = endpoint.send('missing-server', 'echo', null, { timeoutMs: 50 })
     const result = pending.catch((error: unknown) => error)
     scheduler.advance(49)
@@ -143,12 +148,15 @@ describe('endpoint scheduler ownership', () => {
       { now: () => 1 },
       { now: () => Number.NaN, schedule: scheduler.schedule }
     ]) {
-      const failure = await createEndpoint({
-        id: 'invalid-scheduler',
-        transport: silentTransport(),
-        scheduler: invalid as typeof scheduler,
-        middlewares: [connect()]
-      }).catch((error: unknown) => error)
+      const failure = await createRuntimeEndpointComposition(
+        {
+          id: 'invalid-scheduler',
+          transport: silentTransport(),
+          scheduler: invalid as typeof scheduler,
+          middlewares: [connect()]
+        },
+        { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+      ).installing.catch((error: unknown) => error)
       expect(failure).toBeInstanceOf(RpcConfigurationError)
       expect(failure).toMatchObject({ code: 'INVALID_CONFIG' })
     }
@@ -160,13 +168,16 @@ describe('endpoint scheduler ownership', () => {
     const stall = defineMiddleware('scheduler-stall', () => ({
       install: () => new Promise<Record<string, never>>(() => undefined)
     }))
-    const pending = createEndpoint({
-      id: 'scheduler-construction',
-      transport,
-      scheduler,
-      construction: { timeoutMs: 100 },
-      middlewares: [connect({ transport }), stall]
-    })
+    const pending = createRuntimeEndpointComposition(
+      {
+        id: 'scheduler-construction',
+        transport,
+        scheduler,
+        construction: { timeoutMs: 100 },
+        middlewares: [connect({ transport }), stall]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     const result = pending.catch((error: unknown) => error)
     for (let index = 0; index < 40 && scheduler.pendingCount === 0; index += 1)
       await Promise.resolve()
@@ -179,12 +190,15 @@ describe('endpoint scheduler ownership', () => {
   it('preserves original scheduler identity through kernel and PluginHost', async () => {
     const scheduler = createManualScheduler()
     const transport = silentTransport()
-    const injected = await createEndpoint({
-      id: 'scheduler-injected-identity',
-      transport,
-      scheduler,
-      middlewares: [connect({ transport })]
-    })
+    const injected = await createRuntimeEndpointComposition(
+      {
+        id: 'scheduler-injected-identity',
+        transport,
+        scheduler,
+        middlewares: [connect({ transport })]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     expect(schedulerCalls.kernel.at(-1)).toBe(scheduler)
     expect(schedulerCalls.kernelTime.at(-1)).toBe(scheduler)
     expect(schedulerCalls.webRpcHost.at(-1)).toBe(scheduler)
@@ -193,11 +207,14 @@ describe('endpoint scheduler ownership', () => {
     await injected.dispose()
 
     const defaultTransport = silentTransport()
-    const defaultEndpoint = await createEndpoint({
-      id: 'scheduler-default-identity',
-      transport: defaultTransport,
-      middlewares: [connect({ transport: defaultTransport })]
-    })
+    const defaultEndpoint = await createRuntimeEndpointComposition(
+      {
+        id: 'scheduler-default-identity',
+        transport: defaultTransport,
+        middlewares: [connect({ transport: defaultTransport })]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     expect(schedulerCalls.kernel.at(-1)).toBeUndefined()
     expect(schedulerCalls.kernelTime.at(-1)).toBe(systemScheduler)
     expect(schedulerCalls.webRpcHost.at(-1)).toBeUndefined()
@@ -227,26 +244,32 @@ describe('endpoint scheduler ownership', () => {
       }
     }
     let calls = 0
-    const server = await createEndpoint({
-      id: 'scheduler-server',
-      transport: serverTransport,
-      scheduler,
-      wallClock,
-      provider: {
-        fail: (context) => {
-          calls += 1
-          return context.failed('expected failure', 'EXPECTED_FAILURE')
-        }
+    const server = await createRuntimeEndpointComposition(
+      {
+        id: 'scheduler-server',
+        transport: serverTransport,
+        scheduler,
+        wallClock,
+        provider: {
+          fail: (context) => {
+            calls += 1
+            return context.failed('expected failure', 'EXPECTED_FAILURE')
+          }
+        },
+        middlewares: [connect({ transport: serverTransport })]
       },
-      middlewares: [connect({ transport: serverTransport })]
-    })
-    const client = await createEndpoint({
-      id: 'scheduler-client',
-      transport: clientTransport,
-      scheduler,
-      wallClock,
-      middlewares: [connect({ transport: clientTransport })]
-    })
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'scheduler-client',
+        transport: clientTransport,
+        scheduler,
+        wallClock,
+        middlewares: [connect({ transport: clientTransport })]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     scheduler.advance(42)
     await expect(client.send('scheduler-server', 'fail', null)).rejects.toBeDefined()
     expect(calls).toBe(1)
@@ -290,26 +313,32 @@ describe('endpoint scheduler ownership', () => {
       }
     }
     let providerAborted: boolean | undefined
-    const server = await createEndpoint({
-      id: 'early-abort-server',
-      transport: serverTransport,
-      scheduler,
-      wallClock,
-      provider: {
-        observe: (context) => {
-          providerAborted = context.signal.aborted
-          return context.success('completed')
-        }
+    const server = await createRuntimeEndpointComposition(
+      {
+        id: 'early-abort-server',
+        transport: serverTransport,
+        scheduler,
+        wallClock,
+        provider: {
+          observe: (context) => {
+            providerAborted = context.signal.aborted
+            return context.success('completed')
+          }
+        },
+        middlewares: [connect({ transport: serverTransport }), abort()]
       },
-      middlewares: [connect({ transport: serverTransport }), abort()]
-    })
-    const client = await createEndpoint({
-      id: 'early-abort-client',
-      transport: clientTransport,
-      scheduler,
-      wallClock,
-      middlewares: [connect({ transport: clientTransport }), abort(), timeout()]
-    })
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'early-abort-client',
+        transport: clientTransport,
+        scheduler,
+        wallClock,
+        middlewares: [connect({ transport: clientTransport }), abort(), timeout()]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     const pending = client.send('early-abort-server', 'observe', null, { timeoutMs: 50 })
     for (let index = 0; index < 80 && heldRequest === undefined; index += 1) await Promise.resolve()
     expect(heldRequest).toBeDefined()
@@ -339,18 +368,21 @@ describe('endpoint scheduler ownership', () => {
         }
       }).visit(parseSync(path, readFileSync(path, 'utf8')).program)
     }
-    // The standalone memory pair owns delivery even when no endpoint exists.
-    expect([...systemOwners]).toEqual(['adapters/memory.ts', 'endpoint-kernel.ts'])
+    // Only the endpoint kernel selects a default scheduler in shipped Core source.
+    expect([...systemOwners]).toEqual(['endpoint-kernel.ts'])
   })
 
   it('retains very long endpoint deadlines and requests unref for system timers', async () => {
     vi.useFakeTimers()
     const transport = silentTransport()
-    const endpoint = await createEndpoint({
-      id: 'scheduler-long-deadline',
-      transport,
-      middlewares: [connect({ transport }), timeout()]
-    })
+    const endpoint = await createRuntimeEndpointComposition(
+      {
+        id: 'scheduler-long-deadline',
+        transport,
+        middlewares: [connect({ transport }), timeout()]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     const result = endpoint
       .send('missing-server', 'echo', null, {
         timeoutMs: 2_147_483_648

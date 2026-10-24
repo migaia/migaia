@@ -82,4 +82,4 @@ WebTransport 的服务端须实现相同可靠字节 RPC 协议。插件仅拥�
 
 浏览器来源/载体错误使用 `rpc.transport.browser`；通用握手和调用错误可使用 `rpc.endpoint` 或 `rpc.remote`。按 source/code/cause 处理，例如缺失来源、缺失 Window origin 或不可靠 RTC 配置会在原准入边界拒绝。
 
-根入口导出七个 plugin、选项类型与错误身份。`/adapters/window`、`shared-worker`、`service-worker`、`broadcast-channel`、`web-transport`、`rtc-data-channel`、`message-port`、`web-worker` 为明确需要低级载体的作者保留；应用直接把对应 plugin 安装进 host。更多场景见[使用指南](./USEGUIDE.md)。
+根入口导出七个 plugin、选项类型与错误身份。载体实现由各 plugin 在包内复用；自定义原始部署使用 `@migaia/rpc-host/plugin` SDK。更多场景见[使用指南](./USEGUIDE.md)。

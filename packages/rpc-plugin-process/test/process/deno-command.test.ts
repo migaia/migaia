@@ -8,7 +8,7 @@ import type { IProcessSpec } from '@migaia/supervision/process'
 import {
   createDenoProcessLauncher,
   openProcessStdioChannel
-} from '@migaia/rpc-plugin-process/adapters/deno-command'
+} from '../../dist/process/adapters/deno-command.js'
 import {
   PROCESS_RUNTIME_API_ENV,
   PROCESS_RUNTIME_API_ENV_VERSION
@@ -30,10 +30,165 @@ type ICommandOptions = {
 type IExit = { code: number; signal: string | null }
 
 /**
+ * Native command instances retain an explicit fixture context instead of capturing mutable factory
+ * variables.
+ */
+class DenoFixtureNativeCommand<T> {
+  /**
+   * Constructor observations, acquisition failure and the native child belong to the selected
+   * fixture.
+   */
+  #context: Readonly<{
+    commands: { command: string; options: ICommandOptions }[]
+    spawnFailure?: Error
+    child: T
+  }>
+  /** Observe native command arguments without acquiring any real process. */
+  constructor(
+    command: string,
+    options: ICommandOptions,
+    context: Readonly<{
+      commands: { command: string; options: ICommandOptions }[]
+      spawnFailure?: Error
+      child: T
+    }>
+  ) {
+    this.#context = context
+    context.commands.push({ command, options })
+  }
+  /** Preserve the configured native acquisition failure or return the exact pre-created child. */
+  spawn(): T {
+    if (this.#context.spawnFailure) throw this.#context.spawnFailure
+    return this.#context.child
+  }
+}
+
+/**
  * Model the Deno boundary with real Web Streams, not native Deno execution. Optional write and
  * spawn failures exercise acquisition; held exit and EOF let one case control cleanup ordering.
  * Returned observations and settlement functions belong only to that case.
  */
+/** Allocate only this case's original observations before installing native-shaped callbacks. */
+function denoCommandFixtureState(
+  options: {
+    write?: (chunk: Uint8Array) => void | Promise<void>
+    spawnFailure?: Error
+    exitOnKill?: boolean
+    stdout?: Uint8Array
+    keepStdoutOpen?: boolean
+    abort?: (reason: unknown) => void
+    cancel?: () => void
+  } = {}
+) {
+  const commands: { command: string; options: ICommandOptions }[] = []
+  const writes: Uint8Array[] = []
+  const signals: string[] = []
+  let finish!: (exit: IExit) => void
+  const status = new Promise<IExit>((resolve) => {
+    finish = resolve
+  })
+  let announceKill!: () => void
+  const killed = new Promise<void>((resolve) => {
+    announceKill = resolve
+  })
+  return { options, commands, writes, signals, finish, status, announceKill, killed }
+}
+
+/** Own one test resource's mutable observations without sharing a factory closure. */
+class DenoCommandFixture {
+  /** Counts, native events and construction inputs belong only to this fixture instance. */
+  #state: ReturnType<typeof denoCommandFixtureState>
+  /** Existing consumers retain the same observable fixture surface and callback identities. */
+
+  readonly value
+  /** Install the original native-shaped callbacks after their observations exist. */
+  constructor(
+    options: {
+      write?: (chunk: Uint8Array) => void | Promise<void>
+      spawnFailure?: Error
+      exitOnKill?: boolean
+      stdout?: Uint8Array
+      keepStdoutOpen?: boolean
+      abort?: (reason: unknown) => void
+      cancel?: () => void
+    } = {}
+  ) {
+    this.#state = denoCommandFixtureState(options)
+    const stdin = new WritableStream<Uint8Array>({
+      /** Retain the exact bytes before applying caller-selected backpressure or write rejection. */
+      write: (chunk) => {
+        this.#state.writes.push(chunk)
+        return this.#state.options.write?.(chunk)
+      },
+      /** Observe physical channel retirement without replacing its real writer. */
+      abort: (reason) => {
+        this.#state.options.abort?.(reason)
+      }
+    })
+    const stdout = this.#readable(
+      this.#state.options.stdout ?? new TextEncoder().encode('out'),
+      !this.#state.options.keepStdoutOpen
+    )
+    const stderr = this.#readable(new TextEncoder().encode('err'))
+    const child = {
+      pid: 4242,
+      stdin,
+      stdout,
+      stderr,
+      status: this.#state.status,
+      /** Record native termination and settle exit unless this case explicitly owns that boundary. */
+      kill: (signal: string) => {
+        this.#state.signals.push(signal)
+        ;(0, this.#state.announceKill)()
+        if (this.#state.options.exitOnKill !== false) {
+          ;(0, this.#state.finish)({ code: 0, signal })
+        }
+      }
+    }
+    const ambient: Record<string, string> = { INHERITED: 'ambient', OVERRIDDEN: 'ambient' }
+    /** Native constructor projection borrows only this fixture's observations and exact child. */
+    const commandContext = {
+      commands: this.#state.commands,
+      spawnFailure: this.#state.options.spawnFailure,
+      child
+    }
+    vi.stubGlobal('Deno', {
+      /**
+       * Native Deno constructs with two arguments; pass this fixture's explicit context to the real
+       * owner.
+       */
+      Command: function (command: string, options: ICommandOptions) {
+        return new DenoFixtureNativeCommand(command, options, commandContext)
+      },
+      env: { get: (key: string) => ambient[key] },
+      stdin: { readable: stdout },
+      stdout: { writable: stdin }
+    })
+    this.value = {
+      commands: this.#state.commands,
+      writes: this.#state.writes,
+      signals: this.#state.signals,
+      child,
+      finish: this.#state.finish,
+      killed: this.#state.killed
+    }
+  }
+  /** Drive the original fixture operation through its sole state owner. */
+  #readable = (bytes: Uint8Array, finish = true) =>
+    new ReadableStream<Uint8Array>({
+      /** Closed output drains settle independently; bootstrap input may remain open for business. */
+      start(controller) {
+        controller.enqueue(bytes)
+        if (finish) controller.close()
+      },
+      /** Retain cancellation of an open channel independently from native process exit. */
+      cancel: () => {
+        this.#state.options.cancel?.()
+      }
+    })
+}
+
+/** Create one independent owner for the existing native-boundary fixture. */
 function denoFixture(
   options: {
     write?: (chunk: Uint8Array) => void | Promise<void>
@@ -45,89 +200,7 @@ function denoFixture(
     cancel?: () => void
   } = {}
 ) {
-  /** Constructor observations prove environment and stdio policy before spawn. */
-  const commands: { command: string; options: ICommandOptions }[] = []
-  /** Writes retain their byte identity so bootstrap framing can be checked independently. */
-  const writes: Uint8Array[] = []
-  /** Native signals remain observable without sending any signal to a real process. */
-  const signals: string[] = []
-  /** Resolve native exit only when the fixture observes its intended lifecycle event. */
-  let finish!: (exit: IExit) => void
-  /** A failed startup must await this promise before rejecting its launch. */
-  const status = new Promise<IExit>((resolve) => {
-    finish = resolve
-  })
-  /** Cancellation observations do not depend on sleeps or repeated polling. */
-  let announceKill!: () => void
-  /** Waiting for kill identifies the exact point where cleanup has begun. */
-  const killed = new Promise<void>((resolve) => {
-    announceKill = resolve
-  })
-  /** The writable's real lock and rejected write exercise the native bootstrap owner. */
-  const stdin = new WritableStream<Uint8Array>({
-    /** Retain the exact bytes before applying caller-selected backpressure or write rejection. */
-    write(chunk) {
-      writes.push(chunk)
-      return options.write?.(chunk)
-    },
-    /** Observe physical channel retirement without replacing its real writer. */
-    abort(reason) {
-      options.abort?.(reason)
-    }
-  })
-  /** Queue one physical chunk; optionally hold EOF until the channel's own cleanup cancels it. */
-  const readable = (bytes: Uint8Array, finish = true) =>
-    new ReadableStream<Uint8Array>({
-      /** Closed output drains settle independently; bootstrap input may remain open for business. */
-      start(controller) {
-        controller.enqueue(bytes)
-        if (finish) controller.close()
-      },
-      /** Retain cancellation of an open channel independently from native process exit. */
-      cancel() {
-        options.cancel?.()
-      }
-    })
-  /** Channel mode does not start this reader before a business receiver subscribes. */
-  const stdout = readable(
-    options.stdout ?? new TextEncoder().encode('out'),
-    !options.keepStdoutOpen
-  )
-  /** Stderr is drained independently before a potentially blocked bootstrap write. */
-  const stderr = readable(new TextEncoder().encode('err'))
-  /** The fake child supplies exactly the native streams and exit promise the launcher owns. */
-  const child = {
-    pid: 4242,
-    stdin,
-    stdout,
-    stderr,
-    status,
-    /** Record native termination and settle exit unless this case explicitly owns that boundary. */
-    kill(signal: string) {
-      signals.push(signal)
-      announceKill()
-      if (options.exitOnKill !== false) finish({ code: 0, signal })
-    }
-  }
-  /** Ambient keys distinguish explicit inheritance, absence, and a caller override. */
-  const ambient: Record<string, string> = { INHERITED: 'ambient', OVERRIDDEN: 'ambient' }
-  vi.stubGlobal('Deno', {
-    Command: class {
-      /** Record native constructor arguments without running a command. */
-      constructor(command: string, options: ICommandOptions) {
-        commands.push({ command, options })
-      }
-      /** Native acquisition may fail with the original error before a child exists. */
-      spawn() {
-        if (options.spawnFailure) throw options.spawnFailure
-        return child
-      }
-    },
-    env: { get: (key: string) => ambient[key] },
-    stdin: { readable: stdout },
-    stdout: { writable: stdin }
-  })
-  return { commands, writes, signals, child, finish, killed }
+  return new DenoCommandFixture(options).value
 }
 
 /** Piped defaults are valid for both plain and opt-in runtime bootstrap launches. */

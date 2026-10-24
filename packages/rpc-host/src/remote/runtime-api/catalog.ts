@@ -2,8 +2,8 @@ import type { IAbortSignal } from '@migaia/utils/promise'
 import { createRpcError } from '../../core/errors.js'
 import { RPC_PORTABLE_MAX_DEPTH } from '@migaia/rpc-contract'
 import { RpcWireLimit } from '@migaia/rpc-contract'
-import { RpcCoreErrorCode } from '../../core/index.js'
-import { type IRpcContext } from '../../core/index.js'
+import { RpcCoreErrorCode } from '../../core/errors.js'
+import { type IRpcContext } from '../../core/typing.js'
 import { RemoteMethodName } from '../constants.js'
 import {
   RemoteCatalogLimit,
@@ -153,6 +153,77 @@ function invalid(cause?: unknown): never {
   throw createRpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.provideInvalid, cause)
 }
 
+/** One synchronous compilation owns its ancestor path and sole admitted method index explicitly. */
+type IRuntimeCompilationContext = {
+  /** Only current ancestors reject cycles; separate exported paths may intentionally reuse groups. */
+  active: Set<object>
+  /** This one index is both the whitelist and the returned automatic/advanced route source. */
+  methods: Map<string, IRuntimeMethodEntry>
+  /** The same stable segment grammar is reused without reading application getters. */
+  segment: RegExp
+}
+
+/** Snapshot each group before descending, preserving a thrown descriptor trap as the cause. */
+function visitRuntimeMethods(
+  context: IRuntimeCompilationContext,
+  value: IRuntimePeerProvide,
+  prefix: string,
+  depth: number
+): void {
+  if (
+    value === null ||
+    typeof value !== 'object' ||
+    Array.isArray(value) ||
+    depth > RPC_PORTABLE_MAX_DEPTH
+  )
+    invalid()
+  if (context.active.has(value)) invalid()
+  /** Prototype and descriptors are configuration data; no application getter is read. */
+  let descriptors: PropertyDescriptorMap
+  /** A rejected prototype is a configuration failure; a failed trap retains its own cause. */
+  let prototype: object | null
+  try {
+    prototype = Object.getPrototypeOf(value)
+    descriptors = Object.getOwnPropertyDescriptors(value)
+  } catch (cause) {
+    invalid(cause)
+  }
+  if (prototype !== null && prototype !== Object.prototype) invalid()
+  context.active.add(value)
+  try {
+    for (const key of Reflect.ownKeys(descriptors)) {
+      if (typeof key !== 'string' || !context.segment.test(key)) invalid()
+      /** An accessor is rejected from its descriptor without evaluating its value. */
+      const descriptor = descriptors[key]!
+      if (!descriptor.enumerable || !Object.hasOwn(descriptor, 'value')) invalid()
+      /** Internal stream aliases share the original wire identifier budget with logical names. */
+      const name = prefix === '' ? key : `${prefix}.${key}`
+      if (
+        name.length + RemoteMethodName.runtimeStreamPrefix.length >
+          RpcWireLimit.maxIdentifierChars ||
+        name.startsWith(RemoteMethodName.runtimeNamespace)
+      )
+        invalid()
+      if (typeof descriptor.value !== 'function') {
+        visitRuntimeMethods(context, descriptor.value as IRuntimePeerProvide, name, depth + 1)
+        continue
+      }
+      if (context.methods.has(name) || context.methods.size >= RemoteCatalogLimit.methodsPerCatalog)
+        invalid()
+      context.methods.set(
+        name,
+        Object.freeze(
+          heldForwardMethods.has(descriptor.value)
+            ? { ...heldForwardMethods.get(descriptor.value)!, name }
+            : { name, method: descriptor.value as IRuntimePeerMethod, receiver: value }
+        )
+      )
+    }
+  } finally {
+    context.active.delete(value)
+  }
+}
+
 /**
  * Compile the explicit object once before opening a source. Own descriptors avoid getter execution;
  * the existing portable depth and remote catalog limits bound the same construction work.
@@ -162,69 +233,16 @@ export function compileRuntimeMethods(
   advanced?: IRemoteContract,
   retainIndex?: (index: ReadonlyMap<string, IRuntimeMethodEntry>) => void
 ): readonly IRuntimeMethodEntry[] {
-  /** Only active ancestors identify a cycle; independent groups may reuse the same handler. */
-  const active = new Set<object>()
-  /** Logical paths are the sole whitelist; neither control methods nor internal aliases enter it. */
-  const methods = new Map<string, IRuntimeMethodEntry>()
-  /** The existing segment grammar excludes ambiguous dots and mutable prototype names as paths. */
-  const segment = new RegExp(REMOTE_NAME_PATTERN, 'u')
-
-  /** Snapshot each group before descending, preserving a thrown descriptor trap as the cause. */
-  function visit(value: IRuntimePeerProvide, prefix: string, depth: number): void {
-    if (
-      value === null ||
-      typeof value !== 'object' ||
-      Array.isArray(value) ||
-      depth > RPC_PORTABLE_MAX_DEPTH
-    )
-      invalid()
-    if (active.has(value)) invalid()
-    /** Prototype and descriptors are configuration data; no application getter is read. */
-    let descriptors: PropertyDescriptorMap
-    /** A rejected prototype is a configuration failure; a failed trap retains its own cause. */
-    let prototype: object | null
-    try {
-      prototype = Object.getPrototypeOf(value)
-      descriptors = Object.getOwnPropertyDescriptors(value)
-    } catch (cause) {
-      invalid(cause)
-    }
-    if (prototype !== null && prototype !== Object.prototype) invalid()
-    active.add(value)
-    try {
-      for (const key of Reflect.ownKeys(descriptors)) {
-        if (typeof key !== 'string' || !segment.test(key)) invalid()
-        /** An accessor is rejected from its descriptor without evaluating its value. */
-        const descriptor = descriptors[key]!
-        if (!descriptor.enumerable || !Object.hasOwn(descriptor, 'value')) invalid()
-        /** Internal stream aliases share the original wire identifier budget with logical names. */
-        const name = prefix === '' ? key : `${prefix}.${key}`
-        if (
-          name.length + RemoteMethodName.runtimeStreamPrefix.length >
-            RpcWireLimit.maxIdentifierChars ||
-          name.startsWith(RemoteMethodName.runtimeNamespace)
-        )
-          invalid()
-        if (typeof descriptor.value !== 'function') {
-          visit(descriptor.value as IRuntimePeerProvide, name, depth + 1)
-          continue
-        }
-        if (methods.has(name) || methods.size >= RemoteCatalogLimit.methodsPerCatalog) invalid()
-        methods.set(
-          name,
-          Object.freeze(
-            heldForwardMethods.has(descriptor.value)
-              ? { ...heldForwardMethods.get(descriptor.value)!, name }
-              : { name, method: descriptor.value as IRuntimePeerMethod, receiver: value }
-          )
-        )
-      }
-    } finally {
-      active.delete(value)
-    }
+  /** RPC_PORTABLE_MAX_DEPTH and maxIdentifierChars bound each path copy by contract constants. */
+  const context: IRuntimeCompilationContext = {
+    active: new Set<object>(),
+    methods: new Map<string, IRuntimeMethodEntry>(),
+    segment: new RegExp(REMOTE_NAME_PATTERN, 'u')
   }
+  /** The caller receives this exact compilation index, never a reconstructed route table. */
+  const { methods } = context
 
-  visit(input, '', 0)
+  visitRuntimeMethods(context, input, '', 0)
   for (const entry of runtimePluginEntries.get(input) ?? []) {
     if (methods.has(entry.name) || methods.size >= RemoteCatalogLimit.methodsPerCatalog) invalid()
     methods.set(entry.name, entry)

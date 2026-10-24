@@ -31,70 +31,132 @@ export function enableFastTimePort(port: IEndpointTimePort): void {
   fastSchedulers.get(port)?.()
 }
 
+/** Own one logical timer receipt until its first clear or scheduler callback. */
+class EndpointTimer {
+  /** The port's exact logical handle collection remains the only timer membership owner. */
+  #timers: Set<IScheduledTask>
+  /** The original callback is invoked once without binding a wrapper receiver. */
+  #task: () => void
+  /** Native registration may synchronously fire before returning its cancellation receipt. */
+  #handle: IScheduledTask | undefined
+  /** First clear or callback wins and preserves idempotent cancellation. */
+  #cleared = false
+  /** The original mutable one-property receipt remains detached-call safe. */
+  readonly value: IEndpointTimer
+
+  /** Schedule once, then retain the original unref and membership publication order. */
+  constructor(
+    scheduler: IScheduler,
+    timers: Set<IScheduledTask>,
+    task: () => void,
+    delayMs: number
+  ) {
+    this.#timers = timers
+    this.#task = task
+    this.#handle = scheduler.schedule(this.#fire, delayMs)
+    this.#handle.unref?.()
+    timers.add(this.#handle)
+    this.value = { clear: this.#clear }
+  }
+  /** A clear removes this original registration before invoking native cancellation. */
+  #clear = (): void => {
+    if (this.#cleared) return
+    this.#cleared = true
+    if (this.#handle !== undefined) {
+      this.#timers.delete(this.#handle)
+      this.#handle.cancel()
+    }
+  }
+  /** Native firing retires membership before allowing reentrant application work. */
+  #fire = (): void => {
+    if (this.#cleared) return
+    this.#cleared = true
+    this.#timers.delete(this.#handle!)
+    /** User callbacks retain their original plain invocation receiver. */
+    const task = this.#task
+    task()
+  }
+}
+
+/** Own one endpoint's scheduler strategy, timer membership and terminal transition. */
+class EndpointTimePort {
+  /** The original scheduler remains publicly observable after private strategy enablement. */
+  #scheduler: IScheduler
+  /** Only this private scheduler receiver can change after canonical bootstrap proof. */
+  #runtimeScheduler: IScheduler
+  /** The original wall clock supplies only epoch timestamps. */
+  #wallClock: IWallClock
+  /** Private enablement is available only for the original canonical scheduler contract. */
+  #canonicalScheduler: boolean
+  /** Every live logical registration belongs to this one endpoint. */
+  #timers = new Set<IScheduledTask>()
+  /** Disposal rejects later timer admission without changing the public capability shape. */
+  #disposed = false
+  /** Public operations preserve the original frozen own-property surface and detached calls. */
+  readonly value: IEndpointTimePort
+
+  /** Capture original clocks before publishing the endpoint-local time capability. */
+  constructor(scheduler: IScheduler, wallClock: IWallClock, canonicalScheduler: boolean) {
+    this.#scheduler = scheduler
+    this.#runtimeScheduler = scheduler
+    this.#wallClock = wallClock
+    this.#canonicalScheduler = canonicalScheduler
+    /** The same facade identity is the private enablement and observation key. */
+    const port: IEndpointTimePort = {
+      scheduler,
+      now: this.#now,
+      timestamp: () => this.#wallClock.timestamp(),
+      setTimeout: this.#setTimeout,
+      clearTimeout: this.#clearTimeout,
+      dispose: this.#dispose
+    }
+    this.value = port
+    fastSchedulers.set(port, this.#enableFast)
+    Object.freeze(port)
+  }
+  /** Monotonic reads retain the original scheduler receiver and observation event. */
+  #now = (): number => {
+    /** Read once before notifying the existing private observer. */
+    const value = this.#scheduler.now()
+    reportEndpointTimePortEvent(this.value, { kind: 'now', value })
+    return value
+  }
+  /** Admit one timer through its actual scheduler owner and original event ordering. */
+  #setTimeout = (task: () => void, delayMs: number): IEndpointTimer => {
+    if (this.#disposed) return { clear: () => undefined }
+    /** This receipt owns only this logical registration, without a second scheduling queue. */
+    const timer = new EndpointTimer(this.#runtimeScheduler, this.#timers, task, delayMs).value
+    reportEndpointTimePortEvent(this.value, { kind: 'setTimeout', delayMs, timer })
+    return timer
+  }
+  /** Explicit clear observations precede the exact timer's original idempotent clear operation. */
+  #clearTimeout = (timer: IEndpointTimer): void => {
+    reportEndpointTimePortEvent(this.value, { kind: 'clearTimeout', timer })
+    timer.clear()
+  }
+  /** Terminal cleanup preserves original iteration and first cancellation-failure behavior. */
+  #dispose = (): void => {
+    if (this.#disposed) return
+    this.#disposed = true
+    for (const handle of this.#timers) handle.cancel()
+    this.#timers.clear()
+    fastSchedulers.delete(this.value)
+  }
+  /** Canonical bootstrap can change only the private receiver, once and before terminal disposal. */
+  #enableFast = (): void => {
+    if (this.#canonicalScheduler && this.#runtimeScheduler === this.#scheduler && !this.#disposed)
+      this.#runtimeScheduler = Object.create(this.#scheduler) as IScheduler
+  }
+}
+
 /**
- * Creates one endpoint-local time port and tracks every timer until clear or disposal. `scheduler`
- * drives every duration and timer; `wallClock` only produces diagnostic timestamps and defaults to
- * the host wall clock.
+ * Create one endpoint-local time owner. The scheduler drives durations while wallClock supplies
+ * diagnostic timestamps; all timers remain owned until their first clear or endpoint disposal.
  */
 export function createEndpointTimePort(
   scheduler: IScheduler,
   wallClock: IWallClock = systemWallClock,
   canonicalScheduler = false
 ): IEndpointTimePort {
-  /** Timer strategy may change internally while the original scheduler stays publicly observable. */
-  let runtimeScheduler = scheduler
-  /** All logical task handles remain owned by this port until clear or endpoint disposal. */
-  const timers = new Set<IScheduledTask>()
-  /** Prevents timers from being admitted after endpoint disposal. */
-  let disposed = false
-
-  const port: IEndpointTimePort = {
-    scheduler,
-    now: () => {
-      const value = scheduler.now()
-      reportEndpointTimePortEvent(port, { kind: 'now', value })
-      return value
-    },
-    timestamp: () => wallClock.timestamp(),
-    setTimeout: (task, delayMs) => {
-      if (disposed) return { clear: () => undefined }
-      let handle: IScheduledTask | undefined
-      let cleared = false
-      const clear = (): void => {
-        if (cleared) return
-        cleared = true
-        if (handle !== undefined) {
-          timers.delete(handle)
-          handle.cancel()
-        }
-      }
-      handle = runtimeScheduler.schedule(() => {
-        if (cleared) return
-        cleared = true
-        timers.delete(handle!)
-        task()
-      }, delayMs)
-      handle.unref?.()
-      timers.add(handle)
-      const timer = { clear }
-      reportEndpointTimePortEvent(port, { kind: 'setTimeout', delayMs, timer })
-      return timer
-    },
-    clearTimeout: (timer) => {
-      reportEndpointTimePortEvent(port, { kind: 'clearTimeout', timer })
-      timer.clear()
-    },
-    dispose: () => {
-      if (disposed) return
-      disposed = true
-      for (const handle of timers) handle.cancel()
-      timers.clear()
-      fastSchedulers.delete(port)
-    }
-  }
-  fastSchedulers.set(port, () => {
-    if (canonicalScheduler && runtimeScheduler === scheduler && !disposed)
-      runtimeScheduler = Object.create(scheduler) as IScheduler
-  })
-  return Object.freeze(port)
+  return new EndpointTimePort(scheduler, wallClock, canonicalScheduler).value
 }

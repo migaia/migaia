@@ -1,4 +1,3 @@
-import { walkErrorCauses } from '@migaia/utils/error'
 import { afterEach, expect, it, vi } from 'vitest'
 
 /** Restore only the native namespace supplied by this public discovery fixture. */
@@ -25,31 +24,34 @@ it('does not read denied Deno environment keys and rejects a granted invalid boo
       return stdin()
     }
   })
-  /** Both operations use the package's actual native loader and original discovery owner. */
-  const { createProcessPeer } = await import('../protocol.js')
+  /** Exercise the native discovery owner still used by processPlugin.parent(true). */
+  const { NativeProcessRuntimeLoader } = await import('../../dist/process/runtime-loader.js')
+  const { openAutomaticProcessIO } = await import('../../dist/process/automatic-peer.js')
   const { isProcessChild } = await import('@migaia/rpc-plugin-process')
-  /** A caller-owned connect failure proves denied discovery follows the ordinary supplied source. */
-  const failure = new Error('caller connect failed')
-  /** The custom source remains lazy until discovery confirms no automatic bootstrap is available. */
-  const connect = vi.fn(async () => {
-    throw failure
-  })
+  /** Loading and reading the denied marker must not acquire native I/O. */
+  const native = await new NativeProcessRuntimeLoader().load()
+  expect(native).toBeDefined()
   expect(isProcessChild()).toBe(false)
-  await expect(createProcessPeer({ connect, report: () => undefined })).rejects.toSatisfy(
-    (error: unknown) => walkErrorCauses(error).includes(failure)
-  )
+  expect(native!.processRuntimeIO.discover()).toEqual({ marker: undefined, runtime: 'deno' })
   expect(get).not.toHaveBeenCalled()
   expect(remove).not.toHaveBeenCalled()
-  expect(connect).toHaveBeenCalledOnce()
   granted = true
   expect(isProcessChild()).toBe(false)
-  await expect(createProcessPeer({ connect, report: () => undefined })).rejects.toMatchObject({
-    source: 'rpc.endpoint',
-    code: 'INVALID_CONFIG',
-    message: 'process runtime API bootstrap is invalid'
-  })
+  /** The same production bootstrap admission rejects the marker before calling native open. */
+  const discovered = native!.processRuntimeIO.discover()
+  expect(() =>
+    openAutomaticProcessIO({
+      ...discovered,
+      open: () => native!.processRuntimeIO.open()
+    })
+  ).toThrowError(
+    expect.objectContaining({
+      source: 'rpc.endpoint',
+      code: 'INVALID_CONFIG',
+      message: 'process runtime API bootstrap is invalid'
+    })
+  )
   expect(get).toHaveBeenCalled()
   expect(remove).toHaveBeenCalledOnce()
-  expect(connect).toHaveBeenCalledOnce()
   expect(stdin).not.toHaveBeenCalled()
 })

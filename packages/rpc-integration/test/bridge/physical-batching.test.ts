@@ -4,7 +4,7 @@ import { acceptRpcHandshake } from '@migaia/rpc-contract'
 import {
   BRIDGE_PEER_OFFER,
   BRIDGE_METHODS,
-  bridgeFixture,
+  BridgeFixture,
   bridgeEndpoint,
   flush
 } from './fixture.js'
@@ -12,7 +12,7 @@ import {
 describe('negotiated JSON-RPC physical batching', () => {
   it('uses actual hello intersection and isolates invalid array response members', async () => {
     /** The independent peer advertises mandatory batching through the unchanged hello fields. */
-    const fixture = bridgeFixture({
+    const fixture = new BridgeFixture({
       responder(message) {
         if (message.method !== 'migaia.hello') return undefined
         const answer = acceptRpcHandshake(

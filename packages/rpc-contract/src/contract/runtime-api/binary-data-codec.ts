@@ -22,48 +22,63 @@ export type IRpcBinaryPreparationData = Readonly<{
   beforeDigest?: (manifest: IRpcBinaryManifest, backingBytes: number) => void
 }>
 
-/** Adapt held data capabilities at their original capture and prehash points without exposing sinks. */
+/** Own only the pending native capture between the canonical capture and prehash callbacks. */
+class BinaryPreparationData {
+  /** The original held codec remains the sole representation and quota authority. */
+  #codec: IRpcBinaryDataCodec
+  /** Physical accounting uses the caller's existing byte ceiling. */
+  #limit: number
+  /** The first native roots wait only until the original visitor publishes its byte total. */
+  #pending:
+    | Readonly<{ manifest: IRpcBinaryManifest; roots: ReadonlyMap<object, number> }>
+    | undefined
+  /** Preserve the prehash byte total even if a digest later detaches backing storage. */
+  #backingBytes: number | undefined
+  /** Stable coordination callbacks retain their original conditional presence. */
+  readonly value: IRpcBinaryPreparationData
+
+  /** Capture the original capabilities without reading or encoding any business data. */
+  constructor(codec: IRpcBinaryDataCodec, limit: number) {
+    this.#codec = codec
+    this.#limit = limit
+    /** Only a real JSON capability asks the canonical visitor to retain binary roots. */
+    const encoding: IRpcBinaryEncoding | undefined = codec.captureJsonData
+      ? { encodeInline: codec.encodeInline, capture: this.#capture }
+      : undefined
+    this.value = {
+      encoding,
+      beforeDigest: encoding ? this.#publishBackingBytes : this.#measure
+    }
+  }
+
+  /** Preserve capture timing while waiting for the canonical native byte total when needed. */
+  #capture = (manifest: IRpcBinaryManifest, roots: ReadonlyMap<object, number>): void => {
+    if (manifest.storage === RpcBinaryStorage.native && this.#backingBytes === undefined)
+      this.#pending = { manifest, roots }
+    else this.#codec.captureJsonData!(manifest, roots, this.#backingBytes ?? 0)
+  }
+
+  /** Deliver the visitor's original total before digest work can detach native backing storage. */
+  #publishBackingBytes = (_manifest: IRpcBinaryManifest, backingBytes: number): void => {
+    this.#backingBytes = backingBytes
+    if (this.#pending) {
+      this.#codec.captureJsonData!(this.#pending.manifest, this.#pending.roots, backingBytes)
+      this.#pending = undefined
+    }
+  }
+
+  /** Encode-only codecs retain exact original physical-size accounting at the prehash boundary. */
+  #measure = (manifest: IRpcBinaryManifest, backingBytes: number): void => {
+    /** The held codec owns this representation; no substitute JSON sizing is introduced. */
+    const metadata = this.#codec.encode(manifest)
+    assertRpcNativeBinaryFrameSize(metadata, manifest.backings.length, backingBytes, this.#limit)
+  }
+}
+
+/** Adapt the held codec at its original capture and prehash points without exposing sinks. */
 export function binaryPreparationData(
   codec: IRpcBinaryDataCodec | undefined,
   limit: number
 ): IRpcBinaryPreparationData {
-  if (!codec) return {}
-  /** Retain only the actual first native capture until its original byte total is delivered. */
-  let pendingNativeCapture:
-    | Readonly<{ manifest: IRpcBinaryManifest; roots: ReadonlyMap<object, number> }>
-    | undefined
-  /** The original capture byte total survives later backing detachment and the final manifest. */
-  let nativeBackingBytes: number | undefined
-  /** Only a real JSON-capture capability requests the original one-walk binary root accounting. */
-  const encoding: IRpcBinaryEncoding | undefined = codec.captureJsonData
-    ? {
-        encodeInline: codec.encodeInline,
-        capture: (manifest, roots) => {
-          if (manifest.storage === RpcBinaryStorage.native && nativeBackingBytes === undefined)
-            pendingNativeCapture = { manifest, roots }
-          else codec.captureJsonData!(manifest, roots, nativeBackingBytes ?? 0)
-        }
-      }
-    : undefined
-  return {
-    encoding,
-    beforeDigest: encoding
-      ? (_manifest, backingBytes) => {
-          /** The canonical visitor delivers its original byte total before any digest can detach. */
-          nativeBackingBytes = backingBytes
-          if (pendingNativeCapture) {
-            codec.captureJsonData!(
-              pendingNativeCapture.manifest,
-              pendingNativeCapture.roots,
-              backingBytes
-            )
-            pendingNativeCapture = undefined
-          }
-        }
-      : (manifest, backingBytes) => {
-          /** Encode-only resources retain the original exact representation measurement. */
-          const metadata = codec.encode(manifest)
-          assertRpcNativeBinaryFrameSize(metadata, manifest.backings.length, backingBytes, limit)
-        }
-  }
+  return codec ? new BinaryPreparationData(codec, limit).value : {}
 }

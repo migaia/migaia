@@ -1,3 +1,4 @@
+import { orderStringKeys } from '@migaia/utils/string'
 import { isArrayBuffer, isUint8Array } from '@migaia/utils/bytes'
 import { createContractError } from '../contract-error.js'
 import { RpcContractErrorCode, ERROR_SOURCE } from '../error-code.js'
@@ -13,7 +14,6 @@ import { wrapRuntimeCarrier } from './carrier.js'
 import { measureRpcPhysicalFrame } from '../batch-frame.js'
 import type { IRpcRuntimeEnvelope } from './types.js'
 import type { IRpcPortableValue } from '../types.js'
-import { compareRpcFieldNames } from '../v1/route.js'
 import { normalizeRuntimeEnvelope } from './normalize.js'
 import {
   RpcBinaryProfile,
@@ -189,11 +189,14 @@ export function readRpcNativeBinary(
   const outer = record(value, [F.kind, F.protectedMetadata, F.sidecars])
   const sidecars = array(outer.sidecars)
   const unique = new Set<ArrayBuffer>()
+  /** Every allocated inline backing and every unique whole native backing counts toward this limit. */
   const consume = budget(limit)
+  /** Full backing bytes are retained for the original sender's exact physical-size accounting. */
   let backingBytes = 0
   for (const backing of sidecars) {
     if (!isArrayBuffer(backing) || unique.has(backing)) invalid()
     unique.add(backing)
+    /** Each distinct backing contributes its whole native byte length to the physical budget. */
     const length = rpcBinaryBackingLength(backing)
     consume(length)
     backingBytes += length
@@ -322,18 +325,19 @@ type IDeferredRpcBinaryBytes = {
 /** Preserve the original reserved-field policy; a legacy bytes descriptor remains ordinary data. */
 export function keys(value: Record<string, unknown>): string[] {
   if (Object.hasOwn(value, '$rpc')) normalizePortable(value)
-  return Object.keys(value).sort(compareRpcFieldNames)
+  return orderStringKeys(Object.keys(value))
 }
 
 /** Capture the original graph, byte budget and inline snapshots before any asynchronous handoff. */
-export function captureRpcBinary(
+/** Allocate one synchronous binary capture traversal before installing behavior callbacks. */
+function binaryCaptureState(
   message: IRpcRuntimeEnvelope,
   storage: RpcBinaryStorage,
   limit: number,
   digest: IRpcBinaryDigest | undefined,
   encoding: IRpcBinaryEncoding | undefined,
   fallbackEncodeInline: ((bytes: Uint8Array) => string) | undefined
-): IRpcBinaryCapture {
+) {
   if (!Object.values(RpcBinaryStorage).includes(storage)) invalid()
   /** Original buffer identities determine dense index allocation and explicit transfer eligibility. */
   const sidecars: ArrayBuffer[] = []
@@ -358,80 +362,166 @@ export function captureRpcBinary(
   let jsonByteUpperBound = 0
   /** Inline JSON owns its constructed tags; native signer inputs retain their original mutability. */
   const immutableInline = encoding !== undefined && storage === RpcBinaryStorage.inline
-  /** Owned Core preparation freezes only newly constructed inline tags, never caller backings/views. */
-  const publish = (tuple: IRpcPortableValue[], ownBound: number): IRpcPortableValue => {
-    if (!encoding) return tuple
-    jsonByteUpperBound += ownBound
-    if (immutableInline && frozen) frozen.push(tuple)
-    return immutableInline && !frozen ? Object.freeze(tuple) : tuple
+
+  return {
+    sidecars,
+    indices,
+    active,
+    consume,
+    backingBytes,
+    encodeInline,
+    inline,
+    frozen,
+    capturedRoots,
+    jsonByteUpperBound,
+    immutableInline,
+    message,
+    storage,
+    limit,
+    digest,
+    encoding,
+    fallbackEncodeInline
   }
-  const index = (backing: ArrayBuffer): number => {
-    const known = indices.get(backing)
+}
+
+/** Own one synchronous binary capture traversal; callbacks access only this explicit instance. */
+class BinaryCapture {
+  /** All mutable storage and original construction inputs belong to this operation. */
+  #state: ReturnType<typeof binaryCaptureState>
+  /** Preserve the original stable resource surface and callback identities. */
+  readonly value: IRpcBinaryCapture
+  /** Initialize owned storage before publishing the resource's callbacks. */
+  constructor(
+    message: IRpcRuntimeEnvelope,
+    storage: RpcBinaryStorage,
+    limit: number,
+    digest: IRpcBinaryDigest | undefined,
+    encoding: IRpcBinaryEncoding | undefined,
+    fallbackEncodeInline: ((bytes: Uint8Array) => string) | undefined
+  ) {
+    this.#state = binaryCaptureState(
+      message,
+      storage,
+      limit,
+      digest,
+      encoding,
+      fallbackEncodeInline
+    )
+    /** Header/task/errors remain in the original grammar; only its portable slots call this codec. */
+    const envelope = normalizeRuntimeEnvelope(
+      this.#state.message,
+      this.#state.capturedRoots
+        ? (value) => {
+            /** Each top-level portable slot records only its own constructed subtree bound. */
+            const before = this.#state.jsonByteUpperBound
+            /** Recursive encode remains the original canonical binary visitor. */
+            const encoded = this.#encode(value)
+            if (encoded !== null && typeof encoded === 'object')
+              this.#state.capturedRoots!.set(encoded, this.#state.jsonByteUpperBound - before)
+            return encoded
+          }
+        : this.#encode
+    )
+    if (this.#state.storage === RpcBinaryStorage.native && !this.#state.digest) invalid()
+    this.value = {
+      envelope,
+      sidecars: this.#state.sidecars,
+      backingBytes: this.#state.backingBytes,
+      capturedRoots: this.#state.capturedRoots,
+      inline: this.#state.inline,
+      frozen: this.#state.frozen,
+      beforeDigestComplete: false
+    }
+  }
+  /** Owned Core preparation freezes only newly constructed inline tags, never caller backings/views. */
+  #publish = (tuple: IRpcPortableValue[], ownBound: number): IRpcPortableValue => {
+    if (!this.#state.encoding) return tuple
+    this.#state.jsonByteUpperBound += ownBound
+    if (this.#state.immutableInline && this.#state.frozen) this.#state.frozen.push(tuple)
+    return this.#state.immutableInline && !this.#state.frozen ? Object.freeze(tuple) : tuple
+  }
+
+  #index = (backing: ArrayBuffer): number => {
+    const known = this.#state.indices.get(backing)
     if (known !== undefined) return known
+    /** Each distinct backing contributes its whole native byte length to the physical budget. */
     const length = rpcBinaryBackingLength(backing)
-    consume(length)
-    backingBytes += length
-    const next = sidecars.length
-    indices.set(backing, next)
-    sidecars.push(backing)
+    ;(0, this.#state.consume)(length)
+    this.#state.backingBytes += length
+    const next = this.#state.sidecars.length
+    this.#state.indices.set(backing, next)
+    this.#state.sidecars.push(backing)
     return next
   }
-  const encode = (value: unknown, depth = 0): IRpcPortableValue => {
+
+  #encode = (value: unknown, depth = 0): IRpcPortableValue => {
     if (depth > RPC_PORTABLE_MAX_DEPTH) invalid()
-    if (value === null) return publish([T.null], T.null.length + 4)
-    if (typeof value === 'boolean') return publish([T.boolean, value], T.boolean.length + 10)
+    if (value === null) return this.#publish([T.null], T.null.length + 4)
+    if (typeof value === 'boolean') return this.#publish([T.boolean, value], T.boolean.length + 10)
     if (typeof value === 'number') {
       if (!Number.isFinite(value)) invalid()
-      return publish([T.number, value], T.number.length + 37)
+      return this.#publish([T.number, value], T.number.length + 37)
     }
     if (typeof value === 'string')
-      return publish([T.string, value], T.string.length + value.length * 6 + 7)
+      return this.#publish([T.string, value], T.string.length + value.length * 6 + 7)
     if (isArrayBuffer(value)) {
-      if (storage === RpcBinaryStorage.native)
-        return publish([T.buffer, index(value)], T.buffer.length + 37)
-      consume(rpcBinaryBackingLength(value))
+      if (this.#state.storage === RpcBinaryStorage.native)
+        return this.#publish([T.buffer, this.#index(value)], T.buffer.length + 37)
+      ;(0, this.#state.consume)(rpcBinaryBackingLength(value))
       /** The original inline capture occurs before the first asynchronous digest handoff. */
       const bytes = new Uint8Array(value).slice()
-      if (inline) {
+      if (this.#state.inline) {
         /** The pending slot belongs only to this freshly constructed tuple. */
         const tuple: IRpcPortableValue[] = [T.buffer, '']
-        inline.push({ bytes, tuple, index: 1 })
-        return publish(tuple, T.buffer.length + Math.ceil((bytes.byteLength * 4) / 3) + 7)
+        this.#state.inline.push({ bytes, tuple, index: 1 })
+        return this.#publish(tuple, T.buffer.length + Math.ceil((bytes.byteLength * 4) / 3) + 7)
       }
-      const encoded = encodeInline!(bytes)
-      return publish([T.buffer, encoded], T.buffer.length + encoded.length + 7)
+      /** Invoke the held encoder with its original receiverless callback semantics. */
+      const encodeInline = this.#state.encodeInline!
+      /** Recursive encode remains the original canonical binary visitor. */
+      const encoded = encodeInline(bytes)
+      return this.#publish([T.buffer, encoded], T.buffer.length + encoded.length + 7)
     }
     if (isUint8Array(value)) {
       const selected = rpcBinaryView(value)
-      if (storage === RpcBinaryStorage.native)
-        return publish(
-          [T.uint8array, index(selected.backing), selected.offset, selected.length],
+      if (this.#state.storage === RpcBinaryStorage.native)
+        return this.#publish(
+          [T.uint8array, this.#index(selected.backing), selected.offset, selected.length],
           T.uint8array.length + 103
         )
-      consume(selected.offset + selected.length)
+      ;(0, this.#state.consume)(selected.offset + selected.length)
       /** The visible-byte snapshot retains the original offset and zero-prefix semantics. */
       const bytes = new Uint8Array(selected.backing, selected.offset, selected.length).slice()
-      if (inline) {
+      if (this.#state.inline) {
         /** Offset and copied visible bytes preserve the original zero-prefix representation. */
         const tuple: IRpcPortableValue[] = [T.uint8array, selected.offset, '']
-        inline.push({ bytes, tuple, index: 2 })
-        return publish(tuple, T.uint8array.length + Math.ceil((bytes.byteLength * 4) / 3) + 40)
+        this.#state.inline.push({ bytes, tuple, index: 2 })
+        return this.#publish(
+          tuple,
+          T.uint8array.length + Math.ceil((bytes.byteLength * 4) / 3) + 40
+        )
       }
-      const encoded = encodeInline!(bytes)
-      return publish(
+      /** Invoke the held encoder with its original receiverless callback semantics. */
+      const encodeInline = this.#state.encodeInline!
+      /** Recursive encode remains the original canonical binary visitor. */
+      const encoded = encodeInline(bytes)
+      return this.#publish(
         [T.uint8array, selected.offset, encoded],
         T.uint8array.length + encoded.length + 40
       )
     }
-    if (!value || typeof value !== 'object' || active.has(value)) invalid()
-    active.add(value)
+    if (!value || typeof value !== 'object' || this.#state.active.has(value)) invalid()
+    this.#state.active.add(value)
     try {
       if (Array.isArray(value)) {
         /** Dense children retain their original codec order, each visited exactly once. */
-        const children = array(value).map((item) => encode(item, depth + 1))
-        if (immutableInline && frozen) frozen.push(children)
-        return publish(
-          [T.array, immutableInline && !frozen ? Object.freeze(children) : children],
+        const children = array(value).map((item) => this.#encode(item, depth + 1))
+        if (this.#state.immutableInline && this.#state.frozen) this.#state.frozen.push(children)
+        return this.#publish(
+          [
+            T.array,
+            this.#state.immutableInline && !this.#state.frozen ? Object.freeze(children) : children
+          ],
           T.array.length + 7 + Math.max(0, children.length - 1)
         )
       }
@@ -443,44 +533,34 @@ export function captureRpcBinary(
       const children = keys(data).map((key) => {
         keyBound += key.length * 6 + 5
         /** Only constructed pair containers are frozen for the private owned JSON capture. */
-        const pair = [key, encode(data[key], depth + 1)]
-        if (immutableInline && frozen) frozen.push(pair)
-        return immutableInline && !frozen ? Object.freeze(pair) : pair
+        const pair = [key, this.#encode(data[key], depth + 1)]
+        if (this.#state.immutableInline && this.#state.frozen) this.#state.frozen.push(pair)
+        return this.#state.immutableInline && !this.#state.frozen ? Object.freeze(pair) : pair
       })
-      if (immutableInline && frozen) frozen.push(children)
-      return publish(
-        [T.object, immutableInline && !frozen ? Object.freeze(children) : children],
+      if (this.#state.immutableInline && this.#state.frozen) this.#state.frozen.push(children)
+      return this.#publish(
+        [
+          T.object,
+          this.#state.immutableInline && !this.#state.frozen ? Object.freeze(children) : children
+        ],
         T.object.length + 7 + Math.max(0, children.length - 1) + keyBound
       )
     } finally {
-      active.delete(value)
+      this.#state.active.delete(value)
     }
   }
-  /** Header/task/errors remain in the original grammar; only its portable slots call this codec. */
-  const envelope = normalizeRuntimeEnvelope(
-    message,
-    capturedRoots
-      ? (value) => {
-          /** Each top-level portable slot records only its own constructed subtree bound. */
-          const before = jsonByteUpperBound
-          /** Recursive encode remains the original canonical binary visitor. */
-          const encoded = encode(value)
-          if (encoded !== null && typeof encoded === 'object')
-            capturedRoots.set(encoded, jsonByteUpperBound - before)
-          return encoded
-        }
-      : encode
-  )
-  if (storage === RpcBinaryStorage.native && !digest) invalid()
-  return {
-    envelope,
-    sidecars,
-    backingBytes,
-    capturedRoots,
-    inline,
-    frozen,
-    beforeDigestComplete: false
-  }
+}
+
+/** Construct the single owner for one synchronous binary capture traversal. */
+export function captureRpcBinary(
+  message: IRpcRuntimeEnvelope,
+  storage: RpcBinaryStorage,
+  limit: number,
+  digest: IRpcBinaryDigest | undefined,
+  encoding: IRpcBinaryEncoding | undefined,
+  fallbackEncodeInline: ((bytes: Uint8Array) => string) | undefined
+): IRpcBinaryCapture {
+  return new BinaryCapture(message, storage, limit, digest, encoding, fallbackEncodeInline).value
 }
 
 /** Complete only owned byte slots; no caller container or payload is walked after cold loading. */

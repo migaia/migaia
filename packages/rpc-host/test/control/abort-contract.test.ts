@@ -1,3 +1,4 @@
+import { createRuntimeEndpointComposition } from '../../dist/core/runtime-api-endpoint.js'
 import { describe, expect, it, vi } from 'vitest'
 import {
   normalizeRpcEnvelope,
@@ -5,9 +6,8 @@ import {
   RpcRouteProfile,
   RpcRouteType
 } from '@migaia/rpc-contract'
-import { createClientEndpoint } from '../../dist/core/client.js'
-import { createProviderEndpoint } from '../../dist/core/provider.js'
-import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
+
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
 import { abort } from '../../dist/core/middleware/abort.js'
 import { connect } from '../../dist/core/middleware/connect.js'
 import { hooks } from '../../dist/core/middleware/hooks.js'
@@ -63,30 +63,36 @@ describe('abort control envelope and remote reason', () => {
       const providerAborted = new Promise<unknown>((resolve) => {
         observed = resolve
       })
-      const provider = await createProviderEndpoint({
-        id: 'provider',
-        transport: providerWire,
-        middlewares: [
-          connect({ transport: providerWire }),
-          abort(),
-          hooks({ listeners: (event) => void events.push(event) })
-        ],
-        provider: {
-          slow: async (context) => {
-            started()
-            await new Promise<void>((resolve) =>
-              context.signal.addEventListener('abort', () => resolve(), { once: true })
-            )
-            observed(context.signal.reason)
-            return context.success('late')
+      const provider = await createRuntimeEndpointComposition(
+        {
+          id: 'provider',
+          transport: providerWire,
+          middlewares: [
+            connect({ transport: providerWire }),
+            abort(),
+            hooks({ listeners: (event) => void events.push(event) })
+          ],
+          provider: {
+            slow: async (context) => {
+              started()
+              await new Promise<void>((resolve) =>
+                context.signal.addEventListener('abort', () => resolve(), { once: true })
+              )
+              observed(context.signal.reason)
+              return context.success('late')
+            }
           }
-        }
-      })
-      const client = await createClientEndpoint({
-        id: 'client',
-        transport: capture,
-        middlewares: [connect({ transport: capture }), abort()]
-      })
+        },
+        { agreement: { capabilities: [] }, peerId: '' }
+      ).installing
+      const client = await createRuntimeEndpointComposition(
+        {
+          id: 'client',
+          transport: capture,
+          middlewares: [connect({ transport: capture }), abort()]
+        },
+        { agreement: { capabilities: [] }, peerId: '' }
+      ).installing
       try {
         const pending = client.send('provider', 'slow', null, { timeoutMs: false })
         pending.catch(() => undefined)
@@ -160,26 +166,32 @@ describe('abort control envelope and remote reason', () => {
     const providerAborted = new Promise<unknown>((resolve) => {
       observed = resolve
     })
-    const provider = await createProviderEndpoint({
-      id: 'provider',
-      transport: providerWire,
-      middlewares: [connect({ transport: providerWire }), abort()],
-      provider: {
-        slow: async (context) => {
-          started()
-          await new Promise<void>((resolve) => {
-            context.signal.addEventListener('abort', () => resolve(), { once: true })
-          })
-          observed(context.signal.reason)
-          return context.success('late')
+    const provider = await createRuntimeEndpointComposition(
+      {
+        id: 'provider',
+        transport: providerWire,
+        middlewares: [connect({ transport: providerWire }), abort()],
+        provider: {
+          slow: async (context) => {
+            started()
+            await new Promise<void>((resolve) => {
+              context.signal.addEventListener('abort', () => resolve(), { once: true })
+            })
+            observed(context.signal.reason)
+            return context.success('late')
+          }
         }
-      }
-    })
-    const client = await createClientEndpoint({
-      id: 'client',
-      transport: capture,
-      middlewares: [connect({ transport: capture }), abort()]
-    })
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'client',
+        transport: capture,
+        middlewares: [connect({ transport: capture }), abort()]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     try {
       const controller = new AbortController()
       const result = client.send('provider', 'slow', null, {

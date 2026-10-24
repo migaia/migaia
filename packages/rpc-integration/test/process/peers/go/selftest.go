@@ -202,6 +202,7 @@ func normalizeEnvelope(value record) (record, [][2]string, *envelopeError) {
 			unknownTop = append(unknownTop, key)
 		}
 	}
+	// Test-oracle exception: n counts this envelope's unknown keys; preserve exact cross-language report order.
 	sort.Strings(unknownTop)
 	for _, key := range unknownTop {
 		warnings = append(warnings, [2]string{"", key})
@@ -230,6 +231,7 @@ func normalizeEnvelope(value record) (record, [][2]string, *envelopeError) {
 			unknownRoute = append(unknownRoute, key)
 		}
 	}
+	// Test-oracle exception: n counts this route's unknown keys; preserve exact cross-language report order.
 	sort.Strings(unknownRoute)
 	for _, key := range unknownRoute {
 		warnings = append(warnings, [2]string{"/data/route", key})

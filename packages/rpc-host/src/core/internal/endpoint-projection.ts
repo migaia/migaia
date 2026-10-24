@@ -16,6 +16,19 @@ import {
   type IEndpointKernelHost
 } from '../endpoint-kernel.js'
 
+/** Native Host lifecycle and plumbing names cannot be supplied by public Feature projections. */
+export const RPC_RESERVED_PROJECTION_KEYS: ReadonlySet<string> = new Set([
+  'on',
+  'hooks',
+  'dispose',
+  'use',
+  'unUse',
+  'config',
+  'getPort',
+  'usePipeline',
+  '__proto__'
+])
+
 /** Canonical projections retain construction identity without adding a public endpoint member. */
 const identities = new WeakMap<
   object,
@@ -124,22 +137,13 @@ export function createEndpointProjection(
   const publicKeys = uniqueStrings(options.publicKeys)
   const exposedKeys = uniqueStrings(options.exposedKeys)
   const rejectionKeys = new Set(options.rejectionKeys ?? [])
-  const reservedKeys = new Set([
-    'on',
-    'hooks',
-    'dispose',
-    'use',
-    'unUse',
-    'config',
-    'getPort',
-    'usePipeline',
-    '__proto__'
-  ])
   for (const key of [...publicKeys, ...exposedKeys]) {
-    if (reservedKeys.has(key)) throw projectionError()
+    if (RPC_RESERVED_PROJECTION_KEYS.has(key)) throw projectionError()
   }
   const hostKeys = readHostKeys(options.host)
-  if (hostKeys.some((key) => !publicKeys.includes(key))) throw projectionError()
+  /** Projection keys are snapshotted once; membership never changes their declared order. */
+  const publicKeySet = new Set(publicKeys)
+  if (hostKeys.some((key) => !publicKeySet.has(key))) throw projectionError()
 
   const values = new Map<string, unknown>()
   try {

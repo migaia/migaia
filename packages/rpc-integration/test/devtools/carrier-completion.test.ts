@@ -5,11 +5,11 @@ import { RpcProbeDirection, type IRpcCarrierProbe } from '@migaia/rpc-host/probe
 import { createNativeProcessOffer } from '../../../rpc-plugin-process/dist/process/offer.js'
 import { createProcessTransport } from '../../../rpc-plugin-process/dist/process/handshake.js'
 import { RpcBatchPhysical } from '@migaia/rpc-contract'
-import { bridgeFixture, flush, request } from '../bridge/fixture.js'
+import { BridgeFixture, flush, request } from '../bridge/fixture.js'
 
 it('observes one physical JSON-RPC batch with its existing member count', async () => {
   /** The existing bridge fixture negotiates the real batch capability and physical writer. */
-  const fixture = bridgeFixture()
+  const fixture = new BridgeFixture()
   /** No observation wrapper or parser replacement surrounds the final public channel. */
   const channel = await fixture.open()
   /** The callback consumes primitive fields while the physical batch's original content is live. */

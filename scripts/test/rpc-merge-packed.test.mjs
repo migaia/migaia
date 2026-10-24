@@ -26,7 +26,6 @@ const owners = [
 const checks = [
   'five-packed-artifacts',
   'host-entry',
-  'runtime-peer-pair',
   'subpath-imports',
   'obsolete-subpaths',
   'identity-observer-hidden',

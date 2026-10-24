@@ -3,6 +3,7 @@ import { mergeCleanupResults } from '@migaia/lifecycle'
 import {
   createDynamicCapabilityGraph,
   type IDynamicCapabilityGraph,
+  type IDynamicCapabilityGraphOptions,
   type IDynamicGraphNodeDefinition
 } from '@migaia/capability/graph/dynamic'
 import { CapabilityGraphNodeState, type IGraphNodeId } from '@migaia/capability/graph'
@@ -22,7 +23,6 @@ import { attachTrayError, createTrayError } from '../errors.js'
 import {
   TrayHostState,
   type ICreateHostOptions,
-  type ITrayHost,
   type ITrayHostSource,
   type ITrayHostDisposalResult,
   type ITrayHostEventMap,
@@ -93,218 +93,292 @@ export async function createHost<
   THost extends ITrayHostSource,
   const TPlugins extends readonly ITrayPluginConstraint<THost>[]
 >(options: ICreateHostOptions<THost, TPlugins>): Promise<ITrayResolvedHost<THost, TPlugins>> {
-  const captured = snapshotOptions(options)
-  let concrete: THost | undefined
-  /** 托管协议出口，与 `concrete` 同生命周期；取一次，整个会话复用。 */
-  let composition: IPluginHostCompositionIntegration<object> | undefined
-  let graph: IGraph | undefined
-  let session: object | undefined
-  let anchorName: string | undefined
-  const cleanup: ICleanupAccumulator = { errors: [], complete: true, physical: [] }
-  /** Counts active Runtime callbacks by plugin name to fence same-run mutation. */
-  const activeRuntimeNames = new Map<string, number>()
-  /** Tracks only the synchronous callback turn for unsupported raw-Host mutation rejection. */
-  const callbackRuntimeNames = new Map<string, number>()
-  /** Resolves deferred physical cleanup when all Runtime generation leases are released. */
-  const runtimeQuiescenceWaiters = new Set<() => void>()
-  const waitForRuntimeQuiescence = (): Promise<void> => {
-    if (activeRuntimeNames.size === 0) return Promise.resolve()
-    return new Promise((resolve) => runtimeQuiescenceWaiters.add(resolve))
+  return new HostCreation<THost, TPlugins>(options).create()
+}
+
+/** One creation attempt owns its claim, graph startup, publication receipt and rollback context. */
+class HostCreation<
+  THost extends ITrayHostSource,
+  TPlugins extends readonly ITrayPluginConstraint<THost>[]
+> {
+  /** Options are captured before constructing any actual lifecycle resource. */
+  #captured: ICreateHostOptions<THost, TPlugins>
+  /** The factory's concrete Host is released only if this attempt acquired its claim. */
+  #concrete: THost | undefined
+  /** Composition is opened once for this same concrete Host lifetime. */
+  #composition: IPluginHostCompositionIntegration<object> | undefined
+  /** The canonical graph owns ordering and binding generations. */
+  #graph: IGraph | undefined
+  /** Exact claim token prevents rollback from disposing another session. */
+  #session: object | undefined
+  /** The private anchor is removed by this attempt or its managed disposal. */
+  #anchorName: string | undefined
+  /** Logical and physical cleanup outcomes remain shared with the managed facade. */
+  #cleanup: ICleanupAccumulator = { errors: [], complete: true, physical: [] }
+  /** Active Runtime generations fence physical binding cleanup. */
+  #activeRuntimeNames = new Map<string, number>()
+  /** Synchronous callbacks fence unsupported same-run mutation. */
+  #callbackRuntimeNames = new Map<string, number>()
+  /** Deferred physical cleanup joins the last active generation's release. */
+  #runtimeQuiescenceWaiters = new Set<() => void>()
+  /** Publication always pairs this snapshot with its exact composition revision. */
+  #hostSnapshot: IAnySnapshot | undefined
+  /** Managed reads reject when the concrete Host revision has changed externally. */
+  #revision = 0
+  /** Original composition receipts are indexed by admitted plugin name. */
+  #receiptsByName = new Map<string, IRegistrationToken>()
+
+  /** Snapshot public options before any concrete Host or graph resource is acquired. */
+  constructor(options: ICreateHostOptions<THost, TPlugins>) {
+    this.#captured = snapshotOptions(options)
   }
-  const notifyRuntimeQuiescence = (): void => {
-    if (activeRuntimeNames.size !== 0) return
-    for (const resolve of runtimeQuiescenceWaiters) resolve()
-    runtimeQuiescenceWaiters.clear()
+
+  /** Complete canonical startup or roll back this attempt's own claim on the original failure. */
+  async create(): Promise<ITrayResolvedHost<THost, TPlugins>> {
+    try {
+      await this.#createConcrete()
+      /** Initial definitions retain their original registration order in the graph. */
+      const admissions = await this.#prepareAdmissions()
+      this.#graph = createDynamicCapabilityGraph<IAdmissionRecord>({
+        report: this.#report,
+        mutationAdmissionMs: this.#captured.mutationAdmissionMs,
+        startBatch: this.#startBatch,
+        releaseBatch: this.#releaseBatch,
+        releaseBinding: this.#releaseBinding
+      })
+      /** Mutation and Runtime views borrow this same creation session and its canonical owners. */
+      const managed = new ManagedTrayHost({
+        concrete: this.#concrete!,
+        graph: this.#graph,
+        options: this.#captured as unknown as ICreateHostOptions<
+          IAnyHost,
+          readonly IPluginBinding[]
+        >,
+        readSnapshot: this.#readSnapshot,
+        writeSnapshot: this.#writeSnapshot,
+        assertOwned: this.#assertOwned,
+        cleanup: this.#cleanup,
+        anchorName: this.#anchorName!,
+        readExpectedRevision: () => this.#revision,
+        activeRuntimeNames: this.#activeRuntimeNames,
+        waitForRuntimeQuiescence: this.#waitForRuntimeQuiescence
+      })
+      for (const admission of admissions) {
+        /** Each graph definition refers to its one canonical composition admission. */
+        const node = toGraphNode(admission)
+        await this.#graph.register(node, admission)
+      }
+      await this.#graph.ready()
+      this.#registerBridge(managed)
+      return managed as unknown as ITrayResolvedHost<THost, TPlugins>
+    } catch (error) {
+      return this.#rollback(error)
+    }
   }
-  try {
-    concrete = captured.create()
+
+  /** Return the currently paired canonical composition snapshot. */
+  #readSnapshot = (): IAnySnapshot => this.#hostSnapshot!
+  /** Publish snapshot and its revision together after a concrete mutation. */
+  #writeSnapshot = (snapshot: IAnySnapshot): void => {
+    this.#hostSnapshot = snapshot
+    this.#revision = this.#composition!.revision
+  }
+  /** External raw Host mutation invalidates managed observations until ownership is restored. */
+  #assertOwned = (): void => {
+    if (this.#composition!.revision !== this.#revision)
+      throw createTrayError(TrayErrorCode.hostMutationBypass)
+  }
+  /** Join physical cleanup only while some Runtime generation is still active. */
+  #waitForRuntimeQuiescence = (): Promise<void> => {
+    if (this.#activeRuntimeNames.size === 0) return Promise.resolve()
+    return new Promise((resolve) => this.#runtimeQuiescenceWaiters.add(resolve))
+  }
+  /** Release every existing cleanup waiter when the final Runtime generation exits. */
+  #notifyRuntimeQuiescence(): void {
+    if (this.#activeRuntimeNames.size !== 0) return
+    for (const resolve of this.#runtimeQuiescenceWaiters) resolve()
+    this.#runtimeQuiescenceWaiters.clear()
+  }
+
+  /** Acquire only this call's managed claim and install its private anchor before admission. */
+  async #createConcrete(): Promise<void> {
+    this.#concrete = this.#captured.create()
     // 用登记谓词而不是 `instanceof`：名义检查在两份包副本之间会失败，也看不见工厂产出的宿主。
-    if (!isManagedHost(concrete) || claims.has(concrete as object))
+    if (!isManagedHost(this.#concrete) || claims.has(this.#concrete as object))
       throw createTrayError(TrayErrorCode.invalidEntry)
-    composition = openComposition(concrete as object)
-    session = {}
-    claims.set(concrete as object, session)
-    await concrete.use()
-    anchorName = `__migaia_tray_anchor_${anchorSequence++}`
+    this.#composition = openComposition(this.#concrete as object)
+    this.#session = {}
+    claims.set(this.#concrete as object, this.#session)
+    await this.#concrete.use()
+    this.#anchorName = `__migaia_tray_anchor_${anchorSequence++}`
     const anchor = {
-      name: anchorName,
+      name: this.#anchorName,
       install: () => ({})
     }
-    await (concrete.use as (...plugins: readonly IPluginConstraint<any>[]) => Promise<unknown>)(
-      anchor as IPluginConstraint<any>
-    )
-    let hostSnapshot = composition!.getCurrentSnapshot()
-    let receipt = composition!.revision
-    const report = (error: unknown): void => {
-      try {
-        captured.report?.(error)
-      } catch {
-        // Reporter failures never alter managed state.
-      }
+    await (
+      this.#concrete.use as (...plugins: readonly IPluginConstraint<any>[]) => Promise<unknown>
+    )(anchor as IPluginConstraint<any>)
+    this.#hostSnapshot = this.#composition!.getCurrentSnapshot()
+    this.#revision = this.#composition!.revision
+  }
+
+  /** Reporting is best effort and never changes a managed lifecycle outcome. */
+  #report = (error: unknown): void => {
+    try {
+      this.#captured.report?.(error)
+    } catch {
+      // Reporter failures never alter managed state.
     }
-    const admissions = captured.plugins.map((plugin) => {
+  }
+
+  /** Prepare provider-first initial admissions, publishing their original registration receipts. */
+  async #prepareAdmissions(): Promise<IAdmissionRecord[]> {
+    const admissions = this.#captured.plugins.map((plugin) => {
       /** One canonical admission owns both installation and Feature dependency projection. */
       const { snapshot, admission } = admitTrayPlugin(
         plugin as unknown as IPluginBinding,
-        composition!
+        this.#composition!
       )
       return {
         plugin: plugin as unknown as IPluginBinding,
         snapshot,
         admission,
-        slot: composition!.createDataOrderSlot(snapshot.name)
+        slot: this.#composition!.createDataOrderSlot(snapshot.name)
       }
     })
     const orderedAdmissions = orderAdmissions(admissions)
     const initialAdmissions = computeReadyAdmissions(orderedAdmissions)
-    const prepared = await composition!.prepareAdmissions(
+    const prepared = await this.#composition!.prepareAdmissions(
       initialAdmissions.map(({ admission, slot }) => ({ admission, slot }))
     )
     let receipts: readonly IRegistrationToken[]
     try {
-      receipts = composition!.commitPreparedAdmissions(prepared)
+      receipts = this.#composition!.commitPreparedAdmissions(prepared)
     } catch (error) {
-      await composition!.discardPreparedAdmissions(prepared)
+      await this.#composition!.discardPreparedAdmissions(prepared)
       throw error
     }
-    hostSnapshot = composition!.getCurrentSnapshot()
-    receipt = composition!.revision
+    this.#hostSnapshot = this.#composition!.getCurrentSnapshot()
+    this.#revision = this.#composition!.revision
     initialAdmissions.forEach((entry, index) => {
       entry.receipt = receipts[index]
     })
-    const receiptsByName = new Map(
+    this.#receiptsByName = new Map(
       initialAdmissions.map((entry) => [entry.snapshot.name, entry.receipt!] as const)
     )
-    graph = createDynamicCapabilityGraph<IAdmissionRecord>({
-      report,
-      mutationAdmissionMs: captured.mutationAdmissionMs,
-      startBatch: async (entries) => {
-        const missing: IAdmissionRecord[] = entries
-          .map((entry) => entry.binding)
-          .filter((entry): entry is IAdmissionRecord => entry !== undefined)
-          .filter((entry) => !receiptsByName.has(entry.snapshot.name))
-        if (missing.length > 0) {
-          const prepared = await composition!.prepareAdmissions(
-            missing.map(({ admission, slot }) => ({ admission, slot }))
-          )
-          let nextReceipts: readonly IRegistrationToken[]
-          try {
-            nextReceipts = composition!.commitPreparedAdmissions(prepared)
-          } catch (error) {
-            await composition!.discardPreparedAdmissions(prepared)
-            throw error
-          }
-          missing.forEach((entry, index) => {
-            entry.receipt = nextReceipts[index]
-            receiptsByName.set(entry.snapshot.name, nextReceipts[index])
-          })
-          hostSnapshot = composition!.getCurrentSnapshot()
-          receipt = composition!.revision
-        }
-        return entries.map((entry) => {
-          const record = entry.binding
-          if (!record) throw createTrayError(TrayErrorCode.invalidEntry)
-          return { value: record.plugin, release: async () => undefined }
-        })
-      },
-      releaseBatch: async (entries, fence) => {
-        const cleanupOrder = [...entries].reverse()
-        const currentReceipts = cleanupOrder.map((entry) => {
-          const receipt = entry.binding?.receipt ?? receiptsByName.get(String(entry.id))
-          if (!receipt) throw createTrayError(TrayErrorCode.hostMutationBypass)
-          return receipt
-        })
-        const removalPromise = composition!.commitPreparedUnUseBatch(
-          composition!.prepareUnUseBatch(currentReceipts),
-          { beforeCleanup: fence }
-        )
-        const bounded =
-          captured.shutdown.mode === TrayShutdownMode['strict-drain']
-            ? { complete: true as const, value: await removalPromise }
-            : await settleWithin(removalPromise, captured.quiescenceMs)
-        if (!bounded.complete) {
-          cleanup.complete = false
-          cleanup.physical.push(mergeCleanupResults([removalPromise]))
-          hostSnapshot = composition!.getCurrentSnapshot()
-          receipt = composition!.revision
-          for (const entry of cleanupOrder) receiptsByName.delete(String(entry.id))
-          return
-        }
-        const removal = bounded.value
-        hostSnapshot = removal.snapshot as IAnySnapshot
-        receipt = composition!.revision
-        cleanup.errors.push(...removal.cleanupErrors)
-        cleanup.complete = cleanup.complete && removal.cleanupComplete
-        if (removal.physicalCompletion) {
-          if (captured.shutdown.mode === TrayShutdownMode['strict-drain']) {
-            const physicalResult = await removal.physicalCompletion
-            cleanup.errors.push(...physicalResult.cleanupErrors)
-            cleanup.complete = cleanup.complete && physicalResult.cleanupErrors.length === 0
-          } else cleanup.physical.push(removal.physicalCompletion)
-        }
-        for (const entry of cleanupOrder) receiptsByName.delete(String(entry.id))
-      },
-      releaseBinding: async (entry) => {
-        if (activeRuntimeNames.has(entry.binding?.snapshot.name ?? '')) {
-          cleanup.complete = false
-          const deferred = waitForRuntimeQuiescence().then(async () => {
-            /**
-             * Errors raised by this binding's deferred rollback only. `cleanup.errors` is shared by
-             * the whole removal, so returning it would repeat other bindings' errors here.
-             */
-            const bindingErrors: unknown[] = []
-            try {
-              await entry.binding?.artifactCustody?.rollback()
-            } catch (error) {
-              const cleanupError = attachTrayError(error, TrayErrorCode.artifactCleanupFailed)
-              bindingErrors.push(cleanupError)
-              cleanup.errors.push(cleanupError)
-              cleanup.complete = false
-              report(cleanupError)
-            }
-            return Object.freeze({ cleanupErrors: Object.freeze(bindingErrors) })
-          })
-          cleanup.physical.push(deferred)
-          return
-        }
-        try {
-          await entry.binding.artifactCustody?.rollback()
-        } catch (error) {
-          const cleanupError = attachTrayError(error, TrayErrorCode.artifactCleanupFailed)
-          cleanup.errors.push(cleanupError)
-          cleanup.complete = false
-          report(cleanupError)
-        }
+    return admissions
+  }
+
+  /** Start one graph frontier through the canonical composition admission protocol. */
+  #startBatch: IDynamicCapabilityGraphOptions<IAdmissionRecord>['startBatch'] = async (entries) => {
+    const missing: IAdmissionRecord[] = entries
+      .map((entry) => entry.binding)
+      .filter((entry): entry is IAdmissionRecord => entry !== undefined)
+      .filter((entry) => !this.#receiptsByName.has(entry.snapshot.name))
+    if (missing.length > 0) {
+      const prepared = await this.#composition!.prepareAdmissions(
+        missing.map(({ admission, slot }) => ({ admission, slot }))
+      )
+      let nextReceipts: readonly IRegistrationToken[]
+      try {
+        nextReceipts = this.#composition!.commitPreparedAdmissions(prepared)
+      } catch (error) {
+        await this.#composition!.discardPreparedAdmissions(prepared)
+        throw error
       }
-    })
-    const managed = createManagedHost(
-      concrete,
-      graph,
-      captured as unknown as ICreateHostOptions<IAnyHost, readonly IPluginBinding[]>,
-      () => hostSnapshot,
-      (next) => {
-        hostSnapshot = next
-        receipt = composition!.revision
-      },
-      () => {
-        if (composition!.revision !== receipt)
-          throw createTrayError(TrayErrorCode.hostMutationBypass)
-      },
-      session,
-      cleanup,
-      anchorName,
-      () => receipt,
-      activeRuntimeNames,
-      waitForRuntimeQuiescence
-    )
-    for (const admission of admissions) {
-      const node = toGraphNode(admission)
-      await graph.register(node, admission)
+      missing.forEach((entry, index) => {
+        entry.receipt = nextReceipts[index]
+        this.#receiptsByName.set(entry.snapshot.name, nextReceipts[index])
+      })
+      this.#hostSnapshot = this.#composition!.getCurrentSnapshot()
+      this.#revision = this.#composition!.revision
     }
-    await graph.ready()
+    return entries.map((entry) => {
+      const record = entry.binding
+      if (!record) throw createTrayError(TrayErrorCode.invalidEntry)
+      return { value: record.plugin, release: async () => undefined }
+    })
+  }
+  /** Release graph frontiers in reverse dependency order with the original quiescence budget. */
+  #releaseBatch: IDynamicCapabilityGraphOptions<IAdmissionRecord>['releaseBatch'] = async (
+    entries,
+    fence
+  ) => {
+    const cleanupOrder = [...entries].reverse()
+    const currentReceipts = cleanupOrder.map((entry) => {
+      const receipt = entry.binding?.receipt ?? this.#receiptsByName.get(String(entry.id))
+      if (!receipt) throw createTrayError(TrayErrorCode.hostMutationBypass)
+      return receipt
+    })
+    const removalPromise = this.#composition!.commitPreparedUnUseBatch(
+      this.#composition!.prepareUnUseBatch(currentReceipts),
+      { beforeCleanup: fence }
+    )
+    const bounded =
+      this.#captured.shutdown.mode === TrayShutdownMode['strict-drain']
+        ? { complete: true as const, value: await removalPromise }
+        : await settleWithin(removalPromise, this.#captured.quiescenceMs)
+    if (!bounded.complete) {
+      this.#cleanup.complete = false
+      this.#cleanup.physical.push(mergeCleanupResults([removalPromise]))
+      this.#hostSnapshot = this.#composition!.getCurrentSnapshot()
+      this.#revision = this.#composition!.revision
+      for (const entry of cleanupOrder) this.#receiptsByName.delete(String(entry.id))
+      return
+    }
+    const removal = bounded.value
+    this.#hostSnapshot = removal.snapshot as IAnySnapshot
+    this.#revision = this.#composition!.revision
+    this.#cleanup.errors.push(...removal.cleanupErrors)
+    this.#cleanup.complete = this.#cleanup.complete && removal.cleanupComplete
+    if (removal.physicalCompletion) {
+      if (this.#captured.shutdown.mode === TrayShutdownMode['strict-drain']) {
+        const physicalResult = await removal.physicalCompletion
+        this.#cleanup.errors.push(...physicalResult.cleanupErrors)
+        this.#cleanup.complete = this.#cleanup.complete && physicalResult.cleanupErrors.length === 0
+      } else this.#cleanup.physical.push(removal.physicalCompletion)
+    }
+    for (const entry of cleanupOrder) this.#receiptsByName.delete(String(entry.id))
+  }
+  /** Release provisional artifact custody only after active Runtime generations quiesce. */
+  #releaseBinding: NonNullable<IDynamicCapabilityGraphOptions<IAdmissionRecord>['releaseBinding']> =
+    async (entry) => {
+      if (this.#activeRuntimeNames.has(entry.binding?.snapshot.name ?? '')) {
+        this.#cleanup.complete = false
+        const deferred = this.#waitForRuntimeQuiescence().then(async () => {
+          /**
+           * Errors raised by this binding's deferred rollback only. `cleanup.errors` is shared by
+           * the whole removal, so returning it would repeat other bindings' errors here.
+           */
+          const bindingErrors: unknown[] = []
+          try {
+            await entry.binding?.artifactCustody?.rollback()
+          } catch (error) {
+            const cleanupError = attachTrayError(error, TrayErrorCode.artifactCleanupFailed)
+            bindingErrors.push(cleanupError)
+            this.#cleanup.errors.push(cleanupError)
+            this.#cleanup.complete = false
+            this.#report(cleanupError)
+          }
+          return Object.freeze({ cleanupErrors: Object.freeze(bindingErrors) })
+        })
+        this.#cleanup.physical.push(deferred)
+        return
+      }
+      try {
+        await entry.binding.artifactCustody?.rollback()
+      } catch (error) {
+        const cleanupError = attachTrayError(error, TrayErrorCode.artifactCleanupFailed)
+        this.#cleanup.errors.push(cleanupError)
+        this.#cleanup.complete = false
+        this.#report(cleanupError)
+      }
+    }
+  /** Register Runtime leases against the same graph and managed mutation owner. */
+  #registerBridge(managed: ManagedTrayHost): void {
     registerRuntimeBridge(managed as object, {
       acquire: (name) => {
-        const lease = graph!.acquireBinding(name as IGraphId)
+        const lease = this.#graph!.acquireBinding(name as IGraphId)
         const record = lease.value
         if (!record.receipt) {
           lease.release()
@@ -318,52 +392,54 @@ export async function createHost<
         })
       },
       beginRun: (name) => {
-        changeNameCount(activeRuntimeNames, name, 1)
+        changeNameCount(this.#activeRuntimeNames, name, 1)
       },
       endRun: (name) => {
-        changeNameCount(activeRuntimeNames, name, -1)
-        notifyRuntimeQuiescence()
+        changeNameCount(this.#activeRuntimeNames, name, -1)
+        this.#notifyRuntimeQuiescence()
       },
       enterCallback: (name) => {
-        changeNameCount(callbackRuntimeNames, name, 1)
+        changeNameCount(this.#callbackRuntimeNames, name, 1)
       },
       exitCallback: (name) => {
-        changeNameCount(callbackRuntimeNames, name, -1)
+        changeNameCount(this.#callbackRuntimeNames, name, -1)
       },
       assertMutationAllowed: (name) => {
-        if (callbackRuntimeNames.has(name)) throw createTrayError(TrayErrorCode.unavailable)
+        if (this.#callbackRuntimeNames.has(name)) throw createTrayError(TrayErrorCode.unavailable)
       },
       selfUnUse: async (name, generation, _runId) => {
-        if (graph!.getBinding<IAdmissionRecord>(name as IGraphId) !== generation)
+        if (this.#graph!.getBinding<IAdmissionRecord>(name as IGraphId) !== generation)
           throw createTrayError(TrayErrorCode.unavailable)
         return managed.unUse(name)
       },
       selfReplace: async (name, generation, plugin, _runId) => {
-        if (graph!.getBinding<IAdmissionRecord>(name as IGraphId) !== generation)
+        if (this.#graph!.getBinding<IAdmissionRecord>(name as IGraphId) !== generation)
           throw createTrayError(TrayErrorCode.unavailable)
         if ((plugin as { readonly name?: unknown }).name !== name)
           throw createTrayError(TrayErrorCode.runtimeContractInvalid)
         return managed.replace(plugin as IPluginBinding)
       }
     })
-    return managed as ITrayResolvedHost<THost, TPlugins>
-  } catch (error) {
-    const cleanupErrors: unknown[] = [...cleanup.errors]
-    const physical: Promise<ITrayPluginPhysicalCleanupResult>[] = [...cleanup.physical]
+  }
+
+  /** Roll back only the claim acquired by this call, retaining the original primary failure. */
+  async #rollback(error: unknown): Promise<never> {
+    const cleanupErrors: unknown[] = [...this.#cleanup.errors]
+    const physical: Promise<ITrayPluginPhysicalCleanupResult>[] = [...this.#cleanup.physical]
     try {
-      await graph?.dispose()
+      await this.#graph?.dispose()
     } catch (cleanupError) {
       cleanupErrors.push(cleanupError)
     }
-    // Rollback owns only this call's acquired claim, never another live managed session.
+    // Rollback owns only this call's acquired claim, never another live managed this.#session.
     if (
-      concrete !== undefined &&
-      session !== undefined &&
-      claims.get(concrete as object) === session
+      this.#concrete !== undefined &&
+      this.#session !== undefined &&
+      claims.get(this.#concrete as object) === this.#session
     ) {
-      if (anchorName !== undefined) {
+      if (this.#anchorName !== undefined) {
         try {
-          const anchorRemoval = await (concrete as IAnyHost).unUse(anchorName)
+          const anchorRemoval = await (this.#concrete as IAnyHost).unUse(this.#anchorName)
           if ('ok' in anchorRemoval && !anchorRemoval.ok)
             cleanupErrors.push(...anchorRemoval.errors)
         } catch (cleanupError) {
@@ -371,20 +447,21 @@ export async function createHost<
         }
       }
       try {
-        const result = (await concrete.dispose()) as IPluginHostDisposalResult
+        const result = (await this.#concrete.dispose()) as IPluginHostDisposalResult
         cleanupErrors.push(...result.cleanupErrors)
         if (result.physicalCompletion)
           physical.push(mergeCleanupResults([result.physicalCompletion]))
       } catch (cleanupError) {
         cleanupErrors.push(cleanupError)
       }
-      claims.delete(concrete as object)
+      claims.delete(this.#concrete as object)
     }
     /** Classify first so a frozen factory failure remains reachable without masking it. */
     let primary = attachTrayError(error, TrayErrorCode.invalidEntry)
     const detail = Object.freeze({
-      phase: graph ? 'setup' : 'factory',
-      cleanupComplete: cleanup.complete && cleanupErrors.length === 0 && physical.length === 0,
+      phase: this.#graph ? 'setup' : 'factory',
+      cleanupComplete:
+        this.#cleanup.complete && cleanupErrors.length === 0 && physical.length === 0,
       cleanupErrors: Object.freeze(cleanupErrors),
       ...(physical.length > 0 ? { physicalCompletion: mergeCleanupResults(physical) } : {})
     })
@@ -449,411 +526,387 @@ function toGraphNode(admission: IAdmissionRecord): IDynamicGraphNodeDefinition<u
   }
 }
 
-/** Orders all present Feature providers first; absent optional providers do not delay admission. */
-function orderAdmissions(records: readonly IAdmissionRecord[]): IAdmissionRecord[] {
-  const byName = new Map(records.map((record) => [record.snapshot.name, record] as const))
-  const remaining = new Set(records)
-  const ordered: IAdmissionRecord[] = []
-  while (remaining.size > 0) {
-    const ready = records.filter(
-      (record) =>
-        remaining.has(record) &&
-        record.snapshot.dependencies.every(
-          ({ provider }) =>
-            !byName.has(provider) || ordered.some((item) => item.snapshot.name === provider)
-        )
-    )
-    if (ready.length === 0) {
-      if (
-        [...remaining].some((record) =>
-          record.snapshot.dependencies.some(
-            ({ provider, required }) => required && !byName.has(provider)
-          )
-        )
-      ) {
-        ordered.push(...remaining)
-        break
+/** One batch index records the earliest admission wave of each dependency-satisfied record. */
+type IAdmissionLevels = {
+  readonly levels: ReadonlyMap<IAdmissionRecord, number>
+  readonly readyNames: ReadonlySet<string>
+  readonly presentNames: ReadonlySet<string>
+}
+
+/** Resolve dependency edges once in O(records + dependencies), preserving duplicate-name readiness. */
+function resolveAdmissionLevels(
+  records: readonly IAdmissionRecord[],
+  requiredOnly: boolean
+): IAdmissionLevels {
+  /** Presence is distinct from readiness; absent optional providers never delay admission. */
+  const presentNames = new Set(records.map((record) => record.snapshot.name))
+  /** Each provider name wakes its dependents once, even when several records share that name. */
+  const dependents = new Map<string, IAdmissionRecord[]>()
+  /** Pending counts include repeated edges, whose corresponding adjacency entries release them. */
+  const pending = new Map<IAdmissionRecord, number>()
+  /** A record's wave is one after its latest required present provider. */
+  const levels = new Map<IAdmissionRecord, number>()
+  /** Deferred wave candidates accumulate while the record still has unresolved dependencies. */
+  const candidates = new Map<IAdmissionRecord, number>()
+  /** Cursor processing preserves breadth-first provider waves without shift or re-sorting. */
+  const queue: IAdmissionRecord[] = []
+  /** Original name readiness is fulfilled by the first eligible record of that name. */
+  const readyNames = new Set<string>()
+  for (const record of records) {
+    /** Missing required providers remain unresolved only in the initial-ready projection. */
+    let count = 0
+    for (const { provider, required } of record.snapshot.dependencies) {
+      if (requiredOnly && !required) continue
+      if (!presentNames.has(provider)) {
+        if (requiredOnly) count++
+        continue
       }
+      count++
+      /** One adjacency entry corresponds to one counted dependency edge. */
+      const waiting = dependents.get(provider) ?? []
+      waiting.push(record)
+      dependents.set(provider, waiting)
+    }
+    pending.set(record, count)
+    if (count === 0) {
+      levels.set(record, 0)
+      queue.push(record)
+    }
+  }
+  for (let cursor = 0; cursor < queue.length; cursor++) {
+    /** FIFO work guarantees that a name's first admitted record has its earliest wave. */
+    const record = queue[cursor]!
+    /** Later duplicate records do not announce the same provider a second time. */
+    const name = record.snapshot.name
+    if (readyNames.has(name)) continue
+    readyNames.add(name)
+    for (const dependent of dependents.get(name) ?? []) {
+      /** All present providers of this record contribute to its final wave. */
+      const nextLevel = Math.max(candidates.get(dependent) ?? 0, levels.get(record)! + 1)
+      candidates.set(dependent, nextLevel)
+      /** Release exactly this adjacency entry. */
+      const remaining = pending.get(dependent)! - 1
+      pending.set(dependent, remaining)
+      if (remaining === 0) {
+        levels.set(dependent, nextLevel)
+        queue.push(dependent)
+      }
+    }
+  }
+  return { levels, readyNames, presentNames }
+}
+
+/** Preserve original per-wave input order with stable buckets instead of repeated global scans. */
+function orderAdmissions(records: readonly IAdmissionRecord[]): IAdmissionRecord[] {
+  /** Every present provider, including optional providers, precedes its consumers. */
+  const { levels, presentNames } = resolveAdmissionLevels(records, false)
+  /** At most one new wave per record, so bucket traversal is linear in record count. */
+  const waves: IAdmissionRecord[][] = []
+  /**
+   * Cyclic remnants retain their original insertion order for the existing missing-provider
+   * fallback.
+   */
+  const remaining: IAdmissionRecord[] = []
+  for (const record of records) {
+    /** A missing level identifies a record still blocked by a present dependency cycle. */
+    const level = levels.get(record)
+    if (level === undefined) remaining.push(record)
+    else (waves[level] ??= []).push(record)
+  }
+  /** Flattening walks each record once and retains original ordering inside a wave. */
+  const ordered = waves.flat()
+  if (remaining.length > 0) {
+    if (
+      !remaining.some((record) =>
+        record.snapshot.dependencies.some(
+          ({ provider, required }) => required && !presentNames.has(provider)
+        )
+      )
+    )
       throw createTrayError(TrayErrorCode.invalidEntry)
-    }
-    for (const record of ready) {
-      remaining.delete(record)
-      ordered.push(record)
-    }
+    ordered.push(...remaining)
   }
   return ordered
 }
 
-/** Selects only definitions whose complete required-provider closure is initially present. */
+/** Select definitions whose complete required-provider closure is present, in original input order. */
 function computeReadyAdmissions(records: readonly IAdmissionRecord[]): IAdmissionRecord[] {
-  const names = new Set(records.map((record) => record.snapshot.name))
-  const ready = new Set<string>()
-  let changed = true
-  while (changed) {
-    changed = false
-    for (const record of records) {
-      if (
-        !ready.has(record.snapshot.name) &&
-        record.snapshot.dependencies.every(
-          ({ provider, required }) => !required || (names.has(provider) && ready.has(provider))
-        )
-      ) {
-        ready.add(record.snapshot.name)
-        changed = true
-      }
-    }
-  }
-  return records.filter((record) => ready.has(record.snapshot.name))
+  /** Optional dependencies do not block this initial-ready projection. */
+  const { readyNames } = resolveAdmissionLevels(records, true)
+  return records.filter((record) => readyNames.has(record.snapshot.name))
 }
 
-/** Builds the managed facade over the Graph and exactly one concrete Host view. */
-function createManagedHost(
-  concrete: IAnyHost,
-  graph: IGraph,
-  options: ICreateHostOptions<IAnyHost, readonly IPluginBinding[]>,
-  readSnapshot: () => IAnySnapshot,
-  writeSnapshot: (snapshot: IAnySnapshot) => void,
-  assertOwned: () => void,
-  session: object,
-  cleanup: ICleanupAccumulator,
-  anchorName: string,
-  readExpectedRevision: () => number,
-  activeRuntimeNames: ReadonlyMap<string, number>,
-  waitForRuntimeQuiescence: () => Promise<void>
-): ITrayHost<IAnyHost, readonly IPluginBinding[], readonly IPluginBinding[]> {
-  /** 该会话的托管协议出口；宿主已由调用方判定为登记过的托管宿主。 */
-  const composition = openComposition(concrete as object)
-  let state: ITrayHostState = TrayHostState.active
-  let terminalError: unknown
-  let disposal: Promise<ITrayHostDisposalResult> | undefined
-  /** Managed reads fail closed while Host and Graph publication receipts are converging. */
-  let publicationPending = false
-  const hub = createEventHub<ITrayHostEventMap>({
-    report: ({ error }) => {
-      try {
-        options.report?.(error)
-      } catch {
-        // Observer reporting is best effort and cannot alter a settled mutation.
-      }
-    }
-  })
-  const facade = {
-    get plugins() {
-      assertReadable()
-      return Object.freeze([...graph.nodes].map(String))
-    },
-    get readyPlugins() {
-      assertReadable()
-      return Object.freeze(
-        [...graph.nodes]
-          .filter((id) => graph.nodeState(id).state === CapabilityGraphNodeState.ready)
-          .map(String)
-      )
-    },
-    get state() {
-      return state
-    },
-    get isActive() {
-      return state === TrayHostState.active
-    },
-    get error() {
-      return terminalError
-    },
-    get extensions() {
-      assertReadable()
-      return readSnapshot().extensions
-    },
-    get config() {
-      assertReadable()
-      const config = readSnapshot().config
-      return {
-        get: (path: string) => config.get(path),
-        update: async (
-          name: string,
-          recipe: (previous: Readonly<Record<string, unknown>>) => Record<string, unknown>
-        ) => {
-          await config.update(name, recipe as never)
-          writeSnapshot(readSnapshot())
-        }
-      }
-    },
-    pluginState(name: string) {
-      assertReadable()
-      try {
-        return graph.nodeState(name as IGraphId).state
-      } catch {
-        return CapabilityGraphNodeState.blocked
-      }
-    },
-    on<TKey extends keyof ITrayHostEventMap>(
-      type: TKey,
-      listener: (event: IEventContext<ITrayHostEventMap[TKey]>) => void | PromiseLike<void>
-    ): IUnsubscribe {
-      return hub.subscribe(type, listener as never)
-    },
-    async use(
-      plugin: IPluginBinding
-    ): Promise<ITrayPluginMutationResult<unknown, unknown, unknown>> {
-      assertActive()
-      assertOwned()
-      /** Validate and capture before entering the graph mutation result channel. */
-      const { snapshot, admission } = admitTrayPlugin(plugin, composition)
-      const name = snapshot.name
-      const existedBefore = graph.nodes.some((id) => String(id) === name)
-      let candidate: IAdmissionRecord | undefined
-      try {
-        resetCleanup()
-        candidate = createAdmissionRecord(plugin, snapshot, admission)
-        publicationPending = true
-        const result = await graph.register(toGraphNode(candidate), candidate)
-        publicationPending = false
-        const output = mutationResult(
-          'use',
-          name,
-          result.affected.map(String),
-          result.topologyChanged,
-          facade,
-          cleanup
-        )
-        hub.publish('use', output as never)
-        hub.publish('registered', output as never)
-        return output
-      } catch (error) {
-        publicationPending = false
-        const committed =
-          candidate !== undefined &&
-          !existedBefore &&
-          graph.getBinding(name as IGraphId) === candidate
-        if (candidate && !committed) {
-          composition!.retireDataOrderSlot(candidate.slot)
-          await candidate.artifactCustody?.rollback()
-        }
-        const failure = mutationFailure('use', name, error, facade, committed)
-        hub.publish('mutationFailed', {
-          operation: 'use',
-          name,
-          error: failure.error
-        })
-        return failure
-      }
-    },
-    async unUse(name: string): Promise<ITrayPluginRemovalResult<unknown, unknown>> {
-      assertActive()
-      assertOwned()
-      const runtimeBridge = readRuntimeBridge(facade)
-      try {
-        runtimeBridge?.assertMutationAllowed?.(name)
-      } catch (error) {
-        const failure = removalFailure(name, error, facade)
-        hub.publish('mutationFailed', { operation: 'unUse', name, error: failure.error })
-        return failure
-      }
-      if (!graph.nodes.some((id) => String(id) === name)) return removalMissing(name, facade)
-      const target = graph.getBinding<IAdmissionRecord>(name as IGraphId)
-      try {
-        resetCleanup()
-        publicationPending = true
-        const result = await graph.remove(name as IGraphId)
-        publicationPending = false
-        if (target) composition!.retireDataOrderSlot(target.slot)
-        const output = removalResult(name, result.affected.map(String), facade, cleanup)
-        hub.publish('unUse', output as never)
-        hub.publish('removed', output as never)
-        return output
-      } catch (error) {
-        publicationPending = false
-        const committed = !graph.nodes.some((id) => String(id) === name)
-        const failure = removalFailure(name, error, facade, committed)
-        hub.publish('mutationFailed', { operation: 'unUse', name, error: failure.error })
-        return failure
-      }
-    },
-    async replace(
-      plugin: IPluginBinding
-    ): Promise<ITrayPluginMutationResult<unknown, unknown, unknown>> {
-      assertActive()
-      assertOwned()
-      /** Invalid replacements reject while their existing generation still serves. */
-      const { snapshot, admission } = admitTrayPlugin(plugin, composition)
-      const name = snapshot.name
-      const runtimeBridge = readRuntimeBridge(facade)
-      try {
-        runtimeBridge?.assertMutationAllowed?.(name)
-      } catch (error) {
-        const failure = mutationFailure('replace', name, error, facade)
-        hub.publish('mutationFailed', { operation: 'replace', name, error: failure.error })
-        return failure
-      }
-      const previous = graph.getBinding<IAdmissionRecord>(name as IGraphId)
-      let candidate: IAdmissionRecord | undefined
-      try {
-        resetCleanup()
-        candidate = createAdmissionRecord(plugin, snapshot, admission, previous?.slot)
-        publicationPending = true
-        const result = await graph.replace(toGraphNode(candidate), candidate)
-        publicationPending = false
-        const output = mutationResult(
-          'replace',
-          name,
-          result.affected.map(String),
-          result.topologyChanged,
-          facade,
-          cleanup
-        )
-        hub.publish('replace', output as never)
-        hub.publish('replaced', output as never)
-        return output
-      } catch (error) {
-        publicationPending = false
-        const committed =
-          candidate !== undefined && graph.getBinding(name as IGraphId) === candidate
-        const failure = mutationFailure('replace', name, error, facade, committed)
-        hub.publish('mutationFailed', {
-          operation: 'replace',
-          name,
-          error: failure.error
-        })
-        return failure
-      }
-    },
-    dispose(): Promise<ITrayHostDisposalResult> {
-      if (disposal) return disposal
-      state = TrayHostState.closing
-      // Publish completion identity before invoking any reentrant disposing observer.
-      disposal = Promise.resolve().then(async () => {
-        const cleanupErrors: unknown[] = []
-        const physical: Promise<ITrayPluginPhysicalCleanupResult>[] = []
+/** Immutable references lent to one managed session; each resource retains its canonical owner. */
+type IManagedTrayHostContext = {
+  readonly concrete: IAnyHost
+  readonly graph: IGraph
+  readonly options: ICreateHostOptions<IAnyHost, readonly IPluginBinding[]>
+  readonly readSnapshot: () => IAnySnapshot
+  readonly writeSnapshot: (snapshot: IAnySnapshot) => void
+  readonly assertOwned: () => void
+  readonly cleanup: ICleanupAccumulator
+  readonly anchorName: string
+  readonly readExpectedRevision: () => number
+  readonly activeRuntimeNames: ReadonlyMap<string, number>
+  readonly waitForRuntimeQuiescence: () => Promise<void>
+}
+
+/** One managed Host owns publication state, mutation admission and its cached disposal receipt. */
+class ManagedTrayHost {
+  /** References point to the same concrete Host, Graph and startup session. */
+  #context: IManagedTrayHostContext
+  /** The original concrete Host alone owns plugin installation and data slots. */
+  #composition: IPluginHostCompositionIntegration<object>
+  /** Managed mutation admission stops synchronously when disposal starts. */
+  #state: ITrayHostState = TrayHostState.active
+  /** Terminal failure remains available without replacing its identity. */
+  #terminalError: unknown
+  /** Reentrant disposal observers receive this exact shared promise. */
+  #disposal: Promise<ITrayHostDisposalResult> | undefined
+  /** Reads fail closed while Host and Graph generations converge. */
+  #publicationPending = false
+  /** One event hub publishes settled mutation and disposal outcomes. */
+  #hub: ReturnType<typeof createEventHub<ITrayHostEventMap>>
+
+  /** Borrow canonical owners after startup has acquired its sole managed claim. */
+  constructor(context: IManagedTrayHostContext) {
+    this.#context = context
+    this.#composition = openComposition(context.concrete as object)
+    this.#hub = createEventHub<ITrayHostEventMap>({
+      report: ({ error }) => {
         try {
-          resetCleanup()
-          /** Defers concrete Host disposal so active Runtime callbacks retain physical custody. */
-          const deferConcreteDisposal = async (): Promise<boolean> => {
-            if (activeRuntimeNames.size === 0) return false
-            const runtimeFence = waitForRuntimeQuiescence()
-            const bounded = await settleWithin(runtimeFence, options.quiescenceMs)
-            if (bounded.complete) return false
-            cleanup.complete = false
-            const delayed = runtimeFence.then(
-              () => concrete!.dispose() as Promise<IPluginHostDisposalResult>
-            )
-            physical.push(mergeCleanupResults([delayed]))
-            return true
-          }
-          const externallyMutated = composition!.revision !== readExpectedRevision()
-          if (externallyMutated) {
-            await graph.dispose()
-            cleanupErrors.push(...cleanup.errors)
-            physical.push(...cleanup.physical)
-            if (await deferConcreteDisposal()) {
-              state = TrayHostState.terminal
-              claims.delete(concrete as object)
-              hub.publish('disposed', { state: 'terminal', cleanupComplete: false })
-              return {
-                state: 'terminal' as const,
-                termination: 'external-host' as const,
-                cleanupComplete: false,
-                cleanupErrors: Object.freeze(cleanupErrors),
-                physicalCompletion: mergeCleanupResults(physical)
-              }
-            }
-            const externalResult = (await concrete.dispose()) as IPluginHostDisposalResult
-            cleanupErrors.push(...externalResult.cleanupErrors)
-            if (externalResult.physicalCompletion)
-              physical.push(mergeCleanupResults([externalResult.physicalCompletion]))
-            state = TrayHostState.terminal
-            claims.delete(concrete as object)
-            const cleanupComplete =
-              cleanup.complete && externalResult.cleanupComplete && physical.length === 0
-            hub.publish('disposed', {
-              state: 'terminal',
-              cleanupComplete
-            })
-            return {
-              state: 'terminal' as const,
-              termination: 'external-host' as const,
-              cleanupComplete,
-              cleanupErrors: Object.freeze(cleanupErrors),
-              ...(physical.length > 0 ? { physicalCompletion: mergeCleanupResults(physical) } : {})
-            }
-          }
-          await graph.dispose()
-          cleanupErrors.push(...cleanup.errors)
-          physical.push(...cleanup.physical)
-          const anchorRemoval = await concrete.unUse(anchorName)
-          if ('ok' in anchorRemoval && !anchorRemoval.ok)
-            cleanupErrors.push(...anchorRemoval.errors)
-          if (await deferConcreteDisposal()) {
-            state = TrayHostState.terminal
-            claims.delete(concrete as object)
-            hub.publish('disposed', { state: 'terminal', cleanupComplete: false })
-            return {
-              state: 'terminal' as const,
-              termination: 'managed' as const,
-              cleanupComplete: false,
-              cleanupErrors: Object.freeze(cleanupErrors),
-              physicalCompletion: mergeCleanupResults(physical)
-            }
-          }
-          const result = (await concrete.dispose()) as IPluginHostDisposalResult
-          cleanupErrors.push(...result.cleanupErrors)
-          if (result.physicalCompletion)
-            physical.push(mergeCleanupResults([result.physicalCompletion]))
-          const cleanupComplete =
-            cleanup.complete && result.cleanupComplete && physical.length === 0
-          state = TrayHostState.terminal
-          claims.delete(concrete as object)
-          hub.publish('disposed', {
-            state: 'terminal',
-            cleanupComplete
-          })
-          return {
-            state: 'terminal' as const,
-            termination: 'managed' as const,
-            cleanupComplete,
-            cleanupErrors: Object.freeze(cleanupErrors),
-            ...(physical.length > 0 ? { physicalCompletion: mergeCleanupResults(physical) } : {})
-          }
-        } catch (error) {
-          state = TrayHostState.failed
-          terminalError = error
-          hub.publish('disposed', { state: 'terminal', cleanupComplete: false })
-          return {
-            state: 'terminal' as const,
-            termination: 'managed' as const,
-            cleanupComplete: false,
-            cleanupErrors: Object.freeze([error]),
-            error: error instanceof Error ? error : undefined
-          }
+          context.options.report?.(error)
+        } catch {
+          /* Reporting cannot alter a settled mutation. */
         }
-      })
-      hub.publish('disposing', { state: 'closing' })
-      return disposal
-    },
-    [asyncDisposeKey]() {
-      return facade.dispose().then(() => undefined)
+      }
+    })
+  }
+
+  /** Read the currently owned graph names only after publication converges. */
+  get plugins() {
+    this.#assertReadable()
+    return Object.freeze([...this.#context.graph.nodes].map(String))
+  }
+  /** Project only graph nodes in the canonical ready state. */
+  get readyPlugins() {
+    this.#assertReadable()
+    return Object.freeze(
+      [...this.#context.graph.nodes]
+        .filter((id) => this.#context.graph.nodeState(id).state === CapabilityGraphNodeState.ready)
+        .map(String)
+    )
+  }
+  /** Expose managed admission state without granting mutation authority. */
+  get state() {
+    return this.#state
+  }
+  /** Report whether managed mutations may still be admitted. */
+  get isActive() {
+    return this.#state === TrayHostState.active
+  }
+  /** Retain the original terminal failure for diagnostic callers. */
+  get error() {
+    return this.#terminalError
+  }
+  /** Expose extensions from the exact current composition snapshot. */
+  get extensions() {
+    this.#assertReadable()
+    return this.#context.readSnapshot().extensions
+  }
+  /** Lend the current config projection while publishing its next composition revision after writes. */
+  get config() {
+    this.#assertReadable()
+    const config = this.#context.readSnapshot().config
+    return {
+      get: (path: string) => config.get(path),
+      update: async (
+        name: string,
+        recipe: (previous: Readonly<Record<string, unknown>>) => Record<string, unknown>
+      ) => {
+        await config.update(name, recipe as never)
+        this.#context.writeSnapshot(this.#context.readSnapshot())
+      }
     }
   }
-  void session
-  return facade as never
-
-  function assertActive(): void {
-    if (state !== TrayHostState.active) throw createTrayError(TrayErrorCode.unavailable)
+  /** Map canonical graph state to the existing absent-node blocked result. */
+  pluginState = (name: string) => {
+    this.#assertReadable()
+    try {
+      return this.#context.graph.nodeState(name as IGraphId).state
+    } catch {
+      return CapabilityGraphNodeState.blocked
+    }
+  }
+  /** Subscribe through the one managed event hub, preserving listener settlement. */
+  on = <TKey extends keyof ITrayHostEventMap>(
+    type: TKey,
+    listener: (event: IEventContext<ITrayHostEventMap[TKey]>) => void | PromiseLike<void>
+  ): IUnsubscribe => {
+    return this.#hub.subscribe(type, listener as never)
+  }
+  /** Register one canonical admission and publish only its settled graph outcome. */
+  use = async (
+    plugin: IPluginBinding
+  ): Promise<ITrayPluginMutationResult<unknown, unknown, unknown>> => {
+    this.#assertActive()
+    this.#context.assertOwned()
+    /** Validate and capture before entering the graph mutation result channel. */
+    const { snapshot, admission } = admitTrayPlugin(plugin, this.#composition)
+    const name = snapshot.name
+    const existedBefore = this.#context.graph.nodes.some((id) => String(id) === name)
+    let candidate: IAdmissionRecord | undefined
+    try {
+      this.#resetCleanup()
+      candidate = this.#createAdmissionRecord(plugin, snapshot, admission)
+      this.#publicationPending = true
+      const result = await this.#context.graph.register(toGraphNode(candidate), candidate)
+      this.#publicationPending = false
+      const output = mutationResult(
+        'use',
+        name,
+        result.affected.map(String),
+        result.topologyChanged,
+        this,
+        this.#context.cleanup
+      )
+      this.#hub.publish('use', output as never)
+      this.#hub.publish('registered', output as never)
+      return output
+    } catch (error) {
+      this.#publicationPending = false
+      const committed =
+        candidate !== undefined &&
+        !existedBefore &&
+        this.#context.graph.getBinding(name as IGraphId) === candidate
+      if (candidate && !committed) {
+        this.#composition!.retireDataOrderSlot(candidate.slot)
+        await candidate.artifactCustody?.rollback()
+      }
+      const failure = mutationFailure('use', name, error, this, committed)
+      this.#hub.publish('mutationFailed', {
+        operation: 'use',
+        name,
+        error: failure.error
+      })
+      return failure
+    }
+  }
+  /** Remove one exact generation after enforcing Runtime reentrancy and ownership fences. */
+  unUse = async (name: string): Promise<ITrayPluginRemovalResult<unknown, unknown>> => {
+    this.#assertActive()
+    this.#context.assertOwned()
+    const runtimeBridge = readRuntimeBridge(this)
+    try {
+      runtimeBridge?.assertMutationAllowed?.(name)
+    } catch (error) {
+      const failure = removalFailure(name, error, this)
+      this.#hub.publish('mutationFailed', { operation: 'unUse', name, error: failure.error })
+      return failure
+    }
+    if (!this.#context.graph.nodes.some((id) => String(id) === name))
+      return removalMissing(name, this)
+    const target = this.#context.graph.getBinding<IAdmissionRecord>(name as IGraphId)
+    try {
+      this.#resetCleanup()
+      this.#publicationPending = true
+      const result = await this.#context.graph.remove(name as IGraphId)
+      this.#publicationPending = false
+      if (target) this.#composition!.retireDataOrderSlot(target.slot)
+      const output = removalResult(name, result.affected.map(String), this, this.#context.cleanup)
+      this.#hub.publish('unUse', output as never)
+      this.#hub.publish('removed', output as never)
+      return output
+    } catch (error) {
+      this.#publicationPending = false
+      const committed = !this.#context.graph.nodes.some((id) => String(id) === name)
+      const failure = removalFailure(name, error, this, committed)
+      this.#hub.publish('mutationFailed', { operation: 'unUse', name, error: failure.error })
+      return failure
+    }
+  }
+  /** Replace a captured admission without weakening the existing generation on admission failure. */
+  replace = async (
+    plugin: IPluginBinding
+  ): Promise<ITrayPluginMutationResult<unknown, unknown, unknown>> => {
+    this.#assertActive()
+    this.#context.assertOwned()
+    /** Invalid replacements reject while their existing generation still serves. */
+    const { snapshot, admission } = admitTrayPlugin(plugin, this.#composition)
+    const name = snapshot.name
+    const runtimeBridge = readRuntimeBridge(this)
+    try {
+      runtimeBridge?.assertMutationAllowed?.(name)
+    } catch (error) {
+      const failure = mutationFailure('replace', name, error, this)
+      this.#hub.publish('mutationFailed', { operation: 'replace', name, error: failure.error })
+      return failure
+    }
+    const previous = this.#context.graph.getBinding<IAdmissionRecord>(name as IGraphId)
+    let candidate: IAdmissionRecord | undefined
+    try {
+      this.#resetCleanup()
+      candidate = this.#createAdmissionRecord(plugin, snapshot, admission, previous?.slot)
+      this.#publicationPending = true
+      const result = await this.#context.graph.replace(toGraphNode(candidate), candidate)
+      this.#publicationPending = false
+      const output = mutationResult(
+        'replace',
+        name,
+        result.affected.map(String),
+        result.topologyChanged,
+        this,
+        this.#context.cleanup
+      )
+      this.#hub.publish('replace', output as never)
+      this.#hub.publish('replaced', output as never)
+      return output
+    } catch (error) {
+      this.#publicationPending = false
+      const committed =
+        candidate !== undefined && this.#context.graph.getBinding(name as IGraphId) === candidate
+      const failure = mutationFailure('replace', name, error, this, committed)
+      this.#hub.publish('mutationFailed', {
+        operation: 'replace',
+        name,
+        error: failure.error
+      })
+      return failure
+    }
+  }
+  /** Publish one disposal receipt before any reentrant observer can request disposal again. */
+  dispose = (): Promise<ITrayHostDisposalResult> => {
+    if (this.#disposal) return this.#disposal
+    this.#state = TrayHostState.closing
+    // Publish completion identity before invoking any reentrant disposing observer.
+    this.#disposal = Promise.resolve().then(this.#disposeOnce)
+    this.#hub.publish('disposing', { state: 'closing' })
+    return this.#disposal
+  };
+  /** Join the same canonical disposal receipt for asynchronous using. */
+  [asyncDisposeKey] = () => {
+    return this.dispose().then(() => undefined)
+  }
+  /** Reject mutations after terminal admission has begun. */
+  #assertActive(): void {
+    if (this.#state !== TrayHostState.active) throw createTrayError(TrayErrorCode.unavailable)
   }
 
   /** Rejects observations that could otherwise combine different Host and Graph generations. */
-  function assertReadable(): void {
-    if (publicationPending) throw createTrayError(TrayErrorCode.unavailable)
-    assertOwned()
+  #assertReadable(): void {
+    if (this.#publicationPending) throw createTrayError(TrayErrorCode.unavailable)
+    this.#context.assertOwned()
   }
 
   /** Resets one transaction's cleanup observation before Graph reconciliation starts. */
-  function resetCleanup(): void {
-    cleanup.errors = []
-    cleanup.complete = true
-    cleanup.physical = []
+  #resetCleanup(): void {
+    this.#context.cleanup.errors = []
+    this.#context.cleanup.complete = true
+    this.#context.cleanup.physical = []
   }
 
   /** Captures one managed descriptor and its Host-owned admission handles. */
-  function createAdmissionRecord(
+  #createAdmissionRecord(
     plugin: IPluginBinding,
     snapshot: IPluginSnapshot,
     admission: IPluginAdmission<IPluginConstraint<any>>,
@@ -863,10 +916,116 @@ function createManagedHost(
       plugin,
       snapshot,
       admission,
-      slot: slot ?? composition!.createDataOrderSlot(snapshot.name),
+      slot: slot ?? this.#composition!.createDataOrderSlot(snapshot.name),
       artifactCustody: claimArtifactCustody(plugin as object)
     }
     return record
+  }
+  /** Dispose graph and concrete resources while retaining primary cleanup ordering. */
+  #disposeOnce = async (): Promise<ITrayHostDisposalResult> => {
+    const cleanupErrors: unknown[] = []
+    const physical: Promise<ITrayPluginPhysicalCleanupResult>[] = []
+    try {
+      this.#resetCleanup()
+      const externallyMutated = this.#composition!.revision !== this.#context.readExpectedRevision()
+      if (externallyMutated) {
+        await this.#context.graph.dispose()
+        cleanupErrors.push(...this.#context.cleanup.errors)
+        physical.push(...this.#context.cleanup.physical)
+        if (await this.#deferConcreteDisposal(physical)) {
+          this.#state = TrayHostState.terminal
+          claims.delete(this.#context.concrete as object)
+          this.#hub.publish('disposed', { state: 'terminal', cleanupComplete: false })
+          return {
+            state: 'terminal' as const,
+            termination: 'external-host' as const,
+            cleanupComplete: false,
+            cleanupErrors: Object.freeze(cleanupErrors),
+            physicalCompletion: mergeCleanupResults(physical)
+          }
+        }
+        const externalResult = (await this.#context.concrete.dispose()) as IPluginHostDisposalResult
+        cleanupErrors.push(...externalResult.cleanupErrors)
+        if (externalResult.physicalCompletion)
+          physical.push(mergeCleanupResults([externalResult.physicalCompletion]))
+        this.#state = TrayHostState.terminal
+        claims.delete(this.#context.concrete as object)
+        const cleanupComplete =
+          this.#context.cleanup.complete && externalResult.cleanupComplete && physical.length === 0
+        this.#hub.publish('disposed', {
+          state: 'terminal',
+          cleanupComplete
+        })
+        return {
+          state: 'terminal' as const,
+          termination: 'external-host' as const,
+          cleanupComplete,
+          cleanupErrors: Object.freeze(cleanupErrors),
+          ...(physical.length > 0 ? { physicalCompletion: mergeCleanupResults(physical) } : {})
+        }
+      }
+      await this.#context.graph.dispose()
+      cleanupErrors.push(...this.#context.cleanup.errors)
+      physical.push(...this.#context.cleanup.physical)
+      const anchorRemoval = await this.#context.concrete.unUse(this.#context.anchorName)
+      if ('ok' in anchorRemoval && !anchorRemoval.ok) cleanupErrors.push(...anchorRemoval.errors)
+      if (await this.#deferConcreteDisposal(physical)) {
+        this.#state = TrayHostState.terminal
+        claims.delete(this.#context.concrete as object)
+        this.#hub.publish('disposed', { state: 'terminal', cleanupComplete: false })
+        return {
+          state: 'terminal' as const,
+          termination: 'managed' as const,
+          cleanupComplete: false,
+          cleanupErrors: Object.freeze(cleanupErrors),
+          physicalCompletion: mergeCleanupResults(physical)
+        }
+      }
+      const result = (await this.#context.concrete.dispose()) as IPluginHostDisposalResult
+      cleanupErrors.push(...result.cleanupErrors)
+      if (result.physicalCompletion) physical.push(mergeCleanupResults([result.physicalCompletion]))
+      const cleanupComplete =
+        this.#context.cleanup.complete && result.cleanupComplete && physical.length === 0
+      this.#state = TrayHostState.terminal
+      claims.delete(this.#context.concrete as object)
+      this.#hub.publish('disposed', {
+        state: 'terminal',
+        cleanupComplete
+      })
+      return {
+        state: 'terminal' as const,
+        termination: 'managed' as const,
+        cleanupComplete,
+        cleanupErrors: Object.freeze(cleanupErrors),
+        ...(physical.length > 0 ? { physicalCompletion: mergeCleanupResults(physical) } : {})
+      }
+    } catch (error) {
+      this.#state = TrayHostState.failed
+      this.#terminalError = error
+      this.#hub.publish('disposed', { state: 'terminal', cleanupComplete: false })
+      return {
+        state: 'terminal' as const,
+        termination: 'managed' as const,
+        cleanupComplete: false,
+        cleanupErrors: Object.freeze([error]),
+        error: error instanceof Error ? error : undefined
+      }
+    }
+  }
+  /** Defers concrete Host disposal so active Runtime callbacks retain physical custody. */
+  #deferConcreteDisposal = async (
+    physical: Promise<ITrayPluginPhysicalCleanupResult>[]
+  ): Promise<boolean> => {
+    if (this.#context.activeRuntimeNames.size === 0) return false
+    const runtimeFence = this.#context.waitForRuntimeQuiescence()
+    const bounded = await settleWithin(runtimeFence, this.#context.options.quiescenceMs)
+    if (bounded.complete) return false
+    this.#context.cleanup.complete = false
+    const delayed = runtimeFence.then(
+      () => this.#context.concrete!.dispose() as Promise<IPluginHostDisposalResult>
+    )
+    physical.push(mergeCleanupResults([delayed]))
+    return true
   }
 }
 

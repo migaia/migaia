@@ -19,7 +19,7 @@ import { type IRuntimeEvent } from '@migaia/rpc-host/plugin'
 import {
   createNodeProcessLauncher,
   type INodeProcessHandle
-} from '@migaia/rpc-plugin-process/adapters/node-child-process'
+} from '../../dist/process/adapters/node-child-process.js'
 import { runtimeTestHost } from '../../../rpc-host/test/runtime-api/public-host.js'
 
 /** An absolute TypeScript entry works with Node's native type stripping and no fixture loader. */

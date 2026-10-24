@@ -1,9 +1,9 @@
+import { createRuntimeEndpointComposition } from '../../../rpc-host/dist/core/runtime-api-endpoint.js'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { describe, expect, it, vi } from 'vitest'
 import { normalizeRpcEnvelope, RpcRouteProfile, RpcStreamEvent } from '@migaia/rpc-contract'
-import { createMemoryTransportPair } from '../../../rpc-host/dist/core/adapters/memory.js'
-import { createComposedEndpoint } from '../../../rpc-host/dist/core/composed.js'
-import { createClientEndpoint } from '../../../rpc-host/dist/core/client.js'
+import { createMemoryTransportPair } from '../../../rpc-host/test/fixtures/memory-transport.js'
+
 import { createEndpointKernel } from '../../../rpc-host/dist/core/endpoint-kernel.js'
 import { prepareEndpoint } from '../../../rpc-host/dist/core/internal/endpoint-bootstrap.js'
 import { RpcOutboundAttachment } from '../../../rpc-host/dist/core/internal/outbound-attachment.js'
@@ -11,7 +11,7 @@ import { RpcOutboundSender } from '../../../rpc-host/dist/core/internal/outbound
 import { RpcPortName } from '../../../rpc-host/dist/core/internal/plugin-shared-keys.js'
 import { connect } from '../../../rpc-host/dist/core/middleware/connect.js'
 import { abort } from '../../../rpc-host/dist/core/middleware/abort.js'
-import { createFirstPartyRoots } from '../../../rpc-host/dist/core/internal/first-party-roots.js'
+
 import {
   installOutboundGate,
   registerOutboundGate,
@@ -218,15 +218,15 @@ describe('IPC send queue contract', () => {
       maxPendingData: 3
     })
     const wrapped = queue.createIpcSendQueueTransport(slow, endpointInstallation.gate)
-    const endpoint = await createComposedEndpoint(
+    const endpoint = await createRuntimeEndpointComposition(
       {
         id: 'client',
         transport: wrapped,
         middlewares: [connect({ transport: wrapped })],
         features: [endpointInstallation.feature] as const
       },
-      createFirstPartyRoots(new Set(['first-party-outbound']))
-    )
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     try {
       const calls = [0, 1, 2, 3].map(() =>
         endpoint.send('server', 'test', null, { timeoutMs: false }).catch((error: unknown) => error)
@@ -253,10 +253,10 @@ describe('IPC send queue contract', () => {
         throw new Error('must not inspect ad hoc gate')
       }
     })
-    const ordinary = await createComposedEndpoint(
+    const ordinary = await createRuntimeEndpointComposition(
       { id: 'ordinary', transport: plain, middlewares: [connect({ transport: plain })] },
-      createFirstPartyRoots(new Set(['first-party-outbound']))
-    )
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     await ordinary.dispose()
     expect(touched, 'core reads only the wrapper WeakMap brand').toBe(0)
   })
@@ -382,7 +382,7 @@ describe('IPC send queue contract', () => {
       maxPendingData: 2
     })
     const wrapped = queue.createIpcSendQueueTransport(slow, endpointGate.gate)
-    const endpoint = await createComposedEndpoint(
+    const endpoint = await createRuntimeEndpointComposition(
       {
         id: 'client-budget',
         transport: wrapped,
@@ -391,8 +391,8 @@ describe('IPC send queue contract', () => {
         middlewares: [connect({ transport: wrapped })],
         features: [endpointGate.feature] as const
       },
-      createFirstPartyRoots(new Set(['first-party-outbound']))
-    )
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     try {
       const head = endpoint
         .send('server', 'test', null, { timeoutMs: false })
@@ -677,15 +677,15 @@ describe('IPC send queue contract', () => {
     }
     const installed = queue.createIpcSendQueueFeature({ connectionId: 'no-remote-abort' })
     const wrapper = queue.createIpcSendQueueTransport(slow, installed.gate)
-    const endpoint = await createComposedEndpoint(
+    const endpoint = await createRuntimeEndpointComposition(
       {
         id: 'no-remote-abort',
         transport: wrapper,
         middlewares: [connect({ transport: wrapper }), abort()],
         features: [installed.feature] as const
       },
-      createFirstPartyRoots(new Set(['first-party-outbound']))
-    )
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     try {
       const head = endpoint.send('server', 'test', null, { timeoutMs: false })
       head.catch(() => undefined)
@@ -916,15 +916,15 @@ describe('IPC send queue contract', () => {
     expect(logging.feature, 'log must be a native feature').toBeDefined()
     const [wire] = createMemoryTransportPair()
     const wrapped = queue.createIpcSendQueueTransport(wire, installed.gate)
-    const endpoint = await createComposedEndpoint(
+    const endpoint = await createRuntimeEndpointComposition(
       {
         id: 'a5',
         transport: wrapped,
         middlewares: [connect({ transport: wrapped })],
         features: [installed.feature, logging.feature] as const
       },
-      createFirstPartyRoots(new Set(['first-party-outbound']))
-    )
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     const hooks: unknown[] = []
     endpoint.hooks.on((event) => {
       hooks.push(event)
@@ -1032,15 +1032,15 @@ describe('IPC send queue contract', () => {
       onReportError: () => undefined
     })
     const [transport] = createMemoryTransportPair()
-    const endpoint = await createComposedEndpoint(
+    const endpoint = await createRuntimeEndpointComposition(
       {
         id: 'fixture-disposal',
         transport,
         middlewares: [connect({ transport })],
         features: [logging.feature] as const
       },
-      createFirstPartyRoots(new Set(['first-party-outbound']))
-    )
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     expect(gate.onEvent).toHaveBeenCalledTimes(1)
     await endpoint.dispose()
     expect(unsubscribe, 'log Feature releases its gate listener').toHaveBeenCalledTimes(1)
@@ -1068,12 +1068,15 @@ describe('IPC send queue contract', () => {
     })
     const [physical] = createMemoryTransportPair()
     const wrapper = queue.createIpcSendQueueTransport(physical, installation.gate)
-    const endpoint = await createClientEndpoint({
-      id: 'fixture-reentry',
-      transport: wrapper,
-      middlewares: [connect({ transport: wrapper })],
-      features: [installation.feature, logging.feature] as const
-    })
+    const endpoint = await createRuntimeEndpointComposition(
+      {
+        id: 'fixture-reentry',
+        transport: wrapper,
+        middlewares: [connect({ transport: wrapper })],
+        features: [installation.feature, logging.feature] as const
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     try {
       const blocked = deferredWrite()
       const active = installation.gate.run(request('active'), () => blocked.promise)
@@ -1110,12 +1113,15 @@ describe('IPC send queue contract', () => {
       maxPendingControl: 1
     })
     const wrapper = queue.createIpcSendQueueTransport(slow, installed.gate)
-    const endpoint = await createClientEndpoint({
-      id: 'fixture-capacity',
-      transport: wrapper,
-      middlewares: [connect({ transport: wrapper }), abort()],
-      features: [installed.feature] as const
-    })
+    const endpoint = await createRuntimeEndpointComposition(
+      {
+        id: 'fixture-capacity',
+        transport: wrapper,
+        middlewares: [connect({ transport: wrapper }), abort()],
+        features: [installed.feature] as const
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     const failures: unknown[] = []
     endpoint.hooks.on((event) => {
       if (event.name === 'failure') failures.push(event)
@@ -1162,59 +1168,59 @@ describe('IPC send queue contract', () => {
       () => queue.createIpcSendQueueTransport(transport, installed.gate),
       'one physical connection cannot be wrapped twice'
     ).toThrowError(TypeError)
-    const missingFeature = createComposedEndpoint(
+    const missingFeature = createRuntimeEndpointComposition(
       { id: 'a6', transport: wrapped, middlewares: [connect({ transport: wrapped })] },
-      createFirstPartyRoots(new Set(['first-party-outbound']))
-    )
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     await expect(missingFeature).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
     await expect(missingFeature).rejects.toBeInstanceOf(TypeError)
     const [plain] = createMemoryTransportPair()
     await expect(
-      createComposedEndpoint(
+      createRuntimeEndpointComposition(
         {
           id: 'fixture-bare',
           transport: plain,
           middlewares: [connect({ transport: plain })],
           features: [installed.feature] as const
         },
-        createFirstPartyRoots(new Set(['first-party-outbound']))
-      )
+        { agreement: { capabilities: [] }, peerId: '' }
+      ).installing
     ).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
     const other = queue.createIpcSendQueueFeature({ connectionId: 'fixture-other' })
     await expect(
-      createComposedEndpoint(
+      createRuntimeEndpointComposition(
         {
           id: 'fixture-mismatch',
           transport: wrapped,
           middlewares: [connect({ transport: wrapped })],
           features: [other.feature] as const
         },
-        createFirstPartyRoots(new Set(['first-party-outbound']))
-      )
+        { agreement: { capabilities: [] }, peerId: '' }
+      ).installing
     ).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
-    const recovered = await createComposedEndpoint(
+    const recovered = await createRuntimeEndpointComposition(
       {
         id: 'fixture-recovered',
         transport: wrapped,
         middlewares: [connect({ transport: wrapped })],
         features: [installed.feature] as const
       },
-      createFirstPartyRoots(new Set(['first-party-outbound']))
-    )
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     await recovered.dispose()
 
     const [secondPhysical] = createMemoryTransportPair()
     const reusable = queue.createIpcSendQueueFeature({ connectionId: 'fixture-physical' })
     const firstWrapper = queue.createIpcSendQueueTransport(secondPhysical, reusable.gate)
     await expect(
-      createComposedEndpoint(
+      createRuntimeEndpointComposition(
         {
           id: 'physical-failed',
           transport: firstWrapper,
           middlewares: [connect({ transport: firstWrapper })]
         },
-        createFirstPartyRoots(new Set(['first-party-outbound']))
-      )
+        { agreement: { capabilities: [] }, peerId: '' }
+      ).installing
     ).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
     const replacement = queue.createIpcSendQueueTransport(secondPhysical, reusable.gate)
     expect(replacement, 'failed construction releases the physical claim').toBeDefined()
@@ -1227,26 +1233,26 @@ describe('IPC send queue contract', () => {
     const early = queue.createIpcSendQueueFeature({ connectionId: 'fixture-early' })
     const earlyWrapper = queue.createIpcSendQueueTransport(earlyPhysical, early.gate)
     await expect(
-      createComposedEndpoint(
+      createRuntimeEndpointComposition(
         {
           id: 'early-failed',
           transport: earlyWrapper,
           middlewares: [connect({ transport: earlyWrapper })],
           features: [{} as never] as const
         },
-        createFirstPartyRoots(new Set(['first-party-outbound']))
-      ),
+        { agreement: { capabilities: [] }, peerId: '' }
+      ).installing,
       'preflight failure must not retain the wrapper claim'
     ).rejects.toBeDefined()
-    const afterPreflight = await createComposedEndpoint(
+    const afterPreflight = await createRuntimeEndpointComposition(
       {
         id: 'after-preflight',
         transport: earlyWrapper,
         middlewares: [connect({ transport: earlyWrapper })],
         features: [early.feature] as const
       },
-      createFirstPartyRoots(new Set(['first-party-outbound']))
-    )
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     await afterPreflight.dispose()
   })
 
@@ -1305,15 +1311,15 @@ describe('IPC send queue contract', () => {
     const [physical] = createMemoryTransportPair()
     const installation = queue.createIpcSendQueueFeature({ connectionId: 'gate-close' })
     const wrapper = queue.createIpcSendQueueTransport(physical, installation.gate)
-    const endpoint = await createComposedEndpoint(
+    const endpoint = await createRuntimeEndpointComposition(
       {
         id: 'gate-close',
         transport: wrapper,
         middlewares: [connect({ transport: wrapper })],
         features: [installation.feature] as const
       },
-      createFirstPartyRoots(new Set(['first-party-outbound']))
-    )
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     await endpoint.dispose()
     await expect(
       installation.gate.run(request('after-dispose'), () => undefined),
@@ -1326,7 +1332,7 @@ describe('IPC send queue contract', () => {
     const log = await logModule()
     expect(queue && log).toBeTruthy()
     if (!queue || !log) return
-    const roots = createFirstPartyRoots(new Set(['first-party-outbound']))
+
     const [firstPhysical] = createMemoryTransportPair()
     const firstSend = vi.fn()
     const firstTransport: IRpcTransport = { ...firstPhysical, send: firstSend }
@@ -1334,15 +1340,15 @@ describe('IPC send queue contract', () => {
     const firstWrapper = queue.createIpcSendQueueTransport(firstTransport, first.gate)
     installOutboundGate(firstWrapper, first.gate)
     await expect(
-      createComposedEndpoint(
+      createRuntimeEndpointComposition(
         {
           id: 'first-1',
           transport: firstWrapper,
           middlewares: [connect({ transport: firstWrapper })],
           features: [first.feature] as const
         },
-        roots
-      ),
+        { agreement: { capabilities: [] }, peerId: '' }
+      ).installing,
       'first Feature installation failure preserves INVALID_CONFIG'
     ).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
     expect(firstSend).not.toHaveBeenCalled()
@@ -1364,15 +1370,15 @@ describe('IPC send queue contract', () => {
       onReportError: () => undefined
     })
     await expect(
-      createComposedEndpoint(
+      createRuntimeEndpointComposition(
         {
           id: 'second-1',
           transport: secondWrapper,
           middlewares: [connect({ transport: secondWrapper })],
           features: [second.feature, brokenLog.feature] as const
         },
-        roots
-      ),
+        { agreement: { capabilities: [] }, peerId: '' }
+      ).installing,
       'second Feature installation failure keeps its original cause'
     ).rejects.toBe(failure)
     expect(secondSend).not.toHaveBeenCalled()
@@ -1399,15 +1405,15 @@ describe('IPC send queue contract', () => {
       onReportError: () => undefined
     })
     installOutboundGate(cleanupWrapper, cleanupQueue.gate)
-    const failed = await createComposedEndpoint(
+    const failed = await createRuntimeEndpointComposition(
       {
         id: 'cleanup-1',
         transport: cleanupWrapper,
         middlewares: [connect({ transport: cleanupWrapper })],
         features: [cleanupLog.feature, cleanupQueue.feature] as const
       },
-      roots
-    ).then(
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing.then(
       () => undefined,
       (error: unknown) => error
     )

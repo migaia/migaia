@@ -1,14 +1,13 @@
 import assert from 'node:assert/strict'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { createThreadPeer } from '../../../../rpc-plugin-thread/test/protocol.ts'
+import { createRuntimePeer } from '../../../../rpc-host/dist/remote/runtime-api/peer.js'
 import {
   createAdapterWebThreadLauncher as createWebThreadLauncher,
   createAdapterWebThreadChannelFactory as createWebThreadChannelFactory
 } from '../../../../rpc-plugin-thread/dist/threads/web-launcher.js'
 
-import { createNodeProcessLauncher } from '@migaia/rpc-plugin-process/adapters/node-child-process'
-import { createDenoProcessLauncher } from '@migaia/rpc-plugin-process/adapters/deno-command'
-import { createProcessPeer } from '../../../../rpc-plugin-process/test/protocol.ts'
+import { createNodeProcessLauncher } from '../../../../rpc-plugin-process/dist/process/adapters/node-child-process.js'
+import { createDenoProcessLauncher } from '../../../../rpc-plugin-process/dist/process/adapters/deno-command.js'
 import { createProcessTransport } from '../../../../rpc-plugin-process/dist/process/handshake.js'
 import { createNativeProcessOffer } from '../../../../rpc-plugin-process/dist/process/offer.js'
 
@@ -25,7 +24,7 @@ let handle
 /** A fixture-only auth token never enters a returned business result. */
 const token = 'c3-cross-runtime-token'
 try {
-  peer = await (mode === 'thread' ? createThreadPeer : createProcessPeer)({
+  peer = await createRuntimePeer({
     self: { name: 'parent', instanceId: 'cross-runtime-parent' },
     provide: {
       parentEcho: () => {

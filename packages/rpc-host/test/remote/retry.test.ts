@@ -2,54 +2,61 @@ import { createManualScheduler } from '@migaia/utils/testing'
 import { describe, expect, it, vi } from 'vitest'
 import { createRemoteRetryPort } from '../../dist/remote/retry.js'
 import type { IRemoteGenerationEvents } from '../../dist/remote/types.js'
-import {
-  RpcCoreErrorCode,
-  RPC_CORE_ERROR_SOURCE,
-  deserializeRpcError
-} from '../../dist/core/index.js'
+import { RpcCoreErrorCode, RPC_CORE_ERROR_SOURCE } from '../../dist/core/errors.js'
+import { deserializeRpcError } from '../../dist/core/internal/error-wire-metadata.js'
 
 /** A controllable generation owner keeps the retry tests independent of transport timing. */
 function generations() {
-  let generation = 1
-  let active = true
-  /** Departures are delivered synchronously, as the real supervisor does. */
-  const listeners = new Map<number, Set<(reason: unknown) => void>>()
-  /** A ready waiter settles only after the replacement description is published. */
-  let readyResolve: ((generation: number) => void) | undefined
-  let readyReject: ((reason: unknown) => void) | undefined
-  const events: IRemoteGenerationEvents = {
-    current: () => ({ generation, active }),
+  return new GenerationFixture()
+}
+
+/** One controlled generation source retains actual retry-port event ordering and ready receipts. */
+class GenerationFixture {
+  /** Original active generation starts at one and advances only on ready publication. */
+  #generation = 1
+  /** Leave revokes the current generation synchronously before callbacks are visited. */
+  #active = true
+  /** Original generation-specific membership preserves exact event removal and insertion order. */
+  readonly #listeners = new Map<number, Set<(reason: unknown) => void>>()
+  /** Replacement readiness resolves only the most recently installed original waiter. */
+  #readyResolve: ((generation: number) => void) | undefined
+  /** Explicit release rejects that same original waiter without inventing another lifecycle. */
+  #readyReject: ((reason: unknown) => void) | undefined
+  /** The actual retry port consumes the same original event interface. */
+  readonly events: IRemoteGenerationEvents = {
+    current: () => ({ generation: this.#generation, active: this.#active }),
     onLeave: (number, listener) => {
-      const group = listeners.get(number) ?? new Set<(reason: unknown) => void>()
+      /** Each original generation owns its own insertion-ordered subscriber group. */
+      const group = this.#listeners.get(number) ?? new Set<(reason: unknown) => void>()
       group.add(listener)
-      listeners.set(number, group)
+      this.#listeners.set(number, group)
       return () => group.delete(listener)
     },
     whenReady: (_after, signal) =>
       new Promise<number>((resolve, reject) => {
-        readyResolve = resolve
-        readyReject = reject
+        this.#readyResolve = resolve
+        this.#readyReject = reject
         signal?.addEventListener('abort', () => reject(signal.reason), { once: true })
       })
   }
-  return {
-    events,
-    leave(reason: unknown) {
-      active = false
-      for (const listener of listeners.get(generation) ?? []) listener(reason)
-    },
-    ready() {
-      generation += 1
-      active = true
-      readyResolve?.(generation)
-    },
-    release(reason: unknown) {
-      readyReject?.(reason)
-    },
-    listenerCount() {
-      return [...listeners.values()].reduce((count, group) => count + group.size, 0)
-    }
+  /** Revoke the current original generation before synchronously notifying its departures. */
+  readonly leave = (reason: unknown): void => {
+    this.#active = false
+    for (const listener of this.#listeners.get(this.#generation) ?? []) listener(reason)
   }
+  /** Publish replacement generation before settling the same original ready Promise. */
+  readonly ready = (): void => {
+    this.#generation += 1
+    this.#active = true
+    this.#readyResolve?.(this.#generation)
+  }
+  /** Reject the current original ready waiter with its exact supplied reason. */
+  readonly release = (reason: unknown): void => {
+    this.#readyReject?.(reason)
+  }
+  /** Count remaining original subscriber membership without invoking callbacks. */
+  readonly listenerCount = (): number =>
+    [...this.#listeners.values()].reduce((count, group) => count + group.size, 0)
 }
 
 /** One unresolved send represents a provider result still in flight at departure. */

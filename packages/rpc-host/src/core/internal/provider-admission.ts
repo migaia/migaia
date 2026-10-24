@@ -44,35 +44,55 @@ const admissionPreparations = new WeakMap<
 
 /** Create one caller-owned lazy quota resource without publishing its registry or prepare port. */
 export function createProviderAdmissionScope(): IProviderAdmissionScope {
-  /** All FIFO, receipt and business state remains in the existing single registry. */
-  let registry: ProviderAdmissionRegistry | undefined
-  /** Public operations expose only this resource's constraint and cleanup behavior. */
-  const scope: IProviderAdmissionScope = Object.freeze({
-    constrain(maxGlobal = DEFAULT_MAX_GLOBAL, maxPerPeer = DEFAULT_MAX_PER_PEER) {
-      validateLimits(maxGlobal, maxPerPeer)
-      registry?.constrainBusiness(maxGlobal, maxPerPeer)
-    },
-    clear: () => registry?.clear()
-  })
-  admissionPreparations.set(scope, {
-    owns: (candidate) => registry !== undefined && candidate === registry,
-    prepare: (
-      maxGlobal = DEFAULT_MAX_GLOBAL,
-      maxPerPeer = DEFAULT_MAX_PER_PEER,
-      maxIngress,
-      commitPolicy
-    ) => {
-      validateLimits(maxGlobal, maxPerPeer, maxIngress)
-      if (maxIngress === undefined || (registry && !registry.matchesFraming(maxIngress)))
-        throw createRpcError(
-          RpcCoreErrorCode.capabilityUnsupported,
-          RpcCoreErrorText.capabilityUnsupported
-        )
-      if (registry && commitPolicy) registry.constrainBusiness(maxGlobal, maxPerPeer)
-      return (registry ??= new ProviderAdmissionRegistry(maxGlobal, maxPerPeer, maxIngress))
-    }
-  })
-  return scope
+  return ProviderAdmissionScope.create()
+}
+
+/** One caller-owned quota resource retains its registry without publishing admission authority. */
+class ProviderAdmissionScope implements IProviderAdmissionScope {
+  /** FIFO, receipts, and business state remain in the existing lazily created single registry. */
+  #registry: ProviderAdmissionRegistry | undefined
+
+  /** Freeze the public resource before its exact private construction ports become resolvable. */
+  static create(): IProviderAdmissionScope {
+    /** The exact scope identity is the only key capable of resolving this lazy registry. */
+    const scope = new ProviderAdmissionScope()
+    Object.freeze(scope)
+    admissionPreparations.set(scope, { owns: scope.#owns, prepare: scope.#prepare })
+    return scope
+  }
+
+  /** Narrow only an already constructed registry while retaining lazy scope semantics. */
+  readonly constrain = (
+    maxGlobal = DEFAULT_MAX_GLOBAL,
+    maxPerPeer = DEFAULT_MAX_PER_PEER
+  ): void => {
+    validateLimits(maxGlobal, maxPerPeer)
+    this.#registry?.constrainBusiness(maxGlobal, maxPerPeer)
+  }
+
+  /** Cleanup clears only this resource's original registry. */
+  readonly clear = (): void => this.#registry?.clear()
+
+  /** Structural copies cannot claim another scope's original admission owner. */
+  #owns = (candidate: unknown): boolean =>
+    this.#registry !== undefined && candidate === this.#registry
+
+  /** Actual Core framing facts alone may create or narrow the original quota registry. */
+  #prepare: IProviderAdmissionPreparation = (
+    maxGlobal = DEFAULT_MAX_GLOBAL,
+    maxPerPeer = DEFAULT_MAX_PER_PEER,
+    maxIngress,
+    commitPolicy
+  ) => {
+    validateLimits(maxGlobal, maxPerPeer, maxIngress)
+    if (maxIngress === undefined || (this.#registry && !this.#registry.matchesFraming(maxIngress)))
+      throw createRpcError(
+        RpcCoreErrorCode.capabilityUnsupported,
+        RpcCoreErrorText.capabilityUnsupported
+      )
+    if (this.#registry && commitPolicy) this.#registry.constrainBusiness(maxGlobal, maxPerPeer)
+    return (this.#registry ??= new ProviderAdmissionRegistry(maxGlobal, maxPerPeer, maxIngress))
+  }
 }
 
 /** Same-layer provider construction alone resolves a quota handle using its actual framing facts. */
@@ -118,16 +138,30 @@ export type IProviderIngressReceipt = Readonly<{
 type IOrderedEntry = {
   readonly key: string
   readonly start: () => void
+  /** Exact node retirement makes repeated cancellation/terminal release a no-op. */
+  released?: boolean
   previous?: IOrderedEntry
   next?: IOrderedEntry
 }
 
+/** One native connection lends its original object identity and fixed call capacity. */
+export type IProviderConnectionQuota = Readonly<{
+  key: object
+  maxConcurrent: number
+}>
+
+/** A physical quota shares the original logical lease, without another admission registry. */
+type IProviderAdmissionLease = Readonly<{
+  peerKey: string
+  connectionKey: object
+}>
+
 /** Owns global and per-peer admission leases for provider execution. */
 export class ProviderAdmissionRegistry {
   /** Each waiting or running business item owns one original global/per-peer lease. */
-  readonly #leases = new Map<string, string>()
-  /** Verified peers share the original execution limit across methods and ordered keys. */
-  readonly #peerCounts = new Map<string, number>()
+  readonly #leases = new Map<string, string | IProviderAdmissionLease>()
+  /** Verified-peer strings and native-connection objects keep independent counts in the same owner. */
+  readonly #peerCounts = new Map<string | object, number>()
   /** The original provider quota bounds all business modes, including group members. */
   #maxGlobal: number
   /** Per-peer occupancy includes queued work and never uses an unverified selector field. */
@@ -167,30 +201,57 @@ export class ProviderAdmissionRegistry {
   }
 
   /** Atomically reserves one task lease; duplicate keys are rejected. */
-  acquire(taskKey: string, peerKey: string): boolean {
+  acquire(taskKey: string, peerKey: string, connectionQuota?: IProviderConnectionQuota): boolean {
     if (this.#leases.has(taskKey)) return false
     const peerCount = this.#peerCounts.get(peerKey) ?? 0
-    if (this.#leases.size >= this.#maxGlobal || peerCount >= this.#maxPerPeer) return false
-    this.#leases.set(taskKey, peerKey)
+    if (
+      this.#leases.size >= this.#maxGlobal ||
+      peerCount >= this.#maxPerPeer ||
+      (connectionQuota !== undefined &&
+        (this.#peerCounts.get(connectionQuota.key) ?? 0) >= connectionQuota.maxConcurrent)
+    )
+      return false
+    this.#leases.set(
+      taskKey,
+      connectionQuota ? { peerKey, connectionKey: connectionQuota.key } : peerKey
+    )
     this.#peerCounts.set(peerKey, peerCount + 1)
+    if (connectionQuota)
+      this.#peerCounts.set(
+        connectionQuota.key,
+        (this.#peerCounts.get(connectionQuota.key) ?? 0) + 1
+      )
     return true
   }
 
-  /** Reserve all group member leases at one synchronous point; refusal changes no occupancy. */
-  acquireMany(taskKeys: readonly string[], peerKey: string): boolean {
+  /** Reserve every member against logical and physical bounds in the same synchronous transaction. */
+  acquireMany(
+    taskKeys: readonly string[],
+    peerKey: string,
+    connectionQuota?: IProviderConnectionQuota
+  ): boolean {
     /** Group keys are trusted canonical identities allocated after complete profile/ACL checks. */
     const count = taskKeys.length
     if (
       count === 0 ||
       this.#leases.size + count > this.#maxGlobal ||
-      (this.#peerCounts.get(peerKey) ?? 0) + count > this.#maxPerPeer
+      (this.#peerCounts.get(peerKey) ?? 0) + count > this.#maxPerPeer ||
+      (connectionQuota !== undefined &&
+        (this.#peerCounts.get(connectionQuota.key) ?? 0) + count > connectionQuota.maxConcurrent)
     )
       return false
     /** Duplicate members cannot turn one lease into several units of purported capacity. */
     const unique = new Set(taskKeys)
     if (unique.size !== count || taskKeys.some((key) => this.#leases.has(key))) return false
-    for (const key of taskKeys) this.#leases.set(key, peerKey)
+    /** All original members share one immutable identity pair; each retains its own release key. */
+    const lease = connectionQuota ? { peerKey, connectionKey: connectionQuota.key } : peerKey
+    for (const key of taskKeys) this.#leases.set(key, lease)
     this.#peerCounts.set(peerKey, (this.#peerCounts.get(peerKey) ?? 0) + count)
+    if (connectionQuota)
+      this.#peerCounts.set(
+        connectionQuota.key,
+        (this.#peerCounts.get(connectionQuota.key) ?? 0) + count
+      )
     return true
   }
 
@@ -204,27 +265,30 @@ export class ProviderAdmissionRegistry {
       queue.tail.next = entry
       queue.tail = entry
     } else this.#ordered.set(orderKey, { head: entry, tail: entry })
-    /** Exact removal handles both queued cancellation and actual terminal completion. */
-    let released = false
-    const release = (): void => {
-      if (released) return
-      released = true
-      const current = this.#ordered?.get(orderKey)
-      if (!current) return
-      const wasHead = current.head === entry
-      if (entry.previous) entry.previous.next = entry.next
-      if (entry.next) entry.next.previous = entry.previous
-      if (wasHead) {
-        if (entry.next) current.head = entry.next
-        else this.#ordered!.delete(orderKey)
-      }
-      if (current.tail === entry && entry.previous) current.tail = entry.previous
-      entry.previous = undefined
-      entry.next = undefined
-      if (wasHead && this.#ordered?.get(orderKey) === current) current.head.start()
-    }
     if (!queue) start()
-    return release
+    /** Short cancellation callback retains only immutable identity; the registry owns all state. */
+    return () => this.#releaseOrdered(entry)
+  }
+
+  /** Remove one queued or running order node in O(1), then start only its original successor. */
+  #releaseOrdered(entry: IOrderedEntry): void {
+    if (entry.released) return
+    entry.released = true
+    /** Node identity determines its original queue; no captured mutable release cache remains. */
+    const current = this.#ordered?.get(entry.key)
+    if (!current) return
+    /** Only a completed head can make its same-queue successor eligible. */
+    const wasHead = current.head === entry
+    if (entry.previous) entry.previous.next = entry.next
+    if (entry.next) entry.next.previous = entry.previous
+    if (wasHead) {
+      if (entry.next) current.head = entry.next
+      else this.#ordered!.delete(entry.key)
+    }
+    if (current.tail === entry && entry.previous) current.tail = entry.previous
+    entry.previous = undefined
+    entry.next = undefined
+    if (wasHead && this.#ordered?.get(entry.key) === current) current.head.start()
   }
 
   /** Capture one bounded arrival before authentication; it never reserves a business lease. */
@@ -238,6 +302,10 @@ export class ProviderAdmissionRegistry {
     if (this.#tail) this.#tail.next = entry
     else this.#head = entry
     this.#tail = entry
+    /**
+     * These short receipt callbacks capture this exact node identity and its owning scope only.
+     * Linked ordering, capacity and submission state remain fields of ProviderAdmissionRegistry.
+     */
     return Object.freeze({
       ready: (submit: () => void): boolean => {
         if (!this.#ingress?.has(entry) || entry.submit !== undefined) return false
@@ -279,12 +347,19 @@ export class ProviderAdmissionRegistry {
 
   /** Releases a task lease exactly once. */
   release(taskKey: string): void {
-    const peerKey = this.#leases.get(taskKey)
-    if (peerKey === undefined) return
+    /** The original task key alone can retire both dimensions, including after queued cancellation. */
+    const lease = this.#leases.get(taskKey)
+    if (lease === undefined) return
     this.#leases.delete(taskKey)
-    const count = this.#peerCounts.get(peerKey) ?? 0
-    if (count <= 1) this.#peerCounts.delete(peerKey)
-    else this.#peerCounts.set(peerKey, count - 1)
+    this.#releaseCount(typeof lease === 'string' ? lease : lease.peerKey)
+    if (typeof lease !== 'string') this.#releaseCount(lease.connectionKey)
+  }
+
+  /** Both verified and physical counts retire under the same original lease exactly once. */
+  #releaseCount(key: string | object): void {
+    const count = this.#peerCounts.get(key) ?? 0
+    if (count <= 1) this.#peerCounts.delete(key)
+    else this.#peerCounts.set(key, count - 1)
   }
 
   /** Reports the number of active admission leases without exposing the lease map. */

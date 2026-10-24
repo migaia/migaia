@@ -1,5 +1,10 @@
-import { createThreadPeer } from '../../../../rpc-plugin-thread/test/protocol.ts'
+import { createRpcHost } from '@migaia/rpc-host'
+import { threadPlugin } from '@migaia/rpc-plugin-thread'
 import { provide, report } from './runtime-api-provide.mjs'
 
-/** The original Node parentPort or Web Worker bootstrap supplies actual native source provenance. */
-await createThreadPeer({ provide, report })
+/** The actual Node parentPort or Web Worker bootstrap supplies actual native source provenance. */
+await createRpcHost({
+  plugins: [threadPlugin({ connectToParent: true })],
+  provide,
+  report
+})

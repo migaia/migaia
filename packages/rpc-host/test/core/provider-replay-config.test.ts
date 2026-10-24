@@ -1,8 +1,7 @@
+import { createRuntimeEndpointComposition } from '../../dist/core/runtime-api-endpoint.js'
 import { describe, expect, it } from 'vitest'
-import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
-import { createProviderEndpoint } from '../../dist/core/provider.js'
-import { createComposedEndpoint } from '../../dist/core/composed.js'
-import { createFirstPartyRoots } from '../../dist/core/internal/first-party-roots.js'
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
+
 import { connect } from '../../dist/core/middleware/connect.js'
 
 describe('provider replay workload configuration', () => {
@@ -12,23 +11,28 @@ describe('provider replay workload configuration', () => {
       /** Both peers exercise the canonical provider replay ledger through real routed requests. */
       const [clientTransport, serverTransport] = createMemoryTransportPair()
       /** Only the optional inbound replay limit differs between these two sessions. */
-      const server = await createProviderEndpoint({
-        id: 'replay-server',
-        transport: serverTransport,
-        middlewares: [connect({ transport: serverTransport })],
-        ...(maximum === undefined ? {} : { providerLimits: { maxReplayEntriesPerPeer: maximum } }),
-        provider: { echo: (context) => context.success(context.data) }
-      })
+      const server = await createRuntimeEndpointComposition(
+        {
+          id: 'replay-server',
+          transport: serverTransport,
+          middlewares: [connect({ transport: serverTransport })],
+          ...(maximum === undefined
+            ? {}
+            : { providerLimits: { maxReplayEntriesPerPeer: maximum } }),
+          provider: { echo: (context) => context.success(context.data) }
+        },
+        { agreement: { capabilities: [] }, peerId: '' }
+      ).installing
       /** Outbound identifiers remain at their existing independent 4096 ceiling. */
-      const client = await createComposedEndpoint(
+      const client = await createRuntimeEndpointComposition(
         {
           id: 'replay-client',
           transport: clientTransport,
           targetIds: ['replay-server'],
           middlewares: [connect({ transport: clientTransport })]
         },
-        createFirstPartyRoots(new Set(['first-party-outbound'] as const))
-      )
+        { agreement: { capabilities: [] }, peerId: '' }
+      ).installing
       try {
         for (let index = 0; index < (maximum ?? 1024); index++)
           expect(await client.send('replay-server', 'echo', index)).toBe(index)
@@ -45,12 +49,15 @@ describe('provider replay workload configuration', () => {
     /** Invalid new configuration rejects before the provider receives any requests. */
     const [, transport] = createMemoryTransportPair()
     await expect(
-      createProviderEndpoint({
-        id: 'invalid-replay',
-        transport,
-        middlewares: [connect({ transport })],
-        providerLimits: { maxReplayEntriesPerPeer: value }
-      })
+      createRuntimeEndpointComposition(
+        {
+          id: 'invalid-replay',
+          transport,
+          middlewares: [connect({ transport })],
+          providerLimits: { maxReplayEntriesPerPeer: value }
+        },
+        { agreement: { capabilities: [] }, peerId: '' }
+      ).installing
     ).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
   })
 })

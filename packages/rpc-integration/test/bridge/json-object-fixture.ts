@@ -2,19 +2,19 @@ import { createComposedEndpoint } from '../../../rpc-host/dist/core/composed.js'
 import { createCanonicalChunkFeature } from '../../../rpc-host/dist/core/stream/index.js'
 import { createOutboundFeature } from '../../../rpc-host/dist/core/features/outbound.js'
 import { createOneWayFeature } from '../../../rpc-host/dist/core/features/one-way.js'
-import { abort } from '../../../rpc-host/dist/core/index.js'
-import { codec } from '../../../rpc-host/dist/core/index.js'
-import { framer } from '../../../rpc-host/dist/core/index.js'
-import { connect } from '../../../rpc-host/dist/core/index.js'
-import { uuid } from '../../../rpc-host/dist/core/index.js'
+import { abort } from '../../../rpc-host/dist/core/middleware/abort.js'
+import { codec } from '../../../rpc-host/dist/core/middleware/codec.js'
+import { framer } from '../../../rpc-host/dist/core/middleware/framer.js'
+import { connect } from '../../../rpc-host/dist/core/middleware/connect.js'
+import { uuid } from '../../../rpc-host/test/fixtures/core-role/uuid.js'
 import type {
   IRpcEndpoint,
   IRpcPlugin,
   IRpcConnectConfig
-} from '../../../rpc-host/dist/core/index.js'
+} from '../../../rpc-host/dist/core/typing.js'
 import type { IRemoteChannel } from '@migaia/rpc-host/plugin'
 import type { IOneWaySurface } from '../../../rpc-host/dist/core/features/one-way.js'
-import type { IRpcFeature } from '../../../rpc-host/dist/core/index.js'
+import type { IRpcFeature } from '../../../rpc-host/dist/core/feature.js'
 
 /** Unknown user middleware forces the original public pipeline without mutating a descriptor. */
 export const stringFallbackMiddleware: IRpcPlugin = Object.freeze({

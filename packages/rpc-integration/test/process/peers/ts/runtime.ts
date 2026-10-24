@@ -1,18 +1,16 @@
 import { createComposedEndpoint } from '../../../../../rpc-host/dist/core/composed.js'
-import {
-  abort,
-  codec,
-  connect,
-  framer,
-  ping,
-  type IRpcEndpoint
-} from '../../../../../rpc-host/dist/core/index.js'
+import { abort } from '../../../../../rpc-host/dist/core/middleware/abort.js'
+import { codec } from '../../../../../rpc-host/dist/core/middleware/codec.js'
+import { connect } from '../../../../../rpc-host/dist/core/middleware/connect.js'
+import { framer } from '../../../../../rpc-host/dist/core/middleware/framer.js'
+import { ping } from '../../../../../rpc-host/dist/core/middleware/ping.js'
+import type { IRpcEndpoint } from '../../../../../rpc-host/dist/core/typing.js'
 import {
   createCanonicalChunkFeature,
   createStreamFeature
 } from '../../../../../rpc-host/dist/core/stream/index.js'
 import { createOutboundFeature } from '../../../../../rpc-host/dist/core/features/outbound.js'
-import { createProviderFeature } from '../../../../../rpc-host/dist/core/features/provider.js'
+import { createProviderFeature } from '../../../../../rpc-host/dist/core/internal/provider-feature.js'
 import { createDiscoveryFeature } from '../../../../../rpc-host/dist/core/features/discovery.js'
 import { createControlFeature } from '../../../../../rpc-host/dist/core/features/control.js'
 import { createOneWayFeature } from '../../../../../rpc-host/dist/core/features/one-way.js'
@@ -100,6 +98,7 @@ export async function bridgeEndpointFor(
     {
       'first-party-chunk': chunk,
       'first-party-outbound': outbound,
+      'first-party-provider': createProviderFeature(outbound),
       'first-party-one-way': createOneWayFeature(outbound),
       ...Object.fromEntries(channel.features.map((feature, index) => [`channel-${index}`, feature]))
     }

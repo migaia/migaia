@@ -1,11 +1,12 @@
-import { createWindowMessageTransport } from '@migaia/rpc-plugin-browser/adapters/window'
+import { createWindowMessageTransport } from '../../../../rpc-plugin-browser/dist/browser/adapters/window.js'
 import { readEndpointDebugSnapshot } from '../../../../rpc-host/dist/core/internal/test-observer.js'
 import type { IRpcEndpointDebugSnapshot } from '../../../../rpc-host/dist/core/internal/test-observer.js'
 import { createRpc, installErrorGuards } from './rpc.js'
 
 const errors = installErrorGuards()
 
-globalThis.runWindowIframeScenario = async () => {
+/** Prepare the actual iframe, origin filter and native listener observations before business. */
+async function prepareWindowIframe() {
   const childOrigin =
     new URLSearchParams(location.search).get('origin') === 'cross'
       ? 'http://127.0.0.1:4179'
@@ -22,16 +23,15 @@ globalThis.runWindowIframeScenario = async () => {
     })
   })
   const target = child.contentWindow!
-  let providerCalls = 0
-  let listenerAdds = 0
-  let listenerRemoves = 0
+  /** One explicit observation context records native subscription and provider calls only. */
+  const observation = { providerCalls: 0, listenerAdds: 0, listenerRemoves: 0 }
   const receiver = {
     addEventListener: (type: 'message', listener: (event: MessageEvent<unknown>) => void) => {
-      listenerAdds += 1
+      observation.listenerAdds += 1
       window.addEventListener(type, listener)
     },
     removeEventListener: (type: 'message', listener: (event: MessageEvent<unknown>) => void) => {
-      listenerRemoves += 1
+      observation.listenerRemoves += 1
       window.removeEventListener(type, listener)
     }
   }
@@ -39,7 +39,7 @@ globalThis.runWindowIframeScenario = async () => {
     'parent',
     ['child'],
     createWindowMessageTransport({ target, receiver, targetOrigin: childOrigin }),
-    { count: (context) => context.success(++providerCalls) },
+    { count: (context) => context.success(++observation.providerCalls) },
     undefined,
     undefined,
     false,
@@ -66,6 +66,13 @@ globalThis.runWindowIframeScenario = async () => {
     document.body.append(crossOriginSpoof)
     await new Promise((resolve) => setTimeout(resolve, 30))
   }
+  return { childOrigin, child, target, endpoint, crossOriginSpoof, observation }
+}
+
+/** Keep the same origin/spoof/business/removal transaction on the exact prepared native resources. */
+globalThis.runWindowIframeScenario = async () => {
+  const { childOrigin, child, target, endpoint, crossOriginSpoof, observation } =
+    await prepareWindowIframe()
   const echo = await endpoint.send('child', 'echo', 'window-ok')
   const chunkedRequest = await endpoint.send('child', 'echo', 'window-chunked-request-😀')
   const chunkedTimeout = await endpoint
@@ -147,12 +154,12 @@ globalThis.runWindowIframeScenario = async () => {
     pingTimeout,
     pingAborted,
     parentResult,
-    providerCalls,
+    providerCalls: observation.providerCalls,
     removedResult,
     activeSnapshot,
     errors,
-    listenerAdds,
-    listenerRemoves,
+    listenerAdds: observation.listenerAdds,
+    listenerRemoves: observation.listenerRemoves,
     snapshot: readEndpointDebugSnapshot(endpoint) as IRpcEndpointDebugSnapshot
   }
 }

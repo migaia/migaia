@@ -120,6 +120,25 @@ export const declarations = typegenFeature({
 
 把 declarations 安装进 plugins。write 是应用拥有的输出能力，上例显示文件名与文本；实际文件系统 I/O 由应用决定。生成器订阅已接受目录，不依赖对端语言；方法 input/output/yield schema 来自真实 contract 描述，新代只在接受后写入。feature 卸载后停止写入，写入失败走 host.report。
 
+## 在同一个 host 上观察
+
+观察定义通过真实 feature 安装，借用 host 已有端点。只保留需要的字段；事件视图只在 emit 调用期间有效，延后读取时由应用复制。
+
+```ts doc-test=check
+import { defineProbe } from '@migaia/rpc-host/probe'
+import { defineFeaturePlugin } from '@migaia/rpc-host/plugin'
+
+export const observation = defineFeaturePlugin({
+  name: 'application-observer',
+  probe: defineProbe({
+    stages: ['message', 'peer'],
+    emit: (view) => console.log({ ...view })
+  })
+})
+```
+
+把 observation 与传输一起放入 host 的 plugins。host 关闭时释放对应观察订阅；观察器失败仍走原 report 通道，不接管业务资源。
+
 ## 从旧包迁移
 
 先换包名：rpc-core→rpc-host，rpc-process→rpc-plugin-process，rpc-threads→rpc-plugin-thread，rpc-browser→rpc-plugin-browser，rpc-pool→rpc-plugin-pool，rpc-devtools→rpc-plugin-devtools。协程独立为 rpc-plugin-coroutines。下表中的旧名称只用于迁移识别，不是兼容入口。

@@ -6,7 +6,7 @@ import * as entry from '../src/index.js'
 import * as collectorOwner from '../src/collector/devtools.js'
 import type { IRpcDevtoolsOptions } from '../src/collector-types.js'
 import type { IDevtoolsPlugin } from '../src/index.js'
-import type { IRpcDevtoolsWatchBatch } from '../src/contract/index.js'
+import type { IRpcDevtoolsWatchBatch } from '../src/contract/service.js'
 import { collectorView } from './collector/fixture.js'
 import { memoryServer } from '../../rpc-host/test/host/fixture.js'
 
@@ -29,7 +29,7 @@ function calls(value: IDevtoolsPlugin, method = 'echo'): number {
 }
 
 describe('devtools feature plugin', () => {
-  it('publishes only the new factory and preserves the three existing subpaths', async () => {
+  it('publishes only the native feature root', async () => {
     expect(Object.keys(entry).sort()).toEqual([
       'RPC_DEVTOOLS_SOURCE',
       'RpcDevtoolsErrorCode',
@@ -44,12 +44,7 @@ describe('devtools feature plugin', () => {
       await readFile(new URL('../package.json', import.meta.url), 'utf8')
     ) as { name: string; exports: Record<string, unknown> }
     expect(manifest.name).toBe('@migaia/rpc-plugin-devtools')
-    expect(Object.keys(manifest.exports).sort()).toEqual(['.', './contract', './hub', './log'])
-    expect(await import('@migaia/rpc-plugin-devtools/contract')).toHaveProperty(
-      'encodeRpcDevtoolsRecord'
-    )
-    expect(await import('@migaia/rpc-plugin-devtools/hub')).toHaveProperty('createRpcDevtoolsHub')
-    expect(await import('@migaia/rpc-plugin-devtools/log')).toHaveProperty('createRpcLogProbe')
+    expect(Object.keys(manifest.exports)).toEqual(['.'])
   })
 
   it('constructs exactly one canonical collector and passes the full options object unchanged', () => {

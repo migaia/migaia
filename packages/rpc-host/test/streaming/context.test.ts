@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
 import { createComposedEndpoint } from '../../dist/core/composed.js'
 import { ProviderExecutor } from '../../dist/core/internal/provider-executor.js'
 import { connect } from '../../dist/core/middleware/connect.js'

@@ -1,6 +1,8 @@
+import { createRuntimeEndpointComposition } from '../../dist/core/runtime-api-endpoint.js'
+import { RpcCapability } from '@migaia/rpc-contract'
 import { describe, expect, it } from 'vitest'
-import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
-import { createEndpoint } from '../../dist/core/index.js'
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
+
 import { connect } from '../../dist/core/middleware/connect.js'
 import { RpcRouteProfile, RpcRouteType } from '@migaia/rpc-contract'
 import { createComposedEndpoint } from '../../dist/core/composed.js'
@@ -47,11 +49,14 @@ describe('streaming unclaimed route', () => {
 
   it('reports one protocol failure for an admitted stream frame', async () => {
     const [transport, peer] = createMemoryTransportPair()
-    const endpoint = await createEndpoint({
-      id: 'local',
-      transport,
-      middlewares: [connect({ transport })]
-    })
+    const endpoint = await createRuntimeEndpointComposition(
+      {
+        id: 'local',
+        transport,
+        middlewares: [connect({ transport })]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     const failures: unknown[] = []
     endpoint.hooks.on((event) => {
       if (event.name === 'failure') failures.push(event.error)

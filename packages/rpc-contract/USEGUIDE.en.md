@@ -264,24 +264,23 @@ This package defines RPC wire data and provides construction, validation, normal
 
 Application code normally calls `createRpcHost` from `@migaia/rpc-host` with a transport plugin. Independent-language peers, adapter authors, and error-boundary consumers use contract entries directly. `@migaia/rpc-plugin-process` reuses Content-Length framing and error conversion; serialize owns the underlying portable traversal and error-chain implementation. Contract checkers remain independent of Host, plugins, and native I/O.
 
-| Public entry                                                        | Purpose                                                                               |
-| ------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| `@migaia/rpc-contract`                                              | Common constants, V1 envelopes, handshake, portable values, and error tools           |
-| `./wire`                                                            | Wire constants/types plus pure operations such as measurePortableStreamValue          |
-| `./portable`                                                        | Wire-portable normalization and its depth constant                                    |
-| `./errors`                                                          | Error projection, restoration, validation, JSON-RPC mapping, and local classification |
-| `./handshake`                                                       | Hello/accept/reject construction, negotiation, and validation                         |
-| `./v1`, `./framing/v1`                                              | Protocol 1.x envelopes and message framing                                            |
-| `./framing`                                                         | String/binary fragmentation, assembly, and physical frame inspection                  |
-| `./framing/stream`                                                  | Four-byte network-order length prefixes and bootstrap/handshake receivers             |
-| `./framing/jsonrpc`                                                 | Content-Length byte framing and bridge error codes                                    |
-| `./remote`                                                          | Pure remote contract/catalog/control checkers, shape reasons, and method-schema types |
-| `./runtime`, `./runtime/metadata`, `./runtime/lazy`                 | Runtime envelopes, call headers, generations/steps, and lazy loading                  |
-| `./stream`                                                          | Stream payload, sequence, progress, credit, and control-state checks                  |
-| `./binary`, `./binary/lazy`, `./binary/capture`, `./binary/inspect` | Binary capture, preparation, restoration, manifests, integrity, and size              |
-| `./schema/wire-error`                                               | Published wire-error JSON Schema                                                      |
+| Public entry                                        | Purpose                                                                               |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `@migaia/rpc-contract`                              | Common constants, V1 envelopes, handshake, portable values, and error tools           |
+| `./wire`                                            | Wire constants/types plus pure operations such as measurePortableStreamValue          |
+| `./portable`                                        | Wire-portable normalization and its depth constant                                    |
+| `./errors`                                          | Error projection, restoration, validation, JSON-RPC mapping, and local classification |
+| `./v1`, `./framing/v1`                              | Protocol 1.x envelopes and message framing                                            |
+| `./framing`                                         | String/binary fragmentation, assembly, and physical frame inspection                  |
+| `./framing/stream`                                  | Four-byte network-order length prefixes and bootstrap/handshake receivers             |
+| `./framing/jsonrpc`                                 | Content-Length byte framing and bridge error codes                                    |
+| `./remote`                                          | Pure remote contract/catalog/control checkers, shape reasons, and method-schema types |
+| `./runtime`, `./runtime/metadata`, `./runtime/lazy` | Runtime envelopes, call headers, generations/steps, and lazy loading                  |
+| `./stream`                                          | Stream payload, sequence, progress, credit, and control-state checks                  |
+| `./binary/lazy`, `./binary/inspect`                 | Lazy binary preparation/restoration, manifests, integrity, and size                   |
+| `./schema/wire-error`                               | Published wire-error JSON Schema                                                      |
 
-These are the root and 19 subentries; the schema entry is a JSON file. Do not import internals. V1 uses named rpcProtocol and normalizeRpcEnvelope exports without a default aggregate; the root calls its protocol object rpcProtocolV1. createReassembler and IRpcReassembler were removed: use the original framer.accept/close or Pick their method types. Complete-string carriers use remoteProcessStringFramer. The bare processStringFramer is internal, without a compatibility alias.
+These are the root and 16 subentries; the schema entry is a JSON file. Do not import internals. V1 uses named rpcProtocol and normalizeRpcEnvelope exports without a default aggregate; the root calls its protocol object rpcProtocolV1. createReassembler and IRpcReassembler were removed: use the original framer.accept/close or Pick their method types. Complete-string carriers use remoteProcessStringFramer. The bare processStringFramer is internal, without a compatibility alias.
 
 ### Pure remote and runtime shape checks
 
@@ -378,7 +377,7 @@ normalizeStreamPayload validates payloads. checkRpcStreamSequence/Progress/Consu
 
 ### Binary capture, manifests, restoration, and budgets
 
-prepareRpcBinary(envelope, storage, limit?, digest?, codec?) creates manifests, native sidecars, and totals. restoreRpcBinary validates manifests/integrity before restoring data. Its Decoded variant has the preceding trust restriction. captureRpcBinaryData captures synchronously for later prepare. The lazy entry captures data before loading the full codec and computes its first digest when the native branch requires one.
+prepareRpcBinary(envelope, storage, limit?, digest?, codec?) creates manifests, native sidecars, and totals. restoreRpcBinary validates manifests/integrity before restoring data. Its Decoded variant has the preceding trust restriction. The binary/lazy entry captures data before loading the full codec and computes its first digest when the native branch requires one.
 
 Native storage charges the complete backing ArrayBuffer. Inline storage charges offset + visibleLength, copies visible bytes only, and preserves a zero prefix. Limit does not unconditionally cover every manifest metadata field. The native + encode-only codec prehash branch separately checks the full physical frame. Inline and other codec paths leave physical frame limits to that codec or the caller.
 

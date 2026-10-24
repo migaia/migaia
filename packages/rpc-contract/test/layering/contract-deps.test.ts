@@ -40,12 +40,16 @@ describe('contract utility ownership', () => {
         if (!specifier.startsWith('.')) bare.add(specifier)
       }
     }
-    expect([...bare].sort()).toEqual([
-      '@migaia/serialize',
-      '@migaia/utils/bytes',
-      '@migaia/utils/error',
-      '@migaia/utils/function'
-    ])
+    /** Set equality proves the entire dynamic dependency domain without comparison sorting. */
+    expect(bare).toEqual(
+      new Set([
+        '@migaia/serialize',
+        '@migaia/utils/bytes',
+        '@migaia/utils/error',
+        '@migaia/utils/function',
+        '@migaia/utils/string'
+      ])
+    )
     const normalizeSource = readFileSync(join(contractRoot, 'normalize.ts'), 'utf8')
     const framerSource = readFileSync(join(contractRoot, 'framing/message-framer.ts'), 'utf8')
     const errorSource = readFileSync(join(contractRoot, 'contract-error.ts'), 'utf8')

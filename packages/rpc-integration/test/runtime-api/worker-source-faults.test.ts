@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
 import { it } from 'vitest'
-import { createNodeThreadLauncher } from '@migaia/rpc-plugin-thread/adapters/node'
+import { createNodeThreadLauncher } from '../../../rpc-plugin-thread/dist/threads/adapters/node.js'
 import { nativeWorkerFor } from '../../../rpc-plugin-thread/test/threads/fixture.js'
 
 /** Built public entry imports execute in a real native Worker, independently from source Vitest. */

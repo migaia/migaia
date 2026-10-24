@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { IRpcRouteHeader } from '@migaia/rpc-contract'
-import type { IRpcContext, IRpcProvider } from '../../dist/core/index.js'
+import type { IRpcContext, IRpcProvider } from '../../dist/core/typing.js'
 import {
   attachProviderBulkAdmission,
   attachProviderPreflight,

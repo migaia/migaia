@@ -24,18 +24,6 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
-    },
-    "./contract": {
-      "types": "./dist/contract/index.d.ts",
-      "default": "./dist/contract/index.js"
-    },
-    "./hub": {
-      "types": "./dist/hub/index.d.ts",
-      "default": "./dist/hub/index.js"
-    },
-    "./log": {
-      "types": "./dist/log/index.d.ts",
-      "default": "./dist/log/index.js"
     }
   },
   "scripts": {

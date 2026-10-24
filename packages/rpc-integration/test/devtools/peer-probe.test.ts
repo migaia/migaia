@@ -1,23 +1,22 @@
+import { threadPlugin } from '@migaia/rpc-plugin-thread'
+import { processPlugin } from '@migaia/rpc-plugin-process'
+import { RuntimeEventName, RuntimePluginKey } from '@migaia/rpc-host/plugin'
+import { runtimeTestHost } from '../../../rpc-host/test/runtime-api/fixture.js'
+import { readRuntimeOutletConnection } from '../../../rpc-host/dist/remote/runtime-api/outlet.js'
 import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
 import { it, vi } from 'vitest'
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { createProcessPeer } from '../../../rpc-plugin-process/test/protocol.ts'
-import { createThreadPeer } from '../../../rpc-plugin-thread/test/protocol.ts'
 import { type INodeThreadHandle } from '../../../rpc-plugin-thread/dist/threads/node-launcher.js'
 import {
   createNodeThreadLauncher,
   createNodeThreadChannelFactory
-} from '@migaia/rpc-plugin-thread/adapters/node'
+} from '../../../rpc-plugin-thread/dist/threads/adapters/node.js'
 import { createRpcHost, type IRpcHostOptions } from '@migaia/rpc-host'
 import { windowPlugin } from '@migaia/rpc-plugin-browser'
 import { defineProbe, RpcProbeStage, RpcProbeKind } from '@migaia/rpc-host/probe'
-import {
-  defineFeaturePlugin,
-  type IRuntimeDynamicSurface,
-  type IRuntimePeer
-} from '@migaia/rpc-host/plugin'
+import { defineFeaturePlugin, type IRuntimePeer } from '@migaia/rpc-host/plugin'
 
 /** Existing native fixtures exercise public source construction without another carrier owner. */
 const workerEntry = fileURLToPath(
@@ -49,26 +48,40 @@ it('thread probe observes handshake, ready and a genuine supervised crash/restar
   const launcher = createNodeThreadLauncher()
   /** A real termination causes the existing supervisor to restart, rather than calling restart(). */
   const handles: INodeThreadHandle[] = []
+  /** The actual Host owns supervised native installation and its rollback. */
+  const host = runtimeTestHost({
+    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
+  })
   /** The public factory receives the probe directly through its inherited Runtime Peer option. */
-  const peer = await createThreadPeer<IRuntimeDynamicSurface>({
-    probe,
-    spawn: {
-      spec: { entry: workerEntry, data: { sequence: 1 } },
-      budget,
-      scheduler: systemScheduler,
-      launcher: {
-        ...launcher,
-        launch: async (spec, context) => {
-          const handle = await launcher.launch(spec, context)
-          handles.push(handle)
-          return handle
-        }
-      },
-      channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),
-      supervisor: { restart: { initialDelayMs: 1, maxDelayMs: 1, maxRestarts: 1 } },
-      report: (error) => reports.push(error)
-    },
-    report: (error) => reports.push(error)
+  const peer = await host
+    .use(
+      threadPlugin({
+        probe,
+        spawn: {
+          spec: { entry: workerEntry, data: { sequence: 1 } },
+          budget,
+          scheduler: systemScheduler,
+          launcher: {
+            ...launcher,
+            launch: async (spec, context) => {
+              const handle = await launcher.launch(spec, context)
+              handles.push(handle)
+              return handle
+            }
+          },
+          channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),
+          supervisor: { restart: { initialDelayMs: 1, maxDelayMs: 1, maxRestarts: 1 } },
+          report: (error) => reports.push(error)
+        },
+        report: (error) => reports.push(error)
+      })
+    )
+    .then(() => readRuntimeOutletConnection(host.thread, RuntimePluginKey.thread)!.peer!)
+  /** Physical probe readiness precedes the managed registration's accepted generation pointer. */
+  const acceptedGenerations = new Set<number>()
+  /** Observe the existing outlet receipt before causing the genuine native crash. */
+  const stopReady = host.thread!.on(RuntimeEventName.ready, (event) => {
+    if (typeof event.generation === 'number') acceptedGenerations.add(event.generation)
   })
   try {
     assert.equal(await peer.request('service.data.stable'), 3)
@@ -77,13 +90,18 @@ it('thread probe observes handshake, ready and a genuine supervised crash/restar
     handles[0]!.terminate()
     await handles[0]!.exited
     await vi.waitFor(() => assert.ok(lifecycle.includes('restart')), { timeout: 3000 })
-    await vi.waitFor(() => assert.equal(lifecycle.filter((value) => value === 'ready').length, 2), {
-      timeout: 3000
-    })
+    await vi.waitFor(
+      () => {
+        assert.equal(lifecycle.filter((value) => value === 'ready').length, 2)
+        assert.ok(acceptedGenerations.has(2), 'the managed registration accepts generation two')
+      },
+      { timeout: 3000 }
+    )
     assert.equal(await peer.request('service.data.stable'), 3)
     assert.deepEqual(reports, [])
   } finally {
-    await peer.close()
+    stopReady()
+    await host.dispose()
     for (const handle of handles) handle.terminate()
     await Promise.all(handles.map((handle) => handle.exited))
   }
@@ -105,17 +123,25 @@ it('process spawn:true forwards probe through ordinary entry discovery and emits
   })
   /** Spawn:true uses argv[1]; temporarily select the existing child fixture as the ordinary entry. */
   const argv = process.argv
+  /** The actual Host owns the short native source and its committed managed Peer. */
+  const host = runtimeTestHost({
+    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
+  })
   /** Construction owns the real child; restoration happens before business assertions. */
-  let peer: IRuntimePeer | undefined
+  let peer!: IRuntimePeer
   process.argv = [process.execPath, processEntry]
   try {
-    peer = await createProcessPeer<IRuntimeDynamicSurface>({
-      self: { name: 'probe-parent', instanceId: 'probe-process-parent' },
-      provide: { parentEcho: () => 'probe-process-parent' },
-      spawn: true,
-      probe,
-      report: (error) => reports.push(error)
-    })
+    peer = await host
+      .use(
+        processPlugin({
+          self: { name: 'probe-parent', instanceId: 'probe-process-parent' },
+          provide: { parentEcho: () => 'probe-process-parent' },
+          spawn: true,
+          probe,
+          report: (error) => reports.push(error)
+        })
+      )
+      .then(() => readRuntimeOutletConnection(host.process, RuntimePluginKey.process)!.peer!)
   } finally {
     process.argv = argv
   }
@@ -134,7 +160,7 @@ it('process spawn:true forwards probe through ordinary entry discovery and emits
         'only the existing best-effort termination notice reaches the Peer reporter'
       )
   } finally {
-    await peer.close()
+    await host.dispose()
   }
 }, 15000)
 

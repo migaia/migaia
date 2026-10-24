@@ -5,7 +5,7 @@ import type {
   IRuntimePeerOptions
 } from '../remote/runtime-api/peer.js'
 import type { IRpcFactoryConfig, IRpcProviderLimits } from '../core/typing.js'
-import type { IProviderAdmissionScope } from '../core/features/provider.js'
+import type { IProviderAdmissionScope } from '../core/internal/provider-admission.js'
 import type { IRuntimePreparationContext } from '../remote/runtime-api/launch-context.js'
 import type { IRemoteBinding, IRemoteChannel, IRemoteServeEndpoint } from '../remote/types.js'
 import type { ISupervisor } from '@migaia/supervision'

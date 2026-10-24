@@ -1,8 +1,10 @@
-import { createAutomaticWebThreadPeer } from '../../protocol.js'
-import type { IThreadWebPort } from '../../../dist/threads/types.js'
-
-/** Real DedicatedWorker bootstrap owns its provider until the parent terminates this Worker. */
-await createAutomaticWebThreadPeer(
-  { provide: { twice: (value: number) => value * 2 } },
-  globalThis as unknown as IThreadWebPort
-)
+import { createRpcHost } from '@migaia/rpc-host'
+import { threadPlugin } from '@migaia/rpc-plugin-thread'
+/**
+ * The actual native child bootstrap belongs to its cold transport; one genuine Host owns the
+ * provider.
+ */
+await createRpcHost({
+  plugins: [threadPlugin({ connectToParent: true })],
+  provide: { twice: (value: number) => value * 2 }
+})

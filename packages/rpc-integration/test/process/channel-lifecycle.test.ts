@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { type IScheduler } from '@migaia/utils/scheduler'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { createUnitBudget } from '@migaia/supervision'
-import { createNodeProcessLauncher } from '@migaia/rpc-plugin-process/adapters/node-child-process'
+import { createNodeProcessLauncher } from '../../../rpc-plugin-process/dist/process/adapters/node-child-process.js'
 import { createSpawnProcessBinding } from '../../../rpc-plugin-process/dist/process/plugin/binding.js'
 import type { IRemoteChannel } from '@migaia/rpc-host/plugin'
 import { encodeRpcStreamFrame } from '@migaia/rpc-contract/framing/stream'
@@ -20,78 +20,82 @@ import type {
   IProcessByteChannel,
   IProcessMessageChannel
 } from '../../../rpc-plugin-process/dist/process/types.js'
-import { type IRpcTransport } from '../../../rpc-host/dist/core/index.js'
+import type { IRpcTransport } from '../../../rpc-host/dist/core/transport.js'
 import type { IIpcLogRecord } from '@migaia/rpc-host/plugin'
 
-/** A controllable byte port makes physical drain and late rejection observable. */
-function createBytePort(): Readonly<{
-  channel: IProcessByteChannel
-  emitText(text: string): void
-  emitBytes(bytes: Uint8Array): void
-  settleWrite(error?: unknown): void
-  readonly writes: readonly Uint8Array[]
-  readonly removals: number
-  readonly closes: number
-}> {
-  /** The active reader receives arbitrarily segmented physical bytes. */
-  let dataListener: ((chunk: Uint8Array) => void) | undefined
-  /** The active close listener receives the first physical terminal event. */
-  let closeListener: ((reason?: unknown) => void) | undefined
-  /** The currently blocked physical write is controlled by the test. */
-  let pendingWrite: Readonly<{ resolve(): void; reject(error: unknown): void }> | undefined
-  /** Retained chunks let the test distinguish logical sends from physical writes. */
-  const writes: Uint8Array[] = []
-  let removals = 0
-  let closes = 0
-  const channel: IProcessByteChannel = {
+/** One controlled physical byte port owns its subscriptions, pending write and observations. */
+class ControlledBytePort {
+  /** The current reader receives the exact bytes injected by this fixture. */
+  #dataListener: ((chunk: Uint8Array) => void) | undefined
+  /** The current terminal observer belongs to this physical port alone. */
+  #closeListener: ((reason?: unknown) => void) | undefined
+  /** A test settles only the current physical write, preserving its original Promise. */
+  #pendingWrite: Readonly<{ resolve(): void; reject(error: unknown): void }> | undefined
+  /** Original physical writes remain available for logical/physical count assertions. */
+  #writes: Uint8Array[] = []
+  /** Subscription removal count proves teardown ownership. */
+  #removals = 0
+  /** Physical close count proves the production owner closes once. */
+  #closes = 0
+  /** Native callbacks read this port's explicit state and retain the same channel identity. */
+  readonly channel: IProcessByteChannel = {
     kind: 'byte',
-    write(chunk) {
-      writes.push(chunk)
+    write: (chunk) => {
+      this.#writes.push(chunk)
       return new Promise<void>((resolve, reject) => {
-        pendingWrite = { resolve, reject }
+        this.#pendingWrite = { resolve, reject }
       })
     },
-    onData(listener) {
-      dataListener = listener
+    onData: (listener) => {
+      this.#dataListener = listener
       return () => {
-        removals += 1
-        dataListener = undefined
+        this.#removals += 1
+        this.#dataListener = undefined
       }
     },
-    onClose(listener) {
-      closeListener = listener
+    onClose: (listener) => {
+      this.#closeListener = listener
       return () => {
-        removals += 1
-        closeListener = undefined
+        this.#removals += 1
+        this.#closeListener = undefined
       }
     },
-    close() {
-      closes += 1
-      closeListener?.()
+    close: () => {
+      this.#closes += 1
+      this.#closeListener?.()
     }
   }
-  return {
-    channel,
-    emitText(text) {
-      dataListener?.(encodeRpcStreamFrame(new TextEncoder().encode(text)))
-    },
-    emitBytes(bytes) {
-      dataListener?.(bytes)
-    },
-    settleWrite(error) {
-      if (error === undefined) pendingWrite?.resolve()
-      else pendingWrite?.reject(error)
-      pendingWrite = undefined
-    },
-    get writes() {
-      return writes
-    },
-    get removals() {
-      return removals
-    },
-    get closes() {
-      return closes
-    }
+
+  /** Encode one original physical frame before delivering it to the active reader. */
+  emitText(text: string): void {
+    this.#dataListener?.(encodeRpcStreamFrame(new TextEncoder().encode(text)))
+  }
+
+  /** Deliver already framed or deliberately malformed bytes without normalizing them. */
+  emitBytes(bytes: Uint8Array): void {
+    this.#dataListener?.(bytes)
+  }
+
+  /** Settle the original held physical write exactly as the test requests. */
+  settleWrite(error?: unknown): void {
+    if (error === undefined) this.#pendingWrite?.resolve()
+    else this.#pendingWrite?.reject(error)
+    this.#pendingWrite = undefined
+  }
+
+  /** Return original write observations without creating another queue. */
+  get writes(): readonly Uint8Array[] {
+    return this.#writes
+  }
+
+  /** Return actual listener cleanup count. */
+  get removals(): number {
+    return this.#removals
+  }
+
+  /** Return actual physical close count. */
+  get closes(): number {
+    return this.#closes
   }
 }
 
@@ -131,7 +135,7 @@ describe('process channel boundary', () => {
 
   it('rejects an in-flight write on close and observes its late failure', async () => {
     /** A fake physical writer deliberately never settles until the test releases it. */
-    const port = createBytePort()
+    const port = new ControlledBytePort()
     /** Late physical rejection must reach this report port after the caller has settled. */
     const reports: unknown[] = []
     /** This receipt resolves exactly when the injected reporter observes a late failure. */
@@ -171,7 +175,7 @@ describe('process channel boundary', () => {
   })
 
   it('rejects a second pre-ready frame without delivering business data', async () => {
-    const port = createBytePort()
+    const port = new ControlledBytePort()
     const wire = bindProcessByteWire(port.channel, { peerId: 'peer', report: () => undefined })
     const read = wire.readHandshakeFrame()
     port.emitText('hello')
@@ -182,7 +186,7 @@ describe('process channel boundary', () => {
   })
 
   it('delivers activated frames in order to the first late subscriber', async () => {
-    const port = createBytePort()
+    const port = new ControlledBytePort()
     const wire = bindProcessByteWire(port.channel, { peerId: 'peer', report: () => undefined })
     const handshake = wire.readHandshakeFrame()
     port.emitText('hello')
@@ -199,7 +203,7 @@ describe('process channel boundary', () => {
   })
 
   it('reports and closes instead of discarding an overflowing early queue', async () => {
-    const port = createBytePort()
+    const port = new ControlledBytePort()
     const reports: unknown[] = []
     const wire = bindProcessByteWire(port.channel, {
       peerId: 'peer',
@@ -219,7 +223,7 @@ describe('process channel boundary', () => {
   })
 
   it('bounds early business bytes independently of the frame count', async () => {
-    const port = createBytePort()
+    const port = new ControlledBytePort()
     const reports: unknown[] = []
     const wire = bindProcessByteWire(port.channel, {
       peerId: 'peer',
@@ -241,7 +245,7 @@ describe('process channel boundary', () => {
   })
 
   it('rejects a 16 MiB unauthenticated frame at its header', async () => {
-    const port = createBytePort()
+    const port = new ControlledBytePort()
     const wire = bindProcessByteWire(port.channel, { peerId: 'peer', report: () => undefined })
     const handshake = wire.readHandshakeFrame()
     /** No payload bytes are sent; rejection must happen before payload allocation. */
@@ -252,7 +256,7 @@ describe('process channel boundary', () => {
   })
 
   it('rejects malformed UTF-8 before admitting a handshake', async () => {
-    const port = createBytePort()
+    const port = new ControlledBytePort()
     const wire = bindProcessByteWire(port.channel, { peerId: 'peer', report: () => undefined })
     const handshake = wire.readHandshakeFrame()
     port.emitBytes(encodeRpcStreamFrame(Uint8Array.of(0xff)))
@@ -392,71 +396,78 @@ describe('process channel boundary', () => {
 /** Optional summary field lets the same semantic oracle run on the unmodified baseline. */
 type IStderrRecord = Extract<IIpcLogRecord, { name: 'ipc.stderr' }> & { droppedChunks?: number }
 
-/** Exercise the existing connection owner with a retained source callback and original scheduler. */
-function stderrBudgetFixture(
-  sessionId: string,
-  sink?: (record: IStderrRecord) => void | Promise<void>,
-  schedulerPort?: IScheduler
-) {
-  /** Virtual time separates interval boundaries from operating-system timing noise. */
-  const scheduler = createManualScheduler()
-  /** Only redacted records leave the original logging owner. */
-  const records: IStderrRecord[] = []
-  /** Reporter failures preserve the exact original object. */
-  const reports: unknown[] = []
-  /** The source deliberately retains this callback after unsubscribe to simulate late delivery. */
-  let callback: ((chunk: Uint8Array) => void) | undefined
-  /** Source unsubscribe remains idempotent through the original connection close. */
-  let removals = 0
-  /** The original physical owner closes once even if the final reporter reenters close. */
-  let physicalCloses = 0
-  /** Physical closure has no role in the diagnostic quota. */
-  const physical: IRpcTransport = {
-    platform: 'Process',
-    send: () => undefined,
-    subscribe: () => () => undefined,
-    close: () => {
-      physicalCloses += 1
-    }
-  }
-  /** Existing connection and log Features remain the sole publication owner. */
-  const attached = attachIpcConnection(
-    physical,
-    {
-      connectionId: `connection-${sessionId}`,
-      sessionId,
-      processId: 'fixture-child',
-      log: (record) => {
-        if (record.name !== 'ipc.stderr') return
-        records.push(record)
-        return sink?.(record)
-      },
-      stderr: (listener) => {
-        callback = listener
-        return () => {
-          removals += 1
-        }
+/** One stderr fixture owns only physical observations; the production log keeps quota ownership. */
+class StderrBudgetFixture {
+  /** Source deliberately keeps its callback after unsubscribe to prove late-delivery isolation. */
+  #callback: ((chunk: Uint8Array) => void) | undefined
+  /** Counts the original source unsubscribe operation. */
+  #removals = 0
+  /** Counts the original physical close operation. */
+  #physicalCloses = 0
+  /** Optional hostile sink drives the production reporter's existing failure path. */
+  #sink: ((record: IStderrRecord) => void | Promise<void>) | undefined
+  /** Virtual time separates interval semantics from host scheduling noise. */
+  readonly scheduler = createManualScheduler()
+  /** Only original redacted records enter this observation list. */
+  readonly records: IStderrRecord[] = []
+  /** Original reporter failures retain reference identity here. */
+  readonly reports: unknown[] = []
+  /** The existing connection and log Features remain the sole publication and quota owners. */
+  readonly attached: ReturnType<typeof attachIpcConnection>
+
+  /** Attach the real log once, preserving source retention and the selected scheduler port. */
+  constructor(
+    sessionId: string,
+    sink?: (record: IStderrRecord) => void | Promise<void>,
+    schedulerPort?: IScheduler
+  ) {
+    this.#sink = sink
+    /** Physical closure has no role in diagnostic quota accounting. */
+    const physical: IRpcTransport = {
+      platform: 'Process',
+      send: () => undefined,
+      subscribe: () => () => undefined,
+      close: () => {
+        this.#physicalCloses += 1
       }
-    },
-    (error) => reports.push(error),
-    schedulerPort ?? scheduler
-  )
-  return {
-    records,
-    reports,
-    scheduler,
-    attached,
-    /** Feed hostile-looking data without ever decoding it in the product owner. */
-    emit(count: number) {
-      for (let index = 0; index < count; index += 1)
-        callback?.(new TextEncoder().encode('secret-token-must-never-leave-reader'))
-    },
-    get removals() {
-      return removals
-    },
-    get physicalCloses() {
-      return physicalCloses
     }
+    this.attached = attachIpcConnection(
+      physical,
+      {
+        connectionId: `connection-${sessionId}`,
+        sessionId,
+        processId: 'fixture-child',
+        log: (record) => {
+          if (record.name !== 'ipc.stderr') return
+          this.records.push(record)
+          return this.#sink?.(record)
+        },
+        stderr: (listener) => {
+          this.#callback = listener
+          return () => {
+            this.#removals += 1
+          }
+        }
+      },
+      (error) => this.reports.push(error),
+      schedulerPort ?? this.scheduler
+    )
+  }
+
+  /** Feed hostile-looking bytes without decoding them or adding a diagnostic publication path. */
+  emit(count: number): void {
+    for (let index = 0; index < count; index += 1)
+      this.#callback?.(new TextEncoder().encode('secret-token-must-never-leave-reader'))
+  }
+
+  /** Return the original source unsubscribe count. */
+  get removals(): number {
+    return this.#removals
+  }
+
+  /** Return the original physical close count. */
+  get physicalCloses(): number {
+    return this.#physicalCloses
   }
 }
 
@@ -465,7 +476,7 @@ describe('session stderr budget prototype', () => {
     'preserves normal records and bounds %i chunks exactly',
     async (count) => {
       /** One first-chunk interval decides the fixed normal and summary totals. */
-      const fixture = stderrBudgetFixture(`chunks-${count}`)
+      const fixture = new StderrBudgetFixture(`chunks-${count}`)
       fixture.emit(count)
       expect(fixture.records, 'stderr normal-event budget missing').toHaveLength(
         Math.min(count, 32)
@@ -514,7 +525,7 @@ describe('session stderr budget prototype', () => {
       }
     }
     /** First overflow is scheduled for 1000 but delivered by the host at 1500. */
-    const fixture = stderrBudgetFixture('late-timer', undefined, scheduler)
+    const fixture = new StderrBudgetFixture('late-timer', undefined, scheduler)
     fixture.emit(33)
     now = 1500
     callback?.()
@@ -532,8 +543,8 @@ describe('session stderr budget prototype', () => {
 
   it('isolates sessions and accounts both intervals plus final close exactly', async () => {
     /** Independent session owners must never borrow each other's capacity or totals. */
-    const first = stderrBudgetFixture('first')
-    const second = stderrBudgetFixture('second')
+    const first = new StderrBudgetFixture('first')
+    const second = new StderrBudgetFixture('second')
     first.emit(1000)
     second.emit(33)
     first.scheduler.advance(1000)
@@ -566,7 +577,7 @@ describe('session stderr budget prototype', () => {
     /** The summary reporter delivers one next-interval chunk synchronously. */
     let reentered = false
     /** The fixture is assigned before any record can call its reporter. */
-    const fixture = stderrBudgetFixture('reentry', (record) => {
+    const fixture = new StderrBudgetFixture('reentry', (record) => {
       if (record.droppedChunks === undefined || reentered) return
       reentered = true
       fixture.emit(1)
@@ -590,7 +601,7 @@ describe('session stderr budget prototype', () => {
     expect(fixture.scheduler.pendingCount).toBe(0)
 
     /** A summary can also retire its owner; late source delivery remains invisible. */
-    const closing = stderrBudgetFixture('close-reentry', (record) => {
+    const closing = new StderrBudgetFixture('close-reentry', (record) => {
       if (record.droppedChunks !== undefined) void closing.attached.close()
     })
     closing.emit(33)
@@ -606,7 +617,7 @@ describe('session stderr budget prototype', () => {
     /** The summary sink may join close before the outer call has returned. */
     let reentrant: Promise<void> | undefined
     /** This session overflows once so close synchronously publishes its final summary. */
-    const fixture = stderrBudgetFixture('close-summary-reentry', (record) => {
+    const fixture = new StderrBudgetFixture('close-summary-reentry', (record) => {
       if (record.droppedChunks !== undefined) reentrant = fixture.attached.close()
     })
     fixture.emit(33)
@@ -641,7 +652,7 @@ describe('session stderr budget prototype', () => {
         cause: new Error('fixture original cause')
       })
       /** Every attempted record fails through the established reporter path. */
-      const fixture = stderrBudgetFixture(`report-${mode}`, () => {
+      const fixture = new StderrBudgetFixture(`report-${mode}`, () => {
         if (mode === 'throw') throw failure
         return Promise.reject(failure)
       })

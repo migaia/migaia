@@ -1,11 +1,10 @@
-import { createProcessPlugin } from '../../../rpc-plugin-process/test/protocol.ts'
 import type { IRuntimeExpose } from '@migaia/rpc-host/plugin'
 import { defineFeature, defineHost, definePlugin } from '@migaia/plugin-host'
-import { createThreadPeer } from '../../../rpc-plugin-thread/test/protocol.ts'
 import { threadProtocolDefinition as createThreadPlugin } from '../runtime-api/fixtures/thread-protocol.js'
 import {
   type IRuntimeSurface,
   type IRuntimeDynamicSurface,
+  type IRuntimeFlatten,
   type IRuntimeTypedPeer
 } from '@migaia/rpc-host/plugin'
 
@@ -98,7 +97,7 @@ hostA.thread!.notify('b', 'c.math.add', { y: 1 })
 // @ts-expect-error scalar methods cannot be called as streams.
 hostA.thread!.stream('b', 'c.math.add', { x: 1 })
 /** Omitting a remote surface intentionally offers no callable methods. */
-const unknownPeer = createThreadPeer({ report: () => undefined })
+declare const unknownPeer: Promise<IRuntimeTypedPeer>
 // @ts-expect-error no remote surface means method never.
 unknownPeer.then((peer) => peer.request('math.add', { x: 1 }))
 /** The explicit escape remains subject to the real runtime whitelist. */
@@ -187,9 +186,9 @@ void detailText
 /** Process and thread factories retain platform-specific ownership options purely in types. */
 const binaryProvide = { echo: (payload: ArrayBuffer) => payload }
 /** These declarations exercise public factories; no runtime fixture or extra provider is emitted. */
-const processBinary = import('../../../rpc-plugin-process/test/protocol.ts').then(
-  ({ createProcessPeer }) => createProcessPeer<typeof binaryProvide>({ report: () => undefined })
-)
+declare const processBinary: Promise<
+  IRuntimeTypedPeer<typeof binaryProvide, IRuntimeFlatten<typeof binaryProvide>, 'process'>
+>
 processBinary.then((peer) => {
   // @ts-expect-error process rejects an own transfer field, including an empty list.
   peer.request('echo', new ArrayBuffer(1), { transfer: [] })
@@ -199,7 +198,7 @@ processBinary.then((peer) => {
   peer.group([{ method: 'echo', payload: new ArrayBuffer(1) }], { transfer: [] })
 })
 /** Thread accepts only original ArrayBuffer backings, rather than views or shared memory. */
-const threadBinary = createThreadPeer<typeof binaryProvide>({ report: () => undefined })
+declare const threadBinary: Promise<IRuntimeTypedPeer<typeof binaryProvide>>
 threadBinary.then((peer) => {
   const backing = new ArrayBuffer(1)
   const result: Promise<ArrayBuffer> = peer.request('echo', backing, { transfer: [backing] })
@@ -210,42 +209,25 @@ threadBinary.then((peer) => {
   void result
 })
 
-/** A process Plugin's typed Host outlet uses the same explicit process ownership boundary. */
-const processPlugin = createProcessPlugin<
+/** Explicit process registration metadata retains the real typed outlet's ownership boundary. */
+type IProcessBinaryRegistration = import('@migaia/rpc-host/plugin').IRuntimePluginTyping<
   typeof binaryProvide,
   Record<never, never>,
-  'binary-process'
->({
-  name: 'binary-process',
-  report: () => undefined
-})
-const processHost = defineHost<Record<string, never>, never, readonly [typeof processPlugin]>({
-  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
-})
-// @ts-expect-error a process Plugin does not authorize transfer through its Host facade.
-processHost.process!.request('binary-process', 'echo', new ArrayBuffer(1), { transfer: [] })
+  'binary-process',
+  readonly [],
+  'process'
+>
+/** Type-only native registration metadata does not claim inference from the nongeneric factory. */
+declare const processOutlet: import('../../../rpc-host/dist/remote/runtime-api/typing.js').IRuntimeTypedOutlet<
+  readonly [IProcessBinaryRegistration],
+  'process'
+>
+// @ts-expect-error a process outlet does not authorize transfer through its real platform boundary.
+processOutlet.request('binary-process', 'echo', new ArrayBuffer(1), { transfer: [] })
 /** Accepted thread group calls carry precise backing lists without widening payload or result. */
 threadBinary.then((peer) => {
   const backing = new ArrayBuffer(1)
   peer.group([{ method: 'echo', payload: backing }], { transfer: [backing] })
-})
-
-/** Pair inference is crossed without supplying a remote generic or any runtime type table. */
-const typedPair = import('../../../rpc-host/dist/testing/index.js').then(({ createPeerPair }) =>
-  createPeerPair({
-    a: { provide: { left: (value: string) => value.length } },
-    b: { provide: { right: (value: number) => String(value) } }
-  })
-)
-typedPair.then(({ a, b }) => {
-  const right: Promise<string> = a.request('right', 1)
-  const left: Promise<number> = b.request('left', 'value')
-  // @ts-expect-error A calls B's provide, never its own.
-  a.request('left', 'value')
-  // @ts-expect-error crossed inference retains B's payload.
-  a.request('right', 'value')
-  void right
-  void left
 })
 
 /** Throwing scalars and empty generators preserve their actual callable mode. */

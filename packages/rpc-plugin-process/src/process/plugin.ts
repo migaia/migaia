@@ -1,3 +1,4 @@
+import { RpcTransportMode } from '@migaia/rpc-host/plugin'
 import {
   createAdapterDeployment,
   createAdapterSourceConfigurationError,
@@ -137,8 +138,12 @@ async function processManaged(
     })
   const report = options.report ?? context.report
   if (spawn) {
+    /**
+     * A genuine prewarm pool owns its exact launcher/spec/budget; adoption must retain that
+     * original owner.
+     */
     const launcher =
-      spawn.wire === ProcessPluginWire.jsonrpc
+      spawn.wire === ProcessPluginWire.jsonrpc || spawn.supervision.prewarm !== undefined
         ? spawn.supervision.launcher
         : context.launcher!(spawn.supervision.launcher, spawn.supervision.id)
     const binding = createSpawnProcessBinding(
@@ -212,12 +217,12 @@ export function processPlugin(options: IProcessPluginOptions): IRpcTransportPlug
   const source = spawn ?? target
   const mode =
     parent === true
-      ? 'connect-to-parent'
+      ? RpcTransportMode['connect-to-parent']
       : listen !== undefined
-        ? 'listen'
+        ? RpcTransportMode.listen
         : spawn !== undefined
-          ? 'spawn'
-          : 'connect'
+          ? RpcTransportMode.spawn
+          : RpcTransportMode.connect
   const deployment = createAdapterDeployment({
     runtimeKey: RuntimePluginKey.process,
     runtimeFamily: getProcessByteAdapter(),

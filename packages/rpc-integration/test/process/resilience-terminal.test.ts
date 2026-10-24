@@ -1,9 +1,4 @@
 import * as resilienceOwner from '../../../rpc-plugin-process/dist/process/resilience/index.js'
-import { definePlugin, PluginHost } from '@migaia/plugin-host'
-import { createUnitBudget } from '@migaia/supervision'
-import type { IProcessHandle } from '@migaia/supervision/process'
-import { createProcessPlugin } from '../../../rpc-plugin-process/test/protocol.ts'
-import { REMOTE_FIXTURE_CONTRACT, remoteHarness } from '../../../rpc-host/test/remote/fixture.js'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { describe, expect, it, vi } from 'vitest'
 import { createProcessResilience } from '../../../rpc-plugin-process/dist/process/resilience/index.js'
@@ -14,187 +9,73 @@ async function settle(): Promise<void> {
   for (let turn = 0; turn < 64; turn += 1) await Promise.resolve()
 }
 
-/** A narrow supervisor exposes its real terminal entry and state without a second scheduler. */
-function supervisorFixture(report: (error: unknown) => void) {
-  let state: 'ready' | 'terminal' | 'starting' = 'ready'
-  let entry = 0
-  let listener: (event: { entry: number; error: unknown }) => void = () => undefined
-  const restart = vi.fn(async () => ({ state: 'ready' as const, generation: 2, unit: {} }))
-  const binding: IProcessRegistrationBinding = {
-    ownership: 'spawn-owned',
-    health: 'ping',
-    supervisor: {
-      restart,
-      inspect: () => ({
-        kind: 'fixture',
-        state,
-        generation: 1,
-        failuresInWindow: 0,
-        terminalEntries: entry,
-        degraded: [],
-        abandoned: 0
-      }),
-      onTerminal(next) {
-        listener = next
-        return () => {
-          listener = () => undefined
-        }
-      },
-      dispose: async () => undefined
+/** The original supervisor observation fixture has one explicit mutable state owner. */
+class TerminalSupervisorFixture {
+  /** Terminal observations read the same current supervisor phase as restart consumers. */
+  #state: 'ready' | 'terminal' | 'starting' = 'ready'
+  /** Every native terminal entry advances once and remains visible to inspection. */
+  #entry = 0
+  /** The fixture follows the original single-subscriber supervisor contract. */
+  #listener: (event: { entry: number; error: unknown }) => void = () => undefined
+  /** The exact diagnostic callback remains receiver-free when a terminal entry is reported. */
+  #report: (error: unknown) => void
+  /** Existing assertions retain the same observable restart spy and native result. */
+  readonly restart = vi.fn(async () => ({ state: 'ready' as const, generation: 2, unit: {} }))
+  /** This is the original narrow supervisor port consumed by the production governor. */
+  readonly binding: IProcessRegistrationBinding
+
+  /** Assemble the unchanged registration port before any terminal event can be delivered. */
+  constructor(report: (error: unknown) => void) {
+    this.#report = report
+    this.binding = {
+      ownership: 'spawn-owned',
+      health: 'ping',
+      supervisor: {
+        restart: this.restart,
+        inspect: () => ({
+          kind: 'fixture',
+          state: this.#state,
+          generation: 1,
+          failuresInWindow: 0,
+          terminalEntries: this.#entry,
+          degraded: [],
+          abandoned: 0
+        }),
+        onTerminal: (listener) => {
+          this.#listener = listener
+          return () => {
+            this.#listener = () => undefined
+          }
+        },
+        dispose: async () => undefined
+      }
     }
   }
-  return {
-    binding,
-    restart,
-    enter(error: unknown) {
-      state = 'terminal'
-      entry += 1
-      report(error)
-      listener({ entry, error })
-    },
-    leave() {
-      state = 'starting'
-    }
+
+  /** Report before notifying the original governor, preserving terminal error identity and order. */
+  enter(error: unknown): void {
+    this.#state = 'terminal'
+    this.#entry += 1
+    /** Preserve the original plain callback receiver. */
+    const report = this.#report
+    report(error)
+    /** Deliver the captured listener with the original plain invocation receiver. */
+    const listener = this.#listener
+    listener({ entry: this.#entry, error })
+  }
+
+  /** Simulate only the original departure from terminal, without inventing another lifecycle. */
+  leave(): void {
+    this.#state = 'starting'
   }
 }
 
-describe('process resilience terminal registration', () => {
-  it.each(['spawn', 'connect'] as const)(
-    'gates actual proxy modes and liquidates once through its real local Host for %s',
-    async (deploymentKind) => {
-      /** Existing neutral endpoint records the frame count independently of the real supervisor. */
-      const fixture = remoteHarness()
-      const scheduler = fixture.binding.scheduler
-      const reports: unknown[] = []
-      const host = new PluginHost<Record<string, never>>({
-        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
-      })
-      /** A crash exhausts this deployment without introducing a mocked terminal event. */
-      let crash!: (exit: { code: number; signal: null }) => void
-      const handle: IProcessHandle = {
-        identity: { fingerprint: 'terminal-child' },
-        exited: new Promise((resolve) => {
-          crash = resolve
-        }),
-        terminate: () => crash({ code: 0, signal: null })
-      }
-      /** Borrowed EOF settles only its local socket handle, with no foreign termination port. */
-      let lost: ((reason?: unknown) => void) | undefined
-      const borrowedRaw = {
-        kind: 'byte' as const,
-        write: async () => undefined,
-        onData: () => () => undefined,
-        onClose(listener: (reason?: unknown) => void) {
-          lost = listener
-          return () => {
-            lost = undefined
-          }
-        },
-        close: () => {
-          lost?.()
-          lost = undefined
-        }
-      }
-      const unUse = vi.spyOn(host, 'unUse')
-      const plugin = createProcessPlugin({
-        name: 'p',
-        contract: REMOTE_FIXTURE_CONTRACT,
-        registrationOwner: { name: 'p', host },
-        host: host.plugin,
-        endpointFactory: async () => fixture.served,
-        report: (error) => reports.push(error),
-        deployment:
-          deploymentKind === 'connect'
-            ? {
-                kind: 'connect',
-                address: 'borrowed-fixture',
-                token: 'local-secret',
-                dial: async () => borrowedRaw,
-                establish: async () => ({
-                  ...fixture.channel,
-                  agreement: { ...fixture.channel.agreement, source: 'negotiated' as const }
-                }),
-                supervision: {
-                  scheduler,
-                  restart: { mode: 'on-failure', maxRestarts: 0 },
-                  health: { check: async () => undefined }
-                }
-              }
-            : {
-                kind: 'spawn',
-                channelKind: 'message',
-                supervision: {
-                  id: 'terminal-child',
-                  scheduler,
-                  spec: {
-                    command: 'fixture',
-                    args: [],
-                    env: { inherit: [], set: {} },
-                    stdio: { stdin: 'ignore', stdout: 'ignore', stderr: 'ignore' }
-                  },
-                  launcher: {
-                    capabilities: { termination: 'enforced', 'fault-isolation': 'enforced' },
-                    launch: async () => handle
-                  },
-                  budget: createUnitBudget({ kind: 'process', maxUnits: 1, scheduler }),
-                  restart: { mode: 'on-failure', maxRestarts: 0 },
-                  health: { check: async () => undefined },
-                  report: (error) => reports.push(error)
-                },
-                rawChannel: async () => ({
-                  kind: 'message',
-                  send: () => undefined,
-                  onMessage: () => () => undefined,
-                  onClose: () => () => undefined,
-                  close: () => undefined
-                }),
-                establish: async () => fixture.channel
-              }
-      })
-      try {
-        const [installed] = await host.use(plugin)
-        const feature = installed.getFeature('f') as Record<string, (...args: unknown[]) => unknown>
-        const [other] = await host.use(
-          definePlugin({ name: 'other', install: () => ({ live: true }) })
-        )
-        if (deploymentKind === 'connect') lost!(new Error('borrowed EOF fixture'))
-        else crash({ code: 1, signal: null })
-        await settle()
-        const frames = fixture.sends.length
-        for (const method of ['request', 'oneWay']) {
-          /** Capture rejection before a synchronous assertion, preserving strict base-RED identity. */
-          const failure = await (feature[method]!([]) as Promise<unknown>).then(
-            () => undefined,
-            (error) => error
-          )
-          expect(failure, 'default process call guard').toMatchObject({
-            code: 'PROCESS_TERMINAL_CALL'
-          })
-        }
-        for (const method of ['generator', 'asyncGenerator'])
-          await expect(
-            (feature[method]!([]) as AsyncIterableIterator<unknown>).next()
-          ).rejects.toMatchObject({ code: 'PROCESS_TERMINAL_CALL' })
-        expect(fixture.sends).toHaveLength(frames)
-        expect(reports).toHaveLength(1)
-        for (const offset of [60_000, 240_000, 600_000]) {
-          scheduler.advance(offset)
-          await settle()
-        }
-        expect(unUse.mock.calls.filter(([, options]) => !options?.dryRun)).toHaveLength(1)
-        await unUse.mock.results.find(
-          (result, index) => result.type === 'return' && !unUse.mock.calls[index]?.[1]?.dryRun
-        )?.value
-        await settle()
-        await expect(feature.request!([])).rejects.toMatchObject({ code: 'PROCESS_LIQUIDATED' })
-        expect(other.extensions.live).toBe(true)
-        expect(scheduler.pendingCount).toBe(0)
-      } finally {
-        await host.dispose()
-      }
-    }
-  )
+/** Create the original narrow supervisor with explicit ownership instead of shared factory state. */
+function supervisorFixture(report: (error: unknown) => void) {
+  return new TerminalSupervisorFixture(report)
+}
 
+describe('process resilience terminal registration', () => {
   it('reports at 0/1/5/15 minutes and liquidates after four unhandled entries', async () => {
     const scheduler = createManualScheduler()
     const reports: unknown[] = []

@@ -5,8 +5,7 @@ import {
   RpcProbeKind,
   RpcProbeOutcome,
   RpcProbeStage,
-  rpcProbeSampleKey,
-  snapshotProbeEvent
+  rpcProbeSampleKey
 } from '../../dist/core/probe/index.js'
 import {
   createProbeEmitter,
@@ -34,7 +33,7 @@ it('isolates throwing subscribers, uses one view, updates stages and skips reent
     },
     emit: (view) => {
       identities.add(view)
-      seen.push(snapshotProbeEvent(view))
+      seen.push(Object.freeze({ ...view }))
     }
   })
   /** The failing probe reports its original failure once per callback. */

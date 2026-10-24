@@ -1,29 +1,29 @@
 import { readFileSync } from 'node:fs'
 import { inspect } from 'node:util'
 import { serializeRpcError } from '@migaia/rpc-contract'
+import { attachErrorIdentity } from '@migaia/utils/error'
+import {
+  ERROR_SOURCE,
+  RpcProcessErrorCode
+} from '../../../../rpc-plugin-process/dist/process/error-code.js'
+import { RpcProcessErrorText } from '../../../../rpc-plugin-process/dist/process/error-text.js'
 import { PluginHost, definePlugin, defineFeature } from '@migaia/plugin-host'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { createProcessResilience } from '../../../../rpc-plugin-process/dist/process/resilience/index.js'
 import { createNativeProcessOffer } from '../../../../rpc-plugin-process/dist/process/offer.js'
 import { createProcessTransport } from '../../../../rpc-plugin-process/dist/process/handshake.js'
-import { listenProcessByteChannel } from '@migaia/rpc-plugin-process/adapters/node-socket'
-import { openProcessStdioChannel } from '@migaia/rpc-plugin-process/adapters/node-child-process'
+import { listenProcessByteChannel } from '../../../../rpc-plugin-process/dist/process/adapters/node-socket.js'
+import { openProcessStdioChannel } from '../../../../rpc-plugin-process/dist/process/adapters/node-child-process.js'
 import { serveProcessSessions } from '../../../../rpc-plugin-process/dist/process/plugin/serve.js'
-import { createProcessSessionService } from '../../../../rpc-plugin-process/test/protocol.ts'
+import { createRuntimePeer } from '../../../../rpc-host/dist/remote/runtime-api/peer.js'
 import { createProcessInstanceFallback } from '../../../../rpc-plugin-process/dist/process/resilience/fallback.js'
-import { createComposedEndpoint } from '../../../../rpc-host/dist/core/composed.js'
-import { codec, framer, abort, connect, ping } from '../../../../rpc-host/dist/core/index.js'
+import { createRuntimeEndpointComposition } from '../../../../rpc-host/dist/core/runtime-api-endpoint.js'
+import { codec } from '../../../../rpc-host/dist/core/middleware/codec.js'
+import { framer } from '../../../../rpc-host/dist/core/middleware/framer.js'
+import { abort } from '../../../../rpc-host/dist/core/middleware/abort.js'
+import { connect } from '../../../../rpc-host/dist/core/middleware/connect.js'
+import { ping } from '../../../../rpc-host/dist/core/middleware/ping.js'
 import { isRpcTimeoutError } from '@migaia/rpc-host'
-import {
-  createCanonicalChunkFeature,
-  createStreamFeature
-} from '../../../../rpc-host/dist/core/stream/index.js'
-import { createOutboundFeature } from '../../../../rpc-host/dist/core/features/outbound.js'
-import { createProviderFeature } from '../../../../rpc-host/dist/core/features/provider.js'
-import { createDiscoveryFeature } from '../../../../rpc-host/dist/core/features/discovery.js'
-import { createControlFeature } from '../../../../rpc-host/dist/core/features/control.js'
-import { createOneWayFeature } from '../../../../rpc-host/dist/core/features/one-way.js'
-
 /** The published vector owns every business method and mode used by this fixture. */
 const contract = JSON.parse(
   readFileSync(new URL('../../../schema/vectors/remote-contract.json', import.meta.url), 'utf8')
@@ -40,10 +40,8 @@ const state = {
   frames: [],
   reports: []
 }
-/** A single callback is owned by the production fallback subscription. */
-let health
-/** Physical sessions and target instances receive different monotonically increasing identities. */
-let sequence = 0
+/** Control callbacks never enter the portable business receipt containing provider counters. */
+const control = { health: undefined, sequence: 0 }
 /** Bootstrap mode reads its secret through the public stdio owner. */
 const opened = mode === 'stderr' ? await openProcessStdioChannel({ bootstrap: 'stdin' }) : undefined
 /** Socket authentication is inherited through a private descriptor, never argv or environment. */
@@ -55,11 +53,6 @@ const resilience =
   mode === 'flood'
     ? createProcessResilience({ scheduler: systemScheduler, report, maxConnections: 2 })
     : undefined
-/** The shared target is an actual PluginHost; per-connection targets use the same definition. */
-const host = new PluginHost({
-  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
-})
-
 /** Reports contain only native semantic codes; failure text cannot echo authentication values. */
 function report(error) {
   state.reports.push({
@@ -71,16 +64,8 @@ function report(error) {
 
 /** Build a public canonical graph with the exact session policy supplied by production serve. */
 async function endpointFactory(channel, _signal, session) {
-  /** All control, provider and stream roots share the same outbound and chunk owners. */
-  const chunk = createCanonicalChunkFeature()
-  /** The outbound owner routes responses and cancellations independently per physical session. */
-  const outbound = createOutboundFeature(chunk)
-  /** Provider dispatch uses the core's idempotency and replay owners. */
-  const provider = createProviderFeature(outbound)
-  /** Discovery is the public contract-description owner. */
-  const discovery = createDiscoveryFeature(outbound)
-  /** IPC middleware remains supplied by the authenticated process channel. */
-  const endpoint = await createComposedEndpoint(
+  /** Reuse the genuine runtime physical installation with this exact session's native policy. */
+  const { installing } = createRuntimeEndpointComposition(
     {
       id: 'ts-peer',
       scheduler: channel.scheduler,
@@ -93,21 +78,12 @@ async function endpointFactory(channel, _signal, session) {
         abort(),
         connect({ transport: channel.transport }),
         ping()
-      ]
+      ],
+      features: channel.features
     },
-    {
-      'first-party-chunk': chunk,
-      'first-party-outbound': outbound,
-      'first-party-provider': provider,
-      'first-party-discovery': discovery,
-      'first-party-control': createControlFeature(outbound, discovery),
-      'first-party-one-way': createOneWayFeature(outbound),
-      'first-party-stream': createStreamFeature(outbound, provider, {
-        capability: { supports: () => channel.agreement.capabilities.includes('stream@1') }
-      }),
-      ...Object.fromEntries(channel.features.map((feature, index) => [`channel-${index}`, feature]))
-    }
+    channel
   )
+  const endpoint = await installing
   /** The canonical transport emits decoded envelopes; this observer records only message metadata. */
   channel.transport.subscribe(({ data }) => {
     /** Received metadata demonstrates equal request IDs crossing independent connections. */
@@ -121,74 +97,97 @@ async function endpointFactory(channel, _signal, session) {
   return { endpoint, stream: endpoint.stream, oneWay: endpoint }
 }
 
-/** Produce a real target definition; invocation context comes from production remote dispatch. */
-function target() {
-  /** Each replacement has an observable feature revision in the same child PID. */
-  const revision = state.revision
-  return definePlugin({
-    name: 'p',
-    install: () => ({}),
-    features: {
-      f: defineFeature(() => ({
-        async request(input, context) {
-          if (input === 'stats') return { ...state, pid: process.pid }
-          if (input?.[0] === 'health') {
-            queueMicrotask(() =>
-              health?.({
-                targetName: 'p',
-                connectionId: input[1],
-                reason: new Error('explicit fixture health event')
-              })
-            )
-            return true
-          }
-          if (input === 'stderr') {
-            /** Separate writes deliberately split every potential six-character token window. */
-            for (const part of credentials.alice.match(/.{1,3}/g)) {
-              process.stderr.write(part)
-              await new Promise((resolve) => setTimeout(resolve, 5))
-            }
-            return true
-          }
-          state.executions += 1
-          state.contexts.push({ method: 'request', ...context.session })
-          if (input?.[0] === 'wait') {
-            await new Promise((resolve) =>
-              context.signal.addEventListener(
-                'abort',
-                () => {
-                  state.aborts.push({
-                    label: input[1],
-                    ...context.session,
-                    code: context.signal.reason?.code ?? null,
-                    message: context.signal.reason?.message ?? null,
-                    localTimeout: isRpcTimeoutError(context.signal.reason)
+/** One real PluginHost owns each target instance; providers borrow only its installed outputs. */
+class IsolationTarget {
+  /** Actual native replacement/disposal stays with this original PluginHost. */
+  host = new PluginHost({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } })
+  /** Output is captured only when the real Feature install occurs, never from a candidate DTO. */
+  #output
+  /** Return the currently installed business object after native Feature construction. */
+  get output() {
+    return this.#output
+  }
+  /** Build one actual target definition with the revision captured for that generation. */
+  definition() {
+    const revision = state.revision
+    return definePlugin({
+      name: 'p',
+      install: () => ({}),
+      features: {
+        f: defineFeature(() => {
+          const output = {
+            async request(input, context) {
+              if (input === 'stats') return { ...state, pid: process.pid }
+              if (input?.[0] === 'health') {
+                queueMicrotask(() =>
+                  control.health?.({
+                    targetName: 'p',
+                    connectionId: input[1],
+                    reason: new Error('explicit fixture health event')
                   })
-                  resolve()
-                },
-                { once: true }
-              )
-            )
+                )
+                return true
+              }
+              if (input === 'stderr') {
+                /** Separate writes deliberately split every potential six-character token window. */
+                for (const part of credentials.alice.match(/.{1,3}/g)) {
+                  process.stderr.write(part)
+                  await new Promise((resolve) => setTimeout(resolve, 5))
+                }
+                return true
+              }
+              state.executions += 1
+              state.contexts.push({ method: 'request', ...context.session })
+              if (input?.[0] === 'wait') {
+                await new Promise((resolve) =>
+                  context.signal.addEventListener(
+                    'abort',
+                    () => {
+                      state.aborts.push({
+                        label: input[1],
+                        ...context.session,
+                        code: context.signal.reason?.code ?? null,
+                        message: context.signal.reason?.message ?? null,
+                        localTimeout: isRpcTimeoutError(context.signal.reason)
+                      })
+                      resolve()
+                    },
+                    { once: true }
+                  )
+                )
+              }
+              return { input, execution: state.executions, revision, session: context.session }
+            },
+            oneWay(input, context) {
+              state.contexts.push({ method: 'oneWay', input, ...context.session })
+            },
+            *generator(input, context) {
+              state.contexts.push({ method: 'generator', ...context.session })
+              yield { input, session: context.session }
+            },
+            async *asyncGenerator(input, context) {
+              state.contexts.push({ method: 'asyncGenerator', ...context.session })
+              yield { input, session: context.session }
+            }
           }
-          return { input, execution: state.executions, revision, session: context.session }
-        },
-        oneWay(input, context) {
-          state.contexts.push({ method: 'oneWay', input, ...context.session })
-        },
-        *generator(input, context) {
-          state.contexts.push({ method: 'generator', ...context.session })
-          yield { input, session: context.session }
-        },
-        async *asyncGenerator(input, context) {
-          state.contexts.push({ method: 'asyncGenerator', ...context.session })
-          yield { input, session: context.session }
-        }
-      }))
-    }
-  })
+          this.#output = output
+          return output
+        })
+      }
+    })
+  }
+  /** Install the original target before any session can register business methods. */
+  async start() {
+    await this.host.use(this.definition())
+  }
 }
 
-await host.use(target())
+/** Shared mode deliberately keeps the same target Host across independent physical sessions. */
+const sharedTarget = new IsolationTarget()
+await sharedTarget.start()
+/** The original Host is also the canonical instance fallback replacement authority. */
+const host = sharedTarget.host
+
 /** Production serve owns handshake admission, connection scope, provider limits and fallback. */
 const options = {
   host,
@@ -200,21 +199,13 @@ const options = {
   createSharedTarget: () => {
     state.replacements += 1
     state.revision += 1
-    return target()
+    return sharedTarget.definition()
   },
   onInstanceUnhealthy: (listener) => {
-    health = listener
+    control.health = listener
     return () => {
-      health = undefined
+      control.health = undefined
     }
-  },
-  createSessionHost: async () => {
-    /** Each physical connection receives an independently owned target Host. */
-    const owned = new PluginHost({
-      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
-    })
-    await owned.use(target())
-    return owned
   },
   ingress: opened
     ? {
@@ -257,14 +248,84 @@ const options = {
         createConnectionContext: () => ({
           peerId: 'caller',
           ipc: {
-            connectionId: `connection-${++sequence}`,
-            sessionId: `session-${sequence}`,
+            connectionId: `connection-${++control.sequence}`,
+            sessionId: `session-${control.sequence}`,
             processId: String(process.pid),
             log: () => undefined
           }
         })
       }
 }
+/**
+ * Register this fixture's application payloads on the actual accepted native Peer.
+ *
+ * @param {import('../../../../rpc-plugin-process/dist/process/plugin/serve.js').IProcessReadySession} session
+ *   Genuine native accepted resource.
+ * @returns {Promise<{ close(): Promise<void> }>} Original Peer and optional target cleanup
+ *   transaction.
+ * @throws {unknown} Original construction failure; rollback failures are reported independently.
+ */
+async function serveSession({ channel, endpoint, identity, signal }) {
+  const owned = mode === 'per-connection' ? new IsolationTarget() : undefined
+  if (owned) await owned.start()
+  const feature = (owned ?? sharedTarget).output
+  /** Session identity is lent by the actual process governor, never reconstructed from peer names. */
+  const context = (actual) => ({ session: identity, signal: actual.signal })
+  let peer
+  try {
+    peer = await createRuntimePeer(
+      {
+        self: { name: 'ts-peer', instanceId: 'ts-peer' },
+        contract,
+        report,
+        provide: {
+          p: {
+            f: {
+              request: (params, actual) => feature.request(params[0], context(actual)),
+              oneWay: (params, actual) => feature.oneWay(params[0], context(actual)),
+              generator: (params, actual) => feature.generator(params[0], context(actual)),
+              asyncGenerator: (params, actual) => feature.asyncGenerator(params[0], context(actual))
+            }
+          }
+        }
+      },
+      { channel, endpoint, signal }
+    )
+  } catch (primary) {
+    if (owned) {
+      try {
+        await owned.host.dispose()
+      } catch (cleanup) {
+        report(cleanup)
+      }
+    }
+    throw primary
+  }
+  return {
+    close: async () => {
+      const errors = []
+      try {
+        await peer.close()
+      } catch (error) {
+        errors.push(error)
+      }
+      if (owned) {
+        try {
+          await owned.host.dispose()
+        } catch (error) {
+          errors.push(error)
+        }
+      }
+      if (errors.length === 1) throw errors[0]
+      if (errors.length > 1)
+        throw attachErrorIdentity(new AggregateError(errors, RpcProcessErrorText.channelClosed), {
+          source: ERROR_SOURCE,
+          code: RpcProcessErrorCode.channelClosed
+        })
+    }
+  }
+}
+
 /** Original recovery and target selectors are shared with retained advanced service consumers. */
 const fallback = createProcessInstanceFallback({
   mode: options.instanceMode,
@@ -279,7 +340,7 @@ const governor = resilience ?? createProcessResilience({ scheduler: systemSchedu
 const service = await serveProcessSessions(
   options.ingress,
   endpointFactory,
-  createProcessSessionService(options),
+  serveSession,
   governor,
   report,
   fallback,

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { bridgeFixture, flush } from './fixture.js'
+import { BridgeFixture, flush } from './fixture.js'
 import { objectFixtureEndpoint } from './json-object-fixture.js'
 import { objectGoldenCase } from './json-object-golden-fixture.js'
 
@@ -31,7 +31,7 @@ function observeInner(value: unknown): unknown {
 describe('fixed-seed frame equivalence', () => {
   it('compares every physical frame and inner result for 10000 seeded payloads', async () => {
     /** Two independently assembled endpoints differ only by the public fallback middleware. */
-    const fixtures = [bridgeFixture(), bridgeFixture()]
+    const fixtures = [new BridgeFixture(), new BridgeFixture()]
     /** Both negotiated channels use identical peer contract, clocks and deterministic IDs. */
     const channels = await Promise.all(fixtures.map((fixture) => fixture.open()))
     /** The first endpoint exercises default production admission; the second stays public string. */

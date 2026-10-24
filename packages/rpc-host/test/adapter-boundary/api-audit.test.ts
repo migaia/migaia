@@ -1,11 +1,10 @@
 import { expect, it, vi } from 'vitest'
-import {
-  createRuntimeByteConnection,
-  createRuntimeMessageConnection
-} from '../../dist/adapter/internal-advanced.js'
+import { createRuntimeByteConnection } from '../../dist/runtime-adapter/byte/handshake.js'
+import { createRuntimeMessageConnection } from '../../dist/runtime-adapter/message/connection.js'
 import { connectionOptions, diagnostics, duplex, reaches } from './audit-byte-fixture.js'
-import { constructDefinitionPeer } from '../../dist/runtime-adapter/definition.js'
-import { defineByteAdapter } from '../../dist/adapter.js'
+import { createRpcHost } from '../../dist/index.js'
+import { defineTransportPlugin } from '../../dist/plugin/define.js'
+import { defineByteAdapter } from '../../dist/runtime-adapter/definition.js'
 
 it('refuses a pre-aborted peer signal before opening its byte source', async () => {
   /** A complete byte source remains available, but cancellation must prevent acquisition. */
@@ -20,16 +19,25 @@ it('refuses a pre-aborted peer signal before opening its byte source', async () 
   const controller = new AbortController()
   controller.abort(original)
   /** Observe immediately so both the fixed and broken constructions can be safely reclaimed. */
-  const attempt = constructDefinitionPeer(adapter, {
-    connect: {},
-    peerId: 'remote',
-    self: { name: 'local', instanceId: 'local' },
-    signal: controller.signal
-  }).catch((error: unknown) => error)
+  const attempt = Promise.resolve()
+    .then(() =>
+      createRpcHost({
+        self: { name: 'local', instanceId: 'local' },
+        signal: controller.signal,
+        plugins: [
+          defineTransportPlugin({
+            name: 'audit',
+            mode: 'connect',
+            deployment: adapter.deployment({ connect: {}, peerId: 'remote' })
+          })
+        ]
+      })
+    )
+    .catch((error: unknown) => error)
   try {
     await new Promise<void>((resolve) => setImmediate(resolve))
     physical.close()
-    expect(await attempt).toBe(original)
+    expect(await attempt).toMatchObject({ code: 'CANCELLED', cause: original })
     expect(open).not.toHaveBeenCalled()
   } finally {
     physical.close()
@@ -59,20 +67,29 @@ it('aborts and physically releases an in-progress byte handshake', async () => {
   /** Settlement is recorded before the finally block manually closes either physical side. */
   let settled = false
   /** Observe all outcomes so a broken implementation cannot leave an unhandled construction. */
-  const attempt = constructDefinitionPeer(adapter, {
-    connect: {},
-    peerId: 'remote',
-    self: { name: 'local', instanceId: 'local' },
-    signal: controller.signal
-  }).then(
-    (peer) => {
-      settled = true
-      return peer.close()
-    },
-    () => {
-      settled = true
-    }
-  )
+  const attempt = Promise.resolve()
+    .then(() =>
+      createRpcHost({
+        self: { name: 'local', instanceId: 'local' },
+        signal: controller.signal,
+        plugins: [
+          defineTransportPlugin({
+            name: 'audit',
+            mode: 'connect',
+            deployment: adapter.deployment({ connect: {}, peerId: 'remote' })
+          })
+        ]
+      })
+    )
+    .then(
+      (peer) => {
+        settled = true
+        return peer.close()
+      },
+      () => {
+        settled = true
+      }
+    )
   try {
     await firstWrite
     controller.abort(new Error('audit cancel active handshake'))

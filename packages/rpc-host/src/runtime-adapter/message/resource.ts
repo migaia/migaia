@@ -19,7 +19,10 @@ import {
   registerNativeReplayOwner,
   bindNativeReplayTransport
 } from '../../core/internal/native-replay.js'
-import type { IRuntimePeerSourceResult, IRuntimePeerSourceContext } from '../../remote/index.js'
+import type {
+  IRuntimePeerSourceResult,
+  IRuntimePeerSourceContext
+} from '../../remote/runtime-api/peer.js'
 import { createEventEmitterMessageHandoff, createEventTargetMessageHandoff } from './handoff.js'
 import type {
   IAdapterEventEmitterMessagePort,

@@ -3,14 +3,14 @@ import { fileURLToPath } from 'node:url'
 import { it } from 'vitest'
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { createProcessPlugin } from '../../../rpc-plugin-process/test/protocol.ts'
+import { processPlugin } from '@migaia/rpc-plugin-process'
 import { createProcessTransport } from '../../../rpc-plugin-process/dist/process/handshake.js'
-import { createNodeProcessLauncher } from '@migaia/rpc-plugin-process/adapters/node-child-process'
+import { createNodeProcessLauncher } from '../../../rpc-plugin-process/dist/process/adapters/node-child-process.js'
 import { threadProtocolDefinition as createThreadPlugin } from './fixtures/thread-protocol.js'
 import {
   createNodeThreadChannelFactory,
   createNodeThreadLauncher
-} from '@migaia/rpc-plugin-thread/adapters/node'
+} from '../../../rpc-plugin-thread/dist/threads/adapters/node.js'
 import type { ISpawnProcessPluginDeployment } from '../../../rpc-plugin-process/dist/process/plugin/types.js'
 import { RuntimeEventName } from '../../../rpc-host/dist/remote/runtime-api/constants.js'
 import type { IRuntimeEvent } from '../../../rpc-host/dist/remote/runtime-api/events.js'
@@ -136,7 +136,7 @@ it.each(['process', 'thread'] as const)(
       }
       await host.use(
         kind === 'process'
-          ? createProcessPlugin({
+          ? processPlugin({
               name: 'bridge',
               spawn: processDeployment,
               provide,

@@ -1,15 +1,15 @@
-import { PluginHost } from '@migaia/plugin-host'
+import { definePlugin, PluginHost } from '@migaia/plugin-host'
 import { describe, expect, it } from 'vitest'
 import { acceptRpcHandshake } from '@migaia/rpc-contract'
-import { createRemotePlugin } from '../../../rpc-host/dist/remote/plugin.js'
-import { createRemoteHost } from '../../../rpc-host/dist/remote/host.js'
+import { createManagedRuntimePeer } from '../../../rpc-host/dist/remote/runtime-api/managed-peer.js'
+import type { IRuntimePeer } from '../../../rpc-host/dist/remote/runtime-api/peer.js'
+import type { IRemoteChannel, IRemoteServeEndpoint } from '@migaia/rpc-host/plugin'
 import { remoteHarness, remoteDescription } from '../../../rpc-host/test/remote/fixture.js'
 import {
   BRIDGE_CONTRACT,
   BRIDGE_METHODS,
   BRIDGE_PEER_OFFER,
-  bridgeEndpoint,
-  bridgeFixture,
+  BridgeFixture,
   flush
 } from './fixture.js'
 
@@ -17,6 +17,7 @@ import {
 function responder(description: unknown) {
   return (message: Record<string, unknown>): unknown => {
     if (message.method === 'migaia.hello') {
+      /** The foreign offer remains independent from the native runtime capability list. */
       const answer = acceptRpcHandshake(
         BRIDGE_PEER_OFFER,
         (message.params as { hello: string }).hello
@@ -35,9 +36,82 @@ function responder(description: unknown) {
   }
 }
 
+/** Retain the actual bridge source and canonical managed generation without an old remote facade. */
+class RemoteBridgeScenario {
+  /** Existing neutral supervisor ports supply only native readiness and generation state. */
+  readonly #neutral = remoteHarness()
+  /** The original independent foreign byte peer owns its own frames and close counters. */
+  readonly fixture: BridgeFixture
+  /** Host catalog qualification remains a physical JSON-RPC channel input. */
+  readonly #hostTarget: boolean
+  /** Logical-key generation remains with the original canonical managed call owner. */
+  readonly #keyFactory: (() => string) | undefined
+  /** The accepted callable is published only after one genuine directory exchange. */
+  #peer: IRuntimePeer | undefined
+  /** Endpoint construction count observes actual composition rather than a replacement dispatcher. */
+  endpointConstructions = 0
+  /** Physical messages at endpoint construction prove description has not run prematurely. */
+  endpointMessages: unknown[] = []
+  /** Actual transport features are observed before canonical endpoint installation. */
+  channelFeatureCount = 0
+  /** The accepted channel retains original capability assertions without a synthetic offer. */
+  #channel: IRemoteChannel | undefined
+
+  /** Capture immutable case inputs without opening the native source. */
+  constructor(fixture: BridgeFixture, hostTarget = false, keyFactory?: () => string) {
+    this.fixture = fixture
+    this.#hostTarget = hostTarget
+    this.#keyFactory = keyFactory
+  }
+
+  /** Only accepted startup publishes the actual managed callable for business operations. */
+  get peer(): IRuntimePeer {
+    return this.#peer!
+  }
+  /** Read the original accepted channel rather than copying its capability agreement. */
+  get channel(): IRemoteChannel {
+    return this.#channel!
+  }
+
+  /** Observe the same canonical composition boundary before its first description request. */
+  #endpoint = (channel: IRemoteChannel, served: IRemoteServeEndpoint) => {
+    this.endpointConstructions++
+    this.endpointMessages = this.fixture.messages.map((message) => message.method)
+    this.channelFeatureCount = channel.features.length
+    this.#channel = channel
+    return served
+  }
+
+  /** Prepare one genuine managed registration over the existing source and native readiness ports. */
+  async open(): Promise<IRuntimePeer> {
+    return (this.#peer = await createManagedRuntimePeer(
+      {
+        self: { name: 'client', instanceId: 'client' },
+        keyFactory: this.#keyFactory,
+        report: (error) => this.fixture.reports.push(error)
+      },
+      {
+        ...this.#neutral.binding,
+        scheduler: this.fixture.scheduler,
+        openChannel: () =>
+          this.#hostTarget
+            ? this.fixture.open({ target: { kind: 'host', catalog: { p: BRIDGE_CONTRACT } } })
+            : this.fixture.open()
+      },
+      this.#endpoint
+    ))
+  }
+
+  /** The canonical managed holder owns both normal release and failed-start rollback. */
+  async close(): Promise<void> {
+    await this.#peer?.close()
+  }
+}
+
 describe('JSON-RPC remote assembly', () => {
   it('rejects a missing describe extension through real Host preparation', async () => {
-    const fixture = bridgeFixture({
+    /** Missing extension is still an independent foreign protocol error. */
+    const fixture = new BridgeFixture({
       responder: (message) =>
         message.method === 'migaia.describe'
           ? {
@@ -47,20 +121,10 @@ describe('JSON-RPC remote assembly', () => {
             }
           : responder(remoteDescription([BRIDGE_CONTRACT], 'peer', true))(message)
     })
-    const neutral = remoteHarness()
-    const remote = createRemoteHost({
-      catalog: { p: BRIDGE_CONTRACT },
-      binding: {
-        ...neutral.binding,
-        scheduler: fixture.scheduler,
-        openChannel: () =>
-          fixture.open({ target: { kind: 'host', catalog: { p: BRIDGE_CONTRACT } } })
-      },
-      endpointFactory: async (channel) => ({ endpoint: await bridgeEndpoint(channel) }),
-      report: () => undefined
-    })
+    /** Actual managed startup replaces only the retired ready/release remote facade. */
+    const scenario = new RemoteBridgeScenario(fixture, true)
     try {
-      await expect(remote.ready()).rejects.toMatchObject({
+      await expect(scenario.open()).rejects.toMatchObject({
         code: 'JSONRPC_EXTENSION_MISSING',
         cause: {
           code: 'JSONRPC_EXTENSION_MISSING',
@@ -68,7 +132,7 @@ describe('JSON-RPC remote assembly', () => {
         }
       })
     } finally {
-      await remote.release()
+      await scenario.close()
     }
     expect(fixture.messages.map((message) => message.method)).toEqual([
       'migaia.hello',
@@ -76,104 +140,52 @@ describe('JSON-RPC remote assembly', () => {
     ])
     expect(fixture.closes).toBe(1)
   })
-  it('carries Host controls and their results through the real remote facade', async () => {
-    const description = remoteDescription([BRIDGE_CONTRACT], 'peer', true)
-    const entry = { name: 'p', state: 'enabled', revision: 1, features: ['f'] }
-    const fixture = bridgeFixture({
-      responder: (message) => {
-        if (message.method !== 'migaia.invoke') return responder(description)(message)
-        const method = (message.params as { method: string }).method
-        const result =
-          method === 'migaia.remote.host.use'
-            ? entry
-            : method === 'migaia.remote.host.unUse'
-              ? { ok: true }
-              : { revision: 1, plugins: [entry] }
-        return { jsonrpc: '2.0', id: message.id, result }
-      }
-    })
-    const neutral = remoteHarness()
-    const remote = createRemoteHost({
-      catalog: { p: BRIDGE_CONTRACT },
-      binding: {
-        ...neutral.binding,
-        scheduler: fixture.scheduler,
-        openChannel: () =>
-          fixture.open({ target: { kind: 'host', catalog: { p: BRIDGE_CONTRACT } } })
-      },
-      endpointFactory: async (channel) => ({ endpoint: await bridgeEndpoint(channel) }),
-      report: () => undefined
-    })
-    try {
-      const features = await remote.use('p')
-      expect(Object.keys(features)).toEqual(['f'])
-      await expect(remote.unUse('p', { policy: 'suspend' })).resolves.toEqual({ ok: true })
-      await expect(remote.inspect()).resolves.toEqual({ revision: 1, plugins: [entry] })
-      expect(
-        fixture.messages
-          .filter((message) => message.method === 'migaia.invoke')
-          .map((message) => message.params)
-      ).toEqual([
-        { method: 'migaia.remote.host.use', args: ['p'], meta: { timeoutMs: 1000 } },
-        {
-          method: 'migaia.remote.host.unUse',
-          args: ['p', { policy: 'suspend' }],
-          meta: { timeoutMs: 1000 }
-        },
-        { method: 'migaia.remote.host.inspect', args: [], meta: { timeoutMs: 1000 } }
-      ])
-    } finally {
-      await remote.release()
-    }
-  })
+
   it('gates real PluginHost preparation on one describe and carries the automatic key', async () => {
-    const fixture = bridgeFixture({ responder: responder(remoteDescription([BRIDGE_CONTRACT])) })
-    const neutral = remoteHarness()
+    /** Actual foreign directory retains the original modes and idempotency declarations. */
+    const fixture = new BridgeFixture({
+      responder: responder(remoteDescription([BRIDGE_CONTRACT]))
+    })
+    /** Ordinary installation owns the real managed callable's lifetime. */
     const host = new PluginHost<Record<string, never>>({
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
     })
-    let channel: Awaited<ReturnType<typeof fixture.open>> | undefined
-    let endpointConstructions = 0
-    const plugin = createRemotePlugin({
-      name: 'p',
-      contract: BRIDGE_CONTRACT,
-      host: host.plugin,
-      binding: {
-        ...neutral.binding,
-        scheduler: fixture.scheduler,
-        openChannel: async () => (channel = await fixture.open())
-      },
-      endpointFactory: async (incoming) => {
-        endpointConstructions++
-        expect(fixture.messages.map((message) => message.method)).toEqual(['migaia.hello'])
-        expect(incoming.features).toHaveLength(2)
-        const endpoint = await bridgeEndpoint(incoming)
-        return { endpoint, oneWay: endpoint }
-      },
-      report: (error) => fixture.reports.push(error),
-      keyFactory: () => 'automatic-logical-key'
-    })
+    /** The canonical managed registration owns original logical key generation. */
+    const scenario = new RemoteBridgeScenario(fixture, false, () => 'automatic-logical-key')
     try {
-      const [handle] = await host.use(plugin)
-      expect(endpointConstructions).toBe(1)
+      await host.use(
+        definePlugin({
+          name: 'p',
+          setup: async (context) => {
+            /** PluginHost awaits actual native preparation before completing installation. */
+            const peer = await scenario.open()
+            context.onDispose(peer.close)
+            return peer
+          },
+          install: () => ({})
+        })
+      )
+      expect(scenario.endpointConstructions).toBe(1)
+      expect(scenario.endpointMessages).toEqual(['migaia.hello'])
+      expect(scenario.channelFeatureCount).toBe(2)
       expect(fixture.messages.map((message) => message.method)).toEqual([
         'migaia.hello',
         'migaia.describe'
       ])
-      const feature = handle!.getFeature('f') as {
-        request(args: unknown[], options?: { timeoutMs?: number }): Promise<unknown>
-        plain(
-          args: unknown[],
-          options?: { timeoutMs?: number; idempotencyKey?: string }
-        ): Promise<unknown>
-        oneWay(args: unknown[]): Promise<void>
-      }
-      expect(await feature.request(['idempotent'], { timeoutMs: 40 })).toEqual(['idempotent'])
-      expect(await feature.plain(['plain'], { timeoutMs: 40 })).toEqual(['plain'])
+      expect(await scenario.peer.request('p.f.request', ['idempotent'], { timeoutMs: 40 })).toEqual(
+        ['idempotent']
+      )
+      expect(await scenario.peer.request('p.f.plain', ['plain'], { timeoutMs: 40 })).toEqual([
+        'plain'
+      ])
       expect(
-        await feature.plain(['key'], { timeoutMs: 40, idempotencyKey: 'explicit-key' })
+        await scenario.peer.request('p.f.plain', ['key'], {
+          timeoutMs: 40,
+          idempotencyKey: 'explicit-key'
+        })
       ).toEqual(['key'])
-      await feature.oneWay(['notification'])
+      await scenario.peer.notify('p.f.oneWay', ['notification'])
+      /** Physical invokes retain all original logical-key and notification assertions. */
       const invokes = fixture.messages.filter((message) => message.method === 'migaia.invoke')
       expect(invokes[0]!.params).toMatchObject({
         meta: { idempotencyKey: 'automatic-logical-key', timeoutMs: 40 }
@@ -181,25 +193,35 @@ describe('JSON-RPC remote assembly', () => {
       expect((invokes[1]!.params as { meta: unknown }).meta).not.toHaveProperty('idempotencyKey')
       expect(invokes[2]!.params).toMatchObject({ meta: { idempotencyKey: 'explicit-key' } })
       expect(invokes[3]).not.toHaveProperty('id')
-      await expect(feature.request([() => undefined])).rejects.toMatchObject({
-        code: 'REMOTE_CONTRACT_INVALID'
-      })
+      expect(() => scenario.peer.request('p.f.request', [() => undefined])).toThrow(
+        expect.objectContaining({
+          name: 'TypeError',
+          source: 'rpc.contract',
+          code: 'INVALID_ENVELOPE'
+        })
+      )
       expect(fixture.messages.filter((message) => message.method === 'migaia.invoke')).toHaveLength(
         4
       )
-      expect(channel!.agreement.capabilities).not.toContain('idempotency@1')
+      expect(scenario.channel.agreement.capabilities).not.toContain('idempotency@1')
     } finally {
       await host.dispose()
     }
     expect(fixture.closes).toBe(1)
   })
+
   it('does not settle hello or publish a channel before physical drain', async () => {
+    /** The physical source owns this one original write-drain gate. */
     let drain!: () => void
+    /** Handshake publication cannot overtake the actual raw write completion. */
     const draining = new Promise<void>((resolve) => {
       drain = resolve
     })
-    const fixture = bridgeFixture({ drain: draining })
+    /** The independent foreign peer withholds its original write completion. */
+    const fixture = new BridgeFixture({ drain: draining })
+    /** Observation belongs only to this original channel preparation Promise. */
     let settled = false
+    /** The existing raw source performs the genuine hello exchange. */
     const preparing = fixture.open().then((channel) => {
       settled = true
       return channel
@@ -208,20 +230,14 @@ describe('JSON-RPC remote assembly', () => {
     expect(fixture.writes).toHaveLength(1)
     expect(settled).toBe(false)
     drain()
+    /** Only physical drain allows the original accepted channel to publish. */
     const channel = await preparing
     expect(settled).toBe(true)
     expect(fixture.messages).toHaveLength(1)
     await channel.close()
   })
+
   it.each([
-    [
-      'mismatch',
-      {
-        ...BRIDGE_CONTRACT,
-        features: { f: { methods: { request: { mode: 'request', idempotent: true } } } }
-      },
-      'REMOTE_CONTRACT_INVALID'
-    ],
     [
       'stream',
       {
@@ -233,30 +249,34 @@ describe('JSON-RPC remote assembly', () => {
   ])(
     'rolls back real PluginHost before publishing a %s description',
     async (_kind, description, code) => {
-      const fixture = bridgeFixture({
+      /** The foreign peer independently returns the deliberately incompatible directory. */
+      const fixture = new BridgeFixture({
         responder: responder(remoteDescription([description as typeof BRIDGE_CONTRACT]))
       })
-      const neutral = remoteHarness()
+      /** Ordinary PluginHost retains the original failed-install rollback boundary. */
       const host = new PluginHost<Record<string, never>>({
         execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
       })
-      const plugin = createRemotePlugin({
-        name: 'p',
-        contract: BRIDGE_CONTRACT,
-        host: host.plugin,
-        binding: {
-          ...neutral.binding,
-          scheduler: fixture.scheduler,
-          openChannel: () => fixture.open()
-        },
-        endpointFactory: async (channel) => ({ endpoint: await bridgeEndpoint(channel) }),
-        report: () => undefined
-      })
+      /** Canonical managed startup retains the same actual channel cleanup owner. */
+      const scenario = new RemoteBridgeScenario(fixture)
       try {
-        await expect(host.use(plugin)).rejects.toMatchObject({
-          code: 'PLUGIN_INSTALL_FAILED',
-          cause: { code }
-        })
+        await expect(
+          host.use(
+            definePlugin({
+              name: 'p',
+              setup: async (context) => {
+                /**
+                 * A directory rejection prevents installation and leaves cleanup with native
+                 * startup.
+                 */
+                const peer = await scenario.open()
+                context.onDispose(peer.close)
+                return peer
+              },
+              install: () => ({})
+            })
+          )
+        ).rejects.toMatchObject({ code: 'PLUGIN_INSTALL_FAILED', cause: { code } })
         expect(fixture.messages.map((message) => message.method)).toEqual([
           'migaia.hello',
           'migaia.describe'
@@ -267,14 +287,10 @@ describe('JSON-RPC remote assembly', () => {
       }
     }
   )
+
   it.each([
     ['valid', remoteDescription([BRIDGE_CONTRACT], 'peer', true), undefined],
     ['retired v1 contract', BRIDGE_CONTRACT, 'JSONRPC_PROFILE_INVALID'],
-    [
-      'wrong catalog',
-      remoteDescription([{ ...BRIDGE_CONTRACT, plugin: 'q' }], 'peer', true),
-      'REMOTE_CONTRACT_INVALID'
-    ],
     [
       'stream catalog',
       remoteDescription(
@@ -290,34 +306,25 @@ describe('JSON-RPC remote assembly', () => {
       'JSONRPC_UNSUPPORTED_MODE'
     ]
   ])('validates the Host v2 directory: %s', async (_kind, description, code) => {
-    const fixture = bridgeFixture({ responder: responder(description) })
-    const neutral = remoteHarness()
-    const remote = createRemoteHost({
-      catalog: { p: BRIDGE_CONTRACT },
-      binding: {
-        ...neutral.binding,
-        scheduler: fixture.scheduler,
-        openChannel: () =>
-          fixture.open({ target: { kind: 'host', catalog: { p: BRIDGE_CONTRACT } } })
-      },
-      endpointFactory: async (channel) => ({ endpoint: await bridgeEndpoint(channel) }),
-      report: () => undefined
-    })
+    /** Host directory qualification remains an actual JSON-RPC channel contract. */
+    const fixture = new BridgeFixture({ responder: responder(description) })
+    /** The canonical managed Peer replaces the retired remote ready/release control facade. */
+    const scenario = new RemoteBridgeScenario(fixture, true)
     try {
       if (code)
-        await expect(remote.ready()).rejects.toMatchObject({
+        await expect(scenario.open()).rejects.toMatchObject({
           code,
           ...(_kind === 'retired v1 contract'
             ? { cause: { code: 'JSONRPC_PROFILE_INVALID', cause: { code: 'CONTRACT_INVALID' } } }
             : {})
         })
-      else await expect(remote.ready()).resolves.toBeUndefined()
+      else await expect(scenario.open()).resolves.toBeDefined()
       expect(
         fixture.messages.filter((message) => message.method === 'migaia.describe')
       ).toHaveLength(1)
       expect(fixture.messages.filter((message) => message.method === 'migaia.invoke')).toEqual([])
     } finally {
-      await remote.release()
+      await scenario.close()
     }
     expect(fixture.closes).toBe(1)
   })

@@ -13,54 +13,91 @@ import { BrowserBenchText } from './text.mjs'
  * @returns {void} Publishes fixture controls consumed by the standalone Chromium driver.
  */
 export function installPage(workerPath, activate) {
-  /** One outstanding fixture exchange preserves the sequential budget business path. */
-  let exchange
-  /** Worker ownership belongs to this one isolated browser side. */
-  let worker
+  new BrowserPage(workerPath, activate).install()
+}
+
+/** One isolated page owns the original Worker, control port, echo and full error classification. */
+class BrowserPage {
+  /** Fixed bundle path remains independent for bare and RPC sides. */
+  #workerPath
+  /** Original echo constructor keeps its receiver-free invocation and native ownership. */
+  #activate
+  /** One outstanding exchange preserves the original sequential budget business path. */
+  #exchange
+  /** Worker remains owned by this original isolated page fixture. */
+  #worker
   /** Independent control messages never enter the RPC envelope stream. */
-  let control
-  /** Complete error classifications are retained, with absent semantic reasons explicit. */
-  const classification = { failures: [], rejections: [] }
-  globalThis.benchPrepare = async (payloadBytes) => {
-    /** The control port is set before the provider is constructed or readiness is acknowledged. */
+  #control
+  /** Every failure/rejection retains the original complete semantic classification. */
+  #classification = { failures: [], rejections: [] }
+  /** @param {string} workerPath Original bundle. @param {Function} activate Original constructor. */
+  constructor(workerPath, activate) {
+    this.#workerPath = workerPath
+    this.#activate = activate
+  }
+  /** @returns {void} Publish the same four original driver controls without starting a Worker. */
+  install() {
+    globalThis.benchPrepare = this.#prepare
+    globalThis.benchMark = this.#mark
+    globalThis.benchWarmup = this.#warmup
+    globalThis.benchRun = this.#run
+  }
+  /**
+   * @param {number} payloadBytes Original fixed payload size. @returns {Promise<void>} Actual
+   *   readiness and first echo.
+   */
+  #prepare = async (payloadBytes) => {
+    /** Control is installed before provider construction or native readiness acknowledgement. */
     const channel = new MessageChannel()
-    control = channel.port1
-    /** Both sides allocate through this original page owner; RPC supplies it to its launcher. */
+    this.#control = channel.port1
+    /** Real allocation remains owned by this page even when the native RPC launcher requests it. */
     let createWorker
+    /** Preserve the same original native readiness Promise and error boundary. */
     const ready = new Promise((resolve, reject) => {
-      control.onmessage = () => resolve()
-      /** Real allocation remains here; the RPC launcher calls this before its private bootstrap. */
+      this.#control.onmessage = () => resolve()
       createWorker = () => {
-        worker = new Worker(workerPath, { type: 'module' })
-        worker.onerror = (event) => reject(new Error(event.message))
-        worker.postMessage({ port: channel.port2 }, [channel.port2])
-        return worker
+        this.#worker = new Worker(this.#workerPath, { type: 'module' })
+        this.#worker.onerror = (event) => reject(new Error(event.message))
+        this.#worker.postMessage({ port: channel.port2 }, [channel.port2])
+        return this.#worker
       }
     })
-    exchange = await activate(createWorker, 'x'.repeat(payloadBytes), classification)
+    this.#exchange = await (0, this.#activate)(
+      createWorker,
+      'x'.repeat(payloadBytes),
+      this.#classification
+    )
     await ready
-    await exchange()
+    await (0, this.#exchange)()
   }
-  globalThis.benchMark = async () => {
+  /** @returns {Promise<void>} Keep the same user timing mark and actual Worker acknowledgement. */
+  #mark = async () => {
     performance.mark(BrowserBenchText.pageMark)
     await new Promise((resolve) => {
-      control.onmessage = () => resolve()
-      control.postMessage(BrowserBenchText.mark)
+      this.#control.onmessage = () => resolve()
+      this.#control.postMessage(BrowserBenchText.mark)
     })
   }
-  globalThis.benchWarmup = async () => {
-    for (let index = 0; index < 100; index++) await exchange()
+  /** @returns {Promise<void>} Retain the original fixed 100 sequential warm-up exchanges. */
+  #warmup = async () => {
+    for (let index = 0; index < 100; index++) await (0, this.#exchange)()
   }
-  globalThis.benchRun = async (samples) => {
-    /** Raw issue-order latencies are saved in full; Playwright makes one call for the whole loop. */
+  /**
+   * @param {number} samples Original requested sample count. @returns {Promise<object>} Complete
+   *   issue-order latencies and classification.
+   */
+  #run = async (samples) => {
+    /** Every original settled latency remains in the same raw issue-order array. */
     const latenciesNs = []
+    /** Formal timing still begins in the page's monotonic clock, after preparation and warm-up. */
     const begin = performance.now()
     for (let index = 0; index < samples; index++) {
+      /** Each same-clock interval covers only its original awaited echo. */
       const start = performance.now()
       try {
-        await exchange()
+        await (0, this.#exchange)()
       } catch (error) {
-        classification.failures.push({
+        this.#classification.failures.push({
           source: error?.source ?? null,
           code: error?.code ?? null,
           name: error?.name ?? typeof error,
@@ -71,6 +108,10 @@ export function installPage(workerPath, activate) {
       }
       latenciesNs.push((performance.now() - start) * 1e6)
     }
-    return { latenciesNs, elapsedNs: (performance.now() - begin) * 1e6, classification }
+    return {
+      latenciesNs,
+      elapsedNs: (performance.now() - begin) * 1e6,
+      classification: this.#classification
+    }
   }
 }

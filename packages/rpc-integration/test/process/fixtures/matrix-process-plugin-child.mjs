@@ -1,26 +1,22 @@
 import { access } from 'node:fs/promises'
-import { defineFeature, definePlugin, PluginHost } from '@migaia/plugin-host'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { createManualScheduler } from '@migaia/utils/testing'
-import { openProcessStdioChannel } from '@migaia/rpc-plugin-process/adapters/node-child-process'
-import { listenProcessByteChannel } from '@migaia/rpc-plugin-process/adapters/node-socket'
+import { openProcessStdioChannel } from '../../../../rpc-plugin-process/dist/process/adapters/node-child-process.js'
+import { listenProcessByteChannel } from '../../../../rpc-plugin-process/dist/process/adapters/node-socket.js'
 import { createProcessTransport } from '../../../../rpc-plugin-process/dist/process/handshake.js'
 import { createNativeProcessOffer } from '../../../../rpc-plugin-process/dist/process/offer.js'
 import { serveProcessSessions } from '../../../../rpc-plugin-process/dist/process/plugin/serve.js'
 import { createProcessResilience } from '../../../../rpc-plugin-process/dist/process/resilience/index.js'
-import { serveRemotePlugin } from '../../../../rpc-host/dist/remote/serve-plugin.js'
+import { createRuntimePeer } from '../../../../rpc-host/dist/remote/runtime-api/peer.js'
+import { createRuntimeFeatureRoots } from '../../../../rpc-host/dist/core/runtime-api-endpoint.js'
+import { RemoteMethodName } from '../../../../rpc-host/dist/remote/constants.js'
 import { createComposedEndpoint } from '../../../../rpc-host/dist/core/composed.js'
-import { createCanonicalChunkFeature } from '../../../../rpc-host/dist/core/stream/index.js'
-import { createControlFeature } from '../../../../rpc-host/dist/core/features/control.js'
-import { createDiscoveryFeature } from '../../../../rpc-host/dist/core/features/discovery.js'
-import { createOutboundFeature } from '../../../../rpc-host/dist/core/features/outbound.js'
-import { createProviderFeature } from '../../../../rpc-host/dist/core/features/provider.js'
 import { createStreamFeature } from '../../../../rpc-host/dist/core/stream/index.js'
-import { codec } from '../../../../rpc-host/dist/core/index.js'
-import { framer } from '../../../../rpc-host/dist/core/index.js'
-import { abort } from '../../../../rpc-host/dist/core/index.js'
-import { connect } from '../../../../rpc-host/dist/core/index.js'
-import { ping } from '../../../../rpc-host/dist/core/index.js'
+import { codec } from '../../../../rpc-host/dist/core/middleware/codec.js'
+import { framer } from '../../../../rpc-host/dist/core/middleware/framer.js'
+import { abort } from '../../../../rpc-host/dist/core/middleware/abort.js'
+import { connect } from '../../../../rpc-host/dist/core/middleware/connect.js'
+import { ping } from '../../../../rpc-host/dist/core/middleware/ping.js'
 
 /**
  * Fixture messages go to drained stderr; stdout remains exclusively native RPC.
@@ -50,89 +46,39 @@ async function gate(path) {
   }
 }
 
-/** Both deployment modes expose the same business methods and actual async stream. */
-const contract = {
-  schemaVersion: 1,
-  plugin: 'p',
-  features: {
-    f: {
-      methods: {
-        request: { mode: 'request', idempotent: false },
-        generator: { mode: 'async-generator', idempotent: false }
-      }
-    }
-  }
-}
-/** Fixture Host owns only its business provider, never the parent test's PluginHost. */
-const host = new PluginHost({
-  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
-})
-/** Pending methods observe cancellation through the real process invocation signal. */
+/** Pending methods observe cancellation through the actual process invocation signal. */
 let serving
-await host.use(
-  definePlugin({
-    name: 'p',
-    features: {
-      f: defineFeature(() => ({
-        request: async (value, invocation) => {
-          if (value === 'pending') {
-            mark('request-entered')
-            await new Promise((resolve) =>
-              invocation.signal.addEventListener('abort', resolve, { once: true })
-            )
-            mark('request-aborted')
-            return 'cancelled'
-          }
-          if (value === 'exit') setTimeout(() => process.exit(9), 5)
-          if (value === 'stderr') mark('ready-stderr')
-          if (value === 'explicit-close')
-            setTimeout(async () => {
-              await serving.close()
-              mark('explicit-closed')
-            }, 5)
-          return `${process.env.RPC_VALUE ?? 'child'}:${value}`
-        },
-        generator: async function* (value, invocation) {
-          mark(`stream-entered:${value}`)
-          try {
-            yield `${value}:1`
-            yield `${value}:2`
-            await new Promise((resolve) =>
-              invocation.signal.addEventListener('abort', resolve, { once: true })
-            )
-          } finally {
-            mark(`stream-aborted:${value}`)
-          }
-        }
-      }))
-    },
-    install: () => ({})
-  })
-)
-
-/**
- * Each channel receives fresh stream roots; no provider or stream state crosses sessions.
- *
- * @returns {object} Canonical endpoint feature roots.
- */
-function roots() {
-  /** The endpoint owns canonical chunk state for this session. */
-  const chunk = createCanonicalChunkFeature()
-  /** Outbound shares only the endpoint chunk state. */
-  const outbound = createOutboundFeature(chunk)
-  /** Discovery reuses the endpoint outbound owner. */
-  const discovery = createDiscoveryFeature(outbound)
-  /** Control reuses this endpoint discovery and outbound owners. */
-  const control = createControlFeature(outbound, discovery)
-  /** Provider lifetime is scoped to this endpoint. */
-  const provider = createProviderFeature(outbound)
-  return {
-    'first-party-chunk': chunk,
-    'first-party-outbound': outbound,
-    'first-party-discovery': discovery,
-    'first-party-control': control,
-    'first-party-provider': provider,
-    'first-party-stream': createStreamFeature(outbound, provider)
+/** Both physical deployment modes expose the same real provider methods. */
+const business = {
+  request: async ([value], invocation) => {
+    if (value === 'pending') {
+      mark('request-entered')
+      await new Promise((resolve) =>
+        invocation.signal.addEventListener('abort', resolve, { once: true })
+      )
+      mark('request-aborted')
+      return 'cancelled'
+    }
+    if (value === 'exit') setTimeout(() => process.exit(9), 5)
+    if (value === 'stderr') mark('ready-stderr')
+    if (value === 'explicit-close')
+      setTimeout(async () => {
+        await serving.close()
+        mark('explicit-closed')
+      }, 5)
+    return `${process.env.RPC_VALUE ?? 'child'}:${value}`
+  },
+  generator: async function* ([value], invocation) {
+    mark(`stream-entered:${value}`)
+    try {
+      yield `${value}:1`
+      yield `${value}:2`
+      await new Promise((resolve) =>
+        invocation.signal.addEventListener('abort', resolve, { once: true })
+      )
+    } finally {
+      mark(`stream-aborted:${value}`)
+    }
   }
 }
 
@@ -162,47 +108,107 @@ const token = new TextDecoder().decode(opened.bootstrap)
  * @returns {Promise<object>} Dedicated endpoint and stream owner.
  */
 async function endpointFactory(channel) {
-  /** One negotiated process channel owns this composed endpoint. */
-  const endpoint = await createComposedEndpoint(
-    {
-      id: 'child',
-      transport: channel.transport,
-      middlewares: [
-        codec(channel.pipeline.codec),
-        framer(channel.pipeline.framer),
-        abort(),
-        connect({ transport: channel.transport }),
-        ping()
-      ]
-    },
-    { ...roots(), 'channel-ipc-log': channel.features[0], 'channel-ipc-gate': channel.features[1] }
+  /** Reuse the actual runtime root construction without another preset or selection factory. */
+  const config = {
+    id: 'child',
+    transport: channel.transport,
+    features: channel.features,
+    middlewares: [
+      codec(channel.pipeline.codec),
+      framer(channel.pipeline.framer),
+      abort(),
+      connect({ transport: channel.transport }),
+      ping()
+    ]
+  }
+  /** This foreign stream oracle intentionally retains the original unfiltered stream owner. */
+  const prepared = createRuntimeFeatureRoots(config, channel)
+  prepared.roots['first-party-stream'] = createStreamFeature(
+    prepared.roots['first-party-outbound'],
+    prepared.roots['first-party-provider']
   )
-  /** The canonical registration port is preserved while the describe gate observes it. */
-  const provide = endpoint.provide
-  /** Canonical disposal remains the single endpoint cleanup owner. */
-  const dispose = endpoint.dispose
-  /** Preserve the canonical projection ancestry that owns the authenticated v2 identity. */
-  const observed = Object.create(endpoint)
-  Object.defineProperties(observed, {
-    provide: {
-      value: (method, handler) =>
-        provide(method, async (context) => {
-          if (method === 'migaia.remote.runtime.describe') {
-            mark('describe-entered')
-            await gate(process.env.RPC_DESCRIBE_GATE)
-          }
-          return handler(context)
-        })
-    },
-    dispose: {
-      value: async () => {
-        mark('endpoint-dispose')
-        if (process.env.RPC_PARENT_LOSS === 'hung') await new Promise(() => {})
-        return dispose()
+  /** Each session retains its original physical pipeline and independent kernel. */
+  const endpoint = await createComposedEndpoint(prepared.options, prepared.roots)
+  return { endpoint: new MatrixEndpoint(endpoint).value, oneWay: endpoint, stream: endpoint.stream }
+}
+
+/** Observe the original endpoint without granting an additional runtime or cleanup authority. */
+class MatrixEndpoint {
+  /** @type {import('@migaia/rpc-host').IRpcEndpoint} Actual canonical resource owner. */
+  #endpoint
+  /** @type {Promise<void> | undefined} Shared cleanup joins one disposal and emits its marker once. */
+  #closing
+  /**
+   * @type {import('@migaia/rpc-host').IRpcEndpoint} Original projection ancestry retains private
+   *   attachments.
+   */
+  value
+  /**
+   * Capture the genuine endpoint and expose transparent provider/disposal observations.
+   *
+   * @param {import('@migaia/rpc-host').IRpcEndpoint} endpoint Original composed resource.
+   */
+  constructor(endpoint) {
+    this.#endpoint = endpoint
+    this.value = Object.freeze(
+      Object.defineProperties(Object.create(endpoint), {
+        provide: { value: (method, handler) => this.#provide(method, handler) },
+        dispose: { value: () => this.#dispose() }
+      })
+    )
+  }
+  /**
+   * Delay the actual describe handler at the existing gate.
+   *
+   * @param {string} method Original registration name.
+   * @param {import('@migaia/rpc-host').IRpcProvider} handler Original provider callback.
+   * @returns {import('@migaia/rpc-host').IRpcEndpoint} Original fluent endpoint.
+   */
+  #provide(method, handler) {
+    return (0, this.#endpoint.provide)(method, async (context) => {
+      if (method === RemoteMethodName.runtimeDescribe) {
+        mark('describe-entered')
+        await gate(process.env.RPC_DESCRIBE_GATE)
       }
+      return handler(context)
+    })
+  }
+  /** @returns {Promise<void>} Exact first disposal shared by Peer and session cleanup. */
+  #dispose() {
+    return (this.#closing ??= this.#closeOnce())
+  }
+  /** @returns {Promise<void>} Original disposal, deliberately pending in the parent-loss fault. */
+  async #closeOnce() {
+    mark('endpoint-dispose')
+    if (process.env.RPC_PARENT_LOSS === 'hung') await new Promise(() => {})
+    await this.#endpoint.dispose()
+  }
+}
+
+/**
+ * Bind the original byte session to its actual provider/directory owner.
+ *
+ * @param {import('../../../../rpc-plugin-process/dist/process/plugin/serve.js').IProcessReadySession} session
+ *   Original accepted resources.
+ * @returns {Promise<{ close(): Promise<void> }>} Actual Peer cleanup with the original marker.
+ * @throws {Error} Original provider/directory construction failure.
+ */
+async function prepareService({ channel, endpoint }) {
+  /** The original Peer preserves method contexts and owns its canonical endpoint cleanup. */
+  const peer = await createRuntimePeer(
+    {
+      self: { name: 'child', instanceId: 'child' },
+      provide: { p: { f: business } },
+      report: (error) => mark(`report:${error.code}`)
+    },
+    { channel, endpoint }
+  )
+  return {
+    close: () => {
+      mark('service-close')
+      return peer.close()
     }
-  })
-  return { endpoint: Object.freeze(observed), stream: endpoint.stream }
+  }
 }
 
 /** One responder port delays the actual hello handling until the parent opens the gate. */
@@ -281,23 +287,7 @@ if (scheduler) {
   serving = await serveProcessSessions(
     ingress,
     endpointFactory,
-    async ({ endpoint }) => {
-      /** Observe the canonical service close port separately from endpoint disposal. */
-      const service = await serveRemotePlugin({
-        host,
-        contract,
-        endpoint,
-        report: (error) => mark(`report:${error.code}`),
-        invocationContext: (context) => ({ signal: context.signal })
-      })
-      return {
-        ...service,
-        close: () => {
-          mark('service-close')
-          return service.close()
-        }
-      }
-    },
+    prepareService,
     resilience,
     (error) => mark(`report:${error.code}`),
     undefined,
@@ -321,14 +311,7 @@ if (scheduler) {
   serving = await serveProcessSessions(
     ingress,
     endpointFactory,
-    ({ endpoint, identity }) =>
-      serveRemotePlugin({
-        host,
-        contract,
-        endpoint,
-        report: (error) => mark(`report:${error.code}`),
-        invocationContext: (context) => Object.freeze({ session: identity, signal: context.signal })
-      }),
+    prepareService,
     resilience,
     (error) => mark(`report:${error.code}`),
     undefined,

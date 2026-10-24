@@ -1,23 +1,20 @@
+import { createProbeEmitter, bindInstalledProbe } from '../../dist/core/internal/probe-emitter.js'
+import { systemScheduler } from '@migaia/utils/scheduler'
+import { createRuntimeEndpointComposition } from '../../dist/core/runtime-api-endpoint.js'
+import { RpcCapability } from '@migaia/rpc-contract'
 import { MessageChannel } from 'node:worker_threads'
 import { expect, it } from 'vitest'
-import {
-  connect,
-  createEndpoint,
-  createRuntimeApiEndpoint,
-  defineMiddleware
-} from '../../dist/core/index.js'
-import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
+import { connect } from '../../dist/core/middleware/connect.js'
+
+import { createRuntimeApiEndpoint } from '../../dist/core/runtime-api-endpoint.js'
+import { defineMiddleware } from '../../dist/core/middleware.js'
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
 import {
   createBrowserMessagePortTransport,
   createNodeMessagePortTransport
 } from '../../dist/core/adapters/message-port.js'
 import { createWebWorkerTransport } from '../../dist/core/adapters/web-worker.js'
-import {
-  defineProbe,
-  probePlugin,
-  readProbeStages,
-  subscribeProbeStages
-} from '../../dist/core/probe/index.js'
+import { defineProbe, readProbeStages, subscribeProbeStages } from '../../dist/core/probe/index.js'
 
 it('publishes the binding disposal settlement before one synchronous reentry', async () => {
   /** The bound operation is allowed to synchronously join disposal before returning its Promise. */
@@ -65,19 +62,26 @@ it('rebuilds installed probe stages even when an earlier cold listener throws', 
   /** Actual memory traffic proves pause reaches the emitter rather than only updating the mask. */
   const [left, right] = createMemoryTransportPair()
   /** The provider handles the real request through the normal public endpoint. */
-  const server = await createEndpoint({
-    id: 'probe-server',
-    transport: right,
-    middlewares: [connect({ transport: right })]
-  })
+  const server = await createRuntimeEndpointComposition(
+    {
+      id: 'probe-server',
+      transport: right,
+      middlewares: [connect({ transport: right })]
+    },
+    { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+  ).installing
   server.provide('echo', (context) => context.success(context.data))
-  /** Probe installation follows the failing cold listener. */
-  const client = await createEndpoint({
-    id: 'probe-client',
-    transport: left,
-    targetIds: ['probe-server'],
-    middlewares: [connect({ transport: left }), probePlugin(probe)]
-  })
+  /** The actual emitter subscribes after the failing cold listener. */
+  bindInstalledProbe(left, createProbeEmitter([probe], systemScheduler.now, 'probe-client'))
+  const client = await createRuntimeEndpointComposition(
+    {
+      id: 'probe-client',
+      transport: left,
+      targetIds: ['probe-server'],
+      middlewares: [connect({ transport: left })]
+    },
+    { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+  ).installing
   try {
     await client.send('probe-server', 'echo', 'before')
     expect(() => probe.setStages([])).toThrow(original)
@@ -143,11 +147,14 @@ it('classifies the original middleware installation failure at the endpoint boun
   const [left, right] = createMemoryTransportPair()
   try {
     await expect(
-      createEndpoint({
-        id: 'audit-install',
-        transport: left,
-        middlewares: [connect({ transport: left }), middleware]
-      })
+      createRuntimeEndpointComposition(
+        {
+          id: 'audit-install',
+          transport: left,
+          middlewares: [connect({ transport: left }), middleware]
+        },
+        { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+      ).installing
     ).rejects.toBe(original)
     expect(original).toMatchObject({ source: 'rpc.endpoint', code: 'CALLBACK_FAILED' })
   } finally {
@@ -206,11 +213,14 @@ it.each([true, false])(
     const controller = new AbortController()
     if (preAborted) controller.abort(reason)
     /** Manual mode ensures no automatic discovery changes the cancellation path. */
-    const endpoint = await createEndpoint({
-      id: 'manual-client',
-      transport: left,
-      middlewares: [connect({ transport: left, discoveryMode: 'manual' })]
-    })
+    const endpoint = await createRuntimeEndpointComposition(
+      {
+        id: 'manual-client',
+        transport: left,
+        middlewares: [connect({ transport: left, discoveryMode: 'manual' })]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     try {
       /** Both pre-admission and active-waiter cancellation use the same supported public query. */
       const pending = endpoint.connect

@@ -1,10 +1,12 @@
+import { createRuntimeEndpointComposition } from '../../dist/core/runtime-api-endpoint.js'
+import { RpcCapability } from '@migaia/rpc-contract'
 import assert from 'node:assert/strict'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createGenerationController } from '@migaia/lifecycle'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { identityCodec } from '@migaia/serialize/codecs/identity/v1'
-import { createEndpoint } from '../../dist/core/index.js'
-import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
+
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
 import { connect } from '../../dist/core/middleware/connect.js'
 import { abort } from '../../dist/core/middleware/abort.js'
 import { OperationScope } from '../../dist/core/internal/operation-scope.js'
@@ -172,21 +174,27 @@ describe('private qualification and canonical ownership', () => {
   it('real canonical requests in both directions omit unread caller and provider signals', async () => {
     const [leftTransport, rightTransport] = createMemoryTransportPair()
     /** Both endpoints independently use their actual canonical request and provider owners. */
-    const left = await createEndpoint({
-      id: 'a',
-      targetIds: ['b'],
-      transport: leftTransport,
-      middlewares: [connect(), abort()],
-      provider: { echo: (context) => context.success(context.data) }
-    })
+    const left = await createRuntimeEndpointComposition(
+      {
+        id: 'a',
+        targetIds: ['b'],
+        transport: leftTransport,
+        middlewares: [connect(), abort()],
+        provider: { echo: (context) => context.success(context.data) }
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     /** The second endpoint is also a real initiator, rather than a fake dispatch fixture. */
-    const right = await createEndpoint({
-      id: 'b',
-      targetIds: ['a'],
-      transport: rightTransport,
-      middlewares: [connect(), abort()],
-      provider: { echo: (context) => context.success(context.data) }
-    })
+    const right = await createRuntimeEndpointComposition(
+      {
+        id: 'b',
+        targetIds: ['a'],
+        transport: rightTransport,
+        middlewares: [connect(), abort()],
+        provider: { echo: (context) => context.success(context.data) }
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     try {
       await left.send('b', 'echo', 'warm')
       await right.send('a', 'echo', 'warm')
@@ -221,29 +229,35 @@ describe('private qualification and canonical ownership', () => {
     /** External caller signal exists before constructor observation. */
     const caller = new AbortController()
     /** Real caller owns abort routing. */
-    const left = await createEndpoint({
-      id: 'a',
-      targetIds: ['b'],
-      transport: leftTransport,
-      middlewares: [connect(), abort()]
-    })
+    const left = await createRuntimeEndpointComposition(
+      {
+        id: 'a',
+        targetIds: ['b'],
+        transport: leftTransport,
+        middlewares: [connect(), abort()]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     /** Real provider retains context until this fixture settles it. */
-    const right = await createEndpoint({
-      id: 'b',
-      targetIds: ['a'],
-      transport: rightTransport,
-      middlewares: [connect(), abort()],
-      provider: {
-        echo: async (context) => {
-          if (context.data === 'hold') {
-            retained = context
-            enter()
-            await hold
+    const right = await createRuntimeEndpointComposition(
+      {
+        id: 'b',
+        targetIds: ['a'],
+        transport: rightTransport,
+        middlewares: [connect(), abort()],
+        provider: {
+          echo: async (context) => {
+            if (context.data === 'hold') {
+              retained = context
+              enter()
+              await hold
+            }
+            return context.success(context.data)
           }
-          return context.success(context.data)
         }
-      }
-    })
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     try {
       await left.send('b', 'echo', 'warm')
       /** Capture only the held request and routed cancellation. */
@@ -299,25 +313,31 @@ describe('private qualification and canonical ownership', () => {
       }
     })
     /** Copied middleware token also loses its private factory identity. */
-    const left = await createEndpoint({
-      id: 'a',
-      targetIds: ['b'],
-      transport: leftTransport,
-      codec,
-      framer,
-      middlewares: [{ ...connect() }, abort()],
-      provider: { echo: (context) => context.success(context.data) }
-    })
+    const left = await createRuntimeEndpointComposition(
+      {
+        id: 'a',
+        targetIds: ['b'],
+        transport: leftTransport,
+        codec,
+        framer,
+        middlewares: [{ ...connect() }, abort()],
+        provider: { echo: (context) => context.success(context.data) }
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     /** Matching public configuration does not make either endpoint eligible. */
-    const right = await createEndpoint({
-      id: 'b',
-      targetIds: ['a'],
-      transport: rightTransport,
-      codec,
-      framer,
-      middlewares: [{ ...connect() }, abort()],
-      provider: { echo: (context) => context.success(context.data) }
-    })
+    const right = await createRuntimeEndpointComposition(
+      {
+        id: 'b',
+        targetIds: ['a'],
+        transport: rightTransport,
+        codec,
+        framer,
+        middlewares: [{ ...connect() }, abort()],
+        provider: { echo: (context) => context.success(context.data) }
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     try {
       assert.equal(await left.send('b', 'echo', 'copied'), 'copied')
       assert.equal(await right.send('a', 'echo', 'custom'), 'custom')

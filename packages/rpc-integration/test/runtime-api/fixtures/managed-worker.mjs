@@ -1,4 +1,5 @@
-import { createThreadPeer } from '../../../../rpc-plugin-thread/test/protocol.ts'
+import { createRpcHost } from '@migaia/rpc-host'
+import { threadPlugin } from '@migaia/rpc-plugin-thread'
 import { readThreadBootstrap } from '../../../../rpc-plugin-thread/dist/threads/bootstrap.js'
 import { workerData } from 'node:worker_threads'
 
@@ -17,7 +18,8 @@ const paddingDeclarations = Object.fromEntries(
 )
 /** Native automatic bootstrap supplies this generation's actual identity and parent route. */
 let prepared
-prepared = createThreadPeer({
+prepared = createRpcHost({
+  plugins: [threadPlugin({ connectToParent: true })],
   ...(data.lifecycleMode
     ? {
         contract: {

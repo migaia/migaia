@@ -17,6 +17,47 @@ export type IReplayReservation = Readonly<{
   release(now: number, invokedCount?: number): void
 }>
 
+/** One complete member set keeps its original entry identities for final settlement. */
+type IReplayMembers = Readonly<{
+  keys: readonly string[]
+  entries: readonly IReplayEntry[]
+  peerKey: string
+}>
+
+/** Own one terminal group decision without adding another replay or capacity owner. */
+class ReplayReservation {
+  /** Late rollback cannot erase an already executed group's original replay history. */
+  #settled = false
+  /** The actual ledger alone owns entry identity checks, lease counts and retention. */
+  #settle: (retainInvoked: boolean, now: number, invokedCount: number) => void
+  /** Omitted invoked count retains the original all-members release contract. */
+  #count: number
+
+  /** Capture only the exact accepted member operation, without retaining another replay table. */
+  constructor(
+    count: number,
+    settle: (retainInvoked: boolean, now: number, invokedCount: number) => void
+  ) {
+    this.#count = count
+    this.#settle = settle
+  }
+
+  /** The existing frozen token exposes only its one rollback-or-release terminal decision. */
+  surface(): IReplayReservation {
+    return Object.freeze({
+      rollback: () => this.#finish(false, 0, 0),
+      release: (now, invokedCount = this.#count) => this.#finish(true, now, invokedCount)
+    })
+  }
+
+  /** Publish the terminal decision before the original lease callbacks can reenter. */
+  #finish(retainInvoked: boolean, now: number, invokedCount: number): void {
+    if (this.#settled) return
+    this.#settled = true
+    this.#settle(retainInvoked, now, invokedCount)
+  }
+}
+
 /** Non-evicting replay ledger for business requests. */
 export class RequestReplayLedger {
   /** Accepted requests retain monotonic admission times in insertion order until TTL expiry. */
@@ -183,36 +224,31 @@ export class RequestReplayLedger {
     }
     for (let index = 0; index < keys.length; index++)
       this.#active.set(keys[index]!, entries[index]!)
-    /** One terminal decision prevents a late rollback from erasing executed replay history. */
-    let settled = false
-    return Object.freeze({
-      rollback: () => {
-        if (settled) return
-        settled = true
-        for (let index = 0; index < keys.length; index++) {
-          const entry = entries[index]!
-          if (this.#active.get(keys[index]!) !== entry) continue
-          this.#active.delete(keys[index]!)
-          entry.releaseCount()
-          this.#release?.(peerKey)
-        }
-      },
-      release: (at: number, invokedCount = keys.length) => {
-        if (settled) return
-        settled = true
-        for (let index = 0; index < keys.length; index++) {
-          /** An unused member releases its exact original capacity and identity retention. */
-          const entry = entries[index]!
-          if (this.#active.get(keys[index]!) !== entry) continue
-          if (index < invokedCount) this.releaseActive(keys[index]!, at)
-          else {
-            this.#active.delete(keys[index]!)
-            entry.releaseCount()
-            this.#release?.(peerKey)
-          }
-        }
+    /** These exact accepted entries remain the ledger's single settlement authority. */
+    const members: IReplayMembers = { keys, entries, peerKey }
+    return new ReplayReservation(keys.length, (retainInvoked, at, invokedCount) =>
+      this.#settleMembers(members, retainInvoked, at, invokedCount)
+    ).surface()
+  }
+
+  /** Preserve only the invoked prefix; rollback/unused entries release their original identity. */
+  #settleMembers(
+    members: IReplayMembers,
+    retainInvoked: boolean,
+    at: number,
+    invokedCount: number
+  ): void {
+    for (let index = 0; index < members.keys.length; index++) {
+      /** Exact matching prevents a late token from deleting a newer entry under the same key. */
+      const entry = members.entries[index]!
+      if (this.#active.get(members.keys[index]!) !== entry) continue
+      if (retainInvoked && index < invokedCount) this.releaseActive(members.keys[index]!, at)
+      else {
+        this.#active.delete(members.keys[index]!)
+        entry.releaseCount()
+        this.#release?.(members.peerKey)
       }
-    })
+    }
   }
 
   /** Settles the current active entry; callers observe physical ownership before invoking this. */

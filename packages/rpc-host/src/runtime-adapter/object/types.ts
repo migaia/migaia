@@ -1,6 +1,6 @@
 import type { IRpcHandshakeOffer } from '@migaia/rpc-contract'
 import type { IRpcInboundMessage, IRpcSendOptions } from '../../core/transport.js'
-import type { IRuntimePeerSourceResult } from '../../remote/index.js'
+import type { IRuntimePeerSourceResult } from '../../remote/runtime-api/peer.js'
 import type { IRuntimeByteConnection, IRuntimeConnectionOptions } from '../byte/types.js'
 
 /**

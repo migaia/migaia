@@ -27,20 +27,137 @@ import { BrowserRpcErrorText } from '../error-text.js'
  * or retained reporter failures. onListenerError handles dispatch/probe failures. No close method
  * takes ownership of the channel: dispose the Endpoint/subscriptions, then close the channel.
  */
-export function createBroadcastChannelTransport(channel: BroadcastChannel): IRpcTransport {
+/** Allocate one borrowed broadcast carrier before installing behavior callbacks. */
+function broadcastChannelTransportState(channel: BroadcastChannel) {
+  /** Logical message subscribers share one native listener and retain registration order. */
   const listeners = createMessageListenerHub<{
     data: unknown
     origin?: string
     source?: unknown
   }>()
+  /** Registered diagnostic callbacks receive listener failures without losing the primary error. */
   const listenerErrors = new Set<(error: unknown) => void>()
+  /** Each native messageerror wrapper is retained until its exact registration is released. */
   const transportErrorWrappers = new Set<EventListener>()
+  /**
+   * Reporter and listener cleanup failures remain reachable until the existing failure drain
+   * observes them.
+   */
   const secondaryFailures = createListenerFailureState()
   /** Observation owns no platform resource and reports through the existing carrier channel. */
   const observation = new BrowserCarrierObservation(BrowserRpcCarrier.broadcastChannel, (error) =>
     reportListenerFailure(error, listenerErrors, secondaryFailures)
   )
-  const onMessage = (event: MessageEvent<unknown>): void => {
+
+  return {
+    listeners,
+    listenerErrors,
+    transportErrorWrappers,
+    secondaryFailures,
+    observation,
+    channel
+  }
+}
+
+/** Own one borrowed broadcast carrier; callbacks access only this explicit instance. */
+class BroadcastChannelTransport {
+  /** All mutable storage and original construction inputs belong to this operation. */
+  #state: ReturnType<typeof broadcastChannelTransportState>
+  /** Preserve the original stable resource surface and callback identities. */
+  readonly value: IRpcTransport
+  /** Initialize owned storage before publishing the resource's callbacks. */
+  constructor(channel: BroadcastChannel) {
+    this.#state = broadcastChannelTransportState(channel)
+
+    this.value = {
+      platform: RpcPlatform.broadcastChannel,
+      topology: 'broadcast',
+      ownership: RpcTransportOwnership.borrowed,
+      send: (message) => {
+        /** Broadcast sends have no transfer list and retain captured content by reference. */
+        const probe = this.#state.observation.probe
+        if (probe !== undefined) this.#state.observation.emit(probe, 0, message)
+        try {
+          this.#state.channel.postMessage(message)
+        } catch (error) {
+          throw identifyRpcBoundaryFailure(
+            error,
+            RpcCoreErrorCode.transport,
+            BrowserRpcErrorText.carrierOperationFailed
+          )
+        }
+      },
+      /** Replace the single endpoint probe; disposal is generation-safe and idempotent. */
+      observe: (probe) => {
+        return this.#state.observation.observe(probe)
+      },
+      subscribe: (listener) => {
+        this.#state.listeners.add(listener, () =>
+          registerListeners(
+            [
+              {
+                add: () => this.#state.channel.addEventListener('message', this.#onMessage),
+                remove: () => this.#state.channel.removeEventListener('message', this.#onMessage)
+              }
+            ],
+            { code: RpcCoreErrorCode.transport, secondaryFailures: this.#state.secondaryFailures }
+          )
+        )
+        return () => {
+          if (!this.#state.listeners.has(listener)) return
+          releaseListenerRegistration(
+            this.#state.listeners.size === 1
+              ? [() => this.#state.channel.removeEventListener('message', this.#onMessage)]
+              : [],
+            () => this.#state.listeners.remove(listener, () => undefined),
+            { code: RpcCoreErrorCode.transport, secondaryFailures: this.#state.secondaryFailures }
+          )
+        }
+      },
+      onTransportError: (listener) => {
+        const wrapper: EventListener = (event) => {
+          observeListener(
+            () => listener(event),
+            (error) => collectListenerFailure(this.#state.secondaryFailures, error),
+            this.#state.secondaryFailures
+          )
+        }
+        registerListeners(
+          [
+            {
+              add: () => this.#state.channel.addEventListener('messageerror', wrapper),
+              remove: () => this.#state.channel.removeEventListener('messageerror', wrapper)
+            }
+          ],
+          { code: RpcCoreErrorCode.transport, secondaryFailures: this.#state.secondaryFailures }
+        )
+        this.#state.transportErrorWrappers.add(wrapper)
+        return () => {
+          if (!this.#state.transportErrorWrappers.has(wrapper)) return
+          releaseListenerRegistration(
+            [() => this.#state.channel.removeEventListener('messageerror', wrapper)],
+            () => {
+              this.#state.transportErrorWrappers.delete(wrapper)
+            },
+            { code: RpcCoreErrorCode.transport, secondaryFailures: this.#state.secondaryFailures }
+          )
+        }
+      },
+      onListenerError: (listener) => {
+        this.#state.listenerErrors.add(listener)
+        return () => {
+          const deleted = this.#state.listenerErrors.delete(listener)
+          drainListenerFailures([], {
+            code: RpcCoreErrorCode.transport,
+            secondaryFailures: this.#state.secondaryFailures
+          })
+          return deleted
+        }
+      }
+    }
+  }
+
+  #onMessage = (event: MessageEvent<unknown>): void => {
     let data: unknown
     let origin: string | undefined
     let source: unknown
@@ -49,99 +166,24 @@ export function createBroadcastChannelTransport(channel: BroadcastChannel): IRpc
       origin = event.origin
       source = event.source
     } catch (error) {
-      reportListenerFailure(error, listenerErrors, secondaryFailures)
+      reportListenerFailure(error, this.#state.listenerErrors, this.#state.secondaryFailures)
       return
     }
     /** Exclusive or native-origin traffic is already admitted by this carrier. */
-    const probe = observation.probe
-    if (probe !== undefined) observation.emit(probe, 1, data, origin)
-    listeners.dispatch({ data, origin, source }, (listener, message) => {
+    const probe = this.#state.observation.probe
+    if (probe !== undefined) this.#state.observation.emit(probe, 1, data, origin)
+    this.#state.listeners.dispatch({ data, origin, source }, (listener, message) => {
       observeListener(
         () => listener(message),
-        (error) => reportListenerFailure(error, listenerErrors, secondaryFailures),
-        secondaryFailures
+        (error) =>
+          reportListenerFailure(error, this.#state.listenerErrors, this.#state.secondaryFailures),
+        this.#state.secondaryFailures
       )
     })
   }
-  return {
-    platform: RpcPlatform.broadcastChannel,
-    topology: 'broadcast',
-    ownership: RpcTransportOwnership.borrowed,
-    send(message) {
-      /** Broadcast sends have no transfer list and retain captured content by reference. */
-      const probe = observation.probe
-      if (probe !== undefined) observation.emit(probe, 0, message)
-      try {
-        channel.postMessage(message)
-      } catch (error) {
-        throw identifyRpcBoundaryFailure(
-          error,
-          RpcCoreErrorCode.transport,
-          BrowserRpcErrorText.carrierOperationFailed
-        )
-      }
-    },
-    /** Replace the single endpoint probe; disposal is generation-safe and idempotent. */
-    observe(probe) {
-      return observation.observe(probe)
-    },
-    subscribe(listener) {
-      listeners.add(listener, () =>
-        registerListeners(
-          [
-            {
-              add: () => channel.addEventListener('message', onMessage),
-              remove: () => channel.removeEventListener('message', onMessage)
-            }
-          ],
-          { code: RpcCoreErrorCode.transport, secondaryFailures }
-        )
-      )
-      return () => {
-        if (!listeners.has(listener)) return
-        releaseListenerRegistration(
-          listeners.size === 1 ? [() => channel.removeEventListener('message', onMessage)] : [],
-          () => listeners.remove(listener, () => undefined),
-          { code: RpcCoreErrorCode.transport, secondaryFailures }
-        )
-      }
-    },
-    onTransportError(listener) {
-      const wrapper: EventListener = (event) => {
-        observeListener(
-          () => listener(event),
-          (error) => collectListenerFailure(secondaryFailures, error),
-          secondaryFailures
-        )
-      }
-      registerListeners(
-        [
-          {
-            add: () => channel.addEventListener('messageerror', wrapper),
-            remove: () => channel.removeEventListener('messageerror', wrapper)
-          }
-        ],
-        { code: RpcCoreErrorCode.transport, secondaryFailures }
-      )
-      transportErrorWrappers.add(wrapper)
-      return () => {
-        if (!transportErrorWrappers.has(wrapper)) return
-        releaseListenerRegistration(
-          [() => channel.removeEventListener('messageerror', wrapper)],
-          () => {
-            transportErrorWrappers.delete(wrapper)
-          },
-          { code: RpcCoreErrorCode.transport, secondaryFailures }
-        )
-      }
-    },
-    onListenerError(listener) {
-      listenerErrors.add(listener)
-      return () => {
-        const deleted = listenerErrors.delete(listener)
-        drainListenerFailures([], { code: RpcCoreErrorCode.transport, secondaryFailures })
-        return deleted
-      }
-    }
-  }
+}
+
+/** Construct the single owner for one borrowed broadcast carrier. */
+export function createBroadcastChannelTransport(channel: BroadcastChannel): IRpcTransport {
+  return new BroadcastChannelTransport(channel).value
 }

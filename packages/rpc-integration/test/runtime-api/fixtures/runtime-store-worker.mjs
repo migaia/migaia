@@ -2,14 +2,14 @@ import { parentPort, workerData, threadId } from 'node:worker_threads'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { createRuntimePeer } from '../../../../rpc-host/dist/remote/runtime-api/peer.js'
 import { prepareRuntimePeerEndpoint } from '../../../../rpc-host/dist/remote/runtime-api/peer.js'
-import { createRpcIdempotencyStore } from '../../../../rpc-host/dist/core/index.js'
+import { createRpcIdempotencyStore } from '../../../../rpc-host/dist/core/idempotency-store.js'
 import { createRuntimeProviderScope } from '@migaia/rpc-host/plugin'
 import { readFileSync, appendFileSync } from 'node:fs'
 import { RUNTIME_API_CAPABILITIES } from '../../../../rpc-host/dist/remote/runtime-api/constants.js'
 import { createEventEmitterMessageResource } from '@migaia/rpc-host/plugin'
 import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'
 import { readAdapterMessagePreparation } from '../../../../rpc-host/dist/runtime-adapter/message/resource.js'
-import '@migaia/rpc-plugin-thread/adapters/node'
+import '../../../../rpc-plugin-thread/dist/threads/adapters/node.js'
 
 /** Only the actual native launcher supplies execution identity; fixture offers are explicit. */
 const resource = createEventEmitterMessageResource(parentPort)

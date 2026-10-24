@@ -1,3 +1,4 @@
+import { RpcTransportMode } from '@migaia/rpc-host/plugin'
 import {
   defineByteAdapter,
   defineTransportPlugin,
@@ -68,7 +69,7 @@ export function webTransportPlugin(options: IWebTransportPluginOptions): IRpcTra
     )
   return defineTransportPlugin({
     name: options.name ?? WebTransportPluginText.name,
-    mode: 'connect',
+    mode: RpcTransportMode.connect,
     ...(options.expose ? { expose: options.expose } : {}),
     ...(options.connect ? { connect: options.connect } : {}),
     /** The byte owner replaces this pre-hello route label with the negotiated runtime peer id. */

@@ -1,16 +1,20 @@
+import {
+  createRuntimeEndpointComposition,
+  createRuntimeFeatureRoots
+} from '../../dist/core/runtime-api-endpoint.js'
+import { RpcCapability } from '@migaia/rpc-contract'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { createEndpointTimePort } from '../../dist/core/internal/time-port.js'
 import { readFile } from 'node:fs/promises'
 import { describe, expect, it, vi } from 'vitest'
-import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
 import { normalizeRpcEnvelope } from '@migaia/rpc-contract'
 import { createStringFramer } from '@migaia/rpc-contract/framing'
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
 import { RpcCoreErrorCode } from '../../dist/core/errors.js'
-import { createClientEndpoint } from '../../dist/core/client.js'
+
 import { createComposedEndpoint } from '../../dist/core/composed.js'
-import { createFullEndpoint } from '../../dist/core/full.js'
-import { createProviderEndpoint } from '../../dist/core/provider.js'
+
 import { type IRpcPluginDescriptor } from '../../dist/core/internal/plugin-descriptor.js'
 import {
   RpcControlRole,
@@ -38,10 +42,12 @@ import {
 import { readComposedDisposalPromises } from '../../dist/core/internal/composed-disposal-observer.js'
 import { createConstructionControl } from '../../dist/core/internal/construction-install.js'
 import { createEndpointCapabilitiesBatchFeature } from '../../dist/core/internal/endpoint-capabilities-plugin.js'
-import {
-  createFirstPartyRoots,
-  type IRpcFirstPartyRootName
-} from '../../dist/core/internal/first-party-roots.js'
+
+/** Names refer to the actual runtime roots inspected by the native admission fixture. */
+type IRpcFirstPartyRootName = Extract<
+  keyof ReturnType<typeof createRuntimeFeatureRoots>['roots'],
+  string
+>
 import {
   assertFeatureClaimParity,
   preflightFeatureClaims,
@@ -65,13 +71,13 @@ import { installPlugin } from './middleware/helpers.js'
 import type { IRpcAuthenticationCapability } from '../../dist/core/typing.js'
 import { abort } from '../../dist/core/middleware/abort.js'
 import { connect } from '../../dist/core/middleware/connect.js'
-import { contract } from '../../dist/core/middleware/contract.js'
+import { contract } from '../fixtures/core-role/contract.js'
 import { hooks } from '../../dist/core/middleware/hooks.js'
 import { ping } from '../../dist/core/middleware/ping.js'
-import { canonicalProtocol as protocol } from '../../dist/core/middleware/canonical-protocol.js'
+import { canonicalProtocol as protocol } from '../fixtures/core-role/canonical-protocol.js'
 import { timeout } from '../../dist/core/middleware/timeout.js'
 
-import { uuid } from '../../dist/core/middleware/uuid.js'
+import { uuid } from '../fixtures/core-role/uuid.js'
 import type { IRpcCoreConfig } from '../../dist/core/composed.js'
 import type { IRpcPlugin, IRpcProvider } from '../../dist/core/typing.js'
 import type { IRpcTransport } from '../../dist/core/transport.js'
@@ -118,11 +124,6 @@ async function settleProviderDelivery(): Promise<void> {
   await new Promise<void>((resolve) => setTimeout(resolve, 0))
 }
 
-/** Builds a native root record for direct composition readers without reviving module arrays. */
-function createNativeRoots<const TName extends IRpcFirstPartyRootName>(...names: readonly TName[]) {
-  return createFirstPartyRoots(new Set(names))
-}
-
 /** Narrows only the attachment shape registered by native outbound preparation. */
 function isOutboundAttachmentHost(value: unknown): value is IOutboundAttachmentHost {
   return (
@@ -154,11 +155,19 @@ function createRealProvider(
   providerMap: Readonly<Record<string, IRpcProvider>>,
   withAbort = false
 ) {
-  return createProviderEndpoint({
-    id,
-    transport,
-    middlewares: [connect({ transport }), ...(withAbort ? [abort()] : [])],
-    provider: providerMap
+  /** The canonical root factory supplies dependencies; this oracle selects only outbound/provider. */
+  const { roots, options } = createRuntimeFeatureRoots(
+    {
+      id,
+      transport,
+      middlewares: [connect({ transport }), ...(withAbort ? [abort()] : [])],
+      provider: providerMap
+    },
+    { agreement: { capabilities: [] }, peerId: '' }
+  )
+  return createComposedEndpoint(options, {
+    'first-party-outbound': roots['first-party-outbound'],
+    'first-party-provider': roots['first-party-provider']
   })
 }
 
@@ -234,10 +243,10 @@ type IAdmissionFixtureOptions = {
   readonly endpointId?: string
   readonly transportPeerId?: string
   readonly sourceProof?: IRpcTransport['sourceProof']
-  readonly connectConfig?: import('../../dist/core/index.js').IRpcConnectConfig
+  readonly connectConfig?: import('../../dist/core/typing.js').IRpcConnectConfig
   readonly transportSend?: (message: unknown) => void | Promise<void>
   readonly hookErrorReporter?: (error: unknown, event: unknown) => void
-  readonly contractConfig?: import('../../dist/core/index.js').IRpcContractConfig
+  readonly contractConfig?: import('../../dist/core/typing.js').IRpcContractConfig
   readonly observeOutboundCommand?: (observation: IRpcOutboundCommandObservation) => void
   readonly observeTransferredCleanup?: (pluginName: string) => void
   readonly providerMap?: Readonly<Record<string, IRpcProvider>>
@@ -249,74 +258,94 @@ type IAdmissionFixtureOptions = {
 }
 
 /** Builds one real composed Host transaction through the canonical production inventory seam. */
-async function createActualAdmissionFixture(
-  options: IAdmissionFixtureOptions = {}
-): Promise<IActualAdmissionFixture> {
+/** Allocate explicit fixture state before opening the native provider transaction. */
+function admissionFixtureContext(options: IAdmissionFixtureOptions) {
   const endpointId = options.endpointId ?? 'provider-admission-fixture'
   const [rawClientTransport, transport] = createMemoryTransportPair()
-  /** The hand-written peer now sends signed bindings instead of the removed identity-auth format. */
   const peerAuthentication = installPlugin(
     authentication({
       sign: (value) => value,
       verify: (value) => value
     })
   ).get('authenticationCapability') as IRpcAuthenticationCapability
-  /** One receiver session preserves counter isolation across all response callbacks. */
   const peerSession = {}
-  /** Raw business fixtures retain their original values at the peer boundary. */
+  const stats = { activeSubscriptions: 0, subscribeCalls: 0, dispatches: 0 }
+  /** Callback-visible mutable facts belong to this explicit transaction context. */
+  const state = {
+    prepared: undefined as IPreparedEndpoint<string> | undefined,
+    activated: false,
+    outboundOwner: undefined as IOutboundAttachmentHost | undefined,
+    identityOwner: undefined as object | undefined,
+    activeDescriptors: [] as readonly IRpcPluginDescriptor[]
+  }
+  return {
+    options,
+    endpointId,
+    rawClientTransport,
+    transport,
+    peerAuthentication,
+    peerSession,
+    stats,
+    state
+  }
+}
+
+/** Prepare the real transport, middleware snapshot, kernel and native lifecycle owner. */
+async function prepareAdmissionFixture(context: ReturnType<typeof admissionFixtureContext>) {
   const clientTransport: IRpcTransport = {
-    ...rawClientTransport,
+    ...context.rawClientTransport,
     async send(message, options) {
-      const frame = await peerAuthentication.protect(message, {
+      const frame = await context.peerAuthentication.protect(message, {
         direction: 'outbound',
         endpointId: 'provider-fixture-peer',
         platform: 'Memory'
       })
-      return rawClientTransport.send(frame, options)
+      return context.rawClientTransport.send(frame, options)
     },
     subscribe(listener) {
-      return rawClientTransport.subscribe((message) => {
-        const context = {
+      return context.rawClientTransport.subscribe((message) => {
+        const authenticationContext = {
           direction: 'inbound' as const,
           endpointId: 'provider-fixture-peer',
           platform: 'Memory' as const
         }
-        bindAuthenticationReplayContext(context, peerSession)
-        void Promise.resolve(peerAuthentication.unprotect(message.data, context)).then((data) => {
+        bindAuthenticationReplayContext(authenticationContext, context.peerSession)
+        void Promise.resolve(
+          context.peerAuthentication.unprotect(message.data, authenticationContext)
+        ).then((data) => {
           listener({ ...message, data })
         })
       })
     }
   }
-  const stats = { activeSubscriptions: 0, subscribeCalls: 0, dispatches: 0 }
-  const baseTransport = transport
+  const baseTransport = context.transport
   const composedTransport = {
     ...baseTransport,
-    ...(options.transportPeerId ? { peerId: options.transportPeerId } : {}),
-    ...(options.sourceProof ? { sourceProof: options.sourceProof } : {}),
+    ...(context.options.transportPeerId ? { peerId: context.options.transportPeerId } : {}),
+    ...(context.options.sourceProof ? { sourceProof: context.options.sourceProof } : {}),
     send(message: unknown): void | Promise<void> {
-      stats.dispatches += 1
-      const result = options.transportSend?.(message)
+      context.stats.dispatches += 1
+      const result = context.options.transportSend?.(message)
       if (result !== undefined) return result
       return baseTransport.send(message)
     },
     subscribe(listener: Parameters<IRpcTransport['subscribe']>[0]): () => void {
-      stats.subscribeCalls += 1
-      stats.activeSubscriptions += 1
+      context.stats.subscribeCalls += 1
+      context.stats.activeSubscriptions += 1
       const unsubscribe = baseTransport.subscribe(listener)
       return () => {
-        stats.activeSubscriptions -= 1
+        context.stats.activeSubscriptions -= 1
         unsubscribe()
       }
     }
   }
   const providerMap =
-    options.providerMap ??
+    context.options.providerMap ??
     ({
       echo: (context: Parameters<IRpcProvider>[0]) => context.success('fixture')
     } as Readonly<Record<string, IRpcProvider>>)
   const config: IRpcCoreConfig = {
-    id: endpointId,
+    id: context.endpointId,
     transport: composedTransport,
     middlewares: [
       protocol(),
@@ -326,19 +355,19 @@ async function createActualAdmissionFixture(
         sign: (value) => value,
         verify: (value) => value
       }),
-      contract(options.contractConfig),
-      connect({ ...options.connectConfig, transport: composedTransport }),
+      contract(context.options.contractConfig),
+      connect({ ...context.options.connectConfig, transport: composedTransport }),
       uuid(),
       ping(),
       abort(),
       timeout(),
-      hooks({ onHookError: options.hookErrorReporter })
+      hooks({ onHookError: context.options.hookErrorReporter })
     ],
     provider: providerMap
   }
   const deferred = await prepareEndpoint(config, { deferMiddlewareInstall: true })
   const kernel = createEndpointKernel(deferred.transport, deferred.transportSnapshot)
-  const unregisterProviderRegistrationObservation = options.observeProviderRegistration
+  const unregisterProviderRegistrationObservation = context.options.observeProviderRegistration
     ? registerProviderRegistrationObservation(kernel)
     : () => undefined
   const construction = createConstructionControl({
@@ -352,25 +381,47 @@ async function createActualAdmissionFixture(
     () => undefined,
     { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   )
-  let prepared: IPreparedEndpoint<string> | undefined
-  let activated = false
-  /** Observes the actual attachment registered by native outbound preparation; it owns cleanup. */
-  let outboundOwner: IOutboundAttachmentHost | undefined
-  /** Retains the identity coordinator reached through that actual outbound attachment only. */
-  let identityOwner: object | undefined
-  const rootNames = options.rootNames ?? (['first-party-provider'] as const)
-  const roots = createNativeRoots(...rootNames)
+  return {
+    ...context,
+    clientTransport,
+    composedTransport,
+    providerMap,
+    config,
+    deferred,
+    kernel,
+    unregisterProviderRegistrationObservation,
+    construction,
+    host
+  }
+}
+
+/** Build the canonical capability admission and its one actual native Host batch. */
+function buildAdmissionFixture(context: Awaited<ReturnType<typeof prepareAdmissionFixture>>) {
+  const rootNames = context.options.rootNames ?? (['first-party-provider'] as const)
+  const { roots } = createRuntimeFeatureRoots(context.config, {
+    agreement: {
+      capabilities: rootNames.some(
+        (name) => name === 'first-party-control' || name === 'first-party-discovery'
+      )
+        ? [RpcCapability.ping]
+        : []
+    },
+    peerId: ''
+  })
   const capabilityBatch = createEndpointCapabilitiesBatchFeature(
     roots,
     Object.freeze({
-      getKernel: () => kernel,
+      getKernel: () => context.kernel,
       getPrepared: () => {
-        if (!prepared) throw new Error('native provider fixture prepared endpoint missing')
-        return prepared
+        if (!context.state.prepared)
+          throw new Error('native provider fixture prepared endpoint missing')
+        return context.state.prepared
       },
-      observeOutboundCommand: options.observeOutboundCommand,
+      observeOutboundCommand: context.options.observeOutboundCommand,
       transformOutput: (phase, output) =>
-        phase === 'ports' && options.transformShared ? options.transformShared(output) : output,
+        phase === 'ports' && context.options.transformShared
+          ? context.options.transformShared(output)
+          : output,
       transformFeaturePrepare: (name, prepare) =>
         name === 'first-party-outbound'
           ? (scope) =>
@@ -378,8 +429,8 @@ async function createActualAdmissionFixture(
                 ...scope,
                 own<T>(resource: T, release: () => void | Promise<void>): T {
                   if (isOutboundAttachmentHost(resource)) {
-                    outboundOwner = resource
-                    identityOwner = outboundOwner.inboundIdentity
+                    context.state.outboundOwner = resource
+                    context.state.identityOwner = context.state.outboundOwner.inboundIdentity
                   }
                   return scope.own(resource, release)
                 }
@@ -405,9 +456,9 @@ async function createActualAdmissionFixture(
   if (capabilityAdmission === undefined)
     throw new Error('native provider fixture requires a capability admission')
   const batch = buildNativePluginBatch({
-    kernel,
-    deferred: deferred as never,
-    middlewareSnapshots: deferred.middlewareSnapshots,
+    kernel: context.kernel,
+    deferred: context.deferred as never,
+    middlewareSnapshots: context.deferred.middlewareSnapshots,
     hookEvents: [],
     featureDefinitions: [
       {
@@ -417,17 +468,17 @@ async function createActualAdmissionFixture(
       }
     ],
     onPrepared: (value) => {
-      prepared = value
+      context.state.prepared = value
     },
     onActivationCommitted: () => {
-      activated = true
+      context.state.activated = true
     },
     onActivationRolledBack: () => {
-      activated = false
+      context.state.activated = false
     },
     onNativeFeatureActivate: () => capabilityBatch.plugin.activate(),
     onActivationPreflight: (state, getPort) =>
-      assertFeatureClaimParity(admissions, { getPort }, kernel, {
+      assertFeatureClaimParity(admissions, { getPort }, context.kernel, {
         activated: state.activated,
         activationPhase: 'pre-activation',
         routeKeys: state.routeKeys
@@ -435,7 +486,6 @@ async function createActualAdmissionFixture(
   })
   const admissions = batch.map(({ admission }) => admission)
   preflightFeatureClaims(admissions)
-  /** Metadata-only compatibility observation for legacy assertions during reader migration. */
   const finalDescriptors = batch.map(
     ({ admission }) =>
       Object.freeze({
@@ -456,76 +506,118 @@ async function createActualAdmissionFixture(
     (descriptor) => descriptor.name === 'endpoint-capabilities'
   )
   const claims = finalDescriptors.map((descriptor) => descriptor.claims)
-  let activeDescriptors: readonly IRpcPluginDescriptor[] = finalDescriptors
-  const snapshot = () => ({
+  context.state.activeDescriptors = finalDescriptors
+  return {
+    ...context,
+    rootNames,
+    roots,
+    capabilityBatch,
+    capabilityAdmission,
+    batch,
+    admissions,
+    finalDescriptors,
+    providerIndex,
+    claims
+  }
+}
+
+/** Explicit context is shared by the original observation and lifecycle module functions. */
+type IAdmissionFixtureContext = ReturnType<typeof buildAdmissionFixture>
+
+/** Read only the original native state dimensions used by the provider assertions. */
+function snapshotAdmissionFixture(
+  context: IAdmissionFixtureContext
+): ReturnType<IActualAdmissionFixture['snapshot']> {
+  return {
     providerState: (() => {
-      const debug = capabilityBatch.plugin.getSnapshotReader()?.()
+      const debug = context.capabilityBatch.plugin.getSnapshotReader()?.()
       return {
         admission: debug?.providerState?.admission ?? 0,
         replay: debug?.providerState?.replay ?? 0,
         activeControllers: debug?.activeControllers ?? 0
       }
     })(),
-    hostKeys: [...Reflect.ownKeys(host)].sort(),
+    // Bounded at 20 own strings: defineHost's 15 literal keys, identity and four domain methods.
+    hostKeys: [...Reflect.ownKeys(context.host)].sort(),
     ports: Object.values(RpcPortName).map((key) => {
       try {
-        return host.getPort(key)
+        return context.host.getPort(key)
       } catch {
         return undefined
       }
     }),
-    extensions: [...new Set(activeDescriptors.flatMap(({ claims: item }) => item.publicKeys))].map(
-      (key) => Object.getOwnPropertyDescriptor(host, key)
-    ),
+    extensions: [
+      ...new Set(context.state.activeDescriptors.flatMap(({ claims: item }) => item.publicKeys))
+    ].map((key) => Object.getOwnPropertyDescriptor(context.host, key)),
     installations: [],
-    activeSubscriptions: stats.activeSubscriptions,
-    subscribeCalls: stats.subscribeCalls,
-    dispatches: stats.dispatches,
-    activated,
-    kernelState: kernel.state,
-    kernelOwners: kernel.ownerKeys,
-    kernelRoutes: kernel.routeKeys,
-    resources: capabilityBatch.plugin.getSnapshotReader()?.().resources ?? kernel.resources.size
-  })
-  const installDescriptors = async (
-    nextDescriptors: readonly IRpcPluginDescriptor[],
-    installOptions: { readonly parity?: boolean } = {}
-  ): Promise<void> => {
-    activeDescriptors = nextDescriptors
-    if (installOptions.parity === false) return
-    await host.installBatch(batch.map(({ definition }) => definition))
-    assertFeatureClaimParity(admissions, host, kernel, { activated })
+    activeSubscriptions: context.stats.activeSubscriptions,
+    subscribeCalls: context.stats.subscribeCalls,
+    dispatches: context.stats.dispatches,
+    activated: context.state.activated,
+    kernelState: context.kernel.state,
+    kernelOwners: context.kernel.ownerKeys,
+    kernelRoutes: context.kernel.routeKeys,
+    resources:
+      context.capabilityBatch.plugin.getSnapshotReader()?.().resources ??
+      context.kernel.resources.size
   }
+}
+
+/** Install the original native batch and run its unchanged parity boundary. */
+async function installAdmissionDescriptors(
+  context: IAdmissionFixtureContext,
+  nextDescriptors: readonly IRpcPluginDescriptor[],
+  installOptions: { readonly parity?: boolean } = {}
+): Promise<void> {
+  context.state.activeDescriptors = nextDescriptors
+  if (installOptions.parity === false) return
+  await context.host.installBatch(context.batch.map(({ definition }) => definition))
+  assertFeatureClaimParity(context.admissions, context.host, context.kernel, {
+    activated: context.state.activated
+  })
+}
+
+/** Publish observations and cleanup for this already prepared native fixture only. */
+function projectAdmissionFixture(context: IAdmissionFixtureContext): IActualAdmissionFixture {
   return {
-    id: endpointId,
-    descriptors: finalDescriptors,
-    claims,
-    providerIndex,
-    clientTransport,
-    host,
-    kernel,
+    id: context.endpointId,
+    descriptors: context.finalDescriptors,
+    claims: context.claims,
+    providerIndex: context.providerIndex,
+    clientTransport: context.clientTransport,
+    host: context.host,
+    kernel: context.kernel,
     getNativeRootSharedConsumes: (name) =>
-      name in roots ? readFeaturePolicy(roots[name]!).sharedConsumes : undefined,
-    stats,
+      name in context.roots ? readFeaturePolicy(context.roots[name]!).sharedConsumes : undefined,
+    stats: context.stats,
     install: async () => {
-      await installDescriptors(finalDescriptors, { parity: true })
+      await installAdmissionDescriptors(context, context.finalDescriptors, { parity: true })
     },
-    installDescriptors,
+    installDescriptors: (descriptors, options) =>
+      installAdmissionDescriptors(context, descriptors, options),
     getTranslatedInstallation: () => undefined,
     getProviderInstallation: () => undefined,
-    getIdentityOwner: () => identityOwner,
-    getOutboundOwner: () => outboundOwner,
-    unregisterProviderRegistrationObservation,
-    snapshot,
+    getIdentityOwner: () => context.state.identityOwner,
+    getOutboundOwner: () => context.state.outboundOwner,
+    unregisterProviderRegistrationObservation: context.unregisterProviderRegistrationObservation,
+    snapshot: () => snapshotAdmissionFixture(context),
     dispose: async () => {
-      unregisterProviderRegistrationObservation()
-      construction.close()
-      const hostDispose = host.dispose()
-      expect(host.dispose()).toBe(hostDispose)
+      context.unregisterProviderRegistrationObservation()
+      context.construction.close()
+      const hostDispose = context.host.dispose()
+      expect(context.host.dispose()).toBe(hostDispose)
       await hostDispose
-      if (kernel.state !== 'disposed') kernel.completeDispose()
+      if (context.kernel.state !== 'disposed') context.kernel.completeDispose()
     }
   }
+}
+
+/** Build one real transaction through the canonical inventory with explicit phase contexts. */
+async function createActualAdmissionFixture(
+  options: IAdmissionFixtureOptions = {}
+): Promise<IActualAdmissionFixture> {
+  const prepared = await prepareAdmissionFixture(admissionFixtureContext(options))
+  return projectAdmissionFixture(buildAdmissionFixture(prepared))
 }
 
 /** Rejects the removed provider-bridge key in every surviving package-owned key collection. */
@@ -580,6 +672,7 @@ async function assertMigratedControlIgnoresBridge(fixture: IActualAdmissionFixtu
   await hostDispose
   expect(fixture.getTranslatedInstallation('outbound-compatibility')).toBeUndefined()
   expect(projectBridgeTerminalSnapshot(fixture.snapshot())).toMatchObject({
+    // HOST_SURFACE is the fixed 20-key literal declared in this fixture, independent of methods/peers.
     hostKeys: [...HOST_SURFACE].sort(),
     sharedEmpty: true,
     extensionsEmpty: true,
@@ -646,12 +739,15 @@ describe('provider production-seam matrix', () => {
     const server = await createRealProvider('provider-exposure-host', serverTransport, {
       echo: (context) => context.success(context.data)
     })
-    const client = await createClientEndpoint({
-      id: 'provider-exposure-client',
-      transport: clientTransport,
-      targetIds: ['provider-exposure-host'],
-      middlewares: [connect({ transport: clientTransport })]
-    })
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'provider-exposure-client',
+        transport: clientTransport,
+        targetIds: ['provider-exposure-host'],
+        middlewares: [connect({ transport: clientTransport })]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     try {
       expect(Object.keys(server)).toEqual([
         'on',
@@ -683,18 +779,24 @@ describe('provider production-seam matrix', () => {
     const second = await createRealProvider('provider-second', secondServerTransport, {
       echo: (context) => context.success('second')
     })
-    const firstClient = await createClientEndpoint({
-      id: 'provider-first-client',
-      transport: firstClientTransport,
-      targetIds: ['provider-first'],
-      middlewares: [connect({ transport: firstClientTransport })]
-    })
-    const secondClient = await createClientEndpoint({
-      id: 'provider-second-client',
-      transport: secondClientTransport,
-      targetIds: ['provider-second'],
-      middlewares: [connect({ transport: secondClientTransport })]
-    })
+    const firstClient = await createRuntimeEndpointComposition(
+      {
+        id: 'provider-first-client',
+        transport: firstClientTransport,
+        targetIds: ['provider-first'],
+        middlewares: [connect({ transport: firstClientTransport })]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
+    const secondClient = await createRuntimeEndpointComposition(
+      {
+        id: 'provider-second-client',
+        transport: secondClientTransport,
+        targetIds: ['provider-second'],
+        middlewares: [connect({ transport: secondClientTransport })]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     try {
       await expect(firstClient.send('provider-first', 'echo', null)).resolves.toBe('first')
       await expect(secondClient.send('provider-second', 'echo', null)).resolves.toBe('second')
@@ -747,12 +849,15 @@ describe('provider production-seam matrix', () => {
         throw primary
       }
     })
-    const client = await createClientEndpoint({
-      id: 'provider-error-client',
-      transport: clientTransport,
-      targetIds: ['provider-error-host'],
-      middlewares: [connect({ transport: clientTransport })]
-    })
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'provider-error-client',
+        transport: clientTransport,
+        targetIds: ['provider-error-host'],
+        middlewares: [connect({ transport: clientTransport })]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     try {
       await expect(client.send('provider-error-host', 'fail', null)).rejects.toMatchObject({
         code: RpcCoreErrorCode.internal,
@@ -796,12 +901,15 @@ describe('provider production-seam matrix', () => {
       },
       true
     )
-    const client = await createClientEndpoint({
-      id: 'provider-abort-client',
-      transport: clientTransport,
-      targetIds: ['provider-abort-host'],
-      middlewares: [connect({ transport: clientTransport }), abort()]
-    })
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'provider-abort-client',
+        transport: clientTransport,
+        targetIds: ['provider-abort-host'],
+        middlewares: [connect({ transport: clientTransport }), abort()]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     try {
       const reason = new DOMException('provider caller abort', 'AbortError')
       const controller = new AbortController()
@@ -836,7 +944,10 @@ describe('provider production-seam matrix', () => {
         return providerMap
       }
     } as IRpcCoreConfig
-    const server = await createProviderEndpoint(config)
+    const server = await createRuntimeEndpointComposition(config, {
+      agreement: { capabilities: [] },
+      peerId: ''
+    }).installing
     try {
       expect(reads).toBe(1)
       providerMap.echo = () => ({ ok: false, message: 'mutated', code: 'MUTATED' })
@@ -849,8 +960,16 @@ describe('provider production-seam matrix', () => {
   it('hostile provider getter fails before transport subscription with original cause', async () => {
     const [, serverTransport] = createMemoryTransportPair()
     const cause = new Error('provider getter hostile')
+    /** Build native dependencies without evaluating the hostile endpoint configuration. */
+    const { roots } = createRuntimeFeatureRoots(
+      { id: 'getter-provider-roots', middlewares: [] },
+      { agreement: { capabilities: [] }, peerId: '' }
+    )
     await expect(
-      createProviderEndpoint(createThrowingProviderConfig(serverTransport, cause))
+      createComposedEndpoint(createThrowingProviderConfig(serverTransport, cause), {
+        'first-party-outbound': roots['first-party-outbound'],
+        'first-party-provider': roots['first-party-provider']
+      })
     ).rejects.toMatchObject({
       code: RpcCoreErrorCode.invalidConfig,
       cause
@@ -865,12 +984,15 @@ describe('provider production-seam matrix', () => {
     } as unknown as Record<string, IRpcProvider>
     let failure: unknown
     try {
-      await createProviderEndpoint({
-        id: 'provider-partial-host',
-        transport: serverTransport,
-        middlewares: [connect({ transport: serverTransport })],
-        provider: invalidProvider
-      })
+      await createRuntimeEndpointComposition(
+        {
+          id: 'provider-partial-host',
+          transport: serverTransport,
+          middlewares: [connect({ transport: serverTransport })],
+          provider: invalidProvider
+        },
+        { agreement: { capabilities: [] }, peerId: '' }
+      ).installing
     } catch (error) {
       failure = error
     }
@@ -983,7 +1105,7 @@ describe('provider production-seam matrix', () => {
 
   it('source ownership scan rejects provider attachment broad-bridge imports', async () => {
     const providerSource = await readFile(
-      new URL('../../src/core/features/provider.ts', import.meta.url),
+      new URL('../../src/core/internal/provider-feature.ts', import.meta.url),
       'utf8'
     )
     const attachmentSource = await readFile(
@@ -1132,7 +1254,10 @@ describe('provider production-seam matrix', () => {
         return providerMap
       }
     } as IRpcCoreConfig
-    const server = await createProviderEndpoint(config)
+    const server = await createRuntimeEndpointComposition(config, {
+      agreement: { capabilities: [] },
+      peerId: ''
+    }).installing
     try {
       expect(reads).toEqual(['provider', 'alpha', 'beta', 'gamma'])
       Object.defineProperty(providerMap, 'alpha', {
@@ -1338,7 +1463,10 @@ describe('provider production-seam matrix', () => {
       }
     }
     const createEndpoint = (id: string) =>
-      createFullEndpoint({ id, transport, middlewares: [connect({ transport })] })
+      createRuntimeEndpointComposition(
+        { id, transport, middlewares: [connect({ transport })] },
+        { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+      ).installing
     const first = await createEndpoint('round-eight-first-endpoint')
     const second = await createEndpoint('round-eight-second-endpoint')
     expect(readComposedDisposalPromises(first)).toBeUndefined()
@@ -1397,9 +1525,12 @@ describe('provider production-seam matrix', () => {
 
   it('provider source boundary excludes the provider bridge from all migrated feature consumers', async () => {
     const sources = await Promise.all(
-      ['discovery.ts', 'control.ts', 'provider.ts', 'canonical-chunk.ts'].map((name) =>
-        readFile(new URL(`../../src/core/features/${name}`, import.meta.url), 'utf8')
-      )
+      [
+        'features/discovery.ts',
+        'features/control.ts',
+        'internal/provider-feature.ts',
+        'features/canonical-chunk.ts'
+      ].map((name) => readFile(new URL(`../../src/core/${name}`, import.meta.url), 'utf8'))
     )
     expect(sources[0]).not.toContain('outboundCompatibility')
     expect(sources[1]).not.toContain('outboundCompatibility')
@@ -1423,6 +1554,11 @@ describe('provider production-seam matrix', () => {
   })
 
   it('real composed discovery consumes narrow ports and publishes only its resolver', async () => {
+    /** Public projection selects explicit native roots; transitive dependencies remain private. */
+    const { roots: selectedRoots } = createRuntimeFeatureRoots(
+      { id: 'selected-native-roots', middlewares: [] },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    )
     const discoveryFixture = await createActualAdmissionFixture({
       endpointId: 'cycle-m-discovery-contract',
       rootNames: ['first-party-discovery']
@@ -1444,7 +1580,11 @@ describe('provider production-seam matrix', () => {
         transport: clientTransport,
         middlewares: [connect({ transport: clientTransport }), ping()]
       },
-      createNativeRoots('first-party-outbound', 'first-party-discovery', 'first-party-control')
+      {
+        'first-party-outbound': selectedRoots['first-party-outbound'],
+        'first-party-discovery': selectedRoots['first-party-discovery']!,
+        'first-party-control': selectedRoots['first-party-control']!
+      }
     )
     const server = await createComposedEndpoint(
       {
@@ -1452,7 +1592,11 @@ describe('provider production-seam matrix', () => {
         transport: serverTransport,
         middlewares: [connect({ transport: serverTransport }), ping()]
       },
-      createNativeRoots('first-party-outbound', 'first-party-discovery', 'first-party-control')
+      {
+        'first-party-outbound': selectedRoots['first-party-outbound'],
+        'first-party-discovery': selectedRoots['first-party-discovery']!,
+        'first-party-control': selectedRoots['first-party-control']!
+      }
     )
     try {
       await discoveryFixture.install()
@@ -1509,11 +1653,14 @@ describe('provider production-seam matrix', () => {
     vi.useFakeTimers()
     const [baseTransport] = createMemoryTransportPair()
     const transport = { ...baseTransport, topology: 'multiplexed' as const }
-    const endpoint = await createFullEndpoint({
-      id: 'cycle-m-composed-discovery-time',
-      transport,
-      middlewares: [connect({ transport }), ping()]
-    })
+    const endpoint = await createRuntimeEndpointComposition(
+      {
+        id: 'cycle-m-composed-discovery-time',
+        transport,
+        middlewares: [connect({ transport }), ping()]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     const timeEvents: IRpcTimePortEvent[] = []
     const unregisterTimeObserver = registerEndpointTimePortObserver(endpoint, (event) => {
       timeEvents.push(event)
@@ -1650,6 +1797,7 @@ describe('provider production-seam matrix', () => {
           code: RpcCoreErrorCode.invalidConfig
         }),
         terminal: {
+          // HOST_SURFACE is the fixed 20-key literal declared in this fixture, independent of methods/peers.
           hostKeys: [...HOST_SURFACE].sort(),
           sharedEmpty: true,
           extensionsEmpty: true,
@@ -1786,11 +1934,14 @@ describe('provider production-seam matrix', () => {
 
   it('canonical control endpoint disposal exposes the same stable Host and endpoint Promises', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
-    const endpoint = await createFullEndpoint({
-      id: 'b12c04-control-endpoint-disposal',
-      transport: clientTransport,
-      middlewares: [connect({ transport: clientTransport }), ping()]
-    })
+    const endpoint = await createRuntimeEndpointComposition(
+      {
+        id: 'b12c04-control-endpoint-disposal',
+        transport: clientTransport,
+        middlewares: [connect({ transport: clientTransport }), ping()]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     try {
       const endpointDispose = endpoint.dispose()
       expect(endpoint.dispose()).toBe(endpointDispose)
@@ -1805,79 +1956,25 @@ describe('provider production-seam matrix', () => {
     }
   })
 
-  it('selected control roots keep dependencies private and disposal endpoint-local', async () => {
-    const [, firstTransport] = createMemoryTransportPair()
-    const [, secondTransport] = createMemoryTransportPair()
-    const first = await createComposedEndpoint(
-      {
-        id: 'round-seventeen-control-root-first',
-        transport: firstTransport,
-        middlewares: [connect({ transport: firstTransport }), ping()]
-      },
-      createNativeRoots('first-party-outbound', 'first-party-control')
-    )
-    const second = await createComposedEndpoint(
-      {
-        id: 'round-seventeen-control-root-second',
-        transport: secondTransport,
-        middlewares: [connect({ transport: secondTransport }), ping()]
-      },
-      createNativeRoots('first-party-outbound', 'first-party-control')
-    )
-    try {
-      expect(Object.keys(first)).toEqual([
-        'hooks',
-        'dispose',
-        'send',
-        'sendAll',
-        'dispatch',
-        'dispatchAll',
-        'group',
-        'outcome',
-        'ping',
-        'pingAll',
-        'announceClose'
-      ])
-      expect(first).not.toHaveProperty('connect')
-      expect(first).not.toHaveProperty('discovery')
-      expect(first).not.toHaveProperty('outboundCompatibility')
-      expect(readEndpointDebugSnapshot(first)).toMatchObject({
-        phase: 'active',
-        pending: 0,
-        pingPending: 0
-      })
-      expect(readEndpointDebugSnapshot(second)).toMatchObject({
-        phase: 'active',
-        pending: 0,
-        pingPending: 0
-      })
-      const firstDispose = first.dispose()
-      expect(first.dispose()).toBe(firstDispose)
-      await firstDispose
-      expect(readEndpointDebugSnapshot(first)).toMatchObject({ phase: 'disposed', resources: 0 })
-      expect(readEndpointDebugSnapshot(second)).toMatchObject({ phase: 'active' })
-      const secondDispose = second.dispose()
-      expect(second.dispose()).toBe(secondDispose)
-      await secondDispose
-    } finally {
-      await first.dispose()
-      await second.dispose()
-    }
-  })
-
   it('canonical control ping abort and timeout preserve peer and terminal isolation', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
-    const server = await createFullEndpoint({
-      id: 'round-seventeen-control-peer',
-      transport: serverTransport,
-      middlewares: [connect({ transport: serverTransport }), ping()]
-    })
-    const client = await createFullEndpoint({
-      id: 'round-seventeen-control-client',
-      transport: clientTransport,
-      targetIds: ['round-seventeen-control-peer'],
-      middlewares: [connect({ transport: clientTransport }), ping()]
-    })
+    const server = await createRuntimeEndpointComposition(
+      {
+        id: 'round-seventeen-control-peer',
+        transport: serverTransport,
+        middlewares: [connect({ transport: serverTransport }), ping()]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'round-seventeen-control-client',
+        transport: clientTransport,
+        targetIds: ['round-seventeen-control-peer'],
+        middlewares: [connect({ transport: clientTransport }), ping()]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     try {
       await expect(client.ping!('round-seventeen-control-peer')).resolves.toBe(true)
       const controller = new AbortController()
@@ -1952,11 +2049,14 @@ describe('provider production-seam matrix', () => {
       }
     }
     const [transport] = createMemoryTransportPair()
-    const endpoint = await createFullEndpoint({
-      id: 'round-seventeen-control-cleanup',
-      transport,
-      middlewares: [connect({ transport }), ping(), firstMiddleware, secondMiddleware]
-    })
+    const endpoint = await createRuntimeEndpointComposition(
+      {
+        id: 'round-seventeen-control-cleanup',
+        transport,
+        middlewares: [connect({ transport }), ping(), firstMiddleware, secondMiddleware]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     const endpointDispose = endpoint.dispose()
     expect(endpoint.dispose()).toBe(endpointDispose)
     const promises = readComposedDisposalPromises(endpoint)
@@ -2022,7 +2122,10 @@ describe('provider production-seam matrix', () => {
     const [, firstTransport] = createMemoryTransportPair()
     const [, secondTransport] = createMemoryTransportPair()
     const reusedPing = ping()
-    const reusedRoots = createNativeRoots('first-party-outbound', 'first-party-control')
+    const reusedRoots = createRuntimeFeatureRoots(
+      { id: 'reused-provider-roots', middlewares: [] },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).roots
     const [first, second] = await Promise.all([
       createComposedEndpoint(
         {
@@ -2061,17 +2164,23 @@ describe('provider production-seam matrix', () => {
 
   it('real control fanout keeps tagged peer results endpoint-local', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
-    const server = await createFullEndpoint({
-      id: 'round-eighteen-control-fanout-server',
-      transport: serverTransport,
-      middlewares: [connect({ transport: serverTransport }), ping()]
-    })
-    const client = await createFullEndpoint({
-      id: 'round-eighteen-control-fanout-client',
-      transport: clientTransport,
-      targetIds: ['round-eighteen-control-fanout-server', 'round-eighteen-control-missing'],
-      middlewares: [connect({ transport: clientTransport }), ping()]
-    })
+    const server = await createRuntimeEndpointComposition(
+      {
+        id: 'round-eighteen-control-fanout-server',
+        transport: serverTransport,
+        middlewares: [connect({ transport: serverTransport }), ping()]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'round-eighteen-control-fanout-client',
+        transport: clientTransport,
+        targetIds: ['round-eighteen-control-fanout-server', 'round-eighteen-control-missing'],
+        middlewares: [connect({ transport: clientTransport }), ping()]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     try {
       const result = await client.pingAll!()
       const serverKey = JSON.stringify(['target', 'round-eighteen-control-fanout-server'])
@@ -2088,11 +2197,14 @@ describe('provider production-seam matrix', () => {
 
   it('disposed control endpoint rejects a later operation without reviving state', async () => {
     const [transport] = createMemoryTransportPair()
-    const endpoint = await createFullEndpoint({
-      id: 'round-eighteen-control-terminal-removal',
-      transport,
-      middlewares: [connect({ transport }), ping()]
-    })
+    const endpoint = await createRuntimeEndpointComposition(
+      {
+        id: 'round-eighteen-control-terminal-removal',
+        transport,
+        middlewares: [connect({ transport }), ping()]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     const disposePromise = endpoint.dispose()
     await disposePromise
     let failure: unknown
@@ -2123,11 +2235,14 @@ describe('provider production-seam matrix', () => {
           listener(error)
         }) ?? (() => undefined)
     }
-    const endpoint = await createFullEndpoint({
-      id: 'round-eighteen-control-dispose-race',
-      transport,
-      middlewares: [connect({ transport }), ping()]
-    })
+    const endpoint = await createRuntimeEndpointComposition(
+      {
+        id: 'round-eighteen-control-dispose-race',
+        transport,
+        middlewares: [connect({ transport }), ping()]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     const controller = new AbortController()
     let settlementCount = 0
     const pending = endpoint.ping!('round-eighteen-control-missing', undefined, {
@@ -2203,7 +2318,10 @@ describe('provider production-seam matrix', () => {
     } as unknown as IRpcCoreConfig
     const endpoint = await createComposedEndpoint(
       config,
-      createNativeRoots('first-party-outbound', 'first-party-control')
+      createRuntimeFeatureRoots(
+        { id: 'reused-provider-roots', middlewares: [] },
+        { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+      ).roots
     )
     const snapshotReads = [...reads]
     targetIds[0] = 'round-twenty-mutated-target'
@@ -2242,17 +2360,23 @@ describe('provider production-seam matrix', () => {
         delayedFrames.push(message)
       }
     }
-    const server = await createFullEndpoint({
-      id: 'round-twenty-late-server',
-      transport: serverTransport,
-      middlewares: [connect({ transport: serverTransport }), ping()]
-    })
-    const client = await createFullEndpoint({
-      id: 'round-twenty-late-client',
-      transport: clientTransport,
-      targetIds: ['round-twenty-late-server'],
-      middlewares: [connect({ transport: clientTransport }), ping()]
-    })
+    const server = await createRuntimeEndpointComposition(
+      {
+        id: 'round-twenty-late-server',
+        transport: serverTransport,
+        middlewares: [connect({ transport: serverTransport }), ping()]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'round-twenty-late-client',
+        transport: clientTransport,
+        targetIds: ['round-twenty-late-server'],
+        middlewares: [connect({ transport: clientTransport }), ping()]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     let settlementCount = 0
     try {
       const pending = client.ping!('round-twenty-late-server', undefined, { timeoutMs: 5 }).then(
@@ -2291,7 +2415,10 @@ describe('provider production-seam matrix', () => {
   })
 
   it('concurrent reused control tokens preserve independent post-snapshot target state', async () => {
-    const reusedRoots = createNativeRoots('first-party-outbound', 'first-party-control')
+    const reusedRoots = createRuntimeFeatureRoots(
+      { id: 'reused-provider-roots', middlewares: [] },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).roots
     const firstTargets = ['cycle-m-concurrent-first-target']
     const secondTargets = ['cycle-m-concurrent-second-target']
     const [firstBaseTransport] = createMemoryTransportPair()
@@ -2388,18 +2515,24 @@ describe('provider production-seam matrix', () => {
         else baseServerTransport.send(message)
       }
     }
-    const server = await createFullEndpoint({
-      id: 'cycle-m-replay-server',
-      transport: serverTransport,
-      middlewares: [connect({ transport: serverTransport }), ping()]
-    })
+    const server = await createRuntimeEndpointComposition(
+      {
+        id: 'cycle-m-replay-server',
+        transport: serverTransport,
+        middlewares: [connect({ transport: serverTransport }), ping()]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     const client = await createComposedEndpoint(
       {
         id: 'cycle-m-replay-client',
         transport: clientTransport,
         middlewares: [connect({ transport: clientTransport }), ping()]
       },
-      createNativeRoots('first-party-outbound', 'first-party-control')
+      createRuntimeFeatureRoots(
+        { id: 'reused-provider-roots', middlewares: [] },
+        { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+      ).roots
     )
     try {
       let settlementCount = 0
@@ -2452,16 +2585,22 @@ describe('provider production-seam matrix', () => {
         else baseServerTransport.send(message)
       }
     }
-    const server = await createFullEndpoint({
-      id: 'cycle-m-cross-peer-server',
-      transport: serverTransport,
-      middlewares: [connect({ transport: serverTransport }), ping()]
-    })
-    const client = await createFullEndpoint({
-      id: 'cycle-m-cross-peer-client',
-      transport: clientTransport,
-      middlewares: [connect({ transport: clientTransport }), ping()]
-    })
+    const server = await createRuntimeEndpointComposition(
+      {
+        id: 'cycle-m-cross-peer-server',
+        transport: serverTransport,
+        middlewares: [connect({ transport: serverTransport }), ping()]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'cycle-m-cross-peer-client',
+        transport: clientTransport,
+        middlewares: [connect({ transport: clientTransport }), ping()]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     try {
       let settlementCount = 0
       const pending = client.ping!('cycle-m-cross-peer-server', 'cycle-m-cross-peer-server', {
@@ -2510,15 +2649,18 @@ describe('provider production-seam matrix', () => {
       }
     }
     const reports: unknown[] = []
-    const client = await createFullEndpoint({
-      id: 'cycle-m-late-reject-client',
-      transport: clientTransport,
-      middlewares: [
-        connect({ transport: clientTransport }),
-        ping(),
-        hooks({ onHookError: (error) => reports.push(error) })
-      ]
-    })
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'cycle-m-late-reject-client',
+        transport: clientTransport,
+        middlewares: [
+          connect({ transport: clientTransport }),
+          ping(),
+          hooks({ onHookError: (error) => reports.push(error) })
+        ]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     try {
       const pending = client.ping!('cycle-m-late-reject-server', 'cycle-m-late-reject-server', {
         timeoutMs: 5
@@ -2538,11 +2680,14 @@ describe('provider production-seam matrix', () => {
   it('endpoint time owner advances control timeout and clears its exact timer', async () => {
     vi.useFakeTimers()
     const [transport] = createMemoryTransportPair()
-    const endpoint = await createFullEndpoint({
-      id: 'cycle-m-time-owner',
-      transport,
-      middlewares: [connect({ transport }), ping()]
-    })
+    const endpoint = await createRuntimeEndpointComposition(
+      {
+        id: 'cycle-m-time-owner',
+        transport,
+        middlewares: [connect({ transport }), ping()]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     const timeEvents: IRpcTimePortEvent[] = []
     const unregisterTimeObserver = registerEndpointTimePortObserver(endpoint, (event) => {
       timeEvents.push(event)
@@ -2589,16 +2734,22 @@ describe('provider production-seam matrix', () => {
   it('unchanged discovery/control consumers run through the ordered provider bridge transaction', async () => {
     const [, firstTransport] = createMemoryTransportPair()
     const [, secondTransport] = createMemoryTransportPair()
-    const first = await createFullEndpoint({
-      id: 'r73-d95-first',
-      transport: firstTransport,
-      middlewares: [connect({ transport: firstTransport }), ping()]
-    })
-    const second = await createFullEndpoint({
-      id: 'r73-d95-second',
-      transport: secondTransport,
-      middlewares: [connect({ transport: secondTransport }), ping()]
-    })
+    const first = await createRuntimeEndpointComposition(
+      {
+        id: 'r73-d95-first',
+        transport: firstTransport,
+        middlewares: [connect({ transport: firstTransport }), ping()]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
+    const second = await createRuntimeEndpointComposition(
+      {
+        id: 'r73-d95-second',
+        transport: secondTransport,
+        middlewares: [connect({ transport: secondTransport }), ping()]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     try {
       expect(first.connect).toBeDefined()
       expect(first.discovery).toBeDefined()
@@ -2637,20 +2788,25 @@ describe('provider production-seam matrix', () => {
   })
 
   it('provider and adjacent-consumer artifacts expose the final removed provider-bridge boundary', async () => {
-    const featureNames = ['provider', 'discovery', 'control', 'canonical-chunk'] as const
+    const featureNames = [
+      'internal/provider-feature',
+      'features/discovery',
+      'features/control',
+      'features/canonical-chunk'
+    ] as const
     const sourceTexts = await Promise.all(
       featureNames.map((name) =>
-        readFile(new URL(`../../src/core/features/${name}.ts`, import.meta.url), 'utf8')
+        readFile(new URL(`../../src/core/${name}.ts`, import.meta.url), 'utf8')
       )
     )
     const runtimeTexts = await Promise.all(
       featureNames.map((name) =>
-        readFile(new URL(`../../dist/core/features/${name}.js`, import.meta.url), 'utf8')
+        readFile(new URL(`../../dist/core/${name}.js`, import.meta.url), 'utf8')
       )
     )
     const declarationTexts = await Promise.all(
       featureNames.map((name) =>
-        readFile(new URL(`../../dist/core/features/${name}.d.ts`, import.meta.url), 'utf8')
+        readFile(new URL(`../../dist/core/${name}.d.ts`, import.meta.url), 'utf8')
       )
     )
     const packageJson = JSON.parse(
@@ -2670,22 +2826,28 @@ describe('provider production-seam matrix', () => {
 
   it('chunk is an explicitly inventoried provider-bridge consumer with canonical assembly ownership', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
-    const server = await createFullEndpoint({
-      id: 'r73-chunk-server',
-      transport: serverTransport,
-      codec: defineJsonCodec({ version: 1 }),
-      framer: createStringFramer({ chunkBytes: 4 }),
-      middlewares: [connect({ transport: serverTransport })],
-      provider: { echo: (context) => context.success(context.data) }
-    })
-    const client = await createFullEndpoint({
-      id: 'r73-chunk-client',
-      targetIds: ['r73-chunk-server'],
-      transport: clientTransport,
-      codec: defineJsonCodec({ version: 1 }),
-      framer: createStringFramer({ chunkBytes: 4 }),
-      middlewares: [connect({ transport: clientTransport })]
-    })
+    const server = await createRuntimeEndpointComposition(
+      {
+        id: 'r73-chunk-server',
+        transport: serverTransport,
+        codec: defineJsonCodec({ version: 1 }),
+        framer: createStringFramer({ chunkBytes: 4 }),
+        middlewares: [connect({ transport: serverTransport })],
+        provider: { echo: (context) => context.success(context.data) }
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'r73-chunk-client',
+        targetIds: ['r73-chunk-server'],
+        transport: clientTransport,
+        codec: defineJsonCodec({ version: 1 }),
+        framer: createStringFramer({ chunkBytes: 4 }),
+        middlewares: [connect({ transport: clientTransport })]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     try {
       expect(client.send).toBeTypeOf('function')
       await expect(
@@ -2850,6 +3012,7 @@ describe('provider production-seam matrix', () => {
         ownerDisposeStable: true,
         ownerDisposalFailure: undefined,
         ownerTerminal: {
+          // HOST_SURFACE is the fixed 20-key literal declared in this fixture, independent of methods/peers.
           hostKeys: [...HOST_SURFACE].sort(),
           sharedEmpty: true,
           extensionsEmpty: true,
@@ -2891,12 +3054,15 @@ describe('provider production-seam matrix', () => {
       },
       true
     )
-    const client = await createClientEndpoint({
-      id: 'provider-cancellation-client',
-      transport: clientTransport,
-      targetIds: ['provider-cancellation-owner'],
-      middlewares: [connect({ transport: clientTransport }), abort()]
-    })
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'provider-cancellation-client',
+        transport: clientTransport,
+        targetIds: ['provider-cancellation-owner'],
+        middlewares: [connect({ transport: clientTransport }), abort()]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     try {
       const controller = new AbortController()
       const pending = client.send('provider-cancellation-owner', 'wait', null, {
@@ -3474,12 +3640,15 @@ describe('provider production-seam matrix', () => {
       },
       true
     )
-    const client = await createClientEndpoint({
-      id: 'r71-primitive-reason-client',
-      transport: clientTransport,
-      targetIds: ['r71-primitive-reason-host'],
-      middlewares: [connect({ transport: clientTransport }), abort()]
-    })
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'r71-primitive-reason-client',
+        transport: clientTransport,
+        targetIds: ['r71-primitive-reason-host'],
+        middlewares: [connect({ transport: clientTransport }), abort()]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     try {
       const controller = new AbortController()
       const reason = 'primitive-r71-reason'
@@ -3787,18 +3956,14 @@ describe('provider production-seam matrix', () => {
       new URL('../../dist/core/internal/test-observer.d.ts', import.meta.url),
       'utf8'
     )
-    const rootDeclaration = await readFile(
-      new URL('../../dist/core/index.d.ts', import.meta.url),
-      'utf8'
-    )
-    const fullDeclaration = await readFile(
-      new URL('../../dist/core/full.d.ts', import.meta.url),
+    const publicDeclaration = await readFile(
+      new URL('../../dist/index.d.ts', import.meta.url),
       'utf8'
     )
     const packageJson = JSON.parse(
       await readFile(new URL('../../package.json', import.meta.url), 'utf8')
     ) as { readonly exports: Readonly<Record<string, unknown>> }
-    for (const text of [declaration, rootDeclaration, fullDeclaration]) {
+    for (const text of [declaration, publicDeclaration]) {
       expect(text).not.toContain('registerInboundIdentityReleaseObservation')
       expect(text).not.toContain('recordInboundIdentityRelease')
       expect(text).not.toContain('readInboundIdentityReleaseObservation')
@@ -3830,12 +3995,15 @@ describe('provider production-seam matrix', () => {
       }
     })
     await expect(
-      createProviderEndpoint({
-        id: 'provider-retry-failed',
-        transport: failedTransport,
-        middlewares: [connect({ transport: failedTransport })],
-        provider: failedProvider
-      })
+      createRuntimeEndpointComposition(
+        {
+          id: 'provider-retry-failed',
+          transport: failedTransport,
+          middlewares: [connect({ transport: failedTransport })],
+          provider: failedProvider
+        },
+        { agreement: { capabilities: [] }, peerId: '' }
+      ).installing
     ).rejects.toMatchObject({
       name: 'RpcConfigurationError',
       source: 'rpc.endpoint',
@@ -5324,22 +5492,28 @@ describe('provider production-seam matrix', () => {
   it('canonical endpoint disposal preserves Promise identity and terminal provider residue', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
     const primary = new Error('canonical provider failure')
-    const server = await createProviderEndpoint({
-      id: 'r70-canonical-provider',
-      transport: serverTransport,
-      middlewares: [connect({ transport: serverTransport })],
-      provider: {
-        fail: () => {
-          throw primary
+    const server = await createRuntimeEndpointComposition(
+      {
+        id: 'r70-canonical-provider',
+        transport: serverTransport,
+        middlewares: [connect({ transport: serverTransport })],
+        provider: {
+          fail: () => {
+            throw primary
+          }
         }
-      }
-    })
-    const client = await createClientEndpoint({
-      id: 'r70-canonical-client',
-      transport: clientTransport,
-      targetIds: ['r70-canonical-provider'],
-      middlewares: [connect({ transport: clientTransport })]
-    })
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'r70-canonical-client',
+        transport: clientTransport,
+        targetIds: ['r70-canonical-provider'],
+        middlewares: [connect({ transport: clientTransport })]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     try {
       await expect(client.send('r70-canonical-provider', 'fail', null)).rejects.toMatchObject({
         code: RpcCoreErrorCode.internal
@@ -5375,12 +5549,15 @@ describe('provider production-seam matrix', () => {
         closeCalls += 1
       }
     }
-    const endpoint = await createProviderEndpoint({
-      id: 'r72-owned-transport',
-      transport,
-      middlewares: [connect({ transport })],
-      provider: { echo: (context) => context.success('owned') }
-    })
+    const endpoint = await createRuntimeEndpointComposition(
+      {
+        id: 'r72-owned-transport',
+        transport,
+        middlewares: [connect({ transport })],
+        provider: { echo: (context) => context.success('owned') }
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     const dispose = endpoint.dispose()
     expect(endpoint.dispose()).toBe(dispose)
     await dispose
@@ -5430,12 +5607,15 @@ describe('provider production-seam matrix', () => {
         closeCalls += 1
       }
     }
-    const endpoint = await createProviderEndpoint({
-      id: 'r72-borrowed-transport',
-      transport,
-      middlewares: [connect({ transport })],
-      provider: { echo: (context) => context.success('borrowed') }
-    })
+    const endpoint = await createRuntimeEndpointComposition(
+      {
+        id: 'r72-borrowed-transport',
+        transport,
+        middlewares: [connect({ transport })],
+        provider: { echo: (context) => context.success('borrowed') }
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     const dispose = endpoint.dispose()
     expect(endpoint.dispose()).toBe(dispose)
     await dispose
@@ -5498,19 +5678,22 @@ describe('provider production-seam matrix', () => {
     const invoked = new Promise<void>((resolve) => {
       started = resolve
     })
-    const server = await createProviderEndpoint({
-      id: 'one-way-server',
-      transport: serverTransport,
-      middlewares: [connect({ transport: serverTransport })],
-      provider: {
-        notify: async (context) => {
-          deliveries.push(context.data)
-          started()
-          await held
-          return context.success(null)
+    const server = await createRuntimeEndpointComposition(
+      {
+        id: 'one-way-server',
+        transport: serverTransport,
+        middlewares: [connect({ transport: serverTransport })],
+        provider: {
+          notify: async (context) => {
+            deliveries.push(context.data)
+            started()
+            await held
+            return context.success(null)
+          }
         }
-      }
-    })
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     const client = await createComposedEndpoint(
       {
         id: 'one-way-client',
@@ -5518,7 +5701,10 @@ describe('provider production-seam matrix', () => {
         targetIds: ['one-way-server'],
         middlewares: [connect({ transport: clientTransport })]
       },
-      createNativeRoots('first-party-one-way')
+      createRuntimeFeatureRoots(
+        { id: 'one-way-owner-roots', middlewares: [] },
+        { agreement: { capabilities: [] }, peerId: '' }
+      ).roots
     )
     try {
       const sent = client.sendOneWay('one-way-server', 'notify', 'payload')
@@ -5558,17 +5744,20 @@ describe('provider production-seam matrix', () => {
     }
     /** Records provider execution to prove the Good retry delivered a real request. */
     const deliveries: unknown[] = []
-    const server = await createProviderEndpoint({
-      id: 'one-way-rejection-server',
-      transport: serverTransport,
-      middlewares: [connect({ transport: serverTransport })],
-      provider: {
-        notify: (context) => {
-          deliveries.push(context.data)
-          return context.success(null)
+    const server = await createRuntimeEndpointComposition(
+      {
+        id: 'one-way-rejection-server',
+        transport: serverTransport,
+        middlewares: [connect({ transport: serverTransport })],
+        provider: {
+          notify: (context) => {
+            deliveries.push(context.data)
+            return context.success(null)
+          }
         }
-      }
-    })
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     const client = await createComposedEndpoint(
       {
         id: 'one-way-rejection-client',
@@ -5576,7 +5765,10 @@ describe('provider production-seam matrix', () => {
         targetIds: ['one-way-rejection-server'],
         middlewares: [connect({ transport: clientTransport })]
       },
-      createNativeRoots('first-party-one-way')
+      createRuntimeFeatureRoots(
+        { id: 'one-way-owner-roots', middlewares: [] },
+        { agreement: { capabilities: [] }, peerId: '' }
+      ).roots
     )
     try {
       /** Captures the rejected one-way result for precise wrapper/cause identity assertions. */

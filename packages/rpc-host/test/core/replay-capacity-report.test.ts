@@ -1,9 +1,8 @@
+import { createRuntimeEndpointComposition } from '../../dist/core/runtime-api-endpoint.js'
 import { describe, expect, it, vi } from 'vitest'
 import { createManualScheduler } from '@migaia/utils/testing'
-import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
-import { createProviderEndpoint } from '../../dist/core/provider.js'
-import { createComposedEndpoint } from '../../dist/core/composed.js'
-import { createFirstPartyRoots } from '../../dist/core/internal/first-party-roots.js'
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
+
 import { connect } from '../../dist/core/middleware/connect.js'
 import { hooks } from '../../dist/core/middleware/hooks.js'
 import type { IRpcHookEvent } from '../../dist/core/typing.js'
@@ -19,11 +18,9 @@ describe('local replay capacity reports', () => {
     /** Record only the first endpoint's local capacity evidence. */
     const events: IRpcHookEvent[] = []
     /** Provider and outbound features share the same canonical endpoint diagnostic owner. */
-    const roots = createFirstPartyRoots(
-      new Set(['first-party-outbound', 'first-party-provider'] as const)
-    )
+
     /** Tiny optional capacities make both namespaces exhaust without changing defaults. */
-    const first = await createComposedEndpoint(
+    const first = await createRuntimeEndpointComposition(
       {
         id: 'budget-first',
         transport: firstTransport,
@@ -41,10 +38,10 @@ describe('local replay capacity reports', () => {
           })
         ]
       },
-      roots
-    )
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     /** The opposite endpoint keeps ordinary replay defaults throughout. */
-    const second = await createComposedEndpoint(
+    const second = await createRuntimeEndpointComposition(
       {
         id: 'budget-second',
         transport: secondTransport,
@@ -52,8 +49,8 @@ describe('local replay capacity reports', () => {
         provider: { echo: (context) => context.success(context.data) },
         middlewares: [connect({ transport: secondTransport })]
       },
-      roots
-    )
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     try {
       await second.send('budget-first', 'echo', null)
       await expect(second.send('budget-first', 'echo', null)).rejects.toMatchObject({
@@ -85,31 +82,34 @@ describe('local replay capacity reports', () => {
     /** All requests use canonical verified memory peer binding. */
     const [clientTransport, serverTransport] = createMemoryTransportPair()
     /** Default 310-second retention is preserved, with a small existing per-peer option. */
-    const server = await createProviderEndpoint({
-      id: 'cached-server',
-      transport: serverTransport,
-      scheduler,
-      providerLimits: { maxReplayEntriesPerPeer: 1 },
-      provider: { echo: (context) => context.success(context.data) },
-      middlewares: [
-        connect({ transport: serverTransport }),
-        hooks({
-          listeners: (event) => {
-            if (event.detail) events.push(event)
-          }
-        })
-      ]
-    })
+    const server = await createRuntimeEndpointComposition(
+      {
+        id: 'cached-server',
+        transport: serverTransport,
+        scheduler,
+        providerLimits: { maxReplayEntriesPerPeer: 1 },
+        provider: { echo: (context) => context.success(context.data) },
+        middlewares: [
+          connect({ transport: serverTransport }),
+          hooks({
+            listeners: (event) => {
+              if (event.detail) events.push(event)
+            }
+          })
+        ]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     /** Caller replay clock stays independent from this server's controlled expiry. */
-    const client = await createComposedEndpoint(
+    const client = await createRuntimeEndpointComposition(
       {
         id: 'cached-client',
         transport: clientTransport,
         targetIds: ['cached-server'],
         middlewares: [connect({ transport: clientTransport })]
       },
-      createFirstPartyRoots(new Set(['first-party-outbound'] as const))
-    )
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     /** Records exact incoming frames so repeated identity uses the actual production route. */
     const unsubscribe = serverTransport.subscribe(({ data }) => frames.push(data))
     /** Raw response count lets the unowned repeated response settle before the assertion. */
@@ -158,14 +158,17 @@ describe('local replay capacity reports', () => {
     /** Only capacity hook events are counted; unrelated endpoint hooks remain available. */
     const events: IRpcHookEvent[] = []
     /** Provider replay and wire behavior remain unmodified for this outbound capacity fixture. */
-    const server = await createProviderEndpoint({
-      id: 'capacity-server',
-      transport: serverTransport,
-      middlewares: [connect({ transport: serverTransport })],
-      provider: { echo: (context) => context.success(context.data) }
-    })
+    const server = await createRuntimeEndpointComposition(
+      {
+        id: 'capacity-server',
+        transport: serverTransport,
+        middlewares: [connect({ transport: serverTransport })],
+        provider: { echo: (context) => context.success(context.data) }
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     /** Optional public replay configuration isolates exhaustion without changing product defaults. */
-    const client = await createComposedEndpoint(
+    const client = await createRuntimeEndpointComposition(
       {
         id: 'capacity-client',
         transport: clientTransport,
@@ -182,8 +185,8 @@ describe('local replay capacity reports', () => {
           })
         ]
       },
-      createFirstPartyRoots(new Set(['first-party-outbound', 'first-party-one-way'] as const))
-    )
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     /** Raw delivery proves refusal never writes an additional payload or diagnostic frame. */
     const unsubscribe = serverTransport.subscribe(({ data }) => received.push(data))
     try {
@@ -256,35 +259,38 @@ describe('local replay capacity reports', () => {
         throw original
       })
       /** Per-peer capacity is intentionally small through an existing optional public parameter. */
-      const server = await createProviderEndpoint({
-        id: 'ledger-server',
-        transport: serverTransport,
-        scheduler,
-        middlewares: [
-          connect({ transport: serverTransport }),
-          hooks({
-            listeners: (event) => {
-              if (event.name === 'failure') events.push(event)
-            },
-            onHookError: reporter
-          })
-        ],
-        providerLimits: {
-          maxReplayEntriesPerPeer: 1,
-          ...(mode === 'none' ? {} : { onRejected: observer })
+      const server = await createRuntimeEndpointComposition(
+        {
+          id: 'ledger-server',
+          transport: serverTransport,
+          scheduler,
+          middlewares: [
+            connect({ transport: serverTransport }),
+            hooks({
+              listeners: (event) => {
+                if (event.name === 'failure') events.push(event)
+              },
+              onHookError: reporter
+            })
+          ],
+          providerLimits: {
+            maxReplayEntriesPerPeer: 1,
+            ...(mode === 'none' ? {} : { onRejected: observer })
+          },
+          provider: { echo: (context) => context.success(context.data) }
         },
-        provider: { echo: (context) => context.success(context.data) }
-      })
+        { agreement: { capabilities: [] }, peerId: '' }
+      ).installing
       /** Request and one-way use the same actual provider replay admission. */
-      const client = await createComposedEndpoint(
+      const client = await createRuntimeEndpointComposition(
         {
           id: 'ledger-client',
           transport: clientTransport,
           targetIds: ['ledger-server'],
           middlewares: [connect({ transport: clientTransport })]
         },
-        createFirstPartyRoots(new Set(['first-party-outbound', 'first-party-one-way'] as const))
-      )
+        { agreement: { capabilities: [] }, peerId: '' }
+      ).installing
       /** Raw responses distinguish the unchanged request error from silent one-way refusal. */
       const replies: unknown[] = []
       const unsubscribe = clientTransport.subscribe(({ data }) => replies.push(data))

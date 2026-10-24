@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest'
 import { createManualScheduler } from '@migaia/utils/testing'
-import { createMemoryTransportPair } from '@migaia/rpc-host/adapters/memory'
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
 
 it('uses the injected clock when the host has no microtask queue', () => {
   /** This scheduler exercises only the external method/error contract under test. */

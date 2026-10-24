@@ -1,5 +1,11 @@
+import { createComposedEndpoint } from '../../../rpc-host/dist/core/composed.js'
+import { createCanonicalChunkFeature } from '../../../rpc-host/dist/core/features/canonical-chunk.js'
+import { createOutboundFeature } from '../../../rpc-host/dist/core/features/outbound.js'
+import { createProviderFeature } from '../../../rpc-host/dist/core/internal/provider-feature.js'
+import { createDiscoveryFeature } from '../../../rpc-host/dist/core/features/discovery.js'
+import { createControlFeature } from '../../../rpc-host/dist/core/features/control.js'
 import { describe, expect, it } from 'vitest'
-import { connect, createFullOneWayEndpoint } from '../../../rpc-host/dist/core/index.js'
+import { connect } from '../../../rpc-host/dist/core/middleware/connect.js'
 import type { IRpcCarrierProbe } from '@migaia/rpc-host/probe'
 import type { IRpcTransport } from '@migaia/rpc-host/plugin'
 import { createWindowMessageTransport } from '../../src/browser/adapters/window.js'
@@ -7,7 +13,6 @@ import { createSharedWorkerTransport } from '../../src/browser/adapters/shared-w
 import { createServiceWorkerTransport } from '../../src/browser/adapters/service-worker.js'
 import { createBroadcastChannelTransport } from '../../src/browser/adapters/broadcast-channel.js'
 import { createRtcDataChannelTransport } from '../../src/browser/adapters/rtc-data-channel.js'
-import { createWebTransportDatagramTransport } from '../../src/browser/adapters/web-transport.js'
 
 /** Each fixture names one public browser carrier, independently of probe-core. */
 const carriers = [
@@ -15,8 +20,7 @@ const carriers = [
   'shared-worker',
   'service-worker',
   'broadcast-channel',
-  'rtc-data-channel',
-  'web-transport'
+  'rtc-data-channel'
 ] as const
 /** The oracle retains metadata immediately because production detail is reused. */
 type IEvent = {
@@ -40,108 +44,117 @@ type IFixture = {
 }
 
 /** Builds a physical loopback for one exported factory without constructing an Endpoint. */
-function fixture(carrier: (typeof carriers)[number], detach = false): IFixture {
-  /** Registered native callbacks belong to the adapter under test. */
+/** Allocate only this case's original observations before installing native-shaped callbacks. */
+function browserProbeFixtureState(carrier: (typeof carriers)[number], detach = false) {
   const callbacks = new Map<string, Set<(event: unknown) => void>>()
-  /** The configured peer identity supplies valid sourceProof input. */
-  const source = {
-    id: 'client',
-    readyState: 'open',
-    /** Retain exact callback identity under its native event name for later fixture delivery. */
-    addEventListener<T>(type: string, callback: (event: T) => void) {
-      if (!callbacks.has(type)) callbacks.set(type, new Set())
-      callbacks.get(type)!.add(callback as (event: unknown) => void)
-    },
-    /** Remove only the adapter callback belonging to this native event registration. */
-    removeEventListener<T>(type: string, callback: (event: T) => void) {
-      callbacks.get(type)?.delete(callback as (event: unknown) => void)
-    },
-    /** Model both Window and port argument shapes, including real native transfer detachment. */
+  return { carrier, detach, callbacks }
+}
+
+/** Own one test resource's mutable observations without sharing a factory closure. */
+class BrowserProbeFixture {
+  /** Counts, native events and construction inputs belong only to this fixture instance. */
+  #state: ReturnType<typeof browserProbeFixtureState>
+  /** Existing consumers retain the same observable fixture surface and callback identities. */
+  /** Native resource projection retained by this fixture instance. */
+  #source: {
+    id: string
+    readyState: string
+    addEventListener<T>(type: string, callback: (event: T) => void): void
+    removeEventListener<T>(type: string, callback: (event: T) => void): void
     postMessage(
       message: unknown,
       originOrTransfer?: unknown,
       windowTransfer?: readonly Transferable[]
-    ) {
-      /** This fixture models native structured-clone wire delivery and real detachment. */
-      const transfer =
-        typeof originOrTransfer === 'string'
-          ? windowTransfer
-          : (originOrTransfer as readonly Transferable[] | undefined)
-      deliver(
-        detach
-          ? structuredClone(message, { transfer: transfer as Transferable[] | undefined })
-          : message
-      )
-    },
-    /** RTC sends deliver their physical string without introducing a second encoding boundary. */
-    send(message: string) {
-      deliver(message)
-    }
+    ): void
+    send(message: string): void
   }
-  /** Readable ownership is used only by the datagram carrier. */
-  let controller: ReadableStreamDefaultController<Uint8Array> | undefined
-  /** Dispatch one native event to each registered browser reader. */
-  function deliver(data: unknown, peer: unknown = source, origin = 'https://peer.test'): void {
-    if (carrier === 'web-transport') {
-      controller!.enqueue(data as Uint8Array)
-      return
+  readonly value: IFixture
+  /** Install the original native-shaped callbacks after their observations exist. */
+  constructor(carrier: (typeof carriers)[number], detach = false) {
+    this.#state = browserProbeFixtureState(carrier, detach)
+    this.#source = {
+      id: 'client',
+      readyState: 'open',
+      /** Retain exact callback identity under its native event name for later fixture delivery. */
+      addEventListener: <T>(type: string, callback: (event: T) => void) => {
+        if (!this.#state.callbacks.has(type)) this.#state.callbacks.set(type, new Set())
+        this.#state.callbacks.get(type)!.add(callback as (event: unknown) => void)
+      },
+      /** Remove only the adapter callback belonging to this native event registration. */
+      removeEventListener: <T>(type: string, callback: (event: T) => void) => {
+        this.#state.callbacks.get(type)?.delete(callback as (event: unknown) => void)
+      },
+      /** Model both Window and port argument shapes, including real native transfer detachment. */
+      postMessage: (
+        message: unknown,
+        originOrTransfer?: unknown,
+        windowTransfer?: readonly Transferable[]
+      ) => {
+        /** This fixture models native structured-clone wire delivery and real detachment. */
+        const transfer =
+          typeof originOrTransfer === 'string'
+            ? windowTransfer
+            : (originOrTransfer as readonly Transferable[] | undefined)
+        this.#deliver(
+          this.#state.detach
+            ? structuredClone(message, { transfer: transfer as Transferable[] | undefined })
+            : message
+        )
+      },
+      /** RTC sends deliver their physical string without introducing a second encoding boundary. */
+      send: (message: string) => {
+        this.#deliver(message)
+      }
     }
-    /** Every native message reader receives the same physical event fields. */
-    for (const callback of callbacks.get('message') ?? []) callback({ data, source: peer, origin })
-  }
-  /** The switch keeps each public adapter constructor explicit in the coverage oracle. */
-  let transport: IRpcTransport<unknown, Transferable>
-  switch (carrier) {
-    case 'window':
-      transport = createWindowMessageTransport({
-        target: source,
-        receiver: source,
-        targetOrigin: 'https://peer.test'
-      })
-      break
-    case 'shared-worker':
-      transport = createSharedWorkerTransport(source)
-      break
-    case 'service-worker':
-      transport = createServiceWorkerTransport({ target: source, receiver: source })
-      break
-    case 'broadcast-channel':
-      transport = createBroadcastChannelTransport(source as unknown as BroadcastChannel)
-      break
-    case 'rtc-data-channel':
-      transport = createRtcDataChannelTransport(source)
-      break
-    case 'web-transport':
-      transport = createWebTransportDatagramTransport({
-        readable: new ReadableStream<Uint8Array>({
-          /** Save the actual stream ingress owner so fixture delivery exercises adapter reading. */
-          start(value) {
-            controller = value
-          }
-        }),
-        writable: new WritableStream<Uint8Array>({
-          /** Reflect native datagram writes through the same readable ownership boundary. */
-          write(message) {
-            deliver(message)
-          }
+    let transport: IRpcTransport<unknown, Transferable>
+    switch (this.#state.carrier) {
+      case 'window':
+        transport = createWindowMessageTransport({
+          target: this.#source,
+          receiver: this.#source,
+          targetOrigin: 'https://peer.test'
         })
-      }) as IRpcTransport<unknown, Transferable>
-      break
-  }
-  return {
-    transport,
-    source,
-    message: carrier === 'rtc-data-channel' ? 'payload-😀' : new Uint8Array([1, 2, 3]),
-    deliver,
-    /** Join the adapter's existing close result without closing borrowed native owners. */
-    async close() {
-      await transport.close?.()
-    },
-    /** Retire RTC through native terminal callbacks so its observation slot is released. */
-    fail() {
-      for (const callback of callbacks.get('close') ?? []) callback({})
+        break
+      case 'shared-worker':
+        transport = createSharedWorkerTransport(this.#source)
+        break
+      case 'service-worker':
+        transport = createServiceWorkerTransport({ target: this.#source, receiver: this.#source })
+        break
+      case 'broadcast-channel':
+        transport = createBroadcastChannelTransport(this.#source as unknown as BroadcastChannel)
+        break
+      case 'rtc-data-channel':
+        transport = createRtcDataChannelTransport(this.#source)
+        break
+    }
+    this.value = {
+      transport,
+      source: this.#source,
+      message:
+        this.#state.carrier === 'rtc-data-channel' ? 'payload-😀' : new Uint8Array([1, 2, 3]),
+      deliver: this.#deliver,
+      /** Join the adapter's existing close result without closing borrowed native owners. */
+      close: async () => {
+        await transport.close?.()
+      },
+      /** Retire RTC through native terminal callbacks so its observation slot is released. */
+      fail: () => {
+        for (const callback of this.#state.callbacks.get('close') ?? []) callback({})
+      }
     }
   }
+  /** Drive the original fixture operation through its sole state owner. */
+  #deliver = (data: unknown, peer: unknown = this.#source, origin = 'https://peer.test'): void => {
+    /** Every native message reader receives the same physical event fields. */
+    for (const callback of this.#state.callbacks.get('message') ?? [])
+      callback({ data, source: peer, origin })
+  }
+}
+
+/** Create one independent owner for the existing native-boundary fixture. */
+function fixture(carrier: (typeof carriers)[number], detach = false): IFixture {
+  return new BrowserProbeFixture(carrier, detach).value
 }
 
 /** Captures synchronous probe fields, keeping content by identity. */
@@ -393,20 +406,6 @@ describe('carriers: browser observe', () => {
     })
     expect(() => rtc.transport.send('closed')).toThrow('closed')
     expect(reads).toBe(0)
-    /** Explicit WebTransport close retires its observation slot and read ownership. */
-    const datagram = fixture('web-transport')
-    datagram.transport.observe!({
-      /** Closing the read/write owner must also prevent any later capture-policy access. */
-      get capturing() {
-        reads++
-        return false
-      },
-      /** Capture-policy access alone measures retained observation; emission needs no fixture work. */
-      emit() {}
-    })
-    await datagram.close()
-    expect(() => datagram.transport.send(new Uint8Array())).toThrow('closed')
-    expect(reads).toBe(0)
   })
 
   it('window: nested transferred members retain the original container reference and may detach', async () => {
@@ -471,19 +470,49 @@ describe('carriers: browser observe', () => {
     /** Server business responses use the other public browser transport factory. */
     const serverWire = createSharedWorkerTransport(ports[1]!)
     /** Endpoint dispatch and settlement make failAll regressions observable. */
-    const server = await createFullOneWayEndpoint({
-      id: 'server',
-      transport: serverWire,
-      middlewares: [connect({ transport: serverWire })]
-    })
+    /**
+     * This physical endpoint owns one outbound and discovery graph for its original business
+     * assertions.
+     */
+    const serverOutbound = createOutboundFeature(createCanonicalChunkFeature())
+    /** Discovery shares the same sender and accepted target directory. */
+    const serverDiscovery = createDiscoveryFeature(serverOutbound)
+    const server = await createComposedEndpoint(
+      {
+        id: 'server',
+        transport: serverWire,
+        middlewares: [connect({ transport: serverWire })]
+      },
+      {
+        'first-party-outbound': serverOutbound,
+        'first-party-provider': createProviderFeature(serverOutbound),
+        'first-party-discovery': serverDiscovery,
+        'first-party-control': createControlFeature(serverOutbound, serverDiscovery)
+      }
+    )
     /** Echo returns an ordinary business result independent of carrier diagnostics. */
     server.provide('echo', (context) => context.success(context.data))
     /** Real request creation registers its pending result before transport send. */
-    const client = await createFullOneWayEndpoint({
-      id: 'client',
-      transport: clientWire,
-      middlewares: [connect({ transport: clientWire })]
-    })
+    /**
+     * This physical endpoint owns one outbound and discovery graph for its original business
+     * assertions.
+     */
+    const clientOutbound = createOutboundFeature(createCanonicalChunkFeature())
+    /** Discovery shares the same sender and accepted target directory. */
+    const clientDiscovery = createDiscoveryFeature(clientOutbound)
+    const client = await createComposedEndpoint(
+      {
+        id: 'client',
+        transport: clientWire,
+        middlewares: [connect({ transport: clientWire })]
+      },
+      {
+        'first-party-outbound': clientOutbound,
+        'first-party-provider': createProviderFeature(clientOutbound),
+        'first-party-discovery': clientDiscovery,
+        'first-party-control': createControlFeature(clientOutbound, clientDiscovery)
+      }
+    )
     /** The exact exception must remain reachable through reports while the request succeeds. */
     const failure = new Error('endpoint probe failed')
     /** Listener reports are observable without treating them as physical retirement. */

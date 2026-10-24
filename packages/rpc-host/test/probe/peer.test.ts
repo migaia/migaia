@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { defineProbe, snapshotProbeEvent } from '../../dist/core/probe/index.js'
+import { defineProbe } from '../../dist/core/probe/index.js'
 import {
   createRuntimePeer,
   prepareRuntimePeerEndpoint,
@@ -11,7 +11,7 @@ import {
   createProbeEmitter
 } from '../../dist/core/internal/probe-emitter.js'
 import { createEndpointKernel } from '../../dist/core/endpoint-kernel.js'
-import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
 import { runtimeSources } from '../runtime-api/fixture.js'
 import type { IRpcProbeEventView } from '../../dist/core/probe/types.js'
 
@@ -33,7 +33,7 @@ it('Peer probe observes handshake, ready and close without changing calls', asyn
       described++
     },
     emit: (view) => {
-      seen.push(snapshotProbeEvent(view))
+      seen.push(Object.freeze({ ...view }))
       if (view.lifecycle === 'closing') nestedClose = client?.close()
     }
   })

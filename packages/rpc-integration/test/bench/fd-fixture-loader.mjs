@@ -14,7 +14,8 @@ const fixtureImports = Object.freeze({
   randomUUID: 'node:crypto',
   CapabilityLevel: '@migaia/supervision',
   ProcessCapability: '@migaia/supervision/process',
-  createNodeProcessLauncher: '@migaia/rpc-plugin-process/adapters/node-child-process',
+  createNodeProcessLauncher:
+    '../../../../rpc-plugin-process/dist/process/adapters/node-child-process.js',
   nodeByteStream: '../../../../rpc-plugin-process/dist/process/node-byte-stream.js'
 })
 
@@ -89,7 +90,7 @@ import {once} from 'node:events';
 import {randomUUID} from 'node:crypto';
 import {CapabilityLevel} from '@migaia/supervision';
 import {ProcessCapability} from '@migaia/supervision/process';
-import {createNodeProcessLauncher} from '@migaia/rpc-plugin-process/adapters/node-child-process';
+import {createNodeProcessLauncher} from ${JSON.stringify(new URL('../../../rpc-plugin-process/dist/process/adapters/node-child-process.js', import.meta.url).href)};
 import {nodeByteStream} from ${JSON.stringify(new URL('../../../rpc-plugin-process/dist/process/node-byte-stream.js', import.meta.url).href)};
 `
   const body = stripTypeScriptTypes(source.slice(start, end))

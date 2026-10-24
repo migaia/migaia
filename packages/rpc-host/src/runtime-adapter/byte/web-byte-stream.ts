@@ -32,114 +32,151 @@ export type IRuntimeWebByteStreamOptions = Readonly<{
 }>
 
 /** Acquire native Web Streams once; their own buffering and write order remain authoritative. */
+class RuntimeWebByteStream {
+  /** Original closePhysical resource retained by this single adapter owner. */
+  #closePhysical: () => void | Promise<void>
+
+  /** Original options resource retained by this single adapter owner. */
+  #options: IRuntimeWebByteStreamOptions
+
+  /** Failed writer acquisition returns the already-acquired native reader to its caller. */
+  #writer!: IRuntimeByteStreamWriter
+
+  /** The successful acquisition branch owns this stable reader for the connection lifetime. */
+  #reader
+
+  /** Listener sets never retain frames after the port closes. */
+  #dataListeners
+
+  #closeListeners
+
+  /** The pump waits without reading while no channel owner is subscribed. */
+  #wakeReader: (() => void) | undefined
+
+  #closed
+
+  #terminal: unknown
+
+  #closing: Promise<void> | undefined
+
+  /** End the one physical port and replay the first reason to late listeners. */
+  #end = (reason?: unknown): Promise<void> => {
+    if (this.#closing) return this.#closing
+    /** Publish completion before notifying any callback that can synchronously reenter close. */
+    const completion = deferred<void>()
+    this.#closing = completion.promise
+    this.#closed = true
+    this.#terminal = reason ?? this.#options.closedError()
+    this.#wakeReader?.()
+    /** Retire the exact current observers before invoking arbitrary application callbacks. */
+    const listeners = [...this.#closeListeners]
+    this.#dataListeners.clear()
+    this.#closeListeners.clear()
+    /** Observer failures precede cleanup failures and never prevent physical cleanup. */
+    const errors: unknown[] = []
+    for (const listener of listeners) {
+      try {
+        listener(this.#terminal)
+      } catch (error) {
+        errors.push(error)
+      }
+    }
+    void Promise.allSettled([
+      this.#reader.cancel(),
+      this.#writer.abort(this.#terminal),
+      Promise.resolve().then(this.#closePhysical)
+    ]).then((results) => {
+      /** A failed reader may reject cancel with its already-reported terminal reason. */
+      errors.push(
+        ...results.flatMap((result) =>
+          result.status === 'rejected' && result.reason !== this.#terminal ? [result.reason] : []
+        )
+      )
+      if (errors.length) completion.reject(this.#options.cleanupFailed(errors))
+      else completion.resolve()
+    })
+    return this.#closing
+  }
+
+  /** Frozen operation surface keeps the original transport/resource identity. */
+  readonly value: IRuntimeByteIO
+  /** Acquire resources and install native observers in the original construction order. */
+  constructor(
+    readable: IRuntimeReadableByteStream,
+    writable: IRuntimeWritableByteStream,
+    closePhysical: () => void | Promise<void>,
+    options: IRuntimeWebByteStreamOptions
+  ) {
+    this.#closePhysical = closePhysical
+    this.#options = options
+
+    /** Writer acquisition failure releases the reader acquired by this construction attempt. */
+    let acquiredReader: IRuntimeByteStreamReader | undefined
+    try {
+      acquiredReader = readable.getReader()
+      this.#writer = writable.getWriter()
+    } catch (error) {
+      acquiredReader?.releaseLock()
+      throw this.#options.openFailed(error as Error)
+    }
+    this.#reader = acquiredReader
+    this.#dataListeners = new Set<(chunk: Uint8Array) => void>()
+    this.#closeListeners = new Set<(reason?: unknown) => void>()
+    this.#closed = false
+
+    void this.#pump().catch((error: unknown) => {
+      this.#options.report(error)
+    })
+
+    this.value = Object.freeze({
+      kind: 'byte' as const,
+      write: (chunk: Uint8Array) => {
+        if (this.#closed) return Promise.reject(this.#terminal)
+        return this.#writer.write(chunk)
+      },
+      onData: (listener: (chunk: Uint8Array) => void) => {
+        this.#dataListeners.add(listener)
+        this.#wakeReader?.()
+        return () => this.#dataListeners.delete(listener)
+      },
+      onClose: (listener: (reason?: unknown) => void) => {
+        if (this.#closed) listener(this.#terminal)
+        else this.#closeListeners.add(listener)
+        return () => this.#closeListeners.delete(listener)
+      },
+      close: () => this.#end()
+    })
+  }
+  /** Deliver each native read once while pausing the pump when no owner subscribes. */
+  async #pump(): Promise<void> {
+    try {
+      while (!this.#closed) {
+        if (this.#dataListeners.size === 0) {
+          await new Promise<void>((resolve) => {
+            this.#wakeReader = resolve
+          })
+          this.#wakeReader = undefined
+          continue
+        }
+        const next = await this.#reader.read()
+        if (next.done) {
+          await this.#end()
+          return
+        }
+        for (const listener of this.#dataListeners) listener(next.value)
+      }
+    } catch (error) {
+      await this.#end(error)
+    }
+  }
+}
+
+/** Acquire one native reader/writer pair and retain its exact pump and cleanup lifecycle. */
 export function createRuntimeWebByteStream(
   readable: IRuntimeReadableByteStream,
   writable: IRuntimeWritableByteStream,
   closePhysical: () => void | Promise<void>,
   options: IRuntimeWebByteStreamOptions
 ): IRuntimeByteIO {
-  /** Retain only successfully acquired native resources until construction can commit. */
-  let acquiredReader: IRuntimeByteStreamReader | undefined
-  /** Failed writer acquisition returns the already-acquired native reader to its caller. */
-  let writer: IRuntimeByteStreamWriter
-  try {
-    acquiredReader = readable.getReader()
-    writer = writable.getWriter()
-  } catch (error) {
-    acquiredReader?.releaseLock()
-    throw options.openFailed(error as Error)
-  }
-  /** The successful acquisition branch owns this stable reader for the connection lifetime. */
-  const reader = acquiredReader
-  /** Listener sets never retain frames after the port closes. */
-  const dataListeners = new Set<(chunk: Uint8Array) => void>()
-  const closeListeners = new Set<(reason?: unknown) => void>()
-  /** The pump waits without reading while no channel owner is subscribed. */
-  let wakeReader: (() => void) | undefined
-  let closed = false
-  let terminal: unknown
-  let closing: Promise<void> | undefined
-
-  /** End the one physical port and replay the first reason to late listeners. */
-  const end = (reason?: unknown): Promise<void> => {
-    if (closing) return closing
-    /** Publish completion before notifying any callback that can synchronously reenter close. */
-    const completion = deferred<void>()
-    closing = completion.promise
-    closed = true
-    terminal = reason ?? options.closedError()
-    wakeReader?.()
-    /** Retire the exact current observers before invoking arbitrary application callbacks. */
-    const listeners = [...closeListeners]
-    dataListeners.clear()
-    closeListeners.clear()
-    /** Observer failures precede cleanup failures and never prevent physical cleanup. */
-    const errors: unknown[] = []
-    for (const listener of listeners) {
-      try {
-        listener(terminal)
-      } catch (error) {
-        errors.push(error)
-      }
-    }
-    void Promise.allSettled([
-      reader.cancel(),
-      writer.abort(terminal),
-      Promise.resolve().then(closePhysical)
-    ]).then((results) => {
-      /** A failed reader may reject cancel with its already-reported terminal reason. */
-      errors.push(
-        ...results.flatMap((result) =>
-          result.status === 'rejected' && result.reason !== terminal ? [result.reason] : []
-        )
-      )
-      if (errors.length) completion.reject(options.cleanupFailed(errors))
-      else completion.resolve()
-    })
-    return closing
-  }
-
-  /** Each read result is delivered once; the runtime's stream owns byte buffering. */
-  void (async () => {
-    try {
-      while (!closed) {
-        if (dataListeners.size === 0) {
-          await new Promise<void>((resolve) => {
-            wakeReader = resolve
-          })
-          wakeReader = undefined
-          continue
-        }
-        const next = await reader.read()
-        if (next.done) {
-          await end()
-          return
-        }
-        for (const listener of dataListeners) listener(next.value)
-      }
-    } catch (error) {
-      await end(error)
-    }
-  })().catch((error: unknown) => {
-    options.report(error)
-  })
-
-  return Object.freeze({
-    kind: 'byte' as const,
-    write(chunk: Uint8Array) {
-      if (closed) return Promise.reject(terminal)
-      return writer.write(chunk)
-    },
-    onData(listener: (chunk: Uint8Array) => void) {
-      dataListeners.add(listener)
-      wakeReader?.()
-      return () => dataListeners.delete(listener)
-    },
-    onClose(listener: (reason?: unknown) => void) {
-      if (closed) listener(terminal)
-      else closeListeners.add(listener)
-      return () => closeListeners.delete(listener)
-    },
-    close: () => end()
-  })
+  return new RuntimeWebByteStream(readable, writable, closePhysical, options).value
 }

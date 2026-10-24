@@ -1,9 +1,9 @@
+import { createRuntimeEndpointComposition } from '../../dist/core/runtime-api-endpoint.js'
 import { describe, expect, it, vi } from 'vitest'
-import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
-import { createProviderEndpoint } from '../../dist/core/provider.js'
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
+
 import { connect } from '../../dist/core/middleware/connect.js'
-import { createComposedEndpoint } from '../../dist/core/composed.js'
-import { createFirstPartyRoots } from '../../dist/core/internal/first-party-roots.js'
+
 import type { IRpcProviderRejection } from '../../dist/core/provider-admission.js'
 import { hooks } from '../../dist/core/middleware/hooks.js'
 
@@ -29,7 +29,7 @@ describe('provider concurrency observer', () => {
       const reports: unknown[] = []
       /** Provider entry is the exact business boundary denied by concurrency admission. */
       const provider = vi.fn(
-        async (context: Parameters<import('../../dist/core/index.js').IRpcProvider>[0]) => {
+        async (context: Parameters<import('../../dist/core/typing.js').IRpcProvider>[0]) => {
           await held
           return context.success('done')
         }
@@ -37,34 +37,37 @@ describe('provider concurrency observer', () => {
       /** Memory transport uses the same production provider owner as native endpoints. */
       const [clientTransport, serverTransport] = createMemoryTransportPair()
       /** The optional callback does not change either configured concurrency limit. */
-      const server = await createProviderEndpoint({
-        id: 'overload-server',
-        transport: serverTransport,
-        middlewares: [
-          connect({ transport: serverTransport }),
-          hooks({
-            listeners: (event) => {
-              if (event.name === 'failure') reports.push(event)
-            }
-          })
-        ],
-        providerLimits: {
-          maxGlobal: 1,
-          maxPerPeer: 1,
-          ...(mode === 'none' ? {} : { onRejected: observer })
+      const server = await createRuntimeEndpointComposition(
+        {
+          id: 'overload-server',
+          transport: serverTransport,
+          middlewares: [
+            connect({ transport: serverTransport }),
+            hooks({
+              listeners: (event) => {
+                if (event.name === 'failure') reports.push(event)
+              }
+            })
+          ],
+          providerLimits: {
+            maxGlobal: 1,
+            maxPerPeer: 1,
+            ...(mode === 'none' ? {} : { onRejected: observer })
+          },
+          provider: { hold: provider }
         },
-        provider: { hold: provider }
-      })
+        { agreement: { capabilities: [] }, peerId: '' }
+      ).installing
       /** A real sender decodes the unchanged canonical OVERLOADED response. */
-      const client = await createComposedEndpoint(
+      const client = await createRuntimeEndpointComposition(
         {
           id: 'overload-client',
           transport: clientTransport,
           targetIds: ['overload-server'],
           middlewares: [connect({ transport: clientTransport })]
         },
-        createFirstPartyRoots(new Set(['first-party-outbound', 'first-party-one-way'] as const))
-      )
+        { agreement: { capabilities: [] }, peerId: '' }
+      ).installing
       /** Observe raw replies to distinguish request refusal from silent one-way rejection. */
       const replies: unknown[] = []
       const unsubscribe = clientTransport.subscribe(({ data }) => {

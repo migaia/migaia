@@ -5,9 +5,9 @@ import {
   isRpcErrorInstance,
   isRpcRemoteError,
   isRpcTimeoutError,
-  deserializeRpcError,
   RPC_CORE_ERROR_SOURCE
-} from '../../dist/core/index.js'
+} from '../../dist/core/errors.js'
+import { deserializeRpcError } from '../../dist/core/internal/error-wire-metadata.js'
 import {
   RpcError,
   RpcRemoteError,
@@ -19,7 +19,7 @@ import {
   localRpcErrorCode
 } from '../../dist/core/errors.js'
 import { tagRpcError } from '../../dist/core/errors.js'
-import { createListenerFailure } from '../../dist/core/transport-kit.js'
+import { createListenerFailure } from '../../dist/core/internal/listener-safety.js'
 import { attachErrorIdentity } from '@migaia/utils/error'
 
 /** A real independent realm supplies native Error objects rather than local class instances. */

@@ -4,10 +4,9 @@ import * as root from '../../dist/index.js'
 import * as sdk from '../../dist/plugin/index.js'
 import * as features from '../../dist/features/index.js'
 
-/** The final publication retains the Host, feature factories and explicit authoring/testing tools. */
+/** The final publication retains the Host, feature factories and explicit authoring tools. */
 const expectedEntries = [
   '.',
-  './adapters/memory',
   './features',
   './features/auth',
   './features/chunk',
@@ -15,9 +14,7 @@ const expectedEntries = [
   './features/timeout',
   './features/typegen',
   './plugin',
-  './probe',
-  './stream',
-  './testing'
+  './probe'
 ]
 /** Application exports describe Host behavior and stable failures without lower-level factories. */
 const expectedRoot = [
@@ -56,7 +53,6 @@ const expectedSdk = [
   'RpcAdapterErrorText',
   'RpcCandidateStatus',
   'RpcCarrierDetailKey',
-  'RpcEndpointStatus',
   'RpcOperation',
   'RpcPlatform',
   'RpcRemoteLayerErrorCode',
@@ -113,7 +109,6 @@ const expectedSdk = [
   'holdAdapterLaunch',
   'holdAdapterMessageBootstrapSource',
   'holdAdapterObjectChannel',
-  'holdAdapterRegistration',
   'identifyRpcBoundaryFailure',
   'materializeAdapterJson',
   'normalizeRemoteContract',
@@ -134,26 +129,27 @@ const expectedSdk = [
   'safeString',
   'sameRemoteContract',
   'serializeRpcError',
-  'validateAdapterPeerMethods',
-  'validateAdapterPeerTimeout',
   'validateJsonRpcDescription'
 ]
 
 it('publishes exactly the final Host package entries and runtime symbols', () => {
   /** This is the real package manifest, independent of the generated export registry. */
   const manifest = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8'))
-  expect(Object.keys(manifest.exports).sort()).toEqual(expectedEntries)
-  expect(Object.keys(root).sort()).toEqual(expectedRoot)
-  expect(Object.keys(sdk).sort()).toEqual(expectedSdk)
-  expect(Object.keys(features).sort()).toEqual([
-    'authFeature',
-    'chunkFeature',
-    'retryFeature',
-    'timeoutFeature',
-    'typegenFeature'
-  ])
+  expect(new Set(Object.keys(manifest.exports))).toEqual(new Set(expectedEntries))
+  expect(new Set(Object.keys(root))).toEqual(new Set(expectedRoot))
+  expect(new Set(Object.keys(sdk))).toEqual(new Set(expectedSdk))
+  expect(new Set(Object.keys(features))).toEqual(
+    new Set(['authFeature', 'chunkFeature', 'retryFeature', 'timeoutFeature', 'typegenFeature'])
+  )
   expect(sdk).not.toHaveProperty('registerJsonObjectPort')
   expect(sdk).not.toHaveProperty('registerBatchAgreement')
+  for (const removed of [
+    'holdAdapterRegistration',
+    'RpcEndpointStatus',
+    'validateAdapterPeerMethods',
+    'validateAdapterPeerTimeout'
+  ])
+    expect(sdk).not.toHaveProperty(removed)
 })
 
 it('publishes the same feature factory through its named and default entry', async () => {

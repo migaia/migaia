@@ -6,16 +6,15 @@ import { definePlugin, defineFeature } from '@migaia/plugin-host'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { createUnitBudget } from '@migaia/supervision'
 import { threadProtocolDefinition as createThreadPlugin } from './fixtures/thread-protocol.js'
-import { createProcessPlugin } from '../../../rpc-plugin-process/test/protocol.ts'
+import { processPlugin, type IProcessPluginOptions } from '@migaia/rpc-plugin-process'
 import {
   createNodeThreadLauncher,
   createNodeThreadChannelFactory
-} from '@migaia/rpc-plugin-thread/adapters/node'
-import { createNodeProcessLauncher } from '@migaia/rpc-plugin-process/adapters/node-child-process'
+} from '../../../rpc-plugin-thread/dist/threads/adapters/node.js'
+import { createNodeProcessLauncher } from '../../../rpc-plugin-process/dist/process/adapters/node-child-process.js'
 import { createProcessTransport } from '../../../rpc-plugin-process/dist/process/handshake.js'
 import { createNativeProcessOffer } from '../../../rpc-plugin-process/dist/process/offer.js'
 import type { IRuntimePeerSourceContext } from '../../../rpc-host/dist/remote/runtime-api/peer.js'
-import type { IRuntimePluginOptions } from '../../../rpc-host/dist/remote/runtime-api/plugin.js'
 import type { ISpawnProcessPluginDeployment } from '../../../rpc-plugin-process/dist/process/plugin/types.js'
 
 /** A real child loads built public factories independently from the source-side parent Host. */
@@ -216,14 +215,14 @@ for (const kind of ['process', 'thread'] as const) {
           report: () => undefined
         }
         /**
-         * The temporary cast admits the intended source grammar before its RED-first
-         * implementation.
+         * The case selects one original physical source grammar at runtime; each branch retains its
+         * actual native definition input type.
          */
         const installed = await host
           .use(
             kind === 'thread'
-              ? createThreadPlugin(options as unknown as IRuntimePluginOptions)
-              : createProcessPlugin(options as unknown as IRuntimePluginOptions)
+              ? createThreadPlugin(options as unknown as Parameters<typeof createThreadPlugin>[0])
+              : processPlugin(options as unknown as IProcessPluginOptions)
           )
           .then(
             () => undefined,
@@ -246,9 +245,18 @@ for (const kind of ['process', 'thread'] as const) {
         const values: unknown[] = []
         for await (const value of outlet.stream('bridge', 'service.values')) values.push(value)
         assert.deepEqual(values, [1, 2])
-        assert.throws(() => outlet.request('bridge', 'service.data.probe'), {
-          code: 'PROVIDER_NOT_FOUND'
-        })
+        if (source === 'deployment')
+          assert.throws(() => outlet.request('bridge', 'service.data.probe'), {
+            source: 'rpc.endpoint',
+            code: 'PROVIDER_NOT_FOUND'
+          })
+        else
+          await assert.rejects(outlet.request('bridge', 'service.data.probe'), {
+            source: 'rpc.endpoint',
+            code: 'TARGET_UNKNOWN',
+            name: 'RpcError'
+          })
+        assert.equal(reverseCalls, 1, 'the unadvertised flattened path executes no Feature')
         assert.equal(Object.hasOwn(await outlet.get('bridge'), 'host'), false)
       } finally {
         await host.dispose()

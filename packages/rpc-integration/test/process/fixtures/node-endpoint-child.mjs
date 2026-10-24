@@ -1,11 +1,11 @@
-import { openProcessStdioChannel } from '@migaia/rpc-plugin-process/adapters/node-child-process'
+import { openProcessStdioChannel } from '../../../../rpc-plugin-process/dist/process/adapters/node-child-process.js'
 import { createProcessTransport } from '../../../../rpc-plugin-process/dist/process/handshake.js'
 import { createNativeProcessOffer } from '../../../../rpc-plugin-process/dist/process/offer.js'
-import { createFullEndpoint as createEndpoint } from '../../../../rpc-host/dist/core/full.js'
-import { codec } from '../../../../rpc-host/dist/core/index.js'
-import { framer } from '../../../../rpc-host/dist/core/index.js'
-import { connect } from '../../../../rpc-host/dist/core/index.js'
-import { abort } from '../../../../rpc-host/dist/core/index.js'
+import { createRuntimeEndpointComposition } from '../../../../rpc-host/dist/core/runtime-api-endpoint.js'
+import { codec } from '../../../../rpc-host/dist/core/middleware/codec.js'
+import { framer } from '../../../../rpc-host/dist/core/middleware/framer.js'
+import { connect } from '../../../../rpc-host/dist/core/middleware/connect.js'
+import { abort } from '../../../../rpc-host/dist/core/middleware/abort.js'
 
 /** A real child endpoint serves the same middleware pipeline as its parent. */
 const opened = await openProcessStdioChannel({ bootstrap: 'stdin' })
@@ -30,31 +30,34 @@ const channel = await createProcessTransport(opened.channel, {
   ipc: { connectionId: 'child', sessionId: 'child', log: () => undefined },
   report: () => undefined
 })
-const endpoint = await createEndpoint({
-  id: 'child',
-  transport: channel.transport,
-  features: channel.features,
-  provider: {
-    echo: (context) => context.success(context.data),
-    pause: (context) => {
-      process.stdin.pause()
-      pauseKeeper = setInterval(() => undefined, 1_000)
-      return context.success('paused')
-    },
-    wait: (context) =>
-      new Promise((resolve) => {
-        context.signal.addEventListener('abort', () => resolve(context.success('cancelled')), {
-          once: true
+const endpoint = await createRuntimeEndpointComposition(
+  {
+    id: 'child',
+    transport: channel.transport,
+    features: channel.features,
+    provider: {
+      echo: (context) => context.success(context.data),
+      pause: (context) => {
+        process.stdin.pause()
+        pauseKeeper = setInterval(() => undefined, 1_000)
+        return context.success('paused')
+      },
+      wait: (context) =>
+        new Promise((resolve) => {
+          context.signal.addEventListener('abort', () => resolve(context.success('cancelled')), {
+            once: true
+          })
         })
-      })
+    },
+    middlewares: [
+      codec(channel.pipeline.codec),
+      framer(channel.pipeline.framer),
+      abort(),
+      connect({ transport: channel.transport })
+    ]
   },
-  middlewares: [
-    codec(channel.pipeline.codec),
-    framer(channel.pipeline.framer),
-    abort(),
-    connect({ transport: channel.transport })
-  ]
-})
+  channel
+).installing
 channel.transport.onTransportError?.(() => {
   void endpoint.dispose().then(() => process.exit(0))
 })

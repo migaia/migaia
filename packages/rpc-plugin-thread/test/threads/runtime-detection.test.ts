@@ -10,7 +10,7 @@ import { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'
 import { expandThreadSpawn } from '../../dist/threads/short-spawn.js'
 import { threadRuntimeResource } from '../../dist/threads/runtime-resource.js'
 import * as web from '../../dist/threads/adapters/web.js'
-import * as node from '@migaia/rpc-plugin-thread/adapters/node'
+import * as node from '../../dist/threads/adapters/node.js'
 
 /** Runtime markers are restored after each actual source-selection case. */
 const nativeProcess = process

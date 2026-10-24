@@ -1,7 +1,13 @@
+import { createProbeEmitter, bindInstalledProbe } from '../../dist/core/internal/probe-emitter.js'
+import { systemScheduler } from '@migaia/utils/scheduler'
+import { createRuntimeEndpointComposition } from '../../dist/core/runtime-api-endpoint.js'
+import { RpcCapability } from '@migaia/rpc-contract'
 import { expect, it } from 'vitest'
-import { createEndpoint, connect, authentication } from '../../dist/core/index.js'
-import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
-import { defineProbe, probePlugin, type IRpcProbeDescriptor } from '../../dist/core/probe/index.js'
+
+import { connect } from '../../dist/core/middleware/connect.js'
+import { authentication } from '../../dist/core/middleware/authentication.js'
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
+import { defineProbe, type IRpcProbeDescriptor } from '../../dist/core/probe/index.js'
 import { readEndpointDebugSnapshot } from '../../dist/core/internal/test-observer.js'
 
 it('keeps the canonical fast endpoint proof and unchanged business/debug state', async () => {
@@ -20,19 +26,28 @@ it('keeps the canonical fast endpoint proof and unchanged business/debug state',
     })
     /** Paired native-reference carriers keep component/path choices equal in both arms. */
     const [left, right] = createMemoryTransportPair()
+    /** Observation uses the same emitter owner as Host without adding middleware. */
+    if (observed)
+      bindInstalledProbe(left, createProbeEmitter([probe], systemScheduler.now, 'fast-caller'))
     /** The provider returns the exact same business response in both configurations. */
-    const server = await createEndpoint({
-      id: 'fast-provider',
-      transport: right,
-      middlewares: [connect()],
-      provider: { echo: (context) => context.success(context.data) }
-    })
-    /** Only the probe plugin differs; its genuine factory proof must preserve fast eligibility. */
-    const client = await createEndpoint({
-      id: 'fast-caller',
-      transport: left,
-      middlewares: observed ? [connect(), probePlugin(probe)] : [connect()]
-    })
+    const server = await createRuntimeEndpointComposition(
+      {
+        id: 'fast-provider',
+        transport: right,
+        middlewares: [connect()],
+        provider: { echo: (context) => context.success(context.data) }
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
+    /** Only the installed observer differs; canonical fast eligibility stays unchanged. */
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'fast-caller',
+        transport: left,
+        middlewares: [connect()]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     try {
       expect(await client.send('fast-provider', 'echo', 42)).toBe(42)
       /** Existing debug state covers settled pending work and framer-owned chunk retention. */
@@ -54,8 +69,8 @@ it('keeps the canonical fast endpoint proof and unchanged business/debug state',
   expect(snapshots[1]).toEqual(snapshots[0])
 })
 
-it('describes plugin-only encryption from the authentication configuration owner', async () => {
-  /** Plugin-only installation must report the same mode as a Peer option installation. */
+it('describes endpoint encryption from the authentication configuration owner', async () => {
+  /** The actual endpoint emitter reports the same mode as a Peer option installation. */
   const descriptors: IRpcProbeDescriptor[] = []
   /** This cold callback observes only the successfully activated endpoint configuration. */
   const probe = defineProbe({
@@ -67,21 +82,25 @@ it('describes plugin-only encryption from the authentication configuration owner
   })
   /** No business traffic is required to prove the canonical immutable authentication fact. */
   const [left, right] = createMemoryTransportPair()
+  /** The emitter borrows the canonical authentication facts of this endpoint. */
+  bindInstalledProbe(left, createProbeEmitter([probe], systemScheduler.now, 'auth-descriptor'))
   /** Valid transforms keep the existing any-encoded contract and enable signing plus encryption. */
-  const endpoint = await createEndpoint({
-    id: 'auth-descriptor',
-    transport: left,
-    middlewares: [
-      connect(),
-      authentication({
-        encrypt: (value) => value,
-        decrypt: (value) => value,
-        sign: () => 'fixture-signature',
-        verify: () => true
-      }),
-      probePlugin(probe)
-    ]
-  })
+  const endpoint = await createRuntimeEndpointComposition(
+    {
+      id: 'auth-descriptor',
+      transport: left,
+      middlewares: [
+        connect(),
+        authentication({
+          encrypt: (value) => value,
+          decrypt: (value) => value,
+          sign: () => 'fixture-signature',
+          verify: () => true
+        })
+      ]
+    },
+    { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+  ).installing
   try {
     expect(descriptors[0]!.authentication).toBe('encrypt-sign')
   } finally {

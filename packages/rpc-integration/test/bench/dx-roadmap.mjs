@@ -492,17 +492,103 @@ function guard(receipt) {
   }
 }
 
+/** @typedef {IResult & { p50Ns: number | null; guard?: ReturnType<typeof guard> }} IRoadmapRow */
+
+/** Saved evidence lookup preserves the first original arm and journal row for each exact case. */
+class RoadmapEvidenceIndex {
+  /** One indexed projection owns no native resource and never changes the saved evidence. */
+  #byCase = new Map()
+
+  /**
+   * Index each original journal and plan once, retaining the old first-match semantics.
+   *
+   * @param {IPlan} plan Original finite arm plan.
+   * @param {IRoadmapRow[]} rows Original result projections in journal order.
+   */
+  constructor(plan, rows) {
+    /** Duplicate journal IDs keep the same first row previously selected by Array.find. */
+    const byId = new Map()
+    for (const row of rows) if (!byId.has(row.arm.id)) byId.set(row.arm.id, row)
+    for (const arm of plan.arms) {
+      /** Case tuples contain only the original scalar selectors, without filename inference. */
+      const key = this.#key(
+        arm.unit.id,
+        arm.phase,
+        arm.pair,
+        arm.version,
+        arm.side,
+        arm.repetition,
+        arm.samples
+      )
+      if (!this.#byCase.has(key)) this.#byCase.set(key, byId.get(arm.id))
+    }
+  }
+
+  /**
+   * Encode the exact original selector tuple, keeping scalar boundaries unambiguous.
+   *
+   * @param {string} unit Unit identity from the saved plan.
+   * @param {IArm['phase']} phase Original measurement phase.
+   * @param {number} pair Original pair number.
+   * @param {IVersion} version Original graph side.
+   * @param {IArm['side']} side Original RPC or bare arm.
+   * @param {number} repetition Original control repetition.
+   * @param {number} samples Original finite sample count.
+   * @returns {string} Stable private lookup key.
+   */
+  #key(unit, phase, pair, version, side, repetition, samples) {
+    return JSON.stringify([unit, phase, pair, version, side, repetition, samples])
+  }
+
+  /**
+   * Read the same first exact result the prior two Array.find calls selected.
+   *
+   * @param {string} unit Saved unit identity.
+   * @param {IArm['phase']} phase Saved phase.
+   * @param {number} pair Saved pair number.
+   * @param {IVersion} version Saved graph side.
+   * @param {IArm['side']} side Saved RPC or bare arm.
+   * @param {number} [repetition] Original default control repetition.
+   * @param {number} [samples] Original default sample count.
+   * @returns {IRoadmapRow | undefined} Exact original row or unavailable evidence.
+   */
+  lookup(unit, phase, pair, version, side, repetition = 0, samples = 1000) {
+    return this.#byCase.get(this.#key(unit, phase, pair, version, side, repetition, samples))
+  }
+
+  /**
+   * Subtract the original paired bare p50 from the same graph's RPC p50.
+   *
+   * @param {string} unit Saved unit identity.
+   * @param {IArm['phase']} phase Original comparison phase.
+   * @param {number} pair Original pair number.
+   * @param {IVersion} version Original graph side.
+   * @param {number} [repetition] Original control repetition.
+   * @returns {{ bareP50Ns: number; rpcP50Ns: number; overheadNs: number } | null} Paired overhead.
+   */
+  overhead(unit, phase, pair, version, repetition = 0) {
+    /** Both values come from the same original case tuple. */
+    const bare = this.lookup(unit, phase, pair, version, 'bare', repetition)?.p50Ns,
+      rpc = this.lookup(unit, phase, pair, version, 'rpc', repetition)?.p50Ns
+    return bare == null || rpc == null
+      ? null
+      : { bareP50Ns: bare, rpcP50Ns: rpc, overheadNs: rpc - bare }
+  }
+}
+
 /**
- * Reread every saved arm and recompute tables without running a side or changing its raw data.
+ * Read original arm receipts and retain every loaded-code observation, including failed arms.
  *
- * @param {string} output Existing output directory with plan and completed arm journal.
- * @returns {Promise<object>} Complete timing/noise/guard tables and missing-evidence disposition.
- * @throws {Error} Missing or malformed saved plan/journal is never silently repaired.
+ * @param {IResult[]} results Original journal entries; readFailure remains attached to its entry.
+ * @returns {Promise<{
+ *   receipts: Map<string, IReceipt | undefined>
+ *   loaded: object[]
+ *   rows: IRoadmapRow[]
+ * }>}
+ *   Original receipts plus their timing/guard projections.
+ * @throws {Error} A missing side-error receipt retains the original I/O failure.
  */
-export async function recomputeRoadmap(output) {
-  /** The saved finite inventory defines completeness; failed arms are never dropped from it. */
-  const plan = await json(join(output, 'plan.json')),
-    results = await json(join(output, 'arms.json'))
+async function loadRoadmapEvidence(results) {
   /** Exact original receipts remain joined to their arm identities. */
   const receipts = new Map()
   /** Manifest rows retain both actual loaded and disk hashes, including failed-side snapshots. */
@@ -532,137 +618,150 @@ export async function recomputeRoadmap(output) {
       ...(result.arm.phase === 'guard' ? { guard: guard(receipt) } : {})
     })
   }
-  /** Lookup is exact over the persisted finite input, never inferred from filename sorting. */
-  const lookup = (unit, phase, pair, version, side, repetition = 0, samples = 1000) => {
-    const arm = plan.arms.find(
-      (value) =>
-        value.unit.id === unit &&
-        value.phase === phase &&
-        value.pair === pair &&
-        value.version === version &&
-        value.side === side &&
-        value.repetition === repetition &&
-        value.samples === samples
-    )
-    return arm ? rows.find((row) => row.arm.id === arm.id) : undefined
-  }
-  /** Subtract independently measured bare p50 from the same graph's RPC p50. */
-  const overhead = (unit, phase, pair, version, repetition = 0) => {
-    const bare = lookup(unit, phase, pair, version, 'bare', repetition)?.p50Ns,
-      rpc = lookup(unit, phase, pair, version, 'rpc', repetition)?.p50Ns
-    return bare == null || rpc == null
-      ? null
-      : { bareP50Ns: bare, rpcP50Ns: rpc, overheadNs: rpc - bare }
-  }
-  /** Tables preserve each A/A and A/B block before computing medians. */
-  const timing = [],
-    counters = []
-  for (const unit of unitIds) {
-    /** Two same-base controls independently calibrate the normalized overhead metric. */
-    const aa = Array.from({ length: 2 }, (_, pair) => {
-      const first = overhead(unit, 'aa', pair, 'base', 0),
-        second = overhead(unit, 'aa', pair, 'base', 1)
-      return {
-        pair,
-        first,
-        second,
-        relativeChange:
-          first?.overheadNs > 0 && second?.overheadNs > 0
-            ? Math.abs(second.overheadNs / first.overheadNs - 1)
-            : null
-      }
-    })
-    /** Retain all paired gains; an incomplete block cannot contribute a passing median. */
-    const pairs = Array.from({ length: plan.pairs }, (_, pair) => {
-      const base = overhead(unit, 'timing', pair, 'base'),
-        candidate = overhead(unit, 'timing', pair, 'candidate')
-      return {
-        pair,
-        order: pair % 2 ? ['candidate', 'base'] : ['base', 'candidate'],
-        base,
-        candidate,
-        improvement:
-          base?.overheadNs > 0 && candidate?.overheadNs > 0
-            ? 1 - candidate.overheadNs / base.overheadNs
-            : null
-      }
-    })
-    /** Noise and target qualification require every original control and pair to remain complete. */
-    const noiseBand = aa.every((value) => value.relativeChange !== null)
-      ? Math.max(...aa.map((value) => value.relativeChange))
-      : null
-    const improvement = pairs.every((value) => value.improvement !== null)
-      ? median(pairs.map((value) => value.improvement))
-      : null
-    timing.push({
-      unit,
-      aa,
-      pairs,
-      noiseBand,
-      improvement,
-      target: 0.3,
-      status:
-        plan.mode !== 'timing' || noiseBand === null || improvement === null
-          ? Status.unavailable
-          : improvement >= 0.3 && improvement > noiseBand
-            ? Status.pass
-            : Status.fail
-    })
-    /**
-     * This 90-request difference estimates slope/intercept; diagnostic/control work remains
-     * included.
-     */
-    const repetitions = []
-    for (const version of ['base', 'candidate'])
-      for (let repetition = 0; repetition < 2; repetition++) {
-        const points = guardSamples.map((samples) => ({
-          samples,
-          guard: lookup(unit, 'guard', 0, version, 'rpc', repetition, samples)?.guard
-        }))
-        const slope = {}
-        for (const metric of [
-          'promises',
-          'normalizationEntries',
-          'trackedHeapBytes',
-          'trackedEventCount'
-        ]) {
-          const low = points[0].guard?.totals?.[metric],
-            high = points[1].guard?.totals?.[metric]
-          slope[metric] =
-            low == null || high == null
-              ? null
-              : {
-                  perRequest: (high - low) / (guardSamples[1] - guardSamples[0]),
-                  interceptEstimate:
-                    low - ((high - low) / (guardSamples[1] - guardSamples[0])) * guardSamples[0]
-                }
-        }
-        repetitions.push({ version, repetition, points, slope })
-      }
-    /** Allocation comparisons are scoped tracked-heap evidence, never total native allocation PASS. */
-    const allocation = {}
-    for (const version of ['base', 'candidate']) {
-      const values = repetitions
-        .filter((row) => row.version === version)
-        .map((row) => row.slope.trackedHeapBytes?.perRequest)
-      allocation[version] = values.every((value) => Number.isFinite(value) && value > 0)
-        ? median(values)
-        : null
+  return { receipts, loaded, rows }
+}
+
+/**
+ * Compute one unit's original A/A noise and all persisted A/B gains without dropping pairs.
+ *
+ * @param {RoadmapEvidenceIndex} index Exact saved-case lookup.
+ * @param {IPlan} plan Original pair count and measurement mode.
+ * @param {string} unit Fixed benchmark unit identity.
+ * @returns {object} Original timing qualification row.
+ */
+function roadmapTiming(index, plan, unit) {
+  /** Two same-base controls independently calibrate the normalized overhead metric. */
+  const aa = Array.from({ length: 2 }, (_, pair) => {
+    const first = index.overhead(unit, 'aa', pair, 'base', 0),
+      second = index.overhead(unit, 'aa', pair, 'base', 1)
+    return {
+      pair,
+      first,
+      second,
+      relativeChange:
+        first?.overheadNs > 0 && second?.overheadNs > 0
+          ? Math.abs(second.overheadNs / first.overheadNs - 1)
+          : null
     }
-    counters.push({
-      unit,
-      sampleDifference: guardSamples[1] - guardSamples[0],
-      repetitions,
-      trackedAllocationPerRequest: allocation,
-      trackedAllocationImprovement:
-        allocation.base > 0 && allocation.candidate > 0
-          ? 1 - allocation.candidate / allocation.base
-          : null,
-      totalAllocationStatus: Status.unavailable,
-      scope:
-        'Tracked Node heap trace slope only; original total per-request native/external allocation target remains unavailable.'
-    })
+  })
+  /** Retain all paired gains; an incomplete block cannot contribute a passing median. */
+  const pairs = Array.from({ length: plan.pairs }, (_, pair) => {
+    const base = index.overhead(unit, 'timing', pair, 'base'),
+      candidate = index.overhead(unit, 'timing', pair, 'candidate')
+    return {
+      pair,
+      order: pair % 2 ? ['candidate', 'base'] : ['base', 'candidate'],
+      base,
+      candidate,
+      improvement:
+        base?.overheadNs > 0 && candidate?.overheadNs > 0
+          ? 1 - candidate.overheadNs / base.overheadNs
+          : null
+    }
+  })
+  /** Noise and target qualification require every original control and pair to remain complete. */
+  const noiseBand = aa.every((value) => value.relativeChange !== null)
+    ? Math.max(...aa.map((value) => value.relativeChange))
+    : null
+  const improvement = pairs.every((value) => value.improvement !== null)
+    ? median(pairs.map((value) => value.improvement))
+    : null
+  return {
+    unit,
+    aa,
+    pairs,
+    noiseBand,
+    improvement,
+    target: 0.3,
+    status:
+      plan.mode !== 'timing' || noiseBand === null || improvement === null
+        ? Status.unavailable
+        : improvement >= 0.3 && improvement > noiseBand
+          ? Status.pass
+          : Status.fail
   }
+}
+
+/**
+ * Compute one unit's tracked-heap slopes from its fixed two guard sample sizes and repetitions.
+ *
+ * @param {RoadmapEvidenceIndex} index Exact saved-case lookup.
+ * @param {string} unit Fixed benchmark unit identity.
+ * @returns {object} Original allocation evidence and its unchanged unavailable total-allocation
+ *   claim.
+ */
+function roadmapCounters(index, unit) {
+  /** This 90-request difference estimates slope/intercept; diagnostic/control work remains included. */
+  const repetitions = []
+  for (const version of ['base', 'candidate'])
+    for (let repetition = 0; repetition < 2; repetition++) {
+      const points = guardSamples.map((samples) => ({
+        samples,
+        guard: index.lookup(unit, 'guard', 0, version, 'rpc', repetition, samples)?.guard
+      }))
+      const slope = {}
+      for (const metric of [
+        'promises',
+        'normalizationEntries',
+        'trackedHeapBytes',
+        'trackedEventCount'
+      ]) {
+        const low = points[0].guard?.totals?.[metric],
+          high = points[1].guard?.totals?.[metric]
+        slope[metric] =
+          low == null || high == null
+            ? null
+            : {
+                perRequest: (high - low) / (guardSamples[1] - guardSamples[0]),
+                interceptEstimate:
+                  low - ((high - low) / (guardSamples[1] - guardSamples[0])) * guardSamples[0]
+              }
+      }
+      repetitions.push({ version, repetition, points, slope })
+    }
+  /** Allocation comparisons are scoped tracked-heap evidence, never total native allocation PASS. */
+  const allocation = {}
+  for (const version of ['base', 'candidate']) {
+    const values = repetitions
+      .filter((row) => row.version === version)
+      .map((row) => row.slope.trackedHeapBytes?.perRequest)
+    allocation[version] = values.every((value) => Number.isFinite(value) && value > 0)
+      ? median(values)
+      : null
+  }
+  return {
+    unit,
+    sampleDifference: guardSamples[1] - guardSamples[0],
+    repetitions,
+    trackedAllocationPerRequest: allocation,
+    trackedAllocationImprovement:
+      allocation.base > 0 && allocation.candidate > 0
+        ? 1 - allocation.candidate / allocation.base
+        : null,
+    totalAllocationStatus: Status.unavailable,
+    scope:
+      'Tracked Node heap trace slope only; original total per-request native/external allocation target remains unavailable.'
+  }
+}
+
+/**
+ * Reread every saved arm and recompute tables without running a side or changing its raw data.
+ *
+ * @param {string} output Existing output directory with plan and completed arm journal.
+ * @returns {Promise<object>} Complete timing/noise/guard tables and missing-evidence disposition.
+ * @throws {Error} Missing or malformed saved plan/journal is never silently repaired.
+ */
+export async function recomputeRoadmap(output) {
+  /** The saved inventory, not current filenames or successful-arm count, defines completeness. */
+  const plan = await json(join(output, 'plan.json')),
+    results = await json(join(output, 'arms.json'))
+  /** Loading and indexing retain the original row objects and failed-side observations. */
+  const { receipts, loaded, rows } = await loadRoadmapEvidence(results)
+  /** Index creation is O(arms + results); every subsequent original case lookup is O(1). */
+  const index = new RoadmapEvidenceIndex(plan, rows)
+  /** The immutable unit IDs drive the same original timing and counter row order. */
+  const timing = unitIds.map((unit) => roadmapTiming(index, plan, unit)),
+    counters = unitIds.map((unit) => roadmapCounters(index, unit))
   /** A finite failed side marks this run incomplete without throwing away successful evidence. */
   const complete =
     results.length === plan.arms.length &&

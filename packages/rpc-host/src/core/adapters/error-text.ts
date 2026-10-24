@@ -2,8 +2,6 @@
 export const RpcAdapterErrorText = {
   /** Native postMessage failures retain their original instance under the TRANSPORT identity. */
   nativeSendFailed: '[rpc] native message send failed',
-  /** The memory-pair factory accepts only its optional delivery scheduler configuration. */
-  memoryOptions: '[rpc] memory transport options must be an object',
   /**
    * Probe callbacks report through the existing TRANSPORT channel without changing message
    * delivery.
@@ -15,11 +13,6 @@ export const RpcAdapterErrorText = {
   workerClosed: '[rpc] worker transport is closed',
   /** Stable aggregate text for browser and Node MessagePort terminal cleanup failures. */
   messagePortCleanupFailed: '[rpc] message port cleanup failed',
-  /**
-   * Stable core error text consumed by core/adapters/memory.ts; preserves its existing
-   * caller-facing wording.
-   */
-  rpcMemoryTransportIsClosed: '[rpc] memory transport is closed',
   /**
    * Stable worker error text consumed by core/adapters/web-worker.ts; preserves its existing
    * caller-facing wording after the canonical factory moves into Core.

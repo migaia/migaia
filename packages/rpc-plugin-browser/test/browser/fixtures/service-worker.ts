@@ -5,125 +5,143 @@ import type {
   IServiceWorkerMessageTarget
 } from '../../../src/browser/adapters/service-worker.js'
 
-/** Native-shaped receiver is distinct from every outbound target; MessagePorts remain internal. */
-export function serviceWorkerRealm() {
-  /** One actual worker scope dispatches native page messages to the installed carrier. */
-  const workerListeners = new Set<(event: MessageEvent<unknown>) => void>()
-  /** Native Clients.get, rather than a wire claim, resolves each currently addressable page. */
-  const clients = new Map<string, IServiceWorkerMessageTarget>()
-  /** Test cleanup owns these actual physical pipes; closing a Host must not close them. */
-  const channels: MessageChannel[] = []
-  /** WaitUntil observation proves preparation joins the original native event lifetime. */
-  const lifetimes: Promise<unknown>[] = []
-  /** Stopping native delivery models silent loss without inventing a worker-close event. */
-  let silent = false
-  /** Deliver only actual event metadata; source cannot be substituted by payload identity. */
-  const dispatch = (data: unknown, source: unknown): void => {
-    if (silent) return
-    /** Native ExtendableMessageEvent keeps its asynchronous preparation alive. */
+/** Own one page's physical pipe, delivery holds and native container subscriptions. */
+class ServiceWorkerPageFixture {
+  /** The worker realm alone owns Clients identity and worker-side dispatch. */
+  #realm: ServiceWorkerRealmFixture
+  /** Both physical ports stay fixture-owned after logical Host disposal. */
+  #channel = new MessageChannel()
+  /** Only the native page container owns incoming callbacks. */
+  #listeners = new Set<(event: MessageEvent<unknown>) => void>()
+  /** Count physical receipt independently of logical subscriptions and delivery holds. */
+  #physicalReceipts = 0
+  /** Fixture-only holds suppress delivery without manufacturing lifecycle events. */
+  #holdOutgoing = false
+  /** Inbound holds retain physical payloads for explicit ordered replay. */
+  #holdIncoming = false
+  /** Held native outbound frames remain available to wrong-source assertions. */
+  readonly outgoing: unknown[] = []
+  /** Held native inbound frames retain their original payload identities. */
+  readonly incoming: unknown[] = []
+  /** The outbound target represents registration.active for this generation. */
+  readonly serviceWorker: IServiceWorkerMessageTarget
+  /** Native event.source supplies the exact Client and reply target. */
+  readonly client: IServiceWorkerMessageTarget
+  /** Container subscriptions are distinct from outbound ServiceWorker operations. */
+  readonly receiver: IServiceWorkerMessageReceiver
+  /** Acquire the real pipe and attach its two native message observers once. */
+  constructor(realm: ServiceWorkerRealmFixture, id: string) {
+    this.#realm = realm
+    this.serviceWorker = {
+      postMessage: (data, transfer) => this.#channel.port1.postMessage(data, transfer as never)
+    }
+    this.client = {
+      id,
+      postMessage: (data, transfer) => this.#channel.port2.postMessage(data, transfer as never)
+    }
+    realm.register(id, this.client, this.#channel)
+    this.#channel.port2.on('message', (data) => {
+      this.#physicalReceipts += 1
+      if (this.#holdOutgoing) this.outgoing.push(data)
+      else this.#realm.dispatch(data, this.client)
+    })
+    this.#channel.port1.on('message', (data) => {
+      if (this.#holdIncoming) this.incoming.push(data)
+      else this.deliver(data)
+    })
+    this.receiver = {
+      addEventListener: (_type, listener) => this.#listeners.add(listener),
+      removeEventListener: (_type, listener) => this.#listeners.delete(listener)
+    }
+  }
+  /** Snapshot native receivers so handoff cannot deliver one physical event twice. */
+  deliver = (data: unknown, source: unknown = this.serviceWorker): void => {
+    /** New subscriptions wait for the next native event. */
+    const listeners = [...this.#listeners]
+    for (const listener of listeners)
+      listener({ data, source, origin: '' } as MessageEvent<unknown>)
+  }
+  /** Observe native subscriptions without inferring Host state. */
+  listeners = (): number => this.#listeners.size
+  /** Observe actual physical receipt even while delivery is held. */
+  physicalReceipts = (): number => this.#physicalReceipts
+  /** Hold worker-directed physical receipts for explicit replay. */
+  holdToWorker = (): void => {
+    this.#holdOutgoing = true
+  }
+  /** Hold page-directed physical receipts for explicit replay. */
+  holdToPage = (): void => {
+    this.#holdIncoming = true
+  }
+  /** Release already-held outbound frames in original arrival order. */
+  releaseToWorker = (): void => {
+    this.#holdOutgoing = false
+    for (const data of this.outgoing.splice(0)) this.#realm.dispatch(data, this.client)
+  }
+  /** Release already-held inbound frames in original arrival order. */
+  releaseToPage = (): void => {
+    this.#holdIncoming = false
+    for (const data of this.incoming.splice(0)) this.deliver(data)
+  }
+}
+
+/** Own one native-shaped worker realm without mutable factory captures across pages. */
+class ServiceWorkerRealmFixture {
+  /** The worker scope owns all native page-message subscriptions. */
+  #listeners = new Set<(event: MessageEvent<unknown>) => void>()
+  /** Native Clients.get resolves reply targets independently of wire claims. */
+  #clients = new Map<string, IServiceWorkerMessageTarget>()
+  /** Test cleanup owns every physical pipe after borrowed Host subscriptions retire. */
+  #channels: MessageChannel[] = []
+  /** Silent loss suppresses physical delivery without inventing a worker close event. */
+  #silent = false
+  /** WaitUntil observes each native consumer's exact preparation Promise. */
+  readonly lifetimes: Promise<unknown>[] = []
+  /** Borrowed scope separates Client lookup and native event subscription from outbound targets. */
+  readonly scope: IServiceWorkerClientsScope = {
+    clients: { get: async (id) => this.#clients.get(id) },
+    addEventListener: (_type, listener) => this.#listeners.add(listener),
+    removeEventListener: (_type, listener) => this.#listeners.delete(listener)
+  }
+  /** Register the actual Client and fixture-owned physical pipe for one page. */
+  register(id: string, client: IServiceWorkerMessageTarget, channel: MessageChannel): void {
+    this.#channels.push(channel)
+    this.#clients.set(id, client)
+  }
+  /** Deliver native source metadata; payload identity never selects a different Client. */
+  dispatch = (data: unknown, source: unknown): void => {
+    if (this.#silent) return
+    /** Native ExtendableMessageEvent retains the original preparation completion. */
     const event = {
       data,
       source,
       origin: '',
       waitUntil: (opening: Promise<unknown>) => {
-        lifetimes.push(opening)
+        this.lifetimes.push(opening)
       }
     } as unknown as MessageEvent<unknown>
-    /** Native EventTarget does not visit listeners newly added during the same dispatch. */
-    const listeners = [...workerListeners]
+    /** Native dispatch does not visit callbacks registered during the current handoff. */
+    const listeners = [...this.#listeners]
     for (const listener of listeners) listener(event)
   }
-  /** This borrowed scope supplies the browser's actual native event and Clients operations. */
-  const scope: IServiceWorkerClientsScope = {
-    clients: { get: async (id) => clients.get(id) },
-    addEventListener: (_type, listener) => workerListeners.add(listener),
-    removeEventListener: (_type, listener) => workerListeners.delete(listener)
+  /** Observe the actual worker subscription count. */
+  listeners = (): number => this.#listeners.size
+  /** Model silent delivery loss while retaining both native ports. */
+  silence = (): void => {
+    this.#silent = true
   }
-  return {
-    scope,
-    lifetimes,
-    dispatch,
-    listeners: () => workerListeners.size,
-    silence: () => {
-      silent = true
-    },
-    /** Each page has separate Client, outbound worker target and inbound container identities. */
-    page(id: string) {
-      /** Real native structured cloning and asynchronous delivery are the physical test pipe. */
-      const channel = new MessageChannel()
-      channels.push(channel)
-      /** Page container callbacks belong to the receiver, never to its outbound ServiceWorker. */
-      const pageListeners = new Set<(event: MessageEvent<unknown>) => void>()
-      /** Controlled holds expose genuine wire frames for wrong-source delivery assertions. */
-      const outgoing: unknown[] = []
-      const incoming: unknown[] = []
-      /** Actual port receipt proves borrowed I/O remains live after logical Host disposal. */
-      let physicalReceipts = 0
-      /** Holds are fixture-only delivery control and do not manufacture native lifecycle events. */
-      let holdOutgoing = false
-      let holdIncoming = false
-      /** One concrete target represents registration.active for this realm generation. */
-      const serviceWorker: IServiceWorkerMessageTarget = {
-        postMessage: (data, transfer) => channel.port1.postMessage(data, transfer as never)
-      }
-      /** Client identity and reply target come from the worker's native event.source. */
-      const client: IServiceWorkerMessageTarget = {
-        id,
-        postMessage: (data, transfer) => channel.port2.postMessage(data, transfer as never)
-      }
-      clients.set(id, client)
-      /** Container dispatch keeps the actual worker source separate from the sent frame. */
-      const deliver = (data: unknown, source: unknown = serviceWorker): void => {
-        /** Handoff may replace a listener; this physical event is delivered only once. */
-        const listeners = [...pageListeners]
-        for (const listener of listeners)
-          listener({ data, source, origin: '' } as MessageEvent<unknown>)
-      }
-      channel.port2.on('message', (data) => {
-        physicalReceipts += 1
-        if (holdOutgoing) outgoing.push(data)
-        else dispatch(data, client)
-      })
-      channel.port1.on('message', (data) => {
-        if (holdIncoming) incoming.push(data)
-        else deliver(data)
-      })
-      /** Only this container owns incoming subscriptions; target has no addEventListener. */
-      const receiver: IServiceWorkerMessageReceiver = {
-        addEventListener: (_type, listener) => pageListeners.add(listener),
-        removeEventListener: (_type, listener) => pageListeners.delete(listener)
-      }
-      return {
-        serviceWorker,
-        receiver,
-        client,
-        outgoing,
-        incoming,
-        deliver,
-        listeners: () => pageListeners.size,
-        physicalReceipts: () => physicalReceipts,
-        holdToWorker: () => {
-          holdOutgoing = true
-        },
-        holdToPage: () => {
-          holdIncoming = true
-        },
-        releaseToWorker: () => {
-          holdOutgoing = false
-          for (const data of outgoing.splice(0)) dispatch(data, client)
-        },
-        releaseToPage: () => {
-          holdIncoming = false
-          for (const data of incoming.splice(0)) deliver(data)
-        }
-      }
-    },
-    /** Test owner alone closes the internal pipes after all borrowed Host subscriptions retire. */
-    close() {
-      for (const channel of channels) {
-        channel.port1.close()
-        channel.port2.close()
-      }
+  /** Acquire a distinct page container, worker target and native Client identity. */
+  page = (id: string): ServiceWorkerPageFixture => new ServiceWorkerPageFixture(this, id)
+  /** Close fixture-owned pipes after logical owners release their borrowed subscriptions. */
+  close = (): void => {
+    for (const channel of this.#channels) {
+      channel.port1.close()
+      channel.port2.close()
     }
   }
+}
+
+/** Create an independent native-shaped worker realm backed by real MessageChannels. */
+export function serviceWorkerRealm(): ServiceWorkerRealmFixture {
+  return new ServiceWorkerRealmFixture()
 }

@@ -1,7 +1,7 @@
 import type { IAbortSignal } from '@migaia/utils/promise'
 import type { IRuntimePeerSourceContext, IRuntimePeerProvide, IRuntimePeer } from './peer.js'
 import type { IRpcRuntimeGeneration } from '@migaia/rpc-contract'
-import type { IProviderAdmissionScope } from '../../core/features/provider.js'
+import type { IProviderAdmissionScope } from '../../core/internal/provider-admission.js'
 
 /** Original Host operation and resource ownership travel only through exact internal options. */
 export type IRuntimePreparationContext = Readonly<{

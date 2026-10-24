@@ -1,7 +1,8 @@
+import { createRuntimeEndpointComposition } from '../../dist/core/runtime-api-endpoint.js'
 import { assert, describe, expect, it } from 'vitest'
 import { RpcRouteProfile, normalizeRpcEnvelope } from '@migaia/rpc-contract'
-import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
-import { createClientEndpoint } from '../../dist/core/client.js'
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
+
 import { ProviderAdmissionRegistry } from '../../dist/core/internal/provider-admission.js'
 import {
   ProviderExecutor,
@@ -9,7 +10,6 @@ import {
 } from '../../dist/core/internal/provider-executor.js'
 import { ProviderRegistry } from '../../dist/core/internal/provider.js'
 import { connect } from '../../dist/core/middleware/connect.js'
-import { createProviderEndpoint } from '../../dist/core/provider.js'
 
 /** Allows a dispatched frame to cross the memory transport before assertions. */
 const delivered = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0))
@@ -17,18 +17,24 @@ const delivered = (): Promise<void> => new Promise((resolve) => setTimeout(resol
 /** Builds the public client/provider path used by listener ownership cases. */
 async function makeEndpoints() {
   const [clientTransport, serverTransport] = createMemoryTransportPair()
-  const server = await createProviderEndpoint({
-    id: 'event-server',
-    transport: serverTransport,
-    targetIds: ['event-client'],
-    middlewares: [connect({ transport: serverTransport })]
-  })
-  const client = await createClientEndpoint({
-    id: 'event-client',
-    transport: clientTransport,
-    targetIds: ['event-server'],
-    middlewares: [connect({ transport: clientTransport })]
-  })
+  const server = await createRuntimeEndpointComposition(
+    {
+      id: 'event-server',
+      transport: serverTransport,
+      targetIds: ['event-client'],
+      middlewares: [connect({ transport: serverTransport })]
+    },
+    { agreement: { capabilities: [] }, peerId: '' }
+  ).installing
+  const client = await createRuntimeEndpointComposition(
+    {
+      id: 'event-client',
+      transport: clientTransport,
+      targetIds: ['event-server'],
+      middlewares: [connect({ transport: clientTransport })]
+    },
+    { agreement: { capabilities: [] }, peerId: '' }
+  ).installing
   return { client, server }
 }
 

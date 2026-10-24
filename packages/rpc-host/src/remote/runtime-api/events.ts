@@ -2,7 +2,7 @@ import { createRpcError } from '../../core/errors.js'
 import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { IpcReporterContext } from '../../core/plugins/reporter-context.js'
-import { RpcCoreErrorCode } from '../../core/index.js'
+import { RpcCoreErrorCode } from '../../core/errors.js'
 import { createRemoteLayerError } from '../error.js'
 import { RpcRemoteLayerErrorCode } from '../error-code.js'
 import {
@@ -141,138 +141,206 @@ type IRuntimeEventListener = Readonly<{
   checkOverflow?: (report: (error: unknown) => void) => void
 }>
 
-/** Create only the local lifecycle subscriber adapter, with the prescribed bounded event buffer. */
+/** Reporter failure cannot replace command completion or leave a callback rejection unobserved. */
+function reportEventFailure(report: (error: unknown) => void, error: unknown): void {
+  try {
+    report(error)
+  } catch (failure) {
+    hostRethrowReporter(failure, IpcReporterContext)
+  }
+}
+
+/** Own one bounded local event iterator without owning native facts, connections or execution. */
+class RuntimeEventWatch implements AsyncIterableIterator<IRuntimeEvent> {
+  /** The original publisher alone owns listener membership and its terminal boundary. */
+  #publisher: RuntimeEventPublisher
+  /** Unread events are bounded by the existing100-record overflow contract. */
+  #queue: IRuntimeEvent[] = []
+  /** Insertion order retains FIFO pending reads without repeated growing-array shifts. */
+  #reads = new Set<IWatchRead>()
+  /** One terminal transition removes both exact listener and publisher-close receipts. */
+  #finished: boolean
+  /** A rejected undefined remains distinct from graceful terminal completion. */
+  #failed = false
+  /** Terminal failure remains visible to every subsequent original next call. */
+  #failure: unknown
+  /** This exact receipt alone can receive events and run its original overflow policy. */
+  #receipt: IRuntimeEventListener
+
+  /** Capture publisher lifetime before registering this iterator's exact listener receipt. */
+  constructor(publisher: RuntimeEventPublisher) {
+    this.#publisher = publisher
+    this.#finished = publisher.closed
+    this.#receipt = {
+      invoke: (event) => this.#receive(event),
+      checkOverflow: (report) => this.#checkOverflow(report)
+    }
+    if (!this.#finished) publisher.addWatch(this.#receipt, this.#close)
+  }
+
+  /** The iterator retains its own native async-iteration receiver. */
+  [Symbol.asyncIterator](): AsyncIterableIterator<IRuntimeEvent> {
+    return this
+  }
+
+  /** Settle one original FIFO read, otherwise retain only an unread bounded local event. */
+  #receive(event: IRuntimeEvent): void {
+    if (this.#finished) return
+    /** Set insertion order is the same FIFO order as the original pending read array. */
+    const read = this.#reads.values().next().value
+    if (read) {
+      this.#reads.delete(read)
+      read.resolve({ done: false, value: event })
+    } else this.#queue.push(event)
+  }
+
+  /** The actual event reporter observes the same overflow failure after publication. */
+  #checkOverflow(report: (error: unknown) => void): void {
+    if (this.#queue.length <= RuntimeQueryLimit.recent || this.#finished) return
+    /** This is the original prescribed watch overflow error, not a native terminal state. */
+    const error = createRemoteLayerError(RpcRemoteLayerErrorCode.runtimeEventOverflow)
+    this.#finish(true, error)
+    reportEventFailure(report, error)
+  }
+
+  /** Retire membership and clear ownership before settling the original pending reads. */
+  #finish(reject: boolean, error?: unknown): void {
+    if (this.#finished) return
+    this.#finished = true
+    this.#failed = reject
+    this.#failure = error
+    this.#publisher.removeWatch(this.#receipt, this.#close)
+    this.#queue.length = 0
+    /** Snapshot/clear retains original settlement order and reentrant terminal behavior. */
+    const reads = [...this.#reads]
+    this.#reads.clear()
+    for (const read of reads)
+      if (!reject) read.resolve({ done: true, value: undefined })
+      else read.reject(error)
+  }
+
+  /** Owner close and explicit return join the same graceful iterator termination. */
+  #close = (): void => this.#finish(false)
+
+  /** Read one bounded buffered event or join the existing FIFO pending-read owner. */
+  next = (): Promise<IteratorResult<IRuntimeEvent>> => {
+    if (this.#failed) return Promise.reject(this.#failure)
+    if (this.#finished) return Promise.resolve({ done: true as const, value: undefined })
+    /** The event queue has the existing fixed RuntimeQueryLimit.recent bound. */
+    const value = this.#queue.shift()
+    if (value) return Promise.resolve({ done: false as const, value })
+    return new Promise<IteratorResult<IRuntimeEvent>>((resolve, reject) =>
+      this.#reads.add({ resolve, reject })
+    )
+  }
+
+  /** Explicit return preserves the original graceful terminal result. */
+  return = (): Promise<IteratorResult<IRuntimeEvent>> => {
+    this.#finish(false)
+    return Promise.resolve({ done: true as const, value: undefined })
+  }
+
+  /** A thrown undefined still rejects and stays visible to later reads. */
+  throw = (error: unknown): Promise<IteratorResult<IRuntimeEvent>> => {
+    this.#finish(true, error)
+    return Promise.reject(error)
+  }
+}
+
+/** Own only local lifecycle subscribers and bounded watches, never native connection state. */
+class RuntimeEventPublisher {
+  /** Each listener is an exact receipt snapshotted before publication invokes callbacks. */
+  #listeners = new Set<IRuntimeEventListener>()
+  /** Publisher close settles every original watch without requiring a later native event. */
+  #watchers = new Set<() => void>()
+  /** This boundary belongs to subscriber lifetime rather than native execution lifecycle. */
+  #closed = false
+  /** Host bootstrap may select its actual emitter after subscribers have already joined. */
+  #probe: IProbeEmitter | (() => IProbeEmitter | undefined) | undefined
+
+  /** Capture the existing probe or cold reader without acquiring a runtime observer. */
+  constructor(probe?: IProbeEmitter | (() => IProbeEmitter | undefined)) {
+    this.#probe = probe
+  }
+
+  /** A watch snapshots the original publisher terminal boundary before subscription. */
+  get closed(): boolean {
+    return this.#closed
+  }
+
+  /** Register only this exact watch's listener and publisher-close receipts. */
+  addWatch(receipt: IRuntimeEventListener, close: () => void): void {
+    this.#listeners.add(receipt)
+    this.#watchers.add(close)
+  }
+
+  /** One watch terminal transition releases both original membership receipts. */
+  removeWatch(receipt: IRuntimeEventListener, close: () => void): void {
+    this.#listeners.delete(receipt)
+    this.#watchers.delete(close)
+  }
+
+  /** Capture one exact callback receipt; later additions cannot enter an in-progress publication. */
+  #on = (event: RuntimeEventName, listener: (event: IRuntimeEvent) => unknown): (() => void) => {
+    if (!Object.values(RuntimeEventName).includes(event) || typeof listener !== 'function')
+      throw createRpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.eventInvalid)
+    if (this.#closed) return () => undefined
+    /** The original callback remains on its exact receipt, including its invocation receiver. */
+    const receipt = { event, invoke: listener }
+    this.#listeners.add(receipt)
+    return () => {
+      this.#listeners.delete(receipt)
+    }
+  }
+
+  /** Publish native facts synchronously while observing every original callback rejection. */
+  #publish(event: IRuntimeEvent, report: (error: unknown) => void): void {
+    if (this.#closed) return
+    /** Cold lookup retains its original bare receiver and yields only the actual installed emitter. */
+    const observer = typeof this.#probe === 'function' ? (0, this.#probe)() : this.#probe
+    if (observer && (observer.mask & (1 << RpcProbeStage.peer)) !== 0)
+      observer.peer(
+        event.type,
+        typeof event.instanceId === 'string' ? event.instanceId : undefined,
+        event.error
+      )
+    for (const receipt of Array.from(this.#listeners)) {
+      if (receipt.event !== undefined && receipt.event !== event.type) continue
+      try {
+        /** Invocation preserves the original exact callback receipt receiver. */
+        const result = receipt.invoke(event)
+        observeThenableRejection(result, inspectThenable(result), (error) =>
+          reportEventFailure(report, error)
+        )
+        receipt.checkOverflow?.(report)
+      } catch (error) {
+        reportEventFailure(report, error)
+      }
+    }
+  }
+
+  /** Terminate watches before clearing callback membership; repeat close remains inert. */
+  #close(): void {
+    if (this.#closed) return
+    this.#closed = true
+    for (const close of Array.from(this.#watchers)) close()
+    this.#listeners.clear()
+  }
+
+  /** Retain the original frozen own-property callback surface, with unbound on/watch consumers. */
+  surface(): IRuntimeEventPublisher {
+    return Object.freeze({
+      on: this.#on,
+      watch: () => new RuntimeEventWatch(this),
+      publish: (event, report) => this.#publish(event, report),
+      close: () => this.#close()
+    })
+  }
+}
+
+/** Create the existing local subscriber owner with its original bounded event-buffer policy. */
 export function createRuntimeEventPublisher(
   probe?: IProbeEmitter | (() => IProbeEmitter | undefined)
 ): IRuntimeEventPublisher {
-  /**
-   * Each subscription is an exact receipt; publication snapshots this Set before invoking
-   * callbacks.
-   */
-  const listeners = new Set<IRuntimeEventListener>()
-  /** Owner close settles every watch without depending on a later native event. */
-  const watchers = new Set<() => void>()
-  /** This flag belongs only to publisher lifetime, not connection or native lifecycle state. */
-  let closed = false
-  /**
-   * Reporter failure cannot replace native command completion or leave unhandled callback
-   * rejection.
-   */
-  const reportSafely = (report: (error: unknown) => void, error: unknown): void => {
-    try {
-      report(error)
-    } catch (failure) {
-      hostRethrowReporter(failure, IpcReporterContext)
-    }
-  }
-  return Object.freeze({
-    on(event, listener) {
-      if (!Object.values(RuntimeEventName).includes(event) || typeof listener !== 'function')
-        throw createRpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.eventInvalid)
-      if (closed) return () => undefined
-      const receipt = { event, invoke: listener }
-      listeners.add(receipt)
-      return () => {
-        listeners.delete(receipt)
-      }
-    },
-    watch() {
-      /**
-       * Only unread events occupy this local 100-record queue; no native facts are retained
-       * elsewhere.
-       */
-      const queue: IRuntimeEvent[] = []
-      /** Pending caller reads preserve FIFO and all settle when this watch terminates. */
-      const reads: IWatchRead[] = []
-      /** One terminal transition removes both exact subscriber and owner-close receipt. */
-      let finished = closed
-      /** Overflow remains visible to subsequent next(), without silently dropping the old queue. */
-      let failure: unknown
-      /** A thrown undefined still rejects; absence of a failure value cannot represent closure. */
-      let failed = false
-      const finish = (reject: boolean, error?: unknown): void => {
-        if (finished) return
-        finished = true
-        failed = reject
-        failure = error
-        listeners.delete(receipt)
-        watchers.delete(closeWatch)
-        queue.length = 0
-        for (const read of reads.splice(0))
-          if (!reject) read.resolve({ done: true, value: undefined })
-          else read.reject(error)
-      }
-      const closeWatch = (): void => finish(false)
-      const receipt: IRuntimeEventListener = {
-        invoke(event: IRuntimeEvent): void {
-          if (finished) return
-          const read = reads.shift()
-          if (read) read.resolve({ done: false, value: event })
-          else queue.push(event)
-        },
-        /** The publication owner supplies the actual reporter for an overflowing event. */
-        checkOverflow(report): void {
-          if (queue.length <= RuntimeQueryLimit.recent || finished) return
-          const error = createRemoteLayerError(RpcRemoteLayerErrorCode.runtimeEventOverflow)
-          finish(true, error)
-          reportSafely(report, error)
-        }
-      }
-      if (!closed) {
-        listeners.add(receipt)
-        watchers.add(closeWatch)
-      }
-      return {
-        [Symbol.asyncIterator]() {
-          return this
-        },
-        next() {
-          if (failed) return Promise.reject(failure)
-          if (finished) return Promise.resolve({ done: true as const, value: undefined })
-          const value = queue.shift()
-          if (value) return Promise.resolve({ done: false as const, value })
-          return new Promise<IteratorResult<IRuntimeEvent>>((resolve, reject) =>
-            reads.push({ resolve, reject })
-          )
-        },
-        return() {
-          finish(false)
-          return Promise.resolve({ done: true as const, value: undefined })
-        },
-        throw(error: unknown) {
-          finish(true, error)
-          return Promise.reject(error)
-        }
-      }
-    },
-    publish(event, report) {
-      if (closed) return
-      /** Host bootstrap selects the emitter after this original publisher acquires subscribers. */
-      const observer = typeof probe === 'function' ? probe() : probe
-      if (observer && (observer.mask & (1 << RpcProbeStage.peer)) !== 0)
-        observer.peer(
-          event.type,
-          typeof event.instanceId === 'string' ? event.instanceId : undefined,
-          event.error
-        )
-      for (const receipt of Array.from(listeners)) {
-        if (receipt.event !== undefined && receipt.event !== event.type) continue
-        try {
-          const result = receipt.invoke(event)
-          observeThenableRejection(result, inspectThenable(result), (error) =>
-            reportSafely(report, error)
-          )
-          receipt.checkOverflow?.(report)
-        } catch (error) {
-          reportSafely(report, error)
-        }
-      }
-    },
-    close() {
-      if (closed) return
-      closed = true
-      for (const close of Array.from(watchers)) close()
-      listeners.clear()
-    }
-  })
+  return new RuntimeEventPublisher(probe).surface()
 }

@@ -75,17 +75,11 @@ describe('threads public exports', () => {
     expect(manifest.exports['./threads/adapters/*']).toBeUndefined()
     for (const platform of ['deno', 'bun', 'electron-renderer', 'browser'])
       expect(manifest.exports[`./adapters/${platform}`]).toBeUndefined()
-    for (const entry of ['.', ...['node', 'electron-main'].map((name) => `./adapters/${name}`)]) {
-      const exported = manifest.exports[entry]
-      expect(exported).toBeDefined()
-      expect(existsSync(resolve(root, exported.types))).toBe(true)
-      const runtime = await import(pathToFileURL(resolve(root, exported.default)).href)
-      expect(Object.keys(runtime).length).toBeGreaterThan(0)
-      if (entry.includes('adapters/')) {
-        expect(Object.keys(runtime)).toHaveLength(2)
-        expect(manifest.exports[`./threads/${entry.slice(2)}`]).toBeUndefined()
-      }
-    }
+    expect(Object.keys(manifest.exports)).toEqual(['.'])
+    const exported = manifest.exports['.']
+    expect(existsSync(resolve(root, exported.types))).toBe(true)
+    const runtime = await import(pathToFileURL(resolve(root, exported.default)).href)
+    expect(Object.keys(runtime).length).toBeGreaterThan(0)
     const imports = importClosure(resolve(root, 'src/threads/index.ts'))
     expect(imports.filter((item) => /threads\/adapters\/|^(?:node:|electron$)/.test(item))).toEqual(
       []

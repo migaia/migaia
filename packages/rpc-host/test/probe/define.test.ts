@@ -1,9 +1,9 @@
+import { createProbeEmitter } from '../../dist/core/internal/probe-emitter.js'
+import { systemScheduler } from '@migaia/utils/scheduler'
 import { describe, expect, it, vi } from 'vitest'
 import {
   defineProbe,
-  probePlugin,
   rpcProbeSampleKey,
-  snapshotProbeEvent,
   RpcProbeStage,
   RpcProbeStageName,
   RpcProbeDirection,
@@ -13,7 +13,6 @@ import {
   RpcProbeOutcome,
   RpcProbeOutcomeName,
   type IRpcProbeDefinition,
-  type IRpcProbeEventView,
   type IRpcProbe,
   type IRpcProbeStageName
 } from '../../dist/core/probe/index.js'
@@ -316,85 +315,20 @@ describe('probe contract', () => {
     expect(rpcProbeSampleKey('调用方', '请求😀')).toBe(expected)
   })
 
-  it('copies every reusable view field without replacing content, error or detail identity', () => {
-    /** One complete view exercises every fixed-shape field and all reference-bearing payloads. */
-    const view: IRpcProbeEventView = {
-      seq: 1,
-      carrierSeq: -1,
-      at: 123,
-      endpointId: 'left',
-      stage: 1,
-      direction: 0,
-      kind: 0,
-      outcome: 1,
-      messageId: 'message',
-      method: 'echo',
-      variation: undefined,
-      senderId: 'left',
-      targetId: 'right',
-      receiverId: 'receiver',
-      peerId: 'peer',
-      trace: 'trace',
-      sizeBytes: 4,
-      chunkIndex: -1,
-      chunkCount: -1,
-      members: -1,
-      durationMs: -1,
-      rejection: undefined,
-      lifecycle: undefined,
-      error: new Error('snapshot fixture'),
-      carrier: 'memory',
-      detail: { count: 1 },
-      content: { value: 1 }
-    }
-    /** Snapshot ownership is shallow: subsequent field assignments do not mutate the retained event. */
-    const snapshot = snapshotProbeEvent(view)
-    expect(Object.isFrozen(snapshot)).toBe(true)
-    expect(snapshot).toEqual(view)
-    expect(snapshot).not.toBe(view)
-    expect(snapshot.content).toBe(view.content)
-    expect(snapshot.detail).toBe(view.detail)
-    expect(snapshot.error).toBe(view.error)
-    view.seq = 2
-    view.method = 'changed'
-    view.content = undefined
-    expect(snapshot.seq).toBe(1)
-    expect(snapshot.method).toBe('echo')
-    expect(snapshot.content).toEqual({ value: 1 })
-  })
-
-  it('compiles endpoint probe plugins and rejects structural handles before installation', () => {
-    /** Runtime installation accepts both an empty supported plugin and genuine compiled handles. */
+  it('admits genuine compiled probes and rejects structural handles before observation', () => {
+    /** No constructor or disposal may invoke the user's business observer. */
     const emit = vi.fn()
-    /** This exact handle is admitted through the contract's private registration, not its shape. */
+    /** Genuine identity is registered privately by defineProbe, independently of public shape. */
     const probe = defineProbe({ stages: ['message'], emit })
-    for (const plugin of [probePlugin(), probePlugin(probe)]) {
-      expect(Object.isFrozen(plugin)).toBe(true)
-      expect(plugin).toMatchObject({
-        name: 'probe',
-        metadata: {
-          claims: {
-            routes: [],
-            provides: [],
-            consumes: [],
-            publicKeys: [],
-            exposedKeys: [],
-            activator: false
-          },
-          sharedProvides: ['probe'],
-          sharedConsumes: ['time']
-        },
-        install: expect.any(Function)
-      })
-    }
+    /** Both empty and populated observers remain actual canonical emitter owners. */
+    const empty = createProbeEmitter([], systemScheduler.now, 'empty')
+    /** The real handle must register and release its stage subscription without emitting. */
+    const populated = createProbeEmitter([probe], systemScheduler.now, 'populated')
     expect(emit).not.toHaveBeenCalled()
-    /** Matching every public field cannot forge the private probe identity used by installation. */
-    expect(() => probePlugin({ ...probe })).toThrow(
-      expect.objectContaining({
-        source: 'rpc.endpoint',
-        code: 'INVALID_CONFIG',
-        name: 'TypeError'
-      })
+    expect(() => createProbeEmitter([{ ...probe }], systemScheduler.now, 'forged')).toThrow(
+      expect.objectContaining({ source: 'rpc.endpoint', code: 'INVALID_CONFIG', name: 'TypeError' })
     )
+    empty.dispose()
+    populated.dispose()
   })
 })

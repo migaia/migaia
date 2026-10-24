@@ -1,11 +1,12 @@
 import { expect, it, vi } from 'vitest'
-import { PluginHost } from '@migaia/plugin-host'
-import { createRemotePlugin, createRemoteRetryPort } from '../../dist/remote/index.js'
+import { definePlugin, PluginHost } from '@migaia/plugin-host'
+import { createRemoteRetryPort } from '../../dist/remote/retry.js'
+import { createManagedRuntimePeer } from '../../dist/remote/runtime-api/managed-peer.js'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { deferred } from '@migaia/utils/promise'
 import { MessageChannel } from 'node:worker_threads'
 import { walkErrorCauses } from '@migaia/utils/error'
-import { remoteHarness, REMOTE_FIXTURE_CONTRACT } from './fixture.js'
+import { remoteHarness } from './fixture.js'
 
 it('releases an owned supervisor resource after its endpoint close fails', async () => {
   /** The external supervisor owns a real physical resource behind its opaque unit handle. */
@@ -38,13 +39,22 @@ it('releases an owned supervisor resource after its endpoint close fails', async
   const closeChannel = vi.spyOn(fixture.channel, 'close')
   try {
     await host.use(
-      createRemotePlugin({
+      definePlugin({
         name: 'p',
-        contract: REMOTE_FIXTURE_CONTRACT,
-        binding: { ...fixture.binding, ownership: 'owned' },
-        endpointFactory: async () => fixture.served,
-        host: host.plugin,
-        report: () => {}
+        setup: async (context) => {
+          /** The actual managed owner retains owned native release after endpoint failure. */
+          const peer = await createManagedRuntimePeer(
+            {
+              self: { name: 'audit', instanceId: 'audit' },
+              endpointFactory: async () => fixture.served,
+              report: () => undefined
+            },
+            { ...fixture.binding, ownership: 'owned' }
+          )
+          context.onDispose(peer.close)
+          return {}
+        },
+        install: () => ({})
       })
     )
     /** Physical release and original failure traceability both survive the owned cleanup path. */
@@ -141,13 +151,22 @@ it('closes a departed generation channel even when its endpoint close rejects', 
   const report = vi.fn()
   try {
     await host.use(
-      createRemotePlugin({
+      definePlugin({
         name: 'p',
-        contract: REMOTE_FIXTURE_CONTRACT,
-        binding: fixture.binding,
-        endpointFactory: async () => fixture.served,
-        host: host.plugin,
-        report
+        setup: async (context) => {
+          /** Generation observation and rollback remain with the actual managed holder. */
+          const peer = await createManagedRuntimePeer(
+            {
+              self: { name: 'audit', instanceId: 'audit' },
+              endpointFactory: async () => fixture.served,
+              report
+            },
+            fixture.binding
+          )
+          context.onDispose(peer.close)
+          return {}
+        },
+        install: () => ({})
       })
     )
     fixture.emit({ type: 'exit', generation: 1, unit: 'unit', error: original } as never)

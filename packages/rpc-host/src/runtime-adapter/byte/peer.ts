@@ -4,7 +4,7 @@ import {
   openAdapterByteBootstrapSource
 } from './bootstrap-source.js'
 import { createRuntimePeer } from '../../remote/runtime-api/peer.js'
-import type { IRuntimePeerOptions, IRuntimePeer } from '../../remote/index.js'
+import type { IRuntimePeerOptions, IRuntimePeer } from '../../remote/runtime-api/peer.js'
 import {
   withRuntimePreparationContext,
   type IRuntimePreparationContext

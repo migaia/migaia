@@ -1,8 +1,8 @@
+import { createRuntimePeer } from '../../../../rpc-host/dist/remote/runtime-api/peer.js'
 import { defineHost, definePlugin, defineFeature } from '@migaia/plugin-host'
 import { identityCodec } from '@migaia/serialize/codecs/identity/v1'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { createProcessPeer } from '../../../../rpc-plugin-process/test/protocol.ts'
-import { createMemoryTransportPair } from '../../../../rpc-host/dist/core/adapters/memory.js'
+import { createMemoryTransportPair } from '../../../../rpc-host/test/fixtures/memory-transport.ts'
 import { messageFramerV1 } from '@migaia/rpc-contract/framing'
 import { RpcCapability } from '@migaia/rpc-contract'
 import { registerBatchAgreement } from '../../../../rpc-host/dist/core/internal/batch-frame.js'
@@ -44,7 +44,7 @@ try {
     /** Both real endpoints publish the mandatory v2 directory without reading discovery env. */
     const peers = await Promise.all(
       transports.map((transport, index) =>
-        createProcessPeer({
+        createRuntimePeer({
           self: { name: 'explicit', instanceId: `explicit-${index + 1}` },
           connect: async () => {
             if (index === 0) sourceCalls += 1

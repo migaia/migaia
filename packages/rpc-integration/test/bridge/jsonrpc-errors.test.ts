@@ -3,7 +3,7 @@ import { deserializeRpcError, serializeRpcError } from '@migaia/rpc-contract'
 import { toJsonRpcError } from '@migaia/rpc-contract'
 import { JsonRpcBridgeErrorCode } from '@migaia/rpc-contract/framing/jsonrpc'
 import { createJsonRpcBridgeError } from '@migaia/rpc-host/plugin'
-import { bridgeFixture, request } from './fixture.js'
+import { BridgeFixture, request } from './fixture.js'
 
 describe('JSON-RPC error graph', () => {
   it('preserves all wire error fields, cause/errors identity order and stack', async () => {
@@ -17,7 +17,7 @@ describe('JSON-RPC error graph', () => {
       code: { value: 'PEER_FAILURE', enumerable: true }
     })
     const wire = serializeRpcError(original, { report: () => undefined })
-    const fixture = bridgeFixture()
+    const fixture = new BridgeFixture()
     const channel = await fixture.open()
     const responses: Array<{ error: unknown }> = []
     channel.transport.subscribe((message) => responses.push(JSON.parse(message.data as string)))
@@ -62,7 +62,7 @@ describe('JSON-RPC error graph', () => {
   ] as const)(
     'isolates correlated error %# and allows the next request',
     async (error, source, code, reports) => {
-      const fixture = bridgeFixture()
+      const fixture = new BridgeFixture()
       const channel = await fixture.open()
       const responses: Array<{
         error?: { source: string; code: string; cause?: { code: string } }
@@ -99,14 +99,14 @@ describe('JSON-RPC error graph', () => {
     ).toBeInstanceOf(TypeError)
   })
   it('closes raw once under concurrent close', async () => {
-    const fixture = bridgeFixture()
+    const fixture = new BridgeFixture()
     const channel = await fixture.open()
     await Promise.all([channel.close(), channel.close(), channel.close()])
     expect(fixture.closes).toBe(1)
     expect(fixture.removals).toBe(2)
   })
   it('retains write, cleanup and reporter failures without replacing the primary', async () => {
-    const fixture = bridgeFixture()
+    const fixture = new BridgeFixture()
     const writeFailure = new Error('physical writer failed')
     const cleanupFailure = new Error('raw cleanup failed')
     const reporterFailure = new Error('reporter failed')

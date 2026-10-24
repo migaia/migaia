@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
 import { connected, legacyEndpoint } from './fixture.js'
 import { it } from 'vitest'
-import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
-import { registerRemoteMethods } from '../../dist/remote/serve-methods.js'
-import type { IRpcEndpoint } from '../../dist/core/typing.js'
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
+import { prepareRuntimeProviderAssembly } from '../../dist/remote/runtime-api/peer.js'
+import { compileRuntimeMethods } from '../../dist/remote/runtime-api/catalog.js'
 
 it('the automatic nested doc.save route executes the explicitly provided parent method', async () => {
   /** Both physical sides and all imported owners are real, successfully constructed baseline code. */
@@ -22,19 +22,24 @@ it('the automatic nested doc.save route executes the explicitly provided parent 
     legacyEndpoint('parent', parentTransport),
     legacyEndpoint('child', childTransport)
   ])
-  registerRemoteMethods(
-    {
-      schemaVersion: 1,
-      plugin: 'doc',
-      features: { api: { methods: { save: { mode: 'request', idempotent: false } } } }
-    },
-    { endpoint: parent as unknown as IRpcEndpoint },
-    () => doc,
-    () => false,
-    (error) => {
-      throw error
-    }
-  )
+  /** Canonical provider compilation preserves the independent three-segment wire oracle. */
+  const assembly = prepareRuntimeProviderAssembly({
+    methods: compileRuntimeMethods(
+      { doc: { api: doc } },
+      {
+        schemaVersion: 1,
+        plugin: 'doc',
+        features: { api: { methods: { save: { mode: 'request', idempotent: false } } } }
+      }
+    ),
+    streams: false,
+    generations: false,
+    supports: () => false,
+    remoteNode: () => undefined,
+    bindRemoteNode: () => undefined,
+    describe: () => undefined
+  })
+  assembly.install(parent as unknown as Parameters<typeof assembly.install>[0])
   /** The GREEN fixture selects the new shared owner; the executed legacy RED snapshot is archived. */
   const automatic = await connected({ doc }, {})
   try {
@@ -78,26 +83,31 @@ it('a scalar request of a generator returns PAYLOAD_INVALID with the original no
     legacyEndpoint('parent', parentTransport),
     legacyEndpoint('child', childTransport)
   ])
-  registerRemoteMethods(
-    {
-      schemaVersion: 1,
-      plugin: 'p',
-      features: {
-        f: {
-          methods: {
-            scalar: { mode: 'request', idempotent: false },
-            values: { mode: 'request', idempotent: false }
+  /** Both baseline and automatic calls use the genuine provider/result normalizer. */
+  const assembly = prepareRuntimeProviderAssembly({
+    methods: compileRuntimeMethods(
+      { p: { f: feature } },
+      {
+        schemaVersion: 1,
+        plugin: 'p',
+        features: {
+          f: {
+            methods: {
+              scalar: { mode: 'request', idempotent: false },
+              values: { mode: 'request', idempotent: false }
+            }
           }
         }
       }
-    },
-    { endpoint: parent as unknown as IRpcEndpoint },
-    () => feature,
-    () => false,
-    (error) => {
-      throw error
-    }
-  )
+    ),
+    streams: false,
+    generations: false,
+    supports: () => false,
+    remoteNode: () => undefined,
+    bindRemoteNode: () => undefined,
+    describe: () => undefined
+  })
+  assembly.install(parent as unknown as Parameters<typeof assembly.install>[0])
   /** Only the new result wrapper may change the scalar normalization failure classification. */
   const automatic = await connected({ p: { f: feature } }, {})
   try {

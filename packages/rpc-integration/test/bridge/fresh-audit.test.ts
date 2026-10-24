@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest'
-import { bridgeFixture } from './fixture.js'
+import { BridgeFixture } from './fixture.js'
 import { readJsonObjectPort } from '../../../rpc-host/dist/core/internal/json-object-port.js'
 import { rpcProtocolV1 } from '@migaia/rpc-contract'
 import { createRpcStreamFrameDecoderWithLimit } from '@migaia/rpc-contract/framing/stream'
@@ -16,7 +16,7 @@ afterEach(() => {
 
 it('rejects counterfeit descriptor identities even when all metadata matches', async () => {
   /** The physical channel supplies the only authoritative paired identities. */
-  const fixture = bridgeFixture()
+  const fixture = new BridgeFixture()
   /** Closing revokes the private registry rather than retaining audit payloads. */
   const channel = await fixture.open()
   try {

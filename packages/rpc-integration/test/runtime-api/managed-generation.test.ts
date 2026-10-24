@@ -1,8 +1,9 @@
+import { threadPlugin } from '@migaia/rpc-plugin-thread'
+import { RuntimePluginKey } from '@migaia/rpc-host/plugin'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { observePortableNormalization } from '../../../rpc-contract/test/fixtures/portable-observer.js'
 import { readRuntimeCarrier } from '@migaia/rpc-contract/runtime'
 import { readRuntimeOutletConnection } from '../../../rpc-host/dist/remote/runtime-api/outlet.js'
-import type { IRuntimeDynamicSurface } from '../../../rpc-host/dist/remote/runtime-api/typing.js'
 import { runtimeTestHost } from '../../../rpc-host/test/runtime-api/fixture.js'
 import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
@@ -10,13 +11,12 @@ import { it, vi } from 'vitest'
 import { definePlugin, defineFeature } from '@migaia/plugin-host'
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { createThreadPeer } from '../../../rpc-plugin-thread/test/protocol.ts'
 import { threadProtocolDefinition as createThreadPlugin } from './fixtures/thread-protocol.js'
 import { type INodeThreadHandle } from '../../../rpc-plugin-thread/dist/threads/node-launcher.js'
 import {
   createNodeThreadLauncher,
   createNodeThreadChannelFactory
-} from '@migaia/rpc-plugin-thread/adapters/node'
+} from '../../../rpc-plugin-thread/dist/threads/adapters/node.js'
 import type { IRuntimePeer } from '../../../rpc-host/dist/remote/runtime-api/peer.js'
 import { readRuntimePeerConnection } from '../../../rpc-host/dist/remote/runtime-api/peer.js'
 
@@ -74,11 +74,15 @@ for (const mode of ['peer', 'plugin'] as const) {
     }
     try {
       if (mode === 'peer')
-        peer = await createThreadPeer<IRuntimeDynamicSurface>({
-          spawn,
-          provide: { parent: { echo: () => 42 } },
-          report: () => undefined
-        })
+        peer = await host
+          .use(
+            threadPlugin({
+              spawn,
+              provide: { parent: { echo: () => 42 } },
+              report: () => undefined
+            })
+          )
+          .then(() => readRuntimeOutletConnection(host.thread, RuntimePluginKey.thread)!.peer!)
       else
         await host.use(
           createThreadPlugin({
@@ -275,46 +279,56 @@ for (const catalogSize of [4, 32])
       const entered = new Promise<void>((resolve) => {
         started = resolve
       })
+      /** The actual Host owns the managed generation and its native rollback. */
+      const nativeHost = runtimeTestHost({
+        host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
+      })
       /** Cleanup closes the canonical generation holder and actual native unit. */
-      let peer: IRuntimePeer | undefined
+      let peer!: IRuntimePeer
       try {
-        peer = await createThreadPeer<IRuntimeDynamicSurface>({
-          self: { name: 'retry-parent', instanceId: 'retry-parent' },
-          provide: { parent: { echo: () => 42, started: () => started() } },
-          report: () => undefined,
-          spawn: {
-            spec: {
-              entry,
-              name: 'retry-child',
-              data: { advanced: idempotent, crash: idempotent, catalogSize }
-            },
-            budget,
-            scheduler: systemScheduler,
-            launcher: {
-              ...native,
-              launch: async (spec, context) => {
-                const handle = await native.launch(
-                  {
-                    ...spec,
-                    data: { ...(spec.data as object), sequence: ++sequence }
-                  },
-                  context
-                )
-                const send = handle.port.postMessage
-                handle.port.postMessage = (message, transfer) => {
-                  frames.push(message)
-                  Reflect.apply(send, handle.port, [message, transfer])
-                }
-                handles.push(handle)
-                return handle
+        peer = await nativeHost
+          .use(
+            threadPlugin({
+              self: { name: 'retry-parent', instanceId: 'retry-parent' },
+              provide: { parent: { echo: () => 42, started: () => started() } },
+              report: () => undefined,
+              spawn: {
+                spec: {
+                  entry,
+                  name: 'retry-child',
+                  data: { advanced: idempotent, crash: idempotent, catalogSize }
+                },
+                budget,
+                scheduler: systemScheduler,
+                launcher: {
+                  ...native,
+                  launch: async (spec, context) => {
+                    const handle = await native.launch(
+                      {
+                        ...spec,
+                        data: { ...(spec.data as object), sequence: ++sequence }
+                      },
+                      context
+                    )
+                    const send = handle.port.postMessage
+                    handle.port.postMessage = (message, transfer) => {
+                      frames.push(message)
+                      Reflect.apply(send, handle.port, [message, transfer])
+                    }
+                    handles.push(handle)
+                    return handle
+                  }
+                },
+                channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),
+                supervisor: { restart: { initialDelayMs: 1, maxDelayMs: 1, maxRestarts: 1 } },
+                keyFactory: () => `native-original-key-${++keys}`,
+                report: () => undefined
               }
-            },
-            channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),
-            supervisor: { restart: { initialDelayMs: 1, maxDelayMs: 1, maxRestarts: 1 } },
-            keyFactory: () => `native-original-key-${++keys}`,
-            report: () => undefined
-          }
-        })
+            })
+          )
+          .then(
+            () => readRuntimeOutletConnection(nativeHost.thread, RuntimePluginKey.thread)!.peer!
+          )
         if (!idempotent)
           assert.equal(((await peer.request('probe', 'ordinary')) as { parent: number }).parent, 42)
         assert.equal(await peer.request('service.data.read', 'ordinary'), 'ordinary')
@@ -396,7 +410,7 @@ for (const catalogSize of [4, 32])
         }
       } finally {
         normalize.mockRestore()
-        await peer?.close()
+        await nativeHost.dispose()
         for (const handle of handles) handle.terminate()
         await Promise.all(handles.map((handle) => handle.exited))
       }

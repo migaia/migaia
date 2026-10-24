@@ -6,7 +6,7 @@ import { systemScheduler } from '@migaia/utils/scheduler'
 import {
   createNodeThreadLauncher,
   createNodeThreadChannelFactory
-} from '@migaia/rpc-plugin-thread/adapters/node'
+} from '../../../rpc-plugin-thread/dist/threads/adapters/node.js'
 import { threadWebPort } from '../../../rpc-plugin-thread/dist/threads/channel.js'
 import type { IThreadWebPort } from '../../../rpc-plugin-thread/dist/threads/types.js'
 

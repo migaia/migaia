@@ -1,5 +1,6 @@
 import type {
   IFactoryPingCapability,
+  INativeMiddlewareSurface,
   IRecursiveProvideSurface,
   IRpcRootProjection,
   IRpcKernelSurface
@@ -32,7 +33,6 @@ import {
   readFeaturePolicy
 } from './internal/feature-policy.js'
 import { createWebRpcPluginHost, type IRpcPluginHost } from './internal/web-rpc-plugin-host.js'
-import { readFirstPartyPublicRoots } from './internal/first-party-roots.js'
 import {
   type IDeferredPreparedEndpoint,
   type IPreparedEndpoint,
@@ -50,7 +50,10 @@ import {
   registerEndpointDebugSnapshot,
   registerEndpointTimePortOwner
 } from './internal/test-observer.js'
-import { createEndpointProjection } from './internal/endpoint-projection.js'
+import {
+  createEndpointProjection,
+  RPC_RESERVED_PROJECTION_KEYS
+} from './internal/endpoint-projection.js'
 import type {
   IRpcEndpoint,
   IRpcFactoryConfig,
@@ -87,136 +90,205 @@ async function createComposedEndpointRuntime<
     IRpcFeatureSurface<TFeatures> &
     IRpcPingEndpointSurface<IFactoryPingCapability<TMiddlewares>>
 > {
-  let featureRoots: readonly IRpcFeature[] = []
-  /** Records only this composition's explicitly public first-party roots. */
-  let publicFirstPartyRoots: readonly string[] = []
-  let capabilityPlugin: ReturnType<typeof createEndpointCapabilitiesPlugin> | undefined
-  try {
-    featureRoots = snapshotFeatureTuple(config.features)
-    inspectFeatures(
-      featureRoots.reduce<Record<string, IRpcFeature>>((roots, feature, index) => {
-        roots[`feature-${index}`] = feature
-        return roots
-      }, Object.create(null))
-    )
-    assertNativeRootRecord(modulesOrRoots)
-    const reservedKeys = new Set([
-      'on',
-      'hooks',
-      'dispose',
-      'use',
-      'unUse',
-      'config',
-      'getPort',
-      'usePipeline',
-      '__proto__'
-    ])
-    const declaredFeatureKeys = featureRoots.flatMap(
-      (feature) => readFeaturePolicy(feature).publicKeys ?? []
-    )
-    if (declaredFeatureKeys.some((key) => reservedKeys.has(key)))
-      throw createRpcError(
-        RpcCoreErrorCode.capabilityConflict,
-        RpcCoreErrorText.endpointModuleDuplicated
+  return new ComposedEndpointResource<TTargetId, TMiddlewares, TFeatures>(
+    config,
+    modulesOrRoots
+  ).open()
+}
+
+/** Compose one actual endpoint; the resource owns construction, activation and rollback state. */
+class ComposedEndpointResource<
+  TTargetId extends string = string,
+  TMiddlewares extends readonly IRpcMiddleware[] = readonly IRpcMiddleware[],
+  TFeatures extends readonly IRpcFeature[] = readonly IRpcFeature[]
+> {
+  /** Original configuration is captured without evaluating application getters early. */
+  readonly #config: IRpcFactoryConfig<TTargetId, TMiddlewares, TFeatures> & {
+    readonly features?: import('./feature.js').IRpcFiniteFeatureTuple<TFeatures>
+  }
+  /** Actual supplied roots remain distinct from the configured user Feature tuple. */
+  readonly #modulesOrRoots: Readonly<Record<string, IRpcFeature>>
+  /** The cold immutable tuple is read once before acquiring physical resources. */
+  #featureRoots: readonly IRpcFeature[] = []
+  /** Public root names grant projection rights without widening dependency-only Features. */
+  #publicFirstPartyRoots: readonly string[] = []
+  /** The real capability installation supplies public keys and diagnostic ownership. */
+  #capabilityPlugin: ReturnType<typeof createEndpointCapabilitiesPlugin> | undefined
+  /** Deferred physical preparation is created before the kernel or native Host. */
+  #deferred!: IDeferredPreparedEndpoint<TTargetId>
+  /** Immutable native middleware claims are checked before resource acquisition. */
+  #staticMiddlewareClaims: Extract<
+    IDeferredPreparedEndpoint<string>['middlewareSnapshots'][number],
+    { kind: 'native' }
+  >[] = []
+  /** Only the acquired canonical kernel can own transport and endpoint resources. */
+  #kernel: IEndpointKernelHost | undefined
+  /** The genuine native Host owns atomic installation and reverse rollback. */
+  #host: IRpcPluginHost | undefined
+  /** Merged native outputs are projected only after their actual batch commits. */
+  #hostExtensions: Readonly<Record<string, unknown>> | undefined
+  /** Named middleware ports retain their actual held Feature values. */
+  #resolvedPorts: ReadonlyMap<PropertyKey, unknown> | undefined
+  /** Construction cancellation and timeout remain with the existing control owner. */
+  #construction: ReturnType<typeof createConstructionControl> | undefined
+  /** The batch activation receipt supplies the actual prepared endpoint identity. */
+  #prepared: IPreparedEndpoint<TTargetId> | undefined
+  /** Exact root failures stay ordered and reachable through native rollback diagnostics. */
+  #rootCleanupErrors: IRpcCleanupError[] = []
+  /** Public keys preserve the original admitted publication order. */
+  #publicKeys: string[] = []
+  /** Membership is indexed once instead of rescanning earlier publications. */
+  #publicKeySet = new Set<string>()
+  /** Native hook events remain available until the real activation role installs them. */
+  #hookEvents: IRpcHookEvent[] = []
+  /** Preflight and final parity distinguish a committed activation from a rolled-back candidate. */
+  #activationCommitted = false
+  /** First-party claims retain the actual capabilities batch's immutable policy objects. */
+  #firstPartyPolicies: ReturnType<
+    typeof createEndpointCapabilitiesBatchFeature
+  >['firstPartyPolicies'] = []
+  /** One native batch owns claim parity before activation and after publication. */
+  #admissions: ReturnType<typeof buildNativePluginBatch>[number]['admission'][] = []
+  /** Public disposal joins its first actual Host cleanup Promise, including failure. */
+  #endpointHostDispose: Promise<void> | undefined
+
+  /** Retain only the original inputs; admission and resource acquisition remain ordered in open. */
+  constructor(
+    config: IRpcFactoryConfig<TTargetId, TMiddlewares, TFeatures> & {
+      readonly features?: import('./feature.js').IRpcFiniteFeatureTuple<TFeatures>
+    },
+    modulesOrRoots: Readonly<Record<string, IRpcFeature>>
+  ) {
+    this.#config = config
+    this.#modulesOrRoots = modulesOrRoots
+  }
+
+  /** Run cold validation, physical preparation, native installation and final projection in order. */
+  async open(): Promise<
+    IRpcKernelSurface &
+      IRpcFeatureSurface<TFeatures> &
+      IRpcPingEndpointSurface<IFactoryPingCapability<TMiddlewares>>
+  > {
+    this.#validateFeatures()
+    await this.#preparePhysical()
+    try {
+      this.#initializeHost()
+      const batch = this.#buildNativeBatch()
+      const pluginDefinitions = this.#prepareDefinitions(batch)
+      await this.#installBatch(pluginDefinitions)
+    } catch (primary) {
+      await this.#rollbackConstruction(primary)
+    }
+    return this.#project()
+  }
+
+  /** Cold tuple/root admission cannot consume a transport or evaluate application outputs. */
+  #validateFeatures(): void {
+    try {
+      this.#featureRoots = snapshotFeatureTuple(this.#config.features)
+      inspectFeatures(
+        this.#featureRoots.reduce<Record<string, IRpcFeature>>((roots, feature, index) => {
+          roots[`feature-${index}`] = feature
+          return roots
+        }, Object.create(null))
       )
-    if (new Set(declaredFeatureKeys).size !== declaredFeatureKeys.length)
+      assertNativeRootRecord(this.#modulesOrRoots)
+
+      const declaredFeatureKeys = this.#featureRoots.flatMap(
+        (feature) => readFeaturePolicy(feature).publicKeys ?? []
+      )
+      if (declaredFeatureKeys.some((key) => RPC_RESERVED_PROJECTION_KEYS.has(key)))
+        throw createRpcError(
+          RpcCoreErrorCode.capabilityConflict,
+          RpcCoreErrorText.endpointModuleDuplicated
+        )
+      if (new Set(declaredFeatureKeys).size !== declaredFeatureKeys.length)
+        throw createRpcError(
+          RpcCoreErrorCode.invalidConfig,
+          RpcCoreErrorText.endpointModuleDuplicated
+        )
+    } catch (error) {
+      if (this.#config.transport) rollbackTransportConstruction(this.#config.transport)
+      if (isLocalRpcError(error, RpcError)) throw error
       throw createRpcError(
         RpcCoreErrorCode.invalidConfig,
-        RpcCoreErrorText.endpointModuleDuplicated
+        RpcCoreErrorText.endpointModuleInvalid,
+        error
       )
-  } catch (error) {
-    if (config.transport) rollbackTransportConstruction(config.transport)
-    if (isLocalRpcError(error, RpcError)) throw error
-    throw createRpcError(
-      RpcCoreErrorCode.invalidConfig,
-      RpcCoreErrorText.endpointModuleInvalid,
-      error
-    )
+    }
   }
-  let deferred: IDeferredPreparedEndpoint<TTargetId>
-  try {
-    deferred = (await prepareEndpoint(config, {
-      deferMiddlewareInstall: true
-    })) as IDeferredPreparedEndpoint<TTargetId>
-  } catch (error) {
-    if (config.transport) rollbackTransportConstruction(config.transport)
-    throw error
-  }
-  /**
-   * Object-form native middleware carries immutable claims. Reject conflicts before the endpoint
-   * creates its kernel or Host; function-form middleware intentionally has dynamic output keys.
-   */
-  const staticMiddlewareClaims = deferred.middlewareSnapshots.flatMap((snapshot) =>
-    snapshot.kind === 'native' && snapshot.metadata !== undefined ? [snapshot] : []
-  )
-  try {
-    preflightFeatureClaims(
-      staticMiddlewareClaims.map((snapshot) => ({
-        name: snapshot.name,
-        claims: snapshot.metadata!.claims,
-        sharedProvides: snapshot.metadata!.sharedProvides,
-        sharedConsumes: snapshot.metadata!.sharedConsumes,
-        sharedOptionalConsumes: snapshot.metadata!.sharedOptionalConsumes
-      })),
-      { requireCompleteGraph: false }
+
+  /** Physical preparation and static middleware claim validation preserve their rollback boundary. */
+  async #preparePhysical(): Promise<void> {
+    try {
+      this.#deferred = (await prepareEndpoint(this.#config, {
+        deferMiddlewareInstall: true
+      })) as IDeferredPreparedEndpoint<TTargetId>
+    } catch (error) {
+      if (this.#config.transport) rollbackTransportConstruction(this.#config.transport)
+      throw error
+    }
+    this.#staticMiddlewareClaims = this.#deferred.middlewareSnapshots.flatMap((snapshot) =>
+      snapshot.kind === 'native' && snapshot.metadata !== undefined ? [snapshot] : []
     )
-  } catch (error) {
-    rollbackTransportConstruction(deferred.transport)
-    throw error
+    try {
+      preflightFeatureClaims(
+        this.#staticMiddlewareClaims.map((snapshot) => ({
+          name: snapshot.name,
+          claims: snapshot.metadata!.claims,
+          sharedProvides: snapshot.metadata!.sharedProvides,
+          sharedConsumes: snapshot.metadata!.sharedConsumes,
+          sharedOptionalConsumes: snapshot.metadata!.sharedOptionalConsumes
+        })),
+        { requireCompleteGraph: false }
+      )
+    } catch (error) {
+      rollbackTransportConstruction(this.#deferred.transport)
+      throw error
+    }
   }
-  let kernel: IEndpointKernelHost | undefined
-  let host: IRpcPluginHost | undefined
-  let hostExtensions: Readonly<Record<string, unknown>> | undefined
-  let resolvedPorts: ReadonlyMap<PropertyKey, unknown> | undefined
-  let construction: ReturnType<typeof createConstructionControl> | undefined
-  let prepared: IPreparedEndpoint<TTargetId> | undefined
-  let rootCleanupErrors: IRpcCleanupError[] = []
-  let publicKeys: readonly string[] = []
-  try {
-    kernel = createEndpointKernel(
-      deferred.transport,
-      deferred.transportSnapshot,
-      deferred.injectedScheduler,
-      deferred.injectedWallClock
+
+  /** Acquire the one canonical kernel, construction scope and native installation Host. */
+  #initializeHost(): void {
+    this.#kernel = createEndpointKernel(
+      this.#deferred.transport,
+      this.#deferred.transportSnapshot,
+      this.#deferred.injectedScheduler,
+      this.#deferred.injectedWallClock
     )
-    const constructionConfig = deferred.construction
+    const constructionConfig = this.#deferred.construction
     const constructionSignal =
       constructionConfig?.signal ?? (new AbortController().signal as IAbortSignal)
-    construction = createConstructionControl({
+    this.#construction = createConstructionControl({
       signal: constructionSignal,
       timeoutMs: constructionConfig?.timeoutMs,
-      time: kernel.time
+      time: this.#kernel!.time
     })
-    const hookEvents: IRpcHookEvent[] = []
-    host = createWebRpcPluginHost(
-      deferred.id,
-      deferred.transport,
-      construction,
-      (event: IRpcHookEvent) => hookEvents.push(event),
+    this.#hookEvents = []
+    this.#host = createWebRpcPluginHost(
+      this.#deferred.id,
+      this.#deferred.transport,
+      this.#construction,
+      (event: IRpcHookEvent) => this.#hookEvents.push(event),
       {
-        scheduler: deferred.injectedScheduler,
+        scheduler: this.#deferred.injectedScheduler,
         execution: {
           mutationTimeoutMs: constructionConfig?.timeoutMs ?? false,
           pipelineDrainTimeoutMs: constructionConfig?.timeoutMs ?? false
         }
       },
-      () => rootCleanupErrors
+      () => this.#rootCleanupErrors
     )
-    let activationCommitted = false
-    let activationPreflight:
-      | ((
-          state: IRpcComposedRuntimeState,
-          host: { readonly getPort: (key: PropertyKey) => unknown }
-        ) => void)
-      | undefined
-    const activationKernel = kernel
-    /** Only direct callers supply first-party Features; retired tokens cannot mint native owners. */
-    const firstPartyRoots = modulesOrRoots as Readonly<Record<string, IRpcFeature>>
-    publicFirstPartyRoots = readFirstPartyPublicRoots(firstPartyRoots)
+  }
+
+  /** Build actual native capability roots before their single activation role can run. */
+  #buildNativeBatch(): ReturnType<typeof buildNativePluginBatch> {
+    const firstPartyRoots = this.#modulesOrRoots as Readonly<Record<string, IRpcFeature>>
+    this.#publicFirstPartyRoots = Object.keys(firstPartyRoots)
     const capabilityRoots: Record<string, IRpcFeature> = Object.assign(
       Object.create(null),
       firstPartyRoots,
-      featureRoots.reduce<Record<string, IRpcFeature>>((roots, feature, index) => {
+      this.#featureRoots.reduce<Record<string, IRpcFeature>>((roots, feature, index) => {
         roots[`feature-${index}`] = feature
         return roots
       }, Object.create(null))
@@ -227,14 +299,14 @@ async function createComposedEndpointRuntime<
         : createEndpointCapabilitiesBatchFeature(
             capabilityRoots,
             Object.freeze({
-              getKernel: () => activationKernel,
+              getKernel: () => this.#kernel!,
               getPrepared: () => {
-                if (!prepared)
+                if (!this.#prepared)
                   throw createRpcError(
                     RpcCoreErrorCode.invalidConfig,
                     RpcCoreErrorText.endpointModuleInvalid
                   )
-                return prepared as IPreparedEndpoint<string>
+                return this.#prepared as IPreparedEndpoint<string>
               }
             }),
             Object.keys(capabilityRoots).filter((name) => name.startsWith('first-party-')),
@@ -248,111 +320,127 @@ async function createComposedEndpointRuntime<
               ].includes(name)
             ),
             new Set([
-              ...publicFirstPartyRoots,
-              ...featureRoots.map((_feature, index) => `feature-${index}`)
+              ...this.#publicFirstPartyRoots,
+              ...this.#featureRoots.map((_feature, index) => `feature-${index}`)
             ])
           )
-    capabilityPlugin = capabilityBatch?.plugin
-    const firstPartyPolicies = capabilityBatch?.firstPartyPolicies ?? []
+    this.#capabilityPlugin = capabilityBatch?.plugin
+    this.#firstPartyPolicies = capabilityBatch?.firstPartyPolicies ?? []
     const capabilityAdmission = capabilityBatch?.admission
-    /** Direct native batch includes the capability Feature before its single activation role. */
     const batch = buildNativePluginBatch({
-      kernel,
-      deferred: deferred as unknown as IDeferredPreparedEndpoint<string>,
-      middlewareSnapshots: deferred.middlewareSnapshots,
+      kernel: this.#kernel!,
+      deferred: this.#deferred as unknown as IDeferredPreparedEndpoint<string>,
+      middlewareSnapshots: this.#deferred.middlewareSnapshots,
       privateFeaturesAllowed: Object.values(capabilityRoots).every(isJsonObjectFeature),
-      hookEvents,
-      ...(capabilityPlugin && capabilityAdmission
+      hookEvents: this.#hookEvents,
+      ...(this.#capabilityPlugin && capabilityAdmission
         ? {
             featureDefinitions: [
               {
-                key: capabilityPlugin.definition.name,
-                definition: capabilityPlugin.definition,
+                key: this.#capabilityPlugin.definition.name,
+                definition: this.#capabilityPlugin.definition,
                 admission: capabilityAdmission
               }
             ]
           }
         : {}),
       onPrepared: (value) => {
-        prepared = value as IPreparedEndpoint<TTargetId>
+        this.#prepared = value as IPreparedEndpoint<TTargetId>
       },
       onActivationCommitted: () => {
-        activationCommitted = true
+        this.#activationCommitted = true
       },
       onActivationRolledBack: () => {
-        activationCommitted = false
+        this.#activationCommitted = false
       },
-      onNativeFeatureActivate: () => capabilityPlugin?.activate(),
+      onNativeFeatureActivate: () => this.#capabilityPlugin?.activate(),
       onRootDisposalErrors: (errors) => {
-        rootCleanupErrors = [...rootCleanupErrors, ...errors]
+        this.#rootCleanupErrors.push(...errors)
       },
-      onActivationPreflight: (state, getPort) => activationPreflight?.(state, { getPort })
+      onActivationPreflight: (state, getPort) => this.#validateActivation(state, { getPort })
     })
-    const admissions = batch.map((entry) => entry.admission)
-    const claims = admissions.map((admission) => admission.claims)
-    publicKeys = [...new Set(claims.flatMap((claim) => claim.publicKeys))]
+    this.#admissions = batch.map((entry) => entry.admission)
+    const claims = this.#admissions.map((admission) => admission.claims)
+    this.#publicKeys = [...new Set(claims.flatMap((claim) => claim.publicKeys))]
+    this.#publicKeySet = new Set(this.#publicKeys)
+    return batch
+  }
+
+  /** Preflight the exact native batch before the Host can install any definition. */
+  #prepareDefinitions(batch: ReturnType<typeof buildNativePluginBatch>): IPluginConstraint<any>[] {
     const pluginDefinitions: IPluginConstraint<any>[] = batch.map((entry) => entry.definition)
-    preflightFeatureClaims(admissions)
-    const activationHost = host
-    if (!activationHost || !activationKernel)
+    preflightFeatureClaims(this.#admissions)
+    if (!this.#host || !this.#kernel)
       throw createRpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.endpointModuleInvalid)
-    activationPreflight = (state, candidateHost) => {
-      const capabilityKeys = capabilityPlugin?.getPublicKeys() ?? []
-      const dynamicKeys = [...capabilityKeys, ...activationHost.readNativeMiddlewareKeys()]
-      const staticNativeKeys = new Set([
-        ...staticMiddlewareClaims.flatMap((snapshot) => snapshot.metadata!.claims.publicKeys),
-        ...firstPartyPolicies.flatMap((policy) => policy.firstPartyClaims?.publicKeys ?? [])
-      ])
-      const reservedKeys = new Set([
-        'on',
-        'hooks',
-        'dispose',
-        'use',
-        'unUse',
-        'config',
-        'getPort',
-        'usePipeline',
-        '__proto__'
-      ])
-      if (
-        dynamicKeys.some(
-          (key) => reservedKeys.has(key) || (publicKeys.includes(key) && !staticNativeKeys.has(key))
-        ) ||
-        new Set(dynamicKeys).size !== dynamicKeys.length
+    return pluginDefinitions
+  }
+
+  /** Dynamic keys and claim parity are admitted at the existing pre-activation boundary. */
+  #validateActivation = (
+    state: IRpcComposedRuntimeState,
+    candidateHost: { readonly getPort: (key: PropertyKey) => unknown }
+  ) => {
+    const capabilityKeys = this.#capabilityPlugin?.getPublicKeys() ?? []
+    const dynamicKeys = [...capabilityKeys, ...this.#host!.readNativeMiddlewareKeys()]
+    const staticNativeKeys = new Set([
+      ...this.#staticMiddlewareClaims.flatMap((snapshot) => snapshot.metadata!.claims.publicKeys),
+      ...this.#firstPartyPolicies.flatMap((policy) => policy.firstPartyClaims?.publicKeys ?? [])
+    ])
+
+    if (
+      dynamicKeys.some(
+        (key) =>
+          RPC_RESERVED_PROJECTION_KEYS.has(key) ||
+          (this.#publicKeySet.has(key) && !staticNativeKeys.has(key))
+      ) ||
+      new Set(dynamicKeys).size !== dynamicKeys.length
+    )
+      throw createRpcError(
+        RpcCoreErrorCode.capabilityConflict,
+        RpcCoreErrorText.endpointModuleDuplicated
       )
-        throw createRpcError(
-          RpcCoreErrorCode.capabilityConflict,
-          RpcCoreErrorText.endpointModuleDuplicated
-        )
-      publicKeys = [...publicKeys, ...dynamicKeys.filter((key) => !publicKeys.includes(key))]
-      assertFeatureClaimParity(admissions, candidateHost, activationKernel, {
-        activated: state.activated,
-        activationPhase: 'pre-activation',
-        routeKeys: state.routeKeys
-      })
+    for (const key of dynamicKeys) {
+      if (this.#publicKeySet.has(key)) continue
+      this.#publicKeySet.add(key)
+      this.#publicKeys.push(key)
     }
-    const handles = await host.installBatch(pluginDefinitions)
-    hostExtensions = mergeMiddlewareExtensions(handles)
-    resolvedPorts = resolveMiddlewarePorts(handles, admissions)
-    /** Dynamic native Feature output is admitted by Host; append only keys it actually published. */
-    const publishedKeys = Reflect.ownKeys(hostExtensions).filter(
+    assertFeatureClaimParity(this.#admissions, candidateHost, this.#kernel!, {
+      activated: state.activated,
+      activationPhase: 'pre-activation',
+      routeKeys: state.routeKeys
+    })
+  }
+
+  /** Merge only the real committed outputs and resolve their original Feature-owned ports. */
+  async #installBatch(pluginDefinitions: IPluginConstraint<any>[]): Promise<void> {
+    const handles = await this.#host!.installBatch(pluginDefinitions)
+    this.#hostExtensions = mergeMiddlewareExtensions(handles)
+    this.#resolvedPorts = resolveMiddlewarePorts(handles, this.#admissions)
+    const publishedKeys = Reflect.ownKeys(this.#hostExtensions).filter(
       (key): key is string => typeof key === 'string'
     )
-    publicKeys = [...publicKeys, ...publishedKeys.filter((key) => !publicKeys.includes(key))]
+    for (const key of publishedKeys) {
+      if (this.#publicKeySet.has(key)) continue
+      this.#publicKeySet.add(key)
+      this.#publicKeys.push(key)
+    }
     assertFeatureClaimParity(
-      admissions,
+      this.#admissions,
       {
-        extensions: hostExtensions,
-        getPort: (key: PropertyKey) => resolvedPorts?.get(key)
+        extensions: this.#hostExtensions,
+        getPort: (key: PropertyKey) => this.#resolvedPorts?.get(key)
       },
-      kernel,
-      { activated: activationCommitted }
+      this.#kernel!,
+      { activated: this.#activationCommitted }
     )
-  } catch (primary) {
-    rollbackTransportConstruction(deferred.transport)
-    if (host) {
+  }
+
+  /** Preserve primary-first construction failures while releasing every acquired native resource. */
+  async #rollbackConstruction(primary: unknown): Promise<never> {
+    rollbackTransportConstruction(this.#deferred.transport)
+    if (this.#host) {
       try {
-        await host.dispose()
+        await this.#host!.dispose()
       } catch (error) {
         throw createRpcConstructionError(RpcCoreErrorText.endpointModuleInvalid, primary, [
           { resource: 'plugin-host', error }
@@ -383,13 +471,13 @@ async function createComposedEndpointRuntime<
           RpcCoreErrorText.callbackFailed
         )
       }
-    } else if (kernel) {
-      construction?.close()
-      if (kernel.state !== EndpointKernelState.disposed)
+    } else if (this.#kernel) {
+      this.#construction?.close()
+      if (this.#kernel!.state !== EndpointKernelState.disposed)
         try {
-          kernel.beginClose()
-          await kernel.resources.releaseAll()
-          kernel.completeDispose()
+          this.#kernel!.beginClose()
+          await this.#kernel!.resources.releaseAll()
+          this.#kernel!.completeDispose()
         } catch (error) {
           throw createRpcConstructionError(RpcCoreErrorText.endpointModuleInvalid, primary, [
             { resource: 'endpoint-kernel', error }
@@ -397,9 +485,9 @@ async function createComposedEndpointRuntime<
         }
     } else {
       const cleanupErrors: { resource: string; error: unknown }[] = []
-      if (deferred.transport.ownership !== 'borrowed')
+      if (this.#deferred.transport.ownership !== 'borrowed')
         try {
-          await deferred.transport.close?.()
+          await this.#deferred.transport.close?.()
         } catch (error) {
           cleanupErrors.push({ resource: 'transport', error })
         }
@@ -412,62 +500,69 @@ async function createComposedEndpointRuntime<
     }
     throw primary
   }
-  /** Project only selected root tokens; dependencies install privately and never widen the root. */
-  const exposedKeys = [...new Set<string>(publicKeys)]
-  const snapshotReader =
-    capabilityPlugin?.getSnapshotReader() ??
-    [hostExtensions]
-      .map((value) => getEndpointDebugSnapshotReader(value as object))
-      .find((reader): reader is NonNullable<typeof reader> => reader !== undefined)
-  const hookOwner = hostExtensions as { hooks?: IRpcEndpoint['hooks'] } | undefined
-  const nativeOn = capabilityPlugin?.getOn()
-  const nativeHooks = capabilityPlugin?.getHooks()
-  let publicSurface: object
-  let endpointHostDispose: Promise<void> | undefined
-  try {
-    publicSurface = createEndpointProjection({
-      identity: prepared!.id,
-      kernel,
-      // 投影的来源是 view 的 extensions;没有 view 就没有任何可投影的成员。此处曾回退到宿主本身,
-      // 那只在宿主是类实例（方法都在原型上、自有键为空）时碰巧等价——宿主改为句柄后就不再成立。
-      host: hostExtensions ?? {},
-      publicKeys,
-      exposedKeys,
-      // 扇出成员在守卫前就是以 rejection 形态失败的；`ping`/`provide` 则是同步抛出。
-      rejectionKeys: ['sendAll', 'pingAll', 'send'],
-      ...(publicFirstPartyRoots.includes('first-party-provider') && nativeOn
-        ? {
-            on: (...args: readonly unknown[]) =>
-              nativeOn(args[0] as string, args[1] as Parameters<IRpcEndpoint['on']>[1])
-          }
-        : {}),
-      ...(publicFirstPartyRoots.includes('first-party-outbound') &&
-      (nativeHooks ?? hookOwner?.hooks)
-        ? { hooks: nativeHooks ?? hookOwner?.hooks }
-        : {}),
-      hostDispose: () => (endpointHostDispose ??= host!.dispose().then(() => undefined)),
-      beforeDispose: (endpoint) => {
-        const cleanupFaults = readDiscoveryCleanupFaults(endpoint)
-        if (!cleanupFaults) return
-        capabilityPlugin?.propagateDiscoveryCleanupFaults(cleanupFaults)
-      }
-    })
-  } catch (primary) {
-    rollbackTransportConstruction(deferred.transport)
+
+  /** Publish only admitted keys and keep native disposal, hooks and diagnostic owners attached. */
+  async #project(): Promise<
+    IRpcKernelSurface &
+      IRpcFeatureSurface<TFeatures> &
+      IRpcPingEndpointSurface<IFactoryPingCapability<TMiddlewares>>
+  > {
+    const exposedKeys = [...new Set<string>(this.#publicKeys)]
+    const snapshotReader =
+      this.#capabilityPlugin?.getSnapshotReader() ??
+      [this.#hostExtensions]
+        .map((value) => getEndpointDebugSnapshotReader(value as object))
+        .find((reader): reader is NonNullable<typeof reader> => reader !== undefined)
+    const hookOwner = this.#hostExtensions as { hooks?: IRpcEndpoint['hooks'] } | undefined
+    const nativeOn = this.#capabilityPlugin?.getOn()
+    const nativeHooks = this.#capabilityPlugin?.getHooks()
+    let publicSurface: object
     try {
-      await host!.dispose()
-    } catch (error) {
-      throw createRpcConstructionError(RpcCoreErrorText.endpointModuleInvalid, primary, [
-        { resource: 'plugin-host', error }
-      ])
+      publicSurface = createEndpointProjection({
+        identity: this.#prepared!.id,
+        kernel: this.#kernel!,
+        // 投影的来源是 view 的 extensions;没有 view 就没有任何可投影的成员。此处曾回退到宿主本身,
+        // 那只在宿主是类实例（方法都在原型上、自有键为空）时碰巧等价——宿主改为句柄后就不再成立。
+        host: this.#hostExtensions ?? {},
+        publicKeys: this.#publicKeys,
+        exposedKeys,
+        // 扇出成员在守卫前就是以 rejection 形态失败的；`ping`/`provide` 则是同步抛出。
+        rejectionKeys: ['sendAll', 'pingAll', 'send'],
+        ...(this.#publicFirstPartyRoots.includes('first-party-provider') && nativeOn
+          ? {
+              on: (...args: readonly unknown[]) =>
+                nativeOn(args[0] as string, args[1] as Parameters<IRpcEndpoint['on']>[1])
+            }
+          : {}),
+        ...(this.#publicFirstPartyRoots.includes('first-party-outbound') &&
+        (nativeHooks ?? hookOwner?.hooks)
+          ? { hooks: nativeHooks ?? hookOwner?.hooks }
+          : {}),
+        hostDispose: () =>
+          (this.#endpointHostDispose ??= this.#host!.dispose().then(() => undefined)),
+        beforeDispose: (endpoint) => {
+          const cleanupFaults = readDiscoveryCleanupFaults(endpoint)
+          if (!cleanupFaults) return
+          this.#capabilityPlugin?.propagateDiscoveryCleanupFaults(cleanupFaults)
+        }
+      })
+    } catch (primary) {
+      rollbackTransportConstruction(this.#deferred.transport)
+      try {
+        await this.#host!.dispose()
+      } catch (error) {
+        throw createRpcConstructionError(RpcCoreErrorText.endpointModuleInvalid, primary, [
+          { resource: 'plugin-host', error }
+        ])
+      }
+      throw primary
     }
-    throw primary
+    registerEndpointTimePortOwner(publicSurface, this.#kernel!.time)
+    if (snapshotReader) registerEndpointDebugSnapshot(publicSurface, snapshotReader)
+    return publicSurface as IRpcKernelSurface &
+      IRpcFeatureSurface<TFeatures> &
+      IRpcPingEndpointSurface<IFactoryPingCapability<TMiddlewares>>
   }
-  registerEndpointTimePortOwner(publicSurface, kernel.time)
-  if (snapshotReader) registerEndpointDebugSnapshot(publicSurface, snapshotReader)
-  return publicSurface as IRpcKernelSurface &
-    IRpcFeatureSurface<TFeatures> &
-    IRpcPingEndpointSurface<IFactoryPingCapability<TMiddlewares>>
 }
 
 import type {
@@ -487,6 +582,7 @@ type IPublicCallable = {
     IRecursiveProvideSurface<
       IRpcKernelSurface &
         IRpcFeatureSurface<IFeatures<TConfig>> &
+        INativeMiddlewareSurface<IMiddlewares<TConfig>> &
         IRpcRootProjection<TRoots> &
         IRpcPingEndpointSurface<IFactoryPingCapability<IMiddlewares<TConfig>>>
     >
@@ -503,6 +599,7 @@ type IPublicCallable = {
     IRecursiveProvideSurface<
       IRpcKernelSurface &
         IRpcFeatureSurface<TFeatures> &
+        INativeMiddlewareSurface<TMiddlewares> &
         IRpcRootProjection<TRoots> &
         IRpcPingEndpointSurface<IFactoryPingCapability<TMiddlewares>>
     >

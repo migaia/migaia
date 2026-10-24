@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { describe, expect, it, beforeAll, vi } from 'vitest'
 import { CapabilityLevel, createUnitBudget } from '@migaia/supervision'
 import { createProcessSupervisor, ProcessCapability } from '@migaia/supervision/process'
-import { createNodeProcessLauncher } from '@migaia/rpc-plugin-process/adapters/node-child-process'
+import { createNodeProcessLauncher } from '../../../rpc-plugin-process/dist/process/adapters/node-child-process.js'
 import { client, peers, evidence } from './fixtures/conformance-business.js'
 
 /** Match the production default rate (budget.ts); resource acceptance never disables admission. */

@@ -1,21 +1,20 @@
+import { createRuntimeEndpointComposition } from '../../dist/core/runtime-api-endpoint.js'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { createEndpointTimePort } from '../../dist/core/internal/time-port.js'
 import { describe, expect, it, vi } from 'vitest'
 import { createComposedEndpoint, type IRpcCoreConfig } from '../../dist/core/composed.js'
-import { createClientEndpoint } from '../../dist/core/client.js'
-import { createProviderEndpoint } from '../../dist/core/provider.js'
-import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
+
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
 import { defineRpcFeature } from '../../dist/core/internal/define-rpc-feature.js'
 import { defineFeature } from '../../dist/core/feature.js'
-import { createFirstPartyRoots } from '../../dist/core/internal/first-party-roots.js'
+
 import { createEndpointProjection } from '../../dist/core/internal/endpoint-projection.js'
 import { RpcCoreErrorCode, RpcLifecycleError } from '../../dist/core/errors.js'
 import { connect } from '../../dist/core/middleware/connect.js'
 import { createConstructionControl } from '../../dist/core/internal/construction-install.js'
 import { createWebRpcPluginHost } from '../../dist/core/internal/web-rpc-plugin-host.js'
 import { ReplayWindow } from '../../dist/core/internal/replay.js'
-import { PeerRegistry } from '../../dist/core/internal/peers.js'
 import { ProviderAdmissionRegistry } from '../../dist/core/internal/provider-admission.js'
 import type { IRpcPlugin } from '../../dist/core/typing.js'
 import { createStringFramer } from '@migaia/rpc-contract/framing'
@@ -114,10 +113,10 @@ describe('candidate-specific duplicate-owner contracts', () => {
   })
 
   it('keeps one canonical endpoint root owner', async () => {
-    const endpoint = await createComposedEndpoint(
+    const endpoint = await createRuntimeEndpointComposition(
       createConfig(() => undefined),
-      createFirstPartyRoots(new Set(['first-party-outbound']))
-    )
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     expect(Object.getPrototypeOf(endpoint)).toBeNull()
     expect(Object.isFrozen(endpoint)).toBe(true)
     expect(Object.keys(SOURCES)).not.toContain('../../src/core/endpoint.ts')
@@ -157,11 +156,12 @@ describe('candidate-specific duplicate-owner contracts', () => {
 
   it('uses the canonical transport and outbound sender', async () => {
     let subscriptions = 0
-    const endpoint = await createClientEndpoint(
+    const endpoint = await createRuntimeEndpointComposition(
       createConfig(() => {
         subscriptions += 1
-      })
-    )
+      }),
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     expect(subscriptions).toBe(1)
     expect(source('../../src/core/internal/outbound-attachment.ts')).toContain(
       "from './outbound-sender.js'"
@@ -213,7 +213,10 @@ describe('candidate-specific duplicate-owner contracts', () => {
   })
 
   it('leaves generic pipeline ownership in PluginHost', async () => {
-    const endpoint = await createClientEndpoint(createConfig(() => undefined))
+    const endpoint = await createRuntimeEndpointComposition(
+      createConfig(() => undefined),
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     // 宿主壳层已从「继承 PluginHost」改为「defineHost 产出句柄」；这条断言要观测的是
     // 「通用 pipeline 所有权留在 plugin-host 里」，用宿主入口而不是继承关系来表达。
     expect(source('../../src/core/internal/web-rpc-plugin-host.ts')).toContain('defineHost')
@@ -223,7 +226,10 @@ describe('candidate-specific duplicate-owner contracts', () => {
   })
 
   it('invokes current middleware directly without a legacy adapter', async () => {
-    const endpoint = await createClientEndpoint(createConfig(() => undefined, [connect()]))
+    const endpoint = await createRuntimeEndpointComposition(
+      createConfig(() => undefined, [connect()]),
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     expect(typeof endpoint.send).toBe('function')
     expect(Object.values(SOURCES).join('\n')).not.toContain('adaptLegacyMiddleware')
     await endpoint.dispose()
@@ -262,15 +268,6 @@ describe('candidate-specific duplicate-owner contracts', () => {
     expect(replay.hasReservedId('candidate-011')).toBe(true)
     replay.clear()
     expect(replay.hasReservedId('candidate-011')).toBe(false)
-  })
-
-  it('keeps peer leases in PeerRegistry', () => {
-    const peers = new PeerRegistry<string>(() => Date.now(), 2, 1_000)
-    peers.add('configured', true)
-    peers.add('learned')
-    expect(peers.snapshot()).toEqual(['configured', 'learned'])
-    peers.removeLearned('learned')
-    expect(peers.snapshot()).toEqual(['configured'])
   })
 
   it('keeps provider admission in ProviderAdmissionRegistry', () => {
@@ -387,7 +384,10 @@ describe('candidate-specific duplicate-owner contracts', () => {
   })
 
   it('exposes provider behavior without provider controllers', async () => {
-    const endpoint = await createProviderEndpoint(createConfig(() => undefined))
+    const endpoint = await createRuntimeEndpointComposition(
+      createConfig(() => undefined),
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     expect(Reflect.ownKeys(endpoint)).toEqual([
       'on',
       'hooks',
@@ -398,7 +398,9 @@ describe('candidate-specific duplicate-owner contracts', () => {
       'dispatchAll',
       'group',
       'outcome',
-      'provide'
+      'provide',
+      'sendOneWay',
+      'stream'
     ])
     expect('providerCancellation' in endpoint).toBe(false)
     expect('abortProvider' in endpoint).toBe(false)
@@ -472,10 +474,13 @@ describe('candidate-specific duplicate-owner contracts', () => {
   })
 
   it('slim features use canonical lifecycle owners', async () => {
-    const endpoint = await createClientEndpoint(createConfig(() => undefined))
+    const endpoint = await createRuntimeEndpointComposition(
+      createConfig(() => undefined),
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     expect(typeof endpoint.send).toBe('function')
     expect(Object.values(SOURCES).join('\n')).not.toContain('EndpointResourceManager')
-    expect(source('../../src/core/composed.ts')).toContain('host.installBatch(')
+    expect(source('../../src/core/composed.ts')).toContain('this.#host!.installBatch(')
     await endpoint.dispose()
   })
 
@@ -530,8 +535,12 @@ describe('candidate-specific duplicate-owner contracts', () => {
   })
 
   it('returns the canonical root projection without a full wrapper', async () => {
-    const endpoint = await createClientEndpoint(createConfig(() => undefined))
+    const endpoint = await createRuntimeEndpointComposition(
+      createConfig(() => undefined),
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     expect(Reflect.ownKeys(endpoint)).toEqual([
+      'on',
       'hooks',
       'dispose',
       'send',
@@ -539,7 +548,10 @@ describe('candidate-specific duplicate-owner contracts', () => {
       'dispatch',
       'dispatchAll',
       'group',
-      'outcome'
+      'outcome',
+      'provide',
+      'sendOneWay',
+      'stream'
     ])
     expect(Object.getPrototypeOf(endpoint)).toBeNull()
     expect(Object.keys(SOURCES)).not.toContain('../../src/core/full-endpoint.ts')

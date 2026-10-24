@@ -1,5 +1,6 @@
 import { parentPort, workerData } from 'node:worker_threads'
-import { createThreadPeer } from '../../../../rpc-plugin-thread/test/protocol.ts'
+import { createRpcHost } from '@migaia/rpc-host'
+import { threadPlugin } from '@migaia/rpc-plugin-thread'
 
 /** Read genuine physical listener count without installing another source reader. */
 const before = parentPort.listenerCount('message')
@@ -10,17 +11,22 @@ const conflict = workerData.data.mode === 'conflict'
 /** Only safe classification reaches the independent actual Worker observer. */
 let code
 try {
-  await createThreadPeer({
+  await createRpcHost({
     provide: {},
     report: () => undefined,
-    ...(conflict
-      ? {
-          connect: async () => {
-            sourceCalls += 1
-            return undefined
-          }
-        }
-      : {})
+    plugins: [
+      threadPlugin({
+        connectToParent: true,
+        ...(conflict
+          ? {
+              spawn: async () => {
+                sourceCalls += 1
+                return undefined
+              }
+            }
+          : {})
+      })
+    ]
   })
 } catch (error) {
   code = error?.code

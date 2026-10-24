@@ -1,14 +1,26 @@
+import { createComposedEndpoint } from '../../dist/core/composed.js'
+import { createRuntimeFeatureRoots } from '../../dist/core/runtime-api-endpoint.js'
+import { RpcCapability } from '@migaia/rpc-contract'
 import { describe, expect, it } from 'vitest'
 import { connect } from '../../dist/core/middleware/connect.js'
 import { codec } from '../../dist/core/middleware/codec.js'
-import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
 import { createStringFramer } from '@migaia/rpc-contract/framing'
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
-import { createFullEndpoint } from '../../dist/core/full.js'
+
 import { defineFeature, type IRpcFeature } from '../../dist/core/feature.js'
 import { defineMiddleware } from '../../dist/core/middleware.js'
 import { RpcError, RpcCoreErrorCode } from '../../dist/core/errors.js'
 import { RpcCoreErrorText } from '../../dist/core/error-text.js'
+
+/**
+ * Native definitions come from actual Host assembly; each composition still owns independent
+ * installation state.
+ */
+const { roots: nativeRoots } = createRuntimeFeatureRoots(
+  { id: 'custom-feature-native-roots', middlewares: [] },
+  { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+)
 
 describe('custom feature public boundary', () => {
   it('installs the first-party chunk through endpoint capabilities and closes its framer once', async () => {
@@ -22,12 +34,15 @@ describe('custom feature public boundary', () => {
         baseFramer.close(reason)
       }
     }
-    const endpoint = await createFullEndpoint({
-      id: 'native-first-party-chunk',
-      transport,
-      framer,
-      middlewares: [connect({ transport }), codec(defineJsonCodec({ version: 1 }))]
-    })
+    const endpoint = await createComposedEndpoint(
+      {
+        id: 'native-first-party-chunk',
+        transport,
+        framer,
+        middlewares: [connect({ transport }), codec(defineJsonCodec({ version: 1 }))]
+      },
+      nativeRoots
+    )
     await endpoint.dispose()
     await endpoint.dispose()
     expect(closes).toBe(1)
@@ -36,12 +51,15 @@ describe('custom feature public boundary', () => {
   it('creates a synchronous native Feature with only its selected root projection', async () => {
     const [transport] = createMemoryTransportPair()
     const feature = defineFeature(() => ({ observe: () => 'native-root' }))
-    const endpoint = await createFullEndpoint({
-      id: 'native-custom-feature',
-      transport,
-      middlewares: [connect({ transport })],
-      features: [feature] as const
-    })
+    const endpoint = await createComposedEndpoint(
+      {
+        id: 'native-custom-feature',
+        transport,
+        middlewares: [connect({ transport })],
+        features: [feature] as const
+      },
+      nativeRoots
+    )
     expect(endpoint.observe()).toBe('native-root')
     await endpoint.dispose()
   })
@@ -58,11 +76,14 @@ describe('custom feature public boundary', () => {
       },
       expose: () => ({ observe: () => core.id })
     }))
-    const endpoint = await createFullEndpoint({
-      id: 'custom-feature-endpoint',
-      transport,
-      middlewares: [connect({ transport }), middleware] as const
-    })
+    const endpoint = await createComposedEndpoint(
+      {
+        id: 'custom-feature-endpoint',
+        transport,
+        middlewares: [connect({ transport }), middleware] as const
+      },
+      nativeRoots
+    )
     expect(endpoint.observe()).toBe('custom-feature-endpoint')
     await endpoint.dispose()
     await endpoint.dispose()
@@ -85,11 +106,14 @@ describe('custom feature public boundary', () => {
       }),
       { alias: feature }
     )
-    const endpoint = await createFullEndpoint({
-      id: 'feature-record',
-      transport,
-      middlewares: [connect({ transport }), middleware] as const
-    })
+    const endpoint = await createComposedEndpoint(
+      {
+        id: 'feature-record',
+        transport,
+        middlewares: [connect({ transport }), middleware] as const
+      },
+      nativeRoots
+    )
     expect(endpoint.throughFeature()).toBe('feature:feature-record')
     expect('root' in endpoint).toBe(false)
     await endpoint.dispose()
@@ -118,11 +142,14 @@ describe('custom feature public boundary', () => {
       }),
       { alias: feature }
     )
-    const endpoint = await createFullEndpoint({
-      id: 'feature-isolation',
-      transport,
-      middlewares: [connect({ transport }), first, second] as const
-    })
+    const endpoint = await createComposedEndpoint(
+      {
+        id: 'feature-isolation',
+        transport,
+        middlewares: [connect({ transport }), first, second] as const
+      },
+      nativeRoots
+    )
     expect(endpoint.firstFromFeature()).toBe('first')
     expect(endpoint.secondFromFeature()).toBe('second')
     await endpoint.dispose()
@@ -145,11 +172,14 @@ describe('custom feature public boundary', () => {
       }
     }))
     await expect(
-      createFullEndpoint({
-        id: 'failed-native-middleware',
-        transport: observedTransport,
-        middlewares: [connect({ transport: observedTransport }), failing] as const
-      })
+      createComposedEndpoint(
+        {
+          id: 'failed-native-middleware',
+          transport: observedTransport,
+          middlewares: [connect({ transport: observedTransport }), failing] as const
+        },
+        nativeRoots
+      )
     ).rejects.toMatchObject({ code: RpcCoreErrorCode.invalidConfig })
     expect(subscriptions).toBe(0)
   })
@@ -172,21 +202,27 @@ describe('custom feature public boundary', () => {
       }))
       if (mode === 'fail') {
         await expect(
-          createFullEndpoint({
-            id,
-            transport,
-            middlewares: [connect({ transport }), middleware] as const,
-            features: [feature] as const
-          })
+          createComposedEndpoint(
+            {
+              id,
+              transport,
+              middlewares: [connect({ transport }), middleware] as const,
+              features: [feature] as const
+            },
+            nativeRoots
+          )
         ).rejects.toMatchObject({ code: RpcCoreErrorCode.invalidConfig })
         return
       }
-      const endpoint = await createFullEndpoint({
-        id,
-        transport,
-        middlewares: [connect({ transport }), middleware] as const,
-        features: [feature] as const
-      })
+      const endpoint = await createComposedEndpoint(
+        {
+          id,
+          transport,
+          middlewares: [connect({ transport }), middleware] as const,
+          features: [feature] as const
+        },
+        nativeRoots
+      )
       expect(endpoint.observe()).toBe(id)
       await endpoint.dispose()
     }
@@ -220,30 +256,39 @@ describe('custom feature public boundary', () => {
     /** Compile-only branch keeps the widened-array rejection out of runtime execution. */
     const typeOnlyBranch: boolean = false
     if (typeOnlyBranch) {
-      void createFullEndpoint({
-        id: 'widened-feature-array',
-        transport: observedTransport,
-        middlewares: [],
-        // @ts-expect-error Feature composition requires a finite readonly tuple.
-        features: widenedFeatures
-      })
+      void createComposedEndpoint(
+        {
+          id: 'widened-feature-array',
+          transport: observedTransport,
+          middlewares: [],
+          // @ts-expect-error Feature composition requires a finite readonly tuple.
+          features: widenedFeatures
+        },
+        {}
+      )
     }
     await expect(
-      createFullEndpoint({
-        id: 'duplicate-feature-endpoint',
-        transport: observedTransport,
-        middlewares: [connect({ transport: observedTransport })],
-        features: [first, second] as const
-      })
+      createComposedEndpoint(
+        {
+          id: 'duplicate-feature-endpoint',
+          transport: observedTransport,
+          middlewares: [connect({ transport: observedTransport })],
+          features: [first, second] as const
+        },
+        nativeRoots
+      )
     ).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
     expect(subscribeCalls).toBe(0)
     await expect(
-      createFullEndpoint({
-        id: 'forged-feature-endpoint',
-        transport: observedTransport,
-        middlewares: [connect({ transport: observedTransport })],
-        features: [{ key: 'forged' }] as never
-      })
+      createComposedEndpoint(
+        {
+          id: 'forged-feature-endpoint',
+          transport: observedTransport,
+          middlewares: [connect({ transport: observedTransport })],
+          features: [{ key: 'forged' }] as never
+        },
+        nativeRoots
+      )
     ).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
     expect(subscribeCalls).toBe(0)
   })
@@ -285,20 +330,26 @@ describe('custom feature public boundary', () => {
     Object.defineProperty(hostileResult, thenKey, { value: () => undefined })
     const hostileThenable = defineFeature(() => hostileResult as never)
     await expect(
-      createFullEndpoint({
-        id: 'base-collision',
-        transport: observedTransport,
-        middlewares: [],
-        features: [colliding] as const
-      })
+      createComposedEndpoint(
+        {
+          id: 'base-collision',
+          transport: observedTransport,
+          middlewares: [],
+          features: [colliding] as const
+        },
+        nativeRoots
+      )
     ).rejects.toMatchObject({ code: 'CAPABILITY_CONFLICT' })
     await expect(
-      createFullEndpoint({
-        id: 'hostile-thenable',
-        transport: observedTransport,
-        middlewares: [],
-        features: [hostileThenable] as const
-      })
+      createComposedEndpoint(
+        {
+          id: 'hostile-thenable',
+          transport: observedTransport,
+          middlewares: [],
+          features: [hostileThenable] as const
+        },
+        nativeRoots
+      )
     ).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
     expect(subscriptions).toBe(0)
   })
@@ -318,19 +369,25 @@ describe('custom feature public boundary', () => {
         throw new Error('install failure')
       }
     }))
-    const endpoint = await createFullEndpoint({
-      id: 'native-promise',
-      transport,
-      middlewares: [connect({ transport }), native] as const
-    })
+    const endpoint = await createComposedEndpoint(
+      {
+        id: 'native-promise',
+        transport,
+        middlewares: [connect({ transport }), native] as const
+      },
+      nativeRoots
+    )
     expect(endpoint.native).toBe(true)
     await endpoint.dispose()
     await expect(
-      createFullEndpoint({
-        id: 'rollback-feature',
-        transport,
-        middlewares: [connect({ transport }), failing] as const
-      })
+      createComposedEndpoint(
+        {
+          id: 'rollback-feature',
+          transport,
+          middlewares: [connect({ transport }), failing] as const
+        },
+        nativeRoots
+      )
     ).rejects.toThrow()
     expect(releases).toBe(1)
   })

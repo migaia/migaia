@@ -2,10 +2,10 @@ import assert from 'node:assert/strict'
 import { setTimeout as delay } from 'node:timers/promises'
 import { nativeSession } from '../../../rpc-integration/test/replay-window/native-harness.mjs'
 import { createNodeMessagePortTransport } from '../../../rpc-host/dist/core/adapters/message-port.js'
-import { createEndpoint } from '../../../rpc-host/dist/core/index.js'
-import { codec } from '../../../rpc-host/dist/core/index.js'
-import { framer } from '../../../rpc-host/dist/core/index.js'
-import { connect } from '../../../rpc-host/dist/core/index.js'
+import { createRuntimeEndpointComposition } from '../../../rpc-host/dist/core/runtime-api-endpoint.js'
+import { codec } from '../../../rpc-host/dist/core/middleware/codec.js'
+import { framer } from '../../../rpc-host/dist/core/middleware/framer.js'
+import { connect } from '../../../rpc-host/dist/core/middleware/connect.js'
 
 /** Existing native adapters and core owners, rather than a receipt substitute, execute every case. */
 const evidence = []
@@ -61,15 +61,18 @@ try {
   assert.equal(session.receipt.qualified, true)
   const transport = createNodeMessagePortTransport(session.handle.port)
   assert.equal(session.receipt.qualified, false, 'exact resource is spent by a second wrapper')
-  second = await createEndpoint({
-    id: 'second',
-    transport,
-    middlewares: [
-      codec(session.channel.pipeline.codec),
-      framer(session.channel.pipeline.framer),
-      connect({ transport })
-    ]
-  })
+  second = await createRuntimeEndpointComposition(
+    {
+      id: 'second',
+      transport,
+      middlewares: [
+        codec(session.channel.pipeline.codec),
+        framer(session.channel.pipeline.framer),
+        connect({ transport })
+      ]
+    },
+    session.channel
+  ).installing
   assert.equal(
     await session.endpoint.send('peer', 'echo', 'original-still-live'),
     'original-still-live'

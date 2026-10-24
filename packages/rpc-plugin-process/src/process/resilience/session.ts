@@ -139,72 +139,110 @@ export function normalizeProcessResilienceOptions(
 }
 
 /** A registration's random prefix prevents reuse of a principal scope by another owner. */
-export function createProcessSessionManager(
-  input: IProcessResilienceOptions
-): IProcessSessionManager {
+/**
+ * Allocate one service session quota and canonical provider policy before installing behavior
+ * callbacks.
+ */
+function processSessionManagerState(input: IProcessResilienceOptions) {
+  /** Normalized resilience policy is held once so all sessions share the same limits. */
   const options = normalizeProcessResilienceOptions(input)
+  /** The existing idempotency store preserves replay ownership across sessions. */
   const store: IRpcIdempotencyStore = input.idempotencyStore ?? createRpcIdempotencyStore()
+  /**
+   * The canonical Core provider scope applies the retained idempotency store to every accepted
+   * session.
+   */
   const coreScope = createRuntimeProviderScope(store)
   /** The same generated namespace remains visible to ordinary public callback/string consumers. */
   const scopePrefix = coreScope.namespace
   /** The same service manager owns cold cross-session preparation alongside its existing store. */
   const runtimeAdmission = coreScope.admission
+  /** Committed session count enforces shared admission without scanning live sessions. */
   let active = 0
+  /** Terminal admission state prevents this owner from accepting work after its resource is closed. */
   let closed = false
-  return Object.freeze({
-    options,
-    runtimeAdmission,
-    coreScope,
-    claimConnection(): IProcessConnectionLease {
-      if (closed)
-        throw attachErrorIdentity(new Error(RpcProcessErrorText.channelClosed), {
-          source: RPC_PROCESS_ERROR_SOURCE,
-          code: RpcProcessErrorCode.channelClosed
-        })
-      if (active >= options.maxConnections)
-        throw attachErrorIdentity(new Error(RpcProcessErrorText.connectionLimit), {
-          source: RPC_PROCESS_ERROR_SOURCE,
-          code: RpcProcessErrorCode.connectionLimit
-        })
-      active += 1
-      let released = false
-      return Object.freeze({
-        release(): void {
-          if (released) return
-          released = true
-          active -= 1
-        }
-      })
-    },
-    sessionOptions(identity: IProcessSessionIdentity) {
-      if (typeof identity.principalId !== 'string' || identity.principalId.length === 0)
-        throw ((originalDetail: Readonly<Record<string, unknown>> | undefined) =>
-          attachErrorIdentity(new TypeError(RpcProcessErrorText.resilienceInvalidOption), {
+
+  return { options, store, coreScope, scopePrefix, runtimeAdmission, active, closed, input }
+}
+
+/**
+ * Own one service session quota and canonical provider policy; callbacks access only this explicit
+ * instance.
+ */
+class ProcessSessionManager {
+  /** All mutable storage and original construction inputs belong to this operation. */
+  #state: ReturnType<typeof processSessionManagerState>
+  /** Preserve the original stable resource surface and callback identities. */
+  readonly value: IProcessSessionManager
+  /** Initialize owned storage before publishing the resource's callbacks. */
+  constructor(input: IProcessResilienceOptions) {
+    this.#state = processSessionManagerState(input)
+
+    this.value = Object.freeze({
+      options: this.#state.options,
+      runtimeAdmission: this.#state.runtimeAdmission,
+      coreScope: this.#state.coreScope,
+      claimConnection: (): IProcessConnectionLease => {
+        if (this.#state.closed)
+          throw attachErrorIdentity(new Error(RpcProcessErrorText.channelClosed), {
             source: RPC_PROCESS_ERROR_SOURCE,
-            code: RpcProcessErrorCode.resilienceInvalidOption,
-            ...(originalDetail ? { detail: originalDetail } : {})
-          }))({
-          field: 'identity.principalId'
+            code: RpcProcessErrorCode.channelClosed
+          })
+        if (this.#state.active >= this.#state.options.maxConnections)
+          throw attachErrorIdentity(new Error(RpcProcessErrorText.connectionLimit), {
+            source: RPC_PROCESS_ERROR_SOURCE,
+            code: RpcProcessErrorCode.connectionLimit
+          })
+        this.#state.active += 1
+        let released = false
+        return Object.freeze({
+          release: (): void => {
+            if (released) return
+            released = true
+            this.#state.active -= 1
+          }
         })
-      return Object.freeze({
-        idempotency: Object.freeze({
-          store,
-          scope: () => `${scopePrefix}:${identity.principalId}`
-        }),
-        limits: Object.freeze({
-          maxGlobal: options.maxConcurrentCallsPerConnection,
-          maxPerPeer: options.maxConcurrentCallsPerConnection
+      },
+      sessionOptions: (identity: IProcessSessionIdentity) => {
+        if (typeof identity.principalId !== 'string' || identity.principalId.length === 0)
+          throw ((originalDetail: Readonly<Record<string, unknown>> | undefined) =>
+            attachErrorIdentity(new TypeError(RpcProcessErrorText.resilienceInvalidOption), {
+              source: RPC_PROCESS_ERROR_SOURCE,
+              code: RpcProcessErrorCode.resilienceInvalidOption,
+              ...(originalDetail ? { detail: originalDetail } : {})
+            }))({
+            field: 'identity.principalId'
+          })
+        return Object.freeze({
+          idempotency: Object.freeze({
+            store: this.#state.store,
+            scope: () => `${this.#state.scopePrefix}:${identity.principalId}`
+          }),
+          limits: Object.freeze({
+            maxGlobal: this.#state.options.maxConcurrentCallsPerConnection,
+            maxPerPeer: this.#state.options.maxConcurrentCallsPerConnection
+          })
         })
-      })
-    },
-    connectionOptions(channel, identity) {
-      /** Preserve ordinary public identity admission and numeric limits before Core provenance work. */
-      const ordinary = this.sessionOptions(identity)
-      return coreScope.session(channel, ordinary.limits)
-    },
-    close(): void {
-      closed = true
-      coreScope.close()
-    }
-  })
+      },
+      connectionOptions: (channel, identity) => {
+        /**
+         * Preserve ordinary public identity admission and numeric limits before Core provenance
+         * work.
+         */
+        const ordinary = this.value.sessionOptions(identity)
+        return this.#state.coreScope.session(channel, ordinary.limits)
+      },
+      close: (): void => {
+        this.#state.closed = true
+        this.#state.coreScope.close()
+      }
+    })
+  }
+}
+
+/** Construct the single owner for one service session quota and canonical provider policy. */
+export function createProcessSessionManager(
+  input: IProcessResilienceOptions
+): IProcessSessionManager {
+  return new ProcessSessionManager(input).value
 }

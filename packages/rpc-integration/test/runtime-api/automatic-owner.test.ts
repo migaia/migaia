@@ -1,16 +1,27 @@
 import assert from 'node:assert/strict'
 import { MessageChannel } from 'node:worker_threads'
-import { it } from 'vitest'
+import { it, vi } from 'vitest'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { createAutomaticWebThreadPeer } from '../../../rpc-plugin-thread/test/protocol.ts'
+import { createRpcHost } from '@migaia/rpc-host'
 import { createThreadRuntimeBootstrap } from '../../../rpc-plugin-thread/dist/threads/bootstrap.js'
-import { createEventTargetMessageResource } from '@migaia/rpc-host/plugin'
+import {
+  createAdapterDeployment,
+  createAdapterSourceConfigurationError,
+  createEventTargetMessageResource,
+  defineTransportPlugin,
+  holdAdapterMessageBootstrapSource,
+  RpcTransportMode
+} from '@migaia/rpc-host/plugin'
 import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'
 import { ThreadBootstrap } from '../../../rpc-plugin-thread/dist/threads/constants.js'
 import { createRuntimePeer } from '../../../rpc-host/dist/remote/runtime-api/peer.js'
-import { createAutomaticProcessPeer } from '../../../rpc-plugin-process/test/protocol.ts'
+import { processPlugin } from '@migaia/rpc-plugin-process'
+import { NativeProcessRuntimeLoader } from '../../../rpc-plugin-process/dist/process/runtime-loader.js'
 import type { IThreadWebPort } from '../../../rpc-plugin-thread/dist/threads/types.js'
-import { PROCESS_RUNTIME_API_ENV_VERSION } from '../../../rpc-plugin-process/dist/process/constants.js'
+import {
+  PROCESS_RUNTIME_API_ENV,
+  PROCESS_RUNTIME_API_ENV_VERSION
+} from '../../../rpc-plugin-process/dist/process/constants.js'
 
 it('automatic EventTarget handoff preserves real business and original parent identity', async () => {
   /**
@@ -19,10 +30,26 @@ it('automatic EventTarget handoff preserves real business and original parent id
    */
   const ports = new MessageChannel()
   const failures: unknown[] = []
-  const child = createAutomaticWebThreadPeer(
-    { provide: { double: (value: number) => value * 2 }, report: (error) => failures.push(error) },
-    ports.port2 as unknown as IThreadWebPort
-  )
+  const child = createRpcHost({
+    provide: { double: (value: number) => value * 2 },
+    report: (error) => failures.push(error),
+    plugins: [
+      defineTransportPlugin({
+        name: 'parent',
+        mode: RpcTransportMode['connect-to-parent'],
+        deployment: createAdapterDeployment({
+          open: async () => {
+            throw createAdapterSourceConfigurationError()
+          },
+          bootstrap: (context) =>
+            holdAdapterMessageBootstrapSource(
+              createEventTargetMessageResource(ports.port2 as unknown as IThreadWebPort),
+              { connectTimeoutMs: context.connectTimeoutMs, report: context.report }
+            )
+        })
+      })
+    ]
+  })
   const parent = await createRuntimePeer({
     self: { name: 'automatic-parent', instanceId: 'automatic-parent-instance' },
     connect: async (context) => {
@@ -70,29 +97,28 @@ it('automatic EventTarget handoff preserves real business and original parent id
   }
 })
 
-it('automatic Web source rejects explicit sources and malformed bootstrap without publication', async () => {
+it('automatic Web source rejects malformed bootstrap without publication', async () => {
   const ports = new MessageChannel()
-  let calls = 0
   try {
-    await assert.rejects(
-      async () =>
-        createAutomaticWebThreadPeer(
-          {
-            connect: async () => {
-              calls++
-              throw new Error('source must not execute')
+    const rejected = createRpcHost({
+      report: () => undefined,
+      plugins: [
+        defineTransportPlugin({
+          name: 'parent',
+          mode: RpcTransportMode['connect-to-parent'],
+          deployment: createAdapterDeployment({
+            open: async () => {
+              throw createAdapterSourceConfigurationError()
             },
-            report: () => undefined
-          },
-          ports.port2 as unknown as IThreadWebPort
-        ),
-      { code: 'INVALID_CONFIG' }
-    )
-    assert.equal(calls, 0)
-    const rejected = createAutomaticWebThreadPeer(
-      { report: () => undefined },
-      ports.port2 as unknown as IThreadWebPort
-    )
+            bootstrap: (context) =>
+              holdAdapterMessageBootstrapSource(
+                createEventTargetMessageResource(ports.port2 as unknown as IThreadWebPort),
+                { connectTimeoutMs: context.connectTimeoutMs, report: context.report }
+              )
+          })
+        })
+      ]
+    })
     const observed = assert.rejects(rejected, { code: 'INVALID_CONFIG' })
     ports.port1.postMessage({ kind: ThreadBootstrap.data, peerId: 'child', runtimeApi: null })
     await observed
@@ -127,27 +153,46 @@ it('automatic process failure closes its original channel and reports cleanup on
       }
     }
   }
-  await assert.rejects(
-    createAutomaticProcessPeer({ report: (error) => reported.push(error) }, platform),
-    { code: 'INVALID_CONFIG' }
+  /** Actual processPlugin bootstrap owns the one-reader claim and original rollback reporter. */
+  const load = vi.spyOn(NativeProcessRuntimeLoader.prototype, 'load').mockImplementation(() =>
+    Promise.resolve({
+      processRuntimeIO: {
+        discover: () => ({ marker: platform.marker, runtime: platform.runtime }),
+        open: platform.open
+      }
+    })
   )
-  assert.equal(opens, 0)
-  await assert.rejects(
-    createAutomaticProcessPeer(
-      { report: (error) => reported.push(error) },
-      { ...platform, marker: PROCESS_RUNTIME_API_ENV_VERSION }
-    ),
-    { code: 'INVALID_CONFIG' }
-  )
-  assert.equal(opens, 1)
-  assert.equal(closes, 1)
-  assert.deepEqual(reported, [cleanup])
-  await assert.rejects(
-    createAutomaticProcessPeer(
-      { report: () => undefined },
-      { ...platform, marker: PROCESS_RUNTIME_API_ENV_VERSION }
-    ),
-    { code: 'INVALID_CONFIG' }
-  )
-  assert.equal(opens, 1, 'failed bootstrap never permits a second process reader')
+  vi.stubEnv(PROCESS_RUNTIME_API_ENV, PROCESS_RUNTIME_API_ENV_VERSION)
+  try {
+    await assert.rejects(
+      createRpcHost({
+        report: (error) => reported.push(error),
+        plugins: [processPlugin({ connectToParent: true })]
+      }),
+      { code: 'INVALID_CONFIG' }
+    )
+    assert.equal(opens, 0)
+    platform.marker = PROCESS_RUNTIME_API_ENV_VERSION
+    await assert.rejects(
+      createRpcHost({
+        report: (error) => reported.push(error),
+        plugins: [processPlugin({ connectToParent: true })]
+      }),
+      { code: 'INVALID_CONFIG' }
+    )
+    assert.equal(opens, 1)
+    assert.equal(closes, 1)
+    assert.deepEqual(reported, [cleanup])
+    await assert.rejects(
+      createRpcHost({
+        report: () => undefined,
+        plugins: [processPlugin({ connectToParent: true })]
+      }),
+      { code: 'INVALID_CONFIG' }
+    )
+    assert.equal(opens, 1, 'failed bootstrap never permits a second process reader')
+  } finally {
+    load.mockRestore()
+    vi.unstubAllEnvs()
+  }
 })

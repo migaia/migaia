@@ -1,3 +1,4 @@
+import { orderStringKeys } from '@migaia/utils/string'
 import { createAdapterJsonRpcChannel } from '../../../rpc-plugin-process/dist/channel/channel.js'
 import { execFileSync } from 'node:child_process'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
@@ -7,13 +8,13 @@ import { join, resolve } from 'node:path'
 import { EventEmitter } from 'node:events'
 import { describe, expect, it } from 'vitest'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { type IRpcTransport } from '../../../rpc-host/dist/core/index.js'
+import type { IRpcTransport } from '../../../rpc-host/dist/core/transport.js'
 import { RpcProbeDirection, type IRpcCarrierProbe } from '@migaia/rpc-host/probe'
 import type { IRuntimePeerSourceResult } from '@migaia/rpc-host/plugin'
-import { createMemoryTransportPair } from '../../../rpc-host/dist/core/adapters/memory.js'
+import { createMemoryTransportPair } from '../../../rpc-host/test/fixtures/memory-transport.js'
 import { createNodeMessagePortTransport } from '../../../rpc-host/dist/core/adapters/message-port.js'
-import { createBrowserMessagePortTransport } from '@migaia/rpc-plugin-browser/adapters/message-port'
-import { createWebWorkerTransport } from '@migaia/rpc-plugin-browser/adapters/web-worker'
+import { createBrowserMessagePortTransport } from '@migaia/rpc-host/plugin'
+import { createWebWorkerTransport } from '@migaia/rpc-host/plugin'
 import {
   createIpcSendQueueFeature,
   createIpcSendQueueTransport
@@ -36,15 +37,14 @@ import {
   createNodeThreadChannel,
   createWebThreadChannel
 } from '../../../rpc-plugin-thread/dist/threads/channel.js'
-import { createWindowMessageTransport } from '@migaia/rpc-plugin-browser/adapters/window'
-import { createSharedWorkerTransport } from '@migaia/rpc-plugin-browser/adapters/shared-worker'
-import { createServiceWorkerTransport } from '@migaia/rpc-plugin-browser/adapters/service-worker'
-import { createBroadcastChannelTransport } from '@migaia/rpc-plugin-browser/adapters/broadcast-channel'
-import { createRtcDataChannelTransport } from '@migaia/rpc-plugin-browser/adapters/rtc-data-channel'
-import { createWebTransportDatagramTransport } from '@migaia/rpc-plugin-browser/adapters/web-transport'
+import { createWindowMessageTransport } from '../../../rpc-plugin-browser/dist/browser/adapters/window.js'
+import { createSharedWorkerTransport } from '../../../rpc-plugin-browser/dist/browser/adapters/shared-worker.js'
+import { createServiceWorkerTransport } from '../../../rpc-plugin-browser/dist/browser/adapters/service-worker.js'
+import { createBroadcastChannelTransport } from '../../../rpc-plugin-browser/dist/browser/adapters/broadcast-channel.js'
+import { createRtcDataChannelTransport } from '../../../rpc-plugin-browser/dist/browser/adapters/rtc-data-channel.js'
 import { createProcessJsonRpcChannel } from '../../../rpc-plugin-process/dist/process/jsonrpc-channel.js'
 import { ProcessChannelDiagnostics } from '../../../rpc-plugin-process/src/process/diagnostics.js'
-import { bridgeFixture, request } from '../bridge/fixture.js'
+import { BridgeFixture, request } from '../bridge/fixture.js'
 
 /** Inventory counts public callable factories that return transports, pairs, or transport channels. */
 type IInventoryEntry = Readonly<{
@@ -174,7 +174,7 @@ function channelInstance(channel: IRuntimePeerSourceResult): IInventoryInstance 
 /** Core's advanced JSON-RPC constructor opens its actual held connection through the Process owner. */
 async function advancedJsonRpcInstance(): Promise<IInventoryInstance> {
   /** Existing integration fixture supplies the canonical hello and foreign byte representation. */
-  const fixture = bridgeFixture()
+  const fixture = new BridgeFixture()
   /** Both public operations execute against the actually negotiated object connection. */
   const channel = await createAdapterJsonRpcChannel(fixture.options, {
     closedError: createProcessChannelClosedError,
@@ -183,10 +183,10 @@ async function advancedJsonRpcInstance(): Promise<IInventoryInstance> {
   return channelInstance(channel)
 }
 
-/** Explicit entries include public aliases and advanced channels, with no exclusions. */
+/** Entries cover published authoring operations and actual private carrier implementations. */
 const inventory: readonly IInventoryEntry[] = [
   {
-    entry: '@migaia/rpc-host/adapters/memory',
+    entry: 'rpc-host/test/fixtures/memory-transport',
     symbol: 'createMemoryTransportPair',
     open() {
       /** Both returned sides are independent transports and must support observe. */
@@ -199,27 +199,19 @@ const inventory: readonly IInventoryEntry[] = [
       }
     }
   },
-  /** Every currently published alias remains observed until its actual export is removed. */
-  ...[
-    '@migaia/rpc-host/adapters/message-port',
-    '@migaia/rpc-host/plugin',
-    '@migaia/rpc-plugin-browser/adapters/message-port'
-  ].map((entry) => ({
+  /** The authoring SDK retains the shared MessagePort constructor. */
+  ...['@migaia/rpc-host/plugin'].map((entry) => ({
     entry,
     symbol: 'createBrowserMessagePortTransport',
     open: () => transportInstance(createBrowserMessagePortTransport(webPort()))
   })),
   {
-    entry: '@migaia/rpc-host/adapters/message-port',
+    entry: '@migaia/rpc-host/dist/core/adapters/message-port',
     symbol: 'createNodeMessagePortTransport',
     open: () => transportInstance(createNodeMessagePortTransport(nodePort()))
   },
-  /** Browser authoring aliases still point to the original constructor, with identical observation. */
-  ...[
-    '@migaia/rpc-host/adapters/web-worker',
-    '@migaia/rpc-host/plugin',
-    '@migaia/rpc-plugin-browser/adapters/web-worker'
-  ].map((entry) => ({
+  /** The authoring SDK retains the shared Worker constructor. */
+  ...['@migaia/rpc-host/plugin'].map((entry) => ({
     entry,
     symbol: 'createWebWorkerTransport',
     open: () => transportInstance(createWebWorkerTransport(webPort()))
@@ -305,7 +297,7 @@ const inventory: readonly IInventoryEntry[] = [
       )
   },
   {
-    entry: '@migaia/rpc-plugin-browser/adapters/window',
+    entry: '@migaia/rpc-plugin-browser/dist/browser/adapters/window',
     symbol: 'createWindowMessageTransport',
     open() {
       /**
@@ -323,12 +315,12 @@ const inventory: readonly IInventoryEntry[] = [
     }
   },
   {
-    entry: '@migaia/rpc-plugin-browser/adapters/shared-worker',
+    entry: '@migaia/rpc-plugin-browser/dist/browser/adapters/shared-worker',
     symbol: 'createSharedWorkerTransport',
     open: () => transportInstance(createSharedWorkerTransport(webPort()))
   },
   {
-    entry: '@migaia/rpc-plugin-browser/adapters/service-worker',
+    entry: '@migaia/rpc-plugin-browser/dist/browser/adapters/service-worker',
     symbol: 'createServiceWorkerTransport',
     open() {
       /** Explicit target and receiver construct the supported Service Worker public boundary. */
@@ -337,33 +329,22 @@ const inventory: readonly IInventoryEntry[] = [
     }
   },
   {
-    entry: '@migaia/rpc-plugin-browser/adapters/broadcast-channel',
+    entry: '@migaia/rpc-plugin-browser/dist/browser/adapters/broadcast-channel',
     symbol: 'createBroadcastChannelTransport',
     open: () =>
       transportInstance(createBroadcastChannelTransport(webPort() as unknown as BroadcastChannel))
   },
   {
-    entry: '@migaia/rpc-plugin-browser/adapters/rtc-data-channel',
+    entry: '@migaia/rpc-plugin-browser/dist/browser/adapters/rtc-data-channel',
     symbol: 'createRtcDataChannelTransport',
     open: () => transportInstance(createRtcDataChannelTransport(webPort()))
-  },
-  {
-    entry: '@migaia/rpc-plugin-browser/adapters/web-transport',
-    symbol: 'createWebTransportDatagramTransport',
-    open: () =>
-      transportInstance(
-        createWebTransportDatagramTransport({
-          readable: new ReadableStream<Uint8Array>(),
-          writable: new WritableStream<Uint8Array>()
-        })
-      )
   },
   {
     entry: '@migaia/rpc-plugin-process',
     symbol: 'createProcessJsonRpcChannel',
     async open() {
       /** The existing foreign peer exercises the canonical Process presentation boundary. */
-      const fixture = bridgeFixture()
+      const fixture = new BridgeFixture()
       return channelInstance(await createProcessJsonRpcChannel(fixture.options))
     }
   }
@@ -506,7 +487,7 @@ function exportedTransportFactories(): readonly string[] {
     ))
       if (message.includes('"factory"'))
         factories.add(`${probes[line]!.entry}#${probes[line]!.name}`)
-    return [...factories].sort()
+    return orderStringKeys([...factories])
   } finally {
     rmSync(directory, { recursive: true, force: true })
   }
@@ -519,10 +500,9 @@ describe('carriers: complete public transport inventory', () => {
     /** Every newly published callable carrier still requires a real observation fixture. */
     const current = new Set(published)
     expect(
-      inventory
-        .map((entry) => `${entry.entry}#${entry.symbol}`)
-        .filter((key) => current.has(key))
-        .sort()
+      orderStringKeys(
+        inventory.map((entry) => `${entry.entry}#${entry.symbol}`).filter((key) => current.has(key))
+      )
     ).toEqual(published)
   })
 

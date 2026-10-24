@@ -1,3 +1,4 @@
+import { orderStringKeys } from '@migaia/utils/string'
 import { normalizePortable, type IRpcPortableValue } from '../portable-index.js'
 import { rejectShape, RpcShapeReason } from './check-result.js'
 
@@ -45,8 +46,7 @@ function record(value: unknown): Readonly<Record<string, unknown>> {
 function canonical(value: IRpcPortableValue): string {
   if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`
   if (value !== null && typeof value === 'object')
-    return `{${Object.keys(value)
-      .sort()
+    return `{${orderStringKeys(Object.keys(value))
       .map(
         (key) =>
           `${JSON.stringify(key)}:${canonical((value as Readonly<Record<string, IRpcPortableValue>>)[key]!)}`

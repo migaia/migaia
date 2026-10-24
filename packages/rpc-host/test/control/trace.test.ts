@@ -1,8 +1,9 @@
+import { createRuntimeEndpointComposition } from '../../dist/core/runtime-api-endpoint.js'
 import { describe, expect, it } from 'vitest'
-import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
-import { createClientEndpoint } from '../../dist/core/client.js'
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
+
 import { connect } from '../../dist/core/middleware/connect.js'
-import { createProviderEndpoint } from '../../dist/core/provider.js'
+
 import type { IRpcTransport } from '../../dist/core/transport.js'
 
 describe('opaque trace propagation', () => {
@@ -16,19 +17,25 @@ describe('opaque trace propagation', () => {
         return clientWire.send(message, options)
       }
     }
-    const provider = await createProviderEndpoint({
-      id: 'provider',
-      transport: providerWire,
-      targetIds: ['client'],
-      middlewares: [connect({ transport: providerWire })],
-      provider: { trace: (context) => context.success(context.trace ?? null) }
-    })
-    const client = await createClientEndpoint({
-      id: 'client',
-      transport: capture,
-      targetIds: ['provider'],
-      middlewares: [connect({ transport: capture })]
-    })
+    const provider = await createRuntimeEndpointComposition(
+      {
+        id: 'provider',
+        transport: providerWire,
+        targetIds: ['client'],
+        middlewares: [connect({ transport: providerWire })],
+        provider: { trace: (context) => context.success(context.trace ?? null) }
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'client',
+        transport: capture,
+        targetIds: ['provider'],
+        middlewares: [connect({ transport: capture })]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     try {
       expect(await client.send('provider', 'trace', null, { trace: '00-abc-01' })).toBe('00-abc-01')
       expect(await client.send('provider', 'trace', null)).toBeNull()

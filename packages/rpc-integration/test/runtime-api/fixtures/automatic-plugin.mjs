@@ -1,7 +1,7 @@
 import { parentPort } from 'node:worker_threads'
 import { setTimeout as delay } from 'node:timers/promises'
 import { defineHost, definePlugin, defineFeature } from '@migaia/plugin-host'
-import { createProcessPlugin } from '../../../../rpc-plugin-process/test/protocol.ts'
+import { processPlugin } from '@migaia/rpc-plugin-process'
 import { threadProtocolDefinition as createThreadPlugin } from './thread-protocol.ts'
 
 /** This genuine child uses the same managed Host and public Plugin factory as its caller. */
@@ -32,8 +32,9 @@ await host.use(
 )
 /** No source or self configuration is supplied on this real automatic side. */
 installed = host.use(
-  (kind === 'thread' ? createThreadPlugin : createProcessPlugin)({
+  (kind === 'thread' ? createThreadPlugin : processPlugin)({
     name: 'bridge',
+    ...(kind === 'process' ? { connectToParent: true } : {}),
     expose: ['service'],
     report: (error) => process.stderr.write(`${error?.code ?? 'fixture-error'}\n`)
   })

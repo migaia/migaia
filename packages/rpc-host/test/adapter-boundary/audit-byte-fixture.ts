@@ -1,5 +1,5 @@
 import * as contract from '@migaia/rpc-contract'
-import type { IRuntimeByteDiagnostics } from '../../dist/adapter/internal-advanced.js'
+import type { IRuntimeByteDiagnostics } from '../../dist/runtime-adapter/byte/types.js'
 /** Core owns these generic byte-adapter failure identities. */
 export const diagnostics: IRuntimeByteDiagnostics = {
   closed: { source: 'rpc.endpoint', code: 'TRANSPORT', message: 'audit byte closed' },

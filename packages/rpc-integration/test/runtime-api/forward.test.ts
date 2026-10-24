@@ -1,7 +1,4 @@
-import type { IAbortSignal } from '@migaia/utils/promise'
-import * as runtimePeerOwner from '../../../rpc-host/dist/remote/runtime-api/peer.js'
-import { readRuntimePreparationContext } from '../../../rpc-host/dist/remote/runtime-api/launch-context.js'
-import type { IRemoteChannelResources } from '../../../rpc-host/dist/remote/types.js'
+import { deferred, type IAbortSignal } from '@migaia/utils/promise'
 import assert from 'node:assert/strict'
 import { it, vi } from 'vitest'
 import { attachErrorIdentity } from '@migaia/utils/error'
@@ -12,8 +9,7 @@ import { runtimeSources, runtimeTestHost } from '../../../rpc-host/test/runtime-
 import { readRuntimeOutletConnection } from '../../../rpc-host/dist/remote/runtime-api/outlet.js'
 import {
   readRuntimePeerEndpoint,
-  readRuntimePeerConnection,
-  prepareRuntimePeerEndpoint
+  readRuntimePeerConnection
 } from '../../../rpc-host/dist/remote/runtime-api/peer.js'
 import { definePlugin, defineFeature } from '@migaia/plugin-host'
 import { createUnitBudget } from '@migaia/supervision'
@@ -21,7 +17,7 @@ import { systemScheduler } from '@migaia/utils/scheduler'
 import {
   createNodeThreadLauncher,
   createNodeThreadChannelFactory
-} from '@migaia/rpc-plugin-thread/adapters/node'
+} from '../../../rpc-plugin-thread/dist/threads/adapters/node.js'
 import { fileURLToPath } from 'node:url'
 import { createHmac } from 'node:crypto'
 import { observePortableNormalization } from '../../../rpc-contract/test/fixtures/portable-observer.js'
@@ -31,20 +27,10 @@ import {
   createProcessFixtureChannel
 } from '../fixtures/process-diagnostics.js'
 import { registerFastCodec } from '../../../rpc-host/dist/core/internal/fast-path.js'
-import { createRuntimeApiEndpoint } from '../../../rpc-host/dist/core/runtime-api-endpoint.js'
-import { authentication } from '../../../rpc-host/dist/core/middleware/authentication.js'
-import { connect } from '../../../rpc-host/dist/core/middleware/connect.js'
-import { abort } from '../../../rpc-host/dist/core/middleware/abort.js'
-import { timeout } from '../../../rpc-host/dist/core/middleware/timeout.js'
-import { hooks } from '../../../rpc-host/dist/core/middleware/hooks.js'
-import { ping } from '../../../rpc-host/dist/core/middleware/ping.js'
-import { codec } from '../../../rpc-host/dist/core/middleware/codec.js'
-import { framer } from '../../../rpc-host/dist/core/middleware/framer.js'
 import {
   readAuthenticationEnvelope,
   wrapAuthenticationEnvelope
 } from '../../../rpc-host/dist/core/middleware/authentication-envelope.js'
-import type { IRemoteServeEndpoint } from '../../../rpc-host/dist/remote/types.js'
 import type { IRpcEndpoint } from '../../../rpc-host/dist/core/typing.js'
 import { RpcCapability } from '@migaia/rpc-contract'
 import { RUNTIME_API_FIXTURE_BASE_CAPABILITIES as RUNTIME_API_CAPABILITIES } from '../../../rpc-host/test/runtime-api/fixture.js'
@@ -53,7 +39,6 @@ import type { RpcOutboundSender } from '../../../rpc-host/dist/core/internal/out
 import { readEndpointOwner } from '../../../rpc-host/dist/core/internal/endpoint-projection.js'
 import type { IRuntimeOutlet } from '../../../rpc-host/dist/remote/runtime-api/outlet.js'
 import type { ProviderAdmissionRegistry } from '../../../rpc-host/dist/core/internal/provider-admission.js'
-import type { IProviderAdmissionScope } from '../../../rpc-host/dist/core/internal/provider-admission.js'
 import type { RequestReplayLedger } from '../../../rpc-host/dist/core/internal/request-replay-ledger.js'
 import { EndpointOwnerKey } from '../../../rpc-host/dist/core/endpoint-kernel.js'
 import { RpcError, RpcCoreErrorCode } from '../../../rpc-host/dist/core/errors.js'
@@ -323,8 +308,6 @@ it.each(['quota', 'drain'] as const)(
     const drain = createRemoteBindingDrain(scheduler, () => undefined)
     let governor: ReturnType<typeof createProcessProviderAdmission> | undefined
     let restoreSend: (() => void) | undefined
-    /** Release the one native setup observer in the original fixture cleanup. */
-    let restoreScopeObservation: (() => void) | undefined
     let pending: Promise<unknown> | undefined
     /** Native policy and physical preparation failures stay visible throughout the fixture. */
     const failures: unknown[] = []
@@ -365,39 +348,25 @@ it.each(['quota', 'drain'] as const)(
           'outbound-pipeline'
         )!
         const original = sender.transport.send
-        const spy = vi.spyOn(sender.transport, 'send').mockImplementation(async (frame) => {
-          const envelope = readRuntimeCarrier(frame)?.frame as
-            | { kind?: string; stream?: { event?: string } }
-            | undefined
-          if (envelope?.kind === 'runtime-control' && envelope.stream?.event === 'open') {
-            openSeen = true
-            await openHeld
-          }
-          /** Kernel.send is a native method; preserve its exact receiver without mutable bind. */
-          return Reflect.apply(original, sender.transport, [frame])
-        })
+        const spy = vi
+          .spyOn(sender.transport, 'send')
+          .mockImplementation(async (frame, options) => {
+            const envelope = readRuntimeCarrier(frame)?.frame as
+              | { kind?: string; stream?: { event?: string } }
+              | undefined
+            if (envelope?.kind === 'runtime-control' && envelope.stream?.event === 'open') {
+              openSeen = true
+              await openHeld
+            }
+            /** Kernel.send is a native method; preserve its exact receiver without mutable bind. */
+            return Reflect.apply(original, sender.transport, [frame, options])
+          })
         restoreSend = () => spy.mockRestore()
       }
-      /** The selected callback borrows the genuine same Host's exact existing quota handle. */
-      let selectedScope: IProviderAdmissionScope | undefined
-      /** Observe setup provenance without replacing configuration or capture behavior. */
-      const createPeer = runtimePeerOwner.createRuntimePeer
-      const prepareSelectedEndpoint: NonNullable<
-        Parameters<typeof createPeer>[0]['endpointFactory']
-      > = async (channel, signal) => {
-        /** The original quota and drain owners retain all scalar and streaming registrations. */
-        const endpoint = await prepareRuntimePeerEndpoint(
-          { self: { name: 'a', instanceId: 'a-caller' }, report: () => undefined },
-          channel,
-          signal,
-          {},
-          selectedScope!
-        )
-        assert.equal(
-          readEndpointOwner(endpoint.endpoint, 'provider-admission'),
-          admission,
-          'custom endpoint retains genuine same Host quota'
-        )
+      /** The native source lends policy to the same Host endpoint at its existing session seam. */
+      const prepareSelectedEndpoint: NonNullable<IRuntimeThreadPluginOptions['prepareEndpoint']> = (
+        channel
+      ) => {
         governor = createProcessProviderAdmission(
           channel as Parameters<typeof createProcessProviderAdmission>[0],
           normalizeProcessResilienceOptions({
@@ -410,17 +379,22 @@ it.each(['quota', 'drain'] as const)(
           async () => undefined,
           () => undefined
         )
-        return drain.wrap(channel as Parameters<typeof drain.wrap>[0], governor.wrap(endpoint))
+        return {
+          policy: {},
+          execution: {
+            provider: governor.core.provider,
+            enterStream: governor.core.enterStream
+          },
+          wrapEndpoint: (endpoint, onExecution) => {
+            assert.equal(
+              readEndpointOwner(endpoint.endpoint, 'provider-admission'),
+              admission,
+              'native session policy retains the genuine same Host quota'
+            )
+            return drain.wrap(channel as Parameters<typeof drain.wrap>[0], endpoint, onExecution)
+          }
+        }
       }
-      /** Exact callback identity distinguishes this Host from other concurrent source setup. */
-      const scopeObservation = vi
-        .spyOn(runtimePeerOwner, 'createRuntimePeer')
-        .mockImplementation((options, resources) => {
-          if (options.endpointFactory === prepareSelectedEndpoint)
-            selectedScope = readRuntimePreparationContext(options)?.providerAdmission
-          return createPeer(options, resources)
-        })
-      restoreScopeObservation = () => scopeObservation.mockRestore()
       carriers.push(
         await attach(
           owners[0],
@@ -432,7 +406,7 @@ it.each(['quota', 'drain'] as const)(
             expose: ['c'],
             report: (error) => failures.push(error),
             provide: { baseline: () => 7 },
-            endpointFactory: prepareSelectedEndpoint
+            prepareEndpoint: prepareSelectedEndpoint
           },
           governedRuntimeSources(capabilities, scheduler)
         )
@@ -490,7 +464,6 @@ it.each(['quota', 'drain'] as const)(
       releaseOpen()
       finish()
       restoreSend?.()
-      restoreScopeObservation?.()
       governor?.close()
       for (const host of owners) await host.dispose()
       for (const carrier of carriers) carrier.close()
@@ -648,23 +621,33 @@ it.each(['mixed', 'multiple', 'failure', 'keyed-local', 'lookup'] as const)(
             .map((args) => readRuntimeCarrier(args[0])?.frame as { kind?: string } | undefined)
             .filter((frame) => frame?.kind === 'runtime-group')
           assert.equal(groups.length, 1)
+        } else if (policy === 'lookup') {
+          /** The actual Host owns local outcomes even when no forwarded namespace owns this key. */
+          const outcome = await upstream.outcome('b', 'unclaimed')
+          assert.ok(outcome.store?.kind === 'memory')
+          assert.equal(typeof outcome.store.epoch, 'string')
+          assert.ok(outcome.store.epoch.length > 0)
+          assert.deepEqual(outcome, {
+            state: 'unknown',
+            store: { kind: 'memory', continuity: 'retained', epoch: outcome.store.epoch }
+          })
+          assert.deepEqual(effects, [])
+          assert.equal(send.mock.calls.length, 0)
         } else {
           await assert.rejects(
             async () =>
-              policy === 'lookup'
-                ? upstream.outcome('b', 'unclaimed')
-                : policy === 'keyed-local'
-                  ? upstream.request('b', 'local', undefined, {
-                      orderKey: 'same',
-                      idempotencyKey: 'ambiguous'
-                    })
-                  : upstream.group('b', [
-                      { method: 'c.first' },
-                      { method: policy === 'multiple' ? 'd.first' : 'local' }
-                    ]),
+              policy === 'keyed-local'
+                ? upstream.request('b', 'local', undefined, {
+                    orderKey: 'same',
+                    idempotencyKey: 'ambiguous'
+                  })
+                : upstream.group('b', [
+                    { method: 'c.first' },
+                    { method: policy === 'multiple' ? 'd.first' : 'local' }
+                  ]),
             {
               code:
-                policy === 'lookup' || policy === 'keyed-local'
+                policy === 'keyed-local'
                   ? RpcCoreErrorCode.capabilityUnsupported
                   : RpcCoreErrorCode.invalidConfig
             }
@@ -776,13 +759,15 @@ it.each([4, 32])(
             ...original,
             decode: (value: unknown) => {
               const decoded = original.decode(value)
-              const payload = (decoded as any)?.payload ?? (decoded as any)?.data?.payload
+              const envelope = readRuntimeCarrier(decoded)?.frame ?? decoded
+              const payload = (envelope as any)?.payload ?? (envelope as any)?.data?.payload
               if (hop === 0 && side === 1 && payload?.marker === 'fixture-relay')
                 incomingAt = normalization.mock.calls.length
               return decoded
             },
             encode: (value: unknown) => {
-              const payload = (value as any)?.payload ?? (value as any)?.data?.payload
+              const envelope = readRuntimeCarrier(value)?.frame ?? value
+              const payload = (envelope as any)?.payload ?? (envelope as any)?.data?.payload
               if (hop === 1 && side === 0 && payload?.marker === 'fixture-relay') {
                 const positions = normalization.mock.calls
                   .map(([input], index) => ({ input, index }))
@@ -1313,6 +1298,20 @@ async function nodeOf(host: ReturnType<typeof owner>, connection: string): Promi
     .directory.localDescription.nodeId!
 }
 
+/** Exact wire failure keeps the actual remote wrapper and original local namespace failure. */
+function isUnavailableForward(error: unknown): boolean {
+  assert.ok(error instanceof Error)
+  assert.equal(error.name, 'RpcRemoteError')
+  assert.equal(Reflect.get(error, 'source'), 'rpc.endpoint')
+  assert.equal(Reflect.get(error, 'code'), 'INTERNAL')
+  const cause = error.cause
+  assert.ok(cause instanceof Error)
+  assert.equal(cause.name, 'RpcError')
+  assert.equal(Reflect.get(cause, 'source'), 'rpc.endpoint')
+  assert.equal(Reflect.get(cause, 'code'), 'TARGET_UNKNOWN')
+  return true
+}
+
 /** Genuine Hosts retain the canonical registration, availability and cleanup owners. */
 function owner() {
   return runtimeTestHost({
@@ -1320,46 +1319,65 @@ function owner() {
   })
 }
 
-/** Keep the existing memory I/O while both genuine Core channel owners observe the bilateral ACK. */
+/** One explicit fixture context retains the original cold bilateral barrier and physical pair. */
+type IGovernedSources = {
+  carrier: ReturnType<typeof runtimeSources>
+  offers: (Parameters<ReturnType<typeof runtimeSources>['sources'][number]>[0] | undefined)[]
+  ready: ReturnType<typeof deferred<void>>
+  scheduler: typeof systemScheduler
+  capabilities: readonly string[]
+}
+
+/** Build one real Core channel after both actual source identities reach the original barrier. */
+async function openGovernedSource(
+  fixture: IGovernedSources,
+  index: number,
+  context: Parameters<IGovernedSources['carrier']['sources'][number]>[0]
+): Promise<Awaited<ReturnType<IGovernedSources['carrier']['sources'][number]>>> {
+  fixture.offers[index] = context
+  if (fixture.offers[0] && fixture.offers[1]) fixture.ready.resolve()
+  await fixture.ready.promise
+  /** The original held memory side delivers genuine messages asynchronously to Core. */
+  const transport = fixture.carrier.transports[index]!
+  /** The opposite actual identity is known before Core consumes the bilateral ACK. */
+  const channel = await createProcessFixtureChannel(
+    {
+      kind: 'message',
+      send: (message) => transport.send(message),
+      onMessage: (listener) => transport.subscribe((message) => listener(message.data)),
+      onClose: (listener) => transport.onTransportError!(listener),
+      /** Both genuine Hosts retain the carrier until their original teardown. */
+      close: () => undefined
+    },
+    {
+      peerId: fixture.offers[1 - index]!.self.instanceId,
+      scheduler: fixture.scheduler,
+      capabilities: fixture.capabilities
+    }
+  )
+  return channel as Awaited<ReturnType<IGovernedSources['carrier']['sources'][number]>>
+}
+
+/** Keep the original pair while explicit context replaces the factory's shared lexical state. */
 function governedRuntimeSources(
   capabilities: readonly string[],
   scheduler: typeof systemScheduler
 ): ReturnType<typeof runtimeSources> {
-  /** Only the pair's raw send/subscription operations are reused; its structural source is not run. */
-  const carrier = runtimeSources(capabilities, capabilities)
-  /** Each side supplies its own actual public source context before either writes startup control. */
-  const offers: (Parameters<(typeof carrier.sources)[number]>[0] | undefined)[] = []
-  /** The original fixture's cold two-source barrier keeps both actual peer identities available. */
-  let accept!: () => void
-  /** The peer source calls join once, before Core installs both physical message readers. */
-  const ready = new Promise<void>((resolve) => {
-    accept = resolve
-  })
-  /** Both ends construct through the same public Core operation; no transport registrar is called. */
-  const source =
-    (index: number): (typeof carrier.sources)[number] =>
-    async (context) => {
-      offers[index] = context
-      if (offers[0] && offers[1]) accept()
-      await ready
-      /** The held memory side delivers real messages asynchronously to the opposite Core reader. */
-      const transport = carrier.transports[index]!
-      /** Core consumes the peer ACK before constructing the final transport or exposing business. */
-      const channel = await createProcessFixtureChannel(
-        {
-          kind: 'message',
-          send: (message) => transport.send(message),
-          onMessage: (listener) => transport.subscribe((message) => listener(message.data)),
-          onClose: (listener) => transport.onTransportError!(listener),
-          /** The original carrier pair remains alive until both Hosts finish their normal teardown. */
-          close: () => undefined
-        },
-        { peerId: offers[1 - index]!.self.instanceId, scheduler, capabilities }
-      )
-      /** Preserve the reference fixture's narrow type signature, returning the exact Core object. */
-      return channel as Awaited<ReturnType<(typeof carrier.sources)[number]>>
-    }
-  return { ...carrier, sources: [source(0), source(1)] as const }
+  /** Source closures capture one named context; Core remains the sole channel lifecycle owner. */
+  const fixture: IGovernedSources = {
+    carrier: runtimeSources(capabilities, capabilities),
+    offers: [],
+    ready: deferred<void>(),
+    scheduler,
+    capabilities
+  }
+  return {
+    ...fixture.carrier,
+    sources: [
+      (context) => openGovernedSource(fixture, 0, context),
+      (context) => openGovernedSource(fixture, 1, context)
+    ] as const
+  }
 }
 
 /** Join two actual Plugin registrations; no substitute dispatcher resolves business methods. */
@@ -1653,7 +1671,7 @@ it('one explicit connection method forwards through B with B as the direct calle
     assert.deepEqual(calls, ['c-caller'], 'C authorizes its direct B peer, rather than A')
     await assert.rejects(
       Promise.resolve().then(() => owners[0].thread!.request('b', 'c.math.sub')),
-      { code: 'PROVIDER_NOT_FOUND' }
+      isUnavailableForward
     )
     assert.equal(calls.length, 1, 'an unexposed remote method performs no business')
   } finally {
@@ -1685,7 +1703,7 @@ it('an unexposed connection never forwards to its business provider', async () =
     carriers.push(await attach(owners[0], owners[1], 'b', 'a'))
     await assert.rejects(
       Promise.resolve().then(() => owners[0].thread!.request('b', 'c.math.add')),
-      { code: 'PROVIDER_NOT_FOUND' }
+      isUnavailableForward
     )
     assert.equal(calls, 0)
     assert.equal(await owners[1].thread!.request('c', 'math.add'), 1)
@@ -2442,8 +2460,8 @@ it.each(['process', 'thread'] as const)(
     const marker = 'forward-payload'
     /** Observing the existing export changes no normalization behavior. */
     const normalize = observePortableNormalization()
-    /** Only whole business request JSON, excluding auth wrappers, counts as process encoding. */
-    const stringify = vi.spyOn(JSON, 'stringify')
+    /** Only the actual downstream byte codec counts as native JSON conversion. */
+    let forwardedEncodes = 0
     /** The true provider count distinguishes authentication refusal from replay admission. */
     let calls = 0
     /** Real authentication callbacks expose success and signature failures independently. */
@@ -2468,63 +2486,45 @@ it.each(['process', 'thread'] as const)(
       const bound = readAuthenticationEnvelope(value)
       return typeof bound.payload === 'string' ? JSON.parse(bound.payload) : bound.payload
     }
-    /**
-     * Custom factories select the existing Runtime API preset and its original authentication
-     * owner.
-     */
-    const factory =
-      (id: string, hop: number, side: number) =>
-      async (channel: IRemoteChannelResources): Promise<IRemoteServeEndpoint> => {
-        const endpoint = createRuntimeApiEndpoint(
-          {
-            id,
-            scheduler: channel.scheduler,
-            targetIds: [channel.peerId],
-            transport: channel.transport,
-            middlewares: [
-              codec(channel.pipeline.codec),
-              framer(channel.pipeline.framer),
-              connect({ transport: channel.transport }),
-              abort(),
-              timeout(),
-              ping(),
-              hooks(),
-              authentication({
-                sign(value) {
-                  const request = semantic(value)
-                  if (counting && side === 0 && request.kind === 'request') signs[hop]! += 1
-                  const frame = { value, signature: signature(hop, value) }
-                  const encoded = kind === 'process' ? JSON.stringify(frame) : frame
-                  if (counting && hop === 1 && side === 0 && request.method === 'echo')
-                    signedFrame = encoded
-                  return encoded
-                },
-                verify(value) {
-                  const frame = (typeof value === 'string' ? JSON.parse(value) : value) as {
-                    value: unknown
-                    signature: string
-                  }
-                  assert.equal(
-                    frame.signature,
-                    signature(hop, frame.value),
-                    'signed route cannot be changed'
-                  )
-                  const request = semantic(frame.value)
-                  if (counting && side === 1 && request.kind === 'request') verifies[hop]! += 1
-                  return frame.value
-                }
-              })
-            ]
-          },
-          channel
-        )
-        await endpoint.ready
-        const original = endpoint as unknown as IRpcEndpoint
-        original.hooks.on((event) => {
-          if (event.name === 'failure') failures.push(event.error)
-        })
-        return { endpoint: original, oneWay: endpoint, stream: endpoint.stream }
+    /** Native authentication belongs to each actual Host endpoint, not a removed custom factory. */
+    const credentials = (hop: number, side: number) => ({
+      sign(value: unknown) {
+        const request = semantic(value)
+        if (counting && side === 0 && request.kind === 'request') signs[hop]! += 1
+        if (counting && hop === 1 && side === 0 && request.method === 'echo') {
+          /** Observe the admitted payload before protection serializes it for physical byte I/O. */
+          outbound = request.data.payload
+          const positions = normalize.mock.calls
+            .map(([input], index) => ({ input, index }))
+            .slice(incomingAt)
+            .filter(({ input }) => (input as any)?.marker === marker)
+          forwardedNormalizations = positions.length - 1
+          admitted = normalize.mock.results[positions[0]?.index ?? -1]?.value
+        }
+        const frame = { value, signature: signature(hop, value) }
+        const encoded = kind === 'process' ? JSON.stringify(frame) : frame
+        if (counting && hop === 1 && side === 0 && request.method === 'echo') signedFrame = encoded
+        return encoded
+      },
+      verify(value: unknown) {
+        const frame = (typeof value === 'string' ? JSON.parse(value) : value) as {
+          value: unknown
+          signature: string
+        }
+        assert.equal(frame.signature, signature(hop, frame.value), 'signed route cannot be changed')
+        const request = semantic(frame.value)
+        if (counting && side === 1 && request.kind === 'request') verifies[hop]! += 1
+        return frame.value
       }
+    })
+    /** Physical codecs observe the actual selector and protection output before logical admission. */
+    const physicalSemantic = (value: unknown): any => {
+      const selected = readRuntimeCarrier(value)?.frame ?? value
+      const frame = typeof selected === 'string' ? JSON.parse(selected) : selected
+      return frame && typeof frame === 'object' && 'signature' in frame
+        ? semantic(frame.value)
+        : frame
+    }
     /** Counter wrappers delegate exact registered codecs; they add no normalization or encoding. */
     const sourcePair = (hop: number) => {
       const carrier = runtimeSources()
@@ -2535,25 +2535,24 @@ it.each(['process', 'thread'] as const)(
           const codec = {
             ...pipeline.codec,
             encode(value: unknown) {
-              if (counting && hop === 1 && side === 0 && (value as any).method === 'echo') {
-                outbound = (value as any).data.payload
-                const entries = normalize.mock.calls
-                  .slice(incomingAt)
-                  .filter(([input]) => (input as any)?.marker === marker)
-                forwardedNormalizations = entries.length - 1
-                admitted =
-                  normalize.mock.results[
-                    incomingAt +
-                      normalize.mock.calls
-                        .slice(incomingAt)
-                        .findIndex(([input]) => (input as any)?.marker === marker)
-                  ]?.value
-              }
+              if (
+                counting &&
+                hop === 1 &&
+                side === 0 &&
+                physicalSemantic(value)?.method === 'echo' &&
+                kind === 'process'
+              )
+                forwardedEncodes++
               return pipeline.codec.encode(value)
             },
             decode(value: unknown) {
               const decoded = pipeline.codec.decode(value)
-              if (counting && hop === 0 && side === 1 && (decoded as any).kind === 'request')
+              if (
+                counting &&
+                hop === 0 &&
+                side === 1 &&
+                physicalSemantic(decoded)?.kind === 'request'
+              )
                 incomingAt = normalize.mock.calls.length
               return decoded
             }
@@ -2576,10 +2575,12 @@ it.each(['process', 'thread'] as const)(
           'c',
           'b',
           {
-            endpointFactory: factory('c-caller', 1, 0)
+            authentication: credentials(1, 0),
+            report: (error) => failures.push(error)
           },
           {
-            endpointFactory: factory('b-caller', 1, 1),
+            authentication: credentials(1, 1),
+            report: (error) => failures.push(error),
             provide: { echo: () => ++calls }
           },
           sourcePair(1)
@@ -2592,27 +2593,26 @@ it.each(['process', 'thread'] as const)(
           'b',
           'a',
           {
-            endpointFactory: factory('b-caller', 0, 0)
+            authentication: credentials(0, 0),
+            report: (error) => failures.push(error)
           },
           {
-            endpointFactory: factory('a-caller', 0, 1),
+            authentication: credentials(0, 1),
+            report: (error) => failures.push(error),
             expose: ['c.echo']
           },
           sourcePair(0)
         )
       )
       normalize.mockClear()
-      stringify.mockClear()
       counting = true
       assert.equal(await owners[0].thread!.request('b', 'c.echo', { marker }), 1)
       assert.equal(forwardedNormalizations, 0, 'B adds no normalization after inbound admission')
       assert.equal(outbound, admitted, 'B outbound uses its original admitted payload reference')
       assert.equal(
-        stringify.mock.calls.filter(
-          ([value]) => (value as any)?.kind === 'request' && (value as any)?.method === 'echo'
-        ).length,
+        forwardedEncodes,
         kind === 'process' ? 1 : 0,
-        'only the process codec encodes the whole forwarded request'
+        'the actual physical byte codec converts each forwarded protected request once'
       )
       assert.deepEqual(signs, [1, 1])
       assert.deepEqual(verifies, [1, 1])
@@ -2634,7 +2634,13 @@ it.each(['process', 'thread'] as const)(
         BigInt(bound.counter)
       )
       const tampered = { value: changed, signature: frame.signature }
-      carriers[0]!.transports[0].send(kind === 'process' ? JSON.stringify(tampered) : tampered)
+      /** The original downstream physical pipeline frames the corrupted signed value. */
+      const pipeline = kind === 'process' ? byteProcessPipeline : messageProcessPipeline
+      for (const frame of pipeline.framer.frame(
+        pipeline.codec.encode(kind === 'process' ? JSON.stringify(tampered) : tampered),
+        { source: 'c-caller', messageId: 'tampered-forward' }
+      ))
+        carriers[1]!.transports[0].send(frame)
       await vi.waitFor(() =>
         assert.equal(
           failures.filter((error) => (error as any)?.code === 'AUTHENTICATION_FAILED').length,

@@ -1,10 +1,10 @@
-import { createDenoProcessLauncher } from '@migaia/rpc-plugin-process/adapters/deno-command'
+import { createDenoProcessLauncher } from '../../../../rpc-plugin-process/dist/process/adapters/deno-command.js'
 import { createProcessTransport } from '../../../../rpc-plugin-process/dist/process/handshake.js'
 import { createNativeProcessOffer } from '../../../../rpc-plugin-process/dist/process/offer.js'
 import {
   dialProcessByteChannel,
   listenProcessByteChannel
-} from '@migaia/rpc-plugin-process/adapters/deno-socket'
+} from '../../../../rpc-plugin-process/dist/process/adapters/deno-socket.js'
 
 /** This executable probe runs only under Deno with explicit local permissions. */
 const token = 'deno-bootstrap-token'

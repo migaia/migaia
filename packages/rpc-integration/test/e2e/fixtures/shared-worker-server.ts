@@ -1,4 +1,4 @@
-import { createSharedWorkerTransport } from '@migaia/rpc-plugin-browser/adapters/shared-worker'
+import { createSharedWorkerTransport } from '../../../../rpc-plugin-browser/dist/browser/adapters/shared-worker.js'
 import { readEndpointDebugSnapshot } from '../../../../rpc-host/dist/core/internal/test-observer.js'
 import { createRpc, terminalProviders } from './rpc.js'
 

@@ -1,5 +1,5 @@
-import { createClientEndpoint } from '../../src/core/client.js'
-import { createProviderEndpoint } from '../../src/core/provider.js'
+import { createRuntimeEndpointComposition } from '../../src/core/runtime-api-endpoint.js'
+
 import { connect } from '../../src/core/middleware/connect.js'
 import { EventEmitter } from 'node:events'
 import { MessageChannel } from 'node:worker_threads'
@@ -7,7 +7,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { IRpcCarrierProbe } from '../../src/core/probe/index.js'
 import type { IRpcTransport } from '../../src/core/transport.js'
 import type { IRpcProvider } from '../../src/core/typing.js'
-import { createMemoryTransportPair } from '../../src/core/adapters/memory.js'
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
 import {
   createNodeMessagePortTransport,
   createBrowserMessagePortTransport
@@ -490,18 +490,24 @@ describe('Core physical carrier observation', () => {
     /** Count real provider execution to prove probe failures leave the business request intact. */
     const provide = vi.fn<IRpcProvider>((context) => context.success(14))
     /** A real Provider Endpoint proves throwing carrier probes cannot suppress business execution. */
-    const server = await createProviderEndpoint({
-      id: 'probe-server',
-      transport: serverWire,
-      middlewares: [connect({ transport: serverWire })],
-      provider: { double: provide }
-    })
+    const server = await createRuntimeEndpointComposition(
+      {
+        id: 'probe-server',
+        transport: serverWire,
+        middlewares: [connect({ transport: serverWire })],
+        provider: { double: provide }
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     /** A real outbound Endpoint proves observation failures do not reject the business RPC. */
-    const client = await createClientEndpoint({
-      id: 'probe-client',
-      transport: clientWire,
-      middlewares: [connect({ transport: clientWire })]
-    })
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'probe-client',
+        transport: clientWire,
+        middlewares: [connect({ transport: clientWire })]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     /**
      * Install the direct carrier contract so assertions do not depend on probe-core
      * instrumentation.

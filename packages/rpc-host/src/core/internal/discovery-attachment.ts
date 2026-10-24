@@ -1,3 +1,5 @@
+import { orderStringKeys } from '@migaia/utils/string'
+import { readPeerTransportCapabilities } from './batch-frame.js'
 import type { IRpcPlatformValue } from '../transport-constants.js'
 import { RpcErrorFamily } from '../error-family.js'
 import type { IAbortSignal } from '@migaia/utils/promise'
@@ -26,6 +28,7 @@ import type {
   IRpcAuthenticationCapability
 } from '../typing.js'
 import {
+  RpcCapability,
   RpcRouteProfile,
   RpcRouteType,
   type IRpcEnvelope,
@@ -280,7 +283,7 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
     return this.#nextReceiverId
   }
 
-  /** Returns active and stale-aware remote receiver metadata. */
+  /** Returns active and stale-aware metadata in first discovery/registration order. */
   getServerList(targetId?: TTargetId): readonly IRpcServerMetadata<TTargetId>[] {
     this.#assertActive()
     const now = this.#ports.time.now()
@@ -289,11 +292,6 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
         .remoteSnapshot<IRpcServerMetadata<TTargetId>>()
         .map(([, entry]) => entry)
         .filter((entry) => targetId === undefined || entry.targetId === targetId)
-        .sort((left, right) =>
-          tupleKey(left.targetId, left.receiverId).localeCompare(
-            tupleKey(right.targetId, right.receiverId)
-          )
-        )
         .map((entry) =>
           Object.freeze({
             ...entry,
@@ -412,10 +410,12 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
 
   /** Reports receiver multiplicity once per stable identity set. */
   diagnoseMultipleReceivers(targetId: TTargetId): void {
-    const receiverIds = this.getServerList(targetId)
-      .filter((entry) => entry.status === 'active')
-      .map((entry) => entry.receiverId)
-      .sort()
+    /** Keep canonical code-unit receiver ordering for stable selection snapshots. */
+    const receiverIds = orderStringKeys(
+      this.getServerList(targetId)
+        .filter((entry) => entry.status === 'active')
+        .map((entry) => entry.receiverId)
+    )
     if (receiverIds.length < 2) {
       this.#multipleReceiverSnapshots.delete(targetId)
       return
@@ -546,6 +546,7 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
     timeoutMs?: number | false,
     signal?: IAbortSignal
   ): Promise<{ readonly receiverId?: string; readonly verifiedPeerKey?: string }> {
+    /** The pin snapshot remains fixed across a real miss, as in the original async selector. */
     const pinned = this.#registry.getPin(targetId)
     if (pinned !== undefined || !this.#receiverSelector) return this.receiverForTarget(targetId)
     const serverList = this.getServerList(targetId)
@@ -620,6 +621,10 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
     targetId: TTargetId,
     receiverId?: string
   ): IOutboundReceiver | Promise<IOutboundReceiver> {
+    /** A held native source without control capability uses the existing direct-receiver path. */
+    const capabilities = readPeerTransportCapabilities(this.#kernel.transport, targetId)
+    if (capabilities !== undefined && !capabilities.includes(RpcCapability.ping))
+      return { receiverId: receiverId ?? String(targetId) }
     if (receiverId !== undefined) {
       if (readAuthenticationChallengePort(this.#authentication)?.needed(receiverId))
         return this.#refreshReceiver(targetId, receiverId)
@@ -1086,8 +1091,7 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
     for (const [key, entry] of this.#registry.remoteSnapshot<IRpcServerMetadata<TTargetId>>()) {
       if (
         entry.targetId === targetId &&
-        (receiverId === undefined || entry.receiverId === receiverId) &&
-        !keysToRevoke.includes(key)
+        (receiverId === undefined || entry.receiverId === receiverId)
       )
         keysToRevoke.push(key)
     }
@@ -1177,159 +1181,12 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
     )
       return
     if (route.route.manual && this.#mode !== 'manual') return
-    /** Reports an invalid inbound discovery metadata read through this endpoint's existing hook. */
-    const reportRead: IRpcPropertyReadReporter = ({ key, error }) => {
-      this.#emit({
-        name: 'failure',
-        code: RpcCoreErrorCode.invalidConfig,
-        error,
-        ...(typeof key === 'string' ? { field: key } : {})
-      })
-      return undefined
-    }
     if (route.route.type === RpcRouteType.discoveryQuery) {
-      if (route.route.manual && this.#mode === 'manual') {
-        const replayKey = tupleKey(
-          'manual-query',
-          verifiedPeerKey,
-          route.route.senderId,
-          envelope.id
-        )
-        if (this.#replay.has(replayKey, this.#kernel.time.scheduler.now())) {
-          this.#emit({ name: 'authentication.rejected', code: 'MANUAL_QUERY_REPLAY' })
-          return
-        }
-        const queryKey = tupleKey(
-          'manual-query',
-          verifiedPeerKey,
-          route.route.senderId,
-          envelope.id
-        )
-        if (this.#registry.hasInboundQuery(queryKey)) {
-          this.#emit({ name: 'authentication.rejected', code: 'MANUAL_QUERY_COLLISION' })
-          return
-        }
-        if (this.#registry.inboundQuerySize() >= this.limits.maxManualInboundQueries) {
-          this.#emit({ name: 'failure', code: 'MANUAL_QUERY_LIMIT' })
-          return
-        }
-        if (!this.#replay.admit(replayKey, verifiedPeerKey, this.#kernel.time.scheduler.now())) {
-          this.#emit({ name: 'failure', code: 'DISCOVERY_QUERY_LIMIT' })
-          return
-        }
-        const queryData =
-          route.payload && typeof route.payload === 'object' && !Array.isArray(route.payload)
-            ? Object.freeze(
-                Object.fromEntries(
-                  Object.entries(route.payload as Record<string, unknown>).filter(
-                    ([key]) => key !== '__unique_id__'
-                  )
-                )
-              )
-            : route.payload
-        this.#registry.setInboundQuery(queryKey, {
-          authenticationNonce: readAuthenticationChallengeProof(envelope)?.nonce,
-          queryId: envelope.id,
-          senderId: route.route.senderId,
-          targetId: route.route.targetId,
-          verifiedPeerKey,
-          data: queryData,
-          platform: this.#kernel.platform,
-          origin: source?.origin
-        } satisfies IManualInboundQuery)
-        this.#setInboundDiscoveryTimer(
-          queryKey,
-          this.#ports.time.setTimeout(() => {
-            this.#deleteInboundDiscoveryTimer(queryKey)
-            if (!this.#registry.deleteInboundQuery(queryKey)) return
-            this.#replay.admit(replayKey, verifiedPeerKey, this.#kernel.time.scheduler.now())
-            this.#emit({ name: 'authentication.rejected', code: 'MANUAL_QUERY_EXPIRED' })
-          }, this.limits.manualInboundQueryTtlMs)
-        )
-        const listener = this.getManualQueryListener()
-        if (listener) {
-          const handle: IRpcInboundDiscoveryQuery<TTargetId> = Object.freeze({
-            targetId: this.#identity.id as TTargetId,
-            data: queryData,
-            platform: this.#kernel.platform,
-            origin: source?.origin,
-            accept: (data: unknown) => this.#settleManualInboundQuery(queryKey, true, data),
-            reject: (reason?: string) =>
-              this.#settleManualInboundQuery(queryKey, false, undefined, reason)
-          })
-          try {
-            void Promise.resolve(listener(handle)).catch((error) =>
-              this.#emit({ name: 'failure', code: RpcCoreErrorCode.internal, error })
-            )
-          } catch (error) {
-            this.#emit({ name: 'failure', code: RpcCoreErrorCode.internal, error })
-          }
-        }
-        return
-      }
-      const replayKey = tupleKey(
-        'automatic-query',
-        verifiedPeerKey,
-        route.route.senderId,
-        envelope.id
-      )
-      const challengeProof = readAuthenticationChallengeProof(envelope)
-      const residentQuery = this.#replay.has(replayKey, this.#kernel.time.scheduler.now())
-      if (residentQuery && !challengeProof) {
-        this.#emit({ name: 'authentication.rejected', code: 'DISCOVERY_QUERY_REPLAY' })
-        return
-      }
-      if (
-        !residentQuery &&
-        !this.#replay.canAdmit(replayKey, verifiedPeerKey, this.#kernel.time.scheduler.now())
-      ) {
-        this.#emit({ name: 'failure', code: 'DISCOVERY_QUERY_LIMIT' })
-        return
-      }
-      if (!residentQuery && !this.#admitAutomaticDiscovery(verifiedPeerKey, replayKey)) {
-        this.#emit({ name: 'failure', code: 'DISCOVERY_QUERY_LIMIT' })
-        return
-      }
-      if (
-        !residentQuery &&
-        !this.#replay.admit(replayKey, verifiedPeerKey, this.#kernel.time.scheduler.now())
-      ) {
-        this.#registry.deleteAdmission(replayKey)
-        this.#emit({ name: 'failure', code: 'DISCOVERY_QUERY_LIMIT' })
-        return
-      }
-      const receiverId = this.ensureLocalReceiver(this.#identity.id as TTargetId)
-      const response: IRpcEnvelopeData = {
-        route: {
-          profile: RpcRouteProfile,
-          type: RpcRouteType.discoveryResponse,
-          applicationVersion: this.#applicationVersion,
-          senderId: this.#identity.id,
-          targetId: route.route.senderId,
-          resolvedTargetId: this.#identity.id,
-          sentAt: this.#ports.time.timestamp(),
-          platform: this.#kernel.platform,
-          receiverId
-        },
-        ...(this.#uniqueTargetId === undefined
-          ? {}
-          : { payload: { __unique_id__: this.#uniqueTargetId } })
-      }
-      if (challengeProof) {
-        const owner = readAuthenticationChallengePort(this.#authentication)!
-        retainAuthenticationChallengeResponse(response, {
-          nonce: challengeProof.nonce,
-          control: RpcAuthenticationControl.response,
-          echoNonce: challengeProof.nonce,
-          challenge: owner.issue(challengeProof.nonce),
-          receiverId
-        })
-      }
-      void this.#sendFrame(envelope.id, response).catch((error: unknown) =>
-        this.#emit({ name: 'transport.failure', code: RpcCoreErrorCode.transport, error })
-      )
-      return
+      if (route.route.manual && this.#mode === 'manual')
+        return this.#receiveManualDiscoveryQuery(envelope, route, verifiedPeerKey, source)
+      return this.#receiveAutomaticDiscoveryQuery(envelope, route, verifiedPeerKey)
     }
+    /** Response routing requires a concrete target before it can touch discovery state. */
     const resolvedTargetId = route.route.resolvedTargetId
     if (typeof resolvedTargetId !== 'string') return
     if (route.route.manual && route.route.operation === 'unregister') {
@@ -1339,88 +1196,272 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
       })
       return
     }
-    if (route.route.manual) {
-      const waiter = this.#registry.getManualWaiter<IManualDiscoveryWaiter<TTargetId>>(envelope.id)
-      if (!waiter || waiter.targetId !== route.route.resolvedTargetId) return
-      if (route.route.accepted !== true || typeof route.route.receiverId !== 'string') return
+    if (route.route.manual)
+      return this.#receiveManualDiscoveryResponse(envelope, route, verifiedPeerKey, source)
+    this.#receiveAutomaticDiscoveryResponse(
+      envelope,
+      route,
+      verifiedPeerKey,
+      resolvedTargetId,
+      source
+    )
+  }
+
+  /** Report an invalid metadata getter through the existing endpoint failure hook. */
+  #reportDiscoveryRead: IRpcPropertyReadReporter = ({ key, error }) => {
+    this.#emit({
+      name: 'failure',
+      code: RpcCoreErrorCode.invalidConfig,
+      error,
+      ...(typeof key === 'string' ? { field: key } : {})
+    })
+    return undefined
+  }
+
+  /** Admit one manual query and publish its original accept/reject capability under the same TTL. */
+  #receiveManualDiscoveryQuery(
+    envelope: Extract<IRpcEnvelope, { readonly kind: 'discovery' }>,
+    route: IRpcEnvelopeData,
+    verifiedPeerKey: string,
+    source?: IRpcInboundMessage<unknown>
+  ): void {
+    const replayKey = tupleKey('manual-query', verifiedPeerKey, route.route.senderId, envelope.id)
+    if (this.#replay.has(replayKey, this.#kernel.time.scheduler.now())) {
+      this.#emit({ name: 'authentication.rejected', code: 'MANUAL_QUERY_REPLAY' })
+      return
+    }
+    const queryKey = tupleKey('manual-query', verifiedPeerKey, route.route.senderId, envelope.id)
+    if (this.#registry.hasInboundQuery(queryKey)) {
+      this.#emit({ name: 'authentication.rejected', code: 'MANUAL_QUERY_COLLISION' })
+      return
+    }
+    if (this.#registry.inboundQuerySize() >= this.limits.maxManualInboundQueries) {
+      this.#emit({ name: 'failure', code: 'MANUAL_QUERY_LIMIT' })
+      return
+    }
+    if (!this.#replay.admit(replayKey, verifiedPeerKey, this.#kernel.time.scheduler.now())) {
+      this.#emit({ name: 'failure', code: 'DISCOVERY_QUERY_LIMIT' })
+      return
+    }
+    const queryData =
+      route.payload && typeof route.payload === 'object' && !Array.isArray(route.payload)
+        ? Object.freeze(
+            Object.fromEntries(
+              Object.entries(route.payload as Record<string, unknown>).filter(
+                ([key]) => key !== '__unique_id__'
+              )
+            )
+          )
+        : route.payload
+    this.#registry.setInboundQuery(queryKey, {
+      authenticationNonce: readAuthenticationChallengeProof(envelope)?.nonce,
+      queryId: envelope.id,
+      senderId: route.route.senderId,
+      targetId: route.route.targetId,
+      verifiedPeerKey,
+      data: queryData,
+      platform: this.#kernel.platform,
+      origin: source?.origin
+    } satisfies IManualInboundQuery)
+    this.#setInboundDiscoveryTimer(
+      queryKey,
+      this.#ports.time.setTimeout(() => {
+        this.#deleteInboundDiscoveryTimer(queryKey)
+        if (!this.#registry.deleteInboundQuery(queryKey)) return
+        this.#replay.admit(replayKey, verifiedPeerKey, this.#kernel.time.scheduler.now())
+        this.#emit({ name: 'authentication.rejected', code: 'MANUAL_QUERY_EXPIRED' })
+      }, this.limits.manualInboundQueryTtlMs)
+    )
+    const listener = this.getManualQueryListener()
+    if (listener) {
+      const handle: IRpcInboundDiscoveryQuery<TTargetId> = Object.freeze({
+        targetId: this.#identity.id as TTargetId,
+        data: queryData,
+        platform: this.#kernel.platform,
+        origin: source?.origin,
+        accept: (data: unknown) => this.#settleManualInboundQuery(queryKey, true, data),
+        reject: (reason?: string) =>
+          this.#settleManualInboundQuery(queryKey, false, undefined, reason)
+      })
       try {
-        this.#validateIdentifier(route.route.receiverId, 'receiverId')
+        void Promise.resolve(listener(handle)).catch((error) =>
+          this.#emit({ name: 'failure', code: RpcCoreErrorCode.internal, error })
+        )
+      } catch (error) {
+        this.#emit({ name: 'failure', code: RpcCoreErrorCode.internal, error })
+      }
+    }
+    return
+  }
+
+  /** Respond to one authenticated automatic query with the original replay and challenge policy. */
+  #receiveAutomaticDiscoveryQuery(
+    envelope: Extract<IRpcEnvelope, { readonly kind: 'discovery' }>,
+    route: IRpcEnvelopeData,
+    verifiedPeerKey: string
+  ): void {
+    const replayKey = tupleKey(
+      'automatic-query',
+      verifiedPeerKey,
+      route.route.senderId,
+      envelope.id
+    )
+    const challengeProof = readAuthenticationChallengeProof(envelope)
+    const residentQuery = this.#replay.has(replayKey, this.#kernel.time.scheduler.now())
+    if (residentQuery && !challengeProof) {
+      this.#emit({ name: 'authentication.rejected', code: 'DISCOVERY_QUERY_REPLAY' })
+      return
+    }
+    if (
+      !residentQuery &&
+      !this.#replay.canAdmit(replayKey, verifiedPeerKey, this.#kernel.time.scheduler.now())
+    ) {
+      this.#emit({ name: 'failure', code: 'DISCOVERY_QUERY_LIMIT' })
+      return
+    }
+    if (!residentQuery && !this.#admitAutomaticDiscovery(verifiedPeerKey, replayKey)) {
+      this.#emit({ name: 'failure', code: 'DISCOVERY_QUERY_LIMIT' })
+      return
+    }
+    if (
+      !residentQuery &&
+      !this.#replay.admit(replayKey, verifiedPeerKey, this.#kernel.time.scheduler.now())
+    ) {
+      this.#registry.deleteAdmission(replayKey)
+      this.#emit({ name: 'failure', code: 'DISCOVERY_QUERY_LIMIT' })
+      return
+    }
+    const receiverId = this.ensureLocalReceiver(this.#identity.id as TTargetId)
+    const response: IRpcEnvelopeData = {
+      route: {
+        profile: RpcRouteProfile,
+        type: RpcRouteType.discoveryResponse,
+        applicationVersion: this.#applicationVersion,
+        senderId: this.#identity.id,
+        targetId: route.route.senderId,
+        resolvedTargetId: this.#identity.id,
+        sentAt: this.#ports.time.timestamp(),
+        platform: this.#kernel.platform,
+        receiverId
+      },
+      ...(this.#uniqueTargetId === undefined
+        ? {}
+        : { payload: { __unique_id__: this.#uniqueTargetId } })
+    }
+    if (challengeProof) {
+      const owner = readAuthenticationChallengePort(this.#authentication)!
+      retainAuthenticationChallengeResponse(response, {
+        nonce: challengeProof.nonce,
+        control: RpcAuthenticationControl.response,
+        echoNonce: challengeProof.nonce,
+        challenge: owner.issue(challengeProof.nonce),
+        receiverId
+      })
+    }
+    void this.#sendFrame(envelope.id, response).catch((error: unknown) =>
+      this.#emit({ name: 'transport.failure', code: RpcCoreErrorCode.transport, error })
+    )
+    return
+  }
+
+  /** Admit one manual response into its exact waiting query, retaining original candidate identity. */
+  #receiveManualDiscoveryResponse(
+    envelope: Extract<IRpcEnvelope, { readonly kind: 'discovery' }>,
+    route: IRpcEnvelopeData,
+    verifiedPeerKey: string,
+    source?: IRpcInboundMessage<unknown>
+  ): void {
+    const waiter = this.#registry.getManualWaiter<IManualDiscoveryWaiter<TTargetId>>(envelope.id)
+    if (!waiter || waiter.targetId !== route.route.resolvedTargetId) return
+    if (route.route.accepted !== true || typeof route.route.receiverId !== 'string') return
+    try {
+      this.#validateIdentifier(route.route.receiverId, 'receiverId')
+    } catch (error) {
+      this.#emit({ name: 'failure', code: RpcCoreErrorCode.invalidConfig, error })
+      return
+    }
+    /** Read the candidate’s optional unique identity from the admitted payload. */
+    const candidateUniqueId =
+      route.payload && typeof route.payload === 'object'
+        ? safeRead<unknown>(route.payload, '__unique_id__', this.#reportDiscoveryRead)
+        : undefined
+    if (candidateUniqueId !== undefined && typeof candidateUniqueId !== 'string') {
+      this.#emit({
+        name: 'failure',
+        code: RpcCoreErrorCode.invalidConfig,
+        error: createRpcError(
+          RpcCoreErrorCode.invalidConfig,
+          RpcCoreErrorText.discoveryCandidateUniqueTargetIdMustBeAString
+        )
+      })
+      return
+    }
+    if (candidateUniqueId !== undefined) {
+      try {
+        this.#validateIdentifier(candidateUniqueId, 'uniqueTargetId')
       } catch (error) {
         this.#emit({ name: 'failure', code: RpcCoreErrorCode.invalidConfig, error })
         return
       }
-      const candidateUniqueId =
-        route.payload && typeof route.payload === 'object'
-          ? safeRead<unknown>(route.payload, '__unique_id__', reportRead)
-          : undefined
-      if (candidateUniqueId !== undefined && typeof candidateUniqueId !== 'string') {
-        this.#emit({
-          name: 'failure',
-          code: RpcCoreErrorCode.invalidConfig,
-          error: createRpcError(
-            RpcCoreErrorCode.invalidConfig,
-            RpcCoreErrorText.discoveryCandidateUniqueTargetIdMustBeAString
-          )
-        })
-        return
-      }
-      if (candidateUniqueId !== undefined) {
-        try {
-          this.#validateIdentifier(candidateUniqueId, 'uniqueTargetId')
-        } catch (error) {
-          this.#emit({ name: 'failure', code: RpcCoreErrorCode.invalidConfig, error })
-          return
-        }
-      }
-      if (
-        this.#kernel.platform === RpcPlatform.broadcastChannel &&
-        route.route.receiverId !==
-          (candidateUniqueId === undefined
-            ? route.route.resolvedTargetId
-            : `${route.route.resolvedTargetId}:${candidateUniqueId}`)
-      )
-        return
-      const candidateKey = tupleKey(
-        verifiedPeerKey,
-        route.route.resolvedTargetId,
-        route.route.receiverId
-      )
-      if (waiter.candidateKeys.has(candidateKey)) return
-      const peerCandidateCount = waiter.candidatePeerCounts.get(verifiedPeerKey) ?? 0
-      if (waiter.candidates.length >= this.limits.maxManualCandidatesPerQuery) {
-        this.#emit({ name: 'failure', code: 'MANUAL_CANDIDATE_LIMIT' })
-        return
-      }
-      if (peerCandidateCount >= this.limits.maxManualCandidatesPerPeer) {
-        this.#emit({ name: 'failure', code: 'MANUAL_CANDIDATE_PEER_LIMIT' })
-        return
-      }
-      const candidate = Object.freeze({
-        queryId: envelope.id,
-        targetId: route.route.resolvedTargetId as TTargetId,
-        receiverId: route.route.receiverId,
-        data: route.payload,
-        platform: this.#kernel.platform,
-        origin: source?.origin
-      })
-      waiter.candidateKeys.add(candidateKey)
-      waiter.candidatePeerCounts.set(verifiedPeerKey, peerCandidateCount + 1)
-      waiter.candidates.push(candidate)
-      const proof = readAuthenticationChallengeProof(envelope)
-      if (proof?.control === RpcAuthenticationControl.response && proof.challenge)
-        retainAuthenticationChallengeResponse(candidate, proof)
-      this.#registry.setCandidate(
-        candidate,
-        {
-          expiresAt: this.#ports.time.now() + this.limits.manualInboundQueryTtlMs,
-          registered: false,
-          revoked: false,
-          verifiedPeerKey
-        },
-        candidateUniqueId
-      )
+    }
+    if (
+      this.#kernel.platform === RpcPlatform.broadcastChannel &&
+      route.route.receiverId !==
+        (candidateUniqueId === undefined
+          ? route.route.resolvedTargetId
+          : `${route.route.resolvedTargetId}:${candidateUniqueId}`)
+    )
+      return
+    const candidateKey = tupleKey(
+      verifiedPeerKey,
+      route.route.resolvedTargetId,
+      route.route.receiverId
+    )
+    if (waiter.candidateKeys.has(candidateKey)) return
+    const peerCandidateCount = waiter.candidatePeerCounts.get(verifiedPeerKey) ?? 0
+    if (waiter.candidates.length >= this.limits.maxManualCandidatesPerQuery) {
+      this.#emit({ name: 'failure', code: 'MANUAL_CANDIDATE_LIMIT' })
       return
     }
+    if (peerCandidateCount >= this.limits.maxManualCandidatesPerPeer) {
+      this.#emit({ name: 'failure', code: 'MANUAL_CANDIDATE_PEER_LIMIT' })
+      return
+    }
+    const candidate = Object.freeze({
+      queryId: envelope.id,
+      targetId: route.route.resolvedTargetId as TTargetId,
+      receiverId: route.route.receiverId,
+      data: route.payload,
+      platform: this.#kernel.platform,
+      origin: source?.origin
+    })
+    waiter.candidateKeys.add(candidateKey)
+    waiter.candidatePeerCounts.set(verifiedPeerKey, peerCandidateCount + 1)
+    waiter.candidates.push(candidate)
+    const proof = readAuthenticationChallengeProof(envelope)
+    if (proof?.control === RpcAuthenticationControl.response && proof.challenge)
+      retainAuthenticationChallengeResponse(candidate, proof)
+    this.#registry.setCandidate(
+      candidate,
+      {
+        expiresAt: this.#ports.time.now() + this.limits.manualInboundQueryTtlMs,
+        registered: false,
+        revoked: false,
+        verifiedPeerKey
+      },
+      candidateUniqueId
+    )
+    return
+  }
+
+  /** Commit one automatic response's live receiver and original authentication challenge facts. */
+  #receiveAutomaticDiscoveryResponse(
+    envelope: Extract<IRpcEnvelope, { readonly kind: 'discovery' }>,
+    route: IRpcEnvelopeData,
+    verifiedPeerKey: string,
+    resolvedTargetId: string,
+    source?: IRpcInboundMessage<unknown>
+  ): void {
     const targetId = this.#registry.getTask(envelope.id)
     if (
       targetId === undefined ||
@@ -1438,9 +1479,10 @@ export class RpcDiscoveryAttachment<TTargetId extends string = string> {
       this.#emit({ name: 'failure', code: RpcCoreErrorCode.invalidConfig, error })
       return
     }
+    /** Read the remote unique identity used by discovery replacement rules. */
     const uniqueTargetId =
       route.payload && typeof route.payload === 'object'
-        ? safeRead<unknown>(route.payload, '__unique_id__', reportRead)
+        ? safeRead<unknown>(route.payload, '__unique_id__', this.#reportDiscoveryRead)
         : undefined
     if (uniqueTargetId !== undefined) {
       if (typeof uniqueTargetId !== 'string') {

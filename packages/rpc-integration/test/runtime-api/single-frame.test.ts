@@ -14,7 +14,7 @@ import { RpcOutboundSender } from '../../../rpc-host/dist/core/internal/outbound
 import type { IRpcSelectedComponents } from '../../../rpc-host/dist/core/internal/endpoint-options.js'
 import { wrapRuntimeCarrier } from '@migaia/rpc-contract/runtime'
 import { measureRpcPhysicalFrame } from '@migaia/rpc-contract/framing'
-import { bridgeFixture } from '../bridge/fixture.js'
+import { BridgeFixture } from '../bridge/fixture.js'
 import { objectFixtureEndpoint } from '../bridge/json-object-fixture.js'
 import { readEndpointOwner } from '../../../rpc-host/dist/core/internal/endpoint-projection.js'
 
@@ -22,7 +22,7 @@ it.each([false, true])(
   'actual JSON-RPC bridge fallback=%s refuses group without a JSON-RPC batch or member send',
   async (fallback) => {
     /** The independent raw JSON-RPC peer establishes a genuine negotiated bridge channel. */
-    const fixture = bridgeFixture()
+    const fixture = new BridgeFixture()
     const channel = await fixture.open()
     const endpoint = await objectFixtureEndpoint(channel, { fallback })
     try {

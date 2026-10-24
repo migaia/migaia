@@ -90,7 +90,6 @@ type IEntry = {
   outcome?: IRpcIdempotencyOutcome | 'unavailable'
   settledAt?: number
   bytes: number
-  sequence: number
 }
 
 /**
@@ -160,155 +159,202 @@ function capacity(value: number | undefined, fallback: number): number {
   return value
 }
 
-/**
- * Provide bounded, settlement-relative deduplication without owning endpoint timers. All capacities
- * must be positive safe integers. Completed bodies may become unavailable under byte pressure while
- * their tombstones still prevent re-execution. Pending claims expire only by settlement or
- * release.
- */
-export function createRpcIdempotencyStore(
-  options: {
-    /**
-     * Completed-entry retention, defaulting to 300000 ms; pending executions are not expired by
-     * this budget.
-     */
-    readonly retentionMs?: number
-    /** Global claim/tombstone capacity; defaults to 1024. */
-    readonly maxEntries?: number
-    /** Per-authenticated-scope claim/tombstone capacity; defaults to 256. */
-    readonly maxEntriesPerScope?: number
-    /** Total retained outcome-body budget; defaults to 8 MiB. */
-    readonly maxBytes?: number
-    /** Per-outcome body budget; defaults to 1 MiB. */
-    readonly maxOutcomeBytes?: number
-  } = {}
-): IRpcIdempotencyStore {
+/** Capacity inputs are validated before the store retains any scoped execution state. */
+type IRpcIdempotencyStoreOptions = {
+  /**
+   * Completed-entry retention, defaulting to 300000 ms; pending executions are not expired by this
+   * budget.
+   */
+  readonly retentionMs?: number
+  /** Global claim/tombstone capacity; defaults to 1024. */
+  readonly maxEntries?: number
+  /** Per-authenticated-scope claim/tombstone capacity; defaults to 256. */
+  readonly maxEntriesPerScope?: number
+  /** Total retained outcome-body budget; defaults to 8 MiB. */
+  readonly maxBytes?: number
+  /** Per-outcome body budget; defaults to 1 MiB. */
+  readonly maxOutcomeBytes?: number
+}
+
+/** One claimed handle lends only settlement and release rights for its exact original entry. */
+class RpcIdempotencyClaim {
+  /** The original store retains scope membership and all budget mutation authority. */
+  readonly #store: RpcIdempotencyStore
+  /** Entry identity prevents stale handles from settling a replacement with the same key. */
+  readonly #entry: IEntry
+  /** A claim handle never changes state; its store determines whether its rights remain live. */
+  readonly status = 'claimed' as const
+
+  /** Retain the actual entry, not a copied key that could later identify a replacement. */
+  constructor(store: RpcIdempotencyStore, entry: IEntry) {
+    this.#store = store
+    this.#entry = entry
+  }
+
+  /** Receiver-independent settlement preserves the original claim method's callable contract. */
+  readonly settle = (outcome: IRpcIdempotencyOutcome, now: number): void => {
+    this.#store.settleClaim(this.#entry, outcome, now)
+  }
+
+  /** Receiver-independent release affects only this still-pending entry and its own waiters. */
+  readonly release = (): void => {
+    this.#store.releaseClaim(this.#entry)
+  }
+}
+
+/** One store owns all scopes, pending claims, retained bodies and the optional continuity epoch. */
+class RpcIdempotencyStore implements IRpcIdempotencyStore {
   /** Retention begins when a terminal provider outcome is known, not when execution starts. */
-  const retentionMs = capacity(options.retentionMs, 300_000)
-  const maxEntries = capacity(options.maxEntries, 1024)
-  const maxEntriesPerScope = capacity(options.maxEntriesPerScope, 256)
-  const maxBytes = capacity(options.maxBytes, 8 * 1024 * 1024)
-  const maxOutcomeBytes = capacity(options.maxOutcomeBytes, 1024 * 1024)
+  readonly #retentionMs: number
+  /** Global pending/tombstone limit is fixed when this store is created. */
+  readonly #maxEntries: number
+  /** An authenticated scope cannot consume another scope's reserved claim capacity. */
+  readonly #maxEntriesPerScope: number
+  /** Body pressure evicts outcomes without reviving their execution keys. */
+  readonly #maxBytes: number
+  /** Oversized outcomes retain an unavailable tombstone rather than an unbounded body. */
+  readonly #maxOutcomeBytes: number
   /** Scope maps separate identical method/key tuples on different admitted connections. */
-  const scopes = new Map<string, Map<string, IEntry>>()
-  let entries = 0
-  let bytes = 0
-  let sequence = 0
+  readonly #scopes = new Map<string, Map<string, IEntry>>()
+  /** Settlement insertion order is already the original sequence order used for body eviction. */
+  readonly #completed = new Map<IEntry, true>()
+  /** Every pending or completed tombstone consumes exactly one global claim slot. */
+  #entries = 0
+  /** Sum of currently retained completed-body sizes, excluding unavailable tombstones. */
+  #bytes = 0
   /** Lazily minted only when outcome lookup queries this exact in-memory store incarnation. */
-  let epoch: string | undefined
+  #epoch: string | undefined
+
+  /** Validate all numeric policy before allocating an application's first claim. */
+  constructor(options: IRpcIdempotencyStoreOptions) {
+    this.#retentionMs = capacity(options.retentionMs, 300_000)
+    this.#maxEntries = capacity(options.maxEntries, 1024)
+    this.#maxEntriesPerScope = capacity(options.maxEntriesPerScope, 256)
+    this.#maxBytes = capacity(options.maxBytes, 8 * 1024 * 1024)
+    this.#maxOutcomeBytes = capacity(options.maxOutcomeBytes, 1024 * 1024)
+  }
 
   /** Remove an entry only if the same owner still holds that key. */
-  function remove(entry: IEntry): void {
-    const scope = scopes.get(entry.scope)
+  #remove(entry: IEntry): void {
+    const scope = this.#scopes.get(entry.scope)
     if (scope?.get(entry.key) !== entry) return
     scope.delete(entry.key)
-    if (scope.size === 0) scopes.delete(entry.scope)
-    entries -= 1
-    bytes -= entry.bytes
+    if (scope.size === 0) this.#scopes.delete(entry.scope)
+    this.#completed.delete(entry)
+    this.#entries -= 1
+    this.#bytes -= entry.bytes
   }
 
   /** Purge completed outcomes whose settlement-relative retention has elapsed. */
-  function purge(now: number): void {
-    for (const scope of scopes.values())
+  #purge(now: number): void {
+    for (const scope of this.#scopes.values())
       for (const entry of scope.values())
         if (
           entry.status === 'done' &&
           entry.settledAt !== undefined &&
-          now - entry.settledAt >= retentionMs
+          now - entry.settledAt >= this.#retentionMs
         )
-          remove(entry)
+          this.#remove(entry)
   }
 
   /** Drop oldest completed bodies while keeping tombstones and their execution history. */
-  function enforceByteBudget(): void {
-    if (bytes <= maxBytes) return
-    const completed = [...scopes.values()]
-      .flatMap((scope) => [...scope.values()])
-      .filter((entry) => entry.status === 'done' && entry.outcome !== 'unavailable')
-      .sort((a, b) => a.sequence - b.sequence)
-    for (const entry of completed) {
-      if (bytes <= maxBytes) break
-      bytes -= entry.bytes
+  #enforceByteBudget(): void {
+    for (const entry of this.#completed.keys()) {
+      if (this.#bytes <= this.#maxBytes) break
+      this.#completed.delete(entry)
+      this.#bytes -= entry.bytes
       entry.bytes = 0
       entry.outcome = 'unavailable'
     }
   }
 
-  return Object.freeze({
-    /** Read one original entry without purge, waiters, retention refresh or quota mutation. */
-    readRuntimeFacts(): IRpcRuntimeStore {
+  /** Read one original entry without purge, waiters, retention refresh or quota mutation. */
+  readonly readRuntimeFacts = (): IRpcRuntimeStore => {
+    return Object.freeze({
+      kind: RpcRuntimeStoreKind.memory,
+      epoch: (this.#epoch ??= defaultRpcId()),
+      continuity: RpcRuntimeStoreContinuity.retained
+    })
+  }
+  /** Lookup observes retention without allocating waiters or modifying a claim's lifetime. */
+  readonly lookup = (scope: string, key: string, now: number): IRpcIdempotencyLookup => {
+    /** Missing/expired/body-evicted keys are unknown; continuity belongs to the actual store owner. */
+    const entry = this.#scopes.get(scope)?.get(key)
+    if (
+      !entry ||
+      (entry.status === 'done' && now - entry.settledAt! >= this.#retentionMs) ||
+      entry.outcome === 'unavailable'
+    )
+      return Object.freeze({ state: RpcRuntimeOutcomeState.unknown })
+    return entry.status === 'pending'
+      ? Object.freeze({ state: RpcRuntimeOutcomeState.pending })
+      : Object.freeze({ state: RpcRuntimeOutcomeState.done, outcome: entry.outcome! })
+  }
+  /** Existing atomic claim retains one optional new-domain fingerprint until its result expires. */
+  readonly claim = (
+    scope: string,
+    key: string,
+    now: number,
+    fingerprint?: string
+  ): IRpcIdempotencyClaim => {
+    this.#purge(now)
+    const existing = this.#scopes.get(scope)?.get(key)
+    if (fingerprint !== undefined && existing && existing.fingerprint !== fingerprint)
+      throw createRpcContractError(RpcCoreErrorText.runtimeIdempotencyConflict)
+    if (existing?.status === 'done')
+      return Object.freeze({ status: 'done', outcome: existing.outcome! })
+    if (existing?.status === 'pending')
       return Object.freeze({
-        kind: RpcRuntimeStoreKind.memory,
-        epoch: (epoch ??= defaultRpcId()),
-        continuity: RpcRuntimeStoreContinuity.retained
-      })
-    },
-    lookup(scope: string, key: string, now: number): IRpcIdempotencyLookup {
-      /**
-       * Missing/expired/body-evicted keys are unknown; continuity belongs to the actual store
-       * owner.
-       */
-      const entry = scopes.get(scope)?.get(key)
-      if (
-        !entry ||
-        (entry.status === 'done' && now - entry.settledAt! >= retentionMs) ||
-        entry.outcome === 'unavailable'
-      )
-        return Object.freeze({ state: RpcRuntimeOutcomeState.unknown })
-      return entry.status === 'pending'
-        ? Object.freeze({ state: RpcRuntimeOutcomeState.pending })
-        : Object.freeze({ state: RpcRuntimeOutcomeState.done, outcome: entry.outcome! })
-    },
-    /** Existing atomic claim retains one optional new-domain fingerprint until its result expires. */
-    claim(scope: string, key: string, now: number, fingerprint?: string): IRpcIdempotencyClaim {
-      purge(now)
-      const existing = scopes.get(scope)?.get(key)
-      if (fingerprint !== undefined && existing && existing.fingerprint !== fingerprint)
-        throw createRpcContractError(RpcCoreErrorText.runtimeIdempotencyConflict)
-      if (existing?.status === 'done')
-        return Object.freeze({ status: 'done', outcome: existing.outcome! })
-      if (existing?.status === 'pending')
-        return Object.freeze({
-          status: 'pending',
-          outcome: new Promise<IRpcIdempotencyOutcome | 'unavailable' | undefined>((resolve) => {
-            existing.waiters.push(resolve)
-          })
-        })
-      const scoped = scopes.get(scope) ?? new Map<string, IEntry>()
-      if (entries >= maxEntries || scoped.size >= maxEntriesPerScope)
-        return Object.freeze({ status: 'full' })
-      if (!scopes.has(scope)) scopes.set(scope, scoped)
-      const entry: IEntry = {
-        scope,
-        key,
-        ...(fingerprint === undefined ? {} : { fingerprint }),
-        waiters: [],
         status: 'pending',
-        bytes: 0,
-        sequence: 0
-      }
-      scoped.set(key, entry)
-      entries += 1
-      return Object.freeze({
-        status: 'claimed',
-        settle(outcome: IRpcIdempotencyOutcome, settledAt: number): void {
-          if (entry.status !== 'pending' || scoped.get(key) !== entry) return
-          const size = outcomeBytes(outcome)
-          entry.status = 'done'
-          entry.settledAt = settledAt
-          entry.sequence = ++sequence
-          entry.outcome = size > maxOutcomeBytes ? 'unavailable' : outcome
-          entry.bytes = size > maxOutcomeBytes ? 0 : size
-          bytes += entry.bytes
-          enforceByteBudget()
-          for (const waiter of entry.waiters.splice(0)) waiter(entry.outcome!)
-        },
-        release(): void {
-          if (entry.status !== 'pending' || scoped.get(key) !== entry) return
-          remove(entry)
-          for (const waiter of entry.waiters.splice(0)) waiter(undefined)
-        }
+        outcome: new Promise<IRpcIdempotencyOutcome | 'unavailable' | undefined>((resolve) => {
+          existing.waiters.push(resolve)
+        })
       })
+    const scoped = this.#scopes.get(scope) ?? new Map<string, IEntry>()
+    if (this.#entries >= this.#maxEntries || scoped.size >= this.#maxEntriesPerScope)
+      return Object.freeze({ status: 'full' })
+    if (!this.#scopes.has(scope)) this.#scopes.set(scope, scoped)
+    const entry: IEntry = {
+      scope,
+      key,
+      ...(fingerprint === undefined ? {} : { fingerprint }),
+      waiters: [],
+      status: 'pending',
+      bytes: 0
     }
-  })
+    scoped.set(key, entry)
+    this.#entries += 1
+    return Object.freeze(new RpcIdempotencyClaim(this, entry))
+  }
+
+  /** Commit one exact pending claim, then release its waiters after ordered body eviction. */
+  settleClaim(entry: IEntry, outcome: IRpcIdempotencyOutcome, settledAt: number): void {
+    if (entry.status !== 'pending' || this.#scopes.get(entry.scope)?.get(entry.key) !== entry)
+      return
+    /** Byte measurement preserves the original provider-value access and failure point. */
+    const size = outcomeBytes(outcome)
+    entry.status = 'done'
+    entry.settledAt = settledAt
+    entry.outcome = size > this.#maxOutcomeBytes ? 'unavailable' : outcome
+    entry.bytes = size > this.#maxOutcomeBytes ? 0 : size
+    this.#bytes += entry.bytes
+    if (entry.outcome !== 'unavailable') this.#completed.set(entry, true)
+    this.#enforceByteBudget()
+    for (const waiter of entry.waiters.splice(0)) waiter(entry.outcome!)
+  }
+
+  /** Release a pending exact claim without affecting any replacement or already-settled body. */
+  releaseClaim(entry: IEntry): void {
+    if (entry.status !== 'pending' || this.#scopes.get(entry.scope)?.get(entry.key) !== entry)
+      return
+    this.#remove(entry)
+    for (const waiter of entry.waiters.splice(0)) waiter(undefined)
+  }
+}
+
+/** Provide one bounded store; pending claims expire only by settlement or explicit release. */
+export function createRpcIdempotencyStore(
+  options: IRpcIdempotencyStoreOptions = {}
+): IRpcIdempotencyStore {
+  return Object.freeze(new RpcIdempotencyStore(options))
 }

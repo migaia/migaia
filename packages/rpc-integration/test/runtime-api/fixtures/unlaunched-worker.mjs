@@ -1,5 +1,6 @@
 import { defineHost, definePlugin, defineFeature } from '@migaia/plugin-host'
-import { createThreadPeer } from '../../../../rpc-plugin-thread/test/protocol.ts'
+import { createRpcHost } from '@migaia/rpc-host'
+import { threadPlugin } from '@migaia/rpc-plugin-thread'
 
 /** Ordinary local Feature execution succeeds inside the actual plain Worker. */
 const host = defineHost({
@@ -15,7 +16,10 @@ const [local] = await host.use(
 )
 postMessage({ ordinary: local.getFeature('data').read() })
 try {
-  const peer = await createThreadPeer({ report: () => undefined })
+  const peer = await createRpcHost({
+    plugins: [threadPlugin({ connectToParent: true })],
+    report: () => undefined
+  })
   await peer.close()
   postMessage({ code: 'UNEXPECTED_PREPARATION' })
 } catch (error) {

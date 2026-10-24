@@ -6,8 +6,6 @@ export const BrowserRpcErrorText = {
   carrierObservationFailed: 'Browser carrier observation failed',
   /** The RTC adapter reports setup and rollback failure with this stable aggregate text. */
   rtcSubscriptionCleanupFailed: 'subscription setup failed',
-  /** The WebTransport adapter reports terminal cleanup failure with this stable aggregate text. */
-  webTransportCleanupFailed: 'WebTransport close failed',
   /**
    * The ServiceWorker adapter reports a failed source identity read through its transport error
    * observer.
@@ -42,22 +40,6 @@ export const BrowserRpcErrorText = {
    * caller-facing wording.
    */
   rpcSharedWorkerMessageError: '[rpc] shared worker message error',
-  /**
-   * Stable browser error text consumed by browser/adapters/web-transport.ts; preserves its existing
-   * caller-facing wording.
-   */
-  webTransportDatagramStreamEnded: 'WebTransport datagram stream ended',
-  /**
-   * Stable browser error text consumed by browser/adapters/web-transport.ts; preserves its existing
-   * caller-facing wording.
-   */
-  webTransportIsClosed: 'WebTransport is closed',
-  /**
-   * Stable browser error text consumed by browser/adapters/web-transport.ts; preserves its existing
-   * caller-facing wording.
-   */
-  webTransportRequiresUint8ArrayEncodedMessages:
-    'WebTransport requires Uint8Array encoded messages',
   /**
    * Stable browser error text consumed by browser/adapters/window.ts; preserves its existing
    * caller-facing wording.

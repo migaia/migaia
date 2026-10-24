@@ -9,8 +9,6 @@ import { AdapterNodeThreadParentChannel } from '../../dist/threads/node-parent.j
 import { createAdapterWebThreadChannelFactory as createWebThreadChannelFactory } from '../../dist/threads/web-launcher.js'
 import { createNodeThreadChannelFactory } from '../../src/threads/adapters/node.js'
 
-import { createElectronMainThreadChannelFactory } from '../../src/threads/adapters/electron-main.js'
-
 import type { IThreadWebPort } from '../../src/threads/types.js'
 
 /** Structural Node I/O exercises each exported channel's actual borrowed-port branch. */
@@ -29,22 +27,45 @@ function nodePort() {
   return port
 }
 /** EventTarget ports preserve native transfer detachment without relying on a platform runtime. */
-function webPort(): IThreadWebPort {
-  /** The fixture owns native EventTarget dispatch without a platform-specific Worker. */
+/** Allocate only this case's original observations before installing native-shaped callbacks. */
+function webPortFixtureState() {
   const events = new EventTarget()
-  return {
-    postMessage(message, transfer) {
-      /**
-       * Native clone output preserves physical postMessage delivery and transfer detachment in the
-       * fixture.
-       */
-      const data = structuredClone(message, { transfer: transfer as Transferable[] | undefined })
-      queueMicrotask(() => events.dispatchEvent(new MessageEvent('message', { data })))
-    },
-    addEventListener: (type, listener) => events.addEventListener(type, listener),
-    removeEventListener: (type, listener) => events.removeEventListener(type, listener)
+  return { events }
+}
+
+/** Own one test resource's mutable observations without sharing a factory closure. */
+class WebPortFixture {
+  /** Counts, native events and construction inputs belong only to this fixture instance. */
+  #state: ReturnType<typeof webPortFixtureState>
+  /** Existing consumers retain the same observable fixture surface and callback identities. */
+  readonly value: IThreadWebPort
+  /** Install the original native-shaped callbacks after their observations exist. */
+  constructor() {
+    this.#state = webPortFixtureState()
+
+    this.value = {
+      postMessage: (message, transfer) => {
+        /**
+         * Native clone output preserves physical postMessage delivery and transfer detachment in
+         * the fixture.
+         */
+        const data = structuredClone(message, { transfer: transfer as Transferable[] | undefined })
+        queueMicrotask(() =>
+          this.#state.events.dispatchEvent(new MessageEvent('message', { data }))
+        )
+      },
+      addEventListener: (type, listener) => this.#state.events.addEventListener(type, listener),
+      removeEventListener: (type, listener) =>
+        this.#state.events.removeEventListener(type, listener)
+    }
   }
 }
+
+/** Create one independent owner for the existing native-boundary fixture. */
+function webPort(): IThreadWebPort {
+  return new WebPortFixture().value
+}
+
 /** A custom handle supplies only the public raw-port shape; it cannot counterfeit Core preparation. */
 function handle<T>(port: T) {
   return {
@@ -74,14 +95,6 @@ const cases: readonly [
     'node factory',
     () =>
       createNodeThreadChannelFactory({ scheduler: systemScheduler }).open(
-        handle(nodePort()),
-        new AbortController().signal
-      )
-  ],
-  [
-    'Electron main factory',
-    () =>
-      createElectronMainThreadChannelFactory({ scheduler: systemScheduler }).open(
         handle(nodePort()),
         new AbortController().signal
       )

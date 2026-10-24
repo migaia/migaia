@@ -1,4 +1,12 @@
 import { RpcCapability, RpcBatchPhysical } from '@migaia/rpc-contract'
+import type { IRpcSelectedComponents } from './endpoint-options.js'
+
+/** The original physical pair is borrowed only by native operations on its admitted peer. */
+export type IRpcPeerTransportPipeline = Pick<IRpcSelectedComponents, 'framer' | 'ingressPrepare'> &
+  Readonly<{
+    codec: Pick<IRpcSelectedComponents['codec'], 'id' | 'version' | 'encodedType' | 'encode'> &
+      Readonly<{ decode(value: unknown): unknown }>
+  }>
 
 /** Exact final transport identities carry only their completed/static capability intersection. */
 const agreements = new WeakMap<
@@ -8,6 +16,7 @@ const agreements = new WeakMap<
     capabilities: readonly string[]
     cloneTransfer?: true
     capabilitiesForPeer?: (peerId: string) => readonly string[] | undefined
+    pipelineForPeer?: (peerId: string) => IRpcPeerTransportPipeline | undefined
   }>
 >()
 /** Only the canonical sender can bypass the gate's single-envelope physical limiter. */
@@ -29,6 +38,9 @@ export function registerBatchAgreement<T extends object>(
       ...(agreements.get(transport)?.cloneTransfer ? { cloneTransfer: true as const } : {}),
       ...(agreements.get(transport)?.capabilitiesForPeer
         ? { capabilitiesForPeer: agreements.get(transport)!.capabilitiesForPeer }
+        : {}),
+      ...(agreements.get(transport)?.pipelineForPeer
+        ? { pipelineForPeer: agreements.get(transport)!.pipelineForPeer }
         : {}),
       ...(capabilities.includes(RpcCapability.batch)
         ? { limit: RpcBatchPhysical.maxBytes - framingBytes }
@@ -82,13 +94,15 @@ export function readTransportCapabilities(transport: object): readonly string[] 
  */
 export function registerPeerTransportCapabilities(
   transport: object,
-  read: (peerId: string) => readonly string[] | undefined
+  read: (peerId: string) => readonly string[] | undefined,
+  pipelineForPeer?: (peerId: string) => IRpcPeerTransportPipeline | undefined
 ): void {
   agreements.set(
     transport,
     Object.freeze({
       ...(agreements.get(transport) ?? { capabilities: [] }),
-      capabilitiesForPeer: read
+      capabilitiesForPeer: read,
+      ...(pipelineForPeer === undefined ? {} : { pipelineForPeer })
     })
   )
 }
@@ -99,6 +113,14 @@ export function readPeerTransportCapabilities(
   peerId: string
 ): readonly string[] | undefined {
   return agreements.get(transport)?.capabilitiesForPeer?.(peerId)
+}
+
+/** Source admission supplies the peer id; protected payload routing never selects a decoder. */
+export function readPeerTransportPipeline(
+  transport: object,
+  peerId: string
+): IRpcPeerTransportPipeline | undefined {
+  return agreements.get(transport)?.pipelineForPeer?.(peerId)
 }
 
 /** Existing gate still counts every envelope; its guard is rechecked at physical invocation. */

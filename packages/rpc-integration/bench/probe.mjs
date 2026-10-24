@@ -9,6 +9,7 @@ import { spawn } from 'node:child_process'
 import { loadavg } from 'node:os'
 import { IpcBenchErrorText } from './error-text.mjs'
 import { IpcBenchDiagnostic, IpcProbeBenchStages } from './text.mjs'
+import { orderStatistic } from './cross-runtime/statistics.mjs'
 
 /** One canonical fixture vocabulary keeps the four acceptance cells and arms unchanged. */
 const ProbeBench = {
@@ -516,11 +517,8 @@ export function judgeProbe(
   collectorAudit,
   selectedStageMode = IpcProbeBenchStages.legacy
 ) {
-  /** Analysis restores sorted scalar report data without changing the original raw series. */
-  const median = (values) => {
-    const sorted = values.toSorted((a, b) => a - b)
-    return sorted[Math.floor(sorted.length / 2)]
-  }
+  /** Exact upper-median selection preserves the original even-count index and raw series. */
+  const median = (values) => orderStatistic(values, Math.floor(values.length / 2))
   /** Paired A/A absolute bands are derived from this exact cell's two frozen-base launches. */
   const noise = {
     p50: Math.max(...rounds.map(({ baseA, baseB }) => Math.abs(baseB.p50Ns / baseA.p50Ns - 1))),
@@ -648,148 +646,10 @@ export function judgeProbe(
  */
 async function main() {
   /** Explicit cell selection lets the caller keep each exclusive window below its 45-minute cap. */
-  const args = process.argv.slice(2)
-  /** Explicit root mode changes only the installed arm and its frozen acceptance label/budget. */
-  const rootMode = args.includes('--collector')
-  /** Read options once before starting any actual peer or measurement. */
-  const value = (name, fallback) => {
-    const index = args.indexOf(name)
-    return index < 0 ? fallback : args[index + 1]
-  }
-  /** Defaults retain the original IPC fixture's 1000 requests and 100 warm-up calls. */
-  const options = {
-    collector: rootMode,
-    /** Omitted mode preserves the original all-stage CLI; revision-2 modes must be explicit. */
-    stageMode: value(IpcProbeBenchStages.option, IpcProbeBenchStages.legacy),
-    /** Diagnostic selection remains absent for every formal timing and exact-counter launch. */
-    diagnostic: value(ProbeBench.diagnosticOption, undefined),
-    /** The current audit must match every named source and compiled file before collector runs. */
-    collectorAuditPath: resolve(
-      value(
-        ProbeBench.collectorAuditOption,
-        join(workspace, 'docs/rpc-plugin-devtools/scratch/hub/collector-source-audit.json')
-      )
-    ),
-    pairs: Number(value('--pairs', '5')),
-    samples: Number(value('--samples', '1000')),
-    warmup: Number(value('--warmup', '100')),
-    baseDist: resolve(
-      value('--base-dist', join(workspace, 'docs/rpc-plugin-devtools/scratch/probe-core/base-dist'))
-    ),
-    output: resolve(
-      value(
-        '--output',
-        join(workspace, `docs/rpc-plugin-devtools/scratch/${rootMode ? 'hub' : 'probe-core'}/bench`)
-      )
-    )
-  }
-  /** A frozen cell cannot be changed by independent carrier or payload CLI switches. */
-  const cellId = value('--cell', 'all')
-  /** Each selected cell's full interleaved series remains in one caller-owned exclusive window. */
-  const cells = ProbeBench.cells.filter((cell) => cellId === 'all' || cell.id === cellId)
-  if (
-    !cells.length ||
-    ![IpcProbeBenchStages.default, IpcProbeBenchStages.all, IpcProbeBenchStages.legacy].includes(
-      options.stageMode
-    ) ||
-    !Number.isInteger(options.pairs) ||
-    options.pairs < 5 ||
-    !Number.isInteger(options.samples) ||
-    options.samples < 1000 ||
-    !Number.isInteger(options.warmup) ||
-    options.warmup < 1 ||
-    (options.diagnostic !== undefined &&
-      (![IpcBenchDiagnostic.cpu, IpcBenchDiagnostic.sampling].includes(options.diagnostic) ||
-        cells.length !== 1))
-  )
-    throw new Error(IpcBenchErrorText.configuration)
-  if (rootMode) {
-    /** The bounded source audit names the existing six owners and their exact current emitted bytes. */
-    const path = options.collectorAuditPath
-    /** Keep the complete original audit receipt; its byte hash binds every installed guard snapshot. */
-    const bytes = readFileSync(path)
-    /** Audit evidence covers source-defined event constructors, not unknown VM storage allocation. */
-    const audit = JSON.parse(bytes)
-    for (const file of audit.files) {
-      if (
-        createHash('sha256')
-          .update(readFileSync(join(workspace, file.sourcePath)))
-          .digest('hex') !== file.sourceSha256 ||
-        createHash('sha256')
-          .update(readFileSync(join(workspace, file.compiledPath)))
-          .digest('hex') !== file.compiledSha256
-      )
-        throw new Error(IpcBenchErrorText.configuration)
-    }
-    /** Only the audited ring owns a source-defined collector event-shaped object construction. */
-    const ring = audit.files.find((file) => file.compiledPath === ProbeBench.collectorRingPath)
-    if (ring === undefined) throw new Error(IpcBenchErrorText.configuration)
-    options.collectorAudit = {
-      path,
-      sha256: createHash('sha256').update(bytes).digest('hex'),
-      ringCompiledSha256: ring.compiledSha256,
-      files: audit.files
-    }
-  }
-  mkdirSync(options.output, { recursive: true })
-  /** Canonical declared codes bound the native fixture's observable package classification. */
-  const codeTables = {
-    'rpc.endpoint': ['packages/rpc-host/src/core/error-code.ts', 'RpcCoreErrorCode'],
-    'rpc.contract': ['packages/rpc-contract/src/contract/error-code.ts', 'RpcContractErrorCode'],
-    'rpc.transport.process': [
-      'packages/rpc-plugin-process/src/error-code.ts',
-      'RpcProcessErrorCode'
-    ],
-    'rpc.transport.thread': ['packages/rpc-plugin-thread/src/error-code.ts', 'RpcThreadErrorCode']
-  }
-  if (rootMode)
-    codeTables['rpc.devtools'] = [
-      'packages/rpc-plugin-devtools/src/error-code.ts',
-      'RpcDevtoolsErrorCode'
-    ]
-  /** Inventory parsing reads source tables only; it never adds a production diagnostic path. */
-  const observableCodes = Object.fromEntries(
-    Object.entries(codeTables).map(([source, [path, name]]) => {
-      /** Read only the single package-owned table, excluding other ordinal/reason constants. */
-      const declaration = readFileSync(join(workspace, path), 'utf8')
-        .split(`export const ${name} = {`)[1]
-        ?.split('} as const')[0]
-      if (!declaration) throw new Error(IpcBenchErrorText.configuration)
-      return [
-        source,
-        Array.from(declaration.matchAll(/\b\w+: '([A-Z_0-9]+)'/gu), (match) => match[1])
-      ]
-    })
-  )
-  /** The original public reason domain avoids maintaining a parallel branch vocabulary. */
-  const { RpcProviderRejectionReason } = await import('@migaia/rpc-host')
-  /** Existing reporter/onRejected channels distinguish shared OVERLOADED and session/flow failures. */
-  const failureInventory = {
-    observableCodes,
-    installedPath:
-      'Existing public process/thread Peer options receive the genuine probe through their canonical forwarding owners',
-    source: 'rpc.endpoint',
-    sharedCode: 'OVERLOADED',
-    reasons: Object.values(RpcProviderRejectionReason),
-    reasonChannel:
-      'existing fixture nativeProviderLimits.onRejected records the actual provider reason; other capacity sites retain missing reason as null/UNVERIFIED',
-    observable:
-      'all native public Peer provider/transport/reporter errors retain source, code, name, reason and redacted message',
-    providerConcurrency: 'NOT_INSTRUMENTED; client lanes are reported separately',
-    classification: 'original IPC receipt classification and both OOB isolate snapshots'
-  }
-  console.error(
-    JSON.stringify({
-      type: 'probe-bench-inventory',
-      cells,
-      options,
-      failureInventory,
-      acceptance: rootMode ? ProbeBench.rootAcceptance : ProbeBench.coreAcceptance,
-      collector: rootMode
-        ? 'ENABLED: selected-stage metadata, captureMask=0'
-        : 'DISABLED: Core-only acceptance'
-    })
-  )
+  /** One invocation admission phase freezes the original configuration and finite selected cells. */
+  const { options, rootMode, cells } = readProbeInvocation(process.argv.slice(2))
+  /** Source/audit inventory is admitted before any formal observation or launched arm. */
+  const failureInventory = await admitProbeInventory(options, rootMode, cells)
   /** The exclusive runner owns admission/end-load enforcement; this receipt also records raw loads. */
   const startLoad = loadavg()
   if (options.diagnostic !== undefined) {
@@ -930,6 +790,164 @@ async function main() {
   )
   console.log(`${rootMode ? ProbeBench.rootAcceptance : ProbeBench.coreAcceptance} ${status}`)
   if (status !== 'PASS') process.exitCode = status === 'ERROR' ? 2 : 1
+}
+
+/**
+ * @param {string[]} args Original CLI. @returns {object} Original validated configuration and
+ *   selected fixed cells.
+ */
+function readProbeInvocation(args) {
+  /** Explicit root mode changes only the installed arm and its frozen acceptance label/budget. */
+  const rootMode = args.includes('--collector')
+  /** Read options once before starting any actual peer or measurement. */
+  const value = (name, fallback) => {
+    const index = args.indexOf(name)
+    return index < 0 ? fallback : args[index + 1]
+  }
+  /** Defaults retain the original IPC fixture's 1000 requests and 100 warm-up calls. */
+  const options = {
+    collector: rootMode,
+    /** Omitted mode preserves the original all-stage CLI; revision-2 modes must be explicit. */
+    stageMode: value(IpcProbeBenchStages.option, IpcProbeBenchStages.legacy),
+    /** Diagnostic selection remains absent for every formal timing and exact-counter launch. */
+    diagnostic: value(ProbeBench.diagnosticOption, undefined),
+    /** The current audit must match every named source and compiled file before collector runs. */
+    collectorAuditPath: resolve(
+      value(
+        ProbeBench.collectorAuditOption,
+        join(workspace, 'docs/rpc-plugin-devtools/scratch/hub/collector-source-audit.json')
+      )
+    ),
+    pairs: Number(value('--pairs', '5')),
+    samples: Number(value('--samples', '1000')),
+    warmup: Number(value('--warmup', '100')),
+    baseDist: resolve(
+      value('--base-dist', join(workspace, 'docs/rpc-plugin-devtools/scratch/probe-core/base-dist'))
+    ),
+    output: resolve(
+      value(
+        '--output',
+        join(workspace, `docs/rpc-plugin-devtools/scratch/${rootMode ? 'hub' : 'probe-core'}/bench`)
+      )
+    )
+  }
+  /** A frozen cell cannot be changed by independent carrier or payload CLI switches. */
+  const cellId = value('--cell', 'all')
+  /** Each selected cell's full interleaved series remains in one caller-owned exclusive window. */
+  const cells = ProbeBench.cells.filter((cell) => cellId === 'all' || cell.id === cellId)
+  if (
+    !cells.length ||
+    ![IpcProbeBenchStages.default, IpcProbeBenchStages.all, IpcProbeBenchStages.legacy].includes(
+      options.stageMode
+    ) ||
+    !Number.isInteger(options.pairs) ||
+    options.pairs < 5 ||
+    !Number.isInteger(options.samples) ||
+    options.samples < 1000 ||
+    !Number.isInteger(options.warmup) ||
+    options.warmup < 1 ||
+    (options.diagnostic !== undefined &&
+      (![IpcBenchDiagnostic.cpu, IpcBenchDiagnostic.sampling].includes(options.diagnostic) ||
+        cells.length !== 1))
+  )
+    throw new Error(IpcBenchErrorText.configuration)
+  return { options, rootMode, cells }
+}
+
+/**
+ * @param {object} options Original admitted configuration. @param {boolean} rootMode Original
+ *   collector arm. @param {object[]} cells Frozen selection. @returns {Promise<object>} Actual
+ *   source-code/reason inventory before measurement.
+ */
+async function admitProbeInventory(options, rootMode, cells) {
+  if (rootMode) {
+    /** The bounded source audit names the existing six owners and their exact current emitted bytes. */
+    const path = options.collectorAuditPath
+    /** Keep the complete original audit receipt; its byte hash binds every installed guard snapshot. */
+    const bytes = readFileSync(path)
+    /** Audit evidence covers source-defined event constructors, not unknown VM storage allocation. */
+    const audit = JSON.parse(bytes)
+    for (const file of audit.files) {
+      if (
+        createHash('sha256')
+          .update(readFileSync(join(workspace, file.sourcePath)))
+          .digest('hex') !== file.sourceSha256 ||
+        createHash('sha256')
+          .update(readFileSync(join(workspace, file.compiledPath)))
+          .digest('hex') !== file.compiledSha256
+      )
+        throw new Error(IpcBenchErrorText.configuration)
+    }
+    /** Only the audited ring owns a source-defined collector event-shaped object construction. */
+    const ring = audit.files.find((file) => file.compiledPath === ProbeBench.collectorRingPath)
+    if (ring === undefined) throw new Error(IpcBenchErrorText.configuration)
+    options.collectorAudit = {
+      path,
+      sha256: createHash('sha256').update(bytes).digest('hex'),
+      ringCompiledSha256: ring.compiledSha256,
+      files: audit.files
+    }
+  }
+  mkdirSync(options.output, { recursive: true })
+  /** Canonical declared codes bound the native fixture's observable package classification. */
+  const codeTables = {
+    'rpc.endpoint': ['packages/rpc-host/src/core/error-code.ts', 'RpcCoreErrorCode'],
+    'rpc.contract': ['packages/rpc-contract/src/contract/error-code.ts', 'RpcContractErrorCode'],
+    'rpc.transport.process': [
+      'packages/rpc-plugin-process/src/error-code.ts',
+      'RpcProcessErrorCode'
+    ],
+    'rpc.transport.thread': ['packages/rpc-plugin-thread/src/error-code.ts', 'RpcThreadErrorCode']
+  }
+  if (rootMode)
+    codeTables['rpc.devtools'] = [
+      'packages/rpc-plugin-devtools/src/error-code.ts',
+      'RpcDevtoolsErrorCode'
+    ]
+  /** Inventory parsing reads source tables only; it never adds a production diagnostic path. */
+  const observableCodes = Object.fromEntries(
+    Object.entries(codeTables).map(([source, [path, name]]) => {
+      /** Read only the single package-owned table, excluding other ordinal/reason constants. */
+      const declaration = readFileSync(join(workspace, path), 'utf8')
+        .split(`export const ${name} = {`)[1]
+        ?.split('} as const')[0]
+      if (!declaration) throw new Error(IpcBenchErrorText.configuration)
+      return [
+        source,
+        Array.from(declaration.matchAll(/\b\w+: '([A-Z_0-9]+)'/gu), (match) => match[1])
+      ]
+    })
+  )
+  /** The original public reason domain avoids maintaining a parallel branch vocabulary. */
+  const { RpcProviderRejectionReason } = await import('@migaia/rpc-host')
+  /** Existing reporter/onRejected channels distinguish shared OVERLOADED and session/flow failures. */
+  const failureInventory = {
+    observableCodes,
+    installedPath:
+      'Existing public process/thread Peer options receive the genuine probe through their canonical forwarding owners',
+    source: 'rpc.endpoint',
+    sharedCode: 'OVERLOADED',
+    reasons: Object.values(RpcProviderRejectionReason),
+    reasonChannel:
+      'existing fixture nativeProviderLimits.onRejected records the actual provider reason; other capacity sites retain missing reason as null/UNVERIFIED',
+    observable:
+      'all native public Peer provider/transport/reporter errors retain source, code, name, reason and redacted message',
+    providerConcurrency: 'NOT_INSTRUMENTED; client lanes are reported separately',
+    classification: 'original IPC receipt classification and both OOB isolate snapshots'
+  }
+  console.error(
+    JSON.stringify({
+      type: 'probe-bench-inventory',
+      cells,
+      options,
+      failureInventory,
+      acceptance: rootMode ? ProbeBench.rootAcceptance : ProbeBench.coreAcceptance,
+      collector: rootMode
+        ? 'ENABLED: selected-stage metadata, captureMask=0'
+        : 'DISABLED: Core-only acceptance'
+    })
+  )
+  return failureInventory
 }
 
 if (process.argv[1] === entry) {

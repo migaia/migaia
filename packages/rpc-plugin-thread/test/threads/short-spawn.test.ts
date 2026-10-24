@@ -1,7 +1,8 @@
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { describe, expect, it, vi } from 'vitest'
-import { createThreadPeer } from '../protocol.js'
+import { createRpcHost } from '@migaia/rpc-host'
+import { threadPlugin } from '@migaia/rpc-plugin-thread'
 import { isThreadChild } from '../../src/threads/child.js'
 import { expandThreadSpawn } from '../../src/threads/short-spawn.js'
 import { threadRuntimeResource } from '../../src/threads/runtime-resource.js'
@@ -91,13 +92,14 @@ describe('thread source shorthand', () => {
 
   it('self spawn rejects a test runner main module before native acquisition', async () => {
     /** The failure must occur before a caller-held runtime loader can construct a Worker. */
-    const load = vi.fn(threadRuntimeResource.load)
-    await expect(
-      createThreadPeer({ spawn: true }, { load, pid: process.pid })
-    ).rejects.toMatchObject({
-      code: 'INVALID_CONFIG'
-    })
+    const load = vi.spyOn(threadRuntimeResource, 'load')
+    await expect(createRpcHost({ plugins: [threadPlugin({ spawn: true })] })).rejects.toMatchObject(
+      {
+        code: 'INVALID_CONFIG'
+      }
+    )
     expect(load).not.toHaveBeenCalled()
+    load.mockRestore()
   })
 
   it('browser shorthand requires a URL and preserves its exact entry', async () => {
@@ -113,10 +115,14 @@ describe('thread source shorthand', () => {
     }
     vi.stubGlobal('process', browserProcess)
     try {
-      await expect(createThreadPeer({ spawn: true })).rejects.toMatchObject({
+      await expect(async () =>
+        createRpcHost({ plugins: [threadPlugin({ spawn: true })] })
+      ).rejects.toMatchObject({
         code: 'INVALID_CONFIG'
       })
-      await expect(createThreadPeer({ spawn: './worker.ts' })).rejects.toMatchObject({
+      await expect(async () =>
+        createRpcHost({ plugins: [threadPlugin({ spawn: './worker.ts' })] })
+      ).rejects.toMatchObject({
         code: 'INVALID_CONFIG'
       })
       /** A query/fragment is part of the exact browser module URL rather than an inferred path. */

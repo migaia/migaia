@@ -1,3 +1,4 @@
+import { orderStringKeys } from '@migaia/utils/string'
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -101,17 +102,6 @@ const ordinaryEntries: Record<string, Record<string, string[]>> = {
       'serializeRpcError',
       'toJsonRpcError'
     ],
-    './handshake': [
-      'RpcCapability',
-      'RpcHandshakeReason',
-      'RpcHandshakeStep',
-      'RpcHandshakeViolation',
-      'RpcProtocol',
-      'acceptRpcHandshake',
-      'completeRpcHandshake',
-      'createRpcHello',
-      'normalizeRpcHandshake'
-    ],
     './runtime': [
       'RUNTIME_API_SCHEMA_VERSION',
       'RuntimeApiMode',
@@ -186,15 +176,6 @@ const ordinaryEntries: Record<string, Record<string, string[]>> = {
       'createJsonRpcFrameDecoder',
       'encodeJsonRpcFrame'
     ],
-    './binary': [
-      'RpcBinaryProfile',
-      'RpcBinaryStorage',
-      'RpcNativeBinaryKind',
-      'captureRpcBinaryData',
-      'prepareRpcBinary',
-      'restoreRpcBinary',
-      'restoreRpcBinaryDecoded'
-    ],
     './binary/lazy': [
       'RpcBinaryProfile',
       'RpcBinaryStorage',
@@ -203,7 +184,6 @@ const ordinaryEntries: Record<string, Record<string, string[]>> = {
       'restoreRpcBinary',
       'restoreRpcBinaryDecoded'
     ],
-    './binary/capture': ['RpcBinaryStorage', 'captureRpcBinaryData'],
     './stream': [
       'RpcStreamEvent',
       'RpcStreamLimit',
@@ -233,9 +213,7 @@ const ordinaryEntries: Record<string, Record<string, string[]>> = {
       'RpcProbeOutcome',
       'RpcProbeOutcomeName',
       'defineProbe',
-      'snapshotProbeEvent',
       'rpcProbeSampleKey',
-      'probePlugin',
       'readProbeStages',
       'subscribeProbeStages',
       'hostRethrowReporter',
@@ -243,7 +221,7 @@ const ordinaryEntries: Record<string, Record<string, string[]>> = {
     ]
   },
   'rpc-plugin-browser': {
-    /** Browser users select one cold carrier; lower-level constructors remain author subpaths. */
+    /** Browser users select one cold carrier through the package root. */
     '.': [
       'windowPlugin',
       'dedicatedWorkerPlugin',
@@ -254,9 +232,7 @@ const ordinaryEntries: Record<string, Record<string, string[]>> = {
       'webTransportPlugin',
       'RpcBrowserErrorCode',
       'RPC_BROWSER_ERROR_SOURCE'
-    ],
-    './adapters/web-worker': ['createWebWorkerTransport'],
-    './adapters/message-port': ['createBrowserMessagePortTransport']
+    ]
   }
 }
 /** Retires factories/claim-oriented helpers; ordinary operations now own each violation or state. */
@@ -298,10 +274,10 @@ const formerProtocolOperations: Record<string, string> = {
   normalizeRuntimeEnvelope: '@migaia/rpc-contract/runtime',
   normalizeRuntimeGeneration: '@migaia/rpc-contract/runtime/metadata',
   normalizeRuntimeSteps: '@migaia/rpc-contract/runtime/metadata',
-  prepareRpcBinary: '@migaia/rpc-contract/binary',
+  prepareRpcBinary: '@migaia/rpc-contract/binary/lazy',
   readRpcNativeBinary: '@migaia/rpc-contract/binary/inspect',
   readRuntimeCarrier: '@migaia/rpc-contract/runtime',
-  restoreRpcBinary: '@migaia/rpc-contract/binary',
+  restoreRpcBinary: '@migaia/rpc-contract/binary/lazy',
   rpcBinaryBackingLength: '@migaia/rpc-contract/binary/inspect',
   rpcBinaryView: '@migaia/rpc-contract/binary/inspect',
   runtimeOperationCapabilities: '@migaia/rpc-contract/runtime',
@@ -341,24 +317,18 @@ describe('merged public exports', () => {
         './portable',
         './errors',
         './schema/wire-error',
-        './handshake',
         './runtime',
         './runtime/metadata',
         './runtime/lazy',
         './binary/inspect',
         './framing/jsonrpc',
-        './binary',
         './binary/lazy',
-        './binary/capture',
         './stream',
         './remote'
       ],
       'rpc-host': [
         '.',
         './probe',
-        './stream',
-        './adapters/memory',
-        './testing',
         './plugin',
         './features',
         './features/auth',
@@ -369,34 +339,16 @@ describe('merged public exports', () => {
       ],
       'rpc-plugin-process': [
         '.',
-        './adapters/node-child-process',
-        './adapters/node-socket',
-        './adapters/bun-spawn',
-        './adapters/bun-socket',
-        './adapters/deno-command',
-        './adapters/deno-socket',
-        './adapters/electron-utility-process',
-        './adapters/windows-job',
         './features',
         './features/send-queue',
         './features/log',
         './features/flow-control'
       ],
-      'rpc-plugin-thread': ['.', './adapters/node', './adapters/electron-main'],
-      'rpc-plugin-browser': [
-        '.',
-        './adapters/window',
-        './adapters/shared-worker',
-        './adapters/service-worker',
-        './adapters/broadcast-channel',
-        './adapters/web-transport',
-        './adapters/rtc-data-channel',
-        './adapters/message-port',
-        './adapters/web-worker'
-      ],
+      'rpc-plugin-thread': ['.'],
+      'rpc-plugin-browser': ['.'],
       'rpc-plugin-coroutines': ['.'],
       'rpc-plugin-pool': ['.'],
-      'rpc-plugin-devtools': ['.', './contract', './hub', './log']
+      'rpc-plugin-devtools': ['.']
     }
     /** Every current owner must resolve its actual built runtime and declaration entry. */
     const manifests = Object.fromEntries(
@@ -408,7 +360,9 @@ describe('merged public exports', () => {
       ])
     )
     for (const [owner, expected] of Object.entries(expectedPaths)) {
-      expect(Object.keys(manifests[owner]!.exports).sort(), owner).toEqual([...expected].sort())
+      expect(orderStringKeys(Object.keys(manifests[owner]!.exports)), owner).toEqual(
+        orderStringKeys([...expected])
+      )
       for (const [key, entry] of Object.entries(manifests[owner]!.exports)) {
         expect(existsSync(join(packageRoot, owner, entry.default)), `${owner}:${key}`).toBe(true)
         if (key !== './schema/wire-error') {
@@ -434,69 +388,64 @@ describe('merged public exports', () => {
       expect(existsSync(join(ownerRoot, relative)), name).toBe(true)
       expect(existsSync(join(ownerRoot, entry.types)), name).toBe(true)
       expect(
-        Object.keys(await import(pathToFileURL(join(ownerRoot, relative)).href)).sort(),
+        orderStringKeys(Object.keys(await import(pathToFileURL(join(ownerRoot, relative)).href))),
         name
       ).toEqual(
-        [
-          ...new Set([
-            ...(name.startsWith('@migaia/rpc/core')
-              ? baseline.names.map(layeredName)
-              : baseline.names
-            ).filter(
-              (item) =>
-                !(retiredSymbols[name] ?? []).includes(item) &&
-                !((errorFormatDelta.removed as Record<string, string[]>)[name] ?? []).includes(
-                  item
-                ) &&
-                !((controlSemanticsDelta.removed as Record<string, string[]>)[name] ?? []).includes(
-                  item
-                )
-            ),
-            ...((errorFormatDelta.added as Record<string, string[]>)[name] ?? []),
-            ...((controlSemanticsDelta.added as Record<string, string[]>)[name] ?? []),
-            ...((streamingDelta.added as Record<string, string[]>)[name] ?? []),
-            // Cross-package runtime adapters consume the same canonical fallback reporter.
-            ...(name === '@migaia/rpc/core'
-              ? ['RpcProviderRejectionReason', 'defaultRpcReporter']
-              : []),
-            ...(name === '@migaia/rpc/contract'
-              ? ['RPC_CONTRACT_SOURCE', 'RpcBatchPhysical', 'classifyRpcContractError']
-              : []),
-            ...(name === '@migaia/rpc/core'
-              ? [
-                  'serializeRpcError',
-                  'deserializeRpcError',
-                  'isRpcErrorInstance',
-                  'isRpcRemoteError',
-                  'isRpcTimeoutError'
-                ]
-              : []),
-            ...(name === '@migaia/rpc/contract/framing'
-              ? [
-                  'processStringFramer',
-                  'remoteProcessStringFramer',
-                  'inspectRpcPhysicalFrame',
-                  'rpcByteRuntimeBootstrap'
-                ]
-              : []),
-            ...((coreRefactorDelta.added as Record<string, string[]>)[name] ?? [])
-          ])
-        ]
-          .filter((item) => !(retiredSymbols[name] ?? []).includes(item))
-          .sort()
+        orderStringKeys(
+          [
+            ...new Set([
+              ...(name.startsWith('@migaia/rpc/core')
+                ? baseline.names.map(layeredName)
+                : baseline.names
+              ).filter(
+                (item) =>
+                  !(retiredSymbols[name] ?? []).includes(item) &&
+                  !((errorFormatDelta.removed as Record<string, string[]>)[name] ?? []).includes(
+                    item
+                  ) &&
+                  !(
+                    (controlSemanticsDelta.removed as Record<string, string[]>)[name] ?? []
+                  ).includes(item)
+              ),
+              ...((errorFormatDelta.added as Record<string, string[]>)[name] ?? []),
+              ...((controlSemanticsDelta.added as Record<string, string[]>)[name] ?? []),
+              ...((streamingDelta.added as Record<string, string[]>)[name] ?? []),
+              // Cross-package runtime adapters consume the same canonical fallback reporter.
+              ...(name === '@migaia/rpc/core'
+                ? ['RpcProviderRejectionReason', 'defaultRpcReporter']
+                : []),
+              ...(name === '@migaia/rpc/contract'
+                ? ['RPC_CONTRACT_SOURCE', 'RpcBatchPhysical', 'classifyRpcContractError']
+                : []),
+              ...(name === '@migaia/rpc/core'
+                ? [
+                    'serializeRpcError',
+                    'deserializeRpcError',
+                    'isRpcErrorInstance',
+                    'isRpcRemoteError',
+                    'isRpcTimeoutError'
+                  ]
+                : []),
+              ...(name === '@migaia/rpc/contract/framing'
+                ? [
+                    'processStringFramer',
+                    'remoteProcessStringFramer',
+                    'inspectRpcPhysicalFrame',
+                    'rpcByteRuntimeBootstrap'
+                  ]
+                : []),
+              ...((coreRefactorDelta.added as Record<string, string[]>)[name] ?? [])
+            ])
+          ].filter((item) => !(retiredSymbols[name] ?? []).includes(item))
+        )
       )
       // A leaf export maps to its own source path; index entries map to directory roots.
       expect(relative, name).toBe(expectedRelative)
     }
+    /** Actual built Host files remain independently checked below the narrowed package boundary. */
     const coreRoot = join(packageRoot, 'rpc-host')
-    const stream = manifest.exports['./stream']
-    expect(stream).toEqual({
-      types: './dist/core/stream/index.d.ts',
-      default: './dist/core/stream/index.js'
-    })
-    expect(
-      Object.keys(await import(pathToFileURL(join(coreRoot, stream.default)).href)).sort()
-    ).toEqual(['createCanonicalChunkFeature', 'createStreamFeature'])
+    /** Canonical streaming remains an internal Host owner, with no application factory path. */
+    expect(manifest.exports).not.toHaveProperty('./stream')
     /** SDK descriptions use the original contract vocabulary without publishing old assemblies. */
     const remoteNamespace = await import('@migaia/rpc-host/plugin')
     /** Every ordinary entry retains an exact namespace, with no claimed preparation exports. */
@@ -506,9 +455,11 @@ describe('merged public exports', () => {
         const ownerRoot = join(packageRoot, owner)
         expect(existsSync(join(ownerRoot, entry.types)), `${owner}:${key}`).toBe(true)
         expect(
-          Object.keys(await import(pathToFileURL(join(ownerRoot, entry.default)).href)).sort(),
+          orderStringKeys(
+            Object.keys(await import(pathToFileURL(join(ownerRoot, entry.default)).href))
+          ),
           `${owner}:${key}`
-        ).toEqual([...names].sort())
+        ).toEqual(orderStringKeys([...names]))
       }
     }
     for (const [symbol, module] of Object.entries(formerProtocolOperations))
@@ -534,11 +485,13 @@ describe('merged public exports', () => {
     /** The process root publishes one native transport factory and stable error identities. */
     const processEntry = manifests['rpc-plugin-process']!.exports['.']!
     expect(
-      Object.keys(
-        await import(
-          pathToFileURL(join(packageRoot, 'rpc-plugin-process', processEntry.default)).href
+      orderStringKeys(
+        Object.keys(
+          await import(
+            pathToFileURL(join(packageRoot, 'rpc-plugin-process', processEntry.default)).href
+          )
         )
-      ).sort()
+      )
     ).toEqual([
       'RPC_PROCESS_ERROR_SOURCE',
       'RpcProcessErrorCode',
@@ -550,20 +503,26 @@ describe('merged public exports', () => {
     expect(processNamespace).not.toHaveProperty('createJsonRpcAdapterChannel')
     expect(processNamespace).not.toHaveProperty('createJsonRpcRemoteChannel')
     /** Moved raw native operations belong to the already-public native adapter entries. */
-    const nodeProcesses = await import('@migaia/rpc-plugin-process/adapters/node-child-process')
-    expect(Object.keys(nodeProcesses).sort()).toEqual(
-      [
+    const nodeProcesses =
+      await import('../../../rpc-plugin-process/dist/process/adapters/node-child-process.js')
+    expect(orderStringKeys(Object.keys(nodeProcesses))).toEqual(
+      orderStringKeys([
         'createAdapterChildStdio',
         'createAdapterNodeProcessLaunch',
         'createAdapterProcessStdio',
         'createNodeProcessLauncher',
         'openProcessStdioChannel'
-      ].sort()
+      ])
     )
     /** The socket adapter owns its actual held native stream constructor. */
-    const nodeSockets = await import('@migaia/rpc-plugin-process/adapters/node-socket')
-    expect(Object.keys(nodeSockets).sort()).toEqual(
-      ['createAdapterSocketByteIO', 'dialProcessByteChannel', 'listenProcessByteChannel'].sort()
+    const nodeSockets =
+      await import('../../../rpc-plugin-process/dist/process/adapters/node-socket.js')
+    expect(orderStringKeys(Object.keys(nodeSockets))).toEqual(
+      orderStringKeys([
+        'createAdapterSocketByteIO',
+        'dialProcessByteChannel',
+        'listenProcessByteChannel'
+      ])
     )
     /** Removes text/constructor/lazy aliases without weakening the exact ordinary namespaces. */
     for (const [owner, entries] of Object.entries(manifests)) {
@@ -589,13 +548,18 @@ describe('merged public exports', () => {
     /** Native adapters expose diagnostics at their user-facing package root. */
     const threads = await import('@migaia/rpc-plugin-thread')
     /** Applications see one native transport factory and its original diagnostics. */
-    expect(Object.keys(threads).sort()).toEqual(
-      ['RPC_THREAD_ERROR_SOURCE', 'RpcThreadErrorCode', 'isThreadChild', 'threadPlugin'].sort()
+    expect(orderStringKeys(Object.keys(threads))).toEqual(
+      orderStringKeys([
+        'RPC_THREAD_ERROR_SOURCE',
+        'RpcThreadErrorCode',
+        'isThreadChild',
+        'threadPlugin'
+      ])
     )
     /** The moved Node channel factory uses its already-public native-owner entry. */
-    const nodeThreads = await import('@migaia/rpc-plugin-thread/adapters/node')
-    expect(Object.keys(nodeThreads).sort()).toEqual(
-      ['createNodeThreadChannelFactory', 'createNodeThreadLauncher'].sort()
+    const nodeThreads = await import('../../../rpc-plugin-thread/dist/threads/adapters/node.js')
+    expect(orderStringKeys(Object.keys(nodeThreads))).toEqual(
+      orderStringKeys(['createNodeThreadChannelFactory', 'createNodeThreadLauncher'])
     )
     expect(threads.RPC_THREAD_ERROR_SOURCE).toBe('rpc.transport.thread')
     expect(threads.RpcThreadErrorCode.usageSampleFailed).toBe('THREAD_USAGE_SAMPLE_FAILED')
@@ -604,7 +568,7 @@ describe('merged public exports', () => {
   it('publishes coroutine admission and factory only from its owning package', async () => {
     /** One cooperative transport owns the moved task types and its native source admission code. */
     const coroutine = await import('@migaia/rpc-plugin-coroutines')
-    expect(Object.keys(coroutine).sort()).toEqual([
+    expect(orderStringKeys(Object.keys(coroutine))).toEqual([
       'RPC_COROUTINE_ERROR_SOURCE',
       'RpcCoroutineErrorCode',
       'coroutinePlugin'
@@ -615,30 +579,24 @@ describe('merged public exports', () => {
     expect(await import('@migaia/rpc-host/plugin')).not.toHaveProperty('createCoroutinePlugin')
   })
 
-  it('exports the browser plugin root and every retained carrier subpath', async () => {
+  it('exports the browser plugin root with its retained carrier factories', async () => {
     /** This direct-consumer oracle remains independent from the earlier whole-family migration. */
     const root = join(packageRoot, 'rpc-plugin-browser')
-    /** Browser's eight authoring subpaths retain their exact runtime exports beside the new root. */
-    const expected = {
-      './adapters/window': ['createWindowMessageTransport'],
-      './adapters/shared-worker': ['createSharedWorkerTransport'],
-      './adapters/service-worker': ['createServiceWorkerTransport'],
-      './adapters/broadcast-channel': ['createBroadcastChannelTransport'],
-      './adapters/rtc-data-channel': ['createRtcDataChannelTransport'],
-      './adapters/web-transport': ['createWebTransportDatagramTransport'],
-      ...ordinaryEntries['rpc-plugin-browser']
-    }
+    /** The root contains every supported browser plugin factory. */
+    const expected = ordinaryEntries['rpc-plugin-browser']!
     /** Actual package exports select built modules; source imports cannot satisfy this boundary. */
     const manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as {
       exports: Record<string, { default: string; types: string }>
     }
-    expect(Object.keys(manifest.exports).sort()).toEqual(Object.keys(expected).sort())
+    expect(orderStringKeys(Object.keys(manifest.exports))).toEqual(
+      orderStringKeys(Object.keys(expected))
+    )
     for (const [entry, names] of Object.entries(expected)) {
       const target = manifest.exports[entry]!
       expect(target.types).toBe(target.default.replace(/\.js$/, '.d.ts'))
       expect(existsSync(join(root, target.types))).toBe(true)
       const namespace = await import(pathToFileURL(join(root, target.default)).href)
-      expect(Object.keys(namespace).sort(), entry).toEqual([...names].sort())
+      expect(orderStringKeys(Object.keys(namespace)), entry).toEqual(orderStringKeys([...names]))
     }
   })
 

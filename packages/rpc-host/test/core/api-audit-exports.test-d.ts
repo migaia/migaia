@@ -1,15 +1,15 @@
 // @ts-expect-error nonce generation is owned by the internal authentication module.
-import { createAuthenticationNonce } from '../../dist/core/index.js'
+import { createAuthenticationNonce } from '../../dist/index.js'
 // @ts-expect-error use the canonical IRpcError contract.
-import type { IRpcPublicError } from '../../dist/core/index.js'
+import type { IRpcPublicError } from '../../dist/index.js'
 // @ts-expect-error use IRpcPlatformValue from the canonical constant/type owner.
-import type { IRpcPlatform } from '../../dist/core/index.js'
+import type { IRpcPlatform } from '../../dist/index.js'
 // @ts-expect-error use IRpcTransportTopologyValue from the canonical constant/type owner.
-import type { IRpcTransportTopology } from '../../dist/core/index.js'
+import type { IRpcTransportTopology } from '../../dist/index.js'
 // @ts-expect-error middleware inference is private to the endpoint factories.
-import type { IFactoryDiscoveryMode } from '../../dist/core/index.js'
+import type { IFactoryDiscoveryMode } from '../../dist/index.js'
 // @ts-expect-error middleware inference is private to the endpoint factories.
-import type { IFactoryPingCapability } from '../../dist/core/index.js'
+import type { IFactoryPingCapability } from '../../dist/index.js'
 // @ts-expect-error fluent return inference is private to the endpoint factories.
 import type { IRecursiveProvideSurface } from '../../dist/core/composed.js'
 // @ts-expect-error root projection is private to the endpoint factories.

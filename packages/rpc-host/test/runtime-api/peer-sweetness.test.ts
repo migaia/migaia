@@ -1,6 +1,6 @@
+import { RUNTIME_API_CAPABILITIES } from '../../dist/remote/runtime-api/constants.js'
 import { describe, expect, it, vi } from 'vitest'
 import { createRuntimePeer } from '../../dist/remote/runtime-api/peer.js'
-import { createPeerPair } from '../../dist/testing/index.js'
 import { runtimeSources } from './fixture.js'
 
 describe('Runtime Peer convenience', () => {
@@ -42,7 +42,22 @@ describe('Runtime Peer convenience', () => {
 
   it('asyncDispose is the original close function and Promise', async () => {
     /** Typed testing Peers expose the actual Core facade, without a new cleanup owner. */
-    const pair = await createPeerPair({ a: { provide: {} }, b: { provide: {} } })
+    const pairOptions = { a: { provide: {} }, b: { provide: {} } }
+    /** Reuse the independently negotiated sources and actual canonical Peer constructors. */
+    const pairChannel = runtimeSources(RUNTIME_API_CAPABILITIES, RUNTIME_API_CAPABILITIES)
+    const [a, b] = await Promise.all([
+      createRuntimePeer({
+        ...pairOptions.a,
+        self: { name: 'a', instanceId: 'test-pair-a' },
+        connect: pairChannel.sources[0]
+      }),
+      createRuntimePeer({
+        ...pairOptions.b,
+        self: { name: 'b', instanceId: 'test-pair-b' },
+        connect: pairChannel.sources[1]
+      })
+    ])
+    const pair = { a, b }
     try {
       expect(pair.a[Symbol.asyncDispose]).toBe(pair.a.close)
       /** Concurrent explicit/scoped cleanup must retain exact original settlement identity. */
@@ -51,12 +66,28 @@ describe('Runtime Peer convenience', () => {
       await closing
     } finally {
       await Promise.all([pair.a.close(), pair.b.close()])
+      pairChannel.close()
     }
   })
 
   it('raw Peer subscriptions never fabricate initial ready or native exit', async () => {
     /** Memory provides callable Peers, but has no native execution lifecycle to report. */
-    const pair = await createPeerPair({ a: { provide: {} }, b: { provide: {} } })
+    const pairOptions = { a: { provide: {} }, b: { provide: {} } }
+    /** Reuse the independently negotiated sources and actual canonical Peer constructors. */
+    const pairChannel = runtimeSources(RUNTIME_API_CAPABILITIES, RUNTIME_API_CAPABILITIES)
+    const [a, b] = await Promise.all([
+      createRuntimePeer({
+        ...pairOptions.a,
+        self: { name: 'a', instanceId: 'test-pair-a' },
+        connect: pairChannel.sources[0]
+      }),
+      createRuntimePeer({
+        ...pairOptions.b,
+        self: { name: 'b', instanceId: 'test-pair-b' },
+        connect: pairChannel.sources[1]
+      })
+    ])
+    const pair = { a, b }
     /** Factory resolution is initial readiness; a later listener must not receive a fake replay. */
     const ready = vi.fn()
     /** Closing a logical memory connection cannot counterfeit native execution exit. */
@@ -73,6 +104,7 @@ describe('Runtime Peer convenience', () => {
       expect(exit).not.toHaveBeenCalled()
     } finally {
       await Promise.all([pair.a.close(), pair.b.close()])
+      pairChannel.close()
     }
   })
 })

@@ -1,4 +1,4 @@
-import { openProcessStdioChannel } from '@migaia/rpc-plugin-process/adapters/node-child-process'
+import { openProcessStdioChannel } from '../../../../rpc-plugin-process/dist/process/adapters/node-child-process.js'
 import { createProcessTransport } from '../../../../rpc-plugin-process/dist/process/handshake.js'
 import { createNativeProcessOffer } from '../../../../rpc-plugin-process/dist/process/offer.js'
 

@@ -230,6 +230,7 @@ func validateWireNode(value any, pointer string, depth int, state *wireState) (r
 			unknown = append(unknown, key)
 		}
 	}
+	// Test-oracle exception: n counts this wire-error node's unknown keys; preserve exact cross-language report order.
 	sort.Strings(unknown)
 	if len(unknown) > 0 && !state.ignore {
 		return nil, &wireViolation{"unknownField", pointer}

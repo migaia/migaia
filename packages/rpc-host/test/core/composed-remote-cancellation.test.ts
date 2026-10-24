@@ -1,7 +1,7 @@
+import { createRuntimeEndpointComposition } from '../../dist/core/runtime-api-endpoint.js'
 import { describe, expect, it } from 'vitest'
-import { createProviderEndpoint } from '../../dist/core/provider.js'
-import { createClientEndpoint } from '../../dist/core/client.js'
-import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
+
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
 import { connect } from '../../dist/core/middleware/connect.js'
 import { abort } from '../../dist/core/middleware/abort.js'
 import { readEndpointDebugSnapshot } from '../../dist/core/internal/test-observer.js'
@@ -34,17 +34,23 @@ function hangUntilAborted(context: IRpcContext): Promise<IRpcProviderResult> {
 describe('composed remote cancellation on caller-side settlement', () => {
   it('notifies the remote and leaves zero active controllers after a local timeoutMs expiry', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
-    const server = await createProviderEndpoint({
-      id: 'cancel-timeout-server',
-      transport: serverTransport,
-      middlewares: [connect({ transport: serverTransport }), abort()],
-      provider: { hang: hangUntilAborted }
-    })
-    const client = await createClientEndpoint({
-      id: 'cancel-timeout-client',
-      transport: clientTransport,
-      middlewares: [connect({ transport: clientTransport }), abort()]
-    })
+    const server = await createRuntimeEndpointComposition(
+      {
+        id: 'cancel-timeout-server',
+        transport: serverTransport,
+        middlewares: [connect({ transport: serverTransport }), abort()],
+        provider: { hang: hangUntilAborted }
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'cancel-timeout-client',
+        transport: clientTransport,
+        middlewares: [connect({ transport: clientTransport }), abort()]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     try {
       const result = await client
         .send('cancel-timeout-server', 'hang', null, { timeoutMs: 40 })
@@ -63,17 +69,23 @@ describe('composed remote cancellation on caller-side settlement', () => {
 
   it('notifies the remote and leaves zero active controllers after a local signal.abort() fired synchronously right after send()', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
-    const server = await createProviderEndpoint({
-      id: 'cancel-abort-server',
-      transport: serverTransport,
-      middlewares: [connect({ transport: serverTransport }), abort()],
-      provider: { hang: hangUntilAborted }
-    })
-    const client = await createClientEndpoint({
-      id: 'cancel-abort-client',
-      transport: clientTransport,
-      middlewares: [connect({ transport: clientTransport }), abort()]
-    })
+    const server = await createRuntimeEndpointComposition(
+      {
+        id: 'cancel-abort-server',
+        transport: serverTransport,
+        middlewares: [connect({ transport: serverTransport }), abort()],
+        provider: { hang: hangUntilAborted }
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'cancel-abort-client',
+        transport: clientTransport,
+        middlewares: [connect({ transport: clientTransport }), abort()]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     try {
       const controller = new AbortController()
       const pending = client.send('cancel-abort-server', 'hang', null, {

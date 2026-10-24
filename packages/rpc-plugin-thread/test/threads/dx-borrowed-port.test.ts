@@ -2,7 +2,8 @@ import { MessageChannel } from 'node:worker_threads'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { describe, expect, it } from 'vitest'
 import { createNodeThreadChannel } from '../../dist/threads/channel.js'
-import { createThreadPeer } from '../protocol.js'
+import { createRpcHost } from '@migaia/rpc-host'
+import { createAdapterDeployment, defineTransportPlugin } from '@migaia/rpc-host/plugin'
 import type { IRuntimePeer } from '@migaia/rpc-host/plugin'
 import { deferred } from '@migaia/utils/promise'
 
@@ -22,24 +23,44 @@ describe('borrowed MessagePort runtime peers', () => {
     try {
       /** Both source proposals come from the Core-owned runtime assembly, never a hand-written list. */
       const opened = await Promise.all([
-        createThreadPeer<IRightApi>({
+        createRpcHost<IRightApi>({
           self: { name: 'left', instanceId: 'left-1' },
           provide: { greet: (name: string) => `hello ${name}` },
-          connect: async (context) =>
-            createNodeThreadChannel(ports.port1, 'right-1', {
-              scheduler: systemScheduler,
-              capabilities: context.capabilities
-            }),
+          plugins: [
+            defineTransportPlugin({
+              name: 'thread',
+              mode: 'connect',
+              deployment: createAdapterDeployment({
+                runtimeKey: 'thread',
+                runtimeFamily: createNodeThreadChannel,
+                open: async (context) =>
+                  createNodeThreadChannel(ports.port1, 'right-1', {
+                    scheduler: systemScheduler,
+                    capabilities: context.capabilities
+                  })
+              })
+            })
+          ],
           report: () => undefined
         }),
-        createThreadPeer<ILeftApi>({
+        createRpcHost<ILeftApi>({
           self: { name: 'right', instanceId: 'right-1' },
           provide: { twice: (value: number) => value * 2 },
-          connect: async (context) =>
-            createNodeThreadChannel(ports.port2, 'left-1', {
-              scheduler: systemScheduler,
-              capabilities: context.capabilities
-            }),
+          plugins: [
+            defineTransportPlugin({
+              name: 'thread',
+              mode: 'connect',
+              deployment: createAdapterDeployment({
+                runtimeKey: 'thread',
+                runtimeFamily: createNodeThreadChannel,
+                open: async (context) =>
+                  createNodeThreadChannel(ports.port2, 'left-1', {
+                    scheduler: systemScheduler,
+                    capabilities: context.capabilities
+                  })
+              })
+            })
+          ],
           report: () => undefined
         })
       ])
@@ -67,29 +88,53 @@ describe('borrowed MessagePort runtime peers', () => {
     try {
       /** Peer ids identify the opposite logical connection; endpoint addressing remains Core-owned. */
       const opened = await Promise.all([
-        createThreadPeer({
+        createRpcHost({
           provide: { echo: (value: string) => value },
-          connect: async (context) => {
-            leftAddress.resolve(context.self.instanceId)
-            return createNodeThreadChannel(ports.port1, 'right', {
-              scheduler: systemScheduler,
-              capabilities: context.capabilities
+          plugins: [
+            defineTransportPlugin({
+              name: 'thread',
+              mode: 'connect',
+              deployment: createAdapterDeployment({
+                runtimeKey: 'thread',
+                runtimeFamily: createNodeThreadChannel,
+                open: async (context) => {
+                  leftAddress.resolve(context.self.instanceId)
+                  return createNodeThreadChannel(ports.port1, 'right', {
+                    scheduler: systemScheduler,
+                    capabilities: context.capabilities
+                  })
+                }
+              })
             })
-          },
+          ],
           report: () => undefined
         }),
-        createThreadPeer<IEchoApi>({
+        createRpcHost<IEchoApi>({
           self: { name: 'right', instanceId: 'right' },
-          connect: async (context) =>
-            createNodeThreadChannel(ports.port2, await leftAddress.promise, {
-              scheduler: systemScheduler,
-              capabilities: context.capabilities
-            }),
+          plugins: [
+            defineTransportPlugin({
+              name: 'thread',
+              mode: 'connect',
+              deployment: createAdapterDeployment({
+                runtimeKey: 'thread',
+                runtimeFamily: createNodeThreadChannel,
+                open: async (context) =>
+                  createNodeThreadChannel(ports.port2, await leftAddress.promise, {
+                    scheduler: systemScheduler,
+                    capabilities: context.capabilities
+                  })
+              })
+            })
+          ],
           report: () => undefined
         })
       ])
       peers.push(...opened)
-      expect(opened[0].self).toMatchObject({ name: 'thread', instanceId: expect.any(String) })
+      expect(opened[0].self).toMatchObject({
+        name: expect.any(String),
+        instanceId: expect.any(String)
+      })
+      expect(opened[0].self.name).toBe(opened[0].self.instanceId)
       expect(await opened[1].request('echo', 'default address')).toBe('default address')
     } finally {
       await Promise.all(peers.map((peer) => peer.close()))

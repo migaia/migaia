@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { serializeRpcError } from '@migaia/rpc-contract'
-import { bridgeEndpoint, bridgeFixture, flush, request } from './fixture.js'
+import { bridgeEndpoint, BridgeFixture, flush, request } from './fixture.js'
 
 describe('JSON-RPC envelope mapping', () => {
   it.each(['response-first', 'abort-first'])(
     'retains core settlement for %s same-tick response/abort delivery',
     async (order) => {
-      const fixture = bridgeFixture()
+      const fixture = new BridgeFixture()
       const channel = await fixture.open()
       const endpoint = await bridgeEndpoint(channel)
       const controller = new AbortController()
@@ -44,7 +44,7 @@ describe('JSON-RPC envelope mapping', () => {
     }
   )
   it('preserves ids, reverses routes, handles null and projects exact metadata', async () => {
-    const fixture = bridgeFixture()
+    const fixture = new BridgeFixture()
     const channel = await fixture.open()
     const responses: unknown[] = []
     channel.transport.subscribe((message) => responses.push(JSON.parse(message.data as string)))
@@ -119,7 +119,7 @@ describe('JSON-RPC envelope mapping', () => {
     await channel.close()
   })
   it('preserves Host control method names and args through invoke', async () => {
-    const fixture = bridgeFixture()
+    const fixture = new BridgeFixture()
     const channel = await fixture.open({
       target: {
         kind: 'host',
@@ -145,7 +145,7 @@ describe('JSON-RPC envelope mapping', () => {
     await channel.close()
   })
   it('sends one cancel after invoke, reports late response once, and keeps the next call usable', async () => {
-    const fixture = bridgeFixture()
+    const fixture = new BridgeFixture()
     const channel = await fixture.open()
     const responses: unknown[] = []
     channel.transport.subscribe((message) => responses.push(JSON.parse(message.data as string)))
@@ -188,7 +188,7 @@ describe('JSON-RPC envelope mapping', () => {
     await channel.close()
   })
   it('core gate preserves one-way ids and caller abort/deadline settlement', async () => {
-    const fixture = bridgeFixture()
+    const fixture = new BridgeFixture()
     const channel = await fixture.open()
     const endpoint = await bridgeEndpoint(channel)
     try {

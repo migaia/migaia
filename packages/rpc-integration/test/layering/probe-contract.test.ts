@@ -52,10 +52,10 @@ describe('rpc-devtools layer-1 dependency direction', () => {
     for (const path of sourceFiles(devtoolsRoot))
       for (const specifier of imports(path)) {
         if (specifier.startsWith('.')) expect(specifier, path).toMatch(/\.js$/u)
-        // The runtime-neutral scheduler is the only foundation import: one clock for snapshots.
+        // Shared runtime-neutral owners provide one clock and linear UTF-16 key ordering.
         else
           expect(specifier, path).toMatch(
-            /^(?:@migaia\/rpc-(?:host|contract)(?:\/|$)|@migaia\/utils\/scheduler$)/u
+            /^(?:@migaia\/rpc-(?:host|contract)(?:\/|$)|@migaia\/utils\/(?:scheduler|string)$)/u
           )
       }
   })

@@ -15,7 +15,7 @@ import type {
 import type { IOutboundSurface } from '../features/outbound.js'
 import type { IDiscoverySurface } from '../features/discovery.js'
 import type { IControlSurface } from '../features/control.js'
-import type { IProviderRegistrationSurface } from '../features/provider.js'
+import type { IProviderRegistrationSurface } from './provider-feature.js'
 import type { IOneWaySurface } from '../features/one-way.js'
 import type { IRpcStreamSurface } from '../features/stream.js'
 

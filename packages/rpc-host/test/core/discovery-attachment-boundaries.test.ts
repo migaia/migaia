@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
 import { createEndpointKernel } from '../../dist/core/endpoint-kernel.js'
 import { type IScheduler } from '@migaia/utils/scheduler'
 import { createManualScheduler } from '@migaia/utils/testing'
@@ -307,6 +307,55 @@ function forgedCandidate(): IRpcDiscoveryCandidate<string> {
 }
 
 describe('discovery attachment boundary semantics', () => {
+  it('[BC4-DISCOVERY-ORDER] preserves registration order for snapshots and receiver selection', async () => {
+    /** The existing selector consumes the actual canonical metadata list, without a second sort. */
+    const harness = await createDiscoveryHarness(
+      'automatic',
+      undefined,
+      (servers) => servers[0]?.receiverId
+    )
+    /** Receiver ids deliberately arrive opposite their former locale-sorted order. */
+    const targetId = 'registration-order-target'
+    try {
+      const pending = harness.attachment.query(targetId)
+      const taskId = latestTaskId(harness.commands)
+      const verifiedPeerKey = await harness.admitPeer(
+        'registration-order-peer',
+        'coverage-direct-automatic'
+      )
+      for (const receiverId of ['z-receiver', 'a-receiver', 'z-receiver']) {
+        await harness.attachment.handleInboundDiscovery(
+          ...discoveryInput({
+            kind: RpcMessageKind.discoveryResponse,
+            taskId,
+            senderId: 'registration-order-peer',
+            targetId: 'coverage-direct-automatic',
+            resolvedTargetId: targetId,
+            receiverId,
+            sentAt: Date.now()
+          }),
+          verifiedPeerKey
+        )
+      }
+      await expect(pending).resolves.toBeUndefined()
+      const servers = harness.attachment.getServerList(targetId)
+      expect(servers.map((entry) => entry.receiverId)).toEqual(['z-receiver', 'a-receiver'])
+      expect(harness.attachment.getServerList()).toEqual(servers)
+      expect(harness.attachment.controls.getServerList(targetId)).toEqual(servers)
+      expect(harness.attachment.getServerList('absent-target')).toEqual([])
+      expect(Object.isFrozen(servers)).toBe(true)
+      expect(servers.every((entry) => Object.isFrozen(entry))).toBe(true)
+      await expect(harness.attachment.receiverForOperation(targetId, 'send', 100)).resolves.toEqual(
+        {
+          receiverId: 'z-receiver',
+          verifiedPeerKey
+        }
+      )
+    } finally {
+      await harness.dispose()
+    }
+  })
+
   it('covers direct automatic query response, receiver binding, selector fallback, and local ownership', async () => {
     const harness = await createDiscoveryHarness('automatic', 'unique-direct')
     const targetId = 'direct-remote'

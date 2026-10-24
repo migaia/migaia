@@ -1,3 +1,5 @@
+import { createRpcHost } from '@migaia/rpc-host'
+import { processPlugin } from '@migaia/rpc-plugin-process'
 import assert from 'node:assert/strict'
 import { it } from 'vitest'
 import { systemScheduler } from '@migaia/utils/scheduler'
@@ -6,14 +8,14 @@ import {
   createRpcIdempotencyStore,
   type IRpcIdempotencyStore
 } from '../../../rpc-host/dist/core/idempotency-store.js'
-import { createProcessFixtureListenerPeer as createProcessListenerPeer } from '../fixtures/process-diagnostics.js'
+
 import { createProcessResilience } from '../../../rpc-plugin-process/dist/process/resilience/index.js'
 import { createNativeProcessOffer } from '../../../rpc-plugin-process/dist/process/offer.js'
 import { createProcessTransport } from '../../../rpc-plugin-process/dist/process/handshake.js'
 import {
   dialProcessByteChannel,
   listenProcessByteChannel
-} from '@migaia/rpc-plugin-process/adapters/node-socket'
+} from '../../../rpc-plugin-process/dist/process/adapters/node-socket.js'
 import {
   createRuntimePeer,
   type IRuntimePeer
@@ -57,32 +59,34 @@ it('authenticated reconnect retains the service store and replacement reads the 
       report: (error) => failures.push(error),
       idempotencyStore: external
     })
-    const peer = await createProcessListenerPeer(
-      {
-        self: { name: 'stable-service', instanceId: 'stable-service' },
-        provide: { value: () => ++executions },
-        report: (error) => failures.push(error)
-      },
-      {
-        kind: 'listener',
-        address: 'tcp://127.0.0.1:0',
-        resilience,
-        listen: async (options) => {
-          const listener = await listenProcessByteChannel(options)
-          address = listener.address
-          return listener
-        },
-        verify: (auth) => String(auth),
-        offer: createNativeProcessOffer({
-          peer: { id: 'stable-service', runtime: 'node' },
-          capabilities
-        }),
-        createConnectionContext: () => ({
-          peerId: 'stable-caller',
-          ipc: { connectionId: 'native-store', sessionId: 'native-store', log: () => undefined }
+    const peer = await createRpcHost({
+      self: { name: 'stable-service', instanceId: 'stable-service' },
+      provide: { value: () => ++executions },
+      report: (error) => failures.push(error),
+      plugins: [
+        processPlugin({
+          listen: {
+            kind: 'listener',
+            address: 'tcp://127.0.0.1:0',
+            resilience,
+            listen: async (options) => {
+              const listener = await listenProcessByteChannel(options)
+              address = listener.address
+              return listener
+            },
+            verify: (auth) => String(auth),
+            offer: createNativeProcessOffer({
+              peer: { id: 'stable-service', runtime: 'node' },
+              capabilities
+            }),
+            createConnectionContext: () => ({
+              peerId: 'stable-caller',
+              ipc: { connectionId: 'native-store', sessionId: 'native-store', log: () => undefined }
+            })
+          }
         })
-      }
-    )
+      ]
+    })
     return {
       peer,
       close: async () => {
@@ -91,28 +95,33 @@ it('authenticated reconnect retains the service store and replacement reads the 
       }
     }
   }
+  /** Each genuine native connection owns a distinct Host identity, separate from its principal. */
+  let sequence = 0
   /** Original authentication supplies a stable principal independently of changing physical sockets. */
-  const connect = (principal: string) =>
-    createRuntimePeer({
-      self: { name: 'stable-caller', instanceId: 'stable-caller' },
+  const connect = (principal: string) => {
+    /** Reconnect continuity must derive from authentication, never a reused physical caller name. */
+    const instanceId = `stable-caller-${++sequence}`
+    return createRuntimePeer({
+      self: { name: instanceId, instanceId },
       connect: async () =>
         createProcessTransport(await dialProcessByteChannel({ address }), {
           role: 'initiator',
           offer: createNativeProcessOffer({
-            peer: { id: 'stable-caller', runtime: 'node' },
+            peer: { id: instanceId, runtime: 'node' },
             auth: principal,
             capabilities
           }),
           peerId: 'stable-service',
           ipc: {
-            connectionId: 'native-store-client',
-            sessionId: 'native-store-client',
+            connectionId: instanceId,
+            sessionId: instanceId,
             log: () => undefined
           },
           report: (error) => failures.push(error)
         }),
       report: (error) => failures.push(error)
     })
+  }
   /** Cleanup follows actual source ownership, including assertion failures during replacement. */
   let service: Awaited<ReturnType<typeof serve>> | undefined
   let client: IRuntimePeer | undefined
@@ -157,7 +166,7 @@ it('authenticated reconnect retains the service store and replacement reads the 
       await client.request('value', undefined, { orderKey: 'same', idempotencyKey: 'key' }),
       2
     )
-    assert.equal(failures.length, 0)
+    assert.deepEqual(failures, [])
   } finally {
     await client?.close()
     await service?.close()

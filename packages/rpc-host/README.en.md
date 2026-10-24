@@ -122,4 +122,6 @@ Error sources are functional domains: `rpc.endpoint` for calls and host admissio
 
 Transport and feature objects are genuine plugin-host definitions and also work with ordinary `PluginHost.use(...)`, retaining its existing installation, replacement, and cleanup owners. Transport authors use cold deployment and scope tools from `@migaia/rpc-host/plugin`. Applications start with `createRpcHost` and need no private files or lower-level factories.
 
+Public subpaths are `/probe`, `/plugin`, and `/features` with its feature subpaths. `/probe` compiles observation definitions; install them on the same host through `/plugin` with `defineFeaturePlugin({ name, probe })`. Observers borrow that host’s calls and physical connections without creating another endpoint.
+
 See the [usage guide](./USEGUIDE.en.md) for calls, cancellation, and migration.

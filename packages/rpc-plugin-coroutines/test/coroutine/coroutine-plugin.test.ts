@@ -216,12 +216,12 @@ it.each(['thread', 'process'] as const)(
     const { threadProtocolDefinition: createThreadPlugin } =
       await import('../../../rpc-integration/test/runtime-api/fixtures/thread-protocol.js')
     const { createNodeThreadLauncher, createNodeThreadChannelFactory } =
-      await import('@migaia/rpc-plugin-thread/adapters/node')
-    const { createProcessPlugin } = await import('../../../rpc-plugin-process/test/protocol.js')
+      await import('../../../rpc-plugin-thread/dist/threads/adapters/node.js')
+    const { processPlugin } = await import('@migaia/rpc-plugin-process')
     const { createProcessTransport } =
       await import('../../../rpc-plugin-process/dist/process/handshake.js')
     const { createNodeProcessLauncher } =
-      await import('@migaia/rpc-plugin-process/adapters/node-child-process')
+      await import('../../../rpc-plugin-process/dist/process/adapters/node-child-process.js')
     /** Native receipt counters independently prove notify delivery and provider cancellation. */
     type INativeStats = { notices: unknown[]; waiting: number; cancelled: number }
     /** The existing child fixture uses real native bootstrap and committed public outlets. */
@@ -363,7 +363,7 @@ it.each(['thread', 'process'] as const)(
               })
           }
         await host.use(
-          createProcessPlugin({
+          processPlugin({
             name: 'native',
             expose: ['parent'],
             spawn,

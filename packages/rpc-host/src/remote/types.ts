@@ -3,12 +3,12 @@ import type { ICodec } from '@migaia/serialize/codec'
 import type { ISupervisor } from '@migaia/supervision'
 import type { IScheduler } from '@migaia/utils/scheduler'
 import type { IRpcFramer, IRpcPortableValue } from '@migaia/rpc-contract'
-import type { IRpcFeature } from '../core/index.js'
+import type { IRpcFeature } from '../core/feature.js'
 import type { IOneWaySurface } from '../core/features/one-way.js'
 import type { IRpcStreamRuntime } from '../core/stream/index.js'
-import type { IRpcEndpoint } from '../core/index.js'
-import type { IRpcTransport } from '../core/index.js'
-import type { IRemoteContract, IRemoteHostCatalog, RemoteMethodMode } from './contract.js'
+import type { IRpcEndpoint } from '../core/typing.js'
+import type { IRpcTransport } from '../core/transport.js'
+import type { RemoteMethodMode } from './contract.js'
 import type { IRuntimeCallOptions } from './runtime-api/typing.js'
 
 /** Native drain invokes one cold dispatcher or the unchanged zero-argument legacy operation. */
@@ -162,22 +162,10 @@ export type IRemoteRetryPort = Readonly<{
   dispatch(input: IRemoteRetryDispatch): Promise<IRpcPortableValue>
 }>
 
-/** Host methods require a caller-provided PluginHost enablement port. */
-export type IRemotePluginHostPort = Readonly<{
-  /** Suspend the named local proxy registration when its remote generation becomes unavailable. */
-  disable(name: string, options: { readonly policy: 'suspend' }): Promise<unknown>
-  /** Enable the same registration after the replacement generation is admitted. */
-  enable(name: string): Promise<unknown>
-}>
-
-/** Common proxy configuration; platform launchers supply only the binding. */
+/** Actual native generation configuration; platform launchers supply the original binding. */
 export type IRemoteProxyOptions<TUnit, TSpec> = Readonly<{
-  /** Explicit plugin contract or Host catalog validated before proxy publication. */
-  contract: IRemoteContract | IRemoteHostCatalog
   /** Execution-unit/channel owner used by this registration. */
   binding: IRemoteBinding<TUnit, TSpec>
-  /** Construct an endpoint using the whole accepted channel, including its selected pipeline. */
-  endpointFactory: IRemoteEndpointFactory
   /** Required reporter for background and secondary cleanup failures. */
   report(error: unknown): void
   /** Optional idempotency key generator; omission uses the canonical identity generator. */
@@ -186,6 +174,4 @@ export type IRemoteProxyOptions<TUnit, TSpec> = Readonly<{
   retryPort?: IRemoteRetryPort
   /** Optional positive safe-integer upper deadline cap; omission imposes no additional proxy cap. */
   callDeadlineCapMs?: number
-  /** Optional one-shot pre-dispatch admission guard. */
-  callGuard?: IRemoteCallGuard
 }>

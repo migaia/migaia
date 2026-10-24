@@ -1,14 +1,16 @@
+import { threadPlugin } from '@migaia/rpc-plugin-thread'
+import { RuntimePluginKey } from '@migaia/rpc-host/plugin'
+import { runtimeTestHost } from '../../../rpc-host/test/runtime-api/fixture.js'
+import { readRuntimeOutletConnection } from '../../../rpc-host/dist/remote/runtime-api/outlet.js'
 import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
 import { it } from 'vitest'
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { createThreadPeer } from '../../../rpc-plugin-thread/test/protocol.ts'
 import {
   createNodeThreadLauncher,
   createNodeThreadChannelFactory
-} from '@migaia/rpc-plugin-thread/adapters/node'
-import type { IRuntimeDynamicSurface } from '../../../rpc-host/dist/remote/runtime-api/typing.js'
+} from '../../../rpc-plugin-thread/dist/threads/adapters/node.js'
 
 /** The same actual native child used by generation and shutdown acceptance holds its provider. */
 const entry = fileURLToPath(new URL('./fixtures/managed-worker.mjs', import.meta.url))
@@ -21,20 +23,29 @@ async function fixture() {
     entered = resolve
   })
   const budget = createUnitBudget({ kind: 'thread', maxUnits: 1 })
-  const peer = await createThreadPeer<IRuntimeDynamicSurface>({
-    self: { name: 'shutdown-parent', instanceId: 'shutdown-parent' },
-    provide: { parent: { started: () => entered(), echo: () => 42 } },
-    report: () => undefined,
-    spawn: {
-      spec: { entry, name: 'shutdown-child' },
-      launcher: createNodeThreadLauncher(),
-      budget,
-      scheduler: systemScheduler,
-      channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),
-      report: () => undefined
-    }
+  /** The real native Host owns installation and rollback for this managed connection. */
+  const host = runtimeTestHost({
+    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   })
-  return { peer, budget, started }
+  /** The committed outlet lends its genuine managed Peer and original iterator/call contracts. */
+  const peer = await host
+    .use(
+      threadPlugin({
+        self: { name: 'shutdown-parent', instanceId: 'shutdown-parent' },
+        provide: { parent: { started: () => entered(), echo: () => 42 } },
+        report: () => undefined,
+        spawn: {
+          spec: { entry, name: 'shutdown-child' },
+          launcher: createNodeThreadLauncher(),
+          budget,
+          scheduler: systemScheduler,
+          channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),
+          report: () => undefined
+        }
+      })
+    )
+    .then(() => readRuntimeOutletConnection(host.thread, RuntimePluginKey.thread)!.peer)
+  return { peer, host, budget, started }
 }
 
 it('managed close immediately rejects all new public operations during native drain', async () => {
@@ -63,7 +74,7 @@ it('managed close immediately rejects all new public operations during native dr
     assert.equal(active.budget.inUse, 0)
   } finally {
     await outcome
-    await active.peer.close()
+    await active.host.dispose()
   }
 })
 
@@ -85,7 +96,7 @@ it('native drain preserves an already-started whole group through its terminal r
     assert.equal(active.budget.inUse, 0)
   } finally {
     await outcome
-    await active.peer.close()
+    await active.host.dispose()
   }
 })
 
@@ -122,7 +133,7 @@ for (const mode of ['default', 'ordered', 'before-start'] as const) {
       await closing
       assert.equal(active.budget.inUse, 0)
     } finally {
-      await active.peer.close()
+      await active.host.dispose()
     }
   })
 }

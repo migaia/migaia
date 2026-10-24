@@ -1,67 +1,15 @@
+import { RUNTIME_API_CAPABILITIES } from '../../dist/remote/runtime-api/constants.js'
+import { createRuntimePeer } from '../../dist/remote/runtime-api/peer.js'
 import assert from 'node:assert/strict'
-import { existsSync, readFileSync } from 'node:fs'
-import { it, vi } from 'vitest'
-import * as memory from '@migaia/rpc-host/adapters/memory'
-import { createPeerPair } from '../../dist/testing/index.js'
+import { it } from 'vitest'
 import { RpcError, RpcCoreErrorCode } from '../../dist/core/errors.js'
 import { RpcCoreErrorText } from '../../dist/core/error-text.js'
-import { connected } from './fixture.js'
+import { runtimeSources } from './fixture.js'
 
-it('pair snapshots the second-side configuration before acquiring the original carrier', async () => {
-  /** The spy observes the real carrier factory and never substitutes a fake transport. */
-  const allocation = vi.spyOn(memory, 'createMemoryTransportPair')
-  /** Construction must retain this exact primary configuration failure. */
-  const primary = new Error('pair-second-config-fixture')
-  /** This ordinary configuration field throws before either canonical Peer should start. */
-  const second = Object.defineProperty({}, 'provide', {
-    enumerable: true,
-    get: () => {
-      throw primary
-    }
-  }) as { provide: Record<string, never> }
-  try {
-    await assert.rejects(
-      createPeerPair({ a: { provide: {} }, b: second, report: () => undefined }),
-      (error) => error === primary
-    )
-    assert.equal(
-      allocation.mock.calls.length,
-      0,
-      'no carrier or first Peer exists on config failure'
-    )
-  } finally {
-    /** RED evidence still closes an actually allocated pair without taking ownership of other work. */
-    for (const result of allocation.mock.results)
-      if (result.type === 'return') result.value[0].close()
-    allocation.mockRestore()
-  }
-})
-
-it('testing pair exports the canonical callable owner instead of a separate dispatcher', async () => {
-  /** Actual production roots establish the business baseline before testing export admission. */
-  const baseline = await connected({}, { echo: (value: unknown) => value })
-  try {
-    assert.equal(await baseline.peers[0].request('echo', 1), 1)
-  } finally {
-    await baseline.close()
-  }
-  const metadata = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8'))
-  assert.equal(
-    metadata.exports['./testing']?.default,
-    './dist/testing/index.js',
-    'the explicit testing-only subpath must be packed'
-  )
-  assert.equal(
-    existsSync(new URL('../../src/testing/index.ts', import.meta.url)),
-    true,
-    'the canonical helper owns that single export'
-  )
-})
-
-it('pair uses canonical binary, group, outcome and provider errors with honest memory metadata', async () => {
+it('canonical peers use binary, group, outcome and provider errors with honest memory metadata', async () => {
   const reports: unknown[] = []
   let effects = 0
-  const pair = await createPeerPair({
+  const pairOptions = {
     a: { provide: { twice: (value: number) => value * 2 } },
     b: {
       provide: {
@@ -78,8 +26,25 @@ it('pair uses canonical binary, group, outcome and provider errors with honest m
         }
       }
     },
-    report: (error) => reports.push(error)
-  })
+    report: (error: unknown) => reports.push(error)
+  }
+  /** Reuse the independently negotiated sources and actual canonical Peer constructors. */
+  const pairChannel = runtimeSources(RUNTIME_API_CAPABILITIES, RUNTIME_API_CAPABILITIES)
+  const [a, b] = await Promise.all([
+    createRuntimePeer({
+      ...pairOptions.a,
+      self: { name: 'a', instanceId: 'test-pair-a' },
+      connect: pairChannel.sources[0],
+      report: pairOptions.report
+    }),
+    createRuntimePeer({
+      ...pairOptions.b,
+      self: { name: 'b', instanceId: 'test-pair-b' },
+      connect: pairChannel.sources[1],
+      report: pairOptions.report
+    })
+  ])
+  const pair = { a, b }
   try {
     assert.equal(await pair.b.request('twice', 2), 4)
     const backing = new Uint8Array([1, 2]).buffer
@@ -108,10 +73,11 @@ it('pair uses canonical binary, group, outcome and provider errors with honest m
     assert.equal((await pair.a.describe()).connections[0]!.carrier, 'Memory')
   } finally {
     await Promise.all([pair.a.close(), pair.b.close()])
+    pairChannel.close()
   }
 })
 
-it('pair preserves original deadline, abort reason, close Promise and in-flight retirement', async () => {
+it('canonical peers preserve original deadline, abort reason, close Promise and in-flight retirement', async () => {
   const reports: unknown[] = []
   /** The second actual handler invocation is the in-flight close observation. */
   let reached!: () => void
@@ -119,7 +85,7 @@ it('pair preserves original deadline, abort reason, close Promise and in-flight 
     reached = resolve
   })
   let starts = 0
-  const pair = await createPeerPair({
+  const pairOptions = {
     a: { provide: {} },
     b: {
       provide: {
@@ -129,8 +95,25 @@ it('pair preserves original deadline, abort reason, close Promise and in-flight 
         }
       }
     },
-    report: (error) => reports.push(error)
-  })
+    report: (error: unknown) => reports.push(error)
+  }
+  /** Reuse the independently negotiated sources and actual canonical Peer constructors. */
+  const pairChannel = runtimeSources(RUNTIME_API_CAPABILITIES, RUNTIME_API_CAPABILITIES)
+  const [a, b] = await Promise.all([
+    createRuntimePeer({
+      ...pairOptions.a,
+      self: { name: 'a', instanceId: 'test-pair-a' },
+      connect: pairChannel.sources[0],
+      report: pairOptions.report
+    }),
+    createRuntimePeer({
+      ...pairOptions.b,
+      self: { name: 'b', instanceId: 'test-pair-b' },
+      connect: pairChannel.sources[1],
+      report: pairOptions.report
+    })
+  ])
+  const pair = { a, b }
   try {
     await assert.rejects(pair.a.request('hold', undefined, { timeoutMs: 5 }), {
       code: RpcCoreErrorCode.deadlineExceeded
@@ -151,25 +134,6 @@ it('pair preserves original deadline, abort reason, close Promise and in-flight 
     assert.ok((await active) instanceof Error)
   } finally {
     await Promise.all([pair.a.close(), pair.b.close()])
+    pairChannel.close()
   }
-})
-
-it('a second-side canonical compilation failure rolls back the original pair without leaking the first', async () => {
-  let reads = 0
-  const invalid = Object.defineProperty({}, 'secret', {
-    enumerable: true,
-    get: () => {
-      reads++
-      return () => 1
-    }
-  })
-  await assert.rejects(
-    createPeerPair({
-      a: { provide: { echo: (value: number) => value } },
-      b: { provide: invalid },
-      report: () => undefined
-    }),
-    { code: RpcCoreErrorCode.invalidConfig }
-  )
-  assert.equal(reads, 0)
 })

@@ -1,64 +1,137 @@
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { defineFeature, definePlugin, PluginHost } from '@migaia/plugin-host'
+import { defineFeature, definePlugin } from '@migaia/plugin-host'
 import { createUnitBudget } from '@migaia/supervision'
-import { describe, expect, it, vi } from 'vitest'
-import { systemScheduler } from '@migaia/utils/scheduler'
-import { createComposedEndpoint } from '../../../rpc-host/dist/core/composed.js'
-import { createCanonicalChunkFeature } from '../../../rpc-host/dist/core/stream/index.js'
-import { createControlFeature } from '../../../rpc-host/dist/core/features/control.js'
-import { createDiscoveryFeature } from '../../../rpc-host/dist/core/features/discovery.js'
-import { createOutboundFeature } from '../../../rpc-host/dist/core/features/outbound.js'
-import { createProviderFeature } from '../../../rpc-host/dist/core/features/provider.js'
-import { createStreamFeature } from '../../../rpc-host/dist/core/stream/index.js'
-import { type IRpcEndpoint } from '../../../rpc-host/dist/core/index.js'
-import { abort } from '../../../rpc-host/dist/core/index.js'
-import { codec } from '../../../rpc-host/dist/core/index.js'
-import { connect } from '../../../rpc-host/dist/core/index.js'
-import { framer } from '../../../rpc-host/dist/core/index.js'
-import { ping } from '../../../rpc-host/dist/core/index.js'
-import { createNodeProcessLauncher } from '../../../rpc-plugin-process/src/process/adapters/node-child-process.js'
+import { describe, expect, it } from 'vitest'
+import { processPlugin } from '@migaia/rpc-plugin-process'
+import { runtimeTestHost } from '../../../rpc-host/test/runtime-api/fixture.js'
+import { RUNTIME_API_BASE_CAPABILITIES } from '../../../rpc-host/dist/remote/runtime-api/constants.js'
+import { readRuntimeOutletConnection } from '../../../rpc-host/dist/remote/runtime-api/outlet.js'
+import { createNodeProcessLauncher } from '../../../rpc-plugin-process/dist/process/adapters/node-child-process.js'
 import { createProcessTransport } from '../../../rpc-plugin-process/dist/process/handshake.js'
-import { createNativeProcessOffer } from '../../../rpc-plugin-process/src/process/offer.js'
-import { createProcessPlugin } from '../../../rpc-plugin-process/test/protocol.ts'
-import { createProcessResilience } from '../../../rpc-plugin-process/dist/process/resilience/index.js'
-import type { IRemoteContract } from '@migaia/rpc-host/plugin'
-import type { IRemoteServeEndpoint } from '@migaia/rpc-host/plugin'
+import { createNativeProcessOffer } from '../../../rpc-plugin-process/dist/process/offer.js'
+import type { IProcessByteChannel } from '../../../rpc-plugin-process/dist/process/types.js'
+import type { IProcessPluginOptions } from '../../../rpc-plugin-process/dist/process/plugin.js'
 
-/** A child fixture imports the built process-plugin implementation without Vitest IPC. */
+/** This real child imports built native implementations without sharing the test runner's IPC. */
 const childFixture = resolve(
   fileURLToPath(new URL('.', import.meta.url)),
   './fixtures/node-process-plugin-child.mjs'
 )
 
-/** Request and generator exercise both core provider routes on a real pipe. */
-const contract: IRemoteContract = {
-  schemaVersion: 1,
-  plugin: 'p',
-  features: {
-    f: {
-      methods: {
-        request: { mode: 'request', idempotent: false },
-        generator: { mode: 'generator', idempotent: false }
+/** Own one real stdio Host and its caller-owned native budget across both replacement orders. */
+class NativePluginScenario {
+  /** The actual ordinary Host owns installation, shared outlet publication and disposal. */
+  readonly host = runtimeTestHost({
+    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
+  })
+  /** Bootstrap is private deployment input, never a remote feature or diagnostic field. */
+  readonly #token = 'native-process-plugin-token'
+  /** The OS launcher remains the sole process creation and termination owner. */
+  readonly #launcher = createNodeProcessLauncher()
+  /** A committed replacement must return all caller-owned units at final disposal. */
+  readonly budget
+  /** The same native source remains reusable and cold until actual Host installation. */
+  readonly options
+  /** One unit permits stop-first replacement; two permit a genuine overlapping candidate. */
+  constructor(external: boolean) {
+    this.budget = createUnitBudget({ kind: 'process', maxUnits: external ? 2 : 1 })
+    this.options = {
+      name: 'p',
+      self: { name: 'parent', instanceId: 'parent' },
+      report: () => undefined,
+      spawn: {
+        kind: 'spawn',
+        channelKind: 'byte',
+        wire: 'native',
+        token: this.#token,
+        supervision: {
+          id: 'native-child',
+          budget: this.budget,
+          launcher: this.#launcher,
+          isolation: 'best-effort',
+          report: () => undefined,
+          spec: {
+            command: process.execPath,
+            args: [childFixture],
+            env: { inherit: [], set: {} },
+            stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' },
+            bootstrap: { via: 'stdin', payload: new TextEncoder().encode(this.#token) }
+          }
+        },
+        rawChannel: async (handle) => {
+          if (!('channel' in handle)) throw new TypeError('expected native byte channel')
+          return handle.channel as IProcessByteChannel
+        },
+        establish: (raw, context) => {
+          if (raw.kind !== 'byte' || context.role !== 'initiator')
+            throw new TypeError('expected byte initiator')
+          return createProcessTransport(raw, {
+            role: context.role,
+            offer: createNativeProcessOffer({
+              peer: { id: 'parent', runtime: 'node' },
+              auth: context.token,
+              stream: true,
+              capabilities: RUNTIME_API_BASE_CAPABILITIES
+            }),
+            peerId: 'child',
+            scheduler: context.scheduler,
+            ipc: { ...context.session, log: () => undefined },
+            report: () => undefined
+          })
+        }
       }
-    }
+    } satisfies IProcessPluginOptions
   }
-}
-
-/** Composes a single stream owner beside the channel's IPC features. */
-function streamRoots() {
-  const chunk = createCanonicalChunkFeature()
-  const outbound = createOutboundFeature(chunk)
-  const discovery = createDiscoveryFeature(outbound)
-  const control = createControlFeature(outbound, discovery)
-  const provider = createProviderFeature(outbound)
-  return {
-    'first-party-chunk': chunk,
-    'first-party-outbound': outbound,
-    'first-party-discovery': discovery,
-    'first-party-control': control,
-    'first-party-provider': provider,
-    'first-party-stream': createStreamFeature(outbound, provider)
+  /** Verify the first dependent installation sees an already authenticated real remote provider. */
+  async install(): Promise<void> {
+    await this.host.use(processPlugin(this.options))
+    /** This Promise is the actual request created during dependent feature installation. */
+    let firstCall: Promise<unknown> | undefined
+    await this.host.use(
+      definePlugin({
+        name: 'dependent',
+        features: {
+          use: defineFeature(() => {
+            firstCall = this.host.process!.request('p', 'p.request', ['ready'])
+            return {}
+          })
+        },
+        install: () => ({})
+      })
+    )
+    expect(await firstCall).toBe('child:ready')
+  }
+  /** Both orders use existing native owners: supervisor stop-first or ordinary Host candidate swap. */
+  async replace(external: boolean): Promise<void> {
+    /** Only the child behavior changes; native bootstrap authority remains the original token. */
+    const spec = {
+      ...this.options.spawn.supervision.spec,
+      env: { inherit: [], set: { RPC_VALUE: 'new-child' } }
+    }
+    if (external) {
+      /** Capture the actual retiring native Peer, never a removed getFeature proxy. */
+      const old = readRuntimeOutletConnection(this.host.process!, 'p')!.peer
+      await this.host.replace(
+        'p',
+        processPlugin({
+          ...this.options,
+          spawn: {
+            ...this.options.spawn,
+            supervision: { ...this.options.spawn.supervision, spec }
+          }
+        })
+      )
+      expect(() => old.request('p.request', ['old'])).toThrowError(
+        expect.objectContaining({ code: 'REMOTE_CLOSED' })
+      )
+    } else {
+      expect(await this.host.process!.replace('p', spec)).toMatchObject({
+        kind: 'replaced',
+        generation: 2
+      })
+    }
+    expect(await this.host.process!.request('p', 'p.request', ['again'])).toBe('new-child:again')
   }
 }
 
@@ -66,152 +139,21 @@ describe('native process plugin', () => {
   it.each(['default-stop', 'external-switch'] as const)(
     'serves and replaces a real Node child over native stdio (%s)',
     async (mode) => {
-      const token = 'native-process-plugin-token'
-      const launcher = createNodeProcessLauncher()
-      const host = new PluginHost<Record<string, never>>({
-        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
-      })
-      /** A real process consumes exactly one unit of the caller-owned budget. */
-      const budget = createUnitBudget({
-        kind: 'process',
-        maxUnits: mode === 'external-switch' ? 2 : 1
-      })
-      /** A shared governor retains the public plugin identity across a committed switch. */
-      const governor =
-        mode === 'external-switch'
-          ? createProcessResilience({ scheduler: systemScheduler, report: () => undefined })
-          : undefined
-      /** Caller-owned governance must remain open after releasing the PluginHost. */
-      /** Candidate installation returns a real new feature without consulting the retired proxy. */
-      let candidateFeature: { request(params: unknown[]): Promise<unknown> } | undefined
-      /** Replacement keeps bootstrap secret while changing only the child behavior. */
-      const spec = {
-        command: process.execPath,
-        args: [childFixture],
-        env: { inherit: [], set: {} },
-        stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' },
-        bootstrap: { via: 'stdin', payload: new TextEncoder().encode(token) }
-      } as const
-      /** The first dependency call must see an installed, verified remote feature. */
-      let firstCall: Promise<unknown> | undefined
-      const plugin = createProcessPlugin({
-        name: 'p',
-        contract,
-        registrationOwner: { name: 'p', host },
-        host: {
-          ...host.plugin,
-          async replace(name, next) {
-            const installed = await host.replace(name, next)
-            candidateFeature = installed.getFeature('f') as typeof candidateFeature
-          }
-        },
-        resilience: governor,
-        report: () => undefined,
-        deployment: {
-          kind: 'spawn',
-          channelKind: 'byte',
-          wire: 'native',
-          token,
-          supervision: {
-            id: 'native-child',
-            spec,
-            launcher,
-            budget,
-            isolation: 'best-effort',
-            report: () => undefined
-          },
-          rawChannel: async (handle) => handle.channel!,
-          establish: (raw, options) => {
-            if (raw.kind !== 'byte') throw new TypeError('expected byte channel')
-            if (options.role !== 'initiator') throw new TypeError('expected initiator')
-            return createProcessTransport(raw, {
-              role: options.role,
-              offer: createNativeProcessOffer({
-                peer: { id: 'parent', runtime: 'node' },
-                auth: options.token,
-                stream: true
-              }),
-              peerId: 'child',
-              scheduler: options.scheduler,
-              ipc: { ...options.session, log: () => undefined },
-              report: () => undefined
-            })
-          }
-        },
-        endpointFactory: async (channel): Promise<IRemoteServeEndpoint> => {
-          const endpoint = await createComposedEndpoint(
-            {
-              id: 'parent',
-              transport: channel.transport,
-              middlewares: [
-                codec(channel.pipeline.codec),
-                framer(channel.pipeline.framer),
-                abort(),
-                connect({ transport: channel.transport }),
-                ping()
-              ]
-            },
-            {
-              ...streamRoots(),
-              'channel-ipc-log': channel.features[0]!,
-              'channel-ipc-gate': channel.features[1]!
-            }
-          )
-          return { endpoint: endpoint as unknown as IRpcEndpoint, stream: endpoint.stream }
-        }
-      })
-      const dependent = definePlugin({
-        name: 'dependent',
-        features: {
-          use: defineFeature(
-            (_core, dependencies) => {
-              firstCall = (
-                dependencies.remote as { request(params: unknown[]): Promise<unknown> }
-              ).request(['ready'])
-              return {}
-            },
-            { remote: plugin.getFeature('f') }
-          )
-        },
-        install: () => ({})
-      })
+      /** Each case owns its real native process budget and ordinary Host. */
+      const test = new NativePluginScenario(mode === 'external-switch')
       try {
-        const [pluginHandle] = await host.use(plugin)
-        await host.use(dependent)
-        expect(await firstCall).toBe('child:ready')
-        const feature = pluginHandle!.getFeature('f') as {
-          request(params: unknown[]): Promise<unknown>
-          generator(params: unknown[]): AsyncIterableIterator<unknown>
-        }
-        expect(await feature.request(['value'])).toBe('child:value')
-        const iterator = feature.generator(['stream'])
+        await test.install()
+        expect(await test.host.process!.request('p', 'p.request', ['value'])).toBe('child:value')
+        /** The original two yields prove actual generator routing on the same native pipe. */
+        const iterator = test.host.process!.stream('p', 'p.generator', ['stream'])
         expect(await iterator.next()).toEqual({ done: false, value: 'stream:1' })
         expect(await iterator.next()).toEqual({ done: false, value: 'stream:2' })
         expect(await iterator.next()).toMatchObject({ done: true })
-        if (governor) expect(governor.inspect('p')).toMatchObject({ state: 'ready' })
-        const replacement = await plugin.replace({
-          strategy: mode === 'external-switch' ? 'start-then-switch' : 'stop-then-start',
-          spec: { ...spec, env: { inherit: [], set: { RPC_VALUE: 'new-child' } } }
-        })
-        if (mode === 'external-switch') {
-          expect(replacement.strategy).toBe('start-then-switch')
-          expect(governor!.inspect('p')).toMatchObject({ state: 'ready' })
-          await expect(feature.request(['old'])).rejects.toMatchObject({ code: 'REMOTE_CLOSED' })
-          expect(await candidateFeature!.request(['again'])).toBe('new-child:again')
-        } else {
-          expect(replacement).toMatchObject({
-            strategy: 'stop-then-start',
-            outcome: { kind: 'replaced', generation: 2 }
-          })
-          await vi.waitFor(async () => {
-            expect(await feature.request(['again'])).toBe('new-child:again')
-          })
-        }
+        await test.replace(mode === 'external-switch')
       } finally {
-        await host.dispose()
-        if (governor) expect(() => governor.onTerminal(() => undefined)()).not.toThrow()
-        await governor?.close()
+        await test.host.dispose()
       }
+      expect(test.budget.inUse).toBe(0)
     }
   )
 })

@@ -24,18 +24,18 @@ import { readEndpointOwner } from '../../core/internal/endpoint-projection.js'
 import { EndpointOwnerKey } from '../../core/endpoint-kernel.js'
 import type { RpcOutboundAttachment } from '../../core/internal/outbound-attachment.js'
 import { registerLocalErrorWireSummary } from '../../core/internal/error-wire-metadata.js'
-import type { IRpcPortableValue } from '@migaia/rpc-contract'
+import type { IRpcPortableValue, IRpcRuntimeEnvelope } from '@migaia/rpc-contract'
 import { RpcCapability, RpcWireLimit } from '@migaia/rpc-contract'
-import { createRuntimeApiEndpoint } from '../../core/index.js'
+import { createRuntimeApiEndpoint } from '../../core/runtime-api-endpoint.js'
 import { rejectRuntimeApiCapability } from '../../core/runtime-api-endpoint.js'
-import { RpcCoreErrorCode } from '../../core/index.js'
+import { RpcCoreErrorCode } from '../../core/errors.js'
 import { completeProviderReturn } from '../../core/internal/provider.js'
 import { IpcReporterContext } from '../../core/plugins/reporter-context.js'
-import { abort } from '../../core/index.js'
-import { codec } from '../../core/index.js'
-import { connect } from '../../core/index.js'
-import { framer } from '../../core/index.js'
-import { timeout } from '../../core/index.js'
+import { abort } from '../../core/middleware/abort.js'
+import { codec } from '../../core/middleware/codec.js'
+import { connect } from '../../core/middleware/connect.js'
+import { framer } from '../../core/middleware/framer.js'
+import { timeout } from '../../core/middleware/timeout.js'
 import {
   createForwardOptions,
   createForwardQueryOptions
@@ -61,19 +61,19 @@ import { RpcProbeStage } from '../../core/probe/constants.js'
 import { RuntimeEventName } from './constants.js'
 import { deferred } from '@migaia/utils/promise'
 import { isProviderAdmissionScopeOwner } from '../../core/internal/provider-admission.js'
-import type { IProviderAdmissionScope } from '../../core/features/provider.js'
+import type { IProviderAdmissionScope } from '../../core/internal/provider-admission.js'
 import { createAuthenticationNonce } from '../../core/middleware/authentication-envelope.js'
-import { authentication } from '../../core/index.js'
+import { authentication } from '../../core/middleware/authentication.js'
 import { snapshotAuthenticationConfig } from '../../core/middleware/authentication.js'
-import { hooks } from '../../core/index.js'
-import { ping } from '../../core/index.js'
+import { hooks } from '../../core/middleware/hooks.js'
+import { ping } from '../../core/middleware/ping.js'
 import {
   type IRpcEndpoint,
   type IRpcProvider,
   type IRpcProviderLimits,
   type IRpcFactoryConfig,
   type IRpcAuthenticationConfig
-} from '../../core/index.js'
+} from '../../core/typing.js'
 import { RemoteMethodName } from '../constants.js'
 import type { IRemoteContract } from '../contract.js'
 import type {
@@ -97,6 +97,7 @@ import {
   readProviderInvocation,
   readProviderIdentity,
   readProviderRuntimeRelay,
+  type IProviderRuntimeRelay,
   type ProviderRegistry
 } from '../../core/internal/provider.js'
 import { type IRpcStreamRun } from '../../core/stream/index.js'
@@ -222,7 +223,7 @@ export type IRuntimePeer = Readonly<{
       >['options'],
       'timeoutMs'
     > &
-      Pick<import('../../core/index.js').ISendOptions, 'timeoutMs' | 'signal' | 'transfer'>
+      Pick<import('../../core/typing.js').ISendOptions, 'timeoutMs' | 'signal' | 'transfer'>
   ): Promise<readonly IRpcRuntimeStepOutcome[]>
   /** Query the existing logical key without invoking the provider again. */
   outcome(idempotencyKey: string): Promise<IRpcRuntimeOutcomeResult>
@@ -381,20 +382,76 @@ export type IRuntimeProviderAssemblyOptions = Readonly<{
 }>
 
 /** Prepare canonical local/forward handlers before receive activation; append uses the same owner. */
-export function prepareRuntimeProviderAssembly(configuration: IRuntimeProviderAssemblyOptions) {
-  /** This is the original compiled method index, shared by scalar, stream and relay dispatch. */
-  const methodIndex = new Map(configuration.methods.map((entry) => [entry.name, entry]))
-  /** Directory ordering follows the original compiler and later incremental registration order. */
-  const methods = [...configuration.methods]
-  /** The endpoint is borrowed only after its original construction has completed. */
-  let selected: IRuntimePeerEndpoint | undefined
-  /** Core owns provider dispatch and all admission/replay/cancellation leases. */
-  const providers: Record<string, IRpcProvider> = Object.create(null)
+/** Own one compiled provider/directory/relay assembly over the original endpoint registry. */
+class RuntimeProviderAssembly {
+  /** Canonical local and forwarding policies stay with the original assembly configuration. */
+  #configuration: IRuntimeProviderAssemblyOptions
+  /** One compiled index supplies scalar, stream and relay dispatch without a second route table. */
+  #methodIndex: Map<string, IRuntimeMethodEntry>
+  /** Directory order follows the compiler and later canonical incremental registrations. */
+  #methods: IRuntimeMethodEntry[]
+  /** The endpoint is borrowed only after its original construction completes. */
+  #selected: IRuntimePeerEndpoint | undefined
+  /** Generation binding remains owned by the selected endpoint's actual outbound attachment. */
+  #runtimeOutbound: RpcOutboundAttachment | undefined
+  /** Original compiled providers are registered by the existing Core provider/admission owner. */
+  readonly providers: Record<string, IRpcProvider> = Object.create(null)
+
+  /** Compile cold providers before receive activation without opening or owning another endpoint. */
+  constructor(configuration: IRuntimeProviderAssemblyOptions) {
+    this.#configuration = configuration
+    this.#methodIndex = new Map(configuration.methods.map((entry) => [entry.name, entry]))
+    this.#methods = [...configuration.methods]
+    this.#prepareDescribe()
+    this.#appendProviders(this.#methods)
+  }
+
+  /** The bilateral directory is the sole generation/node binding and caller acceptance path. */
+  #prepareDescribe(): void {
+    const describeProvider: IRpcProvider = (context) => {
+      if (this.#configuration.supports(context.senderId, RpcCapability.generation)) {
+        const supplied = normalizeRuntimeGeneration(
+          typeof context.data === 'object' && context.data !== null
+            ? Reflect.get(context.data, 'generation')
+            : undefined
+        )
+        const token = readProviderIdentity(context)
+        if (!token || !this.#runtimeOutbound) invalid(RuntimeApiErrorText.identityInvalid)
+        this.#runtimeOutbound.bindRuntimeCaller(token, supplied)
+      }
+      if (this.#configuration.supports(context.senderId, RpcCapability.forwardRoute)) {
+        /** Only the bilateral directory handshake may exchange a private runtime node. */
+        const supplied =
+          typeof context.data === 'object' && context.data !== null
+            ? Reflect.get(context.data, 'nodeId')
+            : undefined
+        if (
+          typeof supplied !== 'string' ||
+          !/^[0-9a-f]{32}$/u.test(supplied) ||
+          (this.#configuration.remoteNode(context.senderId) !== undefined &&
+            this.#configuration.remoteNode(context.senderId) !== supplied)
+        )
+          invalid(RuntimeApiErrorText.identityInvalid)
+        this.#configuration.bindRemoteNode(context.senderId, supplied)
+      }
+      const accepted = this.#configuration.acceptCaller?.(context)
+      return accepted === undefined
+        ? context.success(this.#configuration.describe(context.senderId))
+        : Promise.resolve(accepted).then(() =>
+            context.success(this.#configuration.describe(context.senderId))
+          )
+    }
+    this.providers[RemoteMethodName.runtimeDescribe] =
+      this.#configuration.generations === false
+        ? describeProvider
+        : attachProviderPreflight(describeProvider, () => undefined)
+  }
+
   /**
-   * One cold completion adapter keeps completion normalization outside handler and context
-   * failures.
+   * Normalize only completed business results; context and handler failures keep their original
+   * classification.
    */
-  const completeScalar = (
+  #completeScalar = (
     result: unknown,
     context: Parameters<IRpcProvider>[0]
   ): ReturnType<Parameters<IRpcProvider>[0]['success']> => {
@@ -406,7 +463,7 @@ export function prepareRuntimeProviderAssembly(configuration: IRuntimeProviderAs
         result,
         0,
         new Set<object>(),
-        configuration.supports(context.senderId, RpcCapability.portableBinary) ||
+        this.#configuration.supports(context.senderId, RpcCapability.portableBinary) ||
           rejectRuntimeApiCapability
       )
     } catch (cause) {
@@ -421,14 +478,20 @@ export function prepareRuntimeProviderAssembly(configuration: IRuntimeProviderAs
     }
     return context.success(portable)
   }
-  /** This cold read reaches only the genuine kernel/attachment retained by canonical projection. */
-  let runtimeOutbound: RpcOutboundAttachment | undefined
-  /** Preserve local Host permission or forwarding policy on the actual canonical provider. */
-  const guardMethod = <T extends Function>(entry: IRuntimeMethodEntry, provider: T): T =>
+
+  /**
+   * Preserve the original local commit guard or exact forwarded route preflight on its canonical
+   * provider.
+   */
+  #guardMethod = <T extends Function>(entry: IRuntimeMethodEntry, provider: T): T =>
     entry.kind === 'forward'
       ? attachProviderPreflight(provider, (route) => {
           try {
-            runtimeForwardRoute(entry, route.forwardRoute, configuration.remoteNode(route.senderId))
+            runtimeForwardRoute(
+              entry,
+              route.forwardRoute,
+              this.#configuration.remoteNode(route.senderId)
+            )
           } catch (error) {
             /** Slot withdrawal still keeps its known path; an existing loop route remains exact. */
             throw retainProviderFailureRoute(
@@ -436,21 +499,123 @@ export function prepareRuntimeProviderAssembly(configuration: IRuntimeProviderAs
               runtimeForwardDiagnosticRoute(
                 entry,
                 route.forwardRoute,
-                configuration.remoteNode(route.senderId)
+                this.#configuration.remoteNode(route.senderId)
               )
             )
           }
         })
       : retainProviderPreflight(entry.method, provider)
-  /** Delegate the original lazy iterator and retain known route facts on terminal business errors. */
-  const forwardStream = async function* (
+
+  /** Compile original local/forward handlers once into the same provider record. */
+  #appendProviders = (entries: readonly IRuntimeMethodEntry[]): void => {
+    for (const entry of entries) {
+      if (entry.supportedModes?.every((mode) => mode === RuntimeApiMode.stream)) continue
+      if (entry.kind !== 'forward') {
+        /** The original provider owner maps actual async results; the scalar facade is synchronous. */
+        this.providers[entry.name] = this.#guardMethod(
+          entry,
+          (context: Parameters<IRpcProvider>[0]) => {
+            /** A committed local method retains the original synchronous provider return path. */
+            const invoke = () =>
+              completeProviderReturn(
+                Reflect.apply(entry.method, entry.receiver, [context.data, context]),
+                context,
+                this.#completeScalar
+              )
+            /** Only exposed local Feature methods carry their install's private commit metadata. */
+            const gate = readCommitGate(entry.method)
+            if (!gate || gate.isOpen()) return invoke()
+            return gate.wait(context.signal).then(() => {
+              if (context.signal.aborted) throw resolveAbortReason(context.signal)
+              return invoke()
+            })
+          }
+        )
+        continue
+      }
+      this.providers[entry.name] = this.#guardMethod(
+        entry,
+        async (context: Parameters<IRpcProvider>[0]) => {
+          if (entry.kind === 'forward') {
+            const relay = readProviderRuntimeRelay(context)
+            if (relay) return context.success(await relay.execute(context))
+            /** The compiled slot resolves the current genuine Peer for every admitted invocation. */
+            const route = runtimeForwardRoute(
+              entry,
+              context.route,
+              this.#configuration.remoteNode(context.senderId)
+            )
+            const connection = entry.slot()
+            const options = createForwardOptions(context, route)
+            try {
+              /** A response-waiting forward preserves the accepted notify-only business mode. */
+              const result =
+                readProviderInvocation(context)?.dispatchOnly ||
+                entry.supportedModes.every((mode) => mode === RuntimeApiMode.notify)
+                  ? await connection.peer.notify(entry.method, context.data, options)
+                  : await connection.peer.request(entry.method, context.data, options)
+              return context.success(result)
+            } catch (error) {
+              throw retainProviderFailureRoute(
+                error,
+                runtimeForwardDiagnosticRoute(
+                  entry,
+                  context.route,
+                  this.#configuration.remoteNode(context.senderId)
+                )
+              )
+            }
+          }
+          return context.success()
+        }
+      )
+    }
+  }
+
+  /** Register original lazy stream consumers with the same commit and forwarding guards. */
+  #appendStreams = (entries: readonly IRuntimeMethodEntry[]): void => {
+    if (this.#configuration.streams) {
+      for (const entry of entries)
+        if (!entry.supportedModes || entry.supportedModes.includes(RuntimeApiMode.stream))
+          this.#selected!.stream!.provide(
+            `${RemoteMethodName.runtimeStreamPrefix}${entry.name}`,
+            this.#guardMethod(
+              entry,
+              (payload: unknown, { context }: Parameters<IRpcStreamRun>[1]) => {
+                if (entry.kind === 'forward')
+                  return (
+                    readProviderRuntimeRelay(context)?.stream(context) ??
+                    this.#forwardStream(entry, context)
+                  )
+                /** Stream admission stays iterable while its first read waits for Host commit. */
+                const gate = readCommitGate(entry.method)
+                if (gate && !gate.isOpen())
+                  return (async function* () {
+                    await gate.wait(context.signal)
+                    if (context.signal.aborted) throw resolveAbortReason(context.signal)
+                    return yield* Reflect.apply(entry.method, entry.receiver, [
+                      payload,
+                      context
+                    ]) as AsyncIterable<IRpcPortableValue> | Iterable<IRpcPortableValue>
+                  })()
+                return Reflect.apply(entry.method, entry.receiver, [payload, context]) as
+                  | AsyncIterable<IRpcPortableValue>
+                  | Iterable<IRpcPortableValue>
+              }
+            )
+          )
+    }
+  }
+
+  /** Delegate the actual lazy downstream iterator and preserve exact forwarding diagnostic routes. */
+  async *#forwardStream(
     entry: IRuntimeForwardMethodEntry,
     context: Parameters<IRpcProvider>[0]
   ): AsyncIterableIterator<IRpcPortableValue> {
     const route = runtimeForwardRoute(
       entry,
       context.route,
-      configuration.remoteNode(context.senderId)
+      this.#configuration.remoteNode(context.senderId)
     )
     try {
       /** Only new-profile relay metadata captures a target before its original key waiting. */
@@ -465,311 +630,227 @@ export function prepareRuntimeProviderAssembly(configuration: IRuntimeProviderAs
         runtimeForwardDiagnosticRoute(
           entry,
           context.route,
-          configuration.remoteNode(context.senderId)
+          this.#configuration.remoteNode(context.senderId)
         )
       )
     }
   }
-  {
-    const describeProvider: IRpcProvider = (context) => {
-      if (configuration.supports(context.senderId, RpcCapability.generation)) {
-        const supplied = normalizeRuntimeGeneration(
-          typeof context.data === 'object' && context.data !== null
-            ? Reflect.get(context.data, 'generation')
-            : undefined
-        )
-        const token = readProviderIdentity(context)
-        if (!token || !runtimeOutbound) invalid(RuntimeApiErrorText.identityInvalid)
-        runtimeOutbound.bindRuntimeCaller(token, supplied)
-      }
-      if (configuration.supports(context.senderId, RpcCapability.forwardRoute)) {
-        /** Only the bilateral directory handshake may exchange a private runtime node. */
-        const supplied =
-          typeof context.data === 'object' && context.data !== null
-            ? Reflect.get(context.data, 'nodeId')
-            : undefined
-        if (
-          typeof supplied !== 'string' ||
-          !/^[0-9a-f]{32}$/u.test(supplied) ||
-          (configuration.remoteNode(context.senderId) !== undefined &&
-            configuration.remoteNode(context.senderId) !== supplied)
-        )
-          invalid(RuntimeApiErrorText.identityInvalid)
-        configuration.bindRemoteNode(context.senderId, supplied)
-      }
-      const accepted = configuration.acceptCaller?.(context)
-      return accepted === undefined
-        ? context.success(configuration.describe(context.senderId))
-        : Promise.resolve(accepted).then(() =>
-            context.success(configuration.describe(context.senderId))
-          )
-    }
-    providers[RemoteMethodName.runtimeDescribe] =
-      configuration.generations === false
-        ? describeProvider
-        : attachProviderPreflight(describeProvider, () => undefined)
-  }
-  /** Compile handler closures once and append them to the original provider registry. */
-  const appendProviders = (entries: readonly IRuntimeMethodEntry[]): void => {
-    for (const entry of entries) {
-      if (entry.supportedModes?.every((mode) => mode === RuntimeApiMode.stream)) continue
-      if (entry.kind !== 'forward') {
-        /** The original provider owner maps actual async results; the scalar facade is synchronous. */
-        providers[entry.name] = guardMethod(entry, (context: Parameters<IRpcProvider>[0]) => {
-          /** A committed local method retains the original synchronous provider return path. */
-          const invoke = () =>
-            completeProviderReturn(
-              Reflect.apply(entry.method, entry.receiver, [context.data, context]),
-              context,
-              completeScalar
-            )
-          /** Only exposed local Feature methods carry their install's private commit metadata. */
-          const gate = readCommitGate(entry.method)
-          if (!gate || gate.isOpen()) return invoke()
-          return gate.wait(context.signal).then(() => {
-            if (context.signal.aborted) throw resolveAbortReason(context.signal)
-            return invoke()
-          })
-        })
-        continue
-      }
-      providers[entry.name] = guardMethod(entry, async (context: Parameters<IRpcProvider>[0]) => {
-        if (entry.kind === 'forward') {
-          const relay = readProviderRuntimeRelay(context)
-          if (relay) return context.success(await relay.execute(context))
-          /** The compiled slot resolves the current genuine Peer for every admitted invocation. */
-          const route = runtimeForwardRoute(
-            entry,
-            context.route,
-            configuration.remoteNode(context.senderId)
-          )
-          const connection = entry.slot()
-          const options = createForwardOptions(context, route)
-          try {
-            /** A response-waiting forward preserves the accepted notify-only business mode. */
-            const result =
-              readProviderInvocation(context)?.dispatchOnly ||
-              entry.supportedModes.every((mode) => mode === RuntimeApiMode.notify)
-                ? await connection.peer.notify(entry.method, context.data, options)
-                : await connection.peer.request(entry.method, context.data, options)
-            return context.success(result)
-          } catch (error) {
-            throw retainProviderFailureRoute(
-              error,
-              runtimeForwardDiagnosticRoute(
-                entry,
-                context.route,
-                configuration.remoteNode(context.senderId)
-              )
-            )
-          }
-        }
-        return context.success()
-      })
-    }
-  }
-  appendProviders(methods)
 
-  /** Bind canonical relay resolution to the same compiled provider index. */
-  const installRelays = (): void => {
-    if (methods.some((entry) => entry.kind === 'forward')) {
-      /**
-       * The canonical provider registry stores only a cold resolver into its existing compiled
-       * entries.
-       */
-      const registry = readEndpointOwner<ProviderRegistry>(
-        selected!,
-        EndpointOwnerKey.providerRegistry
-      )!
-      /**
-       * Without a method on lookup, only one unambiguous forward-only logical namespace is
-       * selectable.
-       */
-      const queryTargetForMethods = () => {
-        const queryEntries = methods.filter((entry) => !entry.reserved)
-        /** One key-only query cannot select between B-local and multiple final provider namespaces. */
-        return queryEntries[0]?.kind === 'forward' &&
-          queryEntries.every(
-            (entry) =>
-              entry.kind === 'forward' &&
-              entry.forwardedVia === (queryEntries[0] as IRuntimeForwardMethodEntry).forwardedVia
-          )
-          ? queryEntries[0]
-          : undefined
-      }
-      registry.runtimeLookup =
-        configuration.localOutcomes && !queryTargetForMethods()
-          ? undefined
-          : (envelope) => {
-              const first = queryTargetForMethods()
-              if (!first) rejectRuntimeApiCapability()
-              const route = runtimeForwardRoute(
-                first,
-                envelope.route.forwardRoute,
-                configuration.remoteNode(envelope.route.senderId)
-              )
-              return lookupRuntimePeerOutcome(
-                first.slot().peer,
-                envelope.idempotencyKey,
-                createForwardQueryOptions(route)
-              )
-            }
-      registry.runtimeRelay = (envelope) => {
-        if (envelope.kind !== RpcRuntimeKind.call && envelope.kind !== RpcRuntimeKind.group)
-          return undefined
-        /** Do not accept keyed work whose original namespace cannot subsequently be queried. */
-        if (
-          !configuration.localOutcomes &&
-          envelope.options.idempotencyKey !== undefined &&
-          !queryTargetForMethods()
-        )
-          rejectRuntimeApiCapability()
-        /**
-         * These references capture actual method entries; there is no second routing or principal
-         * table.
-         */
-        const entries = (
-          envelope.kind === RpcRuntimeKind.group
-            ? envelope.steps
-            : [{ method: envelope.task.method! }]
-        ).map((step) => methodIndex.get(step.method))
-        const first = entries[0]
-        if (!entries.some((entry) => entry?.kind === 'forward')) return undefined
-        if (
-          configuration.localOutcomes &&
-          envelope.options.idempotencyKey !== undefined &&
-          !queryTargetForMethods()
-        )
-          rejectRuntimeApiCapability()
-        if (
-          !first ||
-          first.kind !== 'forward' ||
-          entries.some(
-            (entry) => entry?.kind !== 'forward' || entry.forwardedVia !== first.forwardedVia
-          )
-        )
-          throw createRpcError(
-            RpcCoreErrorCode.invalidConfig,
-            RpcCoreErrorText.runtimeGroupTargetsInvalid
-          )
-        /**
-         * Slot identity remains captured while this original operation waits; replacement cannot
-         * retarget it.
-         */
-        const connection = first.slot()
-        const route = runtimeForwardRoute(
-          first,
-          envelope.route.forwardRoute,
-          configuration.remoteNode(envelope.route.senderId)
-        )
-        const selected = () => {
-          if (first.slot() !== connection)
-            throw createRpcError(
-              RpcCoreErrorCode.providerGenerationRetired,
-              RpcCoreErrorText.providerGenerationRetired
-            )
-          return connection.peer
-        }
-        /**
-         * One original downstream consumer belongs to this captured task, including prepare and
-         * finish.
-         */
-        let iterator: AsyncIterableIterator<IRpcPortableValue> | undefined
-        const stream = (context: Parameters<IRpcProvider>[0]) =>
-          (iterator ??= selected().stream(
-            first.method,
-            context.data,
-            createForwardOptions(context, route)
-          ))
-        return {
-          execute: async (context) => {
-            const options = createForwardOptions(context, route)
-            if (envelope.kind === RpcRuntimeKind.group)
-              return selected().group(
-                envelope.steps.map((step, index) => ({
-                  ...step,
-                  method: (entries[index] as IRuntimeForwardMethodEntry).method
-                })),
-                options
-              )
-            return envelope.task.mode === RuntimeApiMode.notify
-              ? selected()
-                  .notify(first.method, context.data, options)
-                  .then(() => undefined)
-              : selected().request(first.method, context.data, options)
-          },
-          stream,
-          prepareStream: (context) => prepareRuntimeStreamConsumer(stream(context)),
-          finishStream: async (reason) => {
-            if (!iterator) rejectRuntimeApiCapability()
-            if (reason === undefined) await iterator.return?.()
-            else await iterator.throw?.(reason)
-          }
-        }
-      }
-    }
-  }
-  /** Stream routes retain their canonical lazy consumer and original commit guard. */
-  const appendStreams = (entries: readonly IRuntimeMethodEntry[]): void => {
-    if (configuration.streams) {
-      for (const entry of entries)
-        if (!entry.supportedModes || entry.supportedModes.includes(RuntimeApiMode.stream))
-          selected!.stream!.provide(
-            `${RemoteMethodName.runtimeStreamPrefix}${entry.name}`,
-            guardMethod(entry, (payload: unknown, { context }: Parameters<IRpcStreamRun>[1]) => {
-              if (entry.kind === 'forward')
-                return (
-                  readProviderRuntimeRelay(context)?.stream(context) ??
-                  forwardStream(entry, context)
-                )
-              /** Stream admission stays iterable while its first read waits for Host commit. */
-              const gate = readCommitGate(entry.method)
-              if (gate && !gate.isOpen())
-                return (async function* () {
-                  await gate.wait(context.signal)
-                  if (context.signal.aborted) throw resolveAbortReason(context.signal)
-                  return yield* Reflect.apply(entry.method, entry.receiver, [payload, context]) as
-                    | AsyncIterable<IRpcPortableValue>
-                    | Iterable<IRpcPortableValue>
-                })()
-              return Reflect.apply(entry.method, entry.receiver, [payload, context]) as
-                | AsyncIterable<IRpcPortableValue>
-                | Iterable<IRpcPortableValue>
-            })
-          )
-    }
-  }
-  return {
-    providers,
-    methods: () => methods as readonly IRuntimeMethodEntry[],
-    install(endpoint: IRuntimePeerEndpoint, alreadyRegistered = false): void {
-      selected = endpoint
-      runtimeOutbound = readEndpointOwner<RpcOutboundAttachment>(
-        endpoint,
-        EndpointOwnerKey.outboundAttachment
+  /** Select only one unambiguous forwarding namespace for a key-only lookup. */
+  #queryTargetForMethods(): IRuntimeForwardMethodEntry | undefined {
+    /** Reserved management entries do not create an application outcome namespace. */
+    const entries = this.#methods.filter((entry) => !entry.reserved)
+    return entries[0]?.kind === 'forward' &&
+      entries.every(
+        (entry) =>
+          entry.kind === 'forward' &&
+          entry.forwardedVia === (entries[0] as IRuntimeForwardMethodEntry).forwardedVia
       )
-      if (!alreadyRegistered)
-        for (const [name, provider] of Object.entries(providers)) endpoint.provide(name, provider)
-      appendStreams(methods)
-      installRelays()
-    },
-    append(entries: readonly IRuntimeMethodEntry[]): void {
-      for (const entry of entries) {
-        if (methodIndex.has(entry.name)) {
-          // The canonical registration owner supplies the existing duplicate-name diagnostic.
-          selected!.provide(entry.name, providers[entry.name]!)
-        }
-      }
-      appendProviders(entries)
-      for (const entry of entries) {
-        methodIndex.set(entry.name, entry)
-        methods.push(entry)
-        if (providers[entry.name]) selected!.provide(entry.name, providers[entry.name]!)
-      }
-      appendStreams(entries)
-      installRelays()
-    }
+      ? entries[0]
+      : undefined
   }
+
+  /** The original provider registry borrows cold lookup/relay resolution from this compiled index. */
+  #installRelays(): void {
+    if (!this.#methods.some((entry) => entry.kind === 'forward')) return
+    /** No parallel provider or principal registry is allocated by the relay configuration. */
+    const registry = readEndpointOwner<ProviderRegistry>(
+      this.#selected!,
+      EndpointOwnerKey.providerRegistry
+    )!
+    registry.runtimeLookup =
+      this.#configuration.localOutcomes && !this.#queryTargetForMethods()
+        ? undefined
+        : (envelope) => this.#lookupOutcome(envelope)
+    registry.runtimeRelay = (envelope) => this.#relay(envelope)
+  }
+
+  /** Query the original final provider using its captured forwarding route and canonical key. */
+  #lookupOutcome(envelope: Parameters<NonNullable<ProviderRegistry['runtimeLookup']>>[0]) {
+    /** A query without a method cannot guess among independent target namespaces. */
+    const first = this.#queryTargetForMethods()
+    if (!first) rejectRuntimeApiCapability()
+    /** Original route validation retains known final-provider diagnostics. */
+    const route = runtimeForwardRoute(
+      first,
+      envelope.route.forwardRoute,
+      this.#configuration.remoteNode(envelope.route.senderId)
+    )
+    return lookupRuntimePeerOutcome(
+      first.slot().peer,
+      envelope.idempotencyKey,
+      createForwardQueryOptions(route)
+    )
+  }
+
+  /** Capture one actual downstream task, rejecting mixed or unqueryable provider namespaces. */
+  #relay(envelope: IRpcRuntimeEnvelope): IProviderRuntimeRelay | undefined {
+    if (envelope.kind !== RpcRuntimeKind.call && envelope.kind !== RpcRuntimeKind.group)
+      return undefined
+    if (
+      !this.#configuration.localOutcomes &&
+      envelope.options.idempotencyKey !== undefined &&
+      !this.#queryTargetForMethods()
+    )
+      rejectRuntimeApiCapability()
+    /** Entries reference the original compiled methods rather than a copied routing authority. */
+    const entries = (
+      envelope.kind === RpcRuntimeKind.group ? envelope.steps : [{ method: envelope.task.method! }]
+    ).map((step) => this.#methodIndex.get(step.method))
+    /** A whole relay must retain one original forwarded provider namespace. */
+    const first = entries[0]
+    if (!entries.some((entry) => entry?.kind === 'forward')) return undefined
+    if (
+      this.#configuration.localOutcomes &&
+      envelope.options.idempotencyKey !== undefined &&
+      !this.#queryTargetForMethods()
+    )
+      rejectRuntimeApiCapability()
+    if (
+      !first ||
+      first.kind !== 'forward' ||
+      entries.some(
+        (entry) => entry?.kind !== 'forward' || entry.forwardedVia !== first.forwardedVia
+      )
+    )
+      throw createRpcError(
+        RpcCoreErrorCode.invalidConfig,
+        RpcCoreErrorText.runtimeGroupTargetsInvalid
+      )
+    return new RuntimeForwardRelay(
+      envelope,
+      first,
+      entries as IRuntimeForwardMethodEntry[],
+      this.#configuration.remoteNode(envelope.route.senderId)
+    )
+  }
+
+  /** Return the original ordered method array without inventing a second directory snapshot. */
+  methods(): readonly IRuntimeMethodEntry[] {
+    return this.#methods
+  }
+  /** Borrow a completed endpoint and install into its actual provider/stream registry. */
+  install(endpoint: IRuntimePeerEndpoint, alreadyRegistered = false): void {
+    this.#selected = endpoint
+    this.#runtimeOutbound = readEndpointOwner<RpcOutboundAttachment>(
+      endpoint,
+      EndpointOwnerKey.outboundAttachment
+    )
+    if (!alreadyRegistered)
+      for (const [name, provider] of Object.entries(this.providers))
+        endpoint.provide(name, provider)
+    this.#appendStreams(this.#methods)
+    this.#installRelays()
+  }
+  /** Append actual methods while preserving duplicate diagnostics and insertion order. */
+  append(entries: readonly IRuntimeMethodEntry[]): void {
+    for (const entry of entries) {
+      if (this.#methodIndex.has(entry.name)) {
+        // The canonical registration owner supplies the existing duplicate-name diagnostic.
+        this.#selected!.provide(entry.name, this.providers[entry.name]!)
+      }
+    }
+    this.#appendProviders(entries)
+    for (const entry of entries) {
+      this.#methodIndex.set(entry.name, entry)
+      this.#methods.push(entry)
+      if (this.providers[entry.name])
+        this.#selected!.provide(entry.name, this.providers[entry.name]!)
+    }
+    this.#appendStreams(entries)
+    this.#installRelays()
+  }
+}
+
+/** One downstream relay retains its accepted slot and original lazy stream consumer. */
+class RuntimeForwardRelay implements IProviderRuntimeRelay {
+  /** Only call/group operations enter this existing canonical relay path. */
+  #envelope: Extract<
+    IRpcRuntimeEnvelope,
+    { kind: typeof RpcRuntimeKind.call | typeof RpcRuntimeKind.group }
+  >
+  /** The first actual entry identifies the shared final provider namespace. */
+  #first: IRuntimeForwardMethodEntry
+  /** Each group step retains its original compiled forwarding method. */
+  #entries: readonly IRuntimeForwardMethodEntry[]
+  /** Slot identity remains fixed while the operation waits; replacement cannot retarget it. */
+  #connection: ReturnType<IRuntimeForwardMethodEntry['slot']>
+  /** Original validated forwarding metadata is reused by execute, stream and terminal controls. */
+  #route: ReturnType<typeof runtimeForwardRoute>
+  /** All stream phases share one genuine downstream iterator created lazily on first use. */
+  #iterator: AsyncIterableIterator<IRpcPortableValue> | undefined
+
+  /** Capture the existing task and final slot without sending or creating another dispatch owner. */
+  constructor(
+    envelope: Extract<
+      IRpcRuntimeEnvelope,
+      { kind: typeof RpcRuntimeKind.call | typeof RpcRuntimeKind.group }
+    >,
+    first: IRuntimeForwardMethodEntry,
+    entries: readonly IRuntimeForwardMethodEntry[],
+    remoteNode: string | undefined
+  ) {
+    this.#envelope = envelope
+    this.#first = first
+    this.#entries = entries
+    this.#connection = first.slot()
+    this.#route = runtimeForwardRoute(first, envelope.route.forwardRoute, remoteNode)
+  }
+
+  /** A retired slot cannot redirect accepted work through its replacement. */
+  #selected(): IRuntimePeer {
+    if (this.#first.slot() !== this.#connection)
+      throw createRpcError(
+        RpcCoreErrorCode.providerGenerationRetired,
+        RpcCoreErrorText.providerGenerationRetired
+      )
+    return this.#connection.peer
+  }
+
+  /** Preserve group step order and the original notify-only versus response-waiting mode. */
+  async execute(context: Parameters<IRpcProvider>[0]): Promise<IRpcPortableValue | undefined> {
+    /** Every original child operation reuses the admitted route and cancellation/deadline context. */
+    const options = createForwardOptions(context, this.#route)
+    if (this.#envelope.kind === RpcRuntimeKind.group)
+      return this.#selected().group(
+        this.#envelope.steps.map((step, index) => ({
+          ...step,
+          method: this.#entries[index]!.method
+        })),
+        options
+      )
+    return this.#envelope.task.mode === RuntimeApiMode.notify
+      ? this.#selected()
+          .notify(this.#first.method, context.data, options)
+          .then(() => undefined)
+      : this.#selected().request(this.#first.method, context.data, options)
+  }
+
+  /** Acquire only the original lazy stream, sharing it across prepare and finish. */
+  stream(context: Parameters<IRpcProvider>[0]): AsyncIterableIterator<IRpcPortableValue> {
+    return (this.#iterator ??= this.#selected().stream(
+      this.#first.method,
+      context.data,
+      createForwardOptions(context, this.#route)
+    ))
+  }
+
+  /** The executor lends this callback to its stream receipt, so retain the original relay owner. */
+  prepareStream = (context: Parameters<IRpcProvider>[0]): Promise<void> => {
+    return prepareRuntimeStreamConsumer(this.stream(context))
+  }
+
+  /** The borrowed terminal callback retains the same iterator and unchanged terminal reason. */
+  finishStream = async (reason?: unknown): Promise<void> => {
+    if (!this.#iterator) rejectRuntimeApiCapability()
+    if (reason === undefined) await this.#iterator.return?.()
+    else await this.#iterator.throw?.(reason)
+  }
+}
+
+/** Prepare the actual provider owner before receive activation; append retains the same registry. */
+export function prepareRuntimeProviderAssembly(configuration: IRuntimeProviderAssemblyOptions) {
+  return new RuntimeProviderAssembly(configuration)
 }
 
 /**
@@ -778,6 +859,440 @@ export function prepareRuntimeProviderAssembly(configuration: IRuntimeProviderAs
  * by this construction, observing secondary cleanup failures while preserving the primary error.
  */
 /** A declared remote surface preserves method and payload types on the original callable facade. */
+/**
+ * One actual Peer owns its admitted source, provider assembly, directory and exact close
+ * settlement.
+ */
+class RuntimePeerResource {
+  /** Original user options retain private native preparation provenance without a copied context. */
+  #options: IRuntimePeerOptions
+  /** Managed/Host construction lends its actual endpoint, provider assembly and generation facts. */
+  #resources: IRuntimePeerResources | undefined
+  /** Only this native policy can reject explicit ownership transfer before payload capture. */
+  #restrictTransfer: IRuntimePeerResources['restrictTransfer']
+  /** Native connection metadata is read from the original private preparation owner. */
+  #connectionOrigin: NonNullable<
+    ReturnType<typeof readRuntimePreparationContext>
+  >['connectionOrigin']
+  /** The validated default is captured before any source can be acquired. */
+  #callTimeout: ReturnType<typeof prepareRuntimeCallTimeout>
+  /** Method declarations are compiled exactly once before physical opening. */
+  #methods: readonly IRuntimeMethodEntry[]
+  /** The fixed three source fields retain exclusive configuration admission. */
+  #sources: readonly IRuntimePeerSource[]
+  /** The actual source receives the same safe identity and implemented capability proposal. */
+  #sourceContext: IRuntimePeerSourceContext
+  /** Safe identity is shared by the provider directory, facade and connection receipt. */
+  #self: IRuntimePeerIdentity
+  /** Native owners may lend a genuine generation; standalone peers start one session at zero. */
+  #generation: IRpcRuntimeGeneration
+  /** User reporting keeps its original bare receiver and native rethrow route. */
+  #reporter: (error: unknown) => void
+  /** This acquired channel is owned by exactly this construction's close/rollback path. */
+  #channel!: NonNullable<IRuntimePeerResources['channel']>
+  /** Rollback may dispose only the endpoint actually created before a later failure. */
+  #endpoint: IRuntimePeerEndpoint | undefined
+  /** Only the actual accepted agreement grants binary result normalization. */
+  #supportsBinary = false
+  /** Generation requires the original negotiated profile and prepared outbound attachment. */
+  #supportsGeneration = false
+  /** The bilateral directory exchanges a private node only when forwarding was accepted. */
+  #supportsForward = false
+  /** Native health/drain require the real channel's control capability. */
+  #nativeControl = false
+  /** Stream support remains an independent capability intersection. */
+  #supportsStream = false
+  /** The Host's actual node is retained; standalone forwarding gets one original nonce. */
+  #nodeId: string | undefined
+  /** Original providers enter the sole endpoint before cold receive activation. */
+  #assembly!: ReturnType<typeof prepareRuntimeProviderAssembly>
+  /** Default construction pre-registers providers; custom/borrowed endpoints install afterwards. */
+  #initialProviders = false
+  /** Local descriptions are fixed after endpoint construction and before the first directory send. */
+  #localDescription: IRuntimePeerDescription | undefined
+  /** The accepted bilateral exchange owns one remote node, never payload-derived routing authority. */
+  #remoteNodeId: string | undefined
+  /** The actual outbound attachment owns runtime generations and operation correlation. */
+  #runtimeOutbound: RpcOutboundAttachment | undefined
+  /** Remote directory validation precedes publication of any callable facade. */
+  #remote!: IRuntimePeerDescription
+  /** All methods and aliases use the same accepted snapshot. */
+  #routes!: Map<string, IRuntimePeerRoute>
+  /** Events borrow the installed endpoint probe and own only subscriber membership. */
+  #events!: IRuntimeEventPublisher
+  /** The native channel lends its original installed probe without another middleware. */
+  #probe: ReturnType<typeof readInstalledProbe>
+  /** Every explicit/scoped/concurrent close joins the exact original completion. */
+  #closing: ReturnType<typeof deferred<void>> | undefined
+  /** The original receipt is minted only after endpoint and directory preparation succeed. */
+  #peer: IRuntimePeer | undefined
+
+  /** Validate methods, timeout and exclusive sources before any physical acquisition. */
+  constructor(options: IRuntimePeerOptions, resources?: IRuntimePeerResources) {
+    this.#options = options
+    this.#resources = resources
+    if (options.probe !== undefined)
+      validateProbes(Array.isArray(options.probe) ? options.probe : [options.probe as IRpcProbe])
+    this.#restrictTransfer =
+      resources?.restrictTransfer ?? readRuntimePreparationContext(options)?.restrictTransfer
+    this.#connectionOrigin = readRuntimePreparationContext(options)?.connectionOrigin
+    this.#callTimeout = prepareRuntimeCallTimeout(readRuntimeDefaultTimeout(options))
+    this.#methods = compileRuntimeMethods(options.provide, options.contract)
+    this.#sources = [options.spawn, options.connect, options.listen].filter(
+      (source) => source !== undefined
+    )
+    if (resources?.channel && this.#sources.length > 0) invalid(RuntimeApiErrorText.sourceInvalid)
+    if (
+      !resources?.channel &&
+      (this.#sources.length !== 1 || typeof this.#sources[0] !== 'function')
+    )
+      invalid(RuntimeApiErrorText.sourceInvalid)
+    this.#sourceContext = prepareRuntimePeerSourceContext(
+      options.self,
+      !options.endpointFactory,
+      options.authentication
+    )
+    this.#self = this.#sourceContext.self
+    this.#generation = normalizeRuntimeGeneration(
+      resources?.generation ?? {
+        kind: RpcRuntimeGenerationKind.session,
+        value: 0,
+        providerId: this.#self.instanceId
+      }
+    )
+    this.#reporter = options.report ?? defaultRpcReporter
+  }
+
+  /** Reporter failures remain visible on the existing host route without replacing primaries. */
+  #report = (error: unknown): void => {
+    try {
+      ;(0, this.#reporter)(error)
+    } catch (failure) {
+      hostRethrowReporter(failure, IpcReporterContext)
+    }
+  }
+
+  /**
+   * Open the original source, then retain the original await boundaries for composition and
+   * directory.
+   */
+  async open(): Promise<IRuntimePeer> {
+    this.#channel = this.#resources?.channel ?? (await this.#sources[0]!(this.#sourceContext))
+    try {
+      this.#prepareAgreement()
+      /** Original resources bypass construction without adding another asynchronous phase. */
+      const constructed = this.#resources?.endpoint ?? (await this.#constructEndpoint())
+      this.#bindEndpoint(constructed)
+      this.#channel.activateReceive?.()
+      this.#remote = normalizeRuntimeDescription(await this.#sendDirectory())
+      this.#acceptDirectory()
+      return this.#project()
+    } catch (failure) {
+      try {
+        if (!this.#resources?.assembly) await this.#endpoint?.dispose()
+      } catch (cleanup) {
+        this.#report(cleanup)
+      }
+      try {
+        await this.#channel.close?.()
+      } catch (cleanup) {
+        this.#report(cleanup)
+      }
+      throw failure
+    }
+  }
+
+  /** Derive actual accepted rights and create only the original cold provider assembly. */
+  #prepareAgreement(): void {
+    /** Both baseline capabilities are required before endpoint construction or receive activation. */
+    const baselineAccepted =
+      this.#channel.agreement.capabilities.includes(RpcCapability.runtimeApi) &&
+      this.#channel.agreement.capabilities.includes(RpcCapability.batch)
+    this.#supportsBinary = this.#channel.agreement.capabilities.includes(
+      RpcCapability.portableBinary
+    )
+    this.#supportsGeneration = this.#channel.agreement.capabilities.includes(
+      RpcCapability.generation
+    )
+    this.#supportsForward = this.#channel.agreement.capabilities.includes(
+      RpcCapability.forwardRoute
+    )
+    this.#nodeId = this.#supportsForward
+      ? (this.#resources?.nodeId ??
+        this.#resources?.host?.nodeId ??
+        readRuntimePreparationContext(this.#options)?.host?.nodeId ??
+        createAuthenticationNonce())
+      : undefined
+    this.#nativeControl = this.#channel.agreement.capabilities.includes(RpcCapability.ping)
+    this.#supportsStream = this.#channel.agreement.capabilities.includes(RpcCapability.stream)
+    this.#assembly =
+      this.#resources?.assembly ??
+      prepareRuntimeProviderAssembly({
+        methods: this.#methods,
+        streams: this.#supportsStream,
+        generations: this.#supportsGeneration,
+        supports: (_peerId, capability) =>
+          this.#channel.agreement.capabilities.includes(capability),
+        remoteNode: () => this.#remoteNodeId,
+        bindRemoteNode: (_peerId, value) => {
+          this.#remoteNodeId = value
+        },
+        describe: () => this.#localDescription
+      })
+    if (!baselineAccepted) rejectRuntimeApiCapability()
+    this.#initialProviders =
+      !this.#options.endpointFactory && !this.#resources?.endpoint && !this.#resources?.wrapEndpoint
+  }
+
+  /** Construct through the existing actual endpoint owner without an extra async wrapper. */
+  #constructEndpoint(): Promise<IRemoteServeEndpoint> {
+    return prepareRuntimePeerEndpoint(
+      { ...this.#options, self: this.#self, report: this.#report },
+      this.#channel,
+      this.#resources?.signal ?? createAbortController().signal,
+      this.#initialProviders ? { provider: this.#assembly.providers } : {},
+      this.#supportsGeneration
+        ? (this.#resources?.providerAdmission ??
+            readRuntimePreparationContext(this.#options)?.providerAdmission)
+        : undefined,
+      this.#resources?.providerAdmissionRegistration ??
+        readRuntimePreparationContext(this.#options)?.providerAdmissionRegistration
+    )
+  }
+
+  /**
+   * Retain the actual constructed endpoint for rollback before native policy or projection can
+   * fail.
+   */
+  #bindEndpoint(constructed: IRemoteServeEndpoint): void {
+    this.#endpoint = constructed.endpoint as unknown as IRuntimePeerEndpoint
+    const served = this.#resources?.wrapEndpoint?.(constructed) ?? constructed
+    if (
+      !served.oneWay ||
+      (this.#supportsStream && !served.stream) ||
+      (this.#nativeControl && typeof served.endpoint.ping !== 'function')
+    )
+      rejectRuntimeApiCapability()
+    const selected: IRuntimePeerEndpoint = Object.create(served.endpoint)
+    Object.defineProperties(selected, {
+      sendOneWay: { value: served.oneWay.sendOneWay },
+      stream: { value: served.stream }
+    })
+    this.#endpoint = Object.freeze(selected)
+    if (this.#supportsGeneration) {
+      this.#runtimeOutbound = readEndpointOwner<RpcOutboundAttachment>(
+        this.#endpoint!,
+        EndpointOwnerKey.outboundAttachment
+      )
+      if (!this.#runtimeOutbound) rejectRuntimeApiCapability()
+      if (!this.#resources?.assembly) this.#runtimeOutbound.configureRuntime(this.#generation)
+    }
+    if (!this.#resources?.assembly)
+      this.#assembly.install(this.#endpoint!, Boolean(this.#initialProviders))
+    this.#localDescription =
+      this.#resources?.description?.() ??
+      normalizeRuntimeDescription({
+        schemaVersion: RUNTIME_API_SCHEMA_VERSION,
+        self: this.#supportsGeneration
+          ? { ...this.#self, generation: this.#generation }
+          : this.#self,
+        ...(this.#nodeId === undefined ? {} : { nodeId: this.#nodeId }),
+        methods: describeRuntimeMethods(this.#methods, this.#supportsStream)
+      })
+  }
+
+  /** Only negotiated application rights permit the original reserved directory request. */
+  #sendDirectory() {
+    return this.#endpoint!.send(
+      this.#channel.peerId,
+      RemoteMethodName.runtimeDescribe,
+      this.#supportsGeneration || this.#nodeId !== undefined
+        ? {
+            ...(this.#nodeId === undefined ? {} : { nodeId: this.#nodeId }),
+            ...(this.#supportsGeneration ? { generation: this.#generation } : {}),
+            ...(this.#resources?.hostSession ? { self: this.#self } : {})
+          }
+        : null,
+      {
+        signal: this.#resources?.signal
+      }
+    )
+  }
+
+  /** Validate original identity/generation/node facts and compile the accepted method snapshot once. */
+  #acceptDirectory(): void {
+    if (this.#remote.self.instanceId !== this.#channel.peerId)
+      invalid(RuntimeApiErrorText.identityInvalid)
+    if (this.#supportsGeneration) {
+      if (!this.#remote.self.generation) invalid(RuntimeApiErrorText.identityInvalid)
+      this.#runtimeOutbound!.bindRuntimeTarget(this.#channel.peerId, this.#remote.self.generation)
+    } else if (this.#remote.self.generation !== undefined)
+      invalid(RuntimeApiErrorText.identityInvalid)
+    if (this.#supportsForward) {
+      if (
+        !this.#remote.nodeId ||
+        (this.#remoteNodeId !== undefined && this.#remoteNodeId !== this.#remote.nodeId)
+      )
+        invalid(RuntimeApiErrorText.identityInvalid)
+      this.#remoteNodeId = this.#remote.nodeId
+    } else if (this.#remote.nodeId !== undefined) invalid(RuntimeApiErrorText.identityInvalid)
+    this.#routes = new Map(
+      this.#remote.methods.map(
+        (method) =>
+          [
+            method.name,
+            { ...method, stream: `${RemoteMethodName.runtimeStreamPrefix}${method.name}` }
+          ] as const
+      )
+    )
+  }
+
+  /**
+   * String calls retain the accepted generation's original mode whitelist and Host incremental
+   * rule.
+   */
+  #route = (method: string, mode: RuntimeApiMode): void => {
+    /** Admission uses the accepted generation's compiled whitelist and actual installed modes. */
+    const selected = this.#routes.get(method)
+    // Host string calls reach incremental providers on the selected live session; capability trees keep their accepted snapshot.
+    if (!selected && this.#resources?.hostSession) return
+    if (!selected)
+      throw createRpcError(RpcCoreErrorCode.providerNotFound, RuntimeApiErrorText.methodUnavailable)
+    if (!selected.supportedModes.includes(mode)) rejectRuntimeApiCapability()
+  }
+
+  /** Cold safe detail reads only the original endpoint counters and actual physical closure proof. */
+  #describe = () => {
+    /** The original adapter alone can prove physical closure; absent proof remains unavailable. */
+    const state =
+      this.#channel.transport.closed === undefined
+        ? undefined
+        : this.#channel.transport.closed
+          ? RuntimeQueryStatus.closed
+          : RuntimeQueryStatus.ready
+    /** One canonical endpoint owns both the self and connection client count denominator. */
+    const counters = runtimeCounters(this.#endpoint!)
+    return runtimeDetail(
+      this.#localDescription!,
+      [
+        runtimeConnectionDetail(readRuntimePeerConnection(this.#peer!).directory, state, {
+          counters,
+          report: this.#report
+        })
+      ],
+      [],
+      undefined,
+      counters
+    )
+  }
+
+  /** Publish the first completion before synchronous observers or cleanup can reenter close. */
+  #close = (): Promise<void> => {
+    if (this.#closing) return this.#closing.promise
+    this.#closing = deferred<void>()
+    if (this.#probe && (this.#probe.mask & (1 << RpcProbeStage.peer)) !== 0)
+      this.#probe.peer(RuntimeProbeLifecycle.closing, this.#channel.peerId, undefined)
+    this.#events.close()
+    try {
+      void (this.#resources?.assembly ? Promise.resolve() : this.#endpoint!.dispose()).then(
+        () => this.#finishChannel(undefined, false),
+        (failure) => this.#finishChannel(failure, true)
+      )
+    } catch (failure) {
+      this.#finishChannel(failure, true)
+    }
+    return this.#closing.promise
+  }
+
+  /** Native channel cleanup preserves the original primary and its asynchronous settlement boundary. */
+  #finishChannel(primary: unknown, failed: boolean): void {
+    /** Native close may return synchronously or throw before yielding its original Promise. */
+    let result: void | Promise<void>
+    try {
+      result = this.#channel.close?.()
+    } catch (cleanup) {
+      if (failed) this.#report(cleanup)
+      this.#closing!.reject(failed ? primary : cleanup)
+      return
+    }
+    void Promise.resolve(result).then(
+      () => {
+        if (failed) this.#closing!.reject(primary)
+        else this.#closing!.resolve()
+      },
+      (cleanup) => {
+        if (failed) this.#report(cleanup)
+        this.#closing!.reject(failed ? primary : cleanup)
+      }
+    )
+  }
+
+  /**
+   * Mint the same frozen facade and private actual connection receipt only after bilateral
+   * readiness.
+   */
+  #project(): IRuntimePeer {
+    this.#probe = readInstalledProbe(this.#channel.transport)
+    this.#events = createRuntimeEventPublisher(this.#probe)
+    if (this.#probe && (this.#probe.mask & (1 << RpcProbeStage.peer)) !== 0) {
+      this.#probe.peer(RuntimeProbeLifecycle.handshake, this.#channel.peerId, undefined)
+      this.#probe.peer(RuntimeProbeLifecycle.directory, this.#channel.peerId, undefined)
+      if (this.#resources?.generation === undefined)
+        this.#probe.peer(RuntimeEventName.ready, this.#channel.peerId, undefined)
+    }
+    this.#peer = Object.freeze({
+      self: this.#self,
+      on: this.#events.on,
+      ...createRuntimePeerCalls({
+        restrictTransfer: this.#restrictTransfer,
+        callTimeout: this.#callTimeout,
+        route: this.#route,
+        ready: this.#endpoint!,
+        runtimeOutbound: this.#runtimeOutbound,
+        peerId: this.#channel.peerId,
+        generation: this.#remote.self.generation,
+        supportsBinary: this.#supportsBinary,
+        supportsStream: this.#supportsStream,
+        routes: this.#routes
+      }),
+      describe: runtimeQuery(this.#describe),
+      close: this.#close,
+      [Symbol.asyncDispose]: this.#close
+    })
+    runtimePeerConnections.set(
+      this.#peer!,
+      Object.freeze({
+        peerId: this.#channel.peerId,
+        directory: Object.freeze({
+          localDescription: this.#localDescription!,
+          description: this.#remote,
+          carrier: this.#channel.transport.platform,
+          ...((0, this.#connectionOrigin)?.() ?? {
+            kind: this.#options.spawn
+              ? RuntimeSourceKind.spawn
+              : this.#options.listen
+                ? RuntimeSourceKind.listen
+                : RuntimeSourceKind.connect,
+            direction: this.#resources?.bootstrap
+              ? RuntimeConnectionDirection.spawnedBy
+              : this.#options.spawn
+                ? RuntimeConnectionDirection.spawned
+                : this.#options.listen
+                  ? RuntimeConnectionDirection.listen
+                  : RuntimeConnectionDirection.connect
+          })
+        }),
+        description: this.#remote,
+        endpoint: this.#endpoint!,
+        channel: this.#channel,
+        report: this.#report,
+        routes: this.#routes
+      })
+    )
+    return this.#peer!
+  }
+}
+
 export function createRuntimePeer<TRemote = never>(
   options: IRuntimePeerOptions,
   resources?: IRuntimePeerResources
@@ -792,352 +1307,7 @@ export async function createRuntimePeer(
   options: IRuntimePeerOptions,
   resources?: IRuntimePeerResources
 ): Promise<IRuntimePeer> {
-  if (options.probe !== undefined)
-    validateProbes(Array.isArray(options.probe) ? options.probe : [options.probe as IRpcProbe])
-  /** Invoke only the native rejection policy retained by this exact preparation context. */
-  const restrictTransfer =
-    resources?.restrictTransfer ?? readRuntimePreparationContext(options)?.restrictTransfer
-  /** Native source metadata stays with the same private preparation owner. */
-  const connectionOrigin = readRuntimePreparationContext(options)?.connectionOrigin
-  /** Invalid timeout configuration cannot consume bootstrap or acquire a physical channel. */
-  const callTimeout = prepareRuntimeCallTimeout(readRuntimeDefaultTimeout(options))
-  /** Method descriptors are compiled once by the canonical catalog owner. */
-  const methods = compileRuntimeMethods(options.provide, options.contract)
-  /** A platform automatic source and an explicit source can never compete for one Peer. */
-  const sources = [options.spawn, options.connect, options.listen].filter(
-    (source) => source !== undefined
-  )
-  if (resources?.channel && sources.length > 0) invalid(RuntimeApiErrorText.sourceInvalid)
-  if (!resources?.channel && (sources.length !== 1 || typeof sources[0] !== 'function'))
-    invalid(RuntimeApiErrorText.sourceInvalid)
-  /** Only safe identity fields are retained from user configuration or trusted bootstrap. */
-  const configured = options.self
-  const sourceContext = prepareRuntimePeerSourceContext(
-    configured,
-    !options.endpointFactory,
-    options.authentication
-  )
-  /** Arbitrary extra fields, token, environment and source data never enter this projection. */
-  const self = sourceContext.self
-  /** A standalone accepted connection starts its own session at zero; native owners override it. */
-  const generation = normalizeRuntimeGeneration(
-    resources?.generation ?? {
-      kind: RpcRuntimeGenerationKind.session,
-      value: 0,
-      providerId: self.instanceId
-    }
-  )
-  /** Default diagnostics are selected once without copying the original options. */
-  const reporter = options.report ?? defaultRpcReporter
-  /** Reports remain observable even when a user reporter itself throws. */
-  const report = (error: unknown): void => {
-    try {
-      reporter(error)
-    } catch (failure) {
-      hostRethrowReporter(failure, IpcReporterContext)
-    }
-  }
-  /** Offer only implemented shared capabilities; the platform owner supplies the real intersection. */
-  /** One acquired channel transfers to this construction's rollback/close owner. */
-  const channel = resources?.channel ?? (await sources[0]!(sourceContext))
-  /** A successfully created endpoint is the only owner disposed during later preparation failure. */
-  let endpoint: IRuntimePeerEndpoint | undefined
-  try {
-    /**
-     * Both negotiated baseline capabilities are required before endpoint construction or receive
-     * activation.
-     */
-    const baselineAccepted =
-      channel.agreement.capabilities.includes(RpcCapability.runtimeApi) &&
-      channel.agreement.capabilities.includes(RpcCapability.batch)
-    /**
-     * A negotiated binary profile selects the same original runtime task owner for bidirectional
-     * results.
-     */
-    const supportsBinary = channel.agreement.capabilities.includes(RpcCapability.portableBinary)
-    /** Generation requires the actual bilateral base and one original prepared endpoint. */
-    const supportsGeneration = channel.agreement.capabilities.includes(RpcCapability.generation)
-    /** Directory handshake carries a node only after the two source offers actually agree. */
-    const supportsForward = channel.agreement.capabilities.includes(RpcCapability.forwardRoute)
-    /** Native rebindings preserve the Host node; a standalone callable endpoint owns its own node. */
-    const nodeId = supportsForward
-      ? (resources?.nodeId ??
-        resources?.host?.nodeId ??
-        readRuntimePreparationContext(options)?.host?.nodeId ??
-        createAuthenticationNonce())
-      : undefined
-    /** Health and drain remain real native control operations from the original core owner. */
-    const nativeControl = channel.agreement.capabilities.includes(RpcCapability.ping)
-    /** The existing stream capability remains an independent AND requirement. */
-    const supportsStream = channel.agreement.capabilities.includes(RpcCapability.stream)
-    /** Registration completes before the platform hands cold business receive to the endpoint. */
-    let localDescription: IRuntimePeerDescription | undefined
-    /** The original bilateral directory exchange retains its one remote node. */
-    let remoteNodeId: string | undefined
-    /** The original endpoint attachment owns generation and operation correlation. */
-    let runtimeOutbound: RpcOutboundAttachment | undefined
-    const assembly =
-      resources?.assembly ??
-      prepareRuntimeProviderAssembly({
-        methods,
-        streams: supportsStream,
-        generations: supportsGeneration,
-        supports: (_peerId, capability) => channel.agreement.capabilities.includes(capability),
-        remoteNode: () => remoteNodeId,
-        bindRemoteNode: (_peerId, value) => {
-          remoteNodeId = value
-        },
-        describe: () => localDescription
-      })
-    const providers = assembly.providers
-    if (!baselineAccepted) rejectRuntimeApiCapability()
-    /** Default roots retain initial registration before core receive activation. */
-    const initialProviders =
-      !options.endpointFactory && !resources?.endpoint && !resources?.wrapEndpoint
-    /** An original session/binding contributes its real endpoint rather than a second composition. */
-    const constructed =
-      resources?.endpoint ??
-      (await prepareRuntimePeerEndpoint(
-        { ...options, self, report },
-        channel,
-        resources?.signal ?? createAbortController().signal,
-        initialProviders ? { provider: providers } : {},
-        supportsGeneration
-          ? (resources?.providerAdmission ??
-              readRuntimePreparationContext(options)?.providerAdmission)
-          : undefined,
-        resources?.providerAdmissionRegistration ??
-          readRuntimePreparationContext(options)?.providerAdmissionRegistration
-      ))
-    endpoint = constructed.endpoint as unknown as IRuntimePeerEndpoint
-    /**
-     * Incoming providers must pass through the selected native policy from their first
-     * registration.
-     */
-    const served = resources?.wrapEndpoint?.(constructed) ?? constructed
-    if (
-      !served.oneWay ||
-      (supportsStream && !served.stream) ||
-      (nativeControl && typeof served.endpoint.ping !== 'function')
-    )
-      rejectRuntimeApiCapability()
-    /** A cold view joins existing roots without replacing frozen methods or adding hot wrappers. */
-    const selected: IRuntimePeerEndpoint = Object.create(served.endpoint)
-    Object.defineProperties(selected, {
-      sendOneWay: { value: served.oneWay.sendOneWay },
-      stream: { value: served.stream }
-    })
-    endpoint = Object.freeze(selected)
-    if (supportsGeneration) {
-      runtimeOutbound = readEndpointOwner<RpcOutboundAttachment>(
-        endpoint,
-        EndpointOwnerKey.outboundAttachment
-      )
-      if (!runtimeOutbound) rejectRuntimeApiCapability()
-      if (!resources?.assembly) runtimeOutbound.configureRuntime(generation)
-    }
-    if (!resources?.assembly) assembly.install(endpoint, Boolean(initialProviders))
-    localDescription =
-      resources?.description?.() ??
-      normalizeRuntimeDescription({
-        schemaVersion: RUNTIME_API_SCHEMA_VERSION,
-        self: supportsGeneration ? { ...self, generation } : self,
-        ...(nodeId === undefined ? {} : { nodeId }),
-        methods: describeRuntimeMethods(methods, supportsStream)
-      })
-    channel.activateReceive?.()
-    /** Only mutually negotiated application capability permits sending the new reserved method. */
-    const remote = normalizeRuntimeDescription(
-      await endpoint.send(
-        channel.peerId,
-        RemoteMethodName.runtimeDescribe,
-        supportsGeneration || nodeId !== undefined
-          ? {
-              ...(nodeId === undefined ? {} : { nodeId }),
-              ...(supportsGeneration ? { generation } : {}),
-              ...(resources?.hostSession ? { self } : {})
-            }
-          : null,
-        {
-          signal: resources?.signal
-        }
-      )
-    )
-    if (remote.self.instanceId !== channel.peerId) invalid(RuntimeApiErrorText.identityInvalid)
-    if (supportsGeneration) {
-      if (!remote.self.generation) invalid(RuntimeApiErrorText.identityInvalid)
-      runtimeOutbound!.bindRuntimeTarget(channel.peerId, remote.self.generation)
-    } else if (remote.self.generation !== undefined) invalid(RuntimeApiErrorText.identityInvalid)
-    if (supportsForward) {
-      if (!remote.nodeId || (remoteNodeId !== undefined && remoteNodeId !== remote.nodeId))
-        invalid(RuntimeApiErrorText.identityInvalid)
-      remoteNodeId = remote.nodeId
-    } else if (remote.nodeId !== undefined) invalid(RuntimeApiErrorText.identityInvalid)
-    /** Both scalar admission and aliases are compiled from the accepted remote directory once. */
-    const routes = new Map(
-      remote.methods.map(
-        (method) =>
-          [
-            method.name,
-            { ...method, stream: `${RemoteMethodName.runtimeStreamPrefix}${method.name}` }
-          ] as const
-      )
-    )
-    /** Every accepted baseline channel uses its actual v2 method and mode whitelist. */
-    const route = (method: string, mode: RuntimeApiMode): void => {
-      /** Admission uses the accepted generation's compiled whitelist and actual installed modes. */
-      const selected = routes.get(method)
-      // Host string calls reach incremental providers on the selected live session; capability trees keep their accepted snapshot.
-      if (!selected && resources?.hostSession) return
-      if (!selected)
-        throw createRpcError(
-          RpcCoreErrorCode.providerNotFound,
-          RuntimeApiErrorText.methodUnavailable
-        )
-      if (!selected.supportedModes.includes(mode)) rejectRuntimeApiCapability()
-    }
-    /** Capture original operation surfaces; hot calls allocate no facade Promise or bound function. */
-    const ready = endpoint
-    /** Close retains one Promise identity, including failure and concurrent provider reentry. */
-    let closing: Promise<void> | undefined
-    /** This subscriber projection owns no connection or generation facts beyond the actual Peer. */
-    /** Existing channel identity reaches the same endpoint emitter without adding a middleware. */
-    const probe = readInstalledProbe(channel.transport)
-    const events = createRuntimeEventPublisher(probe)
-    if (probe && (probe.mask & (1 << RpcProbeStage.peer)) !== 0) {
-      probe.peer(RuntimeProbeLifecycle.handshake, channel.peerId, undefined)
-      probe.peer(RuntimeProbeLifecycle.directory, channel.peerId, undefined)
-      // Managed generations publish readiness only after their canonical registration commits.
-      if (resources?.generation === undefined)
-        probe.peer(RuntimeEventName.ready, channel.peerId, undefined)
-    }
-    /** Both explicit and scoped cleanup retain the same original close Promise. */
-    const close = (): Promise<void> => {
-      if (closing) return closing
-      /** Publish the existing close completion before synchronous observers can reenter close. */
-      const completion = deferred<void>()
-      closing = completion.promise
-      if (probe && (probe.mask & (1 << RpcProbeStage.peer)) !== 0)
-        probe.peer(RuntimeProbeLifecycle.closing, channel.peerId, undefined)
-      events.close()
-      /** Channel cleanup keeps the original primary failure and its original asynchronous boundary. */
-      const finishChannel = (primary: unknown, failed: boolean): void => {
-        /** The original channel can return a Promise or finish synchronously. */
-        let result: void | Promise<void>
-        try {
-          result = channel.close?.()
-        } catch (cleanup) {
-          if (failed) report(cleanup)
-          completion.reject(failed ? primary : cleanup)
-          return
-        }
-        void Promise.resolve(result).then(
-          () => {
-            if (failed) completion.reject(primary)
-            else completion.resolve()
-          },
-          (cleanup) => {
-            if (failed) report(cleanup)
-            completion.reject(failed ? primary : cleanup)
-          }
-        )
-      }
-      try {
-        void (resources?.assembly ? Promise.resolve() : ready.dispose()).then(
-          () => finishChannel(undefined, false),
-          (failure) => finishChannel(failure, true)
-        )
-      } catch (failure) {
-        finishChannel(failure, true)
-      }
-      return closing
-    }
-    /** This exact facade is minted only after both directory and endpoint preparation succeed. */
-    const peer: IRuntimePeer = Object.freeze({
-      self,
-      on: events.on,
-      ...createRuntimePeerCalls({
-        restrictTransfer,
-        callTimeout,
-        route,
-        ready,
-        runtimeOutbound,
-        peerId: channel.peerId,
-        generation: remote.self.generation,
-        supportsBinary,
-        supportsStream,
-        routes
-      }),
-      describe: runtimeQuery(() => {
-        /** The original adapter alone can prove physical closure; absent proof remains unavailable. */
-        const state =
-          channel.transport.closed === undefined
-            ? undefined
-            : channel.transport.closed
-              ? RuntimeQueryStatus.closed
-              : RuntimeQueryStatus.ready
-        /** One canonical endpoint owns both the self and connection client count denominator. */
-        const counters = runtimeCounters(ready)
-        return runtimeDetail(
-          localDescription!,
-          [
-            runtimeConnectionDetail(readRuntimePeerConnection(peer).directory, state, {
-              counters,
-              report
-            })
-          ],
-          [],
-          undefined,
-          counters
-        )
-      }),
-      close,
-      [Symbol.asyncDispose]: close
-    })
-    runtimePeerConnections.set(
-      peer,
-      Object.freeze({
-        peerId: channel.peerId,
-        directory: Object.freeze({
-          localDescription,
-          description: remote,
-          carrier: channel.transport.platform,
-          ...(connectionOrigin?.() ?? {
-            kind: options.spawn
-              ? RuntimeSourceKind.spawn
-              : options.listen
-                ? RuntimeSourceKind.listen
-                : RuntimeSourceKind.connect,
-            direction: resources?.bootstrap
-              ? RuntimeConnectionDirection.spawnedBy
-              : options.spawn
-                ? RuntimeConnectionDirection.spawned
-                : options.listen
-                  ? RuntimeConnectionDirection.listen
-                  : RuntimeConnectionDirection.connect
-          })
-        }),
-        description: remote,
-        endpoint: ready,
-        channel,
-        report,
-        routes
-      })
-    )
-    return peer
-  } catch (failure) {
-    try {
-      if (!resources?.assembly) await endpoint?.dispose()
-    } catch (cleanup) {
-      report(cleanup)
-    }
-    try {
-      await channel.close?.()
-    } catch (cleanup) {
-      report(cleanup)
-    }
-    throw failure
-  }
+  return new RuntimePeerResource(options, resources).open()
 }
 
 /**

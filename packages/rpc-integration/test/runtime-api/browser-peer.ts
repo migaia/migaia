@@ -1,7 +1,9 @@
-import type { IRuntimeDynamicSurface } from '../../../rpc-host/dist/remote/runtime-api/typing.js'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import type { IRuntimePeer } from '../../../rpc-host/dist/remote/runtime-api/peer.js'
-import { createThreadPeer } from '../../../rpc-plugin-thread/test/protocol.ts'
+import { runtimeTestHost } from '../../../rpc-host/test/runtime-api/fixture.js'
+import { RuntimePluginKey } from '@migaia/rpc-host/plugin'
+import { readRuntimeOutletConnection } from '../../../rpc-host/dist/remote/runtime-api/outlet.js'
+import { threadProtocolDefinition } from './fixtures/thread-protocol.js'
 import {
   createAdapterWebThreadLauncher as createWebThreadLauncher,
   createAdapterWebThreadChannelFactory as createWebThreadChannelFactory
@@ -14,46 +16,55 @@ globalThis.runAutomaticThreadScenario = async () => {
   /** Genuine reverse calls are counted in parent business, independently from child metadata. */
   let reverseCalls = 0
   /** A constructed canonical Peer alone owns endpoint/channel disposal. */
-  let parent: IRuntimePeer | undefined
+  let parent!: IRuntimePeer
   /** Preparation errors remain visible to the actual browser assertion. */
   const failures: string[] = []
   /** Unsupported actual exit must remain unresolved rather than being guessed from terminate. */
   let exited = false
+  /** The real ordinary Host owns the committed adapter definition and rollback. */
+  const host = runtimeTestHost({
+    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
+  })
   try {
-    parent = await createThreadPeer<IRuntimeDynamicSurface>({
-      self: { name: 'browser-parent', instanceId: 'browser-automatic-parent' },
-      provide: {
-        parentEcho: () => {
-          reverseCalls += 1
-          return parent!.self.instanceId
-        }
-      },
-      spawn: async (context) => {
-        const launcher = createWebThreadLauncher({
-          runtimeApi: context,
+    parent = await host
+      .use(
+        threadProtocolDefinition({
+          name: RuntimePluginKey.thread,
+          self: { name: 'browser-parent', instanceId: 'browser-automatic-parent' },
+          provide: {
+            parentEcho: () => {
+              reverseCalls += 1
+              return parent!.self.instanceId
+            }
+          },
+          spawn: async (context) => {
+            const launcher = createWebThreadLauncher({
+              runtimeApi: context,
+              report: (error) => {
+                failures.push(String((error as { code?: string }).code))
+              }
+            })
+            handle = await launcher.launch(
+              {
+                entry: new URL('./fixtures/browser-worker.ts', import.meta.url).href,
+                name: 'browser-automatic-child'
+              },
+              { signal: new AbortController().signal }
+            )
+            void handle.exited.then(() => {
+              exited = true
+            })
+            return createWebThreadChannelFactory({ scheduler: systemScheduler }).open(
+              handle,
+              new AbortController().signal
+            )
+          },
           report: (error) => {
             failures.push(String((error as { code?: string }).code))
           }
         })
-        handle = await launcher.launch(
-          {
-            entry: new URL('./fixtures/browser-worker.ts', import.meta.url).href,
-            name: 'browser-automatic-child'
-          },
-          { signal: new AbortController().signal }
-        )
-        void handle.exited.then(() => {
-          exited = true
-        })
-        return createWebThreadChannelFactory({ scheduler: systemScheduler }).open(
-          handle,
-          new AbortController().signal
-        )
-      },
-      report: (error) => {
-        failures.push(String((error as { code?: string }).code))
-      }
-    })
+      )
+      .then(() => readRuntimeOutletConnection(host.thread, RuntimePluginKey.thread)!.peer!)
     /** Both endpoints execute real providers through the independently agreed runtime directory. */
     const result = (await parent.request('probe', 'browser-ready')) as {
       value: string
@@ -112,7 +123,7 @@ globalThis.runAutomaticThreadScenario = async () => {
     }
   } finally {
     try {
-      await parent?.close()
+      await host.dispose()
     } finally {
       handle?.terminate()
     }

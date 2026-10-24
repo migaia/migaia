@@ -1,7 +1,8 @@
+import { createRuntimeEndpointComposition } from '../../../dist/core/runtime-api-endpoint.js'
 import { expect, it, vi } from 'vitest'
 import { identityCodec } from '@migaia/serialize/codecs/identity/v1'
-import { createMemoryTransportPair } from '../../../dist/core/adapters/memory.js'
-import { createFullOneWayEndpoint } from '../../../dist/core/index.js'
+import { createMemoryTransportPair } from '../../fixtures/memory-transport.js'
+
 import { connect } from '../../../dist/core/middleware/connect.js'
 import { codec } from '../../../dist/core/middleware/codec.js'
 import { registerBatchAgreement } from '../../../dist/core/internal/batch-frame.js'
@@ -49,18 +50,24 @@ for (const customCodec of [false, true]) {
     /** Diagnostics expose rejected batch parsing without changing receiver behavior. */
     const failures: unknown[] = []
     /** Caller construction retains ordinary source and request ownership. */
-    const caller = await createFullOneWayEndpoint({
-      id: 'caller',
-      transport: left,
-      middlewares: [connect({ transport: left }), ...(customCodec ? [codec(selectedCodec)] : [])]
-    })
+    const caller = await createRuntimeEndpointComposition(
+      {
+        id: 'caller',
+        transport: left,
+        middlewares: [connect({ transport: left }), ...(customCodec ? [codec(selectedCodec)] : [])]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     /** The actual provider generates responses through the unchanged canonical sender. */
-    const provider = await createFullOneWayEndpoint({
-      id: 'provider',
-      transport: right,
-      provider: { echo: (context) => context.success(context.data) },
-      middlewares: [connect({ transport: right })]
-    })
+    const provider = await createRuntimeEndpointComposition(
+      {
+        id: 'provider',
+        transport: right,
+        provider: { echo: (context) => context.success(context.data) },
+        middlewares: [connect({ transport: right })]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     /** Remove the original diagnostic subscription before closing this fixture. */
     const remove = caller.hooks.on((event) => {
       if (event.name === 'failure') failures.push(event.error)

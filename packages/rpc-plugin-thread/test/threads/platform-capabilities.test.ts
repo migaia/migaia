@@ -2,17 +2,15 @@ import { createUnitBudget } from '@migaia/supervision'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { RpcControl, RpcEnvelopeKind } from '@migaia/rpc-contract'
 import { describe, expect, it, vi } from 'vitest'
-import { assembleThreadFixture } from './fixture.js'
-import { createThreadPeer } from '../protocol.js'
+import { threadPlugin } from '@migaia/rpc-plugin-thread'
+import { createRpcHost } from '@migaia/rpc-host'
 import { runtimeTestHost } from '../../../rpc-host/test/runtime-api/public-host.js'
 import {
   createAdapterWebThreadLauncher as createWebThreadLauncher,
   createAdapterWebThreadChannelFactory as createWebThreadChannelFactory
 } from '../../dist/threads/web-launcher.js'
 
-import { createElectronMainThreadLauncher } from '../../src/threads/adapters/electron-main.js'
-
-import { endpointFactory, nativeFixture, nativeWorkerFor } from './fixture.js'
+import { nativeFixture } from './fixture.js'
 
 /** Node fixtures cannot establish Web/Bun/Electron actual-exit enforcement. */
 describe('platform capability admission', () => {
@@ -38,7 +36,7 @@ describe('platform capability admission', () => {
         budget,
         scheduler,
         channelFactory: createWebThreadChannelFactory({ scheduler }),
-        endpointFactory,
+
         report: vi.fn()
       }
       const host = runtimeTestHost({
@@ -52,14 +50,14 @@ describe('platform capability admission', () => {
         for (const build of [
           () =>
             host.use(
-              assembleThreadFixture({
+              threadPlugin({
                 name: 'p',
                 spawn: common,
-                endpointFactory,
+
                 report: vi.fn()
               })
             ),
-          () => createThreadPeer({ spawn: common, endpointFactory, report: vi.fn() })
+          () => createRpcHost({ plugins: [threadPlugin({ spawn: common })], report: vi.fn() })
         ])
           await expect(build()).rejects.toSatisfy(
             (error: {
@@ -77,10 +75,10 @@ describe('platform capability admission', () => {
         const health = { check: vi.fn(async () => undefined) }
         await expect(
           host.use(
-            assembleThreadFixture({
+            threadPlugin({
               name: 'p',
               spawn: { ...common, health },
-              endpointFactory,
+
               report: vi.fn()
             })
           )
@@ -89,10 +87,10 @@ describe('platform capability admission', () => {
           cause: { code: 'CAPABILITY_UNSUPPORTED' }
         })
         /** A valid uninstalled definition stays lazy, matching the original unstarted Host case. */
-        assembleThreadFixture({
+        threadPlugin({
           name: 'p',
           spawn: { ...common, health, supervisor: { isolation: 'best-effort' } },
-          endpointFactory,
+
           report: vi.fn()
         })
         await host.dispose()
@@ -103,12 +101,7 @@ describe('platform capability admission', () => {
       }
     }
   )
-  it('Electron main retains independent unsupported evidence until an Electron fixture runs', () => {
-    expect(createElectronMainThreadLauncher().capabilities).toMatchObject({
-      termination: 'unsupported',
-      'exit-observation': 'unsupported'
-    })
-  })
+
   it('uses the default RPC ping health policy when a launcher does not promise exit observation', async () => {
     /** The supervised Peer and its default health check share the caller's controlled clock. */
     const scheduler = createManualScheduler()
@@ -120,13 +113,17 @@ describe('platform capability admission', () => {
       capabilities: { ...fixture.launcher.capabilities, 'exit-observation': 'unsupported' as const }
     }
     /** Standalone source Peers use the same supported default health path documented for Web. */
-    const peer = await createThreadPeer<{ 'p.read'(value: string): string }>({
+    const peer = await createRpcHost<{ 'p.read'(value: string): string }>({
       self: { name: 'health-parent', instanceId: 'health-parent' },
-      spawn: {
-        ...fixture.spawn,
-        launcher,
-        supervisor: { ...fixture.spawn.supervisor, isolation: 'best-effort' }
-      },
+      plugins: [
+        threadPlugin({
+          spawn: {
+            ...fixture.spawn,
+            launcher,
+            supervisor: { ...fixture.spawn.supervisor, isolation: 'best-effort' }
+          }
+        })
+      ],
       report: (error) => fixture.reported.push(error)
     })
     try {
@@ -150,71 +147,5 @@ describe('platform capability admission', () => {
     /** Unobservable close returns before native exit; only that real receipt releases the lease. */
     await Promise.all(fixture.handles.map((handle) => handle.exited))
     await expect.poll(() => fixture.budget.inUse).toBe(0)
-  })
-  it.each([false, true])('real Worker ping health with missing server ping=%s', async (noPing) => {
-    const scheduler = createManualScheduler()
-    const endpoints = new Map<
-      string,
-      {
-        ping(
-          peer: string,
-          params: undefined,
-          options: { timeoutMs: false; signal: unknown }
-        ): Promise<unknown>
-      }
-    >()
-    const fixture = nativeFixture(
-      {
-        scheduler,
-        health: {
-          intervalMs: 10_000,
-          timeoutMs: 5,
-          failureThreshold: 3,
-          check: async (handle, signal) => {
-            await endpoints
-              .get(handle.identity.fingerprint)!
-              .ping(handle.identity.fingerprint, undefined, { timeoutMs: false, signal })
-          }
-        },
-        endpointFactory: async (channel, signal) => {
-          const built = await endpointFactory(channel, signal)
-          endpoints.set(
-            channel.peerId,
-            built.endpoint as unknown as {
-              ping(
-                peer: string,
-                params: undefined,
-                options: { timeoutMs: false; signal: unknown }
-              ): Promise<unknown>
-            }
-          )
-          return built
-        }
-      },
-      { noPing }
-    )
-    try {
-      await fixture.install()
-      for (let round = 0; round < 3; round += 1) {
-        scheduler.advance(10_000)
-        for (let turn = 0; turn < 40; turn += 1) await Promise.resolve()
-        await new Promise((resolve) => setTimeout(resolve, 5))
-        if (noPing) scheduler.advance(5)
-        for (let turn = 0; turn < 40; turn += 1) await Promise.resolve()
-      }
-      if (noPing) {
-        await fixture.handles[0]!.exited
-        expect(nativeWorkerFor(fixture.handles[0]!).threadId).toBe(-1)
-      } else {
-        expect(fixture.handles).toHaveLength(1)
-        expect(nativeWorkerFor(fixture.handles[0]!).threadId).toBeGreaterThan(0)
-      }
-    } finally {
-      await fixture.close()
-    }
-    // Deferred generation notifications are non-cancellable jobs, like native microtasks.
-    scheduler.advance(0)
-    expect(fixture.budget.inUse).toBe(0)
-    expect(scheduler.pendingCount).toBe(0)
   })
 })

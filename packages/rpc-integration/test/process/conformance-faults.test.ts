@@ -1,3 +1,12 @@
+import { createRemoteRetryPort } from '@migaia/rpc-host/plugin'
+import { createManagedRuntimePeer } from '../../../rpc-host/dist/remote/runtime-api/managed-peer.js'
+import { readRuntimePeerConnection } from '../../../rpc-host/dist/remote/runtime-api/peer.js'
+import type { IRuntimePeer } from '@migaia/rpc-host/plugin'
+import type {
+  IProcessPluginEstablish,
+  ISpawnProcessPluginDeployment,
+  IConnectProcessPluginDeployment
+} from '../../../rpc-plugin-process/dist/process/plugin/types.js'
 import { spawn } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { once } from 'node:events'
@@ -6,22 +15,12 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
-import { PluginHost } from '@migaia/plugin-host'
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { createManualScheduler } from '@migaia/utils/testing'
-import { createProcessPlugin } from '../../../rpc-plugin-process/test/protocol.ts'
-import { createProcessResilience } from '../../../rpc-plugin-process/dist/process/resilience/index.js'
 import { createProcessTransport } from '../../../rpc-plugin-process/dist/process/handshake.js'
 import type { IProcessByteChannel } from '../../../rpc-plugin-process/dist/process/types.js'
-import { type IProcessPluginOptions } from '../../../rpc-plugin-process/test/protocol.ts'
-import { createRemoteHost } from '../../../rpc-host/dist/remote/host.js'
-import {
-  createRemoteRetryPort,
-  type IRemoteRetryPort,
-  type IRemoteServeEndpoint,
-  type IRemoteContract
-} from '@migaia/rpc-host/plugin'
+import { type IRemoteRetryPort, type IRemoteServeEndpoint } from '@migaia/rpc-host/plugin'
 import {
   createSpawnProcessBinding,
   createConnectProcessBinding,
@@ -42,242 +41,213 @@ import {
   offer,
   bridgeFrames,
   evidence,
-  contract,
-  bridgeContract,
   deployment,
   wireFrames
 } from './fixtures/conformance-business.js'
 
 /** Only the five admitted real executables participate; Node and Bun are separate TS runtimes. */
 type IPeer = (typeof peers)[number]
-/** Public facade methods remain contract projected throughout fault injection. */
-type IFeature = {
-  request(
-    params: unknown[],
-    options?: { timeoutMs?: number; signal?: AbortSignal; idempotencyKey?: string }
-  ): Promise<unknown>
-  oneWay(params: unknown[]): Promise<void>
-  generator(params: unknown[]): AsyncIterable<unknown>
-}
 /** Test configuration changes deployment policy, never the production protocol or state machine. */
 type IFaultOptions = {
   host?: boolean
   bridge?: boolean
   scheduler?: ReturnType<typeof createManualScheduler>
-  restart?: NonNullable<IProcessPluginOptions['deployment']['supervision']>['restart']
+  restart?: ISpawnProcessPluginDeployment['supervision']['restart']
   maxPendingData?: number
   address?: string
   token?: string
   retryPort?: IRemoteRetryPort
-  contract?: IRemoteContract
 }
 
-/** Assemble existing public fixtures with observable policy, backlog and physical byte ownership. */
-async function faultClient(peer: IPeer, options: IFaultOptions = {}) {
-  /** One actual budget proves leases return after both success and malformed input. */
-  const budget = createUnitBudget({ kind: 'process', maxUnits: 1, scheduler: options.scheduler })
-  /** Existing deployment owns launcher, bootstrap and language-specific executable preparation. */
-  const fixture = deployment(
-    peer,
-    options.host ?? false,
-    options.token ?? randomUUID(),
-    options.address,
-    options.bridge,
-    budget
-  )
-  /** Each endpoint remains owned by its canonical remote binding. */
-  const runtimes: IRemoteServeEndpoint[] = []
-  /** Retain the physical writer only for explicit raw fault injection. */
-  const physical: IProcessByteChannel[] = []
-  /** Production IPC gate emits actual capacity transitions. */
-  const backlog: unknown[] = []
-  /** All governance, health and endpoint deadlines use exactly one clock. */
-  const scheduler = options.scheduler ?? systemScheduler
-  /** Explicit governance exposes terminal state without fabricating supervisor events. */
-  const resilience = createProcessResilience({
-    scheduler,
-    report: (error) => fixture.reports.push(error)
-  })
-  /** Capture authenticated channels while preserving original bridge establishment. */
-  const establish: IProcessPluginOptions['deployment']['establish'] = async (raw, context) => {
+/** Actual binding types are the only native lifetime resources this fixture may retain. */
+type IFaultBinding =
+  | ReturnType<typeof createSpawnProcessBinding>
+  | ReturnType<typeof createConnectProcessBinding>
+
+/** One fault run owns original native binding resources and passive physical observations. */
+class FaultClient {
+  /** The actual native budget remains authoritative for process lease cleanup. */
+  readonly budget
+  /** Retain every actual OS handle for independent exit/ownership assertions. */
+  readonly handles: ReturnType<typeof deployment>['handles']
+  /** Retain original native stderr chunks for failure evidence. */
+  readonly output: ReturnType<typeof deployment>['output']
+  /** Retain original physical response bytes without decoding them on the live path. */
+  readonly stdout: ReturnType<typeof deployment>['stdout']
+  /** Retain exact original sent byte chunks for zero-write and retry identity assertions. */
+  readonly sent: ReturnType<typeof deployment>['sent']
+  /** Original report callbacks keep every failure object without synthesizing classifications. */
+  readonly reports: ReturnType<typeof deployment>['reports']
+  /** These are the actual canonical endpoints, one per accepted native generation. */
+  readonly runtimes: IRemoteServeEndpoint[] = []
+  /** Explicit raw fault injection borrows only this run's actual physical channels. */
+  readonly physical: IProcessByteChannel[] = []
+  /** Production IPC callbacks retain exact capacity transitions. */
+  readonly backlog: unknown[] = []
+  /** Original native launcher/bootstrap and passive output arrays remain one existing fixture. */
+  #fixture: ReturnType<typeof deployment>
+  /** The existing source form, runtime clock, restart and gate policy are immutable per run. */
+  #options: IFaultOptions
+  /** The independently implemented peer owns its process executable and stable protocol identity. */
+  #remote: IPeer
+  /** Canonical managed calls retain current/leave/retry resources across native generations. */
+  #peer: IRuntimePeer | undefined
+  /** Actual native binding remains sole supervisor, health and physical drain authority. */
+  #binding: IFaultBinding | undefined
+
+  /** Build passive observations and cold source inputs before any native process starts. */
+  constructor(peer: IPeer, options: IFaultOptions) {
+    this.#remote = peer
+    this.#options = options
+    this.budget = createUnitBudget({ kind: 'process', maxUnits: 1, scheduler: options.scheduler })
+    this.#fixture = deployment(
+      peer,
+      options.host ?? false,
+      options.token ?? randomUUID(),
+      options.address,
+      options.bridge,
+      this.budget
+    )
+    this.handles = this.#fixture.handles
+    this.output = this.#fixture.output
+    this.stdout = this.#fixture.stdout
+    this.sent = this.#fixture.sent
+    this.reports = this.#fixture.reports
+  }
+
+  /** Borrow the genuine canonical managed Peer rather than projecting an old feature facade. */
+  get peer(): IRuntimePeer {
+    return this.#peer!
+  }
+
+  /** Native state/health assertions read the actual binding owner directly. */
+  get binding() {
+    return this.#binding!
+  }
+
+  /** Retain native and bridge physical framing while exposing no extra runtime state machine. */
+  #establish: IProcessPluginEstablish = async (raw, context) => {
     if (raw.kind !== 'byte') throw new TypeError('fault fixture requires bytes')
-    physical.push(raw)
-    if (options.bridge) return fixture.selected.establish(raw, context)
-    raw.onData((chunk) => fixture.stdout.push(chunk.slice()))
+    this.physical.push(raw)
+    if (this.#options.bridge) return this.#fixture.selected.establish(raw, context)
+    raw.onData((chunk) => this.stdout.push(chunk.slice()))
     return createProcessTransport(
       {
         ...raw,
         write: async (chunk) => {
-          fixture.sent.push(chunk.slice())
+          this.sent.push(chunk.slice())
           await raw.write(chunk)
         }
       },
       {
         role: 'initiator',
-        peerId: peer.id,
+        peerId: this.#remote.id,
         offer: context.offer!,
         scheduler: context.scheduler,
         signal: context.signal as AbortSignal,
-        report: (error) => fixture.reports.push(error),
+        report: this.#report,
         ipc: {
           ...context.session,
-          maxPendingData: options.maxPendingData,
+          maxPendingData: this.#options.maxPendingData,
           log: (record) => {
-            backlog.push(record)
+            this.backlog.push(record)
           }
         }
       }
     )
   }
-  /** Restart policy is delegated unchanged to the existing supervision owner. */
-  const selected: IProcessPluginOptions['deployment'] =
-    fixture.selected.kind === 'spawn'
-      ? {
-          ...fixture.selected,
-          establish,
-          supervision: {
-            ...fixture.selected.supervision,
-            scheduler,
-            restart: options.restart
-          }
-        }
-      : {
-          ...fixture.selected,
-          establish,
-          supervision: { ...fixture.selected.supervision, scheduler, restart: options.restart }
-        }
-  /** Existing public endpoint assembly reuses channel codec/framer/features. */
-  const endpointFactory = async (channel: Parameters<typeof endpointFor>[0]) => {
-    const endpoint = await (options.bridge ? bridgeEndpointFor : endpointFor)(channel, 'caller')
-    runtimes.push(endpoint)
+
+  /** Diagnostics retain their original object identity in this run's passive report collection. */
+  #report = (error: unknown): void => {
+    this.reports.push(error)
+  }
+
+  /** Reuse the genuine endpoint owner with the accepted channel's codec/framer and exact clock. */
+  #endpoint = async (channel: Parameters<typeof endpointFor>[0]): Promise<IRemoteServeEndpoint> => {
+    const endpoint = await (this.#options.bridge ? bridgeEndpointFor : endpointFor)(
+      channel,
+      'caller'
+    )
+    this.runtimes.push(endpoint)
     return endpoint
   }
-  /** Real PluginHost owns facade registration and release sequencing. */
-  const local = new PluginHost<Record<string, never>>({
-    execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
-  })
-  /** Host and Plugin publish the same contract with their distinct registration ownership. */
-  const selectedContract = options.contract ?? (options.bridge ? bridgeContract : contract)
-  if (options.host) {
-    /** The original owned or borrowed native binding retains health, stderr and real exit. */
-    const binding =
-      selected.kind === 'spawn'
-        ? createSpawnProcessBinding(selected, (error) => fixture.reports.push(error), true)
-        : createConnectProcessBinding(selected, (error) => fixture.reports.push(error))
-    /** Logical retry settlement stays inside the same original physical drain owner. */
-    let retry = options.retryPort
-    const retryPort: IRemoteRetryPort = {
-      dispatch(input) {
-        retry ??= createRemoteRetryPort({
-          events: input.events,
-          scheduler: binding.scheduler,
-          report: (error) => fixture.reports.push(error)
-        })
-        return binding.trackRequest(() => retry!.dispatch(input))
-      }
-    }
-    /** Retains this lower Host controller; no removed process facade is recreated. */
-    const remoteFor = <TUnit extends object, TSpec>(owner: IProcessPluginBinding<TUnit, TSpec>) =>
-      createRemoteHost({
-        catalog: { p: selectedContract },
-        binding: owner,
-        endpointFactory: async (...args: Parameters<typeof endpointFactory>) =>
-          owner.bindEndpoint(args[0], await endpointFactory(...args)),
-        retryPort,
-        callGuard: resilience.callGuard('fault-host'),
-        report: (error) => fixture.reports.push(error)
-      })
-    const facade =
-      selected.kind === 'spawn'
-        ? remoteFor(binding as ReturnType<typeof createSpawnProcessBinding>)
-        : remoteFor(binding as ReturnType<typeof createConnectProcessBinding>)
-    /**
-     * One retained governance registration follows the actual native supervisor and liquidation
-     * owner.
-     */
-    const registration = resilience.attachRegistration(
-      'fault-host',
-      {
-        ownership: selected.kind === 'spawn' ? 'spawn-owned' : 'connection-borrowed',
-        health: binding.health,
-        supervisor: binding.registrationSupervisor
-      },
-      { kind: 'standalone-host', release: facade.release }
-    )
+
+  /** Start exactly one real native binding and let its canonical managed owner handle rebinding. */
+  async open(): Promise<this> {
+    /** Native supervision, health and endpoint deadlines retain this run's one original clock. */
+    const scheduler = this.#options.scheduler ?? systemScheduler
+    /** Only policy and passive establishment observation differ from the existing source fixture. */
+    const selected: ISpawnProcessPluginDeployment | IConnectProcessPluginDeployment =
+      this.#fixture.selected.kind === 'spawn'
+        ? {
+            ...this.#fixture.selected,
+            establish: this.#establish,
+            supervision: {
+              ...this.#fixture.selected.supervision,
+              scheduler,
+              restart: this.#options.restart
+            }
+          }
+        : {
+            ...this.#fixture.selected,
+            establish: this.#establish,
+            supervision: {
+              ...this.#fixture.selected.supervision,
+              scheduler,
+              restart: this.#options.restart
+            }
+          }
     try {
-      await facade.ready()
-      const installed = await facade.use('p')
-      return {
-        ...fixture,
-        physical,
-        runtimes,
-        backlog,
-        budget,
-        resilience,
-        facade,
-        registration,
-        feature: installed.f as IFeature,
-        close: async () => {
-          await binding.drainCurrent()
-          await facade.release()
-          await registration.close()
-          await resilience.close()
-          await local.dispose()
-          if (options.scheduler) await settleFaultTurn(options.scheduler)
-        }
-      }
+      if (selected.kind === 'spawn')
+        await this.#prepare(createSpawnProcessBinding(selected, this.#report, true))
+      else await this.#prepare(createConnectProcessBinding(selected, this.#report))
+      /** Foreign Host controls remain real wire operations over the same genuine managed Peer. */
+      if (this.#options.host) await this.peer.request(RemoteMethodName.hostUse, ['p'])
+      return this
     } catch (error) {
-      await facade.release()
-      await registration.close()
-      await resilience.close()
-      await local.dispose()
+      await this.#peer?.close()
+      await Promise.all(this.handles.map((handle) => handle.exited))
+      writeFileSync(
+        join(evidence, `hf-${this.#remote.language}-startup.stderr.log`),
+        Buffer.concat(this.output)
+      )
+      writeFileSync(
+        join(evidence, `hf-${this.#remote.language}-startup.stdout.bin`),
+        Buffer.concat(this.stdout)
+      )
       throw error
     }
   }
-  /** Registration guard is provided by production resilience, not a local proxy wrapper. */
-  const definition = createProcessPlugin({
-    name: 'p',
-    contract: selectedContract,
-    registrationOwner: { name: 'p', host: local },
-    host: local.plugin,
-    deployment: selected,
-    endpointFactory,
-    resilience,
-    retryPort: options.retryPort,
-    report: (error) => fixture.reports.push(error)
-  })
-  try {
-    const [installed] = await local.use(definition)
-    return {
-      ...fixture,
-      physical,
-      runtimes,
-      backlog,
-      budget,
-      resilience,
-      facade: undefined,
-      registration: undefined,
-      feature: installed!.getFeature('f') as IFeature,
-      close: async () => {
-        await local.dispose()
-        await resilience.close()
-        if (options.scheduler) await settleFaultTurn(options.scheduler)
-      }
-    }
-  } catch (error) {
-    await local.dispose()
-    await resilience.close()
-    await Promise.all(fixture.handles.map((handle) => handle.exited))
-    writeFileSync(
-      join(evidence, `hf-${peer.language}-startup.stderr.log`),
-      Buffer.concat(fixture.output)
+
+  /** The actual production managed owner supplies generation, retry, drain and cleanup semantics. */
+  async #prepare<TUnit extends object, TSpec>(
+    binding: IProcessPluginBinding<TUnit, TSpec>
+  ): Promise<void> {
+    this.#binding = binding as unknown as IFaultBinding
+    this.#peer = await createManagedRuntimePeer(
+      {
+        self: { name: 'caller', instanceId: 'caller' },
+        endpointFactory: this.#endpoint,
+        retryPort: this.#options.retryPort,
+        report: this.#report
+      },
+      binding,
+      (channel, endpoint) => binding.bindEndpoint(channel, endpoint),
+      undefined,
+      () => binding.drainCurrent()
     )
-    writeFileSync(
-      join(evidence, `hf-${peer.language}-startup.stdout.bin`),
-      Buffer.concat(fixture.stdout)
-    )
-    throw error
   }
+
+  /** Release through the same original managed holder, then settle only the explicit manual clock. */
+  close = async (): Promise<void> => {
+    await this.#peer?.close()
+    if (this.#options.scheduler) await settleFaultTurn(this.#options.scheduler)
+  }
+}
+
+/** Build one real native fault resource; all business/cleanup behavior stays in existing owners. */
+async function faultClient(peer: IPeer, options: IFaultOptions = {}) {
+  return new FaultClient(peer, options).open()
 }
 
 /** Preserve complete stdout/stderr and outbound frames for every real fault run. */
@@ -654,8 +624,11 @@ describe('borrowed hang retains external process ownership', () => {
           scheduler,
           restart: { mode: 'on-failure', initialDelayMs: 1, maxDelayMs: 1, maxRestarts: 1 }
         })
-        expect(await active.feature.request(['before-hang'])).toBe('before-hang')
-        expect(active.resilience.inspect('p')).toMatchObject({ health: 'ping', state: 'ready' })
+        expect(await active.peer.request('p.f.request', ['before-hang'])).toBe('before-hang')
+        expect({
+          health: active.binding.health,
+          state: active.binding.supervisor.state
+        }).toMatchObject({ health: 'ping', state: 'ready' })
         let closed = false
         active.physical[0]!.onClose(() => {
           closed = true
@@ -678,12 +651,15 @@ describe('borrowed hang retains external process ownership', () => {
         process.kill(child.pid!, 'SIGCONT')
         paused = false
         await vi.waitFor(() =>
-          expect(active!.resilience.inspect('p')).toMatchObject({ state: 'backoff' })
+          expect({
+            health: active!.binding.health,
+            state: active!.binding.supervisor.state
+          }).toMatchObject({ state: 'backoff' })
         )
         scheduler.advance(1)
         await vi.waitFor(async () => {
           await settleFaultTurn(scheduler)
-          expect(await active!.feature.request(['after-redial'])).toBe('after-redial')
+          expect(await active!.peer.request('p.f.request', ['after-redial'])).toBe('after-redial')
         })
         expect(active.physical).toHaveLength(2)
         await active.close()
@@ -718,14 +694,18 @@ describe('real native business budget and independent session', () => {
          * string.
          */
         const payload = 'x'.repeat(RPC_STREAM_MAX_FRAME_BYTES - 4096)
-        expect(await active.feature.request([payload], { timeoutMs: 10000 })).toBe(payload)
+        expect(await active.peer.request('p.f.request', [payload], { timeoutMs: 10000 })).toBe(
+          payload
+        )
         const writes = active.sent.length
         await expect(
-          active.feature.request(['x'.repeat(RPC_STREAM_MAX_FRAME_BYTES)], { timeoutMs: 10000 })
+          active.peer.request('p.f.request', ['x'.repeat(RPC_STREAM_MAX_FRAME_BYTES)], {
+            timeoutMs: 10000
+          })
         ).rejects.toMatchObject({ cause: { code: 'FRAME_LIMIT_EXCEEDED' } })
         expect(active.sent).toHaveLength(writes)
-        expect(await healthy.feature.request(['healthy'])).toBe('healthy')
-        expect(await active.feature.request(['after-overflow'])).toBe('after-overflow')
+        expect(await healthy.peer.request('p.f.request', ['healthy'])).toBe('healthy')
+        expect(await active.peer.request('p.f.request', ['after-overflow'])).toBe('after-overflow')
       } finally {
         await active.close()
         await healthy.close()
@@ -775,12 +755,12 @@ describe('independent peer rejects raw malformed input', () => {
                   'PEER_ERROR DECODE_FAILED'
                 )
               )
-              expect(await active.feature.request(['after-invalid-json'])).toBe(
+              expect(await active.peer.request('p.f.request', ['after-invalid-json'])).toBe(
                 'after-invalid-json'
               )
             } else await vi.waitFor(() => expect(closed, label).toBe(true), { timeout: 2000 })
             expect(active.handles).toHaveLength(1)
-            expect(await healthy.feature.request([label])).toBe(label)
+            expect(await healthy.peer.request('p.f.request', [label])).toBe(label)
           } finally {
             unsubscribe()
             await active.close()
@@ -815,32 +795,18 @@ describe('real owned terminal guards', () => {
           process.kill(current.identity.pid!, 'SIGKILL')
           await current.exited
           await vi.waitFor(() =>
-            expect(
-              host ? active.registration!.inspect() : active.resilience.inspect('p')
-            ).toMatchObject({ state: 'terminal' })
+            expect({ state: active.binding.supervisor.state }).toMatchObject({ state: 'terminal' })
           )
           const writes = active.sent.length
-          for (const method of ['request', 'oneWay'] as const)
-            await expect(active.feature[method]([])).rejects.toMatchObject({
-              source: 'rpc.transport.process',
-              code: 'PROCESS_TERMINAL_CALL'
+          for (const operation of [
+            () => active.peer.request('p.f.request', []),
+            () => active.peer.notify('p.f.oneWay', []),
+            () => active.peer.stream('p.f.generator', [])[Symbol.asyncIterator]().next()
+          ])
+            await expect(async () => operation()).rejects.toMatchObject({
+              source: 'rpc.remote',
+              code: 'REMOTE_CLOSED'
             })
-          await expect(
-            active.feature.generator([])[Symbol.asyncIterator]().next()
-          ).rejects.toMatchObject({
-            source: 'rpc.transport.process',
-            code: 'PROCESS_TERMINAL_CALL'
-          })
-          if (active.facade) {
-            await expect(active.facade.use('p')).rejects.toMatchObject({
-              source: 'rpc.transport.process',
-              code: 'PROCESS_TERMINAL_CALL'
-            })
-            await expect(active.facade.inspect()).rejects.toMatchObject({
-              source: 'rpc.transport.process',
-              code: 'PROCESS_TERMINAL_CALL'
-            })
-          }
           expect(active.sent).toHaveLength(writes)
           expect(active.handles).toHaveLength(1)
           expect(
@@ -854,7 +820,7 @@ describe('real owned terminal guards', () => {
         expect(active.budget.inUse).toBe(0)
         expect(active.budget.pending).toBe(0)
         expect(scheduler.pendingCount).toBe(0)
-        expect(active.resilience.inspect('p')).toBeUndefined()
+        expect(active.binding.supervisor.state).toBe('disposed')
       }, 15000)
 })
 
@@ -880,7 +846,10 @@ describe('explicit persistent authenticated scope', () => {
         restart: { mode: 'on-failure', initialDelayMs: 1, maxDelayMs: 1, maxRestarts: 1 }
       })
       expect(
-        await active.feature.request([], { timeoutMs: 5000, idempotencyKey: 'hf-original-key' })
+        await active.peer.request('p.f.request', [], {
+          timeoutMs: 5000,
+          idempotencyKey: 'hf-original-key'
+        })
       ).toBe('committed')
       expect(Number(readFileSync(join(directory, 'count.txt'), 'utf8'))).toBe(1)
       expect(active.handles).toHaveLength(2)
@@ -938,7 +907,7 @@ describe('physical departure before sendOnce admission', () => {
       let call: Promise<unknown> | undefined
       try {
         const writes = active.sent.length
-        call = active.feature.request(['blocked-before-sendOnce']).then(
+        call = active.peer.request('p.f.request', ['blocked-before-sendOnce']).then(
           (value) => ({ value }),
           (error) => ({ error })
         )
@@ -947,7 +916,10 @@ describe('physical departure before sendOnce admission', () => {
         process.kill(active.handles[0]!.identity.pid!, 'SIGKILL')
         await active.handles[0]!.exited
         await vi.waitFor(() =>
-          expect(active.resilience.inspect('p')).toMatchObject({ state: 'backoff' })
+          expect({
+            health: active.binding.health,
+            state: active.binding.supervisor.state
+          }).toMatchObject({ state: 'backoff' })
         )
         admit()
         expect(await call).toMatchObject({
@@ -989,7 +961,10 @@ describe('default native health detects real CPU loops', () => {
       })
       try {
         const current = active.handles[0]!
-        expect(active.resilience.inspect('p')).toMatchObject({ health: 'ping', state: 'ready' })
+        expect({
+          health: active.binding.health,
+          state: active.binding.supervisor.state
+        }).toMatchObject({ health: 'ping', state: 'ready' })
         expect(await active.runtimes[0]!.endpoint.send(peer.id, 'peer.busy', [])).toBe('ACK')
         let exited = false
         void current.exited.then(() => {
@@ -1010,13 +985,16 @@ describe('default native health detects real CPU loops', () => {
         expect(scheduler.now() - origin).toBe(17000)
         await current.exited
         await vi.waitFor(() =>
-          expect(active.resilience.inspect('p')).toMatchObject({ state: 'backoff' })
+          expect({
+            health: active.binding.health,
+            state: active.binding.supervisor.state
+          }).toMatchObject({ state: 'backoff' })
         )
         scheduler.advance(1)
         await vi.waitFor(() => expect(active.handles).toHaveLength(2))
         await vi.waitFor(async () => {
           await settleFaultTurn(scheduler)
-          expect(await active.feature.request(['after-busy'])).toBe('after-busy')
+          expect(await active.peer.request('p.f.request', ['after-busy'])).toBe('after-busy')
         })
         expect(active.handles[1]!.identity.pid).not.toBe(current.identity.pid)
         expect(
@@ -1076,13 +1054,13 @@ describe('capacity one real stopped reader', () => {
             trace: 'h-rejected-trace'
           })
         )
-        expect(await healthy.feature.request(['healthy-during-backlog'])).toBe(
+        expect(await healthy.peer.request('p.f.request', ['healthy-during-backlog'])).toBe(
           'healthy-during-backlog'
         )
         process.kill(active.handles[0]!.identity.pid!, 'SIGCONT')
         paused = false
         expect(await blocked).toBe('x'.repeat(2 * 1024 * 1024))
-        expect(await active.feature.request(['after-drain'])).toBe('after-drain')
+        expect(await active.peer.request('p.f.request', ['after-drain'])).toBe('after-drain')
         expect(active.backlog).toContainEqual(
           expect.objectContaining({ name: 'ipc.backlog.low', pendingData: 0 })
         )
@@ -1119,7 +1097,7 @@ describe('real owned crash retry eligibility', () => {
         let pending: Promise<unknown> | undefined
         try {
           expect(await active.runtimes[0]!.endpoint.send(peer.id, 'peer.pause', [])).toBe('ACK')
-          pending = active.feature.request(['replayed-value'], {
+          pending = active.peer.request('p.f.request', ['replayed-value'], {
             idempotencyKey: 'hf-crash-original-key',
             timeoutMs: 500,
             signal: controller.signal
@@ -1148,7 +1126,10 @@ describe('real owned crash retry eligibility', () => {
             await vi.waitFor(() => expect(active.handles).toHaveLength(2))
             await vi.waitFor(async () => {
               await settleFaultTurn(scheduler)
-              expect(active.resilience.inspect('p')).toMatchObject({ state: 'ready' })
+              expect({
+                health: active.binding.health,
+                state: active.binding.supervisor.state
+              }).toMatchObject({ state: 'ready' })
             })
           }
           const result = await observed
@@ -1192,8 +1173,8 @@ describe('real started streams do not resume after crash', () => {
         restart: { mode: 'on-failure', initialDelayMs: 1, maxDelayMs: 1, maxRestarts: 1 }
       })
       try {
-        const stream = active.feature
-          .generator([['first', 'second', 'third']])
+        const stream = active.peer
+          .stream('p.f.generator', [['first', 'second', 'third']])
           [Symbol.asyncIterator]()
         expect(await stream.next()).toMatchObject({ done: false, value: 'first' })
         expect(await active.runtimes[0]!.endpoint.send(peer.id, 'peer.pause', [])).toBe('ACK')
@@ -1204,13 +1185,18 @@ describe('real started streams do not resume after crash', () => {
         process.kill(active.handles[0]!.identity.pid!, 'SIGKILL')
         await active.handles[0]!.exited
         await vi.waitFor(() =>
-          expect(active.resilience.inspect('p')).toMatchObject({ state: 'backoff' })
+          expect({
+            health: active.binding.health,
+            state: active.binding.supervisor.state
+          }).toMatchObject({ state: 'backoff' })
         )
         scheduler.advance(1)
         await vi.waitFor(() => expect(active.handles).toHaveLength(2))
         await vi.waitFor(async () => {
           await settleFaultTurn(scheduler)
-          expect(await active.feature.request(['after-stream-crash'])).toBe('after-stream-crash')
+          expect(await active.peer.request('p.f.request', ['after-stream-crash'])).toBe(
+            'after-stream-crash'
+          )
         })
         expect(await next).toHaveProperty('error')
         expect(
@@ -1237,10 +1223,13 @@ describe('owned bridge hang has no default health detector', () => {
       const active = await faultClient(peer, { bridge: true, scheduler })
       let paused = false
       try {
-        expect(active.resilience.inspect('p')).toMatchObject({ health: 'none', state: 'ready' })
+        expect({
+          health: active.binding.health,
+          state: active.binding.supervisor.state
+        }).toMatchObject({ health: 'none', state: 'ready' })
         process.kill(active.handles[0]!.identity.pid!, 'SIGSTOP')
         paused = true
-        const call = active.feature.request(['bridge-hang'], { timeoutMs: 100 }).then(
+        const call = active.peer.request('p.f.request', ['bridge-hang'], { timeoutMs: 100 }).then(
           (value) => ({ value }),
           (error) => ({ error })
         )
@@ -1250,7 +1239,10 @@ describe('owned bridge hang has no default health detector', () => {
         expect(await call).toHaveProperty('error')
         scheduler.advance(20000)
         await settleFaultTurn(scheduler)
-        expect(active.resilience.inspect('p')).toMatchObject({ health: 'none', state: 'ready' })
+        expect({
+          health: active.binding.health,
+          state: active.binding.supervisor.state
+        }).toMatchObject({ health: 'none', state: 'ready' })
         expect(active.handles).toHaveLength(1)
         process.kill(active.handles[0]!.identity.pid!, 0)
       } finally {
@@ -1274,7 +1266,9 @@ describe('standalone Host restart keeps local ownership and does not replay use'
         restart: { mode: 'on-failure', initialDelayMs: 1, maxDelayMs: 1, maxRestarts: 1 }
       })
       try {
-        expect(await active.facade!.inspect()).toMatchObject({ plugins: [{ name: 'p' }] })
+        expect(await active.peer.request(RemoteMethodName.hostInspect, [])).toMatchObject({
+          plugins: [{ name: 'p' }]
+        })
         process.kill(active.handles[0]!.identity.pid!, 'SIGKILL')
         await active.handles[0]!.exited
         /** Host governance uses an opaque candidate ID; observe its public new endpoint instead. */
@@ -1283,14 +1277,18 @@ describe('standalone Host restart keeps local ownership and does not replay use'
           expect(active.handles).toHaveLength(2)
         })
         await vi.waitFor(async () =>
-          expect(await active.facade!.inspect()).toMatchObject({ plugins: [] })
+          expect(await active.peer.request(RemoteMethodName.hostInspect, [])).toMatchObject({
+            plugins: []
+          })
         )
         /** A fresh explicit remote installation, rather than old use replay, restores business. */
-        const installed = await active.facade!.use('p')
-        expect(await (installed.f as IFeature).request(['new-explicit-use'])).toBe(
+        await active.peer.request(RemoteMethodName.hostUse, ['p'])
+        expect(await active.peer.request('p.f.request', ['new-explicit-use'])).toBe(
           'new-explicit-use'
         )
-        expect(await active.facade!.inspect()).toMatchObject({ plugins: [{ name: 'p' }] })
+        expect(await active.peer.request(RemoteMethodName.hostInspect, [])).toMatchObject({
+          plugins: [{ name: 'p' }]
+        })
       } finally {
         await active.close()
         await Promise.all(active.handles.map((handle) => handle.exited))
@@ -1304,18 +1302,6 @@ describe('standalone Host restart keeps local ownership and does not replay use'
 describe('real non-idempotent request crash', () => {
   for (const original of peers)
     it(`${original.language} reports unknown result without replay`, async () => {
-      /** Publish the matching explicit declaration to both public caller and real independent peer. */
-      const selectedContract: IRemoteContract = {
-        ...contract,
-        features: {
-          f: {
-            methods: {
-              ...contract.features.f!.methods,
-              request: { mode: 'request', idempotent: false }
-            }
-          }
-        }
-      }
       /** The installed provider publishes its false declaration in v2; no v1 contract file exists. */
       const peer = { ...original, args: [...original.args, '--non-idempotent-request'] }
       const scheduler = createManualScheduler()
@@ -1323,12 +1309,16 @@ describe('real non-idempotent request crash', () => {
       let call: Promise<unknown> | undefined
       try {
         active = await faultClient(peer, {
-          contract: selectedContract,
           scheduler,
           restart: { mode: 'on-failure', initialDelayMs: 1, maxDelayMs: 1, maxRestarts: 1 }
         })
+        expect(
+          readRuntimePeerConnection(active.peer).description!.methods.find(
+            (method) => method.name === 'p.f.request'
+          )
+        ).toMatchObject({ idempotent: false })
         expect(await active.runtimes[0]!.endpoint.send(peer.id, 'peer.pause', [])).toBe('ACK')
-        call = active.feature.request(['unknown-side-effect']).then(
+        call = active.peer.request('p.f.request', ['unknown-side-effect']).then(
           (value) => ({ value }),
           (error) => ({ error })
         )
@@ -1340,11 +1330,17 @@ describe('real non-idempotent request crash', () => {
         process.kill(active.handles[0]!.identity.pid!, 'SIGKILL')
         await active.handles[0]!.exited
         await vi.waitFor(() =>
-          expect(active!.resilience.inspect('p')).toMatchObject({ state: 'backoff' })
+          expect({
+            health: active!.binding.health,
+            state: active!.binding.supervisor.state
+          }).toMatchObject({ state: 'backoff' })
         )
         scheduler.advance(1)
         await vi.waitFor(() =>
-          expect(active!.resilience.inspect('p')).toMatchObject({ state: 'ready' })
+          expect({
+            health: active!.binding.health,
+            state: active!.binding.supervisor.state
+          }).toMatchObject({ state: 'ready' })
         )
         expect(await call).toMatchObject({
           error: { source: 'rpc.remote', code: 'REMOTE_RESULT_UNKNOWN' }
@@ -1357,7 +1353,7 @@ describe('real non-idempotent request crash', () => {
         /** Supervisor ready precedes remote describe publication; join the actual business gate. */
         await vi.waitFor(async () => {
           await settleFaultTurn(scheduler)
-          expect(await active!.feature.request(['after-unknown'])).toBe('after-unknown')
+          expect(await active!.peer.request('p.f.request', ['after-unknown'])).toBe('after-unknown')
         })
       } finally {
         await active?.close()

@@ -36,73 +36,103 @@ function invalidConfiguration(message: string): never {
  * The caller supplies only its local proposal; every final agreement and private fact stays
  * Core-owned.
  */
-export function holdAdapterObjectChannel(io: IRuntimeObjectIO): IRuntimeObjectConnection {
+class RuntimeObjectConnection {
+  /** Original io resource retained by this single adapter owner. */
+  #io: IRuntimeObjectIO
+
   /** Retaining the original offer preserves the existing second serialization at completion. */
-  let prepared: Readonly<{ offer: IRpcHandshakeOffer; hello: string }> | undefined
+  #prepared: Readonly<{ offer: IRpcHandshakeOffer; hello: string }> | undefined
+
   /** Reentrant and repeated negotiation joins the exact same published handshake Promise. */
-  let negotiating: Promise<void> | undefined
+  #negotiating: Promise<void> | undefined
+
   /** Only completeRpcHandshake over the actual exchange reply can populate this construction state. */
-  let agreement: IRpcHandshakeAgreement | undefined
+  #agreement: IRpcHandshakeAgreement | undefined
+
   /** Open returns the one original channel rather than constructing another qualified transport. */
-  let opened: IRuntimeObjectChannel | undefined
+  #opened: IRuntimeObjectChannel | undefined
+
   /** The original IPC owner performs all adopted cleanup before closing the physical resource. */
-  let closeChannel: (() => Promise<void>) | undefined
+  #closeChannel: (() => Promise<void>) | undefined
+
   /** The first public close request preserves its exact reason through delayed diagnostic cleanup. */
-  let closeReason: unknown
+  #closeReason: unknown
+
   /** Later close callers cannot replace the first request's reason before the raw close begins. */
-  let closeRequested = false
+  #closeRequested
 
   /** Delegate to the actual lifetime owner while retaining its exact idempotent close Promise. */
-  const close = (reason?: unknown): Promise<void> => {
-    if (!closeRequested) {
-      closeRequested = true
-      closeReason = reason
+  #close = (reason?: unknown): Promise<void> => {
+    if (!this.#closeRequested) {
+      this.#closeRequested = true
+      this.#closeReason = reason
     }
-    return closeChannel ? closeChannel() : io.close(closeReason)
+    return this.#closeChannel ? this.#closeChannel() : this.#io.close(this.#closeReason)
   }
 
-  return Object.freeze({
-    /** Validate the local proposal while held I/O is still cold; exchange cannot replace it later. */
-    prepare(offer: IRpcHandshakeOffer) {
-      if (negotiating) invalidConfiguration(RuntimeObjectErrorText.preparationStarted)
-      /** Local grammar and caller getters are consumed before the adapter binds readers or timers. */
-      const hello = createRpcHello(offer)
-      prepared = Object.freeze({ offer, hello })
-    },
-    /** Exchange the prepared hello once and retain only Core's actual accepted peer agreement. */
-    negotiate() {
-      if (negotiating) return negotiating
-      if (!prepared) invalidConfiguration(RuntimeObjectErrorText.preparationRequired)
-      /** Snapshot only the prepared holder; its original local proposal remains the same object. */
-      const proposal = prepared
-      /** Publish before invoking raw I/O, which may synchronously reenter this public operation. */
-      const done = deferred<void>()
-      negotiating = done.promise
-      void (async () => {
-        try {
-          /** The resource resolves only its actual correlated, physically drained peer reply. */
-          const reply = await io.exchange(proposal.hello)
-          /** The control owner reads the original offer again, exactly as the previous factory did. */
-          const accepted = completeRpcHandshake(proposal.offer, reply)
-          if (accepted.codec !== RpcCodecId.json)
-            invalidConfiguration(RuntimeObjectErrorText.jsonCodecRequired)
-          /** Adapter-specific extensions consume Core output after canonical control admission. */
-          io.activate(accepted.capabilities)
-          io.assertOpen()
-          agreement = accepted
-          done.resolve()
-        } catch (error) {
-          done.reject(error)
-        }
-      })()
-      return negotiating
-    },
-    /** Construct one final channel after the adapter releases its successful handshake timer. */
-    open(options: IRuntimeConnectionOptions) {
-      if (opened) return opened
-      if (!agreement) invalidConfiguration(RuntimeObjectErrorText.negotiationRequired)
+  /** Frozen operation surface keeps the original transport/resource identity. */
+  readonly value: IRuntimeObjectConnection
+  /** Acquire resources and install native observers in the original construction order. */
+  constructor(io: IRuntimeObjectIO) {
+    this.#io = io
+    this.#closeRequested = false
+
+    this.value = RuntimeObjectConnection.#createView(this)
+  }
+  /** Create the original frozen operations while keeping actual object I/O in this owner. */
+  static #createView(owner: RuntimeObjectConnection): IRuntimeObjectConnection {
+    return Object.freeze({
+      /** Validate the local proposal while held I/O is still cold; exchange cannot replace it later. */
+      prepare(offer: IRpcHandshakeOffer) {
+        if (owner.#negotiating) invalidConfiguration(RuntimeObjectErrorText.preparationStarted)
+        /** Local grammar and caller getters are consumed before the adapter binds readers or timers. */
+        const hello = createRpcHello(offer)
+        owner.#prepared = Object.freeze({ offer, hello })
+      },
+      /** Exchange the prepared hello once and retain only Core's actual accepted peer agreement. */
+      negotiate() {
+        if (owner.#negotiating) return owner.#negotiating
+        if (!owner.#prepared) invalidConfiguration(RuntimeObjectErrorText.preparationRequired)
+        /** Snapshot only the prepared holder; its original local proposal remains the same object. */
+        const proposal = owner.#prepared
+        /** Publish before invoking raw I/O, which may synchronously reenter this public operation. */
+        const done = deferred<void>()
+        owner.#negotiating = done.promise
+        void (async () => {
+          try {
+            /** The resource resolves only its actual correlated, physically drained peer reply. */
+            const reply = await owner.#io.exchange(proposal.hello)
+            /**
+             * The control owner reads the original offer again, exactly as the previous factory
+             * did.
+             */
+            const accepted = completeRpcHandshake(proposal.offer, reply)
+            if (accepted.codec !== RpcCodecId.json)
+              invalidConfiguration(RuntimeObjectErrorText.jsonCodecRequired)
+            /** Adapter-specific extensions consume Core output after canonical control admission. */
+            owner.#io.activate(accepted.capabilities)
+            owner.#io.assertOpen()
+            owner.#agreement = accepted
+            done.resolve()
+          } catch (error) {
+            done.reject(error)
+          }
+        })()
+        return owner.#negotiating
+      },
+      /** Construct one final channel after the adapter releases its successful handshake timer. */
+      open: RuntimeObjectConnection.#openOperation(owner),
+      close: owner.#close
+    })
+  }
+
+  /** Preserve the original open operation and its synchronous/async failure boundary. */
+  static #openOperation(owner: RuntimeObjectConnection): IRuntimeObjectConnection['open'] {
+    return function open(this: IRuntimeObjectConnection, options: IRuntimeConnectionOptions) {
+      if (owner.#opened) return owner.#opened
+      if (!owner.#agreement) invalidConfiguration(RuntimeObjectErrorText.negotiationRequired)
       /** Negotiation never exposes this immutable agreement as a qualification input. */
-      const accepted = agreement
+      const accepted = owner.#agreement
       /** The inherited scheduler remains the exact caller resource used by endpoint construction. */
       const scheduler = options.scheduler ?? systemScheduler
       /** Diagnostic text is read once and never grants a component or carrier proof. */
@@ -118,13 +148,13 @@ export function holdAdapterObjectChannel(io: IRuntimeObjectIO): IRuntimeObjectCo
         ownership: RpcTransportOwnership.owned,
         encodedType: RpcTransportEncoding.string,
         peerId: options.peerId,
-        observe: io.observe === undefined ? undefined : (probe) => io.observe!(probe),
-        send: (value, sendOptions) => io.writeText(value, sendOptions),
-        subscribe: (listener) => io.subscribeText(listener),
-        onTransportError: (listener) => io.onTransportError(listener),
-        close: () => io.close(closeReason),
+        observe: owner.#io.observe === undefined ? undefined : (probe) => owner.#io.observe!(probe),
+        send: (value, sendOptions) => owner.#io.writeText(value, sendOptions),
+        subscribe: (listener) => owner.#io.subscribeText(listener),
+        onTransportError: (listener) => owner.#io.onTransportError(listener),
+        close: () => owner.#io.close(owner.#closeReason),
         get closed() {
-          return io.closed
+          return owner.#io.closed
         }
       }
       /** Canonical queue/log composition creates the final public transport before private facts. */
@@ -142,12 +172,12 @@ export function holdAdapterObjectChannel(io: IRuntimeObjectIO): IRuntimeObjectCo
           /** The actual object port preserves the original complete wire-error serialization policy. */
           responseError: (error: unknown) =>
             serializeRpcError(error, { report: ({ error: failure }) => options.report(failure) }),
-          send: (value, sendOptions) => io.writeObject(value, sendOptions),
-          subscribe: (listener) => io.subscribeObject(listener)
+          send: (value, sendOptions) => owner.#io.writeObject(value, sendOptions),
+          subscribe: (listener) => owner.#io.subscribeObject(listener)
         })
       )
-      io.onClosing(releaseObjectPort)
-      closeChannel = ipc.close
+      owner.#io.onClosing(releaseObjectPort)
+      owner.#closeChannel = ipc.close
       /** Actual log/cleanup resources are operations on this channel, never private proof carriers. */
       const channel: IRuntimeObjectChannel = Object.freeze({
         transport: ipc.transport,
@@ -162,12 +192,16 @@ export function holdAdapterObjectChannel(io: IRuntimeObjectIO): IRuntimeObjectCo
         features: ipc.features,
         log: ipc.log,
         ownClose: ipc.ownClose,
-        close: () => close()
+        close: () => owner.#close()
       })
       retainRuntimeConnectionIdentity(channel)
-      opened = channel
+      owner.#opened = channel
       return channel
-    },
-    close
-  })
+    }
+  }
+}
+
+/** Hold actual object I/O under one negotiation and final-channel lifetime owner. */
+export function holdAdapterObjectChannel(io: IRuntimeObjectIO): IRuntimeObjectConnection {
+  return new RuntimeObjectConnection(io).value
 }

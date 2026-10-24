@@ -1,17 +1,14 @@
-import type {
-  IRpcIdempotencyConfig,
-  IRpcProviderLimits,
-  IRpcIdempotencyStore
-} from '../../core/index.js'
-import { createRpcIdempotencyStore } from '../../core/index.js'
+import type { IRpcIdempotencyConfig, IRpcProviderLimits } from '../../core/typing.js'
+import type { IRpcIdempotencyStore } from '../../core/idempotency-store.js'
+import { createRpcIdempotencyStore } from '../../core/idempotency-store.js'
 import { retainRuntimeIdempotencyScope } from '../../core/internal/provider.js'
 import {
   createProviderAdmissionScope,
   type IProviderAdmissionScope
-} from '../../core/features/provider.js'
+} from '../../core/internal/provider-admission.js'
 import { defaultRpcId } from '../../core/internal/id.js'
 import { tagRpcError, RpcCoreErrorCode } from '../../core/errors.js'
-import type { IRemoteChannel } from '../../remote/index.js'
+import type { IRemoteChannel } from '../../remote/types.js'
 import { runtimeConnectionPrincipal } from '../byte/connection-identity.js'
 import { RuntimeAdapterErrorText } from '../byte/error-text.js'
 

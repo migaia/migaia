@@ -67,6 +67,6 @@ Structured clone and ownership transfer are separate capabilities. RPC transfer 
 
 ## Native integration and lifetime
 
-The root provides `threadPlugin`, `isThreadChild`, public options, and error identity. `/adapters/node` and `/adapters/electron-main` serve authors needing explicit native launchers/channels; ordinary applications can use short spawn configuration.
+The root provides `threadPlugin`, `isThreadChild`, public options, and error identity. Package-owned launchers and channels remain internal. Applications select short spawn or a full native supervision recipe; custom raw carriers use the deployment SDK in `@migaia/rpc-host/plugin`.
 
 Definitions also install on ordinary `PluginHost.use(...)`. Its thread outlet retains stop, restart, replacement, exit events, and generations. Close follows the existing native drain before releasing the owned Worker, without repeated terminate calls. See the [usage guide](./USEGUIDE.en.md).

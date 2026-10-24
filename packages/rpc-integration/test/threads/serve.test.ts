@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { RpcCapability } from '@migaia/rpc-contract'
 import { readEndpointClientCounters } from '../../../rpc-host/dist/core/internal/endpoint-projection.js'
 import { readRuntimePeerConnection } from '../../../rpc-host/dist/remote/runtime-api/peer.js'
-import { createThreadPeer } from '../../../rpc-plugin-thread/test/protocol.ts'
+import { createRuntimePeer } from '../../../rpc-host/dist/remote/runtime-api/peer.js'
 import { runtimeSources } from '../../../rpc-host/test/runtime-api/fixture.js'
 
 /** Actual source offers retain the required v2/batch baseline without optional controls. */
@@ -28,7 +28,7 @@ describe('thread serve teardown ownership', () => {
     /** The left source retains the original channel disposer instead of creating another owner. */
     const self = { name: 'service', instanceId: 'service-1' }
     const [handle, other] = await Promise.all([
-      createThreadPeer({
+      createRuntimePeer({
         self,
         connect: async (context) => {
           const channel = await channels.sources[0](context)
@@ -46,7 +46,7 @@ describe('thread serve teardown ownership', () => {
         },
         report: () => undefined
       }),
-      createThreadPeer({
+      createRuntimePeer({
         self: { name: 'caller', instanceId: 'caller-1' },
         connect: channels.sources[1],
         report: () => undefined
@@ -76,7 +76,7 @@ describe('thread serve teardown ownership', () => {
     /** Bilateral source preparation remains real even when one endpoint fails to construct. */
     const channels = runtimeSources(capabilities, capabilities)
     /** Observe the expected failed publication before any teardown can reject the other side. */
-    const failed = createThreadPeer({
+    const failed = createRuntimePeer({
       self: { name: 'service', instanceId: 'service-1' },
       connect: async (context) => {
         const channel = await channels.sources[0](context)
@@ -94,7 +94,7 @@ describe('thread serve teardown ownership', () => {
       report
     }).catch((error: unknown) => error)
     /** The opposite genuine endpoint waits for its directory until physical rollback closes it. */
-    const other = createThreadPeer({
+    const other = createRuntimePeer({
       self: { name: 'caller', instanceId: 'caller-1' },
       connect: channels.sources[1],
       report: () => undefined

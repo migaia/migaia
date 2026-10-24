@@ -4,7 +4,7 @@ import { threadPlugin } from '@migaia/rpc-plugin-thread'
 import {
   createNodeThreadLauncher,
   createNodeThreadChannelFactory
-} from '@migaia/rpc-plugin-thread/adapters/node'
+} from '../../dist/threads/adapters/node.js'
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { runtimeTestHost } from '../../../rpc-host/test/runtime-api/public-host.js'

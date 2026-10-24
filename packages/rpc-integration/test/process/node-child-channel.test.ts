@@ -1,11 +1,13 @@
+import { createRuntimeEndpointComposition } from '../../../rpc-host/dist/core/runtime-api-endpoint.js'
+import { RpcCapability } from '@migaia/rpc-contract'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { createFullEndpoint as createEndpoint } from '../../../rpc-host/dist/core/full.js'
-import { abort } from '../../../rpc-host/dist/core/index.js'
-import { codec } from '../../../rpc-host/dist/core/index.js'
-import { connect } from '../../../rpc-host/dist/core/index.js'
-import { framer } from '../../../rpc-host/dist/core/index.js'
+
+import { abort } from '../../../rpc-host/dist/core/middleware/abort.js'
+import { codec } from '../../../rpc-host/dist/core/middleware/codec.js'
+import { connect } from '../../../rpc-host/dist/core/middleware/connect.js'
+import { framer } from '../../../rpc-host/dist/core/middleware/framer.js'
 import { createNodeProcessLauncher } from '../../../rpc-plugin-process/src/process/adapters/node-child-process.js'
 import { createProcessTransport } from '../../../rpc-plugin-process/dist/process/handshake.js'
 import { createNativeProcessOffer } from '../../../rpc-plugin-process/src/process/offer.js'
@@ -59,17 +61,20 @@ describe('Node child endpoint channel', () => {
     expect(channel.pipeline.codec.id).toBe('json')
     expect(channel.pipeline.framer.outputEncodedType).toBe('string')
     expect(channel.features).toHaveLength(2)
-    const endpoint = await createEndpoint({
-      id: 'parent',
-      transport: channel.transport,
-      features: [channel.features[0]!, channel.features[1]!] as const,
-      middlewares: [
-        codec(channel.pipeline.codec),
-        framer(channel.pipeline.framer),
-        abort(),
-        connect({ transport: channel.transport })
-      ]
-    })
+    const endpoint = await createRuntimeEndpointComposition(
+      {
+        id: 'parent',
+        transport: channel.transport,
+        features: [channel.features[0]!, channel.features[1]!] as const,
+        middlewares: [
+          codec(channel.pipeline.codec),
+          framer(channel.pipeline.framer),
+          abort(),
+          connect({ transport: channel.transport })
+        ]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     /** Cleanup resumes a paused child even if a later assertion fails. */
     let paused = false
     let blocked: Promise<unknown> | undefined
@@ -151,17 +156,20 @@ describe('Node child endpoint channel', () => {
         log: () => undefined
       }
     })
-    const endpoint = await createEndpoint({
-      id: 'parent',
-      transport: channel.transport,
-      features: [channel.features[0]!, channel.features[1]!] as const,
-      middlewares: [
-        codec(channel.pipeline.codec),
-        framer(channel.pipeline.framer),
-        abort(),
-        connect({ transport: channel.transport })
-      ]
-    })
+    const endpoint = await createRuntimeEndpointComposition(
+      {
+        id: 'parent',
+        transport: channel.transport,
+        features: [channel.features[0]!, channel.features[1]!] as const,
+        middlewares: [
+          codec(channel.pipeline.codec),
+          framer(channel.pipeline.framer),
+          abort(),
+          connect({ transport: channel.transport })
+        ]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     try {
       expect(
         await Promise.all([

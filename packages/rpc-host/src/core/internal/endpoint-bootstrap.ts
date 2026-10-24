@@ -281,23 +281,15 @@ async function finalizePreparedEndpoint<TTargetId extends string>(
   }
 }
 
-/** Validates and snapshots config before the single PluginHost construction batch. */
-export function prepareEndpoint<
+/**
+ * Read the original outer descriptor and idempotency policy once, preserving getter/error
+ * precedence.
+ */
+function snapshotEndpointFactoryFields<
   TTargetId extends string = string,
   TMiddlewares extends readonly IRpcMiddleware[] = readonly IRpcMiddleware[],
   TFeatures extends readonly IRpcFeature[] = readonly IRpcFeature[]
->(
-  config: IRpcFactoryConfig<TTargetId, TMiddlewares, TFeatures>,
-  options: { readonly deferMiddlewareInstall: true }
-): Promise<IDeferredPreparedEndpoint<TTargetId>>
-export async function prepareEndpoint<
-  TTargetId extends string = string,
-  TMiddlewares extends readonly IRpcMiddleware[] = readonly IRpcMiddleware[],
-  TFeatures extends readonly IRpcFeature[] = readonly IRpcFeature[]
->(
-  config: IRpcFactoryConfig<TTargetId, TMiddlewares, TFeatures>,
-  _options: { readonly deferMiddlewareInstall: true }
-): Promise<IDeferredPreparedEndpoint<TTargetId>> {
+>(config: IRpcFactoryConfig<TTargetId, TMiddlewares, TFeatures>) {
   let factoryId: unknown
   let factoryMiddlewares: unknown
   let factoryTargetIds: unknown
@@ -368,68 +360,31 @@ export async function prepareEndpoint<
     if (isLocalRpcError(cause, RpcConfigurationError)) throw cause
     throw createRpcConfigurationError(RpcCoreErrorText.idempotencyConfigInvalid, cause)
   }
-  if (typeof factoryId !== 'string' || factoryId.length === 0)
-    throw createRpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.idMustBeANonEmptyString)
-  let injectedScheduler: IScheduler | undefined
-  if (factoryScheduler !== undefined) {
-    try {
-      const scheduler = factoryScheduler as IScheduler
-      const now = scheduler?.now
-      const schedule = scheduler?.schedule
-      if (!scheduler || typeof now !== 'function' || typeof schedule !== 'function')
-        throw createRpcConfigurationError(RpcCoreErrorText.schedulerInvalid)
-      /** One monotonic reading; only its domain is checked, never an epoch interpretation. */
-      const instant: unknown = scheduler.now()
-      if (typeof instant !== 'number' || !Number.isFinite(instant) || instant < 0)
-        throw createRpcConfigurationError(RpcCoreErrorText.schedulerInvalid)
-      injectedScheduler = scheduler
-    } catch (error) {
-      if (isLocalRpcError(error, RpcConfigurationError)) throw error
-      throw createRpcConfigurationError(RpcCoreErrorText.schedulerInvalid, error)
-    }
+  return {
+    factoryId,
+    factoryMiddlewares,
+    factoryTargetIds,
+    factoryTransport,
+    factoryProvider,
+    factoryProviderLimits,
+    construction,
+    factoryScheduler,
+    factoryWallClock,
+    factoryReplay,
+    factoryIdempotency,
+    factoryProtocol,
+    factoryCodec,
+    factoryFramer
   }
-  /** Admitted caller wall clock; undefined keeps the time port's host default. */
-  let injectedWallClock: IWallClock | undefined
-  if (factoryWallClock !== undefined) {
-    try {
-      const wallClock = factoryWallClock as IWallClock
-      if (!wallClock || typeof wallClock.timestamp !== 'function')
-        throw createRpcConfigurationError(RpcCoreErrorText.wallClockInvalid)
-      /** One admission probe of the epoch diagnostic clock. */
-      const probe: unknown = wallClock.timestamp()
-      if (!Number.isSafeInteger(probe) || (probe as number) < 0)
-        throw createRpcConfigurationError(RpcCoreErrorText.wallClockInvalid)
-      injectedWallClock = wallClock
-    } catch (error) {
-      if (isLocalRpcError(error, RpcConfigurationError)) throw error
-      throw createRpcConfigurationError(RpcCoreErrorText.wallClockInvalid, error)
-    }
-  }
-  try {
-    if (!Array.isArray(factoryMiddlewares))
-      throw createRpcError(
-        RpcCoreErrorCode.invalidConfig,
-        RpcCoreErrorText.middlewaresMustBeAnArray
-      )
-    if (factoryTargetIds !== undefined && !Array.isArray(factoryTargetIds))
-      throw createRpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.targetIdsMustBeAnArray)
-    if (
-      (factoryTargetIds as readonly unknown[] | undefined)?.some(
-        (targetId) => typeof targetId !== 'string' || targetId.length === 0
-      )
-    )
-      throw createRpcError(
-        RpcCoreErrorCode.invalidConfig,
-        RpcCoreErrorText.targetIdsMustContainNonEmptyStrings
-      )
-  } catch (error) {
-    if (isLocalRpcError(error, RpcError)) throw error
-    throw createRpcError(
-      RpcCoreErrorCode.invalidConfig,
-      RpcCoreErrorText.factoryCollectionIsUnreadable,
-      error
-    )
-  }
+}
+
+/**
+ * Admit immutable middleware snapshots and duplicate names before any transport or Host
+ * installation.
+ */
+function snapshotEndpointMiddlewares(
+  factoryMiddlewares: readonly IRpcPlugin[]
+): IEndpointMiddlewareSnapshot[] {
   let middlewareSnapshots: IEndpointMiddlewareSnapshot[]
   try {
     middlewareSnapshots = (factoryMiddlewares as readonly IRpcPlugin[]).map((middleware) => {
@@ -517,6 +472,122 @@ export async function prepareEndpoint<
       error
     )
   }
+  return middlewareSnapshots
+}
+
+/** Admit configured monotonic and wall clocks once before middleware descriptor validation. */
+function readInjectedEndpointClocks(
+  factoryScheduler: unknown,
+  factoryWallClock: unknown
+): { injectedScheduler: IScheduler | undefined; injectedWallClock: IWallClock | undefined } {
+  let injectedScheduler: IScheduler | undefined
+  if (factoryScheduler !== undefined) {
+    try {
+      const scheduler = factoryScheduler as IScheduler
+      const now = scheduler?.now
+      const schedule = scheduler?.schedule
+      if (!scheduler || typeof now !== 'function' || typeof schedule !== 'function')
+        throw createRpcConfigurationError(RpcCoreErrorText.schedulerInvalid)
+      /** One monotonic reading; only its domain is checked, never an epoch interpretation. */
+      const instant: unknown = scheduler.now()
+      if (typeof instant !== 'number' || !Number.isFinite(instant) || instant < 0)
+        throw createRpcConfigurationError(RpcCoreErrorText.schedulerInvalid)
+      injectedScheduler = scheduler
+    } catch (error) {
+      if (isLocalRpcError(error, RpcConfigurationError)) throw error
+      throw createRpcConfigurationError(RpcCoreErrorText.schedulerInvalid, error)
+    }
+  }
+  /** Admitted caller wall clock; undefined keeps the time port's host default. */
+  let injectedWallClock: IWallClock | undefined
+  if (factoryWallClock !== undefined) {
+    try {
+      const wallClock = factoryWallClock as IWallClock
+      if (!wallClock || typeof wallClock.timestamp !== 'function')
+        throw createRpcConfigurationError(RpcCoreErrorText.wallClockInvalid)
+      /** One admission probe of the epoch diagnostic clock. */
+      const probe: unknown = wallClock.timestamp()
+      if (!Number.isSafeInteger(probe) || (probe as number) < 0)
+        throw createRpcConfigurationError(RpcCoreErrorText.wallClockInvalid)
+      injectedWallClock = wallClock
+    } catch (error) {
+      if (isLocalRpcError(error, RpcConfigurationError)) throw error
+      throw createRpcConfigurationError(RpcCoreErrorText.wallClockInvalid, error)
+    }
+  }
+  return { injectedScheduler, injectedWallClock }
+}
+
+/** Validates and snapshots config before the single PluginHost construction batch. */
+export function prepareEndpoint<
+  TTargetId extends string = string,
+  TMiddlewares extends readonly IRpcMiddleware[] = readonly IRpcMiddleware[],
+  TFeatures extends readonly IRpcFeature[] = readonly IRpcFeature[]
+>(
+  config: IRpcFactoryConfig<TTargetId, TMiddlewares, TFeatures>,
+  options: { readonly deferMiddlewareInstall: true }
+): Promise<IDeferredPreparedEndpoint<TTargetId>>
+export async function prepareEndpoint<
+  TTargetId extends string = string,
+  TMiddlewares extends readonly IRpcMiddleware[] = readonly IRpcMiddleware[],
+  TFeatures extends readonly IRpcFeature[] = readonly IRpcFeature[]
+>(
+  config: IRpcFactoryConfig<TTargetId, TMiddlewares, TFeatures>,
+  _options: { readonly deferMiddlewareInstall: true }
+): Promise<IDeferredPreparedEndpoint<TTargetId>> {
+  /** All later phases consume this single validated outer descriptor read. */
+  const {
+    factoryId,
+    factoryMiddlewares,
+    factoryTargetIds,
+    factoryTransport,
+    factoryProvider,
+    factoryProviderLimits,
+    construction,
+    factoryScheduler,
+    factoryWallClock,
+    factoryReplay,
+    factoryIdempotency,
+    factoryProtocol,
+    factoryCodec,
+    factoryFramer
+  } = snapshotEndpointFactoryFields(config)
+  if (typeof factoryId !== 'string' || factoryId.length === 0)
+    throw createRpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.idMustBeANonEmptyString)
+  /** Clock admission retains the original now-before-timestamp validation order. */
+  const { injectedScheduler, injectedWallClock } = readInjectedEndpointClocks(
+    factoryScheduler,
+    factoryWallClock
+  )
+  try {
+    if (!Array.isArray(factoryMiddlewares))
+      throw createRpcError(
+        RpcCoreErrorCode.invalidConfig,
+        RpcCoreErrorText.middlewaresMustBeAnArray
+      )
+    if (factoryTargetIds !== undefined && !Array.isArray(factoryTargetIds))
+      throw createRpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.targetIdsMustBeAnArray)
+    if (
+      (factoryTargetIds as readonly unknown[] | undefined)?.some(
+        (targetId) => typeof targetId !== 'string' || targetId.length === 0
+      )
+    )
+      throw createRpcError(
+        RpcCoreErrorCode.invalidConfig,
+        RpcCoreErrorText.targetIdsMustContainNonEmptyStrings
+      )
+  } catch (error) {
+    if (isLocalRpcError(error, RpcError)) throw error
+    throw createRpcError(
+      RpcCoreErrorCode.invalidConfig,
+      RpcCoreErrorText.factoryCollectionIsUnreadable,
+      error
+    )
+  }
+  /** Middleware descriptor admission retains its original isolated failure classification. */
+  const middlewareSnapshots = snapshotEndpointMiddlewares(
+    factoryMiddlewares as readonly IRpcPlugin[]
+  )
   const transportCandidates = middlewareSnapshots.flatMap((item) =>
     item.transport === undefined ? [] : [item.transport]
   )

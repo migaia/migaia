@@ -1,6 +1,6 @@
 import { parentPort } from 'node:worker_threads'
 import { defineFeature, defineHost, definePlugin } from '@migaia/plugin-host'
-import { createProcessPlugin } from '../../../../rpc-plugin-process/test/protocol.ts'
+import { processPlugin } from '@migaia/rpc-plugin-process'
 import { threadProtocolDefinition as createThreadPlugin } from './thread-protocol.ts'
 import { defineProbe, RpcProbeDirection, RpcProbeKind } from '@migaia/rpc-host/probe'
 import type { IRpcContext } from '@migaia/rpc-host'
@@ -109,6 +109,6 @@ const options = {
   report: (error: unknown) => process.stderr.write(`${JSON.stringify(fixtureFailure(error))}\n`)
 }
 if (family === 'thread') await host.use(createThreadPlugin(options))
-else await host.use(createProcessPlugin(options))
+else await host.use(processPlugin({ ...options, connectToParent: true }))
 /** Genuine child commit is complete; one immediate reverse call must succeed without retry. */
 await host[family]!.request('bridge', 'parent.ready')

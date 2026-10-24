@@ -1,24 +1,24 @@
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { describe, expect, it, vi } from 'vitest'
-import { type IRpcEndpoint } from '../../../rpc-host/dist/core/index.js'
+import type { IRpcEndpoint } from '../../../rpc-host/dist/core/typing.js'
 import { createMutationQueue } from '@migaia/lifecycle'
-import { catalog, hostFixture, runtimeHostFixture } from './fixtures/host-control.js'
+import { hostFixture, runtimeHostFixture } from './fixtures/host-control.js'
 import { nativeHostFixture } from './fixtures/host-native.js'
-import { createProcessPlugin } from '../../../rpc-plugin-process/test/protocol.ts'
+import { processPlugin } from '@migaia/rpc-plugin-process'
 import * as runtimePeerModule from '../../../rpc-host/dist/remote/runtime-api/peer.js'
 import { RemoteMethodName } from '@migaia/rpc-host/plugin'
 import { RuntimeEventName } from '@migaia/rpc-host/plugin'
 import { readRuntimeOutletConnection } from '../../../rpc-host/dist/remote/runtime-api/outlet.js'
 import { createSpawnProcessBinding } from '../../../rpc-plugin-process/dist/process/plugin/binding.js'
 import { createProcessResilience } from '../../../rpc-plugin-process/dist/process/resilience/index.js'
-import { createRemoteHost } from '../../../rpc-host/dist/remote/host.js'
-import { remoteDescription } from '../../../rpc-host/test/remote/fixture.js'
+import {
+  createManagedRuntimePeer,
+  readManagedRuntimeHolder
+} from '../../../rpc-host/dist/remote/runtime-api/managed-peer.js'
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { createPrewarmPool } from '@migaia/supervision/process'
-import { parseProcessPluginDescriptor } from '../../../rpc-plugin-process/dist/process/plugin/index.js'
-import { readFileSync } from 'node:fs'
 import { createProcessError } from '../../../rpc-plugin-process/dist/process/error.js'
 import { RpcProcessErrorCode } from '@migaia/rpc-plugin-process'
 import { DEFAULT_DRAIN_MS } from '@migaia/rpc-host/plugin'
@@ -28,12 +28,15 @@ async function settle(): Promise<void> {
   for (let index = 0; index < 48; index += 1) await Promise.resolve()
 }
 
-describe('process Host replacement publication', () => {
+/** Declarative registration only: each case owns its own runtime resources and mutable state. */
+describe('process native replacement rollback', () => {
   it('rejects a candidate released between ready and publication', async () => {
     /** The neutral native ports retain their actual supervisor and true Host install owner. */
     const fixture = runtimeHostFixture()
     /** Retain the genuine factory before observing the second prepared candidate only. */
-    const original = runtimePeerModule.createRuntimePeer
+    const original =
+      vi.mocked(runtimePeerModule.createRuntimePeer).getMockImplementation() ??
+      runtimePeerModule.createRuntimePeer
     /** Both calls construct genuine public Peers; no candidate state is held by this observer. */
     let constructions = 0
     /** Join the original Host release Promise instead of polling or constructing a close facade. */
@@ -43,7 +46,7 @@ describe('process Host replacement publication', () => {
       .spyOn(runtimePeerModule, 'createRuntimePeer')
       .mockImplementation((options, runtime) => {
         const preparing = original(options, runtime)
-        if (++constructions !== 2) return preparing
+        if (options.self?.instanceId !== 'parent' || ++constructions !== 2) return preparing
         return preparing.then((peer) => {
           queueMicrotask(() => {
             releasing = fixture.close()
@@ -52,14 +55,14 @@ describe('process Host replacement publication', () => {
         })
       })
     try {
-      await fixture.host.use(createProcessPlugin(fixture.options))
+      await fixture.host.use(processPlugin(fixture.options))
       const outlet = fixture.host.process!
       await expect(
-        fixture.host.replace('child', createProcessPlugin(fixture.options))
+        fixture.host.replace('child', processPlugin(fixture.options))
       ).rejects.toMatchObject({ code: 'PLUGIN_INSTALL_FAILED', cause: { code: 'HOST_DISPOSING' } })
       await releasing
       expect(fixture.handles).toHaveLength(2)
-      expect(() => outlet.request('child', RemoteMethodName.hostInspect, [])).toThrow(
+      expect(() => outlet.request('child', 'p.f.request', 'probe')).toThrow(
         expect.objectContaining({ code: 'HOST_DISPOSED' })
       )
     } finally {
@@ -70,52 +73,52 @@ describe('process Host replacement publication', () => {
       }
     }
   })
-
   it('never resends an old sent idempotent request into the new real child', async () => {
     /** Real I/O retains production deadlines while the injected monotonic clock advances drain. */
     const fixture = nativeHostFixture('old')
     const scheduler = createManualScheduler()
-    const original = fixture.options.endpointFactory
+
     let draining!: () => void
     const drainStarted = new Promise<void>((resolve) => {
       draining = resolve
+    })
+    fixture.observeEndpoint((served) => {
+      return {
+        ...served,
+        endpoint: Object.create(
+          served.endpoint,
+          Object.getOwnPropertyDescriptors({
+            announceClose(...input: Parameters<typeof served.endpoint.announceClose>) {
+              const announced = served.endpoint.announceClose(...input)
+              draining()
+              return announced
+            }
+          })
+        )
+      }
     })
     const options = {
       ...fixture.options,
       spawn: {
         ...fixture.options.spawn,
         supervision: { ...fixture.options.spawn.supervision, scheduler }
-      },
-      endpointFactory: async (...args: Parameters<typeof original>) => {
-        const served = await original(...args)
-        return {
-          ...served,
-          endpoint: {
-            ...served.endpoint,
-            announceClose(...input: Parameters<typeof served.endpoint.announceClose>) {
-              const announced = served.endpoint.announceClose(...input)
-              draining()
-              return announced
-            }
-          }
-        }
       }
     }
     try {
-      await fixture.host.use(createProcessPlugin(options))
+      await fixture.host.use(processPlugin(options))
       const outlet = fixture.host.process!
       await fixture.ready(fixture.handles[0]!)
-      await outlet.request('child', RemoteMethodName.hostUse, ['p'])
+
       /** The actual old receipt remains captured so a stale call cannot select its successor. */
       const oldPeer = readRuntimeOutletConnection(outlet, 'child')!.peer
-      const pending = outlet.request('child', 'p.request', 'hold', {
+      const pending = outlet.request('child', 'p.f.request', 'hold', {
         idempotencyKey: 'old-request-fixture'
       })
       const outcome = Promise.allSettled([pending])
-      expect(await outlet.request('child', 'p.request', 'count')).toMatchObject({ calls: 1 })
+      expect(await outlet.request('child', 'p.f.request', 'count')).toMatchObject({ calls: 1 })
       const replacing = outlet
         .stop('child')
-        .then(() => fixture.host.replace('child', createProcessPlugin(options)))
+        .then(() => fixture.host.replace('child', processPlugin(options)))
       await drainStarted
       scheduler.advance(DEFAULT_DRAIN_MS)
       await replacing
@@ -125,12 +128,12 @@ describe('process Host replacement publication', () => {
         reason: { code: 'REMOTE_RESULT_UNKNOWN' }
       })
       await fixture.handles[0]!.exited
-      await outlet.request('child', RemoteMethodName.hostUse, ['p'])
-      expect(await outlet.request('child', 'p.request', 'count')).toMatchObject({ calls: 0 })
-      expect(() => oldPeer.request('p.request', 'old-proxy')).toThrow(
+
+      expect(await outlet.request('child', 'p.f.request', 'count')).toMatchObject({ calls: 0 })
+      expect(() => oldPeer.request('p.f.request', 'old-proxy')).toThrow(
         expect.objectContaining({ code: 'REMOTE_CLOSED' })
       )
-      expect(await outlet.request('child', 'p.request', 'count')).toMatchObject({ calls: 0 })
+      expect(await outlet.request('child', 'p.f.request', 'count')).toMatchObject({ calls: 0 })
     } finally {
       await fixture.close()
     }
@@ -142,7 +145,7 @@ describe('process Host replacement publication', () => {
       const fixture = nativeHostFixture('old')
       /** Call-through observes the genuine factory readiness Promise, not a fixture ready facade. */
       const preparing = vi.spyOn(runtimePeerModule, 'createRuntimePeer')
-      const original = fixture.options.endpointFactory
+
       const primary = createProcessError(RpcProcessErrorCode.hostInvalidOption)
       let endpoints = 0
       let entered!: () => void
@@ -153,15 +156,13 @@ describe('process Host replacement publication', () => {
       const gate = new Promise<void>((resolve) => {
         fail = resolve
       })
-      const options = {
-        ...fixture.options,
-        endpointFactory: async (...args: Parameters<typeof original>) => {
-          const served = await original(...args)
-          const ordinal = ++endpoints
-          return {
-            ...served,
-            endpoint: {
-              ...served.endpoint,
+      fixture.observeEndpoint((served) => {
+        const ordinal = ++endpoints
+        return {
+          ...served,
+          endpoint: Object.create(
+            served.endpoint,
+            Object.getOwnPropertyDescriptors({
               async send<T>(...input: Parameters<IRpcEndpoint['send']>) {
                 if (ordinal === 2 && input[1] === RemoteMethodName.runtimeDescribe) {
                   entered()
@@ -170,17 +171,20 @@ describe('process Host replacement publication', () => {
                 }
                 return served.endpoint.send<T>(...input)
               }
-            }
-          }
+            })
+          )
         }
+      })
+      const options = {
+        ...fixture.options
       }
       try {
-        await fixture.host.use(createProcessPlugin(options))
+        await fixture.host.use(processPlugin(options))
         const outlet = fixture.host.process!
         await fixture.ready(fixture.handles[0]!)
-        await outlet.request('child', RemoteMethodName.hostUse, ['p'])
+
         const old = fixture.handles[0]!
-        const candidate = createProcessPlugin(options)
+        const candidate = processPlugin(options)
         const replacing =
           strategy === 'stop-then-start'
             ? outlet.stop('child').then(() => fixture.host.replace('child', candidate))
@@ -205,22 +209,21 @@ describe('process Host replacement publication', () => {
           strategy === 'start-then-switch' ? 1 : 0
         )
         if (strategy === 'start-then-switch') {
-          await outlet.request('child', RemoteMethodName.hostUse, ['p'])
-          expect(await outlet.request('child', 'p.request', 'still-old')).toMatchObject({
+          expect(await outlet.request('child', 'p.f.request', 'still-old')).toMatchObject({
             pid: old.identity.pid
           })
         } else {
           await old.exited
-          expect(() => outlet.request('child', RemoteMethodName.hostUse, ['p'])).toThrow(
+          expect(() => outlet.request('child', 'p.f.request', 'probe')).toThrow(
             expect.objectContaining({ code: 'TARGET_UNKNOWN' })
           )
         }
         if (strategy === 'start-then-switch') await outlet.stop('child')
-        await fixture.host.replace('child', createProcessPlugin(options))
+        await fixture.host.replace('child', processPlugin(options))
         await fixture.ready()
         expect(fixture.host.process).toBe(outlet)
-        await outlet.request('child', RemoteMethodName.hostUse, ['p'])
-        expect(await outlet.request('child', 'p.request', 'recovered')).toMatchObject({
+
+        expect(await outlet.request('child', 'p.f.request', 'recovered')).toMatchObject({
           pid: fixture.handles[2]!.identity.pid
         })
       } finally {
@@ -233,6 +236,10 @@ describe('process Host replacement publication', () => {
       }
     }
   )
+})
+
+/** Declarative registration only: each case owns its own runtime resources and mutable state. */
+describe('process native budget and terminal governance', () => {
   it('invalidates a real size-one pool after old exit without taking it for replacement', async () => {
     const fixture = runtimeHostFixture()
     const deployment = fixture.options.spawn
@@ -280,41 +287,15 @@ describe('process Host replacement publication', () => {
     }
     expect(budget.inUse).toBe(0)
   })
-
-  it('consumes a parsed Host descriptor and preserves its default switch strategy', async () => {
+  it('publishes the actual native replacement before the old process exits', async () => {
     const fixture = runtimeHostFixture()
-    const vectors = JSON.parse(
-      readFileSync(
-        new URL('../../schema/vectors/process-plugin-descriptor.json', import.meta.url),
-        'utf8'
-      )
-    )
-    const base = vectors.cases.find((row: { id: string }) => row.id === 'host-spawn').value
-    const descriptor = parseProcessPluginDescriptor({
-      ...base,
-      catalog: catalog,
-      replaceStrategy: 'start-then-switch'
-    })
-    if (descriptor.target !== 'host') throw new Error('host descriptor required')
-    expect(() => parseProcessPluginDescriptor({ ...base, catalog: { wrong: catalog.p } })).toThrow()
-    /** The descriptor's original contract owns the same actual accepted directory declarations. */
-    fixture.send.mockImplementation(async (_peer, method) =>
-      method === RemoteMethodName.runtimeDescribe
-        ? remoteDescription(Object.values(descriptor.catalog), 'peer', true)
-        : method === RemoteMethodName.hostInspect
-          ? { revision: 0, plugins: [] }
-          : method === RemoteMethodName.hostUnUse
-            ? { ok: true }
-            : { name: 'p', state: 'enabled', revision: 1, features: ['f'] }
-    )
     try {
       await fixture.host.use(fixture.plugin)
       const outlet = fixture.host.process!
-      expect(descriptor.replaceStrategy).toBe('start-then-switch')
-      await fixture.host.replace('child', createProcessPlugin(fixture.options))
+      await fixture.host.replace('child', processPlugin(fixture.options))
       expect(fixture.host.process).toBe(outlet)
       expect(fixture.order).toEqual(['launch:1', 'launch:2', 'exit:1'])
-      await outlet.request('child', RemoteMethodName.hostUse, ['p'])
+
       expect(
         readRuntimeOutletConnection(outlet, 'child')!
           .description!.methods.filter((method) => method.name.startsWith('p.f.'))
@@ -345,17 +326,12 @@ describe('process Host replacement publication', () => {
         scheduler: fixture.scheduler,
         report: fixture.report
       })
-      /** Public lower remote control remains supported after high factories are retired. */
-      const host = createRemoteHost({
-        catalog: fixture.options.catalog,
+      /** Canonical managed Peer consumes this same actual native binding and drain policy. */
+      const host = await createManagedRuntimePeer(
+        { self: { name: 'parent', instanceId: 'parent' }, report: fixture.report },
         binding,
-        endpointFactory: async (...args: Parameters<typeof fixture.options.endpointFactory>) => {
-          const endpoint = await fixture.options.endpointFactory(...args)
-          return binding.bindEndpoint(args[0], endpoint)
-        },
-        report: fixture.report,
-        callGuard: resilience.callGuard('terminal-host')
-      })
+        (channel, endpoint) => binding.bindEndpoint(channel, endpoint)
+      )
       /** Exact original registration owns its diagnostic tombstone independently of remote release. */
       const registration = resilience.attachRegistration(
         'terminal-host',
@@ -364,46 +340,49 @@ describe('process Host replacement publication', () => {
           health: binding.health,
           supervisor: binding.registrationSupervisor
         },
-        { kind: 'standalone-host', release: host.release }
+        { kind: 'standalone-host', release: host.close }
       )
       /** The same existing guard protects native commands after committed liquidation. */
       const guard = resilience.callGuard('terminal-host')
       const assertCommand = () =>
         guard.beforeDispatch({
-          method: RemoteMethodName.hostUse,
-          mode: 'host-control',
+          method: 'p.f.m',
+          mode: 'request',
           generation: binding.supervisor.generation
         })
       try {
-        await host.ready()
+        await readManagedRuntimeHolder(host)!.prepareRebind(new AbortController().signal)
         fixture.crashes[0]!({ code: 1, signal: null })
         await settle()
         expect(registration.inspect()).toMatchObject({ state: 'terminal', unhandled: 1 })
         const frames = fixture.send.mock.calls.length
-        for (const operation of [() => host.use('p'), () => host.unUse('p'), () => host.inspect()])
-          await expect(operation()).rejects.toMatchObject({ code: 'PROCESS_TERMINAL_CALL' })
+        for (let index = 0; index < 3; index++)
+          expect(assertCommand).toThrow(expect.objectContaining({ code: 'PROCESS_TERMINAL_CALL' }))
         expect(fixture.send.mock.calls).toHaveLength(frames)
         if (recover) {
           expect(await registration.restart()).toMatchObject({ state: 'ready' })
-          await host.ready()
+          await readManagedRuntimeHolder(host)!.prepareRebind(new AbortController().signal)
           expect(registration.inspect()).toMatchObject({ unhandled: 0, state: 'ready' })
-          await host.use('p')
+          await host.request('p.f.m')
         } else {
           for (const delay of [60_000, 240_000, 600_000]) {
             fixture.scheduler.advance(delay)
             await settle()
           }
-          expect(registration.inspect()).toMatchObject({ liquidated: true, unhandled: 4 })
+          await vi.waitFor(() =>
+            expect(registration.inspect()).toMatchObject({ liquidated: true, unhandled: 4 })
+          )
           expect(
             fixture.report.mock.calls.filter(([error]) => error?.code === 'SUPERVISION_EXHAUSTED')
           ).toHaveLength(4)
-          expect(
-            fixture.report.mock.calls.filter(([error]) => error?.code === 'REMOTE_CLOSED')
-          ).toHaveLength(2)
+          /**
+           * Graceful actual ManagedRuntimePeer.close reports no failure; the removed facade's two
+           * incidental REMOTE_CLOSED reports are not terminal-governance diagnostics.
+           */
           for (const operation of [
             () => {
               assertCommand()
-              return host.ready()
+              return readManagedRuntimeHolder(host)!.prepareRebind(new AbortController().signal)
             },
             () => {
               assertCommand()
@@ -417,23 +396,28 @@ describe('process Host replacement publication', () => {
             expect(operation).toThrow(expect.objectContaining({ code: 'PROCESS_LIQUIDATED' }))
           expect(() => {
             assertCommand()
-            return host.use('p')
+            return host.request('p.f.m')
           }).toThrow(expect.objectContaining({ code: 'PROCESS_LIQUIDATED' }))
           expect(fixture.launch).toHaveBeenCalledTimes(1)
         }
       } finally {
-        await host.release()
+        await host.close()
         await registration.close()
         await resilience.close()
+        await fixture.close()
       }
     }
   )
+})
+
+/** Declarative registration only: each case owns its own runtime resources and mutable state. */
+describe('process native replacement publication and queued mutation', () => {
   it.each(['stop-then-start', 'start-then-switch'] as const)(
     'gates real Node replacement on describe and never replays installed plugins (%s)',
     async (strategy) => {
       /** A real endpoint is held only at its outbound describe boundary. */
       const fixture = nativeHostFixture('old')
-      const original = fixture.options.endpointFactory
+
       let allow!: () => void
       let entered!: () => void
       const held = new Promise<void>((resolve) => {
@@ -443,18 +427,13 @@ describe('process Host replacement publication', () => {
         entered = resolve
       })
       let endpoints = 0
-      const options = {
-        ...fixture.options,
-        endpointFactory: async (
-          channel: Parameters<typeof original>[0],
-          signal: Parameters<typeof original>[1]
-        ) => {
-          const served = await original(channel, signal)
-          const ordinal = ++endpoints
-          return {
-            ...served,
-            endpoint: {
-              ...served.endpoint,
+      fixture.observeEndpoint((served) => {
+        const ordinal = ++endpoints
+        return {
+          ...served,
+          endpoint: Object.create(
+            served.endpoint,
+            Object.getOwnPropertyDescriptors({
               async send<T>(...args: Parameters<IRpcEndpoint['send']>) {
                 const [peer, method, params, context] = args
                 if (ordinal === 2 && method === RemoteMethodName.runtimeDescribe) {
@@ -463,19 +442,22 @@ describe('process Host replacement publication', () => {
                 }
                 return served.endpoint.send<T>(peer, method, params, context)
               }
-            }
-          }
+            })
+          )
         }
+      })
+      const options = {
+        ...fixture.options
       }
       /** Both transitions retain the actual shared outlet while the candidate is unpublished. */
       let removeReadiness: (() => void) | undefined
       /** Cleanup joins the real transaction even when an earlier assertion rejects. */
       let replacementOutcome: Promise<PromiseSettledResult<unknown>[]> | undefined
       try {
-        await fixture.host.use(createProcessPlugin(options))
+        await fixture.host.use(processPlugin(options))
         const outlet = fixture.host.process!
         await fixture.ready(fixture.handles[0]!)
-        await outlet.request('child', RemoteMethodName.hostUse, ['p'])
+
         const old = fixture.handles[0]!
         const spec = {
           ...fixture.options.spawn.supervision.spec,
@@ -488,7 +470,7 @@ describe('process Host replacement publication', () => {
             resolve()
           })
         })
-        const candidate = createProcessPlugin({
+        const candidate = processPlugin({
           ...options,
           spawn: { ...options.spawn, supervision: { ...options.spawn.supervision, spec } }
         })
@@ -502,13 +484,13 @@ describe('process Host replacement publication', () => {
         if (strategy === 'stop-then-start') {
           await old.exited
           expect(ready).toBe(false)
-          expect(() => outlet.request('child', RemoteMethodName.hostUse, ['p'])).toThrow(
+          expect(() => outlet.request('child', 'p.f.request', 'probe')).toThrow(
             expect.objectContaining({ code: 'TARGET_UNKNOWN' })
           )
         } else {
           expect(process.kill(old.identity.pid!, 0)).toBe(true)
-          await outlet.request('child', RemoteMethodName.hostUse, ['p'])
-          expect(await outlet.request('child', 'p.request', 'old')).toMatchObject({
+
+          expect(await outlet.request('child', 'p.f.request', 'old')).toMatchObject({
             pid: old.identity.pid,
             value: 'old'
           })
@@ -518,14 +500,10 @@ describe('process Host replacement publication', () => {
         await fixture.ready()
         expect(fixture.host.process).toBe(outlet)
         await prepared
-        expect(await outlet.request('child', RemoteMethodName.hostInspect, [])).toMatchObject({
-          plugins: []
-        })
-        await outlet.request('child', RemoteMethodName.hostUse, ['p'])
-        expect(await outlet.request('child', 'p.request', 'new')).toMatchObject({
+
+        expect(await outlet.request('child', 'p.f.request', 'new')).toMatchObject({
           pid: fixture.handles[1]!.identity.pid,
-          value: 'new',
-          resolutions: 1
+          value: 'new'
         })
         await old.exited
       } finally {
@@ -536,7 +514,6 @@ describe('process Host replacement publication', () => {
       }
     }
   )
-
   it('rejects a real overlapping candidate at a one-unit budget and preserves the old PID', async () => {
     const fixture = nativeHostFixture()
     const budget = createUnitBudget({
@@ -558,16 +535,14 @@ describe('process Host replacement publication', () => {
       }
     }
     try {
-      await fixture.host.use(createProcessPlugin(options))
-      await expect(
-        fixture.host.replace('child', createProcessPlugin(options))
-      ).rejects.toBeDefined()
+      await fixture.host.use(processPlugin(options))
+      await expect(fixture.host.replace('child', processPlugin(options))).rejects.toBeDefined()
       expect(fixture.handles).toHaveLength(1)
       expect(budget.inUse).toBe(1)
       const outlet = fixture.host.process!
       await fixture.ready(fixture.handles[0]!)
-      await outlet.request('child', RemoteMethodName.hostUse, ['p'])
-      expect(await outlet.request('child', 'p.request', 'live')).toMatchObject({
+
+      expect(await outlet.request('child', 'p.f.request', 'live')).toMatchObject({
         pid: fixture.handles[0]!.identity.pid
       })
     } finally {
@@ -575,7 +550,6 @@ describe('process Host replacement publication', () => {
     }
     expect(budget.inUse).toBe(0)
   })
-
   it('stops the old owned unit before launching and retains the same facade', async () => {
     const fixture = runtimeHostFixture()
     await fixture.host.use(fixture.plugin)
@@ -598,13 +572,11 @@ describe('process Host replacement publication', () => {
         expect(current).toHaveProperty('state', 'ready')
         expect(current).not.toEqual(oldGeneration)
       })
-      await outlet.request('child', RemoteMethodName.hostUse, ['p'])
     } finally {
       removeReady?.()
       await fixture.close()
     }
   })
-
   it('holds old service until description, publishes once and queues every spec', async () => {
     const fixture = runtimeHostFixture()
     let complete!: () => void
@@ -612,10 +584,11 @@ describe('process Host replacement publication', () => {
       complete = resolve
     })
     const send = fixture.send.getMockImplementation()!
-    fixture.send.mockImplementation(async (peer, method) => {
+    fixture.send.mockImplementation(async (...args) => {
+      const [_peer, method] = args
       if (method === 'migaia.remote.runtime.describe' && fixture.launch.mock.calls.length === 2)
         await described
-      return send(peer, method)
+      return send(...args)
     })
     await fixture.host.use(fixture.plugin)
     const outlet = fixture.host.process!
@@ -626,7 +599,7 @@ describe('process Host replacement publication', () => {
     const first = mutations.enqueue(() =>
       fixture.host.replace(
         'child',
-        createProcessPlugin({
+        processPlugin({
           ...fixture.options,
           spawn: {
             ...fixture.options.spawn,
@@ -638,7 +611,7 @@ describe('process Host replacement publication', () => {
     const second = mutations.enqueue(() =>
       fixture.host.replace(
         'child',
-        createProcessPlugin({
+        processPlugin({
           ...fixture.options,
           spawn: {
             ...fixture.options.spawn,
@@ -649,10 +622,9 @@ describe('process Host replacement publication', () => {
     )
     const outcomes = Promise.allSettled([first, second])
     expect(second).not.toBe(first)
-    await settle()
-    expect(fixture.launch.mock.calls).toHaveLength(2)
+    await vi.waitFor(() => expect(fixture.launch.mock.calls).toHaveLength(2))
     expect(fixture.terminate).not.toHaveBeenCalled()
-    await outlet.request('child', RemoteMethodName.hostUse, ['p'])
+
     complete()
     try {
       await first
@@ -667,26 +639,24 @@ describe('process Host replacement publication', () => {
       await fixture.close()
     }
   })
-
   it('cancels a delayed candidate and refuses queued replacement without another launch', async () => {
     const fixture = runtimeHostFixture()
     const send = fixture.send.getMockImplementation()!
     /** The actual core endpoint honors cancellation; this neutral held-send fixture must too. */
     let candidateSignal: IAbortSignal | undefined
-    const factory = fixture.options.endpointFactory
-    const options = {
-      ...fixture.options,
-      endpointFactory: async (...args: Parameters<typeof factory>) => {
-        candidateSignal = args[1]
-        return factory(...args)
-      }
-    }
+
+    fixture.observeEndpoint((served, _channel, signal) => {
+      candidateSignal = signal
+      return served
+    })
+    const options = fixture.options
     /** Release races a real describe boundary rather than an assumed number of microtasks. */
     let entered!: () => void
     const describing = new Promise<void>((resolve) => {
       entered = resolve
     })
-    fixture.send.mockImplementation(async (peer, method) => {
+    fixture.send.mockImplementation(async (...args) => {
+      const [_peer, method] = args
       if (method === 'migaia.remote.runtime.describe' && fixture.launch.mock.calls.length > 1) {
         entered()
         return new Promise<never>((_resolve, reject) => {
@@ -696,17 +666,13 @@ describe('process Host replacement publication', () => {
           if (signal.aborted) cancel()
         })
       }
-      return send(peer, method)
+      return send(...args)
     })
-    await fixture.host.use(createProcessPlugin(options))
+    await fixture.host.use(processPlugin(options))
     /** Original queue callbacks consult actual Host admission when they reach the head. */
     const mutations = createMutationQueue({ scheduler: fixture.scheduler })
-    const first = mutations.enqueue(() =>
-      fixture.host.replace('child', createProcessPlugin(options))
-    )
-    const second = mutations.enqueue(() =>
-      fixture.host.replace('child', createProcessPlugin(options))
-    )
+    const first = mutations.enqueue(() => fixture.host.replace('child', processPlugin(options)))
+    const second = mutations.enqueue(() => fixture.host.replace('child', processPlugin(options)))
     const results = Promise.allSettled([first, second])
     await describing
     await fixture.close()

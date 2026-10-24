@@ -9,11 +9,11 @@ import { createComposedEndpoint } from '../../../rpc-host/dist/core/composed.js'
 import { createCanonicalChunkFeature } from '../../../rpc-host/dist/core/stream/index.js'
 import { createOutboundFeature } from '../../../rpc-host/dist/core/features/outbound.js'
 import { createOneWayFeature } from '../../../rpc-host/dist/core/features/one-way.js'
-import { codec } from '../../../rpc-host/dist/core/index.js'
-import { framer } from '../../../rpc-host/dist/core/index.js'
-import { abort } from '../../../rpc-host/dist/core/index.js'
-import { connect } from '../../../rpc-host/dist/core/index.js'
-import type { IRpcEndpoint } from '../../../rpc-host/dist/core/index.js'
+import { codec } from '../../../rpc-host/dist/core/middleware/codec.js'
+import { framer } from '../../../rpc-host/dist/core/middleware/framer.js'
+import { abort } from '../../../rpc-host/dist/core/middleware/abort.js'
+import { connect } from '../../../rpc-host/dist/core/middleware/connect.js'
+import type { IRpcEndpoint } from '../../../rpc-host/dist/core/typing.js'
 import type { IOneWaySurface } from '../../../rpc-host/dist/core/features/one-way.js'
 import type { IRemoteChannel } from '@migaia/rpc-host/plugin'
 
@@ -56,42 +56,54 @@ export function peerFrame(value: unknown): Uint8Array {
   return Buffer.concat([Buffer.from(`Content-Length: ${body.length}\r\n\r\n`, 'ascii'), body])
 }
 
-/** A raw peer controls drain and every incoming object without replacing the bridge transport. */
-export function bridgeFixture(
-  input: Readonly<{
-    autoHello?: boolean
-    responder?: (message: Record<string, unknown>) => unknown
-    drain?: Promise<void>
-  }> = {}
-) {
-  const scheduler = createManualScheduler()
-  const writes: Uint8Array[] = []
-  const messages: Record<string, unknown>[] = []
-  const reports: unknown[] = []
-  let data: ((chunk: Uint8Array) => void) | undefined
-  let eof: ((reason?: unknown) => void) | undefined
-  let closes = 0
-  let removals = 0
-  const deliver = (value: unknown): void => data?.(peerFrame(value))
-  const raw: IProcessByteChannel = {
+/** Original independent peer behavior is configured once for this controlled byte source. */
+type IBridgeFixtureInput = Readonly<{
+  autoHello?: boolean
+  responder?: (message: Record<string, unknown>) => unknown
+  drain?: Promise<void>
+}>
+
+/** One raw peer owns its subscriptions, physical write observations and channel close counts. */
+export class BridgeFixture {
+  /** The current byte reader receives independently encoded fixture replies. */
+  #data: ((chunk: Uint8Array) => void) | undefined
+  /** The current terminal reader belongs only to this controlled byte connection. */
+  #onEof: ((reason?: unknown) => void) | undefined
+  /** Physical close observations prove the bridge never silently substitutes a source. */
+  #closes = 0
+  /** Subscription teardown observations remain independent from physical close. */
+  #removals = 0
+  /** Caller-provided response/drain behavior keeps the same original object reference. */
+  #input: IBridgeFixtureInput
+  /** The canonical scheduler owns deadlines; this fixture only exposes it for assertions. */
+  readonly scheduler = createManualScheduler()
+  /** Physical chunks remain available byte-for-byte for framing assertions. */
+  readonly writes: Uint8Array[] = []
+  /** Parsed physical objects preserve batch versus single-member distinctions. */
+  readonly messages: Record<string, unknown>[] = []
+  /** Original product reports keep exact error identity here. */
+  readonly reports: unknown[] = []
+  /** The raw source is stable for the fixture's whole lifetime. */
+  readonly raw: IProcessByteChannel = {
     kind: 'byte',
-    async write(chunk) {
-      writes.push(chunk)
+    /** Decode the original independent frame and deliver its complete response cohort. */
+    write: async (chunk) => {
+      this.writes.push(chunk)
       const text = Buffer.from(chunk).toString('utf8')
       const boundary = text.indexOf('\r\n\r\n')
       if (boundary < 0) throw new Error('fixture received a non-Content-Length frame')
       const physical = JSON.parse(text.slice(boundary + 4)) as
         | Record<string, unknown>
         | Record<string, unknown>[]
-      messages.push(physical as Record<string, unknown>)
+      this.messages.push(physical as Record<string, unknown>)
       const members = Array.isArray(physical) ? physical : [physical]
       const replies: unknown[] = []
-      if (input.drain) await input.drain
+      if (this.#input.drain) await this.#input.drain
       for (const message of members) {
-        if (input.responder) {
-          const answer = input.responder(message)
+        if (this.#input.responder) {
+          const answer = this.#input.responder(message)
           if (answer !== undefined) replies.push(answer)
-        } else if (message.method === 'migaia.hello' && input.autoHello !== false) {
+        } else if (message.method === 'migaia.hello' && this.#input.autoHello !== false) {
           const hello = (message.params as { hello: string }).hello
           const result = acceptRpcHandshake(BRIDGE_PEER_OFFER, hello)
           replies.push({
@@ -101,59 +113,76 @@ export function bridgeFixture(
           })
         }
       }
-      if (replies.length > 0) deliver(Array.isArray(physical) ? replies : replies[0])
+      if (replies.length > 0) this.deliver(Array.isArray(physical) ? replies : replies[0])
     },
-    onData(listener) {
-      data = listener
+    onData: (listener) => {
+      this.#data = listener
       return () => {
-        data = undefined
-        removals++
+        this.#data = undefined
+        this.#removals += 1
       }
     },
-    onClose(listener) {
-      eof = listener
+    onClose: (listener) => {
+      this.#onEof = listener
       return () => {
-        eof = undefined
-        removals++
+        this.#onEof = undefined
+        this.#removals += 1
       }
     },
-    close() {
-      closes++
+    close: () => {
+      this.#closes += 1
     }
   }
-  const options: IProcessJsonRpcChannelOptions = {
-    byte: raw,
-    peerId: 'peer',
-    target: { kind: 'plugin', contract: BRIDGE_CONTRACT },
-    offer: {
-      versions: [{ major: 1, minor: 1 }],
-      capabilities: ['deadline@1', 'trace@1'],
-      peer: { id: 'client', runtime: 'node' }
-    },
-    token: 'Q7X9Z3V5K8W2R6T4Y1N0',
-    scheduler,
-    wallClock: { timestamp: () => 123 },
-    ipc: { connectionId: 'connection', sessionId: 'session', log: () => undefined },
-    report: (error) => reports.push(error)
-  }
-  return {
-    raw,
-    options,
-    scheduler,
-    writes,
-    messages,
-    reports,
-    deliver,
-    bytes: (chunk: Uint8Array) => data?.(chunk),
-    eof: (reason?: unknown) => eof?.(reason),
-    open: (override: Partial<IProcessJsonRpcChannelOptions> = {}) =>
-      createProcessJsonRpcChannel({ ...options, ...override }),
-    get closes() {
-      return closes
-    },
-    get removals() {
-      return removals
+  /** Original channel options remain directly mutable by the hostile-input tests. */
+  readonly options: IProcessJsonRpcChannelOptions
+
+  /** Configure the same actual JSON-RPC channel defaults over this fixture's raw byte identity. */
+  constructor(input: IBridgeFixtureInput = {}) {
+    this.#input = input
+    this.options = {
+      byte: this.raw,
+      peerId: 'peer',
+      target: { kind: 'plugin', contract: BRIDGE_CONTRACT },
+      offer: {
+        versions: [{ major: 1, minor: 1 }],
+        capabilities: ['deadline@1', 'trace@1'],
+        peer: { id: 'client', runtime: 'node' }
+      },
+      token: 'Q7X9Z3V5K8W2R6T4Y1N0',
+      scheduler: this.scheduler,
+      wallClock: { timestamp: () => 123 },
+      ipc: { connectionId: 'connection', sessionId: 'session', log: () => undefined },
+      report: (error) => this.reports.push(error)
     }
+  }
+
+  /** Encode an independent physical reply before entering the product's original byte reader. */
+  deliver = (value: unknown): void => {
+    this.#data?.(peerFrame(value))
+  }
+
+  /** Inject raw hostile or segmented bytes without normalizing them through the product. */
+  bytes = (chunk: Uint8Array): void => {
+    this.#data?.(chunk)
+  }
+
+  /** Publish the actual fixture terminal event to its original subscriber. */
+  eof = (reason?: unknown): void => {
+    this.#onEof?.(reason)
+  }
+
+  /** Construct the original channel with only the caller's explicit option overrides. */
+  open = (override: Partial<IProcessJsonRpcChannelOptions> = {}) =>
+    createProcessJsonRpcChannel({ ...this.options, ...override })
+
+  /** Return original physical close count. */
+  get closes(): number {
+    return this.#closes
+  }
+
+  /** Return original subscription teardown count. */
+  get removals(): number {
+    return this.#removals
   }
 }
 

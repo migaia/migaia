@@ -1,8 +1,11 @@
 import { randomUUID } from 'node:crypto'
 import { createUnitBudget } from '@migaia/supervision'
-import { createProcessPeer } from '../../protocol.ts'
+import { createManagedRuntimePeer } from '../../../../rpc-host/dist/remote/runtime-api/managed-peer.js'
+import { createSpawnProcessBinding } from '../../../dist/process/plugin/binding.js'
+import { createNativeProcessOffer } from '../../../dist/process/offer.js'
+import { endpointFor } from '../../../../rpc-integration/test/process/peers/ts/runtime.ts'
 import { createProcessTransport } from '../../../dist/process/handshake.js'
-import { createNodeProcessLauncher } from '@migaia/rpc-plugin-process/adapters/node-child-process'
+import { createNodeProcessLauncher } from '../../../dist/process/adapters/node-child-process.js'
 
 /** This disposable parent owns one real public Peer and is intentionally killed by its test. */
 const peer = JSON.parse(process.argv[2])
@@ -21,6 +24,12 @@ const peerOptions = {
     wire: 'native',
     channelKind: 'byte',
     token,
+    offer: createNativeProcessOffer({
+      peer: { id: 'caller', runtime: 'node' },
+      auth: token,
+      stream: true,
+      capabilities: ['runtime-api@1', 'abort@1', 'wire-error@1']
+    }),
     supervision: {
       id: 'kill9-parent',
       isolation: 'best-effort',
@@ -60,7 +69,19 @@ const peerOptions = {
   }
 }
 /** The actual Peer source supplies its installed capability offer without a legacy Host facade. */
-const host = await createProcessPeer(peerOptions)
+const binding = createSpawnProcessBinding(peerOptions.spawn, peerOptions.report, true)
+/** Canonical managed ownership retains the actual native generation and drain. */
+const host = await createManagedRuntimePeer(
+  {
+    self: peerOptions.self,
+    report: peerOptions.report,
+    endpointFactory: (channel) => endpointFor(channel, 'caller')
+  },
+  binding,
+  (channel, endpoint) => binding.bindEndpoint(channel, endpoint),
+  undefined,
+  () => binding.drainCurrent()
+)
 /** The wire proves that the descendant-owning peer is serving actual Host business before kill -9. */
 await host.request('migaia.remote.host.use', ['p', {}])
 if ((await host.request('p.f.request', ['kill9-ready'])) !== 'kill9-ready')

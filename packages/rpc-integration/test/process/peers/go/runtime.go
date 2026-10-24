@@ -1,9 +1,11 @@
 package main
 
 import (
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"hash/maphash"
 	"math"
 	"os"
 	"regexp"
@@ -104,91 +106,172 @@ func runtimeSchemaEqual(left, right any) bool {
 	return false
 }
 
+// runtimeSchemaHashWord appends one fixed-width scalar to a private structural hash.
+func runtimeSchemaHashWord(hash *maphash.Hash, value uint64) {
+	// A fixed width keeps adjacent child digests unambiguous.
+	var bytes [8]byte
+	binary.LittleEndian.PutUint64(bytes[:], value)
+	_, _ = hash.Write(bytes[:])
+}
+
+// runtimeSchemaHash indexes already-admitted JSON values; collision buckets retain exact equality.
+// Array order participates, object field order does not, and both numeric forms use original float equality.
+func runtimeSchemaHash(value any, seed maphash.Seed) uint64 {
+	// Every node uses the validation owner's seed; no digest is serialized.
+	var hash maphash.Hash
+	hash.SetSeed(seed)
+	switch item := value.(type) {
+	case nil:
+		_ = hash.WriteByte(0)
+	case bool:
+		_ = hash.WriteByte(1)
+		if item {
+			_ = hash.WriteByte(1)
+		} else {
+			_ = hash.WriteByte(0)
+		}
+	case string:
+		_ = hash.WriteByte(2)
+		_, _ = hash.WriteString(item)
+	case json.Number:
+		// Admission already proved a finite number; normalize signed zero for equality.
+		number, _ := strconv.ParseFloat(string(item), 64)
+		if number == 0 {
+			number = 0
+		}
+		_ = hash.WriteByte(3)
+		runtimeSchemaHashWord(&hash, math.Float64bits(number))
+	case float64:
+		if item == 0 {
+			item = 0
+		}
+		_ = hash.WriteByte(3)
+		runtimeSchemaHashWord(&hash, math.Float64bits(item))
+	case []any:
+		_ = hash.WriteByte(4)
+		runtimeSchemaHashWord(&hash, uint64(len(item)))
+		for _, member := range item {
+			runtimeSchemaHashWord(&hash, runtimeSchemaHash(member, seed))
+		}
+	case record:
+		_ = hash.WriteByte(5)
+		runtimeSchemaHashWord(&hash, uint64(len(item)))
+		// Seeded per-field hashes combine commutatively, preserving object key-order independence.
+		var fields uint64
+		for key, member := range item {
+			// One keyed field digest prevents map iteration order from affecting the bucket.
+			var field maphash.Hash
+			field.SetSeed(seed)
+			_, _ = field.WriteString(key)
+			runtimeSchemaHashWord(&field, runtimeSchemaHash(member, seed))
+			fields += field.Sum64()
+		}
+		runtimeSchemaHashWord(&hash, fields)
+	}
+	return hash.Sum64()
+}
+
+// runtimeSchemaContext owns one synchronous node/reference walk and its private enum hash seed.
+type runtimeSchemaContext struct {
+	// Nodes prove local reference targets without traversing the reference graph.
+	nodes map[string]bool
+	// References remain in their original encounter order until the walk completes.
+	references []string
+	// A private seed prevents an input from choosing structural-hash collision buckets.
+	seed maphash.Seed
+}
+
 // validRuntimeSchema checks schema nodes and local pointers without resolving references recursively.
 func validRuntimeSchema(value any) bool {
 	if !runtimeSchemaData(value, 0) {
 		return false
 	}
-	nodes := map[string]bool{}
-	references := []string{}
-	var visit func(any, string) bool
-	visit = func(value any, path string) bool {
-		schema, ok := value.(record)
-		if !ok {
-			return false
-		}
-		nodes[path] = true
-		for key, child := range schema {
-			if !slices.Contains(runtimeSchemaKeys, key) {
-				return false
-			}
-			switch key {
-			case "type", "required":
-				values, array := child.([]any)
-				if key == "type" && !array {
-					values = []any{child}
-				} else if !array {
-					return false
-				}
-				if key == "type" && len(values) == 0 {
-					return false
-				}
-				seen := map[string]bool{}
-				for _, member := range values {
-					text, ok := member.(string)
-					if !ok || seen[text] || key == "type" && !slices.Contains(runtimeSchemaTypes, text) {
-						return false
-					}
-					seen[text] = true
-				}
-			case "properties", "$defs":
-				members, ok := child.(record)
-				if !ok {
-					return false
-				}
-				for name, member := range members {
-					pointer := strings.ReplaceAll(strings.ReplaceAll(name, "~", "~0"), "/", "~1")
-					if !visit(member, path+"/"+key+"/"+pointer) {
-						return false
-					}
-				}
-			case "items":
-				if !visit(child, path+"/items") {
-					return false
-				}
-			case "enum", "anyOf":
-				members, ok := child.([]any)
-				if !ok || len(members) == 0 {
-					return false
-				}
-				for index, member := range members {
-					if key == "anyOf" && !visit(member, path+"/anyOf/"+strconv.Itoa(index)) {
-						return false
-					}
-					if key == "enum" {
-						for _, earlier := range members[:index] {
-							if runtimeSchemaEqual(member, earlier) {
-								return false
-							}
-						}
-					}
-				}
-			case "$ref":
-				pointer, ok := child.(string)
-				if !ok || !strings.HasPrefix(pointer, "#/$defs/") || runtimeSchemaBadEscape.MatchString(pointer) {
-					return false
-				}
-				references = append(references, pointer[1:])
-			}
-		}
-		return true
-	}
-	if !visit(value, "") {
+	// All mutable traversal state belongs to this one synchronous validation.
+	context := runtimeSchemaContext{nodes: map[string]bool{}, seed: maphash.MakeSeed()}
+	if !context.visit(value, "") {
 		return false
 	}
-	for _, pointer := range references {
-		if !nodes[pointer] {
+	for _, pointer := range context.references {
+		if !context.nodes[pointer] {
 			return false
+		}
+	}
+	return true
+}
+
+// visit retains original schema validation and failure order while borrowing explicit walk state.
+func (context *runtimeSchemaContext) visit(value any, path string) bool {
+	schema, ok := value.(record)
+	if !ok {
+		return false
+	}
+	context.nodes[path] = true
+	for key, child := range schema {
+		if !slices.Contains(runtimeSchemaKeys, key) {
+			return false
+		}
+		switch key {
+		case "type", "required":
+			values, array := child.([]any)
+			if key == "type" && !array {
+				values = []any{child}
+			} else if !array {
+				return false
+			}
+			if key == "type" && len(values) == 0 {
+				return false
+			}
+			seen := map[string]bool{}
+			for _, member := range values {
+				text, ok := member.(string)
+				if !ok || seen[text] || key == "type" && !slices.Contains(runtimeSchemaTypes, text) {
+					return false
+				}
+				seen[text] = true
+			}
+		case "properties", "$defs":
+			members, ok := child.(record)
+			if !ok {
+				return false
+			}
+			for name, member := range members {
+				pointer := strings.ReplaceAll(strings.ReplaceAll(name, "~", "~0"), "/", "~1")
+				if !context.visit(member, path+"/"+key+"/"+pointer) {
+					return false
+				}
+			}
+		case "items":
+			if !context.visit(child, path+"/items") {
+				return false
+			}
+		case "enum", "anyOf":
+			members, ok := child.([]any)
+			if !ok || len(members) == 0 {
+				return false
+			}
+			// Hash each member once; only actual hash collisions need structural equality.
+			seen := map[uint64][]any{}
+			for index, member := range members {
+				if key == "anyOf" && !context.visit(member, path+"/anyOf/"+strconv.Itoa(index)) {
+					return false
+				}
+				if key == "enum" {
+					// Exact equality below remains authoritative even when hashes collide.
+					digest := runtimeSchemaHash(member, context.seed)
+					for _, earlier := range seen[digest] {
+						if runtimeSchemaEqual(member, earlier) {
+							return false
+						}
+					}
+					seen[digest] = append(seen[digest], member)
+				}
+			}
+		case "$ref":
+			pointer, ok := child.(string)
+			if !ok || !strings.HasPrefix(pointer, "#/$defs/") || runtimeSchemaBadEscape.MatchString(pointer) {
+				return false
+			}
+			context.references = append(context.references, pointer[1:])
 		}
 	}
 	return true

@@ -1,13 +1,18 @@
 import assert from 'node:assert/strict'
-import { createProcessPeer } from '../../../../rpc-plugin-process/test/protocol.ts'
-import { isProcessChild } from '@migaia/rpc-plugin-process'
-import { createThreadPeer } from '../../../../rpc-plugin-thread/test/protocol.ts'
+import { isProcessChild, processPlugin } from '@migaia/rpc-plugin-process'
+import { threadPlugin } from '@migaia/rpc-plugin-thread'
+import { RuntimePluginKey } from '@migaia/rpc-host/plugin'
+import { runtimeTestHost } from '../../../../rpc-host/test/runtime-api/fixture.ts'
+import { readRuntimeOutletConnection } from '../../../../rpc-host/dist/remote/runtime-api/outlet.js'
+import {
+  readRuntimePeerConnection,
+  readRuntimePeerEndpoint
+} from '../../../../rpc-host/dist/remote/runtime-api/peer.js'
 import { fixtureAuthentication } from './auth.mjs'
 import {
   observedCore,
   createFixtureReporter,
   createTraceCollector,
-  traceEndpointFactory,
   startFixtureService,
   connectFixtureService,
   proveFixtureSelfFilter,
@@ -29,236 +34,360 @@ const diagnostics = createFixtureReporter(
 /** Actual hosts capture all seven stages; each service uses a separate unprobed endpoint. */
 const collector = observed ? createTraceCollector(diagnostics.report) : undefined
 
-if (childMode) {
-  /** The parent may become ready before the child has finished starting its actual Worker. */
-  let acceptSetup
-  /** Startup failure is returned through the original provider instead of leaving a readiness wait. */
-  let rejectSetup
-  /** This one fixture readiness promise represents real Worker setup, not synthetic collector data. */
-  const setup = new Promise((resolve, reject) => {
-    acceptSetup = resolve
-    rejectSetup = reject
+/** One actual child Host owns setup, Worker transport and local collector service state. */
+class ChildProgram {
+  /** The original strict reporter belongs to this real process. */
+  #diagnostics
+  /** The optional observer remains the exact collector created for this child. */
+  #collector
+  /** Original startup completion is shared only by this child's business providers. */
+  #setup
+  /** Resolve only after the actual Worker and diagnostic listener are ready. */
+  #acceptSetup
+  /** Preserve the original startup failure for every waiting business provider. */
+  #rejectSetup
+  /** Ordinary Host owns the automatic verified parent byte transport. */
+  #childHost = runtimeTestHost({
+    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   })
-  /** Worker lifetime stays with the real Thread Peer and its ordinary managed source. */
-  let worker
-  /** The child's own Worker caller retains the public Endpoint that accepts explicit trace. */
-  let workerEndpoint
-  /** The original channel's actual remote address is retained, never inferred from probe events. */
-  let workerId
-  /** Actual diagnostic setup is published only after each native listener has bound its port. */
-  let service
-  /** Worker descriptor comes from its real ready provider, after its service listener binds. */
-  let workerService
-  /** Automatic stdio consumption occurs before other host setup can inspect the launcher marker. */
-  const child = await createProcessPeer({
-    authentication: fixtureAuthentication(),
-    probe: collector,
-    provide: {
-      /**
-       * Cascading business explicitly passes the original caller trace to the real Worker Endpoint.
-       *
-       * @param {number} value Parent's real business payload.
-       * @param {import('@migaia/rpc-host').IRpcContext} context Original admitted caller context
-       *   and explicit trace.
-       * @returns {Promise<{
-       *   value: number
-       *   childPid: number
-       *   workerPid: number
-       *   workerThreadId: number
-       *   workerIsMainThread: boolean
-       *   childCollectorInstalled: boolean
-       *   workerCollectorInstalled: boolean
-       * }>}
-       *   Result and actual native host identities.
-       * @throws {Error} Original Worker startup or request failure.
-       */
-      async [FixtureMethod.cascade](value, context) {
-        await setup
-        /** The value and thread identity come from the actual Worker provider. */
-        const reply = await workerEndpoint.send(workerId, FixtureMethod.increment, value, {
+  /** Ordinary Host owns the actual Worker and its native termination resource. */
+  #workerHost = runtimeTestHost({
+    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
+  })
+  /** The genuine committed Worker Peer carries request and collector shutdown traffic. */
+  #worker
+  /** The Worker's actual native endpoint receives the original explicit caller trace. */
+  #workerEndpoint
+  /** Physical worker routing identity comes only from its original accepted channel. */
+  #workerId
+  /** This child alone owns its actual bound collector listener. */
+  #service
+  /** Actual Worker ready response supplies its independent collector listener descriptor. */
+  #workerService
+  /**
+   * Capture native observers and allocate the original one-time startup promise.
+   *
+   * @param {ReturnType<typeof createFixtureReporter>} diagnostics Strict child reporter.
+   * @param {ReturnType<typeof createTraceCollector> | undefined} collector Actual optional
+   *   observer.
+   */
+  constructor(diagnostics, collector) {
+    this.#diagnostics = diagnostics
+    this.#collector = collector
+    this.#setup = new Promise((resolve, reject) => {
+      this.#acceptSetup = resolve
+      this.#rejectSetup = reject
+    })
+  }
+  /** Actual providers access only this process's original setup and native Worker state. */
+  #provide = {
+    /**
+     * Cascading business explicitly passes the original caller trace to the real Worker Endpoint.
+     *
+     * @param {number} value Parent's real business payload.
+     * @param {import('@migaia/rpc-host').IRpcContext} context Original admitted caller context and
+     *   explicit trace.
+     * @returns {Promise<{
+     *   value: number
+     *   childPid: number
+     *   workerPid: number
+     *   workerThreadId: number
+     *   workerIsMainThread: boolean
+     *   childCollectorInstalled: boolean
+     *   workerCollectorInstalled: boolean
+     * }>}
+     *   Result and actual native host identities.
+     * @throws {Error} Original Worker startup or request failure.
+     */
+    [FixtureMethod.cascade]: async (value, context) => {
+      await this.#setup
+      /** The value and thread identity come from the actual Worker provider. */
+      const reply = await this.#workerEndpoint.send(
+        this.#workerId,
+        FixtureMethod.increment,
+        value,
+        {
           trace: context.trace
-        })
-        return {
-          value: reply.value + 1,
-          childPid: process.pid,
-          workerPid: reply.pid,
-          workerThreadId: reply.threadId,
-          workerIsMainThread: reply.isMainThread,
-          childCollectorInstalled: collector !== undefined,
-          workerCollectorInstalled: reply.collectorInstalled
         }
-      },
-      /**
-       * Join actual setup without making test-runner or transport readiness guesses.
-       *
-       * @returns {Promise<boolean>} Successful real Worker startup.
-       * @throws {Error} Original Worker startup failure.
-       */
-      async [FixtureMethod.ready]() {
-        await setup
-        return true
-      },
-      /**
-       * Return only actual bound socket descriptors needed by the parent's live service clients.
-       *
-       * @returns {Promise<{
-       *   child: { address: string; id: string } | null
-       *   worker: { address: string; id: string } | null
-       * }>}
-       *   Ordinary application connection configuration.
-       * @throws {Error} Original Worker or diagnostic listener setup failure.
-       */
-      async [FixtureMethod.diagnostics]() {
-        await setup
-        return {
-          child: service ? { address: service.address, id: service.id } : null,
-          worker: workerService ?? null
-        }
-      },
-      /**
-       * Both remote observers close while business connections stay intact for the repeated call.
-       *
-       * @returns {Promise<boolean>} Completion of both real remote-host collector closes.
-       * @throws {Error} Original startup or remote close request failure.
-       */
-      async [FixtureMethod.closeCollectors]() {
-        await setup
-        await worker.request(FixtureMethod.closeCollector)
-        await service?.close()
-        collector?.close()
-        return true
+      )
+      return {
+        value: reply.value + 1,
+        childPid: process.pid,
+        workerPid: reply.pid,
+        workerThreadId: reply.threadId,
+        workerIsMainThread: reply.isMainThread,
+        childCollectorInstalled: this.#collector !== undefined,
+        workerCollectorInstalled: reply.collectorInstalled
       }
     },
-    report: diagnostics.report
-  })
-  try {
-    worker = await createThreadPeer({
-      self: { name: FixtureTrace.caller.child, instanceId: FixtureTrace.caller.child },
-      spawn: {
-        entry: new URL('./worker.mjs', import.meta.url),
-        data: { observed }
-      },
-      authentication: fixtureAuthentication(),
-      endpointFactory: traceEndpointFactory(
-        FixtureTrace.caller.child,
-        (endpoint, peerId) => {
-          workerEndpoint = endpoint
-          workerId = peerId
-        },
-        diagnostics.report
-      ),
-      probe: collector,
-      report: diagnostics.report
-    })
-    workerService = await worker.request(FixtureMethod.ready)
-    if (collector)
-      service = await startFixtureService(collector, FixtureTrace.host.child, diagnostics.report)
-    acceptSetup()
-  } catch (error) {
-    rejectSetup(error)
-    await child.close()
-    diagnostics.report(error)
-    throw error
-  }
-} else {
-  /** Caller-owned Endpoint and channel address are the only surfaces used for explicit trace sends. */
-  let endpoint
-  /** Actual remote address is delivered by the public factory callback. */
-  let childId
-  /** The parent also exposes its original collector through a separate unprobed service Peer. */
-  let service
-  /** All ready diagnostic clients retain their original public close operations. */
-  const serviceClients = []
-  /** This standalone parent satisfies the literal root spawn:true acceptance without a test runner. */
-  const child = await createProcessPeer({
-    self: { name: FixtureTrace.caller.parent, instanceId: FixtureTrace.caller.parent },
-    spawn: true,
-    authentication: fixtureAuthentication(),
-    endpointFactory: traceEndpointFactory(
-      FixtureTrace.caller.parent,
-      (prepared, peerId) => {
-        endpoint = prepared
-        childId = peerId
-      },
-      diagnostics.report
-    ),
-    probe: collector,
-    report: diagnostics.report
-  })
-  try {
-    await child.request(FixtureMethod.ready)
-    /** Only actual setup data, not trace observations, crosses the existing ready/config path. */
-    const addresses = await child.request(FixtureMethod.diagnostics)
-    /** Parent recording starts before the traced business through its real independent service. */
-    let parentService
-    /** Self-filter proof uses actual traffic on a distinct service endpoint before recording begins. */
-    let selfFiltered = false
-    if (collector) {
-      selfFiltered = await proveFixtureSelfFilter(collector, diagnostics.report)
-      service = await startFixtureService(collector, FixtureTrace.host.parent, diagnostics.report)
-      parentService = await connectFixtureService(
-        service,
-        FixtureTrace.host.parent,
-        diagnostics.report
-      )
-      serviceClients.push(parentService)
-      await parentService.request(FixtureTrace.recordStart)
-    }
-    /** The first call executes parent -> actual child -> actual Worker. */
-    const reply = await endpoint.send(childId, FixtureMethod.cascade, 40, {
-      trace: FixtureTrace.id
-    })
-    assert.equal(reply.value, 42)
-    assert.notEqual(reply.childPid, process.pid)
-    assert.equal(reply.workerPid, reply.childPid)
-    assert.equal(reply.workerIsMainThread, false)
-    assert.ok(reply.workerThreadId > 0)
-    assert.equal(reply.childCollectorInstalled, observed)
-    assert.equal(reply.workerCollectorInstalled, observed)
-    /** Live catch-up queries run after the real cascade, so no watcher-arrival timing is guessed. */
-    let trace
-    if (collector) {
-      assert.ok(addresses.child)
-      assert.ok(addresses.worker)
-      /** The canonical service record contains only genuinely emitted parent observations. */
-      const recording = await parentService.request(FixtureTrace.recordStop)
-      /** Existing native socket APIs connect the parent to each remote host's original service. */
-      const childService = await connectFixtureService(
-        addresses.child,
-        FixtureTrace.host.child,
-        diagnostics.report
-      )
-      serviceClients.push(childService)
-      const workerService = await connectFixtureService(
-        addresses.worker,
-        FixtureTrace.host.worker,
-        diagnostics.report
-      )
-      serviceClients.push(workerService)
-      trace = {
-        ...(await proveLiveTrace(
-          [
-            { host: FixtureTrace.host.parent, peer: parentService },
-            { host: FixtureTrace.host.child, peer: childService },
-            { host: FixtureTrace.host.worker, peer: workerService }
-          ],
-          recording,
-          diagnostics.report
-        )),
-        selfFiltered
+    /**
+     * Join actual setup without making test-runner or transport readiness guesses.
+     *
+     * @returns {Promise<boolean>} Successful real Worker startup.
+     * @throws {Error} Original Worker startup failure.
+     */
+    [FixtureMethod.ready]: async () => {
+      await this.#setup
+      return true
+    },
+    /**
+     * Return only actual bound socket descriptors needed by the parent's live service clients.
+     *
+     * @returns {Promise<{
+     *   child: { address: string; id: string } | null
+     *   worker: { address: string; id: string } | null
+     * }>}
+     *   Ordinary application connection configuration.
+     * @throws {Error} Original Worker or diagnostic listener setup failure.
+     */
+    [FixtureMethod.diagnostics]: async () => {
+      await this.#setup
+      return {
+        child: this.#service ? { address: this.#service.address, id: this.#service.id } : null,
+        worker: this.#workerService ?? null
       }
-      // The hub has closed its actual watches before any diagnostic clients/listeners are retired.
-      await Promise.all(serviceClients.map((peer) => peer.close()))
-      await service.close()
+    },
+    /**
+     * Both remote observers close while business connections stay intact for the repeated call.
+     *
+     * @returns {Promise<boolean>} Completion of both real remote-host collector closes.
+     * @throws {Error} Original startup or remote close request failure.
+     */
+    [FixtureMethod.closeCollectors]: async () => {
+      await this.#setup
+      await this.#worker.request(FixtureMethod.closeCollector)
+      await this.#service?.close()
+      this.#collector?.close()
+      return true
     }
-    await child.request(FixtureMethod.closeCollectors)
-    collector?.close()
-    /** Native business remains the same after all three real-host observers are closed. */
-    const closedReply = await endpoint.send(childId, FixtureMethod.cascade, 40, {
-      trace: FixtureTrace.id
-    })
-    assert.equal(closedReply.value, reply.value)
-    /** Actual two-hop evidence is reported only after live service and carrier assertions pass. */
+  }
+  /**
+   * Open the real automatic parent before starting the genuine managed Worker.
+   *
+   * @returns {Promise<void>} Actual child provider and Worker setup completion.
+   * @throws {Error} Original parent, Worker or diagnostic listener startup failure.
+   */
+  async run() {
+    await this.#childHost.use(
+      processPlugin({
+        connectToParent: true,
+        authentication: fixtureAuthentication(),
+        probe: this.#collector,
+        provide: this.#provide,
+        report: this.#diagnostics.report
+      })
+    )
+    try {
+      await this.#workerHost.use(
+        threadPlugin({
+          self: { name: FixtureTrace.caller.child, instanceId: FixtureTrace.caller.child },
+          spawn: { entry: new URL('./worker.mjs', import.meta.url), data: { observed } },
+          authentication: fixtureAuthentication(),
+          probe: this.#collector,
+          report: this.#diagnostics.report
+        })
+      )
+      this.#worker = readRuntimeOutletConnection(
+        this.#workerHost.thread,
+        RuntimePluginKey.thread
+      ).peer
+      this.#workerEndpoint = readRuntimePeerEndpoint(this.#worker).endpoint
+      this.#workerId = readRuntimePeerConnection(this.#worker).peerId
+      this.#workerService = await this.#worker.request(FixtureMethod.ready)
+      if (this.#collector)
+        this.#service = await startFixtureService(
+          this.#collector,
+          FixtureTrace.host.child,
+          this.#diagnostics.report
+        )
+      this.#acceptSetup()
+    } catch (error) {
+      this.#rejectSetup(error)
+      await this.#workerHost.dispose()
+      await this.#childHost.dispose()
+      this.#diagnostics.report(error)
+      throw error
+    }
+  }
+}
+
+/**
+ * The real parent owns its automatic child source, collector connections and explicit trace
+ * endpoint.
+ */
+class ParentProgram {
+  /** Strict reporter retains the actual parent failure classification. */
+  #diagnostics
+  /** This is the original optional parent collector, never a synthetic event source. */
+  #collector
+  /** One ordinary native Host owns the actual spawn:true child installation. */
+  #host = runtimeTestHost({
+    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
+  })
+  /** Genuine committed Peer supplies ready, diagnostics and collector-close requests. */
+  #child
+  /** The exact original native endpoint accepts explicit caller trace metadata. */
+  #endpoint
+  /** Accepted physical routing identity is read from this same genuine child Peer. */
+  #childId
+  /** Parent collector listener stays separate from every probed business endpoint. */
+  #service
+  /** Each actual remote service client retains its original close operation. */
+  #serviceClients = []
+  /** The original parent recording is controlled through its real independent service client. */
+  #parentService
+  /** The actual self-filter proof completes before business recording begins. */
+  #selfFiltered = false
+  /**
+   * Capture the exact optional collector and original strict diagnostic owner.
+   *
+   * @param {ReturnType<typeof createFixtureReporter>} diagnostics Strict parent reporter.
+   * @param {ReturnType<typeof createTraceCollector> | undefined} collector Actual optional
+   *   observer.
+   */
+  constructor(diagnostics, collector) {
+    this.#diagnostics = diagnostics
+    this.#collector = collector
+  }
+  /**
+   * Execute the actual parent-to-child-to-Worker cascade and all original native trace assertions.
+   *
+   * @returns {Promise<void>} Actual business, live trace and resource cleanup completion.
+   * @throws {Error} Original native startup, request, assertion or cleanup failure.
+   */
+  async run() {
+    try {
+      await this.#host.use(
+        processPlugin({
+          self: { name: FixtureTrace.caller.parent, instanceId: FixtureTrace.caller.parent },
+          spawn: true,
+          authentication: fixtureAuthentication(),
+          probe: this.#collector,
+          report: this.#diagnostics.report
+        })
+      )
+      this.#child = readRuntimeOutletConnection(this.#host.process, RuntimePluginKey.process).peer
+      this.#endpoint = readRuntimePeerEndpoint(this.#child).endpoint
+      this.#childId = readRuntimePeerConnection(this.#child).peerId
+      await this.#child.request(FixtureMethod.ready)
+      /** The real ready/config path returns only actually bound diagnostic listener addresses. */
+      const addresses = await this.#child.request(FixtureMethod.diagnostics)
+      await this.#startRecording()
+      /**
+       * This exact send carries caller-owned trace through both real native process and Worker
+       * hops.
+       */
+      const reply = await this.#endpoint.send(this.#childId, FixtureMethod.cascade, 40, {
+        trace: FixtureTrace.id
+      })
+      assert.equal(reply.value, 42)
+      assert.notEqual(reply.childPid, process.pid)
+      assert.equal(reply.workerPid, reply.childPid)
+      assert.equal(reply.workerIsMainThread, false)
+      assert.ok(reply.workerThreadId > 0)
+      assert.equal(reply.childCollectorInstalled, observed)
+      assert.equal(reply.workerCollectorInstalled, observed)
+      /**
+       * Queries observe actual emitted events after business completion, without guessed watcher
+       * timing.
+       */
+      const trace = await this.#collectTrace(addresses)
+      await this.#child.request(FixtureMethod.closeCollectors)
+      this.#collector?.close()
+      /** Original native business remains available after all three observers have closed. */
+      const closedReply = await this.#endpoint.send(this.#childId, FixtureMethod.cascade, 40, {
+        trace: FixtureTrace.id
+      })
+      assert.equal(closedReply.value, reply.value)
+      await this.#reportResult(reply, closedReply, trace)
+    } finally {
+      await Promise.all(this.#serviceClients.map((peer) => peer.close()))
+      await this.#service?.close()
+      this.#collector?.close()
+      await this.#host.dispose()
+    }
+  }
+  /**
+   * Prove self-filtering with actual independent service traffic before starting its original
+   * recording.
+   *
+   * @returns {Promise<void>} Actual parent recording startup, or no work when unobserved.
+   * @throws {Error} Original native service or self-filter assertion failure.
+   */
+  async #startRecording() {
+    if (!this.#collector) return
+    this.#selfFiltered = await proveFixtureSelfFilter(this.#collector, this.#diagnostics.report)
+    this.#service = await startFixtureService(
+      this.#collector,
+      FixtureTrace.host.parent,
+      this.#diagnostics.report
+    )
+    this.#parentService = await connectFixtureService(
+      this.#service,
+      FixtureTrace.host.parent,
+      this.#diagnostics.report
+    )
+    this.#serviceClients.push(this.#parentService)
+    await this.#parentService.request(FixtureTrace.recordStart)
+  }
+  /**
+   * Query the original three actual collectors and close only their independent diagnostic clients.
+   *
+   * @param {{
+   *   child: { address: string; id: string } | null
+   *   worker: { address: string; id: string } | null
+   * }} addresses
+   *   Bound descriptors.
+   * @returns {Promise<unknown>} Original proven live trace or undefined when observers are absent.
+   * @throws {Error} Original descriptor, carrier, catch-up or service failure.
+   */
+  async #collectTrace(addresses) {
+    if (!this.#collector) return undefined
+    assert.ok(addresses.child)
+    assert.ok(addresses.worker)
+    /** Stop returns only genuinely emitted observations from the original parent collector. */
+    const recording = await this.#parentService.request(FixtureTrace.recordStop)
+    /** Real native socket clients contact each original remote collector service. */
+    const childService = await connectFixtureService(
+      addresses.child,
+      FixtureTrace.host.child,
+      this.#diagnostics.report
+    )
+    this.#serviceClients.push(childService)
+    /** Worker diagnostics retain their distinct physical host and thread identity. */
+    const workerService = await connectFixtureService(
+      addresses.worker,
+      FixtureTrace.host.worker,
+      this.#diagnostics.report
+    )
+    this.#serviceClients.push(workerService)
+    /** Carrier and trace assertions consume original service snapshots before any client closes. */
+    const trace = {
+      ...(await proveLiveTrace(
+        [
+          { host: FixtureTrace.host.parent, peer: this.#parentService },
+          { host: FixtureTrace.host.child, peer: childService },
+          { host: FixtureTrace.host.worker, peer: workerService }
+        ],
+        recording,
+        this.#diagnostics.report
+      )),
+      selfFiltered: this.#selfFiltered
+    }
+    await Promise.all(this.#serviceClients.map((peer) => peer.close()))
+    await this.#service.close()
+    return trace
+  }
+  /**
+   * Publish original two-hop evidence only after every actual business/carrier assertion passes.
+   *
+   * @param {Record<string, unknown>} reply Actual initial cascade result and native identities.
+   * @param {Record<string, unknown>} closedReply Actual cascade after observer close.
+   * @param {unknown} trace Original proven service trace, absent when unobserved.
+   * @returns {Promise<void>} Original independent Core observation and both JSON output writes.
+   * @throws {Error} Original Core diagnostic assertion failure.
+   */
+  async #reportResult(reply, closedReply, trace) {
     console.error(
       JSON.stringify({
         acceptance: FixtureTrace.acceptance,
@@ -272,10 +401,7 @@ if (childMode) {
         trace
       })
     )
-    /**
-     * Direct Core observations remain independent from managed business and run after its
-     * assertions.
-     */
+    /** Direct Core observations remain independent and run after the managed business assertions. */
     const core = observed ? await observedCore() : undefined
     console.log(
       JSON.stringify({
@@ -287,19 +413,17 @@ if (childMode) {
         workerPid: reply.workerPid,
         workerThreadId: reply.workerThreadId,
         collectorInstallations: {
-          parent: collector !== undefined,
+          parent: this.#collector !== undefined,
           child: reply.childCollectorInstalled,
           worker: reply.workerCollectorInstalled
         },
         core,
         trace,
-        reports: diagnostics.reports
+        reports: this.#diagnostics.reports
       })
     )
-  } finally {
-    await Promise.all(serviceClients.map((peer) => peer.close()))
-    await service?.close()
-    collector?.close()
-    await child.close()
   }
 }
+
+if (childMode) await new ChildProgram(diagnostics, collector).run()
+else await new ParentProgram(diagnostics, collector).run()

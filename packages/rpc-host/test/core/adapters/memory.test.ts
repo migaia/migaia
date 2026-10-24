@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createMemoryTransportPair } from '../../../dist/core/adapters/memory.js'
+import { createMemoryTransportPair } from '../../fixtures/memory-transport.js'
 import type { IRpcTransport } from '../../../dist/core/transport.js'
 
 describe('memory transport adapter', () => {

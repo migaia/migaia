@@ -8,7 +8,8 @@ import { createCoroutineSupervisor } from '@migaia/supervision/coroutine'
 import { createEventTargetMessageResource } from '../../../rpc-host/dist/runtime-adapter/message/resource.js'
 import { prepareRuntimePeerSourceContext } from '../../../rpc-host/dist/remote/runtime-api/peer.js'
 import { createRuntimePeer } from '../../../rpc-host/dist/remote/runtime-api/peer.js'
-import { constructDefinitionPeer } from '../../../rpc-host/dist/runtime-adapter/definition.js'
+import { createRpcHost } from '../../../rpc-host/dist/index.js'
+import { defineTransportPlugin } from '../../../rpc-host/dist/plugin/define.js'
 import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'
 import type { ICoroutineMessagePort } from '../../dist/coroutine-task.js'
 
@@ -61,7 +62,10 @@ describe('coroutine runtime binding', () => {
     /** The parent uses the same existing resource handshake, without a second identity protocol. */
     const resource = createEventTargetMessageResource(startOnListen(await exposed.promise))
     /** Actual peer lifetimes close before task physical ownership settles. */
-    let peers: Awaited<ReturnType<typeof createRuntimePeer>>[] = []
+    let peers: (
+      | Awaited<ReturnType<typeof createRuntimePeer>>
+      | Awaited<ReturnType<typeof createRpcHost>>
+    )[] = []
     try {
       peers = await Promise.all([
         createRuntimePeer({
@@ -76,10 +80,16 @@ describe('coroutine runtime binding', () => {
               control: rpcMessageCapabilityControl
             })
         }),
-        constructDefinitionPeer(getCoroutineMessageAdapter(), {
-          connect,
+        createRpcHost({
           provide: { read: (value: unknown) => value },
-          report: (error) => reports.push(error)
+          report: (error) => reports.push(error),
+          plugins: [
+            defineTransportPlugin({
+              name: 'coroutine-child',
+              mode: 'connect',
+              deployment: getCoroutineMessageAdapter().deployment({ connect })
+            })
+          ]
         })
       ])
       expect(await peers[0]!.request('read', 'child-recipe')).toBe('child-recipe')

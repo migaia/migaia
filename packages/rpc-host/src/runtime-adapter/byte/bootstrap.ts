@@ -8,7 +8,7 @@ import { registerRuntimeByteFrameSource, RUNTIME_HANDSHAKE_MAX_FRAME_BYTES } fro
 
 import type { IRuntimeByteIO, IRuntimeByteDiagnostics } from './types.js'
 import { systemScheduler, type IScheduledTask, type IScheduler } from '@migaia/utils/scheduler'
-import { RpcCoreErrorCode } from '../../core/index.js'
+import { RpcCoreErrorCode } from '../../core/errors.js'
 import { tagRpcError } from '../../core/errors.js'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { IpcReporterContext } from '../../core/plugins/reporter-context.js'
@@ -21,65 +21,101 @@ export function readRuntimeByteBootstrapSnapshot(channel: IRuntimeByteIO): Uint8
   return bootstraps.get(channel)
 }
 
+/** Own the first-frame receiver and the decoder transferred to the same physical wire. */
+class RuntimeByteBootstrap {
+  /** Exact byte resource stays under the original bootstrap-to-handshake custody. */
+  #channel: IRuntimeByteIO
+  /** Adapter-specific failures retain the original public error contract. */
+  #diagnostics: IRuntimeByteDiagnostics
+  /** Contract owns the first frame, following hello and deferred callback handoff. */
+  #receiver: ReturnType<typeof createRpcBootstrapFrameReceiver>
+  /** Handshake adopts this exact decoder without replaying raw bytes. */
+  #decoder: ReturnType<typeof createRpcStreamFrameDecoderWithLimit>
+  /** Decoder failure and the awaiting caller share one physical teardown. */
+  #closing: Promise<void> | undefined
+
+  /** Validate timeout before acquiring receiver/decoder state and installing native callbacks. */
+  constructor(
+    channel: IRuntimeByteIO,
+    diagnostics: IRuntimeByteDiagnostics,
+    options: Readonly<{ timeoutMs?: number; scheduler?: IScheduler }>
+  ) {
+    if (
+      options.timeoutMs !== undefined &&
+      (!Number.isFinite(options.timeoutMs) || options.timeoutMs < 0)
+    )
+      throw tagRpcError(
+        new TypeError(diagnostics.handshakeTimeoutInvalid),
+        RpcCoreErrorCode.invalidConfig
+      )
+    this.#channel = channel
+    this.#diagnostics = diagnostics
+    this.#receiver = createRpcBootstrapFrameReceiver()
+    this.#decoder = createRpcStreamFrameDecoderWithLimit(
+      {
+        onFrame: (frame) => {
+          /** Copy the actual first frame before the physical reader returns to its caller. */
+          if (!this.#receiver.receivedBootstrap) bootstraps.set(channel, frame.slice())
+          /** Decoder continues the current chunk after the original receiver reports a violation. */
+          const violation = this.#receiver.accept(frame)
+          if (violation) void this.close()
+        },
+        onError: (error) => {
+          this.#receiver.fail(error)
+          void this.close()
+        }
+      },
+      () => (this.#receiver.ready ? RPC_STREAM_MAX_FRAME_BYTES : RUNTIME_HANDSHAKE_MAX_FRAME_BYTES)
+    )
+    registerRuntimeByteFrameSource(channel, {
+      decoder: this.#decoder,
+      activate: () => this.#receiver.activate(),
+      attach: (frame, error) => this.#receiver.attach(frame, error)
+    })
+    channel.onData((chunk) => this.#decoder.push(chunk))
+    channel.onClose(() => {
+      this.#decoder.finish()
+      if (!this.#receiver.receivedBootstrap)
+        this.#receiver.fail(createRuntimeDiagnosticError(diagnostics.closed))
+    })
+  }
+
+  /** Report cleanup once without replacing the bootstrap's original failure. */
+  close = (): Promise<void> =>
+    (this.#closing ??= Promise.resolve()
+      .then(() => this.#channel.close())
+      .catch((cleanup) => hostRethrowReporter(cleanup, IpcReporterContext)))
+
+  /** Waiting code borrows the exact receiver Promise without another async adoption. */
+  get bootstrap(): Promise<Uint8Array> {
+    return this.#receiver.bootstrap
+  }
+
+  /** Only the original optional discovery timer can fail this receiver for timeout. */
+  expire(): void {
+    this.#receiver.fail(createRuntimeDiagnosticError(this.#diagnostics.timeout))
+  }
+}
+
 /** Consume one framed bootstrap and transfer the same decoder to handshake. */
 export async function readRuntimeByteBootstrap(
   channel: IRuntimeByteIO,
   diagnostics: IRuntimeByteDiagnostics,
   options: Readonly<{ timeoutMs?: number; scheduler?: IScheduler }> = {}
 ): Promise<Readonly<{ channel: IRuntimeByteIO; bootstrap: Uint8Array }>> {
-  if (
-    options.timeoutMs !== undefined &&
-    (!Number.isFinite(options.timeoutMs) || options.timeoutMs < 0)
-  )
-    throw tagRpcError(
-      new TypeError(diagnostics.handshakeTimeoutInvalid),
-      RpcCoreErrorCode.invalidConfig
-    )
-  /** Contract owns the first frame, one following hello and original deferred callback handoff. */
-  const receiver = createRpcBootstrapFrameReceiver()
-  /** Decoder failure and the awaiting caller share one physical teardown. */
-  let closing: Promise<void> | undefined
-  /** Cleanup failure is reported once; it cannot replace the bootstrap failure being settled. */
-  const close = (): Promise<void> =>
-    (closing ??= Promise.resolve()
-      .then(() => channel.close())
-      .catch((cleanup) => hostRethrowReporter(cleanup, IpcReporterContext)))
-  const decoder = createRpcStreamFrameDecoderWithLimit(
-    {
-      onFrame(frame) {
-        /** Copy actual first-frame bytes before the physical reader returns to its caller. */
-        if (!receiver.receivedBootstrap) bootstraps.set(channel, frame.slice())
-        /** Owner violations are data here: the original decoder continues the current chunk. */
-        const violation = receiver.accept(frame)
-        if (violation) void close()
-      },
-      onError(error) {
-        receiver.fail(error)
-        void close()
-      }
-    },
-    () => (receiver.ready ? RPC_STREAM_MAX_FRAME_BYTES : RUNTIME_HANDSHAKE_MAX_FRAME_BYTES)
-  )
-  registerRuntimeByteFrameSource(channel, {
-    decoder,
-    activate: () => receiver.activate(),
-    attach: (frame, error) => receiver.attach(frame, error)
-  })
-  channel.onData((chunk) => decoder.push(chunk))
-  channel.onClose(() => {
-    decoder.finish()
-    if (!receiver.receivedBootstrap) receiver.fail(createRuntimeDiagnosticError(diagnostics.closed))
-  })
-  /** Only opt-in discovery installs this original bootstrap owner's bounded wait. */
+  /** One connection owner retains the receiver, decoder and original physical close Promise. */
+  const owner = new RuntimeByteBootstrap(channel, diagnostics, options)
+  /** Timer belongs to this single wait and is released on success and failure. */
   let timer: IScheduledTask | undefined
   try {
     if (options.timeoutMs !== undefined)
-      timer = (options.scheduler ?? systemScheduler).schedule(() => {
-        receiver.fail(createRuntimeDiagnosticError(diagnostics.timeout))
-      }, options.timeoutMs)
-    return Object.freeze({ channel, bootstrap: await receiver.bootstrap })
+      timer = (options.scheduler ?? systemScheduler).schedule(
+        () => owner.expire(),
+        options.timeoutMs
+      )
+    return Object.freeze({ channel, bootstrap: await owner.bootstrap })
   } catch (error) {
-    await close()
+    await owner.close()
     throw error
   } finally {
     timer?.cancel()

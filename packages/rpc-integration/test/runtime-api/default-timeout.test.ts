@@ -2,10 +2,6 @@ import assert from 'node:assert/strict'
 import { it, vi } from 'vitest'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { RpcCoreErrorCode } from '../../../rpc-host/dist/core/errors.js'
-import { createProcessPeer } from '../../../rpc-plugin-process/test/protocol.ts'
-import { createProcessPlugin } from '../../../rpc-plugin-process/test/protocol.ts'
-import { createThreadPeer } from '../../../rpc-plugin-thread/test/protocol.ts'
-import { threadProtocolDefinition as createThreadPlugin } from './fixtures/thread-protocol.js'
 import type { IRpcContext } from '../../../rpc-host/dist/core/typing.js'
 import {
   createRuntimePeer,
@@ -183,13 +179,8 @@ it('a default ordered deadline requires the real bilateral capability while fals
   }
 })
 
-it.each([
-  ['process-peer', createProcessPeer],
-  ['thread-peer', createThreadPeer],
-  ['process-plugin', createProcessPlugin],
-  ['thread-plugin', createThreadPlugin]
-] as const)('%s rejects an invalid default before source acquisition', async (_name, factory) => {
-  /** All four public entries use the same real source acquisition boundary. */
+it('runtime preparation rejects an invalid default before source acquisition', async () => {
+  /** Canonical preparation validates its timeout before acquiring the original physical source. */
   let opens = 0
   const options = {
     name: 'invalid-default',
@@ -200,12 +191,9 @@ it.each([
     },
     report: () => undefined
   }
-  await assert.rejects(
-    Promise.resolve().then(() => Reflect.apply(factory, undefined, [options])),
-    {
-      code: RpcCoreErrorCode.invalidConfig
-    }
-  )
+  await assert.rejects(createRuntimePeer(options), {
+    code: RpcCoreErrorCode.invalidConfig
+  })
   assert.equal(opens, 0)
 })
 

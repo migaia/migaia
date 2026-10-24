@@ -24,15 +24,17 @@ describe('native runtime launchers', () => {
   it.skipIf(!hasBun)('Bun runs a framed stdio child and authenticated TCP listener', () => {
     const result = probe('bun', [resolve(folder, './fixtures/bun-parent.mjs')])
     expect(result.ok).toBe(true)
-    expect(Object.keys(result.capabilities).sort()).toEqual([
-      'bootstrap-fd',
-      'bootstrap-stdin',
-      'cpu-time-limit',
-      'fault-isolation',
-      'memory-limit',
-      'permissions',
-      'termination'
-    ])
+    expect(new Set(Object.keys(result.capabilities))).toEqual(
+      new Set([
+        'bootstrap-fd',
+        'bootstrap-stdin',
+        'cpu-time-limit',
+        'fault-isolation',
+        'memory-limit',
+        'permissions',
+        'termination'
+      ])
+    )
     expect(result.capabilities['bootstrap-stdin']).toBe('enforced')
     expect(result.capabilities['bootstrap-fd']).toBe('unsupported')
     expect(result.capabilities.termination).toBe('unsupported')
@@ -41,15 +43,17 @@ describe('native runtime launchers', () => {
   it.skipIf(!hasDeno)('Deno runs a framed stdio child and authenticated TCP listener', () => {
     const result = probe('deno', ['run', '-A', resolve(folder, './fixtures/deno-parent.mjs')])
     expect(result.ok).toBe(true)
-    expect(Object.keys(result.capabilities).sort()).toEqual([
-      'bootstrap-fd',
-      'bootstrap-stdin',
-      'cpu-time-limit',
-      'fault-isolation',
-      'memory-limit',
-      'permissions',
-      'termination'
-    ])
+    expect(new Set(Object.keys(result.capabilities))).toEqual(
+      new Set([
+        'bootstrap-fd',
+        'bootstrap-stdin',
+        'cpu-time-limit',
+        'fault-isolation',
+        'memory-limit',
+        'permissions',
+        'termination'
+      ])
+    )
     expect(result.capabilities['bootstrap-stdin']).toBe('enforced')
     expect(result.capabilities['bootstrap-fd']).toBe('unsupported')
     expect(result.capabilities.termination).toBe('unsupported')

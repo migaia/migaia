@@ -148,10 +148,10 @@ describe('remote wire shapes', () => {
     const metadata = JSON.parse(
       readFileSync(new URL('../package.json', import.meta.url), 'utf8')
     ) as { dependencies: Record<string, string> }
-    expect(Object.keys(metadata.dependencies).sort()).toEqual([
-      '@migaia/serialize',
-      '@migaia/utils'
-    ])
+    /** Object keys are unique; exact Set equality retains missing and extra dependency checks. */
+    expect(new Set(Object.keys(metadata.dependencies))).toEqual(
+      new Set(['@migaia/serialize', '@migaia/utils'])
+    )
   })
 
   it('normalizes provider schemas through contract, catalog and control without relaxing required fields', () => {

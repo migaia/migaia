@@ -111,7 +111,7 @@ try {
 }
 ```
 
-The v1 header remains { format: 'migaia-rpc-devtools', version: 1 }; package renaming does not change it. /contract exports encodeRpcDevtoolsRecord, decodeRpcDevtoolsRecord, and types. Bytes use reserved $bytes syntax with canonical base64. Native errors restore names, stacks, and cause chains without generating replacement remote stacks. The format does not promise arbitrary JavaScript class-graph round trips.
+The v1 header remains { format: 'migaia-rpc-devtools', version: 1 }; package renaming does not change it. collector.exportRecord/importRecord own record encoding and decoding. Bytes use reserved $bytes syntax with canonical base64. Native errors restore names, stacks, and cause chains without generating replacement remote stacks. The format does not promise arbitrary JavaScript class-graph round trips.
 
 ## Remote service on an existing host
 
@@ -128,48 +128,8 @@ export function exposeDiagnostics(host: IRpcHost, tools: IDevtoolsPlugin) {
 
 capture and exposeContent: true are independent choices. Remote content is hidden by default. Service reads exclude observations from their actual serving host to avoid observing their own queries. The service retains query/watch/stats/describe, record.start/stop, clear, pause, and resume; RPC output uses the original portable/wire conversion.
 
-## Hub and structured logs
-
-/hub exports createRpcDevtoolsHub. It accepts an existing client's request/stream interface or offline records and creates no connection. Registration names are local Hub labels, not endpoint identities.
-
-```ts doc-test=check
-import { createRpcDevtoolsHub } from '@migaia/rpc-plugin-devtools/hub'
-
-export async function inspectRecord(text: string) {
-  const hub = createRpcDevtoolsHub({ maxEvents: 5000 })
-  try {
-    hub.importRecord('offline', text)
-    return hub.timeline({ targets: ['offline'], limit: 100 })
-  } finally {
-    await hub.close()
-  }
-}
-```
-
-Live alignment selects minimum RTT from five samples to estimate offset and uncertainty; network symmetry is not guaranteed. The Hub subscribes before catching up history and deduplicates by original sequence. Interactions use observed trace or sender/message identity; oneSided does not invent a missing side. Hub close returns its watches and cancels its timers, leaving borrowed clients open.
-
-/log exports createRpcLogProbe for a structured logger implementing debug/info/warn/error. Install its probe through an author-SDK feature definition:
-
-```ts doc-test=check
-import { defineFeaturePlugin } from '@migaia/rpc-host/plugin'
-import { createRpcLogProbe, type IRpcLogSink } from '@migaia/rpc-plugin-devtools/log'
-
-const logger: IRpcLogSink = {
-  debug: (message, fields) => console.debug(message, fields),
-  info: (message, fields) => console.info(message, fields),
-  warn: (message, fields) => console.warn(message, fields),
-  error: (message, fields) => console.error(message, fields)
-}
-export const logging = defineFeaturePlugin({
-  name: 'app-logging',
-  probe: createRpcLogProbe(logger, { slowMs: 100 })
-})
-```
-
-Install logging beside the actual transport. The log probe supports message/peer stages and owns no files, buffering, batching, or flush. Keep the logger nonblocking and own its shutdown. Logger/formatting failures enter onError without changing business settlement.
-
 ## Final cleanup and errors
 
-Return owned watches, stop recording, close business hosts, then close the remaining application-owned collector, Hub, and logger. collector.close is idempotent and leaves business hosts open; host.close likewise leaves the collector open.
+Return owned watches, stop recording, close business hosts, then close the remaining application-owned collector. collector.close is idempotent and leaves business hosts open; host.close likewise leaves the collector open.
 
-The source is rpc.devtools. INVALID_OPTION, CLOSED, RECORD_ACTIVE, RECORD_NOT_ACTIVE, RECORD_FORMAT_INVALID, REDACT_FAILED, TARGET_DUPLICATE, TARGET_UNKNOWN, TARGET_RELEASE_FAILED, and SERVICE_RESULT_INVALID preserve native error types and original causes. Handle or report diagnostic and cleanup failures without replacing the original business failure.
+The source is rpc.devtools. INVALID_OPTION, CLOSED, RECORD_ACTIVE, RECORD_NOT_ACTIVE, RECORD_FORMAT_INVALID, REDACT_FAILED, and SERVICE_RESULT_INVALID preserve native error types and original causes. Handle or report diagnostic and cleanup failures without replacing the original business failure.

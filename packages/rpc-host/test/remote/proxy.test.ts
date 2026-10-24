@@ -1,12 +1,20 @@
+import { RpcRuntimeGenerationKind } from '@migaia/rpc-contract/framing/v1'
+import { createRuntimePeer, readRuntimePeerEndpoint } from '../../dist/remote/runtime-api/peer.js'
 import { describe, expect, it, vi } from 'vitest'
 import { RpcRemoteLayerErrorCode } from '../../dist/remote/error-code.js'
-import { createRemoteGenerationHolder, createRemoteRegistration } from '../../dist/remote/proxy.js'
+import {
+  createRemoteGenerationHolder,
+  createRemoteRuntimeRegistration
+} from '../../dist/remote/proxy.js'
 import { remoteHarness } from './fixture.js'
+import { RuntimeStreamFixture } from './stream-fixture.js'
+import { RpcStreamOwner } from '../../dist/core/internal/stream/owner.js'
+import { RpcOutboundAttachment } from '../../dist/core/internal/outbound-attachment.js'
 import {
   RpcCoreErrorCode,
   RpcLifecycleError,
   RPC_CORE_ERROR_SOURCE
-} from '../../dist/core/index.js'
+} from '../../dist/core/errors.js'
 import { attachErrorIdentity } from '@migaia/utils/error'
 
 describe('remote generation proxy', () => {
@@ -101,8 +109,9 @@ describe('remote generation proxy', () => {
     expect(fixture.calls).toEqual(['channel.open', 'endpoint.create'])
     expect(fixture.sends.map((entry) => entry.method)).toEqual(['migaia.remote.runtime.describe'])
     expect(fixture.sends[0]?.options).toMatchObject({ signal })
-    const proxy = fixture.registration.featureProxies().f!.request!
-    await expect(proxy(['first'])).resolves.toBe('result')
+    await expect(fixture.registration.invokeRequest('p.f.request', ['first'])).resolves.toBe(
+      'result'
+    )
     const leaves: string[] = []
     fixture.registration.events.onLeave(1, () => {
       leaves.push('leave')
@@ -114,16 +123,20 @@ describe('remote generation proxy', () => {
       fixture.calls.indexOf('endpoint.dispose')
     )
     expect(fixture.registration.events.current()).toEqual({ generation: 1, active: false })
-    await expect(proxy(['closed'])).rejects.toMatchObject({
-      code: RpcRemoteLayerErrorCode.closed,
-      detail: { generation: 1 },
-      cause: 'gone'
-    })
+    expect(() => fixture.registration.invokeRequest('p.f.request', ['closed'])).toThrowError(
+      expect.objectContaining({
+        code: RpcRemoteLayerErrorCode.closed,
+        detail: { generation: 1 },
+        cause: 'gone'
+      })
+    )
     const ready = fixture.registration.events.whenReady(1)
     fixture.nextGeneration()
     await fixture.registration.prepareGeneration(signal, fixture.own)
     await expect(ready).resolves.toBe(2)
-    await expect(proxy(['second'])).resolves.toBe('result')
+    await expect(fixture.registration.invokeRequest('p.f.request', ['second'])).resolves.toBe(
+      'result'
+    )
     expect(fixture.sends.map((entry) => entry.method)).toEqual([
       'migaia.remote.runtime.describe',
       'p.f.request',
@@ -192,8 +205,7 @@ describe('remote generation proxy', () => {
     const gate = new Promise<void>((resolve) => {
       deliverChannel = resolve
     })
-    const registration = createRemoteRegistration({
-      contract: fixture.registration.contract,
+    const registration = createRemoteRuntimeRegistration({
       binding: {
         ...fixture.binding,
         async openChannel() {
@@ -202,7 +214,8 @@ describe('remote generation proxy', () => {
           return fixture.channel
         }
       },
-      endpointFactory: async () => fixture.served,
+      prepareRuntime: fixture.prepareRuntime,
+      readRuntimeEndpoint: readRuntimePeerEndpoint,
       report: () => undefined
     })
     const holder = createRemoteGenerationHolder(registration, () => undefined)
@@ -227,14 +240,32 @@ describe('remote generation proxy', () => {
     const gate = new Promise<void>((resolve) => {
       deliverEndpoint = resolve
     })
-    const registration = createRemoteRegistration({
-      contract: fixture.registration.contract,
+    const registration = createRemoteRuntimeRegistration({
       binding: fixture.binding,
-      endpointFactory: async () => {
-        constructing?.()
-        await gate
-        return fixture.served
-      },
+      prepareRuntime: (channel, signal, sessionGeneration) =>
+        createRuntimePeer(
+          {
+            self: { name: 'fixture-client', instanceId: 'fixture-client' },
+            endpointFactory: async () => {
+              constructing?.()
+              await gate
+              return fixture.served
+            },
+            report: () => undefined
+          },
+          {
+            channel: Object.fromEntries(
+              Object.entries(channel).filter(([key]) => key !== 'close')
+            ) as Omit<typeof channel, 'close'>,
+            signal,
+            generation: {
+              kind: RpcRuntimeGenerationKind.session,
+              value: sessionGeneration,
+              providerId: 'fixture-client'
+            }
+          }
+        ),
+      readRuntimeEndpoint: readRuntimePeerEndpoint,
       report: () => undefined
     })
     const holder = createRemoteGenerationHolder(registration, () => undefined)
@@ -248,17 +279,14 @@ describe('remote generation proxy', () => {
     await holder.release()
   })
 
-  it('runs guard before the unavailable-generation gate and reports listener errors', async () => {
-    const guardError = new Error('guard')
-    const fixture = remoteHarness({
-      callGuard: {
-        beforeDispatch() {
-          throw guardError
-        }
-      }
-    })
-    const proxy = fixture.registration.featureProxies().f!.request!
-    await expect(proxy([])).rejects.toBe(guardError)
+  it('rejects the unavailable generation and reports listener errors', async () => {
+    /** The actual runtime registration has no removed automatic old-proxy call guard. */
+    const fixture = remoteHarness()
+    expect(() => fixture.registration.invokeRequest('p.f.request', [])).toThrowError(
+      expect.objectContaining({
+        code: RpcRemoteLayerErrorCode.closed
+      })
+    )
     expect(fixture.sends).toHaveLength(0)
     await fixture.registration.prepareGeneration(new AbortController().signal, fixture.own)
     fixture.registration.events.onLeave(1, () => {
@@ -355,39 +383,46 @@ describe('remote generation proxy', () => {
   })
 
   it('caps request and stream deadlines while one-way sends without call options', async () => {
-    const fixture = remoteHarness()
-    const streamOpen = vi.spyOn(fixture.served.stream!, 'open')
-    const registration = createRemoteRegistration({
-      contract: fixture.registration.contract,
-      binding: fixture.binding,
-      endpointFactory: async () => fixture.served,
-      callDeadlineCapMs: 50,
-      report: () => undefined
-    })
-    await registration.prepareGeneration(new AbortController().signal, () => undefined)
-    await registration.invokeRequest('p.f.request', [], { timeoutMs: 90 })
-    await registration.invokeRequest('p.f.request', [], { timeoutMs: 20 })
-    expect(fixture.sends.slice(-2).map((entry) => entry.options)).toMatchObject([
-      { timeoutMs: 50 },
-      { timeoutMs: 20 }
-    ])
-    const stream = registration.invokeStream('p.f.generator', [], { timeoutMs: 90 })
-    await stream.next()
-    expect(fixture.calls).toContain('stream.open')
-    expect(streamOpen).toHaveBeenCalledWith(
-      'peer',
-      'migaia.remote.runtime.stream.p.f.generator',
-      [],
-      { timeoutMs: 50 }
-    )
-    const beforeOneWay = fixture.sends.length
-    await registration.invokeOneWay('p.f.oneWay', [])
-    expect(fixture.calls).toContain('oneWay.send')
-    expect(fixture.sends).toHaveLength(beforeOneWay)
-    await expect(
-      registration.featureProxies().f!.oneWay!([], { timeoutMs: 1 }) as Promise<unknown>
-    ).rejects.toMatchObject({ code: RpcRemoteLayerErrorCode.contractInvalid })
-    await registration.release()
+    /** Only real canonical endpoint owners can carry remote runtime stream dispatch. */
+    const fixture = await RuntimeStreamFixture.open(50)
+    /** Physical request admission records the options actually received by the endpoint. */
+    const send = vi.spyOn(RpcOutboundAttachment.prototype, 'send')
+    /** Stream admission stays distinct from scalar request dispatch. */
+    const streamOpen = vi.spyOn(RpcStreamOwner.prototype, 'open')
+    /** Notification dispatch preserves its actual physical operation without scalar call options. */
+    const oneWay = vi.spyOn(RpcOutboundAttachment.prototype, 'sendOneWay')
+    try {
+      const registration = fixture.registration
+      await registration.invokeRequest('p.f.request', [], { timeoutMs: 90 })
+      await registration.invokeRequest('p.f.request', [], { timeoutMs: 20 })
+      expect(send.mock.calls.slice(-2).map((entry) => entry[3])).toMatchObject([
+        { timeoutMs: 50 },
+        { timeoutMs: 20 }
+      ])
+      const stream = registration.invokeStream('p.f.generator', [], { timeoutMs: 90 })
+      await stream.next()
+      expect(streamOpen).toHaveBeenCalledWith(
+        'peer',
+        'migaia.remote.runtime.stream.p.f.generator',
+        [],
+        { timeoutMs: 50 }
+      )
+      const beforeOneWay = send.mock.calls.length
+      await registration.invokeRequest('p.f.oneWay', [], {}, 'notify')
+      expect(oneWay).toHaveBeenCalledWith('peer', 'p.f.oneWay', [], {
+        signal: undefined,
+        timeoutMs: 50,
+        transfer: undefined
+      })
+      expect(oneWay).toHaveBeenCalledTimes(1)
+      expect(send).toHaveBeenCalledTimes(beforeOneWay)
+      await stream.return!()
+    } finally {
+      send.mockRestore()
+      streamOpen.mockRestore()
+      oneWay.mockRestore()
+      await fixture.close()
+    }
   })
 
   it('rejects readiness on terminal and release without reviving an old generation', async () => {
@@ -408,8 +443,7 @@ describe('remote generation proxy', () => {
     const fixture = remoteHarness()
     const releaseFailure = new Error('release failed')
     const reports: unknown[] = []
-    const registration = createRemoteRegistration({
-      contract: fixture.registration.contract,
+    const registration = createRemoteRuntimeRegistration({
       binding: {
         ...fixture.binding,
         async openChannel() {
@@ -421,7 +455,8 @@ describe('remote generation proxy', () => {
           }
         }
       },
-      endpointFactory: async () => fixture.served,
+      prepareRuntime: fixture.prepareRuntime,
+      readRuntimeEndpoint: readRuntimePeerEndpoint,
       report: (error) => reports.push(error)
     })
     const holder = createRemoteGenerationHolder(registration, (error) => reports.push(error))
@@ -436,8 +471,7 @@ describe('remote generation proxy', () => {
     const rollbackFailure = new Error('rollback failed')
     let opens = 0
     let factories = 0
-    const second = createRemoteRegistration({
-      contract: next.registration.contract,
+    const second = createRemoteRuntimeRegistration({
       binding: {
         ...next.binding,
         async openChannel() {
@@ -450,11 +484,30 @@ describe('remote generation proxy', () => {
           }
         }
       },
-      endpointFactory: async () => {
-        factories += 1
-        if (factories === 2) throw primary
-        return next.served
-      },
+      prepareRuntime: (channel, signal, sessionGeneration) =>
+        createRuntimePeer(
+          {
+            self: { name: 'fixture-client', instanceId: 'fixture-client' },
+            endpointFactory: async () => {
+              factories += 1
+              if (factories === 2) throw primary
+              return next.served
+            },
+            report: () => undefined
+          },
+          {
+            channel: Object.fromEntries(
+              Object.entries(channel).filter(([key]) => key !== 'close')
+            ) as Omit<typeof channel, 'close'>,
+            signal,
+            generation: {
+              kind: RpcRuntimeGenerationKind.session,
+              value: sessionGeneration,
+              providerId: 'fixture-client'
+            }
+          }
+        ),
+      readRuntimeEndpoint: readRuntimePeerEndpoint,
       report: (error) => reports.push(error)
     })
     const replacement = createRemoteGenerationHolder(second, (error) => reports.push(error))

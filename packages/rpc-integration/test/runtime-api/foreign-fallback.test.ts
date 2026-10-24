@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { it } from 'vitest'
-import { createNodeProcessLauncher } from '@migaia/rpc-plugin-process/adapters/node-child-process'
+import { createNodeProcessLauncher } from '../../../rpc-plugin-process/dist/process/adapters/node-child-process.js'
 import { createProcessTransport } from '../../../rpc-plugin-process/dist/process/handshake.js'
 import { createNativeProcessOffer } from '../../../rpc-plugin-process/dist/process/offer.js'
 import { createRpcStreamFrameDecoder } from '@migaia/rpc-contract/framing/stream'
@@ -9,7 +9,7 @@ import { RemoteMethodName } from '../../../rpc-host/dist/remote/constants.js'
 import { readRuntimePeerConnection } from '../../../rpc-host/dist/remote/runtime-api/peer.js'
 import { type IRuntimePeer } from '../../../rpc-host/dist/remote/runtime-api/peer.js'
 import { peers } from '../process/fixtures/conformance-business.js'
-import { createProcessPlugin } from '../../../rpc-plugin-process/test/protocol.ts'
+import { processPlugin } from '@migaia/rpc-plugin-process'
 import { threadProtocolDefinition as createThreadPlugin } from './fixtures/thread-protocol.js'
 import { readRuntimeOutletConnection } from '../../../rpc-host/dist/remote/runtime-api/outlet.js'
 import { runtimeSources, runtimeTestHost } from '../../../rpc-host/test/runtime-api/fixture.js'
@@ -55,7 +55,7 @@ for (const peer of [
     try {
       /** The unchanged peer executes its own real native handshake and business dispatcher. */
       await owners[1].use(
-        createProcessPlugin({
+        processPlugin({
           name: 'c',
           self: { name: 'caller', instanceId: 'caller' },
           provide: {
@@ -64,67 +64,72 @@ for (const peer of [
               return 'hidden'
             }
           },
-          connect: async (context) => {
-            handle = await launcher.launch(
-              {
-                command: peer.command,
-                args: [...peer.args, '--stdio'],
-                env: { inherit: ['PATH'], set: {} },
-                stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' }
-              },
-              { signal: new AbortController().signal, output: () => undefined }
-            )
-            /**
-             * One observer reuses the published decoder; it implements no RPC receiver or
-             * dispatcher.
-             */
-            const decoder = createRpcStreamFrameDecoder({
-              onFrame(frame) {
-                /** Method spelling proves v2 discovery without retaining business payloads. */
-                const decoded = JSON.parse(new TextDecoder().decode(frame))
-                for (const value of Array.isArray(decoded) ? decoded : [decoded]) {
-                  if (value.method !== undefined) methods.push(value.method)
-                  if (value.data?.route?.forwardRoute !== undefined) routedFrames += 1
-                }
-              },
-              onError(error) {
-                throw error
-              }
-            })
-            /**
-             * Capture the native writer through an arrow and preserve the original transport
-             * completion.
-             */
-            const raw = handle.channel!
-            /** Only declared canonical endpoint capabilities enter the initiator's actual offer. */
-            const offer = createNativeProcessOffer({
-              peer: { id: context.self.instanceId, runtime: 'node' }
-            })
-            /** The original process handshake still owns authentication and capability intersection. */
-            const channel = await createProcessTransport(
-              {
-                ...raw,
-                write: (frame) => {
-                  decoder.push(frame)
-                  return raw.write(frame)
-                }
-              },
-              {
-                role: 'initiator',
-                peerId: peer.id,
-                offer: { ...offer, capabilities: context.capabilities },
-                ipc: {
-                  connectionId: `a32-${peer.language}`,
-                  sessionId: `a32-${peer.language}`,
-                  log: () => undefined
+          connect: {
+            target: async (context) => {
+              handle = await launcher.launch(
+                {
+                  command: peer.command,
+                  args: [...peer.args, '--stdio'],
+                  env: { inherit: ['PATH'], set: {} },
+                  stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' }
                 },
-                report: (error) => {
-                  failures.push(error)
+                { signal: new AbortController().signal, output: () => undefined }
+              )
+              /**
+               * One observer reuses the published decoder; it implements no RPC receiver or
+               * dispatcher.
+               */
+              const decoder = createRpcStreamFrameDecoder({
+                onFrame(frame) {
+                  /** Method spelling proves v2 discovery without retaining business payloads. */
+                  const decoded = JSON.parse(new TextDecoder().decode(frame))
+                  for (const value of Array.isArray(decoded) ? decoded : [decoded]) {
+                    if (value.method !== undefined) methods.push(value.method)
+                    if (value.data?.route?.forwardRoute !== undefined) routedFrames += 1
+                  }
+                },
+                onError(error) {
+                  throw error
                 }
-              }
-            )
-            capabilities = channel.agreement.capabilities
-            return channel
+              })
+              /**
+               * Capture the native writer through an arrow and preserve the original transport
+               * completion.
+               */
+              const raw = handle.channel!
+              /** Only declared canonical endpoint capabilities enter the initiator's actual offer. */
+              const offer = createNativeProcessOffer({
+                peer: { id: context.self.instanceId, runtime: 'node' }
+              })
+              /**
+               * The original process handshake still owns authentication and capability
+               * intersection.
+               */
+              const channel = await createProcessTransport(
+                {
+                  ...raw,
+                  write: (frame) => {
+                    decoder.push(frame)
+                    return raw.write(frame)
+                  }
+                },
+                {
+                  role: 'initiator',
+                  peerId: peer.id,
+                  offer: { ...offer, capabilities: context.capabilities },
+                  ipc: {
+                    connectionId: `a32-${peer.language}`,
+                    sessionId: `a32-${peer.language}`,
+                    log: () => undefined
+                  },
+                  report: (error) => {
+                    failures.push(error)
+                  }
+                }
+              )
+              capabilities = channel.agreement.capabilities
+              return channel
+            }
           },
           report: (error) => {
             failures.push(error)

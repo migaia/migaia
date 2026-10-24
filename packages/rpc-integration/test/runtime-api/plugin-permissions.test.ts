@@ -2,7 +2,7 @@ import { readRuntimeOutletConnection } from '../../../rpc-host/dist/remote/runti
 import type { IRuntimeTestRegistry } from '../../../rpc-host/test/runtime-api/fixture.js'
 import { runtimeTestHost } from '../../../rpc-host/test/runtime-api/fixture.js'
 import assert from 'node:assert/strict'
-import { it, vi } from 'vitest'
+import { it, vi, expect } from 'vitest'
 import { PluginHost, definePlugin, defineFeature } from '@migaia/plugin-host'
 import { threadProtocolDefinition as createThreadPlugin } from './fixtures/thread-protocol.js'
 import { runtimeSources } from '../../../rpc-host/test/runtime-api/fixture.js'
@@ -238,11 +238,15 @@ it('a different same-name plugin follows the frozen whitelist without reviving c
     assert.equal(output.read(), 42, 'captured output never invokes the successor')
     assert.equal(successorCalls, 0)
     assert.equal(await owners[1].thread!.request('connection', 'service.read'), 84)
-    for (const method of ['service.removed', 'service.added'])
-      await assert.rejects(
-        Promise.resolve().then(() => owners[1].thread!.request('connection', method)),
-        (error) => permission(error, RpcCoreErrorCode.providerNotFound, 'rpc.endpoint')
-      )
+    await assert.rejects(owners[1].thread!.request('connection', 'service.removed'), (error) =>
+      permission(error, RpcCoreErrorCode.providerNotFound, 'rpc.endpoint')
+    )
+    await expect(owners[1].thread!.request('connection', 'service.added')).rejects.toMatchObject({
+      source: 'rpc.endpoint',
+      code: 'INTERNAL',
+      name: 'RpcRemoteError',
+      cause: { source: 'rpc.endpoint', code: RpcCoreErrorCode.targetUnknown }
+    })
     assert.equal(successorCalls, 1, 'neither a removed key nor an unadvertised key executes')
     /**
      * Connection children retain the exact original contribution, unlike live by-name Feature

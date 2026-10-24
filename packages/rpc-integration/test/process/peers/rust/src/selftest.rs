@@ -347,6 +347,7 @@ fn wire_detail(
             .filter(|(key, _)| !allowed.contains(&key.as_str()))
             .map(|(key, _)| key)
             .collect();
+        // Test-oracle exception: n counts this wire-error node's unknown keys; preserve exact cross-language report order.
         unknown.sort();
         if !ignore && !unknown.is_empty() {
             return bad("unknownField", path.to_owned());
@@ -446,6 +447,7 @@ fn envelope_unknown(value: &Value) -> Value {
                 .filter(|(key, _)| !allowed.contains(&key.as_str()))
                 .map(|(key, _)| key)
                 .collect();
+            // Test-oracle exception: n counts this envelope's unknown keys; preserve exact cross-language report order.
             keys.sort();
             for key in keys {
                 reports.push(Value::Array(vec![

@@ -18,42 +18,74 @@ export async function aborted(signal: IAbortSignal): Promise<void> {
   )
 }
 
+/**
+ * Yield this generation's original provider values without capturing the provider object's
+ * receiver.
+ */
+async function* coroutineValues(
+  label: string,
+  generation: number
+): AsyncIterableIterator<string | number> {
+  yield label
+  yield generation
+}
+
 /** New tasks always create a genuine child host using the exact opaque handle they received. */
-export function service(label: string, report: (error: unknown) => void) {
-  /** Explicit generations retain independent handles, completions and child host identities. */
+/** Allocate only this case's original observations before installing native-shaped callbacks. */
+function coroutineServiceFixtureState(label: string, report: (error: unknown) => void) {
   const contexts: ICoroutineTaskContext[] = []
   const finishes: ReturnType<typeof deferred<void>>[] = []
   const children: IRpcHost[] = []
   const finished: ICoroutineConnect[] = []
   const notices: unknown[] = []
   const cancellation = { entered: 0, cancelled: 0 }
-  /** One task entry is one actual supervised invocation, not a copied connection recipe. */
-  const task: ICoroutineUserTask = async (context) => {
+  return { label, report, contexts, finishes, children, finished, notices, cancellation }
+}
+
+/** Own one test resource's mutable observations without sharing a factory closure. */
+class CoroutineServiceFixture {
+  /** Counts, native events and construction inputs belong only to this fixture instance. */
+  #state: ReturnType<typeof coroutineServiceFixtureState>
+  /** Existing consumers retain the same observable fixture surface and callback identities. */
+  readonly value
+  /** Install the original native-shaped callbacks after their observations exist. */
+  constructor(label: string, report: (error: unknown) => void) {
+    this.#state = coroutineServiceFixtureState(label, report)
+
+    this.value = {
+      task: this.#task,
+      contexts: this.#state.contexts,
+      finishes: this.#state.finishes,
+      children: this.#state.children,
+      finished: this.#state.finished,
+      notices: this.#state.notices,
+      cancellation: this.#state.cancellation
+    }
+  }
+  /** Drive the original fixture operation through its sole state owner. */
+  #task: ICoroutineUserTask = async (context) => {
     /** A caller may reject this original task after its actual child connection became ready. */
     const finish = deferred<void>()
     void finish.promise.catch(() => undefined)
-    contexts.push(context)
-    finishes.push(finish)
+    this.#state.contexts.push(context)
+    this.#state.finishes.push(finish)
     /** Generation-local values expose any accidental reuse of another task's native channel. */
-    const generation = contexts.length
+    const generation = this.#state.contexts.length
     const child = await createRpcHost({
       plugins: [coroutinePlugin({ connectToParent: context.connect })],
-      report,
+      report: this.#state.report,
       provide: {
-        read: (payload: unknown) => [label, generation, payload],
+        read: (payload: unknown) => [this.#state.label, generation, payload],
         notice: (payload: unknown) => {
-          notices.push(payload)
+          this.#state.notices.push(payload)
         },
-        values: async function* () {
-          yield label
-          yield generation
-        },
+        values: () => coroutineValues(this.#state.label, generation),
         wait: (_payload: unknown, call: IRpcContext) =>
           new Promise<void>((_resolve, reject) => {
-            cancellation.entered += 1
+            this.#state.cancellation.entered += 1
             /** Provider cancellation retains the canonical invocation's exact reason. */
             const cancel = () => {
-              cancellation.cancelled += 1
+              this.#state.cancellation.cancelled += 1
               reject(call.signal.reason)
             }
             if (call.signal.aborted) cancel()
@@ -61,15 +93,19 @@ export function service(label: string, report: (error: unknown) => void) {
           })
       }
     })
-    children.push(child)
+    this.#state.children.push(child)
     try {
       await Promise.race([finish.promise, aborted(context.signal)])
     } finally {
       await child.close()
-      finished.push(context.connect)
+      this.#state.finished.push(context.connect)
     }
   }
-  return { task, contexts, finishes, children, finished, notices, cancellation }
+}
+
+/** Create one independent owner for the existing native-boundary fixture. */
+export function service(label: string, report: (error: unknown) => void) {
+  return new CoroutineServiceFixture(label, report).value
 }
 
 /** Ordinary plugin-host retains its real mutation, slot and disposer owners. */

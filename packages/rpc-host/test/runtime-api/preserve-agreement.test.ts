@@ -1,8 +1,9 @@
+import { createRuntimeEndpointComposition } from '../../dist/core/runtime-api-endpoint.js'
 import assert from 'node:assert/strict'
 import { it, vi } from 'vitest'
 import { setImmediate as nextTurn } from 'node:timers/promises'
-import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
-import { createFullOneWayEndpoint } from '../../dist/core/index.js'
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
+
 import { connect } from '../../dist/core/middleware/connect.js'
 import * as agreements from '../../dist/core/internal/batch-frame.js'
 import { RpcCapability, RpcBatchPhysical } from '@migaia/rpc-contract'
@@ -42,18 +43,24 @@ it('live receive agreement changes between two physical batches and late custom 
     return original(frame, options)
   }
   /** Actual caller owns the two original request IDs and their pending entries. */
-  const caller = await createFullOneWayEndpoint({
-    id: 'agreement-caller',
-    transport: left,
-    middlewares: [connect({ transport: left })]
-  })
+  const caller = await createRuntimeEndpointComposition(
+    {
+      id: 'agreement-caller',
+      transport: left,
+      middlewares: [connect({ transport: left })]
+    },
+    { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+  ).installing
   /** Actual provider returns responses through the same production sender. */
-  const provider = await createFullOneWayEndpoint({
-    id: 'agreement-provider',
-    transport: right,
-    provider: { echo: (context) => context.success(context.data) },
-    middlewares: [connect({ transport: right })]
-  })
+  const provider = await createRuntimeEndpointComposition(
+    {
+      id: 'agreement-provider',
+      transport: right,
+      provider: { echo: (context) => context.success(context.data) },
+      middlewares: [connect({ transport: right })]
+    },
+    { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+  ).installing
   /** Own only this fixture diagnostic subscription until terminal cleanup. */
   const remove = caller.hooks.on((event) => {
     if (event.name === 'failure') failures.push(event.error)

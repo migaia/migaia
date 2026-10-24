@@ -1,5 +1,6 @@
-import { createProcessPeer } from '../../../../rpc-plugin-process/test/protocol.ts'
+import { createRpcHost } from '@migaia/rpc-host'
+import { processPlugin } from '@migaia/rpc-plugin-process'
 import { provide, report } from './runtime-api-provide.mjs'
 
-/** The original automatic stdin bootstrap supplies actual identity, offer, auth and execution facts. */
-await createProcessPeer({ provide, report })
+/** Automatic stdin bootstrap supplies actual identity, offer, auth and execution facts. */
+await createRpcHost({ provide, report, plugins: [processPlugin({ connectToParent: true })] })

@@ -55,10 +55,6 @@
     "./schema/wire-error": {
       "default": "./schema/wire-error.schema.json"
     },
-    "./handshake": {
-      "types": "./dist/contract/handshake-index.d.ts",
-      "default": "./dist/contract/handshake-index.js"
-    },
     "./runtime": {
       "types": "./dist/contract/runtime-api/index.d.ts",
       "default": "./dist/contract/runtime-api/index.js"
@@ -79,17 +75,9 @@
       "types": "./dist/contract/framing/jsonrpc.d.ts",
       "default": "./dist/contract/framing/jsonrpc.js"
     },
-    "./binary": {
-      "types": "./dist/contract/binary-index.d.ts",
-      "default": "./dist/contract/binary-index.js"
-    },
     "./binary/lazy": {
       "types": "./dist/contract/binary-lazy-index.d.ts",
       "default": "./dist/contract/binary-lazy-index.js"
-    },
-    "./binary/capture": {
-      "types": "./dist/contract/binary-capture-index.d.ts",
-      "default": "./dist/contract/binary-capture-index.js"
     },
     "./stream": {
       "types": "./dist/contract/stream-index.d.ts",

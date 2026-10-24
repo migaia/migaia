@@ -3,7 +3,7 @@ import { serializeRpcError } from '@migaia/rpc-contract'
  * Fixture emit of maintained web-binary.ts for runtimes requiring concrete .js/.mjs specifiers;
  * production is unchanged.
  */
-import { createThreadPeer } from '../../../rpc-plugin-thread/test/protocol.ts'
+import { createRuntimePeer } from '../../../rpc-host/dist/remote/runtime-api/peer.js'
 import { RUNTIME_API_CAPABILITIES } from '../../../rpc-host/dist/remote/runtime-api/constants.js'
 import { RpcCapability } from '@migaia/rpc-contract'
 import { systemScheduler } from '@migaia/utils/scheduler'
@@ -40,7 +40,7 @@ export async function runWebBinaryQualification(createLauncher, createChannels, 
     })
   }
   /** Every operation uses the public built Thread Peer with its actual configured auth assembly. */
-  const peer = await createThreadPeer({
+  const peer = await createRuntimePeer({
     self: { name: 'binary-web-parent', instanceId: 'binary-web-parent' },
     report,
     spawn: async (context) => {

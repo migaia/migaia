@@ -1,25 +1,15 @@
+import { createComposedEndpoint } from '../../dist/core/composed.js'
+import { createOutboundFeature } from '../../dist/core/features/outbound.js'
+import { createCanonicalChunkFeature } from '../../dist/core/features/canonical-chunk.js'
 /** Hardening regression cases for wire, replay, and identity invariants. */
 import { describe, expect, it, vi } from 'vitest'
-import { createEndpoint } from '../../dist/core/index.js'
+
 import { connect } from '../../dist/core/middleware/connect.js'
 import type { IRpcTransport } from '../../dist/core/transport.js'
-import { splitUtf8 } from '../../dist/core/internal/utf8.js'
 import { ReplayWindow } from '../../dist/core/internal/replay.js'
 import { VerifiedPeerRegistry } from '../../dist/core/internal/identity.js'
 import { RpcRouteProfile, normalizeRpcEnvelope } from '@migaia/rpc-contract'
 import { createStringFramer } from '@migaia/rpc-contract/framing'
-
-describe('#1 splitUtf8 会产出超过 maxBytes 的分片，接收端必然拒收', () => {
-  it('chunk budget 小于最大 UTF-8 code point 时拒绝配置', () => {
-    expect(() => splitUtf8('😀😀', 2)).toThrow(
-      expect.objectContaining({
-        source: 'rpc.endpoint',
-        code: 'INVALID_CONFIG'
-      })
-    )
-    expect(() => splitUtf8('😀😀', 2)).toThrow(RangeError)
-  })
-})
 
 describe('#2 ReplayWindow 出站 id 账本满了之后不再记录', () => {
   it('容量用尽后 reserveId 恒为 false，调用方只能抛 overloaded', () => {
@@ -254,7 +244,11 @@ describe('second adversarial pass (fixed)', () => {
         throw new Error('late replay getter')
       }
     }
-    await expect(createEndpoint(config as any)).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
+    await expect(
+      createComposedEndpoint(config as any, {
+        'first-party-outbound': createOutboundFeature(createCanonicalChunkFeature())
+      })
+    ).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
     expect(installed).toBe(false) // middleware install() must never run once the descriptor is unreadable
     expect(disposed).toBe(false)
   })

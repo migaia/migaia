@@ -2,22 +2,20 @@ import { deferred } from '@migaia/utils/promise'
 import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import type { IUnitHandle, IUnitLauncher, IUnitProfile } from '@migaia/supervision'
-import {
-  createMemoryTransportPair,
-  type IMemoryTransport
-} from '../../dist/core/adapters/memory.js'
+import { createMemoryTransportPair, type IMemoryTransport } from '../fixtures/memory-transport.js'
 import {
   createEventEmitterMessageResource,
   ownAdapterMessageClose
 } from '../../dist/runtime-adapter/message/resource.js'
 import {
   createAdapterDeployment,
-  type IAdapterDeploymentContext
+  type IAdapterDeploymentContext,
+  type IAdapterDeploymentRecipe
 } from '../../dist/runtime-adapter/deployment.js'
 import { defineTransportPlugin } from '../../dist/plugin/index.js'
-import { createRpcHost } from '../../dist/index.js'
+import { createRpcHost, defaultRpcReporter } from '../../dist/index.js'
 import type { IRuntimePeerSourceResult } from '../../dist/remote/runtime-api/peer.js'
-import type { IRpcHostOptions } from '../../dist/host/types.js'
+import type { IRpcHost, IRpcHostOptions } from '../../dist/host/types.js'
 
 /** Wrap the actual memory adapter as raw native-style messaging for canonical resource admission. */
 export function holdMemoryChannel(transport: IMemoryTransport) {
@@ -52,95 +50,166 @@ export function holdMemoryChannel(transport: IMemoryTransport) {
     })
 }
 
-/** The listener retains its actual native accept callback, never an alternate peer/endpoint list. */
-export function memoryServer(name: string, instanceId = name, connectTimeoutMs?: number) {
-  /** Deployment installation publishes the listener operation only when the real hook runs. */
-  let accept!: (channel: IRuntimePeerSourceResult) => Promise<unknown>
-  /** Actual prepared identity comes from the new host, independently of its registration name. */
-  let context!: IAdapterDeploymentContext
-  /** Closing the listener prevents future physical sessions; held sessions stay host-owned. */
-  let closed = false
-  /** A listen deployment is cold and does not create an endpoint or complete peer. */
-  const transport = defineTransportPlugin({
-    name: `${name}-transport`,
-    mode: 'listen',
-    connect: connectTimeoutMs === undefined ? undefined : { timeoutMs: connectTimeoutMs },
-    deployment: createAdapterDeployment({
-      open: async () => {
-        throw new Error('listener-only fixture')
-      },
-      listen: async (prepared, receive) => {
-        context = prepared
-        accept = receive
-        return {
-          close: () => {
-            closed = true
-          }
-        }
-      }
-    })
-  })
-  /** A real native source pairs both existing resource handshakes without creating another caller. */
-  const openPhysical = (prepared: IAdapterDeploymentContext) => {
-    if (closed) throw new Error('fixture listener closed')
-    const pair = createMemoryTransportPair()
-    const serverChannel = holdMemoryChannel(pair[0])
-    const clientChannel = holdMemoryChannel(pair[1])
-    const accepted = deferred<void>()
-    const serverOpening = serverChannel(prepared.self.instanceId, context)
-    const channel = clientChannel(context.self.instanceId, prepared)
-    void serverOpening.then(accept).then(() => accepted.resolve(), accepted.reject)
-    return { pair, channel, accepted: accepted.promise }
-  }
-  return {
-    transport,
-    open(prepared: IAdapterDeploymentContext) {
-      const opening = openPhysical(prepared)
-      void opening.accepted.catch(prepared.report)
-      return opening.channel
-    },
-    /** Join two existing listener hosts through their original raw channel and accept operations. */
-    async link(remote: {
-      open(prepared: IAdapterDeploymentContext): Promise<IRuntimePeerSourceResult>
-    }): Promise<void> {
-      /**
-       * The remote opener owns physical negotiation; this listener admits the same resulting
-       * source.
-       */
-      const channel = await remote.open(context)
-      await accept(channel)
-    },
-    options: { self: { name, instanceId }, plugins: [transport], report: () => undefined },
+/** One real listener owns its native accept callback and admitted physical context. */
+class MemoryServer {
+  /** Each client connection owns only its original physical opening receipt and accept join. */
+  static readonly #Connection = class {
+    /** The real listener remains the sole physical open and native accept owner. */
+    readonly #server: MemoryServer
+    /** Exact physical pair is published only by this client's actual native hook. */
+    #opening: ReturnType<MemoryServer['openPhysical']> | undefined
+    /** Join this same server acceptance with the concurrently opening client Host. */
+    readonly #accepted = deferred<void>()
+    /** Capture only the original listener; no channel or Peer is opened here. */
+    constructor(server: MemoryServer) {
+      this.#server = server
+    }
+    /** The actual installed client source alone acquires and publishes its original physical pair. */
+    readonly #open = async (
+      prepared: IAdapterDeploymentContext
+    ): Promise<IRuntimePeerSourceResult> => {
+      this.#opening = this.#server.openPhysical(prepared)
+      void this.#opening.accepted.then(this.#accepted.resolve, this.#accepted.reject)
+      return this.#opening.channel
+    }
+    /** Open both original sides concurrently and return the exact client Host and raw pair. */
     async connect(
       clientName: string,
-      options: Omit<IRpcHostOptions, 'plugins' | 'self'> = {},
-      clientId = clientName
+      options: Omit<IRpcHostOptions, 'plugins' | 'self'>,
+      clientId: string
     ) {
-      /** Actual raw acquisition happens only in the installed transport hook. */
-      let opening!: ReturnType<typeof openPhysical>
-      const accepted = deferred<void>()
-      /** The client's exact plugin definition delegates only raw channel opening. */
+      /** This cold definition delegates only raw opening to the actual original listener. */
       const plugin = defineTransportPlugin({
         name: `${clientName}-transport`,
         mode: 'connect',
-        deployment: createAdapterDeployment({
-          open: async (prepared) => {
-            opening = openPhysical(prepared)
-            void opening.accepted.then(accepted.resolve, accepted.reject)
-            return opening.channel
-          }
-        })
+        deployment: createAdapterDeployment({ open: this.#open })
       })
-      /** Native acceptance and the client exchange must progress concurrently on the same pair. */
+      /** Native acceptance and the real client exchange progress concurrently on this same pair. */
       const opened = createRpcHost({
         ...options,
         self: { name: clientName, instanceId: clientId },
         plugins: [plugin],
         report: options.report ?? (() => undefined)
       })
-      const [host] = await Promise.all([opened, accepted.promise])
-      return { host, pair: opening.pair }
+      const [host] = await Promise.all([opened, this.#accepted.promise])
+      return { host, pair: this.#opening!.pair }
     }
+  }
+  /** Deployment installation supplies the one actual native session admission callback. */
+  #accept!: (channel: IRuntimePeerSourceResult) => Promise<unknown>
+  /** Prepared identity and cancellation remain owned by this exact listener Host. */
+  #context!: IAdapterDeploymentContext
+  /** Closing only the listener prevents future physical sessions; accepted sessions stay Host-owned. */
+  #closed = false
+  /** Preserve the original plain fixture shape, own-method order and cold transport definition. */
+  readonly value
+  /** Build the original cold native listener without acquiring a channel or complete Peer. */
+  constructor(name: string, instanceId: string, connectTimeoutMs?: number) {
+    /** The real transport hook is the sole point that receives native context and accept authority. */
+    const transport = defineTransportPlugin({
+      name: `${name}-transport`,
+      mode: 'listen',
+      connect: connectTimeoutMs === undefined ? undefined : { timeoutMs: connectTimeoutMs },
+      deployment: createAdapterDeployment({
+        open: async () => {
+          throw new Error('listener-only fixture')
+        },
+        listen: this.#listen
+      })
+    })
+    this.value = {
+      transport,
+      open: this.#open,
+      link: this.#link,
+      options: { self: { name, instanceId }, plugins: [transport], report: () => undefined },
+      connect: this.#connect
+    }
+  }
+  /** Capture the actual native hook inputs once when the listener installation runs. */
+  readonly #listen: NonNullable<IAdapterDeploymentRecipe['listen']> = async (prepared, receive) => {
+    this.#context = prepared
+    this.#accept = receive
+    return { close: this.#closeListener }
+  }
+  /** Retire only future listener acquisition; native accepted sessions keep their original owners. */
+  readonly #closeListener = (): void => {
+    this.#closed = true
+  }
+  /** Pair the two existing raw resource handshakes without creating another caller or endpoint. */
+  openPhysical(prepared: IAdapterDeploymentContext) {
+    if (this.#closed) throw new Error('fixture listener closed')
+    /** Both original memory transports retain their native send/close and probe behavior. */
+    const pair = createMemoryTransportPair()
+    /** Canonical qualification captures each original cold receive side independently. */
+    const serverChannel = holdMemoryChannel(pair[0])
+    /** The opposite canonical raw side belongs only to this connecting client. */
+    const clientChannel = holdMemoryChannel(pair[1])
+    /** This exact completion joins original server acceptance with the client startup. */
+    const accepted = deferred<void>()
+    /** Start the server handshake before its paired client handshake, as in the original fixture. */
+    const serverOpening = serverChannel(prepared.self.instanceId, this.#context)
+    /** Only this original physical channel is delivered to the client transport hook. */
+    const channel = clientChannel(this.#context.self.instanceId, prepared)
+    void serverOpening.then(this.#accept).then(() => accepted.resolve(), accepted.reject)
+    return { pair, channel, accepted: accepted.promise }
+  }
+  /** A borrowed native opener reports rejected acceptance without replacing the original channel. */
+  readonly #open = (prepared: IAdapterDeploymentContext): Promise<IRuntimePeerSourceResult> => {
+    /** Original listener authority owns acquisition and its independent acceptance completion. */
+    const opening = this.openPhysical(prepared)
+    void opening.accepted.catch(prepared.report)
+    return opening.channel
+  }
+  /** Join two existing listener Hosts through only their original raw open and accept operations. */
+  readonly #link = async (remote: {
+    open(prepared: IAdapterDeploymentContext): Promise<IRuntimePeerSourceResult>
+  }): Promise<void> => {
+    /** Remote acquisition owns physical negotiation before this listener accepts that same result. */
+    const channel = await remote.open(this.#context)
+    await this.#accept(channel)
+  }
+  /**
+   * Every connecting client gets its own original physical receipt and no shared mutable factory
+   * locals.
+   */
+  readonly #connect = (
+    clientName: string,
+    options: Omit<IRpcHostOptions, 'plugins' | 'self'> = {},
+    clientId = clientName
+  ) => new MemoryServer.#Connection(this).connect(clientName, options, clientId)
+}
+
+/** Construct the original listener fixture surface while keeping its actual state on one owner. */
+export function memoryServer(name: string, instanceId = name, connectTimeoutMs?: number) {
+  return new MemoryServer(name, instanceId, connectTimeoutMs).value
+}
+
+/**
+ * Pair current public hosts through the existing raw listener fixture, with no private Peer
+ * assembly.
+ */
+export async function connectedHosts<A = unknown, B = unknown>(options: {
+  a: Omit<IRpcHostOptions, 'plugins'>
+  b: Omit<IRpcHostOptions, 'plugins'>
+}): Promise<{ a: IRpcHost<B>; b: IRpcHost<A> }> {
+  /** The server keeps the same listener/physical-session owner used by the facade tests. */
+  const source = memoryServer(options.b.self?.name ?? 'b', options.b.self?.instanceId ?? 'b')
+  /** Only the public entry creates the server's one endpoint and native Host lifetime. */
+  const b = await createRpcHost({ ...source.options, ...options.b })
+  try {
+    const { host: a } = await source.connect(
+      options.a.self?.name ?? 'a',
+      options.a,
+      options.a.self?.instanceId ?? 'a'
+    )
+    return { a: a as unknown as IRpcHost<B>, b: b as unknown as IRpcHost<A> }
+  } catch (primary) {
+    try {
+      await b.close()
+    } catch (cleanup) {
+      ;(options.b.report ?? defaultRpcReporter)(cleanup)
+    }
+    throw primary
   }
 }
 

@@ -6,6 +6,13 @@ import { createWebThreadChannelFactory } from '../../src/threads/adapters/web.js
 import type { IThreadWebPort } from '../../src/threads/types.js'
 import { createRemoteRetryPort } from '@migaia/rpc-host/plugin'
 import { nativeFixture, workerEntry } from './fixture.js'
+import {
+  RpcRuntimeKind,
+  RpcRuntimeMode,
+  RpcRuntimeProfile,
+  readRuntimeCarrier
+} from '@migaia/rpc-contract/runtime'
+import { readRpcBatchMembers } from '@migaia/rpc-contract/framing'
 
 /** Ordinary lifecycle regressions from archived audit receipts do not restart the interrupted audit. */
 describe('thread preparation and retry settlement', () => {
@@ -169,11 +176,42 @@ describe('thread preparation and retry settlement', () => {
       })
       for (
         let turn = 0;
-        turn < 100 && !fixture.frames.some(({ message }) => message.method === 'p.hold');
+        turn < 100 &&
+        !fixture.frames
+          .flatMap(({ message }) => {
+            /** Decode only the canonical physical carrier selector before batch grammar. */
+            const frame = readRuntimeCarrier(message)?.frame ?? message
+            return readRpcBatchMembers(frame) ?? [frame]
+          })
+          .some(
+            (message) =>
+              message !== null &&
+              typeof message === 'object' &&
+              Reflect.get(message, 'profile') === RpcRuntimeProfile &&
+              Reflect.get(message, 'kind') === RpcRuntimeKind.call &&
+              Reflect.get(message, 'task')?.mode === RpcRuntimeMode.request &&
+              Reflect.get(message, 'task')?.method === 'p.hold'
+          );
         turn++
       )
         await new Promise((resolve) => setTimeout(resolve, 2))
-      expect(fixture.frames.some(({ message }) => message.method === 'p.hold')).toBe(true)
+      expect(
+        fixture.frames
+          .flatMap(({ message }) => {
+            /** Decode only the canonical physical carrier selector before batch grammar. */
+            const frame = readRuntimeCarrier(message)?.frame ?? message
+            return readRpcBatchMembers(frame) ?? [frame]
+          })
+          .some(
+            (message) =>
+              message !== null &&
+              typeof message === 'object' &&
+              Reflect.get(message, 'profile') === RpcRuntimeProfile &&
+              Reflect.get(message, 'kind') === RpcRuntimeKind.call &&
+              Reflect.get(message, 'task')?.mode === RpcRuntimeMode.request &&
+              Reflect.get(message, 'task')?.method === 'p.hold'
+          )
+      ).toBe(true)
       scheduler.advance(100)
       for (let turn = 0; turn < 40; turn++) await Promise.resolve()
       expect(outcome).toMatchObject({ code: 'DEADLINE_EXCEEDED' })

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { it, vi } from 'vitest'
 import { identityCodec } from '@migaia/serialize/codecs/identity/v1'
-import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
 import { createEndpointKernel, EndpointOwnerKey } from '../../dist/core/endpoint-kernel.js'
 import { prepareEndpoint } from '../../dist/core/internal/endpoint-bootstrap.js'
 import { RpcOutboundAttachment } from '../../dist/core/internal/outbound-attachment.js'

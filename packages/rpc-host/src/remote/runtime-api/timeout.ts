@@ -1,5 +1,5 @@
 import { createRpcError } from '../../core/errors.js'
-import { RpcCoreErrorCode } from '../../core/index.js'
+import { RpcCoreErrorCode } from '../../core/errors.js'
 import { RUNTIME_API_DEFAULT_TIMEOUT_MS, RuntimeApiErrorText } from './constants.js'
 
 /** Validate the simple factory's default before any original native/source owner is acquired. */

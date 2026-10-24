@@ -1,3 +1,4 @@
+import { orderStringKeys } from '@migaia/utils/string'
 import { createContractError } from '../contract-error.js'
 import { RpcContractErrorCode } from '../error-code.js'
 import type { IRpcEnvelopeOptions, IRpcPortableValue } from '../types.js'
@@ -204,9 +205,7 @@ export function normalizeRpcRoute(
   if (requiredOptional && !Object.hasOwn(normalized, requiredOptional))
     throw invalidRpcEnvelope('required', `/data/route/${requiredOptional}`)
   const known = new Set<string>([...REQUIRED_FIELDS, ...optional])
-  for (const field of Object.keys(record)
-    .filter((key) => !known.has(key))
-    .sort(compareRpcFieldNames))
+  for (const field of orderStringKeys(Object.keys(record).filter((key) => !known.has(key))))
     options?.onUnknownField?.('/data/route', field)
   return Object.freeze(normalized) as IRpcRouteHeader
 }

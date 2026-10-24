@@ -1,7 +1,9 @@
+import { createRuntimeEndpointComposition } from '../../dist/core/runtime-api-endpoint.js'
+import { RpcCapability } from '@migaia/rpc-contract'
 import { describe, expect, it, vi } from 'vitest'
 import { normalizeRpcEnvelope, RpcControl } from '@migaia/rpc-contract'
-import { createEndpoint } from '../../dist/core/index.js'
-import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
+
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
 import { connect } from '../../dist/core/middleware/connect.js'
 import { hooks } from '../../dist/core/middleware/hooks.js'
 import type { IRpcHookEvent } from '../../dist/core/typing.js'
@@ -19,19 +21,25 @@ describe('close control intention', () => {
       }
     }
     const events: IRpcHookEvent[] = []
-    const first = await createEndpoint({
-      id: 'a',
-      transport: capture,
-      middlewares: [connect({ transport: capture })]
-    })
-    const second = await createEndpoint({
-      id: 'b',
-      transport: secondWire,
-      middlewares: [
-        connect({ transport: secondWire }),
-        hooks({ listeners: [(event) => void events.push(event)] })
-      ]
-    })
+    const first = await createRuntimeEndpointComposition(
+      {
+        id: 'a',
+        transport: capture,
+        middlewares: [connect({ transport: capture })]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
+    const second = await createRuntimeEndpointComposition(
+      {
+        id: 'b',
+        transport: secondWire,
+        middlewares: [
+          connect({ transport: secondWire }),
+          hooks({ listeners: [(event) => void events.push(event)] })
+        ]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     try {
       expect(first.announceClose).toBeTypeOf('function')
       await first.announceClose!('b', { drainMs: 500 })

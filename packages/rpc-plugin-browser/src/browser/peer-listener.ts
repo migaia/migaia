@@ -46,7 +46,8 @@ type IBrowserPendingAccept = { resource?: IAdapterMessageResource; opening: Prom
  * Attach SharedWorker acceptance while Core retains negotiation, directory, dispatch and event
  * semantics.
  */
-export async function listenBrowserPorts(
+/** Allocate only the native listener's original membership and cleanup storage. */
+function browserPortListenerState(
   scope: IRuntimeBrowserListen,
   context: IAdapterDeploymentContext,
   adopt: IAdapterDeploymentAccept
@@ -69,65 +70,98 @@ export async function listenBrowserPorts(
   /** Close prevents later native accepts from acquiring a new Core resource. */
   let closed = false
   /** Repeated close and asyncDispose retain one complete cleanup Promise. */
-  let closing: Promise<void> | undefined
-  /** Reporting isolates cleanup observers without replacing the exact opening failure. */
-  const report = (error: unknown): void => {
+  const closing = undefined as Promise<void> | undefined
+  return { scope, context, adopt, carrier, services, pending, closed, closing }
+}
+
+/** Own one native browser listener while the Host keeps accepted endpoint and directory ownership. */
+class BrowserPortListener {
+  /** Native membership, pending preparation and the one close receipt belong to this listener. */
+  #state: ReturnType<typeof browserPortListenerState>
+  /** Create storage before native callbacks can publish any accepted resource. */
+  constructor(
+    scope: IRuntimeBrowserListen,
+    context: IAdapterDeploymentContext,
+    adopt: IAdapterDeploymentAccept
+  ) {
+    this.#state = browserPortListenerState(scope, context, adopt)
+  }
+  /** Attach native acceptance and retain the original rollback and close semantics. */
+  async open() {
+    boundScopes.add(this.#state.scope)
     try {
-      ;(context.report ?? console.error)(error)
+      this.#state.scope.addEventListener(BrowserPeerEvent.connect, this.#accept)
+      this.#state.context.signal?.addEventListener('abort', this.#cancel, { once: true })
+      if (this.#state.context.signal?.aborted) await this.#close()
+      return { close: this.#close }
+    } catch (primary) {
+      try {
+        await this.#close()
+      } catch (cleanup) {
+        this.#report(cleanup)
+      }
+      throw primary
+    }
+  }
+  /** Report asynchronous cleanup without replacing the exact opening failure. */
+  #report = (error: unknown): void => {
+    try {
+      ;(this.#state.context.report ?? console.error)(error)
     } catch (failure) {
       hostRethrowReporter(failure, IpcReporterContext)
     }
   }
-  /**
-   * Native resource retirement determines active sessions; browser never claims accepted Peer
-   * identity.
-   */
-  const active = (): readonly IBrowserListenerService[] => {
-    for (const service of services) if (service.channel.transport.closed) services.delete(service)
-    return [...services]
+  /** Discard native resources retired by Core without duplicating accepted endpoint identity. */
+  #active = (): readonly IBrowserListenerService[] => {
+    for (const service of this.#state.services)
+      if (service.channel.transport.closed) this.#state.services.delete(service)
+    return [...this.#state.services]
   }
-  /** Stop native acceptance before joining all existing session and opening cleanup. */
-  const close = (): Promise<void> => {
-    if (closing) return closing
-    closed = true
-    closing = Promise.resolve().then(async () => {
+  /** Stop native acceptance before joining every cold preparation and accepted session cleanup. */
+  #close = (): Promise<void> => {
+    if (this.#state.closing) return this.#state.closing
+    this.#state.closed = true
+    this.#state.closing = Promise.resolve().then(async () => {
       /** Native cleanup attempts all registrations even when one remover fails. */
       const failures = collectListenerCleanupFailures([
-        () => scope.removeEventListener(BrowserPeerEvent.connect, accept),
-        () => context.signal?.removeEventListener('abort', cancel)
+        () => this.#state.scope.removeEventListener(BrowserPeerEvent.connect, this.#accept),
+        () => this.#state.context.signal?.removeEventListener('abort', this.#cancel)
       ])
-      boundScopes.delete(scope)
+      boundScopes.delete(this.#state.scope)
       /** All cold resources and accepted Peers are retired; borrowed native ports remain open. */
       const results = await Promise.allSettled([
-        ...[...pending].map((accepting) => accepting.resource?.close()),
-        ...[...services].map((service) => service.session.peer.close()),
-        ...[...pending].map((accepting) => accepting.opening)
+        ...[...this.#state.pending].map((accepting) => accepting.resource?.close()),
+        ...[...this.#state.services].map((service) => service.session.peer.close()),
+        ...[...this.#state.pending].map((accepting) => accepting.opening)
       ])
       for (const result of results) if (result.status === 'rejected') failures.push(result.reason)
-      services.clear()
+      this.#state.services.clear()
       await drainTerminalListenerFailures(failures, {
         code: RpcCoreErrorCode.transport,
         message: BrowserPeerErrorText.listenerCleanupFailed
       })
     })
-    return closing
+    return this.#state.closing
   }
-  /** Caller cancellation joins the same listener cleanup owner and reports its observable failure. */
-  const cancel = (): void => {
-    void close().catch(report)
+  /** Join the same close transaction when caller cancellation ends listener lifetime. */
+  #cancel = (): void => {
+    void this.#close().catch(this.#report)
   }
-  /** Each real connect event supplies a separate one-to-one port to the exact Core resource factory. */
-  const accept = (event: IRuntimeBrowserConnectEvent): void => {
-    if (closed) return
+  /**
+   * Open each genuine SharedWorker port through its one canonical Core resource and adoption
+   * receipt.
+   */
+  #accept = (event: IRuntimeBrowserConnectEvent): void => {
+    if (this.#state.closed) return
     for (const port of event.ports) {
       /**
        * Native MessagePort queuing retains early data until this selected carrier starts its
        * reader.
        */
       const accepting: IBrowserPendingAccept = {
-        opening: carrier
+        opening: this.#state.carrier
           .then(async ({ createSharedWorkerTransport }) => {
-            if (closed) return
+            if (this.#state.closed) return
             /** Core owns the exact physical message resource from the first carrier subscription. */
             const resource = createEventTargetMessageResource(
               projectBrowserPeerPort(createSharedWorkerTransport(port))
@@ -137,60 +171,59 @@ export async function listenBrowserPorts(
               /** One deadline covers the original identity and ACK preparation phases. */
               const budget = createAdapterMessageHandshakeBudget(
                 systemScheduler,
-                context.connectTimeoutMs
+                this.#state.context.connectTimeoutMs
               )
               /** Native messages determine the remote identity before shared endpoint adoption. */
-              const peerId = await resource.exchangeIdentity(context, context.signal, budget)
+              const peerId = await resource.exchangeIdentity(
+                this.#state.context,
+                this.#state.context.signal,
+                budget
+              )
               /** The canonical resource owns agreement, codec, and physical control capture. */
               const channel = await resource.open({
                 peerId,
                 scheduler: systemScheduler,
-                offer: context.capabilities,
+                offer: this.#state.context.capabilities,
                 control: rpcMessageCapabilityControl,
-                signal: context.signal,
+                signal: this.#state.context.signal,
                 handshakeBudget: budget
               })
               /** Adoption borrows the host endpoint instead of constructing another peer endpoint. */
-              const session = await adopt(channel)
-              if (closed) {
+              const session = await (0, this.#state.adopt)(channel)
+              if (this.#state.closed) {
                 await session.peer.close()
                 return
               }
-              active()
-              services.add({ channel, session })
+              this.#active()
+              this.#state.services.add({ channel, session })
             } catch (primary) {
               try {
                 await resource.close()
               } catch (cleanup) {
-                report(cleanup)
+                this.#report(cleanup)
               }
               throw primary
             }
           })
           .catch((failure: unknown) => {
-            if (!closed) report(failure)
+            if (!this.#state.closed) this.#report(failure)
           })
           .finally(() => {
-            pending.delete(accepting)
+            this.#state.pending.delete(accepting)
           })
       }
-      pending.add(accepting)
+      this.#state.pending.add(accepting)
       // Native accept callbacks cannot return an asynchronous failure to their event owner.
-      void accepting.opening.catch(report)
+      void accepting.opening.catch(this.#report)
     }
   }
-  boundScopes.add(scope)
-  try {
-    scope.addEventListener(BrowserPeerEvent.connect, accept)
-    context.signal?.addEventListener('abort', cancel, { once: true })
-    if (context.signal?.aborted) await close()
-    return { close }
-  } catch (primary) {
-    try {
-      await close()
-    } catch (cleanup) {
-      report(cleanup)
-    }
-    throw primary
-  }
+}
+
+/** Attach the one native listener without creating another Host or endpoint. */
+export async function listenBrowserPorts(
+  scope: IRuntimeBrowserListen,
+  context: IAdapterDeploymentContext,
+  adopt: IAdapterDeploymentAccept
+) {
+  return new BrowserPortListener(scope, context, adopt).open()
 }

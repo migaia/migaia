@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createRpcIdempotencyStore } from '../../dist/core/index.js'
+import { createRpcIdempotencyStore } from '../../dist/core/idempotency-store.js'
 
 describe('idempotency store', () => {
   it('counts nested portable bytes before retaining a result', () => {

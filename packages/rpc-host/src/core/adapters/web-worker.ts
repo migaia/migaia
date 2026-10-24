@@ -5,23 +5,22 @@ import { createRpcTransportError, identifyRpcBoundaryFailure, tagRpcError } from
 import { registerBatchAgreement } from '../internal/batch-frame.js'
 import { RpcCapability } from '@migaia/rpc-contract/wire'
 import { RpcAdapterErrorText as BrowserRpcErrorText } from './error-text.js'
-import type { IRpcSendOptions, IRpcTransport } from '../transport-kit.js'
+import type { IRpcSendOptions, IRpcTransport } from '../transport.js'
+import { RpcPlatform, RpcTransportOwnership } from '../transport-constants.js'
 import {
-  RpcPlatform,
-  RpcTransportOwnership,
   createListenerFailureState,
   collectListenerCleanupFailures,
   drainTerminalListenerFailures,
-  createMessageListenerHub,
   drainListenerFailures,
   observeListener,
   registerListeners,
   releaseListenerRegistration,
-  reportListenerFailure,
-  safeString
-} from '../transport-kit.js'
+  reportListenerFailure
+} from '../internal/listener-safety.js'
+import { createMessageListenerHub } from '../internal/message-listener-hub.js'
+import { safeString } from '../internal/safe-value.js'
 
-import { RpcCoreErrorCode } from '../index.js'
+import { RpcCoreErrorCode } from '../errors.js'
 
 /**
  * Minimal event-listener worker/port surface — a real `Worker`, `MessagePort`, or
@@ -75,12 +74,13 @@ export type IWebWorkerTransportOptions = {
  * through `onTransportError`, which the endpoint uses to fail every pending call at once instead of
  * leaving them hanging with no response ever coming.
  */
-export function createWebWorkerTransport(
+/** Allocate native carrier state before any lazy subscription is published. */
+function webWorkerTransportState(
   port: IWebWorkerLikePort,
   options: IWebWorkerTransportOptions = {}
-): IRpcTransport<unknown, unknown> {
+) {
   /** The sole installed probe is replaced per observation generation. */
-  let probe: IRpcCarrierProbe | undefined
+  const probe = undefined as IRpcCarrierProbe | undefined
   /** Disposers compare generations even when the same probe object is installed twice. */
   let probeGeneration = 0
   /** Reused detail belongs to this adapter; recipients consume it synchronously. */
@@ -88,28 +88,97 @@ export function createWebWorkerTransport(
   /** Adapter retirement never terminates its borrowed native Worker. */
   let closed = false
   /** Repeated close shares its first cleanup result. */
-  let closeResult: void | Promise<void>
+  const closeResult = undefined as void | Promise<void>
+  /**
+   * The original logical message hub shares native receive registration without changing listener
+   * order.
+   */
   const messageListeners = createMessageListenerHub<{
     data: unknown
     origin?: string
     source?: unknown
   }>()
+  /**
+   * Transport error registrations preserve their original physical-listener generation and failure
+   * delivery.
+   */
   const errorListeners = new Set<(error: unknown) => void>()
+  /** Listener failures remain isolated through the original diagnostic registration owner. */
   const listenerErrors = new Set<(error: unknown) => void>()
+  /**
+   * Secondary reporter and cleanup failures stay retained until the existing failure drain observes
+   * them.
+   */
   const secondaryFailures = createListenerFailureState()
 
-  const emitTransportError = (error: unknown): void => {
-    reportListenerFailure(error, errorListeners, secondaryFailures)
+  return {
+    probe,
+    probeGeneration,
+    probeDetail,
+    closed,
+    closeResult,
+    messageListeners,
+    errorListeners,
+    listenerErrors,
+    secondaryFailures,
+    port,
+    options
+  }
+}
+
+/** Own one native carrier projection; event callbacks retain only this explicit instance. */
+class WebWorkerTransport {
+  /** All mutable observation, listener and close state belongs to this native carrier. */
+  #state: ReturnType<typeof webWorkerTransportState>
+  /** The exact native failure callback remains stable until the last listener is released. */
+  #onError: (event: IWebWorkerPortEvent) => void
+  /** The exact native failure callback remains stable until the last listener is released. */
+  #onMessageError: (event: IWebWorkerPortEvent) => void
+  /** Original transport metadata and callback identities remain on the same public object. */
+  readonly value: IRpcTransport<unknown, unknown>
+  /** Initialize state before publishing lazy native registrations or private carrier capabilities. */
+  constructor(port: IWebWorkerLikePort, options: IWebWorkerTransportOptions = {}) {
+    this.#state = webWorkerTransportState(port, options)
+    this.#onError = this.#onFailure(BrowserRpcErrorText.workerFailedReason)
+    this.#onMessageError = this.#onFailure(BrowserRpcErrorText.workerMessageErrorReason)
+    /** The transport retains its original own enumerable operation keys. */
+    const transport: IRpcTransport<unknown, unknown> = {
+      platform: RpcPlatform.worker,
+      topology: 'exclusive',
+      ownership: RpcTransportOwnership.borrowed,
+      peerId: this.#state.options.peerId,
+      origin: this.#state.options.origin,
+      closed: false,
+      /** Replace observation; the returned disposer retires only its own installation generation. */
+      observe: this.#observe,
+      send: this.#send,
+      // Attached lazily on first subscriber, detached once the last one
+      // leaves — a client that closes must not leave the underlying port
+      // still holding real listeners it can no longer reach.
+      subscribe: this.#subscribe,
+      /** Retire observation and detach borrowed native hooks without terminating the Worker. */
+      close: this.#close,
+      onTransportError: this.#onTransportError,
+      onListenerError: this.#onListenerError
+    }
+
+    Object.defineProperty(transport, 'closed', {
+      configurable: true,
+      enumerable: true,
+      get: () => this.#state.closed
+    })
+    this.value = registerBatchAgreement(
+      transport,
+      this.#state.options.capabilities ?? [RpcCapability.batch]
+    )
+  }
+  /** Handle this native carrier event through its original listener failure owner. */
+  #emitTransportError = (error: unknown): void => {
+    reportListenerFailure(error, this.#state.errorListeners, this.#state.secondaryFailures)
   }
 
-  // `event` is an external boundary — a real MessageEvent never throws
-  // reading `.data`, but a hostile/mocked event object (or a getter that
-  // itself throws) must not be allowed to escape as an uncaught exception
-  // from inside the port's own event dispatch. Routed through
-  // `onTransportError` rather than silently dropped: a message that could
-  // not even be read is exactly the kind of thing pending callers need to
-  // know happened, not have quietly vanish.
-  const onMessage = (event: IWebWorkerPortEvent): void => {
+  /** Handle this native carrier event through its original listener failure owner. */
+  #onMessage = (event: IWebWorkerPortEvent): void => {
     let data: unknown
     let origin: string | undefined
     let source: unknown
@@ -120,12 +189,12 @@ export function createWebWorkerTransport(
       source = (event as { source?: unknown }).source
     } catch (error) {
       const detail = safeString(error, undefined, ({ error: conversionError }) => {
-        emitTransportError(
+        this.#emitTransportError(
           createRpcTransportError(BrowserRpcErrorText.workerMessageReadFailed(''), conversionError)
         )
         return undefined
       })
-      emitTransportError(
+      this.#emitTransportError(
         tagRpcError(
           new Error(BrowserRpcErrorText.workerMessageReadFailed(detail), { cause: error }),
           RpcCoreErrorCode.transport
@@ -133,35 +202,38 @@ export function createWebWorkerTransport(
       )
       return
     }
-    if (probe !== undefined) {
+    if (this.#state.probe !== undefined) {
       /** One event retains the installed handle even if its callback replaces observation. */
-      const currentProbe = probe
+      const currentProbe = this.#state.probe
       try {
-        probeDetail[RpcCarrierDetailKey.transfers] = -1
+        this.#state.probeDetail[RpcCarrierDetailKey.transfers] = -1
         currentProbe.emit(
           1,
           carrierSizeBytes(data),
           RpcPlatform.worker,
-          probeDetail,
+          this.#state.probeDetail,
           currentProbe.capturing ? data : undefined
         )
       } catch (error) {
         reportListenerFailure(
           createRpcTransportError(BrowserRpcErrorText.probeFailed, error),
-          listenerErrors,
-          secondaryFailures
+          this.#state.listenerErrors,
+          this.#state.secondaryFailures
         )
       }
     }
-    messageListeners.dispatch({ data, origin, source }, (listener, message) => {
+    this.#state.messageListeners.dispatch({ data, origin, source }, (listener, message) => {
       observeListener(
         () => listener(message),
-        (error) => reportListenerFailure(error, listenerErrors, secondaryFailures),
-        secondaryFailures
+        (error) =>
+          reportListenerFailure(error, this.#state.listenerErrors, this.#state.secondaryFailures),
+        this.#state.secondaryFailures
       )
     })
   }
-  const onFailure =
+
+  /** Handle this native carrier event through its original listener failure owner. */
+  #onFailure =
     (reason: string) =>
     (event: IWebWorkerPortEvent): void => {
       let detail: string
@@ -173,7 +245,7 @@ export function createWebWorkerTransport(
           (event as unknown as { message?: string } | undefined)?.message || reason,
           reason,
           ({ error }) => {
-            emitTransportError(
+            this.#emitTransportError(
               createRpcTransportError(BrowserRpcErrorText.workerFailure(reason, reason), error)
             )
             return undefined
@@ -181,12 +253,12 @@ export function createWebWorkerTransport(
         )
       } catch (error) {
         cause = error
-        emitTransportError(
+        this.#emitTransportError(
           createRpcTransportError(BrowserRpcErrorText.workerFailure(reason, reason), error)
         )
         detail = reason
       }
-      emitTransportError(
+      this.#emitTransportError(
         tagRpcError(
           new Error(
             BrowserRpcErrorText.workerFailure(reason, detail),
@@ -196,149 +268,166 @@ export function createWebWorkerTransport(
         )
       )
     }
-  const onError = onFailure(BrowserRpcErrorText.workerFailedReason)
-  const onMessageError = onFailure(BrowserRpcErrorText.workerMessageErrorReason)
-
-  /** The canonical factory is the sole owner of this static deployment agreement. */
-  const transport: IRpcTransport<unknown, unknown> = {
-    platform: RpcPlatform.worker,
-    topology: 'exclusive',
-    ownership: RpcTransportOwnership.borrowed,
-    peerId: options.peerId,
-    origin: options.origin,
-    get closed() {
-      return closed
-    },
-    /** Replace observation; the returned disposer retires only its own installation generation. */
-    observe(next) {
-      /** Every installation replaces the prior generation, including equal probe identities. */
-      const generation = ++probeGeneration
-      if (!closed) probe = next
-      return () => {
-        if (generation === probeGeneration) probe = undefined
-      }
-    },
-    send(message, options?: IRpcSendOptions<unknown>) {
-      if (closed) throw createRpcTransportError(BrowserRpcErrorText.workerClosed)
-      /** Read the native transfer option once; observation cannot select a different list. */
-      const transfer = options?.transfer
-      if (probe !== undefined) {
-        /** One event retains the installed handle even if its callback replaces observation. */
-        const currentProbe = probe
-        try {
-          probeDetail[RpcCarrierDetailKey.transfers] = transfer?.length ?? 0
-          currentProbe.emit(
-            0,
-            carrierSizeBytes(message),
-            RpcPlatform.worker,
-            probeDetail,
-            currentProbe.capturing ? captureTransferredContent(message, transfer) : undefined
-          )
-        } catch (error) {
-          reportListenerFailure(
-            createRpcTransportError(BrowserRpcErrorText.probeFailed, error),
-            listenerErrors,
-            secondaryFailures
-          )
-        }
-      }
-      try {
-        port.postMessage(message, transfer)
-      } catch (error) {
-        throw identifyRpcBoundaryFailure(
-          error,
-          RpcCoreErrorCode.transport,
-          BrowserRpcErrorText.nativeSendFailed
-        )
-      }
-    },
-    // Attached lazily on first subscriber, detached once the last one
-    // leaves — a client that closes must not leave the underlying port
-    // still holding real listeners it can no longer reach.
-    subscribe(listener) {
-      if (closed) throw createRpcTransportError(BrowserRpcErrorText.workerClosed)
-      messageListeners.add(listener, () =>
-        registerListeners(
-          [
-            {
-              add: () => port.addEventListener('message', onMessage),
-              remove: () => port.removeEventListener('message', onMessage)
-            }
-          ],
-          { code: RpcCoreErrorCode.transport, secondaryFailures }
-        )
-      )
-      return () => {
-        if (!messageListeners.has(listener)) return
-        releaseListenerRegistration(
-          messageListeners.size === 1 ? [() => port.removeEventListener('message', onMessage)] : [],
-          () => messageListeners.remove(listener, () => undefined),
-          { code: RpcCoreErrorCode.transport, secondaryFailures }
-        )
-      }
-    },
-    /** Retire observation and detach borrowed native hooks without terminating the Worker. */
-    close() {
-      if (closed) return closeResult
-      closed = true
-      probe = undefined
-      messageListeners.clear(() => undefined)
-      closeResult = drainTerminalListenerFailures(
-        collectListenerCleanupFailures([
-          () => port.removeEventListener('message', onMessage),
-          () => port.removeEventListener('error', onError),
-          () => port.removeEventListener('messageerror', onMessageError)
-        ]),
-        {
-          code: RpcCoreErrorCode.transport,
-          message: BrowserRpcErrorText.workerCleanupFailed,
-          secondaryFailures,
-          aggregateSingle: true
-        }
-      )
-      return closeResult
-    },
-    onTransportError(listener) {
-      if (!closed && errorListeners.size === 0) {
-        registerListeners(
-          [
-            {
-              add: () => port.addEventListener('error', onError),
-              remove: () => port.removeEventListener('error', onError)
-            },
-            {
-              add: () => port.addEventListener('messageerror', onMessageError),
-              remove: () => port.removeEventListener('messageerror', onMessageError)
-            }
-          ],
-          { code: RpcCoreErrorCode.transport, secondaryFailures }
-        )
-      }
-      errorListeners.add(listener)
-      return () => {
-        if (!errorListeners.has(listener)) return
-        releaseListenerRegistration(
-          errorListeners.size === 1
-            ? [
-                () => port.removeEventListener('error', onError),
-                () => port.removeEventListener('messageerror', onMessageError)
-              ]
-            : [],
-          () => {
-            errorListeners.delete(listener)
-          },
-          { code: RpcCoreErrorCode.transport, secondaryFailures }
-        )
-      }
-    },
-    onListenerError(listener) {
-      listenerErrors.add(listener)
-      return () => {
-        const deleted = listenerErrors.delete(listener)
-        drainListenerFailures([], { code: RpcCoreErrorCode.transport, secondaryFailures })
-        return deleted
-      }
+  /** Replace observation; the returned disposer retires only its own installation generation. */
+  #observe: NonNullable<IRpcTransport<unknown, unknown>['observe']> = (next) => {
+    /** Every installation replaces the prior generation, including equal probe identities. */
+    const generation = ++this.#state.probeGeneration
+    if (!this.#state.closed) this.#state.probe = next
+    return () => {
+      if (generation === this.#state.probeGeneration) this.#state.probe = undefined
     }
   }
-  return registerBatchAgreement(transport, options.capabilities ?? [RpcCapability.batch])
+
+  /** Preserve the native send operation and its original registration or settlement lifetime. */
+  #send: NonNullable<IRpcTransport<unknown, unknown>['send']> = (
+    message,
+    options?: IRpcSendOptions<unknown>
+  ) => {
+    if (this.#state.closed) throw createRpcTransportError(BrowserRpcErrorText.workerClosed)
+    /** Read the native transfer option once; observation cannot select a different list. */
+    const transfer = options?.transfer
+    if (this.#state.probe !== undefined) {
+      /** One event retains the installed handle even if its callback replaces observation. */
+      const currentProbe = this.#state.probe
+      try {
+        this.#state.probeDetail[RpcCarrierDetailKey.transfers] = transfer?.length ?? 0
+        currentProbe.emit(
+          0,
+          carrierSizeBytes(message),
+          RpcPlatform.worker,
+          this.#state.probeDetail,
+          currentProbe.capturing ? captureTransferredContent(message, transfer) : undefined
+        )
+      } catch (error) {
+        reportListenerFailure(
+          createRpcTransportError(BrowserRpcErrorText.probeFailed, error),
+          this.#state.listenerErrors,
+          this.#state.secondaryFailures
+        )
+      }
+    }
+    try {
+      this.#state.port.postMessage(message, transfer)
+    } catch (error) {
+      throw identifyRpcBoundaryFailure(
+        error,
+        RpcCoreErrorCode.transport,
+        BrowserRpcErrorText.nativeSendFailed
+      )
+    }
+  }
+
+  /** Preserve the native subscribe operation and its original registration or settlement lifetime. */
+  #subscribe: NonNullable<IRpcTransport<unknown, unknown>['subscribe']> = (listener) => {
+    if (this.#state.closed) throw createRpcTransportError(BrowserRpcErrorText.workerClosed)
+    this.#state.messageListeners.add(listener, () =>
+      registerListeners(
+        [
+          {
+            add: () => this.#state.port.addEventListener('message', this.#onMessage),
+            remove: () => this.#state.port.removeEventListener('message', this.#onMessage)
+          }
+        ],
+        { code: RpcCoreErrorCode.transport, secondaryFailures: this.#state.secondaryFailures }
+      )
+    )
+    return () => {
+      if (!this.#state.messageListeners.has(listener)) return
+      releaseListenerRegistration(
+        this.#state.messageListeners.size === 1
+          ? [() => this.#state.port.removeEventListener('message', this.#onMessage)]
+          : [],
+        () => this.#state.messageListeners.remove(listener, () => undefined),
+        { code: RpcCoreErrorCode.transport, secondaryFailures: this.#state.secondaryFailures }
+      )
+    }
+  }
+
+  /** Retire observation and detach borrowed native hooks without terminating the Worker. */
+  #close: NonNullable<IRpcTransport<unknown, unknown>['close']> = () => {
+    if (this.#state.closed) return this.#state.closeResult
+    this.#state.closed = true
+    this.#state.probe = undefined
+    this.#state.messageListeners.clear(() => undefined)
+    this.#state.closeResult = drainTerminalListenerFailures(
+      collectListenerCleanupFailures([
+        () => this.#state.port.removeEventListener('message', this.#onMessage),
+        () => this.#state.port.removeEventListener('error', this.#onError),
+        () => this.#state.port.removeEventListener('messageerror', this.#onMessageError)
+      ]),
+      {
+        code: RpcCoreErrorCode.transport,
+        message: BrowserRpcErrorText.workerCleanupFailed,
+        secondaryFailures: this.#state.secondaryFailures,
+        aggregateSingle: true
+      }
+    )
+    return this.#state.closeResult
+  }
+
+  /**
+   * Preserve the native onTransportError operation and its original registration or settlement
+   * lifetime.
+   */
+  #onTransportError: NonNullable<IRpcTransport<unknown, unknown>['onTransportError']> = (
+    listener
+  ) => {
+    if (!this.#state.closed && this.#state.errorListeners.size === 0) {
+      registerListeners(
+        [
+          {
+            add: () => this.#state.port.addEventListener('error', this.#onError),
+            remove: () => this.#state.port.removeEventListener('error', this.#onError)
+          },
+          {
+            add: () => this.#state.port.addEventListener('messageerror', this.#onMessageError),
+            remove: () => this.#state.port.removeEventListener('messageerror', this.#onMessageError)
+          }
+        ],
+        { code: RpcCoreErrorCode.transport, secondaryFailures: this.#state.secondaryFailures }
+      )
+    }
+    this.#state.errorListeners.add(listener)
+    return () => {
+      if (!this.#state.errorListeners.has(listener)) return
+      releaseListenerRegistration(
+        this.#state.errorListeners.size === 1
+          ? [
+              () => this.#state.port.removeEventListener('error', this.#onError),
+              () => this.#state.port.removeEventListener('messageerror', this.#onMessageError)
+            ]
+          : [],
+        () => {
+          this.#state.errorListeners.delete(listener)
+        },
+        { code: RpcCoreErrorCode.transport, secondaryFailures: this.#state.secondaryFailures }
+      )
+    }
+  }
+
+  /**
+   * Preserve the native onListenerError operation and its original registration or settlement
+   * lifetime.
+   */
+  #onListenerError: NonNullable<IRpcTransport<unknown, unknown>['onListenerError']> = (
+    listener
+  ) => {
+    this.#state.listenerErrors.add(listener)
+    return () => {
+      const deleted = this.#state.listenerErrors.delete(listener)
+      drainListenerFailures([], {
+        code: RpcCoreErrorCode.transport,
+        secondaryFailures: this.#state.secondaryFailures
+      })
+      return deleted
+    }
+  }
+}
+
+/** Construct one explicit native carrier owner while preserving the original transport boundary. */
+export function createWebWorkerTransport(
+  port: IWebWorkerLikePort,
+  options: IWebWorkerTransportOptions = {}
+): IRpcTransport<unknown, unknown> {
+  return new WebWorkerTransport(port, options).value
 }

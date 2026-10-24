@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { createHmac } from 'node:crypto'
-import { authentication } from '../../../rpc-host/dist/core/index.js'
+import { authentication } from '../../../rpc-host/dist/core/middleware/authentication.js'
 
 /** Public test-only key signs the entire inner physical binding; it is never a deployment secret. */
 const key = 'native-stream-public-fixture-key'
@@ -64,22 +64,57 @@ export function verifyNativeFixture(frame) {
  * @returns {{ plugin: object; capability(): object | undefined }} Normal middleware plus exact
  *   port.
  */
-export function nativeFixtureAuthentication(encodedType = 'any') {
-  const original = authentication({
-    sign: signNativeFixture,
-    verify: verifyNativeFixture,
-    encodedType
-  })
-  let installed
-  return {
-    plugin: {
-      ...original,
-      install: async (context) => {
-        const result = await original.install(context)
-        installed = result.ports.authentication
-        return result
-      }
-    },
-    capability: () => installed
+class NativeFixtureAuthentication {
+  /**
+   * The actual canonical middleware retains signing, verification and installed capability
+   * ownership.
+   */
+  #original
+  /** The sender reads only the capability returned by the real middleware installation. */
+  #installed
+  /** The test installs this original middleware with an observation of its genuine capability. */
+  plugin
+  /**
+   * Retain the real authentication owner and observe its ordinary installation result.
+   *
+   * @param {'any' | 'string'} encodedType Exact encoded transport output category.
+   */
+  constructor(encodedType) {
+    this.#original = authentication({
+      sign: signNativeFixture,
+      verify: verifyNativeFixture,
+      encodedType
+    })
+    this.plugin = { ...this.#original, install: this.#install }
   }
+  /**
+   * Observe the capability only after canonical installation succeeds.
+   *
+   * @param {Parameters<ReturnType<typeof authentication>['install']>[0]} context Original
+   *   middleware installation context.
+   * @returns {ReturnType<ReturnType<typeof authentication>['install']>} Original installation
+   *   result, unchanged.
+   */
+  #install = async (context) => {
+    const result = await this.#original.install(context)
+    this.#installed = result.ports.authentication
+    return result
+  }
+  /**
+   * Read the real installed capability without creating a second authentication path.
+   *
+   * @returns {object | undefined} Capability from successful canonical installation.
+   */
+  capability = () => this.#installed
+}
+
+/**
+ * Expose one case-owned observation of the actual canonical authentication installation.
+ *
+ * @param {'any' | 'string'} [encodedType] Exact encoded transport output category.
+ * @returns {{ plugin: object; capability(): object | undefined }} Original middleware and its
+ *   installed capability reader.
+ */
+export function nativeFixtureAuthentication(encodedType = 'any') {
+  return new NativeFixtureAuthentication(encodedType)
 }

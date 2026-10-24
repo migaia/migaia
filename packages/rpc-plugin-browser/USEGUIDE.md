@@ -163,4 +163,4 @@ export async function callReliableSession(session: IWebTransportPluginOptions['s
 
 来源与载体错误使用 `rpc.transport.browser`，通用 RPC/握手错误保留 `rpc.endpoint`、`rpc.remote` 等原身份与完整 cause 链。不要仅按 message 匹配，也不要重建错误而丢失原生 TypeError、stack 或 cause。
 
-普通 `PluginHost` 可安装同一传输定义，`name`/`expose` 用于该安装的注册与公开业务。需要编写载体的作者可使用本包八个 `/adapters/*` 入口与 host `/plugin` SDK 的安全原始部署工具；应用无需另建 endpoint 或调用底层工厂。
+普通 `PluginHost` 可安装同一传输定义，`name`/`expose` 用于该安装的注册与公开业务。自定义载体使用 host `/plugin` SDK 的原始部署工具；应用直接安装对应 browser plugin。

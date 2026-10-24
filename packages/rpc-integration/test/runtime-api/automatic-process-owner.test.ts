@@ -1,14 +1,20 @@
 import assert from 'node:assert/strict'
 import { PassThrough } from 'node:stream'
-import { it } from 'vitest'
-import { createAutomaticProcessPeer } from '../../../rpc-plugin-process/test/protocol.ts'
+import { it, vi } from 'vitest'
+import { createRpcHost } from '@migaia/rpc-host'
+import { processPlugin } from '@migaia/rpc-plugin-process'
+import { NativeProcessRuntimeLoader } from '../../../rpc-plugin-process/dist/process/runtime-loader.js'
+import { NativeProcessRuntimeLoader as SourceProcessRuntimeLoader } from '../../../rpc-plugin-process/src/process/runtime-loader.js'
 import { nodeByteStream } from '../../../rpc-plugin-process/dist/process/node-byte-stream.js'
 import { prepareProcessRuntimeBootstrap } from '../../../rpc-plugin-process/dist/process/runtime-bootstrap.js'
 import { createProcessTransport } from '../../../rpc-plugin-process/dist/process/handshake.js'
 import { receiveAdapterBootstrap } from '../../../rpc-plugin-process/dist/process/bootstrap.js'
 import { encodeRpcStreamFrame } from '@migaia/rpc-contract/framing/stream'
 import { createNativeProcessOffer } from '../../../rpc-plugin-process/dist/process/offer.js'
-import { PROCESS_RUNTIME_API_ENV_VERSION } from '../../../rpc-plugin-process/dist/process/constants.js'
+import {
+  PROCESS_RUNTIME_API_ENV,
+  PROCESS_RUNTIME_API_ENV_VERSION
+} from '../../../rpc-plugin-process/dist/process/constants.js'
 import { createRuntimePeer } from '../../../rpc-host/dist/remote/runtime-api/peer.js'
 
 it('automatic process authenticates its bootstrap parent and retains bidirectional business', async () => {
@@ -53,17 +59,31 @@ it('automatic process authenticates its bootstrap parent and retains bidirection
       return receiveAdapterBootstrap(childChannel, 'stdin')
     }
   }
-  /** A conflicting explicit source is rejected before claiming the one process reader. */
-  await assert.rejects(
-    createAutomaticProcessPeer(
-      {
-        connect: async () => {
-          throw new Error('explicit source must not execute')
-        },
-        report: () => undefined
-      },
-      platform
-    ),
+  /** The existing runtime loader lends the actual held native byte channels to processPlugin. */
+  const loads = [...new Set([NativeProcessRuntimeLoader, SourceProcessRuntimeLoader])].map(
+    (loader) =>
+      vi.spyOn(loader.prototype, 'load').mockImplementation(() =>
+        Promise.resolve({
+          processRuntimeIO: {
+            discover: () => ({ marker: platform.marker, runtime: platform.runtime }),
+            open: platform.open
+          }
+        })
+      )
+  )
+  /** Native child classification remains the real environment marker read by the cold plugin. */
+  vi.stubEnv(PROCESS_RUNTIME_API_ENV, PROCESS_RUNTIME_API_ENV_VERSION)
+  /** Conflicting source cardinality is rejected before the existing one-reader claim. */
+  assert.throws(
+    () =>
+      processPlugin({
+        connectToParent: true,
+        connect: {
+          target: async () => {
+            throw new Error('explicit source must not execute')
+          }
+        }
+      } as never),
     { code: 'INVALID_CONFIG' }
   )
   assert.equal(opens, 0)
@@ -92,13 +112,11 @@ it('automatic process authenticates its bootstrap parent and retains bidirection
       },
       report: (error) => failures.push(error)
     }),
-    createAutomaticProcessPeer(
-      {
-        provide: { double: (value: number) => value * 2 },
-        report: (error) => failures.push(error)
-      },
-      platform
-    )
+    createRpcHost({
+      plugins: [processPlugin({ connectToParent: true })],
+      provide: { double: (value: number) => value * 2 },
+      report: (error) => failures.push(error)
+    })
   ])
   try {
     assert.equal(await parent.request('double', 21), 42)
@@ -111,5 +129,7 @@ it('automatic process authenticates its bootstrap parent and retains bidirection
   } finally {
     await Promise.all([parent.close(), child.close()])
     close()
+    for (const load of loads) load.mockRestore()
+    vi.unstubAllEnvs()
   }
 })

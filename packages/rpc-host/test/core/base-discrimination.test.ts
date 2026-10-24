@@ -1,7 +1,9 @@
+import { createRuntimeEndpointComposition } from '../../dist/core/runtime-api-endpoint.js'
+import { RpcCapability } from '@migaia/rpc-contract'
 import assert from 'node:assert/strict'
 import { describe, it, vi } from 'vitest'
-import { createEndpoint } from '../../dist/core/index.js'
-import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
+
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
 import { connect } from '../../dist/core/middleware/connect.js'
 import { systemScheduler } from '@migaia/utils/scheduler'
 
@@ -15,21 +17,27 @@ describe('successful request completion', () => {
      */
     const scheduler = { ...systemScheduler }
     /** Left endpoint remains unchanged while the host constructor is observed during calls. */
-    const left = await createEndpoint({
-      id: 'a-left',
-      transport: leftTransport,
-      scheduler,
-      middlewares: [connect()],
-      provider: { echo: (context) => context.success(context.data) }
-    })
+    const left = await createRuntimeEndpointComposition(
+      {
+        id: 'a-left',
+        transport: leftTransport,
+        scheduler,
+        middlewares: [connect()],
+        provider: { echo: (context) => context.success(context.data) }
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     /** Right endpoint is also an initiator, avoiding an inactive caller-side positive control. */
-    const right = await createEndpoint({
-      id: 'a-right',
-      transport: rightTransport,
-      scheduler,
-      middlewares: [connect()],
-      provider: { echo: (context) => context.success(context.data) }
-    })
+    const right = await createRuntimeEndpointComposition(
+      {
+        id: 'a-right',
+        transport: rightTransport,
+        scheduler,
+        middlewares: [connect()],
+        provider: { echo: (context) => context.success(context.data) }
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     /** Original host constructor preserves native signal identity and behavior. */
     const NativeController = globalThis.AbortController
     /** Actual constructor calls include both ordinary caller scopes and provider scopes. */

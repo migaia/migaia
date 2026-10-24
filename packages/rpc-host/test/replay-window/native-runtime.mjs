@@ -1,11 +1,11 @@
 import { createComposedEndpoint } from '../../dist/core/composed.js'
-import { createFirstPartyRoots } from '../../dist/core/internal/first-party-roots.js'
-import { createStreamFeature } from '../../dist/core/stream/index.js'
-import { codec } from '../../dist/core/index.js'
-import { framer } from '../../dist/core/index.js'
-import { connect } from '../../dist/core/index.js'
-import { hooks } from '../../dist/core/index.js'
-import { abort } from '../../dist/core/index.js'
+import { createRuntimeFeatureRoots } from '../../dist/core/runtime-api-endpoint.js'
+import { createStreamFeature } from '../../dist/core/features/stream.js'
+import { codec } from '../../dist/core/middleware/codec.js'
+import { framer } from '../../dist/core/middleware/framer.js'
+import { connect } from '../../dist/core/middleware/connect.js'
+import { hooks } from '../../dist/core/middleware/hooks.js'
+import { abort } from '../../dist/core/middleware/abort.js'
 import { readEndpointDebugSnapshot } from '../../dist/core/internal/test-observer.js'
 import { nativeReplayReceipt } from '../../dist/core/internal/native-replay.js'
 import { defineRpcFeature } from '../../dist/core/internal/define-rpc-feature.js'
@@ -24,7 +24,10 @@ export async function nativeEndpoint(channel, id, options = {}) {
   /** Diagnostics remain fixture callbacks and never enter public endpoint configuration. */
   const { onFailure, collectDiagnostics = true, ...configuration } = options
   /** One canonical graph shares outbound, provider, control and stream owners. */
-  const roots = createFirstPartyRoots(new Set(['first-party-provider', 'first-party-one-way']))
+  const { roots } = createRuntimeFeatureRoots(
+    { id, middlewares: [] },
+    { agreement: channel.agreement, peerId: channel.peerId }
+  )
   /** A passive fixture root reads the existing outbound installation, publishing no new member. */
   let outboundSnapshot
   const observer = defineRpcFeature(

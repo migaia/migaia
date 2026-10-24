@@ -1,6 +1,5 @@
 import { EventEmitter } from 'node:events'
 import { assert, describe, expect, it, vi } from 'vitest'
-import { PluginHost } from '@migaia/plugin-host'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { deferred } from '@migaia/utils/promise'
@@ -12,18 +11,15 @@ import {
   type IRpcHandshakeOffer
 } from '@migaia/rpc-contract'
 import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'
-import {
-  holdAdapterLaunch,
-  createAdapterBindingDrain,
-  createRuntimeProviderScope,
-  createRuntimeProviderGovernor,
-  createEventEmitterMessageResource,
-  type IAdapterListenerService,
-  type IRuntimeConnectionOptions
-} from '../../dist/adapter/internal-advanced.js'
-import { createAdapterPlugin } from '../../dist/runtime-adapter/binding.js'
+import { holdAdapterLaunch } from '../../dist/runtime-adapter/peer.js'
+import { createAdapterBindingDrain } from '../../dist/runtime-adapter/binding.js'
+import { createRuntimeProviderScope } from '../../dist/runtime-adapter/provider/scope.js'
+import { createRuntimeProviderGovernor } from '../../dist/runtime-adapter/provider/governor.js'
+import { createEventEmitterMessageResource } from '../../dist/runtime-adapter/message/resource.js'
+import { type IAdapterListenerService } from '../../dist/runtime-adapter/listener.js'
+import { type IRuntimeConnectionOptions } from '../../dist/runtime-adapter/byte/types.js'
 import { prepareAdapterPeer } from '../../dist/runtime-adapter/peer.js'
-import { holdAdapterObjectChannel } from '../../dist/runtime-adapter/object/index.js'
+import { holdAdapterObjectChannel } from '../../dist/runtime-adapter/object/connection.js'
 import type { IRuntimeObjectIO } from '../../dist/runtime-adapter/object/types.js'
 import type { IAdapterListenerOwner } from '../../dist/runtime-adapter/listener.js'
 import { readAdapterBindingDrain } from '../../dist/runtime-adapter/binding.js'
@@ -31,78 +27,93 @@ import { readRuntimeProviderScope } from '../../dist/runtime-adapter/provider/sc
 import { withRuntimePreparationContext } from '../../dist/remote/runtime-api/launch-context.js'
 import { RemoteMethodName } from '../../dist/remote/constants.js'
 import { RpcPlatform } from '../../dist/core/transport-constants.js'
-import type { IRuntimePeerOptions } from '../../dist/remote/index.js'
-import { remoteHarness, REMOTE_FIXTURE_CONTRACT } from '../remote/fixture.js'
+import type { IRuntimePeerOptions } from '../../dist/remote/runtime-api/peer.js'
+import { remoteHarness } from '../remote/fixture.js'
 
 /** Construct held object I/O whose reply still passes the canonical correlated handshake grammar. */
 function objectFixture(codec: string = RpcCodecId.json) {
-  /** Local codec policy is validated before any physical exchange or reader installation. */
-  const offer: IRpcHandshakeOffer = {
-    versions: [{ major: RpcProtocol.major, minor: RpcProtocol.minor }],
-    /** Contract requires JSON in every offer while allowing a preferred additional codec label. */
-    codecs: [...new Set([codec, RpcCodecId.json])],
-    capabilities: [],
-    peer: { id: 'local', runtime: 'fixture' }
-  }
-  /** Negotiation consumers wait for this one actual peer reply supplied by the held exchange. */
-  const reply = deferred<string>()
-  /** The physical resource coalesces its own retirement before Core adds diagnostic cleanup. */
-  const closing = Promise.resolve()
-  /** Object-port revocation runs on actual raw closing before terminal subscribers are notified. */
-  const closingObservers = new Set<() => void>()
-  /** Only physical retirement changes the resource's observable terminal state. */
-  let closed = false
-  /** The responder independently processes the actual serialized local hello. */
-  const exchange = vi.fn((hello: string) => {
-    /** Common codec selection comes from canonical admission rather than a caller agreement DTO. */
+  return new ObjectFixture(codec)
+}
+
+/** One held object resource owns physical closing and original correlated negotiation observations. */
+class ObjectFixture {
+  /** The same native offer is admitted before any physical exchange occurs. */
+  readonly offer: IRpcHandshakeOffer
+  /** Original responder readiness is a distinct correlated result, never a guessed agreement. */
+  readonly #reply = deferred<string>()
+  /** Physical raw close keeps its original exact Promise identity. */
+  readonly closing = Promise.resolve()
+  /** Native revocation callbacks retain original Set delivery and removal semantics. */
+  readonly #closingObservers = new Set<() => void>()
+  /** Only the controlled physical close changes this original resource fact. */
+  #closed = false
+  /** Only the original serialized hello reaches canonical handshake admission. */
+  readonly exchange = vi.fn((hello: string) => {
+    /** The responder independently processes the same physical local hello. */
     const accepted = acceptRpcHandshake(
-      { ...offer, peer: { id: 'peer', runtime: 'fixture' } },
+      { ...this.offer, peer: { id: 'peer', runtime: 'fixture' } },
       hello
     )
     assert(accepted.ok)
-    reply.resolve(accepted.reply)
-    return reply.promise
+    this.#reply.resolve(accepted.reply)
+    return this.#reply.promise
   })
-  /** Only successfully accepted capabilities reach this original held activation operation. */
-  const activate = vi.fn()
-  /** Retain the first Core close reason while invoking real registered closing observers. */
-  const close = vi.fn((_reason?: unknown) => {
-    closed = true
-    for (const observer of closingObservers) observer()
-    return closing
+  /** Actual activation remains independently observable after native negotiation succeeds. */
+  readonly activate = vi.fn()
+  /** Closing invokes the same original observers and returns the original physical Promise. */
+  readonly close = vi.fn((_reason?: unknown) => {
+    this.#closed = true
+    for (const observer of this.#closingObservers) observer()
+    return this.closing
   })
-  /** Structural I/O operations expose held resource behavior without accepting transport proofs. */
-  const io: IRuntimeObjectIO = {
-    exchange,
-    activate,
-    writeText: vi.fn(),
-    writeObject: vi.fn(),
-    subscribeText: () => () => undefined,
-    subscribeObject: () => () => undefined,
-    onTransportError: () => () => undefined,
-    onClosing: (observer) => {
-      closingObservers.add(observer)
-      return () => {
-        closingObservers.delete(observer)
-      }
-    },
-    close,
-    assertOpen: () => {
-      expect(closed).toBe(false)
-    },
-    get closed() {
-      return closed
+  /** Own native-shaped I/O getters preserve the held resource boundary and receiver behavior. */
+  readonly io: IRuntimeObjectIO
+  /** Original default-scheduler opening inputs remain an ordinary unprepared option record. */
+  readonly options: IRuntimeConnectionOptions
+
+  /** Capture original codec selection and construct the same cold raw I/O operations. */
+  constructor(codec: string) {
+    this.offer = {
+      versions: [{ major: RpcProtocol.major, minor: RpcProtocol.minor }],
+      /** JSON remains mandatory while this original fixed optional codec keeps preference order. */
+      codecs: [...new Set([codec, RpcCodecId.json])],
+      capabilities: [],
+      peer: { id: 'local', runtime: 'fixture' }
+    }
+    this.io = ObjectFixture.#view(this)
+    this.options = {
+      platform: RpcPlatform.memory,
+      expectedStringText: 'fixture requires text',
+      peerId: 'peer',
+      report: vi.fn(),
+      ipc: { connectionId: 'object-fixture', sessionId: 'object-session', log: () => undefined }
     }
   }
-  /** Public opening intentionally omits scheduler so Core retains its documented system default. */
-  const options: IRuntimeConnectionOptions = {
-    platform: RpcPlatform.memory,
-    expectedStringText: 'fixture requires text',
-    peerId: 'peer',
-    report: vi.fn(),
-    ipc: { connectionId: 'object-fixture', sessionId: 'object-session', log: () => undefined }
+  /** Preserve the original own plain I/O view while mutable state belongs to one explicit owner. */
+  static #view(owner: ObjectFixture): IRuntimeObjectIO {
+    return {
+      exchange: owner.exchange,
+      activate: owner.activate,
+      writeText: vi.fn(),
+      writeObject: vi.fn(),
+      subscribeText: () => () => undefined,
+      subscribeObject: () => () => undefined,
+      onTransportError: () => () => undefined,
+      onClosing: (observer) => {
+        owner.#closingObservers.add(observer)
+        return () => {
+          owner.#closingObservers.delete(observer)
+        }
+      },
+      close: owner.close,
+      assertOpen: () => {
+        expect(owner.#closed).toBe(false)
+      },
+      get closed() {
+        return owner.#closed
+      }
+    }
   }
-  return { offer, io, exchange, activate, close, closing, options }
 }
 
 describe('held object channel sequencing and retirement', () => {
@@ -732,52 +743,6 @@ describe('adapter registration and provider scope policies', () => {
       await owner.resource.close()
     }
   })
-
-  it.each(['none', 'installed', 'close', 'both'] as const)(
-    'retains %s lifecycle callbacks through actual PluginHost installation and disposal',
-    async (kind) => {
-      /**
-       * Reuse existing endpoint and lifecycle observations rather than add another registration
-       * seam.
-       */
-      const fixture = remoteHarness()
-      /** Actual PluginHost installation and disposal own the tested lifecycle callback sequence. */
-      const host = new PluginHost<Record<string, never>>({
-        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
-      })
-      /** Observe the optional committed-install callback on the original adapter definition. */
-      const installed = vi.fn(async () => undefined)
-      /** Observe resource retirement separately from facade construction and ownership selection. */
-      const close = vi.fn(async () => undefined)
-      /** This trusted adapter definition transfers held binding behavior into PluginHost. */
-      const definition = createAdapterPlugin(
-        {
-          name: 'p',
-          contract: REMOTE_FIXTURE_CONTRACT,
-          binding: fixture.binding,
-          endpointFactory: async () => fixture.served,
-          host: host.plugin,
-          report: vi.fn()
-        },
-        { fixture: true },
-        kind === 'none'
-          ? undefined
-          : {
-              ...(kind === 'installed' || kind === 'both' ? { installed } : {}),
-              ...(kind === 'close' || kind === 'both' ? { close } : {})
-            }
-      )
-      expect(definition.fixture).toBe(true)
-      try {
-        await expect(host.use(definition)).resolves.toHaveLength(1)
-        expect(installed).toHaveBeenCalledTimes(kind === 'installed' || kind === 'both' ? 1 : 0)
-      } finally {
-        await host.dispose()
-      }
-      expect(close).toHaveBeenCalledTimes(kind === 'close' || kind === 'both' ? 1 : 0)
-      expect(fixture.calls).toContain('endpoint.dispose')
-    }
-  )
 
   it('retains a selected idempotency store and refuses unconstructed principal metadata', async () => {
     /** The fixture keeps the accepted channel, session, scope and cleanup operations together. */

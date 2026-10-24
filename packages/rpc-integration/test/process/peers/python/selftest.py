@@ -116,6 +116,7 @@ def normalize_envelope(value: Any, minor: int, unknown: list[list[str]] | None =
         if field in required and field not in value:
             raise VectorFailure("required", "/" + field)
     if unknown is not None:
+        # Test-oracle exception: n counts this envelope's unknown keys; exact lexical reports match cross-language vectors.
         for field in sorted(set(value) - ENVELOPE_FIELDS[kind]):
             unknown.append(["", field])
     if not isinstance(value["id"], str):
@@ -143,8 +144,10 @@ def normalize_envelope(value: Any, minor: int, unknown: list[list[str]] | None =
     if route["profile"] != "migaia.rpc.route":
         raise VectorFailure("route", "/data/route/profile")
     if unknown is not None:
+        # Test-oracle exception: n counts this route's unknown keys; preserve the vector's exact lexical report order.
         for field in sorted(set(route) - ROUTE_FIELDS):
             unknown.append(["/data/route", field])
+        # Test-oracle exception: n counts this data object's unknown keys; preserve the vector's exact lexical report order.
         for field in sorted(set(data) - {"route", "payload"}):
             unknown.append(["/data", field])
     return value
@@ -297,25 +300,34 @@ def generated_wire(spec: dict[str, Any]) -> dict[str, Any]:
     raise AssertionError("unknown generator")
 
 
-def validate_wire(value: Any, mode: str = "reject", reports: list[dict[str, str]] | None = None) -> dict[str, Any]:
-    """Validate wire-error graph budgets, order, unknown keys and data."""
-    total_bytes = 0
-    nodes = 0
+class _WireValidation:
+    """Own exactly one wire graph's original budgets and report sink."""
 
-    def visit(node: Any, path: str, depth: int) -> dict[str, Any]:
-        nonlocal total_bytes, nodes
+    def __init__(self, mode: str, reports: list[dict[str, str]] | None) -> None:
+        """Capture the caller's reporting policy before the original preorder walk."""
+        # Cumulative bytes are charged at the same field before visiting any child.
+        self._total_bytes = 0
+        # Nodes share one budget across cause and errors siblings.
+        self._nodes = 0
+        # Keep the original unknown-field policy and caller-owned report list.
+        self._mode = mode
+        self._reports = reports
+
+    def visit(self, node: Any, path: str, depth: int) -> dict[str, Any]:
+        """Walk preorder and preserve the original first violation and report sequence."""
         if depth > 48:
             raise VectorFailure("depth", path)
-        nodes += 1
-        if nodes > 1024:
+        self._nodes += 1
+        if self._nodes > 1024:
             raise VectorFailure("nodes", path)
         if not isinstance(node, dict):
             raise VectorFailure("type", path)
+        # Test-oracle exception: n counts this wire-error node's unknown keys; exact lexical reports match cross-language vectors.
         unknown = sorted(set(node) - WIRE_FIELDS)
-        if unknown and mode == "reject":
+        if unknown and self._mode == "reject":
             raise VectorFailure("unknownField", path)
-        if reports is not None:
-            reports.extend({"pointer": path, "field": field} for field in unknown)
+        if self._reports is not None:
+            self._reports.extend({"pointer": path, "field": field} for field in unknown)
         clean = {key: item for key, item in node.items() if key in WIRE_FIELDS}
         for field in ("source", "code", "name", "message", "stack"):
             if field not in clean:
@@ -328,25 +340,29 @@ def validate_wire(value: Any, mode: str = "reject", reports: list[dict[str, str]
             amount = len(item.encode("utf-8"))
             if amount > 65_536:
                 raise VectorFailure("stringBytes", path + "/" + field)
-            total_bytes += amount
-            if total_bytes > 1_048_576:
+            self._total_bytes += amount
+            if self._total_bytes > 1_048_576:
                 raise VectorFailure("totalBytes", path + "/" + field)
         if "truncated" in clean and clean["truncated"] is not True:
             raise VectorFailure("truncatedValue", path + "/truncated")
         if "data" in clean:
             validate_portable(clean["data"])
         if "cause" in clean:
-            clean["cause"] = visit(clean["cause"], path + "/cause", depth + 1)
+            clean["cause"] = self.visit(clean["cause"], path + "/cause", depth + 1)
         if "errors" in clean:
             errors = clean["errors"]
             if not isinstance(errors, list):
                 raise VectorFailure("type", path + "/errors")
             if not errors:
                 raise VectorFailure("emptyErrors", path + "/errors")
-            clean["errors"] = [visit(child, path + "/errors/" + str(index), depth + 2) for index, child in enumerate(errors)]
+            clean["errors"] = [self.visit(child, path + "/errors/" + str(index), depth + 2) for index, child in enumerate(errors)]
         return clean
 
-    return visit(value, "", 1)
+
+
+def validate_wire(value: Any, mode: str = "reject", reports: list[dict[str, str]] | None = None) -> dict[str, Any]:
+    """Validate wire-error graph budgets, order, unknown keys and data."""
+    return _WireValidation(mode, reports).visit(value, "", 1)
 
 
 def check_envelope(results: Results, data: dict[str, Any], label: str, minor: int) -> None:
@@ -557,6 +573,28 @@ def check_jsonrpc(case: dict[str, Any]) -> None:
     expect(expected["message"], source["message"])
 
 
+class _FramingChunks:
+    """Keep original vector chunk boundaries without recopying each unread suffix."""
+
+    def __init__(self, chunks: list[bytes]) -> None:
+        """Borrow the expanded vector once; reads own only their index and offset."""
+        self._chunks = chunks
+        self._index = 0
+        self._offset = 0
+
+    def read(self, size: int) -> bytes:
+        """Return at most the current chunk's remaining bytes, preserving empty-read behavior."""
+        if self._index == len(self._chunks):
+            return b""
+        chunk = self._chunks[self._index]
+        value = chunk[self._offset:self._offset + size]
+        self._offset += len(value)
+        if self._offset == len(chunk):
+            self._index += 1
+            self._offset = 0
+        return value
+
+
 def check_framing(results: Results, data: list[dict[str, Any]]) -> None:
     """Compare every decoded byte, prefix and first framing failure."""
     def expand(value: Any) -> bytes:
@@ -565,20 +603,10 @@ def check_framing(results: Results, data: list[dict[str, Any]]) -> None:
         def framing(case: dict[str, Any] = case) -> None:
             chunks = [expand(item) for item in case.get("chunksHex", case.get("chunks", []))]
             wire = b"".join(chunks)
-            class ChunkReader:
-                """Keep vector chunk boundaries visible to the production peer reader."""
-                def read(self, size: int) -> bytes:
-                    if not chunks:
-                        return b""
-                    value = chunks[0][:size]
-                    chunks[0] = chunks[0][size:]
-                    if not chunks[0]:
-                        chunks.pop(0)
-                    return value
             actual = []
             error = None
             try:
-                reader = ChunkReader()
+                reader = _FramingChunks(chunks)
                 while True:
                     frame = read_frame(reader)
                     if frame is None:
@@ -642,6 +670,14 @@ def schema_accepts(value: Any, rule: dict[str, Any], definitions: dict[str, Any]
     return True
 
 
+def strictly_increasing(values: list[str]) -> bool:
+    """Require the same unique lexical order as sorted(set(values)) in one pass."""
+    for index, value in enumerate(values):
+        if index and values[index - 1] >= value:
+            return False
+    return True
+
+
 def check_host_control(results: Results, data: dict[str, Any]) -> None:
     """Check schema and semantic catalog identity and inspect ordering per case."""
     definitions = json.loads((SCHEMA_ROOT / "remote-contract.schema.json").read_text())["$defs"]
@@ -656,7 +692,7 @@ def check_host_control(results: Results, data: dict[str, Any]) -> None:
                 semantic = valid
                 if semantic and definition == "hostInspectResult":
                     names = [item["name"] for item in value["plugins"]]
-                    semantic = names == sorted(set(names)) and all(item["features"] == sorted(set(item["features"])) for item in value["plugins"])
+                    semantic = strictly_increasing(names) and all(strictly_increasing(item["features"]) for item in value["plugins"])
                 expect((valid, semantic), (case["schemaValid"], case["semanticValid"]))
             results.check(f"host/{section}/{case['id']}", check)
 

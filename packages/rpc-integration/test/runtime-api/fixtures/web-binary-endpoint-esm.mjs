@@ -3,15 +3,13 @@
  * .js/.mjs specifiers; production is unchanged.
  */
 import { createRuntimeApiEndpoint } from '../../../../rpc-host/dist/core/runtime-api-endpoint.js'
-import {
-  codec,
-  framer,
-  connect,
-  abort,
-  timeout,
-  hooks,
-  authentication
-} from '../../../../rpc-host/dist/core/index.js'
+import { codec } from '../../../../rpc-host/dist/core/middleware/codec.js'
+import { framer } from '../../../../rpc-host/dist/core/middleware/framer.js'
+import { connect } from '../../../../rpc-host/dist/core/middleware/connect.js'
+import { abort } from '../../../../rpc-host/dist/core/middleware/abort.js'
+import { timeout } from '../../../../rpc-host/dist/core/middleware/timeout.js'
+import { hooks } from '../../../../rpc-host/dist/core/middleware/hooks.js'
+import { authentication } from '../../../../rpc-host/dist/core/middleware/authentication.js'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import fixture from './managed-binary-key.json' with { type: 'json' }
 /** This fixture's verifier owns its failure; production authentication supplies Core's wrapper. */

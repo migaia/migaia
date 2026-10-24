@@ -1,8 +1,8 @@
+import { createRuntimeEndpointComposition } from '../../dist/core/runtime-api-endpoint.js'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createComposedEndpoint, type IRpcCoreConfig } from '../../dist/core/composed.js'
-import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
-import { createClientFirstPartyRoots } from '../../dist/core/internal/client-first-party-roots.js'
-import { createProviderFirstPartyRoots } from '../../dist/core/internal/provider-first-party-roots.js'
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
+
 import { connect } from '../../dist/core/middleware/connect.js'
 import { defineMiddleware } from '../../dist/core/middleware.js'
 import { defineFeature } from '@migaia/plugin-host'
@@ -185,10 +185,10 @@ afterEach(() => {
 
 describe('PluginHost batch completeness', () => {
   it('proves one Host receives the complete kernel, middleware, feature, and activation batch', async () => {
-    const endpoint = await createComposedEndpoint(
+    const endpoint = await createRuntimeEndpointComposition(
       createConfig(() => undefined),
-      createProviderFirstPartyRoots()
-    )
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     try {
       expect(observed.hosts).toHaveLength(1)
       expect(observed.batches).toHaveLength(1)
@@ -230,10 +230,10 @@ describe('Host rollback ownership', () => {
       observedShared = host?.getPort(sharedKey)
       throw primaryFailure
     })
-    const failure = await createComposedEndpoint(
+    const failure = await createRuntimeEndpointComposition(
       createConfig(() => undefined, [connect(), first, installedFeature, failingFeature]),
-      createClientFirstPartyRoots()
-    ).catch((error: unknown) => error)
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing.catch((error: unknown) => error)
 
     expect(failure).toBe(primaryFailure)
     // Construction-time consumers can read an earlier provider from the same ordered batch.
@@ -265,12 +265,12 @@ describe('activation boundary', () => {
         return { extension: {}, ports: {} }
       }
     }
-    const endpoint = await createComposedEndpoint(
+    const endpoint = await createRuntimeEndpointComposition(
       createConfig(() => {
         subscriptions += 1
       }, [connect(), observer]),
-      createClientFirstPartyRoots()
-    )
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     try {
       expect(installSubscriptionCount).toBe(0)
       expect(subscriptions).toBe(1)
@@ -409,13 +409,13 @@ describe('construction and disposal race', () => {
         return pendingInstall
       }
     }
-    const construction = createComposedEndpoint(
+    const construction = createRuntimeEndpointComposition(
       {
         ...createConfig(() => undefined, [connect(), delayed]),
         construction: { signal: controller.signal }
       },
-      createClientFirstPartyRoots()
-    )
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
 
     await vi.waitFor(() => expect(installStarted).toBe(true))
     controller.abort('construction cancelled')
@@ -497,13 +497,13 @@ describe('construction and disposal race', () => {
       }
     }
     observed.throwFromHook = true
-    const construction = createComposedEndpoint(
+    const construction = createRuntimeEndpointComposition(
       {
         ...createConfig(() => undefined, [connect(), delayed]),
         construction: { signal: controller.signal }
       },
-      createClientFirstPartyRoots()
-    )
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
 
     await vi.waitFor(() => expect(installStarted).toBe(true))
     controller.abort('diagnostic isolation')
@@ -519,10 +519,10 @@ describe('construction and disposal race', () => {
 
 describe('public endpoint boundary', () => {
   it('proves the endpoint is a projection and never the PluginHost object', async () => {
-    const endpoint = await createComposedEndpoint(
+    const endpoint = await createRuntimeEndpointComposition(
       createConfig(() => undefined),
-      createProviderFirstPartyRoots()
-    )
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     const host = observed.hosts[0]
     expect(host).toBeDefined()
     expect(Reflect.ownKeys(endpoint)).toEqual([
@@ -535,7 +535,9 @@ describe('public endpoint boundary', () => {
       'dispatchAll',
       'group',
       'outcome',
-      'provide'
+      'provide',
+      'sendOneWay',
+      'stream'
     ])
     expect(endpoint).not.toBe(host)
     for (const key of hostControlKeys) expect(key in (endpoint as object), key).toBe(false)
@@ -547,10 +549,10 @@ describe('public endpoint boundary', () => {
 
 describe('per-endpoint batch cardinality', () => {
   it('proves one endpoint invokes exactly one Host install batch', async () => {
-    const endpoint = await createComposedEndpoint(
+    const endpoint = await createRuntimeEndpointComposition(
       createConfig(() => undefined),
-      createClientFirstPartyRoots()
-    )
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     try {
       expect(observed.hosts).toHaveLength(1)
       expect(observed.batches).toHaveLength(1)

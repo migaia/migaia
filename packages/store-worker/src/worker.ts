@@ -1,10 +1,10 @@
-import type { IWorkerMessageEvent } from './worker-message-event.js'
+import { WorkerMessagePort } from './worker-message-event.js'
 import type { IAbortSignal, INativeAbortSignal } from '@migaia/utils/promise'
 import type { IRuntime } from '@migaia/reactive'
 import { defaultRuntime } from '@migaia/reactive'
 import { Resource, type IResourceOptions } from '@migaia/resource'
 import { createWorkerContractEndpoint, type IWorkerContractEndpoint } from './worker-contract.js'
-import type { IWebWorkerLikePort } from '@migaia/rpc-plugin-browser/adapters/web-worker'
+import type { IWebWorkerLikePort } from '@migaia/rpc-host/plugin'
 import { toManagedRpcHandler, type IManagedRpcHandler } from './managed-rpc-handler.js'
 import { createStoreWorkerError, STORE_WORKER_SOURCE, StoreWorkerErrorCode } from './errors.js'
 import { StoreWorkerErrorText } from './error-text.js'
@@ -203,18 +203,13 @@ export function createWorkerHandler<Input, Output>(
       StoreWorkerErrorText.workerHandlerCallback('postMessage')
     )
   }
-  let inboundListener: ((event: IWorkerMessageEvent) => void) | undefined
+  /** Raw delivery and native listener identity share one explicit bridge owner. */
+  const port = new WorkerMessagePort(postMessage)
+  /** Capture options before asynchronous endpoint assembly begins. */
   const endpointOptions = snapshotWorkerClientOptions(options)
+  /** Managed preparation completes independently of the remote handshake. */
   const endpointPromise = createWorkerContractEndpoint(
-    {
-      postMessage,
-      addEventListener: (type, listener) => {
-        if (type === 'message') inboundListener = listener as (event: IWorkerMessageEvent) => void
-      },
-      removeEventListener: (type, listener) => {
-        if (type === 'message' && inboundListener === listener) inboundListener = undefined
-      }
-    },
+    port,
     {
       id: WorkerRpcIdentity.worker,
       targetId: endpointOptions.clientId ?? WorkerRpcIdentity.main,
@@ -232,12 +227,7 @@ export function createWorkerHandler<Input, Output>(
       }
     }
   )
-  let deliver: (message: unknown) => void = () => undefined
-  const handler = toManagedRpcHandler(endpointPromise, (message) => deliver(message))
-  // The managed callback is the host boundary: it forwards each raw message into
-  // the canonical endpoint's transport listener without recreating a provider path.
-  deliver = (message) => inboundListener?.({ data: message } as IWorkerMessageEvent)
-  return handler
+  return toManagedRpcHandler(endpointPromise, port.deliver)
 }
 
 /**

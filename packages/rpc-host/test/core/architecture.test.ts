@@ -85,13 +85,36 @@ describe('web-rpc 边界：不得依赖 src/store', () => {
           /export\s+(\*|\{[^}]*\})\s+from\s+['"]([^'"]+)['"]/g
         )) {
           if (!/(?:\/internal\/|(?:^|\/)(?:wire|endpoint)\.js$)/.test(specifier)) continue
-          /** Only these two closed operations cross the facade/author SDK, never private writers. */
+          /** These exact canonical operations form the adapter SDK; no mutable owner crosses it. */
+          const allowedSdkSymbols: Readonly<Record<string, readonly string[]>> = {
+            '../core/internal/listener-safety.js': [
+              'collectListenerCleanupFailures',
+              'collectListenerFailure',
+              'createListenerFailure',
+              'createListenerFailureState',
+              'drainListenerFailures',
+              'drainTerminalListenerFailures',
+              'observeListener',
+              'registerListeners',
+              'releaseListenerRegistration',
+              'reportListenerFailure'
+            ],
+            '../core/internal/message-listener-hub.js': ['createMessageListenerHub'],
+            '../core/internal/safe-value.js': ['safeRead', 'safeString'],
+            '../core/internal/error-wire-metadata.js': ['serializeRpcError', 'deserializeRpcError']
+          }
+          /**
+           * Core retains only its original wire-error boundary; the adapter SDK is separately
+           * exact.
+           */
+          const allowed =
+            path === '../../src/plugin/index.ts' ? allowedSdkSymbols[specifier] : undefined
+          /** Set equality permits no extra symbol, namespace export or private writer. */
+          const emitted = new Set(symbols.replace(/[\s{}]/g, '').split(','))
           if (
-            ((path === '../../src/core/index.ts' &&
-              specifier === './internal/error-wire-metadata.js') ||
-              (path === '../../src/plugin/index.ts' &&
-                specifier === '../core/internal/error-wire-metadata.js')) &&
-            symbols.replace(/[\s{}]/g, '') === 'serializeRpcError,deserializeRpcError'
+            allowed &&
+            emitted.size === allowed.length &&
+            allowed.every((name) => emitted.has(name))
           )
             continue
           violations.push(`${path} exports an internal module`)

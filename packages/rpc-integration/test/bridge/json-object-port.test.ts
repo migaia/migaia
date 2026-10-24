@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import assert from 'node:assert/strict'
 import { createHmac } from 'node:crypto'
-import { bridgeFixture, flush, request, peerFrame } from './fixture.js'
+import { BridgeFixture, flush, request, peerFrame } from './fixture.js'
 import { objectFixtureEndpoint, objectDeepValue } from './json-object-fixture.js'
 import {
   createRuntimeObjectPipeline,
@@ -10,11 +10,11 @@ import {
 import { remoteProcessJsonCodec } from '../fixtures/process-diagnostics.js'
 import { readJsonObjectPort } from '../../../rpc-host/dist/core/internal/json-object-port.js'
 import { rpcProtocolV1, type IRpcEnvelope } from '@migaia/rpc-contract'
-import { defineFeature } from '../../../rpc-host/dist/core/index.js'
-import { authentication } from '../../../rpc-host/dist/core/index.js'
+import { defineFeature } from '../../../rpc-host/dist/core/feature.js'
+import { authentication } from '../../../rpc-host/dist/core/middleware/authentication.js'
 import { readAuthenticationEnvelope } from '../../../rpc-host/dist/core/middleware/authentication-envelope.js'
 import { normalizeRpcEnvelope } from '@migaia/rpc-contract'
-import { type IRpcAuthenticationCapability } from '../../../rpc-host/dist/core/index.js'
+import type { IRpcAuthenticationCapability } from '../../../rpc-host/dist/core/typing.js'
 import { installPlugin } from '../../../rpc-host/test/core/middleware/helpers.js'
 
 /** The moved Core factory supplies the same object encoder; this fixture never uses text decode. */
@@ -36,7 +36,7 @@ describe('object port contracts', () => {
   it('counts physical conversions and rejects internal roundtrips in default and fallback', async () => {
     for (const fallback of [false, true]) {
       /** Ready channels keep hello and control JSON outside the business counter window. */
-      const fixture = bridgeFixture()
+      const fixture = new BridgeFixture()
       /** Only the fixture's synchronous outbound peer decode is excluded from production totals. */
       let fixtureJson = false
       const channel = await fixture.open({
@@ -204,7 +204,7 @@ describe('object port contracts', () => {
   })
 
   it('materializes a raw incoming negative zero before canonical core normalization', async () => {
-    const fixture = bridgeFixture()
+    const fixture = new BridgeFixture()
     const channel = await fixture.open()
     const endpoint = await objectFixtureEndpoint(channel)
     try {
@@ -225,7 +225,7 @@ describe('object port contracts', () => {
 
   it('keeps custom authentication, connect callbacks and unknown Features on string', async () => {
     for (const mode of ['authentication', 'connect', 'feature'] as const) {
-      const fixture = bridgeFixture()
+      const fixture = new BridgeFixture()
       const channel = await fixture.open()
       const observed: unknown[] = []
       /** The foreign peer carries the full signed inner frame in its existing positional payload. */
@@ -346,7 +346,7 @@ describe('object port contracts', () => {
   })
 
   it('retains public send/subscribe, per-listener order and close capability release', async () => {
-    const fixture = bridgeFixture()
+    const fixture = new BridgeFixture()
     const channel = await fixture.open()
     const port = readJsonObjectPort(
       channel.transport,
@@ -400,7 +400,7 @@ describe('object port contracts', () => {
   })
 
   it('rejects super-limit portable depth at the same normalization owner before writing', async () => {
-    const fixture = bridgeFixture()
+    const fixture = new BridgeFixture()
     const channel = await fixture.open()
     const port = readJsonObjectPort(
       channel.transport,

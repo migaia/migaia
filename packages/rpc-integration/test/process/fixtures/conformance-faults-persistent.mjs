@@ -1,31 +1,23 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { PluginHost, definePlugin, defineFeature } from '@migaia/plugin-host'
-import {
-  createRpcIdempotencyStore,
-  abort,
-  codec,
-  connect,
-  framer,
-  ping
-} from '../../../../rpc-host/dist/core/index.js'
+import { createRpcIdempotencyStore } from '../../../../rpc-host/dist/core/idempotency-store.js'
+import { abort } from '../../../../rpc-host/dist/core/middleware/abort.js'
+import { codec } from '../../../../rpc-host/dist/core/middleware/codec.js'
+import { connect } from '../../../../rpc-host/dist/core/middleware/connect.js'
+import { framer } from '../../../../rpc-host/dist/core/middleware/framer.js'
+import { ping } from '../../../../rpc-host/dist/core/middleware/ping.js'
 import { createComposedEndpoint } from '../../../../rpc-host/dist/core/composed.js'
-import {
-  createCanonicalChunkFeature,
-  createStreamFeature
-} from '../../../../rpc-host/dist/core/stream/index.js'
-import { createOutboundFeature } from '../../../../rpc-host/dist/core/features/outbound.js'
-import { createProviderFeature } from '../../../../rpc-host/dist/core/features/provider.js'
-import { createDiscoveryFeature } from '../../../../rpc-host/dist/core/features/discovery.js'
-import { createControlFeature } from '../../../../rpc-host/dist/core/features/control.js'
-import { createOneWayFeature } from '../../../../rpc-host/dist/core/features/one-way.js'
+import { createStreamFeature } from '../../../../rpc-host/dist/core/stream/index.js'
+import { createRuntimeFeatureRoots } from '../../../../rpc-host/dist/core/runtime-api-endpoint.js'
+import { prepareRuntimeProviderAssembly } from '../../../../rpc-host/dist/remote/runtime-api/peer.js'
+import { compileRuntimeMethods } from '../../../../rpc-host/dist/remote/runtime-api/catalog.js'
+import { describeRemoteMethods } from '../../../../rpc-host/dist/remote/serve-methods.js'
 import { createNativeProcessOffer } from '../../../../rpc-plugin-process/dist/process/offer.js'
 import { createProcessTransport } from '../../../../rpc-plugin-process/dist/process/handshake.js'
 import { createProcessResilience } from '../../../../rpc-plugin-process/dist/process/resilience/index.js'
-import { openProcessStdioChannel } from '@migaia/rpc-plugin-process/adapters/node-child-process'
+import { openProcessStdioChannel } from '../../../../rpc-plugin-process/dist/process/adapters/node-child-process.js'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { serveProcessSessions } from '../../../../rpc-plugin-process/dist/process/plugin/serve.js'
-import { createProcessSessionService } from '../../../../rpc-plugin-process/test/protocol.ts'
 
 /** Bootstrap ownership starts before asynchronous Host installation, keeping the real pipe alive. */
 const opened = await openProcessStdioChannel({ bootstrap: 'stdin' })
@@ -86,39 +78,28 @@ const store = {
     }
   }
 }
-/** Real PluginHost owns this provider; no protocol implementation is duplicated. */
-const host = new PluginHost({
-  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
-})
-await host.use(
-  definePlugin({
-    name: 'p',
-    features: {
-      f: defineFeature(() => ({
-        /** Increment the independent side effect only when canonical provider execution occurs. */
-        request() {
-          const count = existsSync(countPath) ? Number(readFileSync(countPath, 'utf8')) : 0
-          writeFileSync(countPath, String(count + 1), { mode: 0o600 })
-          return 'committed'
-        },
-        oneWay() {},
-        *generator() {
-          yield 'fixture'
-        },
-        async *asyncGenerator() {
-          yield 'fixture'
-        }
-      }))
-    },
-    install: () => ({})
-  })
-)
+/** The fixed business object is compiled by the actual RuntimeHost provider owner. */
+const provide = {
+  p: {
+    f: {
+      /** Increment the independent side effect only when canonical provider execution occurs. */
+      request() {
+        const count = existsSync(countPath) ? Number(readFileSync(countPath, 'utf8')) : 0
+        writeFileSync(countPath, String(count + 1), { mode: 0o600 })
+        return 'committed'
+      },
+      oneWay() {},
+      *generator() {
+        yield 'fixture'
+      },
+      async *asyncGenerator() {
+        yield 'fixture'
+      }
+    }
+  }
+}
 process.stderr.write('INSTALLED\n')
 const options = {
-  host,
-  contract,
-  createSharedTarget: async () => undefined,
-  onInstanceUnhealthy: () => () => undefined,
   report: (error) => process.stderr.write(`FIXTURE_ERROR ${String(error?.code ?? 'UNKNOWN')}\n`),
   ingress: {
     kind: 'child',
@@ -156,41 +137,29 @@ const options = {
   },
   endpointFactory: async (channel, _signal, session) => {
     if (!authenticated) throw new TypeError('fixture principal not authenticated')
-    /** This explicit public configuration overrides no default session state or incoming tuple. */
-    const chunk = createCanonicalChunkFeature()
-    const outbound = createOutboundFeature(chunk)
-    const provider = createProviderFeature(outbound)
-    const discovery = createDiscoveryFeature(outbound)
-    const endpoint = await createComposedEndpoint(
-      {
-        id: 'ts-peer',
-        transport: channel.transport,
-        scheduler: channel.scheduler,
-        idempotency: { store, scope: () => principal },
-        providerLimits: session.limits,
-        middlewares: [
-          codec(channel.pipeline.codec),
-          framer(channel.pipeline.framer),
-          abort(),
-          connect({ transport: channel.transport }),
-          ping()
-        ]
-      },
-      {
-        'first-party-chunk': chunk,
-        'first-party-outbound': outbound,
-        'first-party-provider': provider,
-        'first-party-discovery': discovery,
-        'first-party-control': createControlFeature(outbound, discovery),
-        'first-party-stream': createStreamFeature(outbound, provider, {
-          capability: { supports: () => true }
-        }),
-        'first-party-one-way': createOneWayFeature(outbound),
-        ...Object.fromEntries(
-          channel.features.map((feature, index) => [`channel-${index}`, feature])
-        )
-      }
+    /** Actual composition supplies the one shared outbound/provider owner and trusted policy. */
+    const config = {
+      id: 'ts-peer',
+      transport: channel.transport,
+      scheduler: channel.scheduler,
+      idempotency: { store, scope: () => principal },
+      providerLimits: session.limits,
+      features: channel.features,
+      middlewares: [
+        codec(channel.pipeline.codec),
+        framer(channel.pipeline.framer),
+        abort(),
+        connect({ transport: channel.transport }),
+        ping()
+      ]
+    }
+    const { roots, options } = createRuntimeFeatureRoots(config, channel)
+    /** Independent v1 peers use legacy streams over the same genuine outbound/provider owner. */
+    roots['first-party-stream'] = createStreamFeature(
+      roots['first-party-outbound'],
+      roots['first-party-provider']
     )
+    const endpoint = await createComposedEndpoint(options, roots)
     return { endpoint, stream: endpoint.stream }
   }
 }
@@ -199,7 +168,21 @@ const resilience = createProcessResilience({ scheduler: systemScheduler, report:
 await serveProcessSessions(
   options.ingress,
   options.endpointFactory,
-  createProcessSessionService(options),
+  async ({ channel, endpoint }) => {
+    /** Authentication and durable idempotency remain with the admitted native/Core owners. */
+    const assembly = prepareRuntimeProviderAssembly({
+      methods: compileRuntimeMethods(provide, contract),
+      streams: channel.agreement.capabilities.includes('stream@1'),
+      generations: false,
+      supports: (_peerId, capability) => channel.agreement.capabilities.includes(capability),
+      remoteNode: () => undefined,
+      bindRemoteNode: () => undefined,
+      describe: () =>
+        describeRemoteMethods([contract], { name: 'ts-peer', instanceId: 'ts-peer' }, false)
+    })
+    assembly.install(endpoint.endpoint)
+    return { close: () => endpoint.endpoint.dispose() }
+  },
   resilience,
   options.report,
   undefined,

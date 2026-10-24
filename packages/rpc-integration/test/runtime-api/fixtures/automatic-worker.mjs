@@ -1,9 +1,11 @@
-import { createThreadPeer } from '../../../../rpc-plugin-thread/test/protocol.ts'
-/** The original native owner remains the automatic bootstrap protocol baseline. */
+import { createRpcHost } from '@migaia/rpc-host'
+import { threadPlugin } from '@migaia/rpc-plugin-thread'
+/** The canonical Host remains the automatic bootstrap protocol baseline. */
 let initialized
-initialized = createThreadPeer({
+initialized = createRpcHost({
+  plugins: [threadPlugin({ connectToParent: true })],
   provide: {
-    /** Await this original factory result before exercising reverse business. */
+    /** Await this actual Host result before exercising reverse business. */
     probe: async (value) => {
       const peer = await initialized
       return { value, self: peer.self, parent: await peer.request('parentEcho') }

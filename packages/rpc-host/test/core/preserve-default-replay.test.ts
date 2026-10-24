@@ -1,8 +1,8 @@
+import { createRuntimeEndpointComposition } from '../../dist/core/runtime-api-endpoint.js'
 import assert from 'node:assert/strict'
 import { it } from 'vitest'
-import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
-import { createClientEndpoint } from '../../dist/core/client.js'
-import { createProviderEndpoint } from '../../dist/core/provider.js'
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
+
 import { connect } from '../../dist/core/middleware/connect.js'
 import { RequestReplayLedger } from '../../dist/core/internal/request-replay-ledger.js'
 import type { IRpcProviderRejection } from '../../dist/core/provider-admission.js'
@@ -18,29 +18,35 @@ it('public default per-peer replay capacity admits 1024 and rejects the next wit
   /** The actual provider invocation count decides whether the refused request reached business. */
   let effects = 0
   /** Only the existing observer is supplied; neither capacity default is configured by this fixture. */
-  const server = await createProviderEndpoint({
-    id: 'default-server',
-    transport: right,
-    middlewares: [connect({ transport: right })],
-    providerLimits: {
-      onRejected: (notice) => {
-        notices.push(notice)
+  const server = await createRuntimeEndpointComposition(
+    {
+      id: 'default-server',
+      transport: right,
+      middlewares: [connect({ transport: right })],
+      providerLimits: {
+        onRejected: (notice) => {
+          notices.push(notice)
+        }
+      },
+      provider: {
+        echo: (context) => {
+          effects++
+          return context.success(context.data)
+        }
       }
     },
-    provider: {
-      echo: (context) => {
-        effects++
-        return context.success(context.data)
-      }
-    }
-  })
+    { agreement: { capabilities: [] }, peerId: '' }
+  ).installing
   /** The public caller uses original UUID, pending, routing and replay owners. */
-  const client = await createClientEndpoint({
-    id: 'default-client',
-    transport: left,
-    targetIds: ['default-server'],
-    middlewares: [connect({ transport: left })]
-  })
+  const client = await createRuntimeEndpointComposition(
+    {
+      id: 'default-client',
+      transport: left,
+      targetIds: ['default-server'],
+      middlewares: [connect({ transport: left })]
+    },
+    { agreement: { capabilities: [] }, peerId: '' }
+  ).installing
   try {
     for (let index = 0; index < 1024; index++)
       assert.equal(await client.send('default-server', 'echo', index), index)

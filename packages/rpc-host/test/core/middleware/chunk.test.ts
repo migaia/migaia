@@ -17,7 +17,7 @@ describe('canonical framing contract', () => {
   })
 
   it('does not retain the former root chunk middleware export', async () => {
-    const root = await import('../../../dist/core/index.js')
+    const root = await import('../../../dist/index.js')
     expect('chunk' in root).toBe(false)
   })
 })

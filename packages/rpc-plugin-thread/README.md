@@ -67,6 +67,6 @@ if (await isThreadChild()) {
 
 ## 原生接入与生命周期
 
-根入口提供 `threadPlugin`、`isThreadChild`、公开选项类型和错误身份。`/adapters/node` 与 `/adapters/electron-main` 是需要显式原生 launcher/channel 的作者入口；应用通常使用短 spawn 配置。
+根入口提供 `threadPlugin`、`isThreadChild`、公开选项类型和错误身份。原生 launcher/channel 由包内对应 owner 使用；应用通过短 spawn 或完整原生监督配置选择来源。自定义原始载体使用 `@migaia/rpc-host/plugin` 的部署 SDK。
 
 传输定义可交给普通 `PluginHost.use(...)`，其 thread outlet 保留原停止、重启、替换、退出事件和代次语义。关闭先沿原生 drain 处理已接纳任务，再释放自己拥有的 Worker；同一次关闭不重复 terminate。更多示例见[使用指南](./USEGUIDE.md)。

@@ -2,6 +2,7 @@ import { createRuntimeDiagnosticError } from '../byte/diagnostics.js'
 import type { IRuntimeDiagnosticError } from '../byte/types.js'
 import {
   attachProviderBulkAdmission,
+  projectNativeStreamResult,
   retainProviderPreflight,
   wrapProviderStreamAdmission,
   type IProviderBulkAdmission
@@ -9,8 +10,8 @@ import {
 import { deferTask, type IScheduledTask } from '@migaia/utils/scheduler'
 import { portableBytes } from '../../core/idempotency-store.js'
 import { resolveAbortReason } from '../../core/internal/async-control.js'
-import type { IRpcProviderRejection } from '../../core/index.js'
-import { RpcProviderRejectionReason } from '../../core/index.js'
+import type { IRpcProviderRejection } from '../../core/provider-admission.js'
+import { RpcProviderRejectionReason } from '../../core/semantic-constants.js'
 import { localRpcErrorCode, RpcCoreErrorCode, tagRpcError } from '../../core/errors.js'
 import { runtimeConnectionPrincipal } from '../byte/connection-identity.js'
 import { RuntimeAdapterErrorText } from '../byte/error-text.js'
@@ -21,9 +22,9 @@ import type {
   IRpcProvider,
   IRpcProviderLimits,
   IRpcProviderResult
-} from '../../core/index.js'
+} from '../../core/typing.js'
 import type { IRpcPortableValue } from '@migaia/rpc-contract'
-import type { IRemoteChannel, IRemoteServeEndpoint } from '../../remote/index.js'
+import type { IRemoteChannel, IRemoteServeEndpoint } from '../../remote/types.js'
 
 /** Numeric connection policies remain chosen by the adapter's existing service governor. */
 export type IRuntimeProviderPolicy = Readonly<{
@@ -48,6 +49,8 @@ export type IRuntimeProviderGovernor = Readonly<{
   provider(original: IRpcProvider): IRpcProvider
   /** Enter the actual producer's existing activity/deadline lifetime without another iterator. */
   enterStream(context: IRpcContext): (succeeded: boolean) => void
+  /** Host producers and the original wrapper borrow the same native terminal-value policy. */
+  streamResult: typeof projectNativeStreamResult
   /** Retire this governor's timers and diagnostic subscriptions. */
   close(): void
 }>
@@ -70,175 +73,204 @@ export function createRuntimeProviderGovernor(
   closeSession: () => Promise<void>,
   report: (error: unknown) => void
 ): IRuntimeProviderGovernor {
-  if (
-    runtimeConnectionPrincipal(channel) === undefined &&
-    readAdapterMessagePreparation(channel) === undefined
+  /** One concrete connection owns counters, subscriptions, and its frozen public policy methods. */
+  const governor = Object.freeze(
+    new RuntimeProviderGovernor(channel, options, closeSession, report)
   )
-    throw tagRpcError(
-      new TypeError(RuntimeAdapterErrorText.connectionRequired),
-      RpcCoreErrorCode.invalidConfig
-    )
-  /** The constructed connection retains its original monotonic clock. */
-  const scheduler = channel.scheduler
-  /** A window starts with its first admitted request, not at connection startup. */
-  let windowStart = scheduler.now()
-  /** Admitted calls in the current original bucket include prepaid group reservations. */
-  let callsInWindow = 0
-  /** Consecutive quota or concurrency refusals trigger the adapter-selected close threshold. */
-  let violations = 0
-  /** Only locally owned deadline aborts contribute to this consecutive policy count. */
-  let consecutiveTimeouts = 0
-  /** Actual producer activity prevents idle retirement until the original lifetime settles. */
-  let active = 0
-  /** The physical inbound observer supplies the last activity time for the idle timer. */
-  let lastInboundAt = scheduler.now()
-  /** Policy teardown never revives a closed connection. */
-  let closed = false
-  /** The governor owns only its current idle deadline and cancels it on activity. */
-  let idleTimer: IScheduledTask | undefined
-  /** Admission owns its abort subscriptions even when business work never settles. */
-  const abortSubscriptions = new Set<() => void>()
+  governors.set(governor, Object.freeze({ channel, governor }))
+  return governor
+}
 
-  /** A close triggered by policy remains secondary to the provider's primary result. */
-  const requestClose = (): void => {
-    void closeSession().catch(report)
+/** Quota and activity ownership live on the actual held connection, independently of callbacks. */
+class RuntimeProviderGovernor implements IRuntimeProviderGovernor {
+  /** Adapter-selected policy remains immutable for this original connection. */
+  readonly #options: IRuntimeProviderPolicy
+  /** Policy retirement delegates to the existing session owner. */
+  readonly #closeSession: () => Promise<void>
+  /** Cleanup failures retain the original unbound diagnostic callback. */
+  readonly #report: (error: unknown) => void
+  /** Rate and idle accounting use the connection's original monotonic scheduler. */
+  readonly #scheduler: IRemoteChannel['scheduler']
+  /** A window begins at connection construction and advances on the next admitted request. */
+  #windowStart: number
+  /** Ordinary calls and prepaid group members debit the same original bucket. */
+  #callsInWindow = 0
+  /** Consecutive local quota or concurrency refusals trigger the configured close threshold. */
+  #violations = 0
+  /** Only core-owned deadline aborts increment the consecutive timeout policy. */
+  #consecutiveTimeouts = 0
+  /** Actual producer activity prevents idle retirement until its lifetime settles. */
+  #active = 0
+  /** The physical inbound observer supplies the idle clock's latest activity. */
+  #lastInboundAt: number
+  /** Retirement is terminal and cannot reschedule an idle deadline. */
+  #closed = false
+  /** Only the current idle deadline belongs to this governor. */
+  #idleTimer: IScheduledTask | undefined
+  /** In-flight providers may ignore cancellation, so retirement owns their abort subscriptions. */
+  readonly #abortSubscriptions = new Set<() => void>()
+  /** Physical activity observation is removed exactly once during retirement. */
+  readonly #unsubscribe: () => void
+  /** Repeated registration retains each provider's exact guarded callback identity. */
+  readonly #guardedProviders = new WeakMap<IRpcProvider, IRpcProvider>()
+  /** Core group reservations and ordinary invocation share this one admission identity. */
+  readonly #bulkAdmission: IProviderBulkAdmission = {
+    reserveMany: (payloads) => this.#reserveMany(payloads)
   }
 
-  /** Only a quiet connection with no provider work is idle. */
-  const scheduleIdle = (): void => {
-    idleTimer?.cancel()
-    if (closed || active > 0) return
-    idleTimer = scheduler.schedule(
-      () => {
-        idleTimer = undefined
-        if (closed || active > 0) return
-        if (scheduler.now() - lastInboundAt >= options.idleTimeoutMs) requestClose()
-        else scheduleIdle()
-      },
-      Math.max(0, lastInboundAt + options.idleTimeoutMs - scheduler.now())
-    )
-    idleTimer.unref?.()
-  }
-
-  /** Observing after endpoint construction leaves channel's early-frame buffer to core. */
-  const unsubscribe = channel.transport.subscribe(() => {
-    lastInboundAt = scheduler.now()
-    scheduleIdle()
-  })
-  scheduleIdle()
-
-  /** Both rate/payload and core concurrency refusals share this connection's consecutive count. */
-  const violate = (): void => {
-    violations += 1
-    if (violations >= options.violationLimit) deferTask(scheduler, requestClose)
-  }
-
-  /** Reject before invoking a provider; the second consecutive violation closes this session. */
-  const admit = (context: IRpcContext): void => {
-    /** Monotonic time advances the same original rate bucket used by group reservations. */
-    const now = scheduler.now()
-    if (now - windowStart >= RATE_WINDOW_MS) {
-      windowStart = now
-      callsInWindow = 0
-    }
+  /** Validate native provenance before subscribing or starting any connection timer. */
+  constructor(
+    channel: IRemoteChannel,
+    options: IRuntimeProviderPolicy,
+    closeSession: () => Promise<void>,
+    report: (error: unknown) => void
+  ) {
     if (
-      callsInWindow >= options.maxCallsPerMinute ||
-      portableBytes(context.data as IRpcPortableValue, options.maxPayloadBytes) >
-        options.maxPayloadBytes
+      runtimeConnectionPrincipal(channel) === undefined &&
+      readAdapterMessagePreparation(channel) === undefined
+    )
+      throw tagRpcError(
+        new TypeError(RuntimeAdapterErrorText.connectionRequired),
+        RpcCoreErrorCode.invalidConfig
+      )
+    this.#options = options
+    this.#closeSession = closeSession
+    this.#report = report
+    this.#scheduler = channel.scheduler
+    this.#windowStart = this.#scheduler.now()
+    this.#lastInboundAt = this.#scheduler.now()
+    this.#unsubscribe = channel.transport.subscribe(() => {
+      this.#lastInboundAt = this.#scheduler.now()
+      this.#scheduleIdle()
+    })
+    this.#scheduleIdle()
+  }
+
+  /** A policy close remains secondary to the provider's primary result. */
+  #requestClose = (): void => {
+    void (0, this.#closeSession)().catch(this.#report)
+  }
+
+  /** Only a quiet connection with no active producer work can retire for idleness. */
+  #scheduleIdle = (): void => {
+    this.#idleTimer?.cancel()
+    if (this.#closed || this.#active > 0) return
+    this.#idleTimer = this.#scheduler.schedule(
+      () => {
+        this.#idleTimer = undefined
+        if (this.#closed || this.#active > 0) return
+        if (this.#scheduler.now() - this.#lastInboundAt >= this.#options.idleTimeoutMs)
+          this.#requestClose()
+        else this.#scheduleIdle()
+      },
+      Math.max(0, this.#lastInboundAt + this.#options.idleTimeoutMs - this.#scheduler.now())
+    )
+    this.#idleTimer.unref?.()
+  }
+
+  /** Local quota and core concurrency refusals retain their shared consecutive count. */
+  #violate = (): void => {
+    this.#violations += 1
+    if (this.#violations >= this.#options.violationLimit)
+      deferTask(this.#scheduler, this.#requestClose)
+  }
+
+  /** Advance the original minute bucket only when ordinary or grouped work seeks admission. */
+  #advanceWindow(): void {
+    /** The injected monotonic clock supplies the same timestamp used by both admission paths. */
+    const now = this.#scheduler.now()
+    if (now - this.#windowStart >= RATE_WINDOW_MS) {
+      this.#windowStart = now
+      this.#callsInWindow = 0
+    }
+  }
+
+  /** Reject quota or payload overflow before invoking the actual provider. */
+  #admit(context: IRpcContext): void {
+    this.#advanceWindow()
+    if (
+      this.#callsInWindow >= this.#options.maxCallsPerMinute ||
+      portableBytes(context.data as IRpcPortableValue, this.#options.maxPayloadBytes) >
+        this.#options.maxPayloadBytes
     ) {
-      violate()
-      throw createRuntimeDiagnosticError(options.overflow)
+      this.#violate()
+      throw createRuntimeDiagnosticError(this.#options.overflow)
     }
-    callsInWindow += 1
+    this.#callsInWindow += 1
   }
 
-  /** Group reservations share these original counters, including ordinary concurrent calls. */
-  const bulkAdmission: IProviderBulkAdmission = {
-    reserveMany(payloads) {
-      /** Advance the same original rate window before validating the entire member set. */
-      const now = scheduler.now()
-      if (now - windowStart >= RATE_WINDOW_MS) {
-        windowStart = now
-        callsInWindow = 0
-      }
-      if (
-        callsInWindow + payloads.length > options.maxCallsPerMinute ||
-        payloads.some(
-          (payload) =>
-            portableBytes(payload as IRpcPortableValue, options.maxPayloadBytes) >
-            options.maxPayloadBytes
-        )
-      ) {
-        violate()
-        throw createRuntimeDiagnosticError(options.overflow)
-      }
-      callsInWindow += payloads.length
-      /** Unexecuted members retain reserved credit until cancellation, refusal, or terminal. */
-      let remaining = payloads.length
-      /** Rollback cannot subtract unused credit from a subsequent minute's original bucket. */
-      const reservedWindow = windowStart
-      return {
-        consume() {
-          if (remaining > 0) remaining -= 1
-        },
-        release() {
-          if (windowStart === reservedWindow) callsInWindow -= remaining
-          remaining = 0
-        }
-      }
+  /** Validate all group payloads once before debiting their shared original minute bucket. */
+  #reserveMany(payloads: Parameters<IProviderBulkAdmission['reserveMany']>[0]) {
+    this.#advanceWindow()
+    if (
+      this.#callsInWindow + payloads.length > this.#options.maxCallsPerMinute ||
+      payloads.some(
+        (payload) =>
+          portableBytes(payload as IRpcPortableValue, this.#options.maxPayloadBytes) >
+          this.#options.maxPayloadBytes
+      )
+    ) {
+      this.#violate()
+      throw createRuntimeDiagnosticError(this.#options.overflow)
     }
+    this.#callsInWindow += payloads.length
+    return new GovernorReservation(this, this.#windowStart, payloads.length)
   }
 
-  /** Observe deadlines at abort time; settlement only releases activity and resets successful work. */
-  const track = (context: IRpcContext): ((succeeded: boolean) => void) => {
-    /** One operation contributes at most one deadline, including after a late settlement. */
-    let timedOut = false
-    /** Provider callbacks and stream finally blocks both retire this activity once. */
-    let settled = false
-    active += 1
-    idleTimer?.cancel()
-    idleTimer = undefined
-    /** The core deadline owner creates this local timeout instance; remote payloads cannot do so. */
-    const onAbort = (): void => {
-      if (closed || timedOut) return
-      /** This guarded read preserves the core-owned cancellation reason. */
-      const reason = resolveAbortReason(context.signal)
-      if (localRpcErrorCode(reason) !== RpcCoreErrorCode.deadlineExceeded) return
-      timedOut = true
-      consecutiveTimeouts += 1
-      if (consecutiveTimeouts === options.maxConsecutiveTimeouts) deferTask(scheduler, requestClose)
-    }
-    /** Releasing admission removes listeners even from providers that ignore cancellation. */
-    const unsubscribeAbort = (): void => context.signal.removeEventListener('abort', onAbort)
-    context.signal.addEventListener('abort', onAbort, { once: true })
-    abortSubscriptions.add(unsubscribeAbort)
-    if (context.signal.aborted) onAbort()
-    return (succeeded) => {
-      if (settled) return
-      settled = true
-      unsubscribeAbort()
-      abortSubscriptions.delete(unsubscribeAbort)
-      if (!closed && succeeded && !context.signal.aborted) {
-        consecutiveTimeouts = 0
-        violations = 0
-      }
-      active -= 1
-      scheduleIdle()
-    }
+  /** Unexecuted group credit can return only to the minute bucket that reserved it. */
+  releaseReserved(window: number, remaining: number): void {
+    if (this.#windowStart === window) this.#callsInWindow -= remaining
   }
 
-  /** One original callback keeps one guarded view per connection, including its bulk metadata. */
-  const guardedProviders = new WeakMap<IRpcProvider, IRpcProvider>()
+  /** Begin actual producer activity before attaching its canonical deadline observer. */
+  beginActivity(): void {
+    this.#active += 1
+    this.#idleTimer?.cancel()
+    this.#idleTimer = undefined
+  }
 
-  /** Preserve the provider's native result and Promise identity while tracking its activity. */
-  const guarded = (provider: IRpcProvider): IRpcProvider => {
-    /** Repeated runtime lookup must retain the same actual quota registration. */
-    const retained = guardedProviders.get(provider)
+  /** Retirement retains the exact listener only after native attachment succeeds. */
+  retainActivity(unsubscribeAbort: () => void): void {
+    this.#abortSubscriptions.add(unsubscribeAbort)
+  }
+
+  /** Only locally created deadline errors contribute to the connection's timeout policy. */
+  observeDeadline(context: IRpcContext): boolean {
+    if (this.#closed) return false
+    if (localRpcErrorCode(resolveAbortReason(context.signal)) !== RpcCoreErrorCode.deadlineExceeded)
+      return false
+    this.#consecutiveTimeouts += 1
+    if (this.#consecutiveTimeouts === this.#options.maxConsecutiveTimeouts)
+      deferTask(this.#scheduler, this.#requestClose)
+    return true
+  }
+
+  /** A successful uncancelled producer resets refusals; every producer retires activity once. */
+  finishActivity(context: IRpcContext, succeeded: boolean, unsubscribeAbort: () => void): void {
+    this.#abortSubscriptions.delete(unsubscribeAbort)
+    if (!this.#closed && succeeded && !context.signal.aborted) {
+      this.#consecutiveTimeouts = 0
+      this.#violations = 0
+    }
+    this.#active -= 1
+    this.#scheduleIdle()
+  }
+
+  /** Each actual provider or stream receives one independently owned activity receipt. */
+  #track(context: IRpcContext): (succeeded: boolean) => void {
+    return new GovernorActivity(this, context).settle
+  }
+
+  /** Preserve native provider result and Promise identity while retaining one guarded registration. */
+  readonly provider = (provider: IRpcProvider): IRpcProvider => {
+    /** Repeated lookup must retain the same quota registration and bulk-admission metadata. */
+    const retained = this.#guardedProviders.get(provider)
     if (retained) return retained
-    /** Ordinary and prepaid invocation share the original activity/deadline tracking body. */
+    /** Settlement observes the provider's result without replacing its returned Promise. */
     const invoke: IRpcProvider = (context) => {
-      /** The deadline subscription preserves the provider's returned Promise identity. */
-      const settle = track(context)
+      /** One activity receipt survives either synchronous failure or asynchronous settlement. */
+      const settle = this.#track(context)
+      /** The original provider result escapes unchanged after its activity observer is attached. */
       let result: IRpcProviderResult | Promise<IRpcProviderResult>
       try {
         result = provider(context)
@@ -252,132 +284,196 @@ export function createRuntimeProviderGovernor(
       )
       return result
     }
+    /** Preflight admission remains attached to the actual invocation callback. */
     const guardedProvider = attachProviderBulkAdmission(
       retainProviderPreflight(provider, (context: IRpcContext) => {
-        admit(context)
+        this.#admit(context)
         return invoke(context)
       }),
-      { admission: bulkAdmission, invoke }
+      { admission: this.#bulkAdmission, invoke }
     )
-    guardedProviders.set(provider, guardedProvider)
+    this.#guardedProviders.set(provider, guardedProvider)
     return guardedProvider
   }
 
-  /** Both old endpoint registration and shared-endpoint producer entry use these exact counters. */
-  const enterStream = (context: IRpcContext): ((succeeded: boolean) => void) => {
-    admit(context)
-    return track(context)
+  /** The same state-free callback serves the wrapper and the canonical Host producer. */
+  readonly streamResult = projectNativeStreamResult
+
+  /** Runtime stream entry uses the same counters and deadline observer as ordinary provider calls. */
+  readonly enterStream = (context: IRpcContext): ((succeeded: boolean) => void) => {
+    this.#admit(context)
+    return this.#track(context)
   }
 
-  /** This one factory result is the canonical policy owner consumed by Core listener sessions. */
-  const governor: IRuntimeProviderGovernor = Object.freeze({
-    provider: guarded,
-    enterStream,
-    /** Preserve the caller's limits and observer while linking canonical concurrency refusals. */
-    limits(limits, configured) {
-      /** Keep valid caller limits within the original governor; invalid values reach core unchanged. */
-      const maximum = (
-        base: number | undefined,
-        selected: number | undefined
-      ): number | undefined =>
-        selected === undefined
-          ? base
-          : base !== undefined && Number.isSafeInteger(selected) && selected > 0
-            ? Math.min(base, selected)
-            : selected
-      /** Distinct original and selected observers retain their exact connection-level ownership. */
-      const observers = [limits.onRejected, configured?.onRejected].filter(
-        (observer, index, all) => observer !== undefined && all.indexOf(observer) === index
-      )
-      return Object.freeze({
-        ...limits,
-        ...configured,
-        maxGlobal: maximum(limits.maxGlobal, configured?.maxGlobal),
-        maxPerPeer: maximum(limits.maxPerPeer, configured?.maxPerPeer),
-        /** Only local concurrency refusal joins the connection's consecutive violation count. */
-        onRejected(rejection: IRpcProviderRejection) {
-          if (rejection.reason === RpcProviderRejectionReason.concurrency) violate()
-          if (observers.length < 2) return observers[0]?.(rejection)
-          /** Every observer failure is reported without suppressing the other refusal observer. */
-          return Promise.allSettled(
-            observers.map((observer) => Promise.resolve().then(() => observer!(rejection)))
-          ).then((outcomes) => {
-            for (const outcome of outcomes)
-              if (outcome.status === 'rejected') report(outcome.reason)
-          })
-        }
-      })
-    },
-    endpoint(endpoint) {
-      /** The admission view shadows only provider registration on the frozen core endpoint. */
-      const guardedEndpoint: IRpcEndpoint = Object.create(endpoint.endpoint)
-      Object.defineProperty(guardedEndpoint, 'provide', {
-        value: (method: string, provider: IRpcProvider) => {
-          endpoint.endpoint.provide(method, guarded(provider))
-          return guardedEndpoint
-        }
-      })
-      Object.freeze(guardedEndpoint)
-      const stream = endpoint.stream
-        ? Object.freeze({
-            ...endpoint.stream,
-            provide: (
-              method: string,
-              run: Parameters<NonNullable<IRemoteServeEndpoint['stream']>['provide']>[1]
-            ) =>
-              endpoint.stream!.provide(
-                method,
-                retainProviderPreflight(
+  /** Preserve selected limits and both original refusal observers on the same connection. */
+  readonly limits = (
+    limits: IRpcProviderLimits,
+    configured?: IRpcProviderLimits
+  ): IRpcProviderLimits => {
+    /** Valid selected limits cannot exceed the base; invalid values still reach Core unchanged. */
+    const maximum = (base: number | undefined, selected: number | undefined): number | undefined =>
+      selected === undefined
+        ? base
+        : base !== undefined && Number.isSafeInteger(selected) && selected > 0
+          ? Math.min(base, selected)
+          : selected
+    /** This list has exactly two possible observers, so identity deduplication has a fixed bound. */
+    const observers = [limits.onRejected, configured?.onRejected].filter(
+      (observer, index, all) => observer !== undefined && all.indexOf(observer) === index
+    )
+    return Object.freeze({
+      ...limits,
+      ...configured,
+      maxGlobal: maximum(limits.maxGlobal, configured?.maxGlobal),
+      maxPerPeer: maximum(limits.maxPerPeer, configured?.maxPerPeer),
+      onRejected: (rejection: IRpcProviderRejection) => {
+        if (rejection.reason === RpcProviderRejectionReason.concurrency) this.#violate()
+        if (observers.length < 2) return observers[0]?.(rejection)
+        return Promise.allSettled(
+          observers.map((observer) => Promise.resolve().then(() => observer!(rejection)))
+        ).then((outcomes) => {
+          for (const outcome of outcomes)
+            if (outcome.status === 'rejected') (0, this.#report)(outcome.reason)
+        })
+      }
+    })
+  }
+
+  /** Shadow only provider registration while preserving the frozen endpoint's actual dispatch. */
+  readonly endpoint = (endpoint: IRemoteServeEndpoint): IRemoteServeEndpoint => {
+    /** The guard inherits the genuine Core endpoint instead of recreating a dispatcher. */
+    const guardedEndpoint: IRpcEndpoint = Object.create(endpoint.endpoint)
+    Object.defineProperty(guardedEndpoint, 'provide', {
+      value: (method: string, provider: IRpcProvider) => {
+        endpoint.endpoint.provide(method, this.provider(provider))
+        return guardedEndpoint
+      }
+    })
+    Object.freeze(guardedEndpoint)
+    /** Stream registration preserves its original producer and retained preflight metadata. */
+    const stream = endpoint.stream
+      ? Object.freeze({
+          ...endpoint.stream,
+          provide: (
+            method: string,
+            run: Parameters<NonNullable<IRemoteServeEndpoint['stream']>['provide']>[1]
+          ) =>
+            endpoint.stream!.provide(
+              method,
+              retainProviderPreflight(
+                run,
+                wrapProviderStreamAdmission(
                   run,
-                  wrapProviderStreamAdmission(
-                    run,
-                    (params: unknown, streamContext: Parameters<typeof run>[1]) =>
-                      (async function* () {
-                        /** The original stream producer supplies its actual admitted operation. */
-                        const context = streamContext.context
-                        if (context.targetGeneration === undefined) admit(context)
-                        /** Stream cancellation uses the same single deadline observer as requests. */
-                        /**
-                         * Runtime producers already enter through the retained native admission
-                         * owner.
-                         */
-                        const settle =
-                          context.targetGeneration === undefined ? track(context) : undefined
-                        /** Only normal producer completion resets consecutive policy failures. */
-                        let succeeded = false
-                        try {
-                          /**
-                           * Preserve the same iterator's actual terminal value through native
-                           * policy.
-                           */
-                          const result = yield* run(params, streamContext)
-                          succeeded = true
-                          return context.targetGeneration === undefined ? undefined : result
-                        } finally {
-                          settle?.(succeeded)
-                        }
-                      })(),
-                    enterStream
-                  )
+                  (params: unknown, streamContext: Parameters<typeof run>[1]) =>
+                    this.#runStream(run, params, streamContext),
+                  this.enterStream
                 )
               )
-          })
-        : undefined
-      return Object.freeze({
-        ...endpoint,
-        endpoint: guardedEndpoint,
-        ...(stream ? { stream } : {})
-      })
-    },
-    close(): void {
-      if (closed) return
-      closed = true
-      idleTimer?.cancel()
-      for (const unsubscribeAbort of abortSubscriptions) unsubscribeAbort()
-      abortSubscriptions.clear()
-      unsubscribe()
+            )
+        })
+      : undefined
+    return Object.freeze({ ...endpoint, endpoint: guardedEndpoint, ...(stream ? { stream } : {}) })
+  }
+
+  /** Preserve native stream terminal values while pairing the original admission lifetime. */
+  async *#runStream(
+    run: Parameters<NonNullable<IRemoteServeEndpoint['stream']>['provide']>[1],
+    params: unknown,
+    streamContext: Parameters<typeof run>[1]
+  ) {
+    /** Runtime producers already enter through their retained native admission owner. */
+    const context = streamContext.context
+    if (context.targetGeneration === undefined) this.#admit(context)
+    /** Only legacy producer entry needs a new receipt; runtime entry already owns one. */
+    const settle = context.targetGeneration === undefined ? this.#track(context) : undefined
+    /** Only normal producer completion resets consecutive policy failures. */
+    let succeeded = false
+    try {
+      /** Delegate the exact iterator and preserve its runtime terminal result. */
+      const result = yield* run(params, streamContext)
+      succeeded = true
+      return projectNativeStreamResult(result, context)
+    } finally {
+      settle?.(succeeded)
     }
-  })
-  governors.set(governor, Object.freeze({ channel, governor }))
-  return governor
+  }
+
+  /** Cancel timers and remove original subscriptions without reviving the held connection. */
+  readonly close = (): void => {
+    if (this.#closed) return
+    this.#closed = true
+    this.#idleTimer?.cancel()
+    for (const unsubscribeAbort of this.#abortSubscriptions) unsubscribeAbort()
+    this.#abortSubscriptions.clear()
+    ;(0, this.#unsubscribe)()
+  }
+}
+
+/** One group reservation owns only its unused credit and the bucket that granted it. */
+class GovernorReservation {
+  /** Counter mutations stay with the original connection governor. */
+  readonly #governor: RuntimeProviderGovernor
+  /** Rollback never subtracts credit from a later minute's bucket. */
+  readonly #window: number
+  /** Consumed members cannot be refunded by later cancellation or close. */
+  #remaining: number
+
+  /** Capture the original bucket after its one atomic bulk debit. */
+  constructor(governor: RuntimeProviderGovernor, window: number, count: number) {
+    this.#governor = governor
+    this.#window = window
+    this.#remaining = count
+  }
+
+  /** A member consumes at most one already-reserved call credit. */
+  readonly consume = (): void => {
+    if (this.#remaining > 0) this.#remaining -= 1
+  }
+
+  /** Release unexecuted credit exactly once to its original minute bucket. */
+  readonly release = (): void => {
+    this.#governor.releaseReserved(this.#window, this.#remaining)
+    this.#remaining = 0
+  }
+}
+
+/** One actual producer owns its deadline subscription and idempotent settlement receipt. */
+class GovernorActivity {
+  /** Original connection accounting remains the only quota and idle authority. */
+  readonly #governor: RuntimeProviderGovernor
+  /** The provider context supplies the canonical cancellation signal and reason. */
+  readonly #context: IRpcContext
+  /** One operation contributes at most one core-owned deadline. */
+  #timedOut = false
+  /** Provider callbacks and stream finally blocks can retire this activity only once. */
+  #settled = false
+
+  /** Enter activity before observing an already-aborted original provider signal. */
+  constructor(governor: RuntimeProviderGovernor, context: IRpcContext) {
+    this.#governor = governor
+    this.#context = context
+    governor.beginActivity()
+    context.signal.addEventListener('abort', this.#onAbort, { once: true })
+    governor.retainActivity(this.#unsubscribeAbort)
+    if (context.signal.aborted) this.#onAbort()
+  }
+
+  /** Deadline classification reads only the original Core-created abort reason. */
+  #onAbort = (): void => {
+    if (this.#timedOut) return
+    this.#timedOut = this.#governor.observeDeadline(this.#context)
+  }
+
+  /** Teardown removes the exact callback installed on the actual provider signal. */
+  #unsubscribeAbort = (): void => {
+    this.#context.signal.removeEventListener('abort', this.#onAbort)
+  }
+
+  /** Late or repeated provider settlement cannot decrement activity or reset policy twice. */
+  readonly settle = (succeeded: boolean): void => {
+    if (this.#settled) return
+    this.#settled = true
+    this.#unsubscribeAbort()
+    this.#governor.finishActivity(this.#context, succeeded, this.#unsubscribeAbort)
+  }
 }

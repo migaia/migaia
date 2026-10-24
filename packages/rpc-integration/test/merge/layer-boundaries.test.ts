@@ -53,10 +53,11 @@ const contractBareAllowlist = new Set([
   '@migaia/serialize',
   '@migaia/utils/bytes',
   '@migaia/utils/error',
-  '@migaia/utils/function'
+  '@migaia/utils/function',
+  '@migaia/utils/string'
 ])
 /** Published adapter boundary: shared primitives, errors, and local text only. */
-const browserCoreAllowlist = new Set(['core/transport-kit.ts', 'core/index.ts'])
+const browserCoreAllowlist = new Set(['core/transport-kit.ts'])
 
 /** Return each import or re-export that violates the contract/core/browser direction. */
 function layerViolations(file: string, source: string): string[] {

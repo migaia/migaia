@@ -1,14 +1,12 @@
 import { createRuntimeApiEndpoint } from '../../../../rpc-host/dist/core/runtime-api-endpoint.js'
-import {
-  codec,
-  framer,
-  connect,
-  abort,
-  timeout,
-  hooks,
-  authentication,
-  type IRpcEndpoint
-} from '../../../../rpc-host/dist/core/index.js'
+import { codec } from '../../../../rpc-host/dist/core/middleware/codec.js'
+import { framer } from '../../../../rpc-host/dist/core/middleware/framer.js'
+import { connect } from '../../../../rpc-host/dist/core/middleware/connect.js'
+import { abort } from '../../../../rpc-host/dist/core/middleware/abort.js'
+import { timeout } from '../../../../rpc-host/dist/core/middleware/timeout.js'
+import { hooks } from '../../../../rpc-host/dist/core/middleware/hooks.js'
+import { authentication } from '../../../../rpc-host/dist/core/middleware/authentication.js'
+import type { IRpcEndpoint } from '../../../../rpc-host/dist/core/typing.js'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import type { IRemoteChannelResources } from '../../../../rpc-host/dist/remote/types.js'
 import fixture from './managed-binary-key.json'
@@ -34,6 +32,38 @@ function signingKey(): Promise<CryptoKey> {
   ))
 }
 
+/** Both genuine parent Host and child Peer use the original HMAC primitives and fixture key. */
+export const webBinaryAuthentication = {
+  sign: async (body: unknown) => ({
+    body,
+    signature: [
+      ...new Uint8Array(
+        await crypto.subtle.sign(
+          'HMAC',
+          await signingKey(),
+          new TextEncoder().encode(JSON.stringify(body))
+        )
+      )
+    ]
+  }),
+  verify: async (value: unknown) => {
+    const signed = value as { body: unknown; signature: number[] }
+    if (
+      !(await crypto.subtle.verify(
+        'HMAC',
+        await signingKey(),
+        new Uint8Array(signed.signature),
+        new TextEncoder().encode(JSON.stringify(signed.body))
+      ))
+    )
+      throw attachErrorIdentity(new Error(VerifierErrorText.signatureInvalid), {
+        source: VERIFIER_SOURCE,
+        code: VerifierErrorCode.signatureInvalid
+      })
+    return signed.body
+  }
+}
+
 /** Compose only the same built canonical roots on both actual Web/Bun native sides. */
 export async function webBinaryEndpoint(
   channel: IRemoteChannelResources,
@@ -54,36 +84,7 @@ export async function webBinaryEndpoint(
         abort(),
         timeout(),
         hooks({ onHookError: report }),
-        authentication({
-          sign: async (body) => ({
-            body,
-            signature: [
-              ...new Uint8Array(
-                await crypto.subtle.sign(
-                  'HMAC',
-                  await signingKey(),
-                  new TextEncoder().encode(JSON.stringify(body))
-                )
-              )
-            ]
-          }),
-          verify: async (value) => {
-            const signed = value as { body: unknown; signature: number[] }
-            if (
-              !(await crypto.subtle.verify(
-                'HMAC',
-                await signingKey(),
-                new Uint8Array(signed.signature),
-                new TextEncoder().encode(JSON.stringify(signed.body))
-              ))
-            )
-              throw attachErrorIdentity(new Error(VerifierErrorText.signatureInvalid), {
-                source: VERIFIER_SOURCE,
-                code: VerifierErrorCode.signatureInvalid
-              })
-            return signed.body
-          }
-        })
+        authentication(webBinaryAuthentication)
       ]
     },
     channel

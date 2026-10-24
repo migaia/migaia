@@ -26,7 +26,8 @@ import {
   retainProviderPreflight,
   retainProviderFailureRoute,
   readProviderStreamAdmission,
-  type ProviderRegistry
+  type ProviderRegistry,
+  type IProviderSessionPolicy
 } from '../provider.js'
 import {
   normalizeStreamPayload,
@@ -158,6 +159,11 @@ type IPendingCancel = {
 type IProducerState = {
   /** Original native quota/drain cleanup stays attached to this producer's existing lifetime. */
   nativeSettlement?: (succeeded: boolean) => void
+  /** The admitted session's result projection borrows this producer's exact original context. */
+  readonly nativeResult?: Readonly<{
+    project: NonNullable<IProviderSessionPolicy['streamResult']>
+    context: IRpcContext
+  }>
   /** Only actual iterator.done establishes successful native policy settlement. */
   nativeSucceeded?: boolean
   /** The final executor supplies admission/start/seal authority to this same iterator owner. */
@@ -190,6 +196,555 @@ type IProducerState = {
 
 /** The one optional stream owner attached to a composed endpoint kernel. */
 export class RpcStreamOwner implements IRpcStreamRuntime {
+  /** One lazy iterator owns its original operation state and serial next tail. */
+  static readonly #ConsumerIterator = class {
+    /** The canonical stream feature retains registries, transport and endpoint lifetime. */
+    // eslint-disable-next-line no-unused-private-class-members -- Consumer methods read canonical private feature operations below.
+    readonly #owner: RpcStreamOwner
+    /** Target identity remains fixed before the first lazy open. */
+    readonly #targetId: string
+    /** Provider method is admitted only when the original iterator starts. */
+    readonly #method: string
+    /** Original payload is retained without copying or eager normalization. */
+    readonly #params: unknown
+    /** Caller options keep their original object identity and lazy reads. */
+    readonly #options: IRpcRuntimeSendOptions | undefined
+    /** Opt-in generation retains the exact accepted provider identity. */
+    readonly #generation: IRpcRuntimeGeneration | undefined
+    /** The one actual consumer is absent until its original first start. */
+    #state: IConsumerState | undefined
+    /** Sticky failure/return before opening prevents a later queued next from starting. */
+    #unopenedTerminal: IConsumerState['terminal']
+    /** The original Promise chain serializes caller next operations only. */
+    #tail = Promise.resolve<unknown>(undefined)
+    /** Public shape stays a frozen own-method plain object with its original iterator identity. */
+    readonly value: AsyncIterableIterator<IRpcPortableValue>
+
+    /** Capture lazy inputs and publish the original ready seam without opening a stream. */
+    constructor(
+      owner: RpcStreamOwner,
+      targetId: string,
+      method: string,
+      params: unknown,
+      options?: IRpcRuntimeSendOptions,
+      generation?: IRpcRuntimeGeneration
+    ) {
+      this.#owner = owner
+      this.#targetId = targetId
+      this.#method = method
+      this.#params = params
+      this.#options = options
+      this.#generation = generation
+      /** Each own callback delegates to this same iterator's actual state, never another tail. */
+      const iterator = {
+        next: this.#next,
+        return: (value?: IRpcPortableValue) => this.#close(value),
+        throw: (reason?: unknown) => this.#close(reason, true),
+        [Symbol.asyncIterator]() {
+          return this
+        }
+      }
+      if (generation) runtimeStreamReady.set(iterator, this.#ready)
+      this.value = Object.freeze(iterator)
+    }
+
+    /** Append one original next operation and return its exact task Promise. */
+    readonly #next = (): Promise<IteratorResult<IRpcPortableValue>> => {
+      /**
+       * This exact queued next Promise is returned to the caller and retained by the original
+       * serial tail.
+       */
+      const task = this.#tail.then(async () => {
+        if (this.#unopenedTerminal) return this.#terminalResult(this.#unopenedTerminal)
+        if (!this.#state) {
+          try {
+            this.#state = this.#start(
+              this.#targetId,
+              this.#method,
+              this.#params,
+              this.#options,
+              this.#generation
+            )
+          } catch (error) {
+            this.#unopenedTerminal = { error }
+            throw error
+          }
+        }
+        return this.#pull(this.#state)
+      })
+      this.#tail = task.then(
+        () => undefined,
+        () => undefined
+      )
+      return task
+    }
+    /** Return or throw preserves the original cleanup aggregation and runtime final Promise. */
+    async #close(value?: unknown, thrown = false): Promise<IteratorResult<IRpcPortableValue>> {
+      if (!this.#state) this.#unopenedTerminal = { done: true }
+      if (this.#state?.runtime) {
+        /**
+         * Ordinary return after local terminal keeps legacy cleanup semantics; next keeps its
+         * error.
+         */
+        if (
+          !thrown &&
+          this.#state.terminal &&
+          this.#state.runtime.options.cancel !== RpcRuntimeCancel
+        )
+          return { done: true, value: value as IRpcPortableValue }
+        try {
+          /** Return observes the same actual producer terminal, including concurrent callers. */
+          const result = await this.#finishRuntimeConsumer(this.#state, thrown ? value : undefined)
+          if (thrown) throw value
+          return result
+        } catch (error) {
+          if (thrown && error !== value)
+            throw new AggregateError([value, error], RpcStreamErrorText.cleanupFailed)
+          throw error
+        }
+      }
+      /** Retain iterator cleanup failure separately so a thrown primary value remains reachable. */
+      const cleanup = this.#state
+        ? await this.#owner.#cancelConsumer(this.#state, { done: true }, thrown ? value : undefined)
+        : undefined
+      if (cleanup !== undefined) {
+        if (thrown) throw new AggregateError([value, cleanup], RpcStreamErrorText.cleanupFailed)
+        throw cleanup
+      }
+      if (thrown) throw value
+      return { done: true, value: value as IRpcPortableValue }
+    }
+
+    /** Ready observes the same actual consumer and preserves the cached original ready Promise. */
+    readonly #ready = (): Promise<void> => {
+      if (!this.#state) {
+        try {
+          this.#state = this.#start(
+            this.#targetId,
+            this.#method,
+            this.#params,
+            this.#options,
+            this.#generation
+          )
+        } catch (error) {
+          this.#unopenedTerminal = { error }
+          throw error
+        }
+      }
+      return this.#state.ready
+    }
+
+    /** Allocate the sole operation scope and issue the initial request through outbound. */
+    #start(
+      targetId: string,
+      method: string,
+      params: unknown,
+      options?: IRpcRuntimeSendOptions,
+      generation?: IRpcRuntimeGeneration
+    ): IConsumerState {
+      if (this.#owner.#capability && !this.#owner.#capability.supports(targetId))
+        throw createRpcError(
+          RpcCoreErrorCode.capabilityConflict,
+          RpcStreamErrorText.capabilityMissing
+        )
+      if (options?.signal?.aborted) throw readStreamAbortReason(options.signal)
+      /** The original stream identity keys this consumer or producer admission only. */
+      const id = allocateRpcId(
+        this.#owner.#outbound.defaultGenerate
+          ? {
+              ...this.#owner.#prepared.options.uuid,
+              generate: this.#owner.#outbound.defaultGenerate
+            }
+          : (this.#owner.#prepared.options.uuid ?? {}),
+        'task',
+        this.#owner.#prepared.id,
+        targetId,
+        (candidate) => this.#owner.#consumers.has(tupleKey(targetId, candidate))
+      )
+      /** The original scope fences this operation lifetime and its inherited cancellation. */
+      const scope = new OperationScope(
+        this.#owner.#kernel.generation,
+        options?.timeoutMs,
+        this.#owner.#kernel.closingSignal,
+        () => this.#owner.#kernel.time.now()
+      )
+      /** The single original ready Promise resolves only after the matching open frame. */
+      let resolveReady!: () => void
+      /** The single original ready Promise retains its exact terminal failure identity. */
+      let rejectReady!: (reason: unknown) => void
+      /** Publish one original open acknowledgement Promise for this exact consumer lifetime. */
+      const ready = new Promise<void>((resolve, reject) => {
+        resolveReady = resolve
+        rejectReady = reject
+      })
+      /** This existing operation context remains the sole owner of sequence and terminal facts. */
+      const state: IConsumerState = {
+        id,
+        targetId,
+        method,
+        scope,
+        timeoutMs: options?.timeoutMs === false ? undefined : options?.timeoutMs,
+        ready,
+        resolveReady,
+        rejectReady,
+        seq: 0
+      }
+      if (generation) {
+        /** The existing outbound replay registry supplies the sole bounded task reservation. */
+        const outbound = this.#owner.#runtimeOutbound()
+        /** Validation occurs before publishing the original consumer state. */
+        let reserved: ReturnType<RpcOutboundAttachment['reserveRuntimeStream']>
+        try {
+          reserved = outbound.reserveRuntimeStream(id, generation, method, options ?? {})
+        } catch (error) {
+          scope.abort(error)
+          throw error
+        }
+        state.runtime = { task: reserved.task, options: options ?? {} }
+        state.runtime.prepared = outbound
+          .prepareRuntimeStreamOpen(
+            id,
+            targetId,
+            reserved.task,
+            reserved.options,
+            params as IRpcPortableValue | undefined,
+            readForwardRoute(options)
+          )
+          .then((envelope) => {
+            state.runtime!.envelope = envelope
+            return envelope
+          })
+        state.openSend = state.runtime.prepared.then((envelope) => {
+          return outbound.sendRuntimeFrame(
+            envelope,
+            {
+              queueSignal: scope.signal,
+              assertCanSend: () => scope.assertActive(this.#owner.#kernel.generation)
+            },
+            undefined,
+            state.runtime!.options
+          )
+        })
+      }
+      this.#owner.#consumers.set(tupleKey(targetId, id), state)
+      if (state.runtime) {
+        /** Shared Host targets select their own native drain; standalone endpoints retain one owner. */
+        const registry = this.#owner.#kernel.readOwner(EndpointOwnerKey.providerRegistry) as
+          | ProviderRegistry
+          | undefined
+        state.runtime.releaseAdmission = registry?.sessionPolicy
+          ? registry.sessionPolicy(targetId)?.enterStreamConsumer?.()
+          : this.#owner.#runtimeConsumerAdmission?.()
+      }
+      state.openSend ??= Promise.resolve().then(() =>
+        this.#owner.#outbound.send(
+          retainForwardOptions(options, {
+            kind: 'stream-open',
+            id,
+            targetId,
+            method,
+            data: params,
+            timeoutMs: options?.timeoutMs === false ? undefined : options?.timeoutMs,
+            operation: {
+              signal: scope.signal,
+              remaining: () => scope.remaining(options?.timeoutMs)
+            }
+          })
+        )
+      )
+      void state.openSend.catch((error) => {
+        if (!state.terminal)
+          this.#owner.#finishConsumer(state, { error: this.#owner.#sendFailureReason(error) })
+      })
+      if (options?.timeoutMs !== undefined && options.timeoutMs !== false) {
+        state.timer = this.#owner.#kernel.time.setTimeout(() => {
+          void this.#owner.#cancelConsumer(state, { error: createRpcTimeoutError() })
+        }, options.timeoutMs)
+      }
+      if (options?.signal) {
+        /** Remove only this consumer abort listener when its original lifetime retires. */
+        const onAbort = (): void => {
+          void this.#owner.#cancelConsumer(state, { error: readStreamAbortReason(options.signal!) })
+        }
+        options.signal.addEventListener('abort', onAbort, { once: true })
+        state.removeAbort = () => options.signal!.removeEventListener('abort', onAbort)
+      }
+      return state
+    }
+
+    /** Send exactly one pull for each awaited caller next and settle it from the matching frame. */
+    async #pull(state: IConsumerState): Promise<IteratorResult<IRpcPortableValue>> {
+      if (state.terminal) return this.#terminalResult(state.terminal, state.runtime !== undefined)
+      await state.ready
+      if (state.terminal) return this.#terminalResult(state.terminal, state.runtime !== undefined)
+      return new Promise<IteratorResult<IRpcPortableValue>>((resolve, reject) => {
+        state.pending = { resolve, reject }
+        /** This exact credit keeps its own abort admission across reentrant physical sends. */
+        const admission = new AbortController()
+        state.pullAdmission = admission
+        /** Snapshot only the original held credit so later reentry cannot consume or clear it. */
+        const seq = state.seq
+        void this.#owner.#sendFrame(
+          state.targetId,
+          state.id,
+          {
+            event: RpcStreamEvent.pull,
+            seq: state.seq
+          },
+          {
+            queueSignal: admission.signal,
+            assertCanSend: () => {
+              this.#owner.#kernel.assertActive()
+              if (state.terminal || !state.pending || state.seq !== seq) throw createRpcAbortError()
+            }
+          },
+          state.receiverId,
+          state.runtime?.envelope
+        ).catch((error) => {
+          if (state.terminal) return
+          void this.#owner.#cancelConsumer(
+            state,
+            { error: this.#owner.#sendFailureReason(error) },
+            error
+          )
+        })
+      })
+    }
+
+    /** Return sticky terminal completion or throw the original terminal error instance. */
+    #terminalResult(
+      terminal: NonNullable<IConsumerState['terminal']>,
+      retainValue = false
+    ): IteratorResult<IRpcPortableValue> {
+      if ('error' in terminal) throw terminal.error
+      return { done: true, value: retainValue ? terminal.value : undefined }
+    }
+
+    /** One original consumer final promise merges repeated return and concurrent next/finish. */
+    #finishRuntimeConsumer(
+      state: IConsumerState,
+      reason?: unknown
+    ): Promise<IteratorResult<IRpcPortableValue>> {
+      /** This method is entered only by a genuinely selected runtime profile. */
+      const runtime = state.runtime!
+      if (runtime.finishing) return runtime.finishing
+      runtime.finishing = new Promise((resolve, reject) => {
+        runtime.resolveFinal = resolve
+        runtime.rejectFinal = reject
+      })
+      if (state.terminal) {
+        if ('error' in state.terminal) runtime.rejectFinal!(state.terminal.error)
+        else runtime.resolveFinal!({ done: true, value: state.terminal.value })
+      } else {
+        void runtime.prepared
+          ?.then(() =>
+            this.#owner.#sendRuntimeIntent(
+              state,
+              reason === undefined
+                ? undefined
+                : serializeRpcError(reason, {
+                    report: (failure) => this.#owner.#report(failure.error)
+                  }),
+              runtime.options.cancel === RpcRuntimeCancel
+            )
+          )
+          .catch((error: unknown) => this.#owner.#finishConsumer(state, { error }))
+      }
+      return runtime.finishing
+    }
+  }
+
+  /** One producer control record owns its original finish/cancel/timer continuations. */
+  static readonly #ProducerControl = class {
+    /** The single feature retains transport and producer registration ownership. */
+    // eslint-disable-next-line no-unused-private-class-members -- Nested owner reads canonical private feature operations below.
+    readonly #owner: RpcStreamOwner
+    /** Original producer state is the sole iterator, sequence and admission context. */
+    readonly #state: IProducerState
+    /** Capture the admitted producer without allocating another lifecycle or queue. */
+    constructor(owner: RpcStreamOwner, state: IProducerState) {
+      this.#owner = owner
+      this.#state = state
+    }
+    /** Bind the final executor's two controls before installing the original legacy deadline. */
+    attach(request: Extract<IRpcEnvelope, { kind: 'request' }>): void {
+      this.#state.runtime?.bindCancel(this.#cancel)
+      this.#state.runtime?.bindControl(this.#control)
+      if (!this.#state.runtime && request.data.route.timeoutMs !== undefined)
+        this.#state.timer = this.#owner.#kernel.time.setTimeout(
+          this.#expire,
+          request.data.route.timeoutMs
+        )
+    }
+    /** Cancellation uses the actual producer's current credit and original error serializer. */
+    readonly #cancel = (reason?: unknown): Promise<void> =>
+      this.#owner.#receiveProducer(
+        this.#state.senderId,
+        this.#state.id,
+        {
+          event: RpcStreamEvent.cancel,
+          seq: this.#state.seq,
+          ...(reason === undefined
+            ? {}
+            : {
+                reason: serializeRpcError(reason, {
+                  report: (failure) => this.#owner.#report(failure.error)
+                })
+              })
+        },
+        true
+      )
+
+    /** Finish changes only the same single-credit loop to discard; pull preserves its permission. */
+    readonly #control: Parameters<IProviderRuntimeStream['bindControl']>[0] = (payload) => {
+      /** The original final executor remains the only start and finish permission owner. */
+      const runtime = this.#state.runtime!
+      if (payload.event === RpcRuntimeFinish) {
+        /** Validate the actual finish against the original admitted start options. */
+        const error = checkRpcRuntimeStreamFinish(runtime.envelope.options)
+        if (error) throw error
+        if (this.#state.discard || this.#state.terminal) return Promise.resolve()
+        this.#state.discard = true
+        if (runtime.finishStream)
+          return runtime
+            .finishStream(
+              payload.reason === undefined ? undefined : deserializeRpcError(payload.reason)
+            )
+            .then(this.#driveDiscard)
+        return this.#state.busy || this.#state.itemAdmission !== undefined
+          ? Promise.resolve()
+          : this.#pullDiscard()
+      }
+      if (payload.event === RpcStreamEvent.pull && !this.#state.discard)
+        return this.#owner.#receiveProducer(this.#state.senderId, this.#state.id, payload, true)
+      return Promise.resolve()
+    }
+    /** A relay finish cannot create a second credit while an item write or next already owns it. */
+    readonly #driveDiscard = (): void | Promise<void> =>
+      this.#state.busy || this.#state.itemAdmission !== undefined || this.#state.terminal
+        ? undefined
+        : this.#pullDiscard()
+    /** Discard reuses the original current sequence and ordinary producer receiver. */
+    #pullDiscard(): Promise<void> {
+      return this.#owner.#receiveProducer(
+        this.#state.senderId,
+        this.#state.id,
+        { event: RpcStreamEvent.pull, seq: this.#state.seq },
+        true
+      )
+    }
+    /** Legacy timeout retains its outstanding return work after terminal Map removal. */
+    readonly #expire = (): void => {
+      if (this.#state.terminal) return
+      if (this.#state.lifetime) this.#state.lifetime.pending += 1
+      this.#owner.#finishProducer(this.#state, createRpcTimeoutError())
+      void Promise.resolve()
+        .then(() => this.#state.iterator.return?.())
+        .catch((error) => this.#owner.#report(error))
+        .finally(() => {
+          if (this.#state.lifetime) this.#state.lifetime.pending -= 1
+          this.#owner.#settleProducer(this.#state)
+        })
+    }
+  }
+
+  /** Compose the two original native admission releases without mutable factory captures. */
+  static readonly #ProducerAdmissionSettlement = class {
+    /** Session cleanup must run first and cannot suppress the prior native release. */
+    readonly #release: (succeeded: boolean) => void
+    /** The first native owner retains its original callback identity and receiver-free invocation. */
+    readonly #prior: IProducerState['nativeSettlement']
+    /** Capture already acquired original receipts only. */
+    constructor(release: (succeeded: boolean) => void, prior: IProducerState['nativeSettlement']) {
+      this.#release = release
+      this.#prior = prior
+    }
+    /** Report the same outcome in original session-then-native finally order. */
+    readonly settle = (succeeded: boolean): void => {
+      /** Local callback selection preserves the original receiver-free call. */
+      const release = this.#release
+      /** Native cleanup remains mandatory if the session cleanup throws. */
+      const prior = this.#prior
+      try {
+        release(succeeded)
+      } finally {
+        prior?.(succeeded)
+      }
+    }
+  }
+
+  /** One physical item admission owns its exact held credit and commit callback. */
+  static readonly #ProducerItemDelivery = class {
+    /** Existing kernel alone decides endpoint generation and active state. */
+    readonly #kernel: IEndpointKernelHost
+    /** This is the same producer context indexed by the original feature Map. */
+    readonly #state: IProducerState
+    /** A physical item write keeps its own original abort admission. */
+    readonly admission: AbortController
+    /** The held sequence cannot be confused with a reentrant later credit. */
+    readonly seq: number
+    /** Legacy transports commit on completion; native batch gates commit at invocation. */
+    #started = false
+    /** Keep original allocate, publish admission, then read sequence order. */
+    constructor(kernel: IEndpointKernelHost, state: IProducerState) {
+      this.#kernel = kernel
+      this.#state = state
+      this.admission = new AbortController()
+      state.itemAdmission = this.admission
+      this.seq = state.seq
+    }
+    /** The caller distinguishes physical invocation from legacy completion. */
+    get started(): boolean {
+      return this.#started
+    }
+    /** Commit this held credit once at the original physical gate. */
+    readonly commit = (): void => {
+      this.#started = true
+      this.#state.seq = this.seq + 1
+      this.#state.busy = false
+    }
+    /** Reentry cannot send a retired or already consumed credit. */
+    readonly assertCanSend = (): void => {
+      this.#kernel.assertActive()
+      if (this.#state.terminal || this.#state.seq !== this.seq) throw createRpcAbortError()
+    }
+  }
+
+  /** One scheduler yield owns its timer, abort listener and the original completion Promise. */
+  static readonly #DataTurn = class {
+    /** Reuse the endpoint's injected scheduler; no extra queue or clock is introduced. */
+    readonly #time: IEndpointKernelHost['time']
+    /** Original producer scope is the only cancellation source for this yield. */
+    readonly #scope: OperationScope
+    /** The existing timer receipt is cleared only by its paired abort callback. */
+    #timer!: IEndpointTimer
+    /** Resolve the one original yield Promise from either timer or abort. */
+    #resolve!: () => void
+    /** Every yield returns its exact original Promise without a wrapper or duplicate tail. */
+    readonly promise: Promise<void>
+    /** Install callbacks before returning exactly as the original Promise executor did. */
+    constructor(time: IEndpointKernelHost['time'], scope: OperationScope) {
+      this.#time = time
+      this.#scope = scope
+      this.promise = new Promise((resolve) => {
+        this.#resolve = resolve
+        this.#timer = time.setTimeout(this.#elapsed, 0)
+        if (scope.signal.aborted) this.#abort()
+        else scope.signal.addEventListener('abort', this.#abort, { once: true })
+      })
+    }
+    /** A normal turn removes only its own abort listener before settlement. */
+    readonly #elapsed = (): void => {
+      this.#scope.signal.removeEventListener('abort', this.#abort)
+      this.#resolve()
+    }
+    /** Scope retirement clears the same timer and settles the same Promise. */
+    readonly #abort = (): void => {
+      this.#time.clearTimeout(this.#timer)
+      this.#resolve()
+    }
+  }
+
   /** Canonical endpoint state and time owner. */
   readonly #kernel: IEndpointKernelHost
   /** Construction snapshot used only for id allocation and local identity. */
@@ -225,6 +780,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
   /** Prevents new streams during reverse feature disposal. */
   #closed = false
   /** Native assembly joins runtime consumer lifetime to its existing physical generation drain. */
+  // eslint-disable-next-line no-unused-private-class-members -- ConsumerIterator.#start reads this canonical admission callback.
   #runtimeConsumerAdmission: (() => () => void) | undefined
 
   /** Installs the stream route and reuses the provider and outbound feature ports. */
@@ -288,88 +844,14 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
   ): AsyncIterableIterator<IRpcPortableValue> {
     this.#kernel.assertActive()
     if (this.#closed) throw createRpcAbortError()
-    let state: IConsumerState | undefined
-    let unopenedTerminal: IConsumerState['terminal']
-    let tail = Promise.resolve<unknown>(undefined)
-    const next = (): Promise<IteratorResult<IRpcPortableValue>> => {
-      const task = tail.then(async () => {
-        if (unopenedTerminal) return this.#terminalResult(unopenedTerminal)
-        if (!state) {
-          try {
-            state = this.#start(targetId, method, params, options, generation)
-          } catch (error) {
-            unopenedTerminal = { error }
-            throw error
-          }
-        }
-        return this.#next(state)
-      })
-      tail = task.then(
-        () => undefined,
-        () => undefined
-      )
-      return task
-    }
-    const close = async (
-      value?: unknown,
-      thrown = false
-    ): Promise<IteratorResult<IRpcPortableValue>> => {
-      if (!state) unopenedTerminal = { done: true }
-      if (state?.runtime) {
-        /**
-         * Ordinary return after local terminal keeps legacy cleanup semantics; next keeps its
-         * error.
-         */
-        if (!thrown && state.terminal && state.runtime.options.cancel !== RpcRuntimeCancel)
-          return { done: true, value: value as IRpcPortableValue }
-        try {
-          /** Return observes the same actual producer terminal, including concurrent callers. */
-          const result = await this.#finishRuntimeConsumer(state, thrown ? value : undefined)
-          if (thrown) throw value
-          return result
-        } catch (error) {
-          if (thrown && error !== value)
-            throw new AggregateError([value, error], RpcStreamErrorText.cleanupFailed)
-          throw error
-        }
-      }
-      const cleanup = state
-        ? await this.#cancelConsumer(state, { done: true }, thrown ? value : undefined)
-        : undefined
-      if (cleanup !== undefined) {
-        if (thrown) throw new AggregateError([value, cleanup], RpcStreamErrorText.cleanupFailed)
-        throw cleanup
-      }
-      if (thrown) throw value
-      return { done: true, value: value as IRpcPortableValue }
-    }
-    /** Iterator identity remains the original consumer tail; metadata is present only for opt-in. */
-    const iterator = {
-      next,
-      return: (value?: IRpcPortableValue) => close(value),
-      throw: (reason?: unknown) => close(reason, true),
-      [Symbol.asyncIterator]() {
-        return this
-      }
-    }
-    if (generation)
-      runtimeStreamReady.set(iterator, () => {
-        if (!state) {
-          try {
-            state = this.#start(targetId, method, params, options, generation)
-          } catch (error) {
-            unopenedTerminal = { error }
-            throw error
-          }
-        }
-        return state.ready
-      })
-    return Object.freeze(iterator)
+    return new RpcStreamOwner.#ConsumerIterator(this, targetId, method, params, options, generation)
+      .value
   }
 
   /** Claim a provider method in the ordinary namespace and release it idempotently. */
   provide(method: string, run: IRpcStreamRun): () => void {
     if (this.#closed) throw createRpcAbortError()
+    /** The original native/session receipt remains paired with its acquired lifetime. */
     const release = this.#registerStream(
       method,
       retainProviderPreflight(
@@ -416,172 +898,6 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
   /** Internal native assembly observes the original consumer without wrapping its iterator. */
   setRuntimeConsumerAdmission(admit: () => () => void): void {
     this.#runtimeConsumerAdmission = admit
-  }
-
-  /** Allocate the sole operation scope and issue the initial request through outbound. */
-  #start(
-    targetId: string,
-    method: string,
-    params: unknown,
-    options?: IRpcRuntimeSendOptions,
-    generation?: IRpcRuntimeGeneration
-  ): IConsumerState {
-    if (this.#capability && !this.#capability.supports(targetId))
-      throw createRpcError(
-        RpcCoreErrorCode.capabilityConflict,
-        RpcStreamErrorText.capabilityMissing
-      )
-    if (options?.signal?.aborted) throw readStreamAbortReason(options.signal)
-    const id = allocateRpcId(
-      this.#outbound.defaultGenerate
-        ? { ...this.#prepared.options.uuid, generate: this.#outbound.defaultGenerate }
-        : (this.#prepared.options.uuid ?? {}),
-      'task',
-      this.#prepared.id,
-      targetId,
-      (candidate) => this.#consumers.has(tupleKey(targetId, candidate))
-    )
-    const scope = new OperationScope(
-      this.#kernel.generation,
-      options?.timeoutMs,
-      this.#kernel.closingSignal,
-      () => this.#kernel.time.now()
-    )
-    let resolveReady!: () => void
-    let rejectReady!: (reason: unknown) => void
-    const ready = new Promise<void>((resolve, reject) => {
-      resolveReady = resolve
-      rejectReady = reject
-    })
-    const state: IConsumerState = {
-      id,
-      targetId,
-      method,
-      scope,
-      timeoutMs: options?.timeoutMs === false ? undefined : options?.timeoutMs,
-      ready,
-      resolveReady,
-      rejectReady,
-      seq: 0
-    }
-    if (generation) {
-      /** The existing outbound replay registry supplies the sole bounded task reservation. */
-      const outbound = this.#runtimeOutbound()
-      /** Validation occurs before publishing the original consumer state. */
-      let reserved: ReturnType<RpcOutboundAttachment['reserveRuntimeStream']>
-      try {
-        reserved = outbound.reserveRuntimeStream(id, generation, method, options ?? {})
-      } catch (error) {
-        scope.abort(error)
-        throw error
-      }
-      state.runtime = { task: reserved.task, options: options ?? {} }
-      state.runtime.prepared = outbound
-        .prepareRuntimeStreamOpen(
-          id,
-          targetId,
-          reserved.task,
-          reserved.options,
-          params as IRpcPortableValue | undefined,
-          readForwardRoute(options)
-        )
-        .then((envelope) => {
-          state.runtime!.envelope = envelope
-          return envelope
-        })
-      state.openSend = state.runtime.prepared.then((envelope) => {
-        return outbound.sendRuntimeFrame(
-          envelope,
-          {
-            queueSignal: scope.signal,
-            assertCanSend: () => scope.assertActive(this.#kernel.generation)
-          },
-          undefined,
-          state.runtime!.options
-        )
-      })
-    }
-    this.#consumers.set(tupleKey(targetId, id), state)
-    if (state.runtime) {
-      /** Shared Host targets select their own native drain; standalone endpoints retain one owner. */
-      const registry = this.#kernel.readOwner(EndpointOwnerKey.providerRegistry) as
-        | ProviderRegistry
-        | undefined
-      state.runtime.releaseAdmission = registry?.sessionPolicy
-        ? registry.sessionPolicy(targetId)?.enterStreamConsumer?.()
-        : this.#runtimeConsumerAdmission?.()
-    }
-    state.openSend ??= Promise.resolve().then(() =>
-      this.#outbound.send(
-        retainForwardOptions(options, {
-          kind: 'stream-open',
-          id,
-          targetId,
-          method,
-          data: params,
-          timeoutMs: options?.timeoutMs === false ? undefined : options?.timeoutMs,
-          operation: { signal: scope.signal, remaining: () => scope.remaining(options?.timeoutMs) }
-        })
-      )
-    )
-    void state.openSend.catch((error) => {
-      if (!state.terminal) this.#finishConsumer(state, { error: this.#sendFailureReason(error) })
-    })
-    if (options?.timeoutMs !== undefined && options.timeoutMs !== false) {
-      state.timer = this.#kernel.time.setTimeout(() => {
-        void this.#cancelConsumer(state, { error: createRpcTimeoutError() })
-      }, options.timeoutMs)
-    }
-    if (options?.signal) {
-      const onAbort = (): void => {
-        void this.#cancelConsumer(state, { error: readStreamAbortReason(options.signal!) })
-      }
-      options.signal.addEventListener('abort', onAbort, { once: true })
-      state.removeAbort = () => options.signal!.removeEventListener('abort', onAbort)
-    }
-    return state
-  }
-
-  /** Send exactly one pull for each awaited caller next and settle it from the matching frame. */
-  async #next(state: IConsumerState): Promise<IteratorResult<IRpcPortableValue>> {
-    if (state.terminal) return this.#terminalResult(state.terminal, state.runtime !== undefined)
-    await state.ready
-    if (state.terminal) return this.#terminalResult(state.terminal, state.runtime !== undefined)
-    return new Promise<IteratorResult<IRpcPortableValue>>((resolve, reject) => {
-      state.pending = { resolve, reject }
-      const admission = new AbortController()
-      state.pullAdmission = admission
-      const seq = state.seq
-      void this.#sendFrame(
-        state.targetId,
-        state.id,
-        {
-          event: RpcStreamEvent.pull,
-          seq: state.seq
-        },
-        {
-          queueSignal: admission.signal,
-          assertCanSend: () => {
-            this.#kernel.assertActive()
-            if (state.terminal || !state.pending || state.seq !== seq) throw createRpcAbortError()
-          }
-        },
-        state.receiverId,
-        state.runtime?.envelope
-      ).catch((error) => {
-        if (state.terminal) return
-        void this.#cancelConsumer(state, { error: this.#sendFailureReason(error) }, error)
-      })
-    })
-  }
-
-  /** Return sticky terminal completion or throw the original terminal error instance. */
-  #terminalResult(
-    terminal: NonNullable<IConsumerState['terminal']>,
-    retainValue = false
-  ): IteratorResult<IRpcPortableValue> {
-    if ('error' in terminal) throw terminal.error
-    return { done: true, value: retainValue ? terminal.value : undefined }
   }
 
   /** Only a top-level overload proves no physical frame was sent. */
@@ -650,13 +966,16 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
       return Promise.resolve(undefined)
     }
     if (state.terminal) return Promise.resolve(undefined)
+    /** This original tuple identifies only the admitted request or stream in its existing registry. */
     const key = tupleKey(state.targetId, state.id)
+    /** Keep the original cancel acknowledgement until the matching peer terminal arrives. */
     const acknowledgement = new Promise<unknown>((resolve) => {
       this.#pendingCancels.set(key, { targetId: state.targetId, seq: state.seq, resolve })
     })
     this.#finishConsumer(state, terminal)
     void state.openSend?.then(
       () => {
+        /** The original validated control frame selects only its matching stream operation. */
         const payload: IRpcStreamPayload = {
           event: RpcStreamEvent.cancel,
           seq: state.seq,
@@ -707,37 +1026,6 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
     })
   }
 
-  /** One original consumer final promise merges repeated return and concurrent next/finish. */
-  #finishRuntimeConsumer(
-    state: IConsumerState,
-    reason?: unknown
-  ): Promise<IteratorResult<IRpcPortableValue>> {
-    /** This method is entered only by a genuinely selected runtime profile. */
-    const runtime = state.runtime!
-    if (runtime.finishing) return runtime.finishing
-    runtime.finishing = new Promise((resolve, reject) => {
-      runtime.resolveFinal = resolve
-      runtime.rejectFinal = reject
-    })
-    if (state.terminal) {
-      if ('error' in state.terminal) runtime.rejectFinal!(state.terminal.error)
-      else runtime.resolveFinal!({ done: true, value: state.terminal.value })
-    } else {
-      void runtime.prepared
-        ?.then(() =>
-          this.#sendRuntimeIntent(
-            state,
-            reason === undefined
-              ? undefined
-              : serializeRpcError(reason, { report: (failure) => this.#report(failure.error) }),
-            runtime.options.cancel === RpcRuntimeCancel
-          )
-        )
-        .catch((error: unknown) => this.#finishConsumer(state, { error }))
-    }
-    return runtime.finishing
-  }
-
   /** Canonical stream state borrows the existing outbound owner; it allocates no second sender. */
   #runtimeOutbound(): RpcOutboundAttachment {
     return this.#kernel.readOwner(EndpointOwnerKey.outboundAttachment) as RpcOutboundAttachment
@@ -771,6 +1059,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
 
   /** Release a pending cancellation exactly once after peer notification or send rejection. */
   #resolveCancel(key: string, cleanupError?: unknown, keepForLateCancelled = false): void {
+    /** The current waiting consumer operation is settled once by its matching peer frame. */
     const pending = this.#pendingCancels.get(key)
     if (!pending) return
     if (!keepForLateCancelled) this.#pendingCancels.delete(key)
@@ -789,6 +1078,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
     receiverId?: string,
     runtime?: IProviderRuntimeStream | IRpcRuntimeEnvelope
   ): Promise<void> {
+    /** Portable validation completes before this stream value reaches the consumer. */
     const normalized = runtime
       ? normalizeStreamPayload(payload, (value) =>
           normalizePortable(value, 0, new Set<object>(), true)
@@ -839,6 +1129,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
         )
       })
     }
+    /** The canonical frame retains the original stream identity and transport provenance. */
     const message = createOutboundEnvelope({
       kind: 'stream',
       id,
@@ -864,9 +1155,12 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
 
   /** Validate one admitted stream event and dispatch it to the peer-isolated role state. */
   async #receive(message: unknown): Promise<void> {
+    /** Inspect only the received envelope record before routing its existing stream operation. */
     const record = message as { envelope?: IRpcEnvelope }
+    /** Use the original accepted runtime task rather than minting another stream identity. */
     const envelope = record.envelope
     if (envelope?.kind !== 'stream' || envelope.data.route.targetId !== this.#prepared.id) return
+    /** The admitted sender selects only its own producer state and reply destination. */
     const senderId = envelope.data.route.senderId
     if (this.#capability && !this.#capability.supports(senderId)) {
       this.#report(
@@ -874,14 +1168,21 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
       )
       return
     }
+    /** The original validated control frame selects only its matching stream operation. */
     let payload: IRpcStreamPayload
     try {
       payload = normalizeStreamPayload(envelope.data.payload)
     } catch (error) {
       this.#report(error)
+      /**
+       * This original tuple identifies only the admitted request or stream in its existing
+       * registry.
+       */
       const key = tupleKey(senderId, envelope.id)
+      /** The original consumer Map is the only authority for caller sequence and terminal state. */
       const consumer = this.#consumers.get(key)
       if (consumer) void this.#cancelConsumer(consumer, { error }, error)
+      /** The original producer Map is the only authority for provider credit and terminal state. */
       const producer = this.#producers.get(key)
       if (producer) {
         this.#finishProducer(producer, error)
@@ -915,10 +1216,13 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
     receiverId?: string,
     runtimeControl = false
   ): void {
+    /** This original tuple identifies only the admitted request or stream in its existing registry. */
     const key = tupleKey(senderId, id)
+    /** This existing operation context remains the sole owner of sequence and terminal facts. */
     const state = this.#consumers.get(key)
     if (state?.runtime && !runtimeControl) return
     if (!state) {
+      /** The current waiting consumer operation is settled once by its matching peer frame. */
       const pending = this.#pendingCancels.get(key)
       if (pending) {
         if (payload.event === RpcStreamEvent.cancelled) {
@@ -1032,6 +1336,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
         return
       }
       if (payload.event === RpcStreamEvent.fail) {
+        /** Retain the original validation or transport failure for reporting and terminal cleanup. */
         const error = deserializeRpcError(payload.error!)
         this.#finishConsumer(state, { error })
       } else
@@ -1056,84 +1361,22 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
   ): Promise<void> {
     /** Only the final executor can attach this opt-in start/seal/control provenance. */
     const runtime = (message as { runtime?: IProviderRuntimeStream }).runtime
+    /** The original admitted envelope supplies this hop identity and elapsed request budget. */
     const request = (message as { envelope?: IRpcEnvelope }).envelope
     if (request?.kind !== 'request') return
+    /** The admitted sender selects only its own producer state and reply destination. */
     const senderId = request.data.route.senderId
     /** Original identity admission precedes this proof read; logical names cannot select replies. */
     const receiverId = runtime?.replyReceiverId ?? authenticationReplyReceiverId(request)
-    if ((message as { preflightError?: unknown }).preflightError !== undefined) {
-      await this.#sendFailure(
-        senderId,
-        request.id,
-        0,
-        (message as { preflightError: unknown }).preflightError,
-        undefined,
-        receiverId,
-        runtime
-      )
+    /** Only refusal awaits; admitted iterator construction still starts in the same turn. */
+    const admitted = this.#admitProducerRequest(message, request, runtime, receiverId, senderId)
+    if (typeof admitted !== 'string') {
+      await admitted
       return
     }
-    if ((message as { replayRejected?: boolean }).replayRejected) {
-      await this.#sendFailure(
-        senderId,
-        request.id,
-        0,
-        createRpcError(RpcCoreErrorCode.overloaded, RpcCoreErrorText.requestReplayLedgerIsFull),
-        undefined,
-        receiverId,
-        runtime
-      )
-      return
-    }
-    if (this.#capability && !this.#capability.supports(senderId)) {
-      this.#report(
-        createRpcError(RpcCoreErrorCode.protocolInvalid, RpcStreamErrorText.capabilityMissing)
-      )
-      return
-    }
-    const key = tupleKey(senderId, request.id)
-    const early = runtime ? undefined : this.#earlyCancels.get(key)
-    if (early) {
-      this.#earlyCancels.delete(key)
-      await this.#sendFrame(
-        senderId,
-        request.id,
-        {
-          event: RpcStreamEvent.cancelled,
-          seq: early.seq
-        },
-        undefined,
-        receiverId
-      )
-      return
-    }
-    if (!runtime && this.#earlyCancelOverflow.has(senderId)) {
-      await this.#sendFailure(
-        senderId,
-        request.id,
-        0,
-        createRpcError(RpcCoreErrorCode.overloaded, RpcStreamErrorText.peerOverloaded),
-        undefined,
-        receiverId,
-        runtime
-      )
-      return
-    }
-    if (this.#producers.has(key)) return
-    let peerOpen = 0
-    for (const state of this.#producers.values()) if (state.senderId === senderId) peerOpen += 1
-    if (peerOpen >= RpcStreamLimit.maxOpenStreamsPerPeer) {
-      await this.#sendFailure(
-        senderId,
-        request.id,
-        0,
-        createRpcError(RpcCoreErrorCode.overloaded, RpcStreamErrorText.peerOverloaded),
-        undefined,
-        receiverId,
-        runtime
-      )
-      return
-    }
+    /** This original tuple identifies only the admitted request or stream in its existing registry. */
+    const key = admitted
+    /** The original scope fences this operation lifetime and its inherited cancellation. */
     const scope = new OperationScope(
       this.#kernel.generation,
       runtime ? undefined : request.data.route.timeoutMs,
@@ -1142,6 +1385,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
         : (runtime?.signal ?? this.#kernel.closingSignal),
       () => this.#kernel.time.now()
     )
+    /** This existing operation context remains the sole owner of sequence and terminal facts. */
     let state: IProducerState
     /** Relay open uses the same provider context that constructed this original iterator. */
     let context: IRpcContext
@@ -1151,12 +1395,16 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
       context = createContext(runtime?.forwarded ? runtime.signal : scope.signal)
       if (runtime) nativeSettlement = readProviderStreamAdmission(run)?.(context)
       /** The verified session enters its original governor on this same producer lifetime. */
-      const enterSession = (
+      const session = (
         this.#kernel.readOwner(EndpointOwnerKey.providerRegistry) as ProviderRegistry | undefined
-      )?.sessionPolicy?.(context.senderId)?.enterStream
+      )?.sessionPolicy?.(context.senderId)
+      /** Policy selection is captured before the iterator is invoked or its first pull can yield. */
+      const projectResult = session?.streamResult
+      const enterSession = session?.enterStream
       if (enterSession) {
         /** Existing native rollback remains primary if the selected connection refuses entry. */
         const prior = nativeSettlement
+        /** The original native/session receipt remains paired with its acquired lifetime. */
         let release: (succeeded: boolean) => void
         try {
           release = enterSession(context)
@@ -1165,15 +1413,11 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
           nativeSettlement = undefined
           throw error
         }
-        nativeSettlement = (succeeded) => {
-          try {
-            release(succeeded)
-          } finally {
-            prior?.(succeeded)
-          }
-        }
+        nativeSettlement = new RpcStreamOwner.#ProducerAdmissionSettlement(release, prior).settle
       }
+      /** Invoke the registered producer once before selecting its original iterator. */
       const iterable = run(request.data.payload, { signal: scope.signal, context }) as unknown
+      /** Read the original iterable protocol methods without replacing their receiver. */
       const source = iterable as {
         [Symbol.asyncIterator]?: () => AsyncIterator<IRpcPortableValue>
         [Symbol.iterator]?: () => Iterator<IRpcPortableValue>
@@ -1185,6 +1429,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
           typeof source?.[Symbol.iterator] !== 'function')
       )
         throw createRpcError(RpcCoreErrorCode.payloadInvalid, RpcStreamErrorText.iterableInvalid)
+      /** The original producer iterator alone owns next and return side effects. */
       const iterator =
         typeof source[Symbol.asyncIterator] === 'function'
           ? source[Symbol.asyncIterator]!()
@@ -1202,6 +1447,9 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
       }
       state = {
         ...(nativeSettlement === undefined ? {} : { nativeSettlement }),
+        ...(projectResult === undefined
+          ? {}
+          : { nativeResult: { project: projectResult, context } }),
         ...(runtime === undefined ? {} : { runtime }),
         ...(receiverId === undefined ? {} : { receiverId }),
         route: request.data.route.forwardRoute,
@@ -1215,74 +1463,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
         terminal: false
       }
       this.#producers.set(key, state)
-      runtime?.bindCancel((reason) =>
-        this.#receiveProducer(
-          senderId,
-          request.id,
-          {
-            event: RpcStreamEvent.cancel,
-            seq: state.seq,
-            ...(reason === undefined
-              ? {}
-              : {
-                  reason: serializeRpcError(reason, {
-                    report: (failure) => this.#report(failure.error)
-                  })
-                })
-          },
-          true
-        )
-      )
-      runtime?.bindControl((payload) => {
-        if (payload.event === RpcRuntimeFinish) {
-          /** Finish may only preserve the start permission selected on this admitted task. */
-          /** The actual finish control and start options retain the original protocol rule. */
-          const error = checkRpcRuntimeStreamFinish(runtime.envelope.options)
-          if (error) throw error
-          if (state.discard || state.terminal) return Promise.resolve()
-          state.discard = true
-          if (runtime.finishStream)
-            return runtime
-              .finishStream(
-                payload.reason === undefined ? undefined : deserializeRpcError(payload.reason)
-              )
-              .then(() =>
-                state.busy || state.itemAdmission !== undefined || state.terminal
-                  ? undefined
-                  : this.#receiveProducer(
-                      senderId,
-                      request.id,
-                      { event: RpcStreamEvent.pull, seq: state.seq },
-                      true
-                    )
-              )
-          /** An outstanding physical item write retains its original discard-driving invocation. */
-          return state.busy || state.itemAdmission !== undefined
-            ? Promise.resolve()
-            : this.#receiveProducer(
-                senderId,
-                request.id,
-                { event: RpcStreamEvent.pull, seq: state.seq },
-                true
-              )
-        }
-        if (payload.event === RpcStreamEvent.pull && !state.discard)
-          return this.#receiveProducer(senderId, request.id, payload, true)
-        return Promise.resolve()
-      })
-      if (!runtime && request.data.route.timeoutMs !== undefined)
-        state.timer = this.#kernel.time.setTimeout(() => {
-          if (state.terminal) return
-          if (state.lifetime) state.lifetime.pending += 1
-          this.#finishProducer(state, createRpcTimeoutError())
-          void Promise.resolve()
-            .then(() => state.iterator.return?.())
-            .catch((error) => this.#report(error))
-            .finally(() => {
-              if (state.lifetime) state.lifetime.pending -= 1
-              this.#settleProducer(state)
-            })
-        }, request.data.route.timeoutMs)
+      new RpcStreamOwner.#ProducerControl(this, state).attach(request)
     } catch (error) {
       nativeSettlement?.(false)
       scope.abort()
@@ -1313,6 +1494,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
         throw this.#sendFailureReason(error)
       }
     } catch (error) {
+      /** Keep the original primary failure while cleanup and terminal delivery complete. */
       const failure = error
       this.#finishProducer(state, failure)
       try {
@@ -1334,6 +1516,90 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
       this.#settleProducer(state)
     }
     if (state.lifetime) await state.lifetime.settled
+  }
+
+  /** Refuse replay, missing capability or producer limits before allocating an iterator scope. */
+  #admitProducerRequest(
+    message: unknown,
+    request: Extract<IRpcEnvelope, { kind: 'request' }>,
+    runtime: IProviderRuntimeStream | undefined,
+    receiverId: string | undefined,
+    senderId: string
+  ): string | void | Promise<void> {
+    if ((message as { preflightError?: unknown }).preflightError !== undefined) {
+      return this.#sendFailure(
+        senderId,
+        request.id,
+        0,
+        (message as { preflightError: unknown }).preflightError,
+        undefined,
+        receiverId,
+        runtime
+      )
+    }
+    if ((message as { replayRejected?: boolean }).replayRejected) {
+      return this.#sendFailure(
+        senderId,
+        request.id,
+        0,
+        createRpcError(RpcCoreErrorCode.overloaded, RpcCoreErrorText.requestReplayLedgerIsFull),
+        undefined,
+        receiverId,
+        runtime
+      )
+    }
+    if (this.#capability && !this.#capability.supports(senderId)) {
+      this.#report(
+        createRpcError(RpcCoreErrorCode.protocolInvalid, RpcStreamErrorText.capabilityMissing)
+      )
+    }
+    /** This original tuple identifies only the admitted request or stream in its existing registry. */
+    const key = tupleKey(senderId, request.id)
+    /**
+     * An already accepted cancellation prevents this delayed request from starting an orphan
+     * producer.
+     */
+    const early = runtime ? undefined : this.#earlyCancels.get(key)
+    if (early) {
+      this.#earlyCancels.delete(key)
+      return this.#sendFrame(
+        senderId,
+        request.id,
+        {
+          event: RpcStreamEvent.cancelled,
+          seq: early.seq
+        },
+        undefined,
+        receiverId
+      )
+    }
+    if (!runtime && this.#earlyCancelOverflow.has(senderId)) {
+      return this.#sendFailure(
+        senderId,
+        request.id,
+        0,
+        createRpcError(RpcCoreErrorCode.overloaded, RpcStreamErrorText.peerOverloaded),
+        undefined,
+        receiverId,
+        runtime
+      )
+    }
+    if (this.#producers.has(key)) return
+    /** Count only this sender existing producers before admitting another stream. */
+    let peerOpen = 0
+    for (const state of this.#producers.values()) if (state.senderId === senderId) peerOpen += 1
+    if (peerOpen >= RpcStreamLimit.maxOpenStreamsPerPeer) {
+      return this.#sendFailure(
+        senderId,
+        request.id,
+        0,
+        createRpcError(RpcCoreErrorCode.overloaded, RpcStreamErrorText.peerOverloaded),
+        undefined,
+        receiverId,
+        runtime
+      )
+    }
+    return key
   }
 
   /** Grant one producer credit and send exactly its result, never prefetching. */
@@ -1365,85 +1631,28 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
     id: string,
     payload: IRpcStreamPayload
   ): Promise<void> {
+    /** This original tuple identifies only the admitted request or stream in its existing registry. */
     const key = tupleKey(senderId, id)
+    /** This existing operation context remains the sole owner of sequence and terminal facts. */
     const state = this.#producers.get(key)
     if (!state) {
-      if (payload.event === RpcStreamEvent.cancel && !this.#earlyCancelOverflow.has(senderId)) {
-        if (!this.#earlyCancels.has(key)) {
-          let peerCancels = 0
-          for (const early of this.#earlyCancels.values())
-            if (early.senderId === senderId) peerCancels += 1
-          if (peerCancels >= RpcStreamLimit.maxOpenStreamsPerPeer) {
-            this.#earlyCancelOverflow.add(senderId)
-            return
-          }
-        }
-        this.#earlyCancels.set(key, { senderId, seq: payload.seq })
-      }
+      this.#retainEarlyCancel(senderId, key, payload)
       return
     }
     if (state.terminal) return
-    if (payload.event === RpcStreamEvent.cancel) {
-      state.terminal = true
-      state.scope.abort(
-        payload.reason === undefined ? undefined : deserializeRpcError(payload.reason)
-      )
-      let cleanupError: unknown
-      try {
-        await state.iterator.return?.()
-      } catch (error) {
-        cleanupError = error
-      }
-      this.#producers.delete(tupleKey(senderId, id))
-      await this.#sendFrame(
-        senderId,
-        id,
-        {
-          event: RpcStreamEvent.cancelled,
-          seq: payload.seq,
-          ...(cleanupError === undefined
-            ? {}
-            : {
-                error: serializeRpcError(cleanupError, {
-                  report: (failure) => this.#report(failure.error)
-                })
-              })
-        },
-        undefined,
-        state.receiverId,
-        state.runtime
-      )
-      return
-    }
+    if (payload.event === RpcStreamEvent.cancel) return this.#cancelProducerStep(state, payload)
     /** A producer cannot reuse a busy pull or skip its held sequence. */
     const creditError = checkRpcStreamProducerCredit(payload, state)
-    if (creditError) {
-      const error = creditError
-      this.#report(error)
-      this.#finishProducer(state, error)
-      try {
-        await state.iterator.return?.()
-      } catch (cleanupError) {
-        this.#report(cleanupError)
-      }
-      await this.#sendFailure(
-        senderId,
-        id,
-        state.seq,
-        error,
-        undefined,
-        state.receiverId,
-        state.runtime
-      )
-      return
-    }
+    if (creditError) return this.#rejectProducerCredit(state, creditError)
     while (!state.terminal) {
       state.busy = true
+      /** Observe exactly one original provider or iterator result before terminal selection. */
       let result: IteratorResult<IRpcPortableValue>
       try {
         result = await state.iterator.next()
       } catch (error) {
         this.#finishProducer(state, error)
+        /** Keep the original primary failure while cleanup and terminal delivery complete. */
         let failure = error
         try {
           await state.iterator.return?.()
@@ -1465,22 +1674,12 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
         return
       }
       if (state.terminal) return
-      const outboundPayload: IRpcStreamPayload = {
-        event: result.done ? RpcStreamEvent.end : RpcStreamEvent.item,
-        seq: state.seq,
-        ...(result.done
-          ? result.value === undefined
-            ? {}
-            : { value: result.value }
-          : { value: result.value })
-      }
+      /** Validate this exact yielded or final value before discard or physical delivery. */
+      let outboundPayload: IRpcStreamPayload
       try {
-        if (state.runtime)
-          normalizeStreamPayload(outboundPayload, (value) =>
-            normalizePortable(value, 0, new Set<object>(), true)
-          )
-        else normalizeStreamPayload(outboundPayload)
+        outboundPayload = this.#producerPayload(state, result)
       } catch (error) {
+        /** Keep the original primary failure while cleanup and terminal delivery complete. */
         const failure = createRpcError(
           RpcCoreErrorCode.payloadInvalid,
           RpcStreamErrorText.valueInvalid,
@@ -1528,20 +1727,12 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
         state.busy = false
         return
       }
-      const admission = new AbortController()
-      state.itemAdmission = admission
-      const seq = state.seq
-      /**
-       * Legacy transports without a gate commit after completion; batch writers commit at
-       * invocation.
-       */
-      let started = false
-      /** Commits this credit once without awaiting physical completion before peer reentry. */
-      const commit = () => {
-        started = true
-        state.seq = seq + 1
-        state.busy = false
-      }
+      /** This original item credit owns its gate callbacks and physical admission. */
+      const delivery = new RpcStreamOwner.#ProducerItemDelivery(this.#kernel, state)
+      /** This exact credit keeps its own abort admission across reentrant physical sends. */
+      const admission = delivery.admission
+      /** Snapshot only the original held credit so later reentry cannot consume or clear it. */
+      const seq = delivery.seq
       try {
         await this.#yieldDataTurn(state)
         await this.#sendFrame(
@@ -1550,18 +1741,16 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
           outboundPayload,
           {
             queueSignal: admission.signal,
-            assertCanSend: () => {
-              this.#kernel.assertActive()
-              if (state.terminal || state.seq !== seq) throw createRpcAbortError()
-            },
-            onStarted: commit
+            assertCanSend: delivery.assertCanSend,
+            onStarted: delivery.commit
           },
           state.receiverId,
           state.runtime
         )
-        if (!started) commit()
+        if (!delivery.started) delivery.commit()
       } catch (error) {
         if (state.terminal) return
+        /** Keep the original primary failure while cleanup and terminal delivery complete. */
         const failure = this.#sendFailureReason(error)
         this.#finishProducer(state, failure)
         try {
@@ -1589,6 +1778,112 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
     }
   }
 
+  /**
+   * Build and validate exactly one yielded item or final value before any discard or physical
+   * write.
+   */
+  #producerPayload(
+    state: IProducerState,
+    result: IteratorResult<IRpcPortableValue>
+  ): IRpcStreamPayload {
+    /** The native session projects the one terminal value without wrapping or pulling the iterator. */
+    const value =
+      result.done && state.nativeResult
+        ? (0, state.nativeResult.project)(result.value, state.nativeResult.context)
+        : result.value
+    /** Validate this exact yielded or projected final value before discard or physical delivery. */
+    const outboundPayload: IRpcStreamPayload = {
+      event: result.done ? RpcStreamEvent.end : RpcStreamEvent.item,
+      seq: state.seq,
+      ...(result.done ? (value === undefined ? {} : { value }) : { value })
+    }
+    if (state.runtime)
+      normalizeStreamPayload(outboundPayload, (value) =>
+        normalizePortable(value, 0, new Set<object>(), true)
+      )
+    else normalizeStreamPayload(outboundPayload)
+    return outboundPayload
+  }
+
+  /** Keep only the original bounded early-cancel intent when its request has not arrived. */
+  #retainEarlyCancel(senderId: string, key: string, payload: IRpcStreamPayload): void {
+    if (payload.event === RpcStreamEvent.cancel && !this.#earlyCancelOverflow.has(senderId)) {
+      if (!this.#earlyCancels.has(key)) {
+        /** Count only this sender retained early cancels against the original fixed budget. */
+        let peerCancels = 0
+        for (const early of this.#earlyCancels.values())
+          if (early.senderId === senderId) peerCancels += 1
+        if (peerCancels >= RpcStreamLimit.maxOpenStreamsPerPeer) {
+          this.#earlyCancelOverflow.add(senderId)
+          return
+        }
+      }
+      this.#earlyCancels.set(key, { senderId, seq: payload.seq })
+    }
+  }
+
+  /** Complete iterator cancellation before its exact peer acknowledgement. */
+  async #cancelProducerStep(state: IProducerState, payload: IRpcStreamPayload): Promise<void> {
+    /** The admitted sender selects only its own producer state and reply destination. */
+    const senderId = state.senderId
+    /** The original stream identity keys this consumer or producer admission only. */
+    const id = state.id
+    state.terminal = true
+    state.scope.abort(
+      payload.reason === undefined ? undefined : deserializeRpcError(payload.reason)
+    )
+    /** Retain the original iterator return failure for the same cancellation acknowledgement. */
+    let cleanupError: unknown
+    try {
+      await state.iterator.return?.()
+    } catch (error) {
+      cleanupError = error
+    }
+    this.#producers.delete(tupleKey(senderId, id))
+    await this.#sendFrame(
+      senderId,
+      id,
+      {
+        event: RpcStreamEvent.cancelled,
+        seq: payload.seq,
+        ...(cleanupError === undefined
+          ? {}
+          : {
+              error: serializeRpcError(cleanupError, {
+                report: (failure) => this.#report(failure.error)
+              })
+            })
+      },
+      undefined,
+      state.receiverId,
+      state.runtime
+    )
+  }
+
+  /** Invalid credit terminates only this original producer and reports its cleanup failure. */
+  async #rejectProducerCredit(state: IProducerState, error: Error): Promise<void> {
+    /** The admitted sender selects only its own producer state and reply destination. */
+    const senderId = state.senderId
+    /** The original stream identity keys this consumer or producer admission only. */
+    const id = state.id
+    this.#report(error)
+    this.#finishProducer(state, error)
+    try {
+      await state.iterator.return?.()
+    } catch (cleanupError) {
+      this.#report(cleanupError)
+    }
+    await this.#sendFailure(
+      senderId,
+      id,
+      state.seq,
+      error,
+      undefined,
+      state.receiverId,
+      state.runtime
+    )
+  }
+
   /** Release one producer state before any terminal notification can reenter it. */
   #finishProducer(state: IProducerState, reason?: unknown): void {
     state.terminal = true
@@ -1612,18 +1907,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
 
   /** Yield the endpoint scheduler once without leaving a pull suspended on disposal. */
   #yieldDataTurn(state: IProducerState): Promise<void> {
-    return new Promise((resolve) => {
-      const timer = this.#kernel.time.setTimeout(() => {
-        state.scope.signal.removeEventListener('abort', onAbort)
-        resolve()
-      }, 0)
-      const onAbort = (): void => {
-        this.#kernel.time.clearTimeout(timer)
-        resolve()
-      }
-      if (state.scope.signal.aborted) onAbort()
-      else state.scope.signal.addEventListener('abort', onAbort, { once: true })
-    })
+    return new RpcStreamOwner.#DataTurn(this.#kernel.time, state.scope).promise
   }
 
   /** Send a serialized failure while keeping the producer's original error graph reachable. */
@@ -1636,6 +1920,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
     receiverId?: string,
     runtime?: IProviderRuntimeStream
   ): Promise<void> {
+    /** The original terminal envelope supplies the exact portable outcome and error graph. */
     const wire = serializeRpcError(retainProviderFailureRoute(error, route), {
       report: (failure) => this.#report(failure.error)
     })
@@ -1664,6 +1949,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
 
   /** A connection failure terminates all live streams without replaying delivered items. */
   #transportFailed(cause: unknown, targetId?: string): void {
+    /** Retain the original validation or transport failure for reporting and terminal cleanup. */
     const error = isLocalRpcError(cause, RpcAbortError)
       ? cause
       : createRpcError(

@@ -45,7 +45,7 @@ it('publishes one host entry with raw authoring tools and transport or feature p
     [devtools, ['RPC_DEVTOOLS_SOURCE', 'RpcDevtoolsErrorCode', 'devtoolsPlugin']]
   ] as const
   for (const [root, expected] of roots)
-    expect(Object.keys(root).sort()).toEqual([...expected].sort())
+    expect(new Set(Object.keys(root))).toEqual(new Set(expected))
   expect(typeof host.createRpcHost).toBe('function')
   for (const name of [
     'createEndpoint',
@@ -79,23 +79,22 @@ it('publishes one host entry with raw authoring tools and transport or feature p
       throw new Error('unused physical opener')
     }
   })
-  expect(Object.keys(adapter).sort()).toEqual(['deployment', 'scope'])
+  expect(new Set(Object.keys(adapter))).toEqual(new Set(['deployment', 'scope']))
   /** Publication paths are read from the package owning the linked runtime artifacts. */
   const manifest = JSON.parse(
     readFileSync(new URL('../../../rpc-host/package.json', import.meta.url), 'utf8')
   )
-  expect(Object.keys(manifest.exports).sort()).toEqual([
-    '.',
-    './adapters/memory',
-    './features',
-    './features/auth',
-    './features/chunk',
-    './features/retry',
-    './features/timeout',
-    './features/typegen',
-    './plugin',
-    './probe',
-    './stream',
-    './testing'
-  ])
+  expect(new Set(Object.keys(manifest.exports))).toEqual(
+    new Set([
+      '.',
+      './features',
+      './features/auth',
+      './features/chunk',
+      './features/retry',
+      './features/timeout',
+      './features/typegen',
+      './plugin',
+      './probe'
+    ])
+  )
 })

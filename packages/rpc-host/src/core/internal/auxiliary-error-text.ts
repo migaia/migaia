@@ -11,17 +11,5 @@ export const RpcAuxiliaryErrorText = {
   /** Describes an encoded message that exceeds the configured message budget. */
   encodedMessageTooLarge: 'Encoded message exceeds configured maximum',
   /** Describes a splitter result that violates the bounded framing contract. */
-  invalidChunkFrames: 'Chunk splitter returned invalid frames',
-  /** Stable range text for the minimum UTF-8 chunk budget accepted by WebRPC. */
-  utf8ChunkBudgetInvalid: 'maxBytes must be at least 4 bytes',
-  /**
-   * Stable core error text consumed by core/internal/peers.ts; preserves its existing caller-facing
-   * wording.
-   */
-  maxLearnedMustBeAPositiveSafeInteger: 'maxLearned must be a positive safe integer',
-  /**
-   * Stable core error text consumed by core/internal/peers.ts; preserves its existing caller-facing
-   * wording.
-   */
-  learnedTtlMsMustBeAPositiveSafeInteger: 'learnedTtlMs must be a positive safe integer'
+  invalidChunkFrames: 'Chunk splitter returned invalid frames'
 } as const

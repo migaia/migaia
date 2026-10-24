@@ -1,3 +1,4 @@
+import { RpcTransportMode } from '@migaia/rpc-host/plugin'
 import {
   createAdapterDeployment,
   createAdapterMessageHandshakeBudget,
@@ -89,7 +90,8 @@ async function openResource(
 }
 
 /** Each native Client owns its original raw resource; Host remains the sole endpoint/session owner. */
-function listenClients(
+/** Allocate only the native listener's original membership and cleanup storage. */
+function serviceWorkerClientListenerState(
   scope: IServiceWorkerClientsScope,
   context: IAdapterDeploymentContext,
   accept: IAdapterDeploymentAccept
@@ -102,29 +104,68 @@ function listenClients(
   /** Closing stops native acceptance before joining the existing raw preparation operations. */
   let closed = false
   /** Concurrent Host cleanup joins the same subscription/resource retirement Promise. */
-  let closing: Promise<void> | undefined
-  /** Native callbacks report preparation failures without replacing their actual error object. */
-  const report = (error: unknown): void => context.report(error)
-  /** Dispatch preserves original event/source metadata until the canonical sourceProof projection. */
-  const dispatch = (
-    session: IServiceWorkerClientSession,
-    event: IServiceWorkerClientEvent
-  ): void => {
+  const closing = undefined as Promise<void> | undefined
+  return { scope, context, accept, sessions, closed, closing }
+}
+
+/** Own one native browser listener while the Host keeps accepted endpoint and directory ownership. */
+class ServiceWorkerClientListener {
+  /** Native membership, pending preparation and the one close receipt belong to this listener. */
+  #state: ReturnType<typeof serviceWorkerClientListenerState>
+  /** Create storage before native callbacks can publish any accepted resource. */
+  constructor(
+    scope: IServiceWorkerClientsScope,
+    context: IAdapterDeploymentContext,
+    accept: IAdapterDeploymentAccept
+  ) {
+    this.#state = serviceWorkerClientListenerState(scope, context, accept)
+  }
+  /** Attach native acceptance and retain the original rollback and close semantics. */
+  open() {
+    this.#state.scope.addEventListener(BrowserPeerEvent.message, this.#onMessage)
+    return {
+      /**
+       * Host close removes listeners/resources but never terminates the borrowed native
+       * worker/client.
+       */
+      close: (): Promise<void> => {
+        if (this.#state.closing) return this.#state.closing
+        this.#state.closed = true
+        this.#state.scope.removeEventListener(BrowserPeerEvent.message, this.#onMessage)
+        this.#state.closing = Promise.allSettled([
+          ...[...this.#state.sessions.values()].map((session) => session.resource?.close()),
+          ...[...this.#state.sessions.values()].map((session) => session.opening)
+        ]).then((results) => {
+          this.#state.sessions.clear()
+          for (const result of results)
+            if (result.status === 'rejected') this.#report(result.reason)
+        })
+        return this.#state.closing
+      }
+    }
+  }
+  /** Send native preparation failures to the deployment reporter without replacing their identity. */
+  #report = (error: unknown): void => this.#state.context.report(error)
+  /**
+   * Snapshot native listeners so a receiver installed during handoff does not observe the same
+   * frame twice.
+   */
+  #dispatch = (session: IServiceWorkerClientSession, event: IServiceWorkerClientEvent): void => {
     /** Native dispatch must not also invoke a receiver installed during this frame's handoff. */
     const listeners = [...session.listeners]
     for (const listener of listeners) listener(event)
   }
-  /** A genuine worker event supplies Client.id; wire-level ids cannot choose a different resource. */
-  const onMessage = (event: IServiceWorkerClientEvent): void => {
-    if (closed) return
+  /** Resolve the genuine native Client before opening its one source-filtered raw resource. */
+  #onMessage = (event: IServiceWorkerClientEvent): void => {
+    if (this.#state.closed) return
     try {
       /** Native source identity is read once before selecting or constructing any capture owner. */
       const source = event.source
       const id = source && Reflect.get(source, 'id')
       if (typeof id !== 'string' || id.length === 0) return
       /** Existing accepted and preparing sessions retain their original native resource. */
-      let session = sessions.get(id)
-      if (session) dispatch(session, event)
+      let session = this.#state.sessions.get(id)
+      if (session) this.#dispatch(session, event)
       else {
         /**
          * The original first native event is held only until Clients.get resolves its actual
@@ -135,13 +176,13 @@ function listenClients(
           opening: Promise.resolve()
         }
         session = created
-        sessions.set(id, created)
+        this.#state.sessions.set(id, created)
         created.opening = Promise.resolve()
           .then(async () => {
             /** Native Clients is the authority for the current addressable reply object. */
-            const client = await scope.clients.get(id)
-            if (closed || !isTarget(client) || client.id !== id) {
-              if (sessions.get(id) === created) sessions.delete(id)
+            const client = await this.#state.scope.clients.get(id)
+            if (this.#state.closed || !isTarget(client) || client.id !== id) {
+              if (this.#state.sessions.get(id) === created) this.#state.sessions.delete(id)
               return
             }
             /** Separate receiver operations expose only this native Client's filtered events. */
@@ -157,49 +198,42 @@ function listenClients(
             )
             created.resource = resource
             /** Core owns handshake, accepted capabilities and the one Host endpoint's new session. */
-            const channel = await openResource(resource, context, () => dispatch(created, event))
-            if (closed) {
+            const channel = await openResource(resource, this.#state.context, () =>
+              this.#dispatch(created, event)
+            )
+            if (this.#state.closed) {
               await channel.close?.()
               return
             }
-            await accept(channel)
+            await (0, this.#state.accept)(channel)
           })
           .catch(async (error: unknown) => {
-            if (sessions.get(id) === created) sessions.delete(id)
+            if (this.#state.sessions.get(id) === created) this.#state.sessions.delete(id)
             try {
               await created.resource?.close()
             } catch (cleanup) {
-              report(cleanup)
+              this.#report(cleanup)
             }
-            if (!closed) report(error)
+            if (!this.#state.closed) this.#report(error)
           })
       }
       /** Native lifetime extension joins this Client's real preparation; no extra keepalive exists. */
       event.waitUntil?.(session.opening)
     } catch (cause) {
-      report(createBrowserTransportError(BrowserRpcErrorText.serviceWorkerSourceReadFailed, cause))
+      this.#report(
+        createBrowserTransportError(BrowserRpcErrorText.serviceWorkerSourceReadFailed, cause)
+      )
     }
   }
-  scope.addEventListener(BrowserPeerEvent.message, onMessage)
-  return {
-    /**
-     * Host close removes listeners/resources but never terminates the borrowed native
-     * worker/client.
-     */
-    close: (): Promise<void> => {
-      if (closing) return closing
-      closed = true
-      scope.removeEventListener(BrowserPeerEvent.message, onMessage)
-      closing = Promise.allSettled([
-        ...[...sessions.values()].map((session) => session.resource?.close()),
-        ...[...sessions.values()].map((session) => session.opening)
-      ]).then((results) => {
-        sessions.clear()
-        for (const result of results) if (result.status === 'rejected') report(result.reason)
-      })
-      return closing
-    }
-  }
+}
+
+/** Attach the one native listener without creating another Host or endpoint. */
+function listenClients(
+  scope: IServiceWorkerClientsScope,
+  context: IAdapterDeploymentContext,
+  accept: IAdapterDeploymentAccept
+) {
+  return new ServiceWorkerClientListener(scope, context, accept).open()
 }
 
 /** Define a cold page-to-worker or native Clients listener without creating a complete Peer. */
@@ -247,7 +281,7 @@ export function serviceWorkerPlugin(options: IServiceWorkerPluginOptions): IRpcT
   })
   return defineTransportPlugin({
     name: configured!.name ?? ServiceWorkerPluginText.name,
-    mode: clients ? 'listen' : 'connect',
+    mode: clients ? RpcTransportMode.listen : RpcTransportMode.connect,
     ...(configured!.expose ? { expose: configured!.expose } : {}),
     ...(configured!.connect ? { connect: configured!.connect } : {}),
     deployment

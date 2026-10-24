@@ -1,10 +1,14 @@
+import { createProbeEmitter, bindInstalledProbe } from '../../dist/core/internal/probe-emitter.js'
+import { systemScheduler } from '@migaia/utils/scheduler'
+import { createRuntimeEndpointComposition } from '../../dist/core/runtime-api-endpoint.js'
 import { describe, expect, it, vi } from 'vitest'
-import { createEndpoint, connect, abort, ping } from '../../dist/core/index.js'
-import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
+
+import { connect } from '../../dist/core/middleware/connect.js'
+import { abort } from '../../dist/core/middleware/abort.js'
+import { ping } from '../../dist/core/middleware/ping.js'
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
 import {
   defineProbe,
-  probePlugin,
-  snapshotProbeEvent,
   RpcProbeDirection,
   RpcProbeKind,
   RpcProbeOutcome,
@@ -29,43 +33,58 @@ describe('probe logical observations', () => {
     })
     /** Actual provider invocations distinguish refusal from accidental business execution. */
     const calls: string[] = []
-    /** Both logical observers install through the public endpoint plugin. */
+    /** Both compiled observers are owned by their actual endpoint emitters. */
     const leftProbe = defineProbe({
       stages: ['message'],
-      emit: (event) => caller.push(snapshotProbeEvent(event))
+      emit: (event) => caller.push(Object.freeze({ ...event }))
     })
     const rightProbe = defineProbe({
       stages: ['message'],
-      emit: (event) => provider.push(snapshotProbeEvent(event))
+      emit: (event) => provider.push(Object.freeze({ ...event }))
     })
     /** Real reference transports retain the usual routing and authentication owners. */
     const [leftTransport, rightTransport] = createMemoryTransportPair()
-    const server = await createEndpoint({
-      id: 'probe-provider',
-      transport: rightTransport,
-      middlewares: [connect(), abort(), ping(), probePlugin(rightProbe)],
-      providerLimits: { maxGlobal: 1, maxPerPeer: 1 },
-      provider: {
-        echo: (context) => {
-          calls.push('echo')
-          return context.success(context.data)
-        },
-        fail: () => {
-          calls.push('fail')
-          throw original
-        },
-        hold: async (context) => {
-          calls.push('hold')
-          await held
-          return context.success('released')
+    /** Actual emitters join each transport before its canonical endpoint constructs. */
+    bindInstalledProbe(
+      rightTransport,
+      createProbeEmitter([rightProbe], systemScheduler.now, 'probe-provider')
+    )
+    bindInstalledProbe(
+      leftTransport,
+      createProbeEmitter([leftProbe], systemScheduler.now, 'probe-caller')
+    )
+    const server = await createRuntimeEndpointComposition(
+      {
+        id: 'probe-provider',
+        transport: rightTransport,
+        middlewares: [connect(), abort(), ping()],
+        providerLimits: { maxGlobal: 1, maxPerPeer: 1 },
+        provider: {
+          echo: (context) => {
+            calls.push('echo')
+            return context.success(context.data)
+          },
+          fail: () => {
+            calls.push('fail')
+            throw original
+          },
+          hold: async (context) => {
+            calls.push('hold')
+            await held
+            return context.success('released')
+          }
         }
-      }
-    })
-    const client = await createEndpoint({
-      id: 'probe-caller',
-      transport: leftTransport,
-      middlewares: [connect(), abort(), ping(), probePlugin(leftProbe)]
-    })
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'probe-caller',
+        transport: leftTransport,
+        middlewares: [connect(), abort(), ping()]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     try {
       expect(await client.send('probe-provider', 'echo', 42, { trace: 'explicit-trace' })).toBe(42)
       /** The actual caller-side request id selects corresponding provider and response records. */
@@ -204,7 +223,7 @@ describe('probe logical observations', () => {
         connect: channel.sources[0],
         probe: defineProbe({
           stages: ['message'],
-          emit: (event) => left.push(snapshotProbeEvent(event))
+          emit: (event) => left.push(Object.freeze({ ...event }))
         })
       }),
       createRuntimePeer({
@@ -212,7 +231,7 @@ describe('probe logical observations', () => {
         connect: channel.sources[1],
         probe: defineProbe({
           stages: ['message'],
-          emit: (event) => right.push(snapshotProbeEvent(event))
+          emit: (event) => right.push(Object.freeze({ ...event }))
         }),
         provide: {
           echo: (value: unknown) => value,

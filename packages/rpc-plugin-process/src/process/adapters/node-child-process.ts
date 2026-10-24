@@ -83,6 +83,147 @@ function terminateChild(child: ChildProcess, mode: TerminationMode): void {
  * The supervisor owns termination after adoption; advertised tree termination remains unsupported.
  * Native spawn/bootstrap failures reject with PROCESS_CHANNEL_CONNECT_FAILED and reachable cause.
  */
+/** Allocate one native generation's original launch receipts without opening a second supervisor. */
+function nodeProcessGenerationState(
+  child: ReturnType<typeof spawn>,
+  spec: Parameters<IProcessLauncher<INodeProcessHandle>['launch']>[0],
+  context: Parameters<IProcessLauncher<INodeProcessHandle>['launch']>[1],
+  launch: ReturnType<typeof createAdapterNodeProcessLaunch>,
+  runtimeBootstrap: ReturnType<typeof createAdapterNodeProcessLaunch>['bootstrap']
+) {
+  /** Node emits EPIPE on stdin independently of the bootstrap write callback. */
+  const stdinFailure = undefined as Error | undefined
+  /** A pending bootstrap must reject when the child closes stdin early. */
+  const rejectBootstrap = undefined as ((error: Error) => void) | undefined
+  /** The handle settles only after Node closes all child stdio descriptors. */
+  const exited = undefined as unknown as Promise<{ code: number | null; signal: string | null }>
+  return { stdinFailure, rejectBootstrap, exited, child, spec, context, launch, runtimeBootstrap }
+}
+
+/** Own one actual native process generation from post-spawn acquisition through supervised handoff. */
+class NodeProcessGeneration {
+  /** Raw process, bootstrap and cleanup observations belong only to this launched generation. */
+  #state: ReturnType<typeof nodeProcessGenerationState>
+  /** Attach output/failure/cancellation observers in their original post-spawn order. */
+  constructor(
+    child: ReturnType<typeof spawn>,
+    spec: Parameters<IProcessLauncher<INodeProcessHandle>['launch']>[0],
+    context: Parameters<IProcessLauncher<INodeProcessHandle>['launch']>[1],
+    launch: ReturnType<typeof createAdapterNodeProcessLaunch>,
+    runtimeBootstrap: ReturnType<typeof createAdapterNodeProcessLaunch>['bootstrap']
+  ) {
+    this.#state = nodeProcessGenerationState(child, spec, context, launch, runtimeBootstrap)
+    this.#state.child.stdin?.on('error', this.#onStdinError)
+    if (this.#state.child.stderr)
+      this.#state.child.stderr.on('data', (chunk: Buffer) =>
+        deliverOutput(this.#state.context.output, 'stderr', chunk)
+      )
+    if (this.#state.spec.stdio.stdout === 'drain' && this.#state.child.stdout)
+      this.#state.child.stdout.on('data', (chunk: Buffer) =>
+        deliverOutput(this.#state.context.output, 'stdout', chunk)
+      )
+    this.#state.exited = new Promise<{ code: number | null; signal: string | null }>((resolve) => {
+      this.#state.child.once('close', (code, signal) => resolve({ code, signal }))
+    })
+    this.#state.context.signal.addEventListener('abort', this.#onAbort, { once: true })
+    void this.#state.exited.then(() =>
+      this.#state.context.signal.removeEventListener('abort', this.#onAbort)
+    )
+  }
+  /**
+   * Finish the original startup transaction, preserving native primary failures and rollback
+   * ordering.
+   */
+  async open(): Promise<INodeProcessHandle> {
+    try {
+      await new Promise<void>((resolve, reject) => {
+        this.#state.child.once('spawn', resolve)
+        this.#state.child.once('error', reject)
+      })
+      this.#state.launch.assertActive()
+      /** A framed bootstrap is always the first stdin write. */
+      if (this.#state.spec.bootstrap?.via === 'stdin') {
+        if (!this.#state.child.stdin)
+          throw attachErrorIdentity(new Error(RpcProcessErrorText.connectFailed), {
+            source: RPC_PROCESS_ERROR_SOURCE,
+            code: RpcProcessErrorCode.connectFailed
+          })
+        if (this.#state.stdinFailure) throw this.#state.stdinFailure
+        await new Promise<void>((resolve, reject) => {
+          this.#state.rejectBootstrap = reject
+          this.#state.child.stdin!.write(
+            encodeRpcStreamFrame(
+              this.#state.runtimeBootstrap?.payload ?? this.#state.spec.bootstrap!.payload
+            ),
+            (error) => {
+              if (error) reject(error)
+              else resolve()
+            }
+          )
+        })
+        this.#state.rejectBootstrap = undefined
+      }
+      if (this.#state.stdinFailure) throw this.#state.stdinFailure
+      if (this.#state.spec.bootstrap?.via === 'fd')
+        throw attachErrorIdentity(new TypeError(RpcProcessErrorText.optionsInvalid), {
+          source: RPC_CORE_ERROR_SOURCE,
+          code: RpcCoreErrorCode.invalidConfig
+        })
+      /** Stdout channel is never also consumed by the output drain. */
+      const channel =
+        this.#state.spec.stdio.stdin === 'channel' &&
+        this.#state.spec.stdio.stdout === 'channel' &&
+        this.#state.child.stdin &&
+        this.#state.child.stdout
+          ? this.#state.launch.createChildChannel(this.#state.child as IAdapterChildStdio)
+          : undefined
+      this.#state.child.stdin?.removeListener('error', this.#onStdinError)
+      /** Successful handoff gives stop/force exclusively to the original supervisor slot. */
+      this.#state.context.signal.removeEventListener('abort', this.#onAbort)
+      return Object.freeze({
+        identity: Object.freeze({
+          fingerprint: this.#state.runtimeBootstrap?.self.instanceId ?? randomUUID(),
+          pid: this.#state.child.pid
+        }),
+        exited: this.#state.exited,
+        channel,
+        /** Sampling follows this actual child; a completed child never substitutes another PID. */
+        ...(this.#state.child.pid === undefined
+          ? {}
+          : {
+              sampleUsage: () =>
+                this.#state.child.exitCode !== null || this.#state.child.signalCode !== null
+                  ? Promise.resolve({})
+                  : sampleNativeProcess(this.#state.child.pid!)
+            }),
+        ...(this.#state.runtimeBootstrap
+          ? { runtimeApiIdentity: this.#state.runtimeBootstrap.self }
+          : {}),
+        terminate: (mode: TerminationMode) => terminateChild(this.#state.child, mode)
+      })
+    } catch (error) {
+      terminateChild(this.#state.child, 'force')
+      await this.#state.exited
+      this.#state.child.stdin?.removeListener('error', this.#onStdinError)
+      throw ((originalCause: unknown) =>
+        attachErrorIdentity(
+          new Error(
+            RpcProcessErrorText.connectFailed,
+            originalCause === undefined ? undefined : { cause: originalCause }
+          ),
+          { source: RPC_PROCESS_ERROR_SOURCE, code: RpcProcessErrorCode.connectFailed }
+        ))(error)
+    }
+  }
+  /** Preserve this generation's original native callback and its cleanup identity. */
+  #onStdinError = (error: Error): void => {
+    this.#state.stdinFailure ??= error
+    this.#state.rejectBootstrap?.(error)
+  }
+  /** Preserve this generation's original native callback and its cleanup identity. */
+  #onAbort = (): void => terminateChild(this.#state.child, 'force')
+}
+
 export function createNodeProcessLauncher(
   options: Readonly<{ runtimeApiBootstrap?: IProcessRuntimeBootstrapOptions }> = {}
 ): IProcessLauncher<INodeProcessHandle> {
@@ -118,103 +259,8 @@ export function createNodeProcessLauncher(
       } catch (error) {
         throw tagNativeProcessError(error as Error, RpcProcessErrorCode.connectFailed)
       }
-      /** Node emits EPIPE on stdin independently of the bootstrap write callback. */
-      let stdinFailure: Error | undefined
-      /** A pending bootstrap must reject when the child closes stdin early. */
-      let rejectBootstrap: ((error: Error) => void) | undefined
-      /** Hold the error listener until nodeByteStream takes ownership of stdin. */
-      const onStdinError = (error: Error): void => {
-        stdinFailure ??= error
-        rejectBootstrap?.(error)
-      }
-      child.stdin?.on('error', onStdinError)
-      /** Stderr must drain from spawn, including while the child waits for bootstrap. */
-      if (child.stderr)
-        child.stderr.on('data', (chunk: Buffer) => deliverOutput(context.output, 'stderr', chunk))
-      if (spec.stdio.stdout === 'drain' && child.stdout)
-        child.stdout.on('data', (chunk: Buffer) => deliverOutput(context.output, 'stdout', chunk))
-      /** The handle settles only after Node closes all child stdio descriptors. */
-      const exited = new Promise<{ code: number | null; signal: string | null }>((resolve) => {
-        child.once('close', (code, signal) => resolve({ code, signal }))
-      })
-      const onAbort = (): void => terminateChild(child, 'force')
-      context.signal.addEventListener('abort', onAbort, { once: true })
-      void exited.then(() => context.signal.removeEventListener('abort', onAbort))
-      try {
-        await new Promise<void>((resolve, reject) => {
-          child.once('spawn', resolve)
-          child.once('error', reject)
-        })
-        launch.assertActive()
-        /** A framed bootstrap is always the first stdin write. */
-        if (spec.bootstrap?.via === 'stdin') {
-          if (!child.stdin)
-            throw attachErrorIdentity(new Error(RpcProcessErrorText.connectFailed), {
-              source: RPC_PROCESS_ERROR_SOURCE,
-              code: RpcProcessErrorCode.connectFailed
-            })
-          if (stdinFailure) throw stdinFailure
-          await new Promise<void>((resolve, reject) => {
-            rejectBootstrap = reject
-            child.stdin!.write(
-              encodeRpcStreamFrame(runtimeBootstrap?.payload ?? spec.bootstrap!.payload),
-              (error) => {
-                if (error) reject(error)
-                else resolve()
-              }
-            )
-          })
-          rejectBootstrap = undefined
-        }
-        if (stdinFailure) throw stdinFailure
-        if (spec.bootstrap?.via === 'fd')
-          throw attachErrorIdentity(new TypeError(RpcProcessErrorText.optionsInvalid), {
-            source: RPC_CORE_ERROR_SOURCE,
-            code: RpcCoreErrorCode.invalidConfig
-          })
-        /** Stdout channel is never also consumed by the output drain. */
-        const channel =
-          spec.stdio.stdin === 'channel' &&
-          spec.stdio.stdout === 'channel' &&
-          child.stdin &&
-          child.stdout
-            ? launch.createChildChannel(child as IAdapterChildStdio)
-            : undefined
-        child.stdin?.removeListener('error', onStdinError)
-        /** Successful handoff gives stop/force exclusively to the original supervisor slot. */
-        context.signal.removeEventListener('abort', onAbort)
-        return Object.freeze({
-          identity: Object.freeze({
-            fingerprint: runtimeBootstrap?.self.instanceId ?? randomUUID(),
-            pid: child.pid
-          }),
-          exited,
-          channel,
-          /** Sampling follows this actual child; a completed child never substitutes another PID. */
-          ...(child.pid === undefined
-            ? {}
-            : {
-                sampleUsage: () =>
-                  child.exitCode !== null || child.signalCode !== null
-                    ? Promise.resolve({})
-                    : sampleNativeProcess(child.pid!)
-              }),
-          ...(runtimeBootstrap ? { runtimeApiIdentity: runtimeBootstrap.self } : {}),
-          terminate: (mode: TerminationMode) => terminateChild(child, mode)
-        })
-      } catch (error) {
-        terminateChild(child, 'force')
-        await exited
-        child.stdin?.removeListener('error', onStdinError)
-        throw ((originalCause: unknown) =>
-          attachErrorIdentity(
-            new Error(
-              RpcProcessErrorText.connectFailed,
-              originalCause === undefined ? undefined : { cause: originalCause }
-            ),
-            { source: RPC_PROCESS_ERROR_SOURCE, code: RpcProcessErrorCode.connectFailed }
-          ))(error)
-      }
+      /** One generation owns all post-spawn callbacks and the exact original native exit receipt. */
+      return new NodeProcessGeneration(child, spec, context, launch, runtimeBootstrap).open()
     }
   })
 }
@@ -240,6 +286,7 @@ export async function openProcessStdioChannel(
       source: RPC_CORE_ERROR_SOURCE,
       code: RpcCoreErrorCode.invalidConfig
     })
+  /** Stdout channel is never also consumed by the output drain. */
   const channel = createAdapterProcessStdio(process)
   return receiveAdapterBootstrap(channel, options.bootstrap, options)
 }

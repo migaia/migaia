@@ -33,7 +33,7 @@ describe('canonical child stdio replay registration', () => {
     }))
     try {
       const { openProcessStdioChannel } =
-        await import('@migaia/rpc-plugin-process/adapters/node-child-process')
+        await import('../../../rpc-plugin-process/dist/process/adapters/node-child-process.js')
       await expect(openProcessStdioChannel({ bootstrap: 'fd', fd: 3 })).rejects.toMatchObject({
         code: 'INVALID_CONFIG'
       })

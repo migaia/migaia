@@ -100,6 +100,219 @@ export type IRpcMiddlewareCore<
   readonly featureExpose: TFeatureExpose
 }>
 
+/** One object-form middleware registration owns its native port cells and original install scope. */
+class ObjectMiddlewareRegistration {
+  /** The genuine native core owns lifecycle disposal and dynamic-key publication. */
+  #core: IRpcPluginCore & import('@migaia/plugin-host').IPluginHostCore<never>
+  /** The original frozen descriptor preserves its install receiver and output contract. */
+  #legacy: IRpcPlugin
+  /** Immutable declared keys are checked only after successful original installation. */
+  #policy: IRpcPluginMetadata
+  /** Each native registration owns its own deferred shared-port cells. */
+  #portRuntime: ReturnType<ReturnType<typeof createWebRpcPortFeatureSet>['createRuntime']>
+  /** Native PluginHost hooks reference only this explicit registration owner. */
+  readonly value
+  /** Initialize this installation's original port cells before publishing native callbacks. */
+  constructor(
+    core: IRpcPluginCore & import('@migaia/plugin-host').IPluginHostCore<never>,
+    legacy: IRpcPlugin,
+    policy: IRpcPluginMetadata,
+    portRuntime: ReturnType<ReturnType<typeof createWebRpcPortFeatureSet>['createRuntime']>
+  ) {
+    this.#core = core
+    this.#legacy = legacy
+    this.#policy = policy
+    this.#portRuntime = portRuntime
+    this.value = { featureExpose: () => this.#portRuntime.expose, install: this.#install }
+  }
+  /** Run the existing construction scope, then publish exact checked output and shared ports. */
+  #install = async () => {
+    /** The existing scope owns the original rollback and cleanup ordering. */ const result =
+      await runConstructionInstall(
+        {
+          id: this.#core.id,
+          transport: this.#core.transport,
+          control: this.#core.construction,
+          hooks: this.#core.hooks,
+          getPort: this.#core.getPort,
+          report: (error) =>
+            this.#core.hooks({
+              name: 'failure',
+              at: this.#core.construction.time.timestamp(),
+              localId: this.#core.id,
+              code: RpcCoreErrorCode.internal,
+              error
+            }),
+          registerScope: (_scope, close, awaitClose) => {
+            this.#core.onDispose(async () => {
+              close()
+              await awaitClose()
+            })
+          }
+        },
+        (scope) => this.#legacy.install(scope)
+      )
+    assertPluginInstallResult(result)
+    assertDeclaredKeys(this.#policy.claims.publicKeys, result.extension)
+    if (this.#policy.sharedProvides !== undefined)
+      assertDeclaredKeys(this.#policy.sharedProvides, result.ports)
+    this.#portRuntime.publish(result.ports)
+    this.#core.publishPortFeatures(this.#portRuntime.outputs)
+    this.#core.registerNativeMiddlewareKeys(this.#legacy.name, Object.keys(result.extension))
+    return result.extension
+  }
+}
+
+/** Preserve object-form immutable policy admission separately from descriptor registration. */
+function defineObjectMiddleware(definition: IRpcPlugin): IRpcNativeMiddleware {
+  const legacy = freezePlugin(definition)
+  const policy = snapshotMiddlewarePolicy(legacy.metadata)
+  /** Each declared port is a registration-local Feature owned by this middleware. */
+  const portFeatures = createWebRpcPortFeatureSet(policy.sharedProvides)
+  /** Capture validated legacy hooks once so later caller mutation cannot alter native installation. */
+  const middleware = definePlugin<IRpcPluginCore, Record<string, unknown>>(
+    legacy.name,
+    (core) =>
+      new ObjectMiddlewareRegistration(core, legacy, policy, portFeatures.createRuntime()).value,
+    portFeatures.features
+  )
+  nativeMiddlewares.add(middleware)
+  nativeMiddlewarePolicies.set(middleware, policy)
+  const components: Pick<
+    IRpcPlugin,
+    'transport' | 'protocol' | 'codec' | 'framer' | 'discoveryMode' | 'pingCapability'
+  > = {}
+  for (const key of [
+    'transport',
+    'protocol',
+    'codec',
+    'framer',
+    'discoveryMode',
+    'pingCapability'
+  ] as const) {
+    const property = Object.getOwnPropertyDescriptor(legacy, key)
+    if (property && 'value' in property) Object.assign(components, { [key]: property.value })
+  }
+  nativeMiddlewareComponents.set(middleware, Object.freeze(components))
+  return middleware as IRpcNativeMiddleware
+}
+
+/** The genuine native descriptor receives lifecycle methods and exact selected Feature outputs. */
+type INativeMiddlewareRegistrationCore<
+  TFeatures extends IFeatureRecord,
+  TExpose extends object
+> = IRpcPluginCore &
+  import('@migaia/plugin-host').IPluginHostCore<never> &
+  Readonly<{ features: IFeatureOutputs<TFeatures>; featureExpose: TExpose }>
+
+/** Each native registration owns the descriptor's original construction-scope lifetime. */
+class NativeMiddlewareDescriptorRegistration<
+  TExtension extends Record<string, unknown>,
+  TPublic extends object,
+  TFeatures extends IFeatureRecord,
+  TExpose extends object
+> {
+  /** The original core owns hooks, lifecycle registration and public-key publication. */
+  #core: INativeMiddlewareRegistrationCore<TFeatures, TExpose>
+  /** The definition name labels only this registration's dynamic middleware keys. */
+  #name: string
+  /** Scope remains absent during the synchronous descriptor factory, then belongs to install. */
+  #installScope: IRpcPluginInstallScope | undefined
+  /** The admitted install callback stays receiverless and preserves its original returned value. */
+  #install: IRpcMiddlewareDescriptor<TExtension, TPublic, TExpose>['install']
+  /** The admitted expose callback stays synchronous and receiverless. */
+  #expose: IRpcMiddlewareDescriptor<TExtension, TPublic, TExpose>['expose']
+  /** The frozen descriptor retains only the original fields and selected lifecycle wrappers. */
+  readonly value: IRpcMiddlewareDescriptor<TExtension, TPublic, TExpose>
+  /**
+   * Capture descriptor callbacks only after its synchronous factory has observed the uninstalled
+   * core.
+   */
+  constructor(
+    name: string,
+    core: INativeMiddlewareRegistrationCore<TFeatures, TExpose>,
+    factory: (
+      core: IRpcMiddlewareCore<TFeatures, TExpose>
+    ) => IRpcMiddlewareDescriptor<TExtension, TPublic, TExpose>
+  ) {
+    this.#core = core
+    this.#name = name
+    /**
+     * A frozen public view borrows native Feature resolution without granting install-scope access
+     * early.
+     */
+    const middlewareCore = {
+      id: core.id,
+      transport: core.transport,
+      signal: core.signal,
+      hooks: core.hooks,
+      own: <T>(resource: T, release: () => void | Promise<void>) =>
+        this.#requireInstallScope().own(resource, release),
+      get features(): IFeatureOutputs<TFeatures> {
+        return core.features as IFeatureOutputs<TFeatures>
+      },
+      get featureExpose(): TExpose {
+        return core.featureExpose as TExpose
+      }
+    } satisfies IRpcMiddlewareCore<TFeatures, TExpose>
+    /** The original factory is invoked once without lending it a native mutable receiver. */
+    const descriptor = factory(Object.freeze(middlewareCore))
+    this.#install = descriptor.install
+    this.#expose = descriptor.expose
+    this.value = Object.freeze({
+      ...descriptor,
+      ...(this.#install === undefined ? {} : { install: this.#runInstall }),
+      ...(this.#expose === undefined ? {} : { expose: this.#runExpose })
+    })
+  }
+  /** Own is unavailable until the canonical construction scope has entered installation. */
+  #requireInstallScope = (): IRpcPluginInstallScope => {
+    if (!this.#installScope)
+      throw createRpcConfigurationError(RpcCoreErrorText.endpointModuleInvalid)
+    return this.#installScope
+  }
+  /** Run installation through the original rollback scope and publish keys only after success. */
+  #runInstall = () =>
+    runConstructionInstall(
+      {
+        id: this.#core.id,
+        transport: this.#core.transport,
+        control: this.#core.construction,
+        hooks: this.#core.hooks,
+        getPort: () => undefined,
+        report: (error) =>
+          this.#core.hooks({
+            name: 'failure',
+            at: this.#core.construction.time.timestamp(),
+            localId: this.#core.id,
+            code: RpcCoreErrorCode.internal,
+            error
+          }),
+        registerScope: (_scope, close, awaitClose) => {
+          this.#core.onDispose(async () => {
+            close()
+            await awaitClose()
+          })
+        }
+      },
+      (scope) => {
+        this.#installScope = scope
+        /** Keep the original user callback receiverless. */ const install = this.#install!
+        return install()
+      }
+    ).then((output) => {
+      this.#core.registerNativeMiddlewareKeys(this.#name, Object.keys(output))
+      return output
+    })
+  /** Project the original synchronous output before publishing this registration's public keys. */
+  #runExpose = () => {
+    /** Keep the original user callback receiverless. */ const expose = this.#expose!
+    const output = expose()
+    this.#core.registerNativeMiddlewareKeys(this.#name, Object.keys(output))
+    return output
+  }
+}
+
 /** Defines a named native middleware Plugin; descriptor code runs per Host registration. */
 export function defineMiddleware<const TComponents extends object>(
   definition: IRpcPlugin<TComponents>
@@ -150,80 +363,13 @@ export function defineMiddleware<
       : { readonly featureExpose: () => TFeatureExpose }),
   featureRecord?: TFeatures
 ): IRpcNativeMiddleware<TExtension, TPublic, TFeatureExpose, TFeatures> {
-  if (typeof name === 'object' && name !== null) {
-    const legacy = freezePlugin(name)
-    const policy = snapshotMiddlewarePolicy(legacy.metadata)
-    /** Each declared port is a registration-local Feature owned by this middleware. */
-    const portFeatures = createWebRpcPortFeatureSet(policy.sharedProvides)
-    /**
-     * Capture validated legacy hooks once so later caller mutation cannot alter native
-     * installation.
-     */
-    const middleware = definePlugin<IRpcPluginCore, Record<string, unknown>>(
-      legacy.name,
-      (core) => {
-        const portRuntime = portFeatures.createRuntime()
-        return {
-          featureExpose: () => portRuntime.expose,
-          install: async () => {
-            const result = await runConstructionInstall(
-              {
-                id: core.id,
-                transport: core.transport,
-                control: core.construction,
-                hooks: core.hooks,
-                getPort: core.getPort,
-                report: (error) => {
-                  core.hooks({
-                    name: 'failure',
-                    at: core.construction.time.timestamp(),
-                    localId: core.id,
-                    code: RpcCoreErrorCode.internal,
-                    error
-                  })
-                },
-                registerScope: (_scope, close, awaitClose) => {
-                  core.onDispose(async () => {
-                    close()
-                    await awaitClose()
-                  })
-                }
-              },
-              (scope) => legacy.install(scope)
-            )
-            assertPluginInstallResult(result)
-            assertDeclaredKeys(policy.claims.publicKeys, result.extension)
-            if (policy.sharedProvides !== undefined)
-              assertDeclaredKeys(policy.sharedProvides, result.ports)
-            portRuntime.publish(result.ports)
-            core.publishPortFeatures(portRuntime.outputs)
-            core.registerNativeMiddlewareKeys(legacy.name, Object.keys(result.extension))
-            return result.extension
-          }
-        }
-      },
-      portFeatures.features
-    )
-    nativeMiddlewares.add(middleware)
-    nativeMiddlewarePolicies.set(middleware, policy)
-    const components: Pick<
-      IRpcPlugin,
-      'transport' | 'protocol' | 'codec' | 'framer' | 'discoveryMode' | 'pingCapability'
-    > = {}
-    for (const key of [
-      'transport',
-      'protocol',
-      'codec',
-      'framer',
-      'discoveryMode',
-      'pingCapability'
-    ] as const) {
-      const property = Object.getOwnPropertyDescriptor(legacy, key)
-      if (property && 'value' in property) Object.assign(components, { [key]: property.value })
-    }
-    nativeMiddlewareComponents.set(middleware, Object.freeze(components))
-    return middleware as IRpcNativeMiddleware<TExtension, TPublic, TFeatureExpose, TFeatures>
-  }
+  if (typeof name === 'object' && name !== null)
+    return defineObjectMiddleware(name) as unknown as IRpcNativeMiddleware<
+      TExtension,
+      TPublic,
+      TFeatureExpose,
+      TFeatures
+    >
   if (!descriptorFactory)
     throw createRpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.endpointModuleInvalid)
   if (name.length === 0 || typeof descriptorFactory !== 'function')
@@ -240,77 +386,13 @@ export function defineMiddleware<
   >(
     name,
     (core) => {
-      /** Scope is absent while the synchronous descriptor factory executes. */
-      let installScope: IRpcPluginInstallScope | undefined
-      const requireInstallScope = (): IRpcPluginInstallScope => {
-        if (!installScope) throw createRpcConfigurationError(RpcCoreErrorText.endpointModuleInvalid)
-        return installScope
-      }
-      const middlewareCore = {
-        id: core.id,
-        transport: core.transport,
-        signal: core.signal,
-        hooks: core.hooks,
-        own: <T>(resource: T, release: () => void | Promise<void>) =>
-          requireInstallScope().own(resource, release),
-        get features(): IFeatureOutputs<TFeatures> {
-          return core.features as IFeatureOutputs<TFeatures>
-        },
-        get featureExpose(): TFeatureExpose {
-          return core.featureExpose as TFeatureExpose
-        }
-      } satisfies IRpcMiddlewareCore<TFeatures, TFeatureExpose>
-      const descriptor = descriptorFactory(Object.freeze(middlewareCore))
-      const install = descriptor.install
-      const expose = descriptor.expose
-      const nativeDescriptor = Object.freeze({
-        ...descriptor,
-        ...(install === undefined
-          ? {}
-          : {
-              install: () =>
-                runConstructionInstall(
-                  {
-                    id: core.id,
-                    transport: core.transport,
-                    control: core.construction,
-                    hooks: core.hooks,
-                    getPort: () => undefined,
-                    report: (error) => {
-                      core.hooks({
-                        name: 'failure',
-                        at: core.construction.time.timestamp(),
-                        localId: core.id,
-                        code: RpcCoreErrorCode.internal,
-                        error
-                      })
-                    },
-                    registerScope: (_scope, close, awaitClose) => {
-                      core.onDispose(async () => {
-                        close()
-                        await awaitClose()
-                      })
-                    }
-                  },
-                  (scope) => {
-                    installScope = scope
-                    return install()
-                  }
-                ).then((output) => {
-                  core.registerNativeMiddlewareKeys(name, Object.keys(output))
-                  return output
-                })
-            }),
-        ...(expose === undefined
-          ? {}
-          : {
-              expose: () => {
-                const output = expose()
-                core.registerNativeMiddlewareKeys(name, Object.keys(output))
-                return output
-              }
-            })
-      })
+      /** Each native registration owns its own install scope and captured descriptor callbacks. */
+      const nativeDescriptor = new NativeMiddlewareDescriptorRegistration<
+        TExtension,
+        TPublic,
+        TFeatures,
+        TFeatureExpose
+      >(name, core, descriptorFactory).value
       return nativeDescriptor as typeof nativeDescriptor &
         (keyof IFeatureRecordRequiredExpose<TFeatures> extends never
           ? unknown
@@ -355,8 +437,11 @@ function snapshotMiddlewarePolicy(metadata: IRpcPluginMetadata): IRpcPluginMetad
 
 /** Rejects object-form output drift before endpoint publication or ingress activation. */
 function assertDeclaredKeys(expected: readonly PropertyKey[], value: object): void {
+  /** Read actual keys first so an unreadable output retains the original admission failure order. */
   const actual = Reflect.ownKeys(value)
-  if (actual.length !== expected.length || actual.some((key) => !expected.includes(key)))
+  /** Snapshot declared membership once; total actual/expected key admission is O(n). */
+  const declared = new Set(expected)
+  if (actual.length !== expected.length || actual.some((key) => !declared.has(key)))
     throw createRpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.endpointModuleInvalid)
 }
 

@@ -1,9 +1,10 @@
+import { createRuntimeEndpointComposition } from '../../dist/core/runtime-api-endpoint.js'
 import { describe, expect, it, vi } from 'vitest'
-import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
-import { createClientEndpoint } from '../../dist/core/client.js'
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
+
 import { connect } from '../../dist/core/middleware/connect.js'
 import { hooks } from '../../dist/core/middleware/hooks.js'
-import { createProviderEndpoint } from '../../dist/core/provider.js'
+
 import type { IRpcTransport } from '../../dist/core/transport.js'
 import type { IRpcHookEvent } from '../../dist/core/typing.js'
 
@@ -20,20 +21,26 @@ describe('endpoint unknown-field report', () => {
     }
     const events: IRpcHookEvent[] = []
     let calls = 0
-    const provider = await createProviderEndpoint({
-      id: 'provider',
-      transport: providerWire,
-      middlewares: [
-        connect({ transport: providerWire }),
-        hooks({ listeners: (event) => void events.push(event) })
-      ],
-      provider: { count: (context) => context.success(++calls) }
-    })
-    const client = await createClientEndpoint({
-      id: 'client',
-      transport: capture,
-      middlewares: [connect({ transport: capture })]
-    })
+    const provider = await createRuntimeEndpointComposition(
+      {
+        id: 'provider',
+        transport: providerWire,
+        middlewares: [
+          connect({ transport: providerWire }),
+          hooks({ listeners: (event) => void events.push(event) })
+        ],
+        provider: { count: (context) => context.success(++calls) }
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'client',
+        transport: capture,
+        middlewares: [connect({ transport: capture })]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     try {
       expect(await client.send('provider', 'count', null)).toBe(1)
       const frame = request as {

@@ -1,13 +1,15 @@
+import { createRuntimeEndpointComposition } from '../../dist/core/runtime-api-endpoint.js'
+import { RpcCapability } from '@migaia/rpc-contract'
 import assert from 'node:assert/strict'
 import { it, vi } from 'vitest'
 import { connected, runtimeSources } from './fixture.js'
-import * as runtimeApiEndpoint from '../../dist/core/index.js'
+import * as runtimeApiEndpoint from '../../dist/core/runtime-api-endpoint.js'
 import { createRuntimePeer } from '../../dist/remote/runtime-api/peer.js'
 import { setImmediate as nextTurn } from 'node:timers'
 import type { IRpcEnvelope } from '@migaia/rpc-contract'
 import { getEndpointDebugSnapshotReader } from '../../dist/core/internal/test-observer.js'
 import { PendingRegistry } from '../../dist/core/internal/pending.js'
-import { createFullOneWayEndpoint } from '../../dist/core/index.js'
+
 import { connect } from '../../dist/core/middleware/connect.js'
 import type { IRpcInboundMessage } from '../../dist/core/transport.js'
 
@@ -146,18 +148,24 @@ it('synchronous transport response reentry sees pending before every physical se
     }
   }))
   /** Actual caller owns the two original request IDs and their pending entries. */
-  const caller = await createFullOneWayEndpoint({
-    id: 'sync-a',
-    transport: transports[0]!,
-    middlewares: [connect({ transport: transports[0]! })]
-  })
+  const caller = await createRuntimeEndpointComposition(
+    {
+      id: 'sync-a',
+      transport: transports[0]!,
+      middlewares: [connect({ transport: transports[0]! })]
+    },
+    { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+  ).installing
   /** Actual provider returns responses through the same production sender. */
-  const provider = await createFullOneWayEndpoint({
-    id: 'sync-b',
-    transport: transports[1]!,
-    middlewares: [connect({ transport: transports[1]! })],
-    provider: { echo: (context) => context.success(context.data) }
-  })
+  const provider = await createRuntimeEndpointComposition(
+    {
+      id: 'sync-b',
+      transport: transports[1]!,
+      middlewares: [connect({ transport: transports[1]! })],
+      provider: { echo: (context) => context.success(context.data) }
+    },
+    { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+  ).installing
   try {
     assert.deepEqual(
       await Promise.all([

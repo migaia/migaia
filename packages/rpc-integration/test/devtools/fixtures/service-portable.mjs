@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
-import { createProcessPeer } from '../../../../rpc-plugin-process/test/protocol.ts'
+import { createRpcHost } from '@migaia/rpc-host'
+import { processPlugin } from '@migaia/rpc-plugin-process'
 import { isProcessChild } from '@migaia/rpc-plugin-process'
 import { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'
-import { decodeRpcDevtoolsRecord } from '@migaia/rpc-plugin-devtools/contract'
+import { decodeRpcDevtoolsRecord } from '../../../../rpc-plugin-devtools/dist/contract/record-codec.js'
 import { deserializeRpcError } from '@migaia/rpc-contract/errors'
 import {
   RpcProbeDirection,
@@ -219,7 +220,7 @@ function assertError(wire) {
 /**
  * Assert the real service's wire representation without serializing or repairing its output.
  *
- * @param {readonly import('@migaia/rpc-plugin-devtools/contract').IRpcDevtoolsWireEvent[]} events
+ * @param {readonly import('../../../../rpc-plugin-devtools/dist/contract/wire.js').IRpcDevtoolsWireEvent[]} events
  *   Received query/watch rows.
  * @param {boolean} exposed Whether the producing collector enables remote content.
  * @returns {void} Completes metadata, error and captured-content assertions.
@@ -269,24 +270,26 @@ async function serve(exposed) {
   })
   /** The public service object stays mutable while its own methods remain the conversion owner. */
   const service =
-    /** @type {import('@migaia/rpc-plugin-devtools/contract').IRpcDevtoolsServiceApi} */ (
+    /** @type {import('../../../../rpc-plugin-devtools/dist/contract/service.js').IRpcDevtoolsServiceApi} */ (
       collector.service
     )
   /** Runtime invocation supplies the original serving context as the second provider argument. */
   const originalWatch = /**
    * @type {(
    *   input?: Omit<
-   *     import('@migaia/rpc-plugin-devtools/contract').IRpcDevtoolsQuery,
+   *     import('../../../../rpc-plugin-devtools/dist/contract/service.js').IRpcDevtoolsQuery,
    *     'afterSeq' | 'limit'
    *   >,
    *   context?: import('@migaia/rpc-host').IRpcContext
-   * ) => AsyncGenerator<import('@migaia/rpc-plugin-devtools/contract').IRpcDevtoolsWatchBatch>}
+   * ) => AsyncGenerator<
+   *   import('../../../../rpc-plugin-devtools/dist/contract/service.js').IRpcDevtoolsWatchBatch
+   * >}
    */ (service.watch)
   /**
    * Observe readiness while returning the exact service-owned iterator and forwarding its context.
    *
    * @param {Omit<
-   *       import('@migaia/rpc-plugin-devtools/contract').IRpcDevtoolsQuery,
+   *       import('../../../../rpc-plugin-devtools/dist/contract/service.js').IRpcDevtoolsQuery,
    *       'afterSeq' | 'limit'
    *     >
    *   | undefined} input
@@ -294,7 +297,7 @@ async function serve(exposed) {
    * @param {import('@migaia/rpc-host').IRpcContext | undefined} context Original serving provider
    *   context.
    * @returns {AsyncGenerator<
-   *   import('@migaia/rpc-plugin-devtools/contract').IRpcDevtoolsWatchBatch
+   *   import('../../../../rpc-plugin-devtools/dist/contract/service.js').IRpcDevtoolsWatchBatch
    * >}
    *   Exact original service iterator.
    * @throws {Error} Original synchronous service setup failure.
@@ -309,7 +312,9 @@ async function serve(exposed) {
      *
      * @param {unknown} value Original optional generator input.
      * @returns {Promise<
-     *   IteratorResult<import('@migaia/rpc-plugin-devtools/contract').IRpcDevtoolsWatchBatch>
+     *   IteratorResult<
+     *     import('../../../../rpc-plugin-devtools/dist/contract/service.js').IRpcDevtoolsWatchBatch
+     *   >
      * >}
      *   Exact native next Promise.
      * @throws {Error} Original synchronous next invocation failure.
@@ -322,7 +327,8 @@ async function serve(exposed) {
     }
     return iterator
   }
-  await createProcessPeer({
+  await createRpcHost({
+    plugins: [processPlugin({ connectToParent: true })],
     provide: {
       devtools: service,
       fixture: {
@@ -356,7 +362,10 @@ async function serve(exposed) {
  */
 async function run(exposed) {
   /** Standalone argv is the launcher's supported actual entry, outside the test runner. */
-  const peer = await createProcessPeer({ spawn: true, report: reportFailure })
+  const peer = await createRpcHost({
+    plugins: [processPlugin({ spawn: true })],
+    report: reportFailure
+  })
   /** One receipt carries concrete counts from actual remote query, watch and record results. */
   let receipt
   /** Actual child diagnostics cross the ordinary fixture-control provider without hiding failures. */

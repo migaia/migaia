@@ -1,6 +1,6 @@
 # `@migaia/rpc-plugin-devtools`
 
-把真实 host 调用观察为有界事件、累计统计、增量 watch、独立录制和离线时间线。
+把真实 host 调用观察为有界事件、累计统计、增量 watch、独立录制和记录导入/导出。
 
 [English](./README.en.md) · [使用指南](./USEGUIDE.md)
 
@@ -9,7 +9,7 @@
 - 事件淘汰不减掉已累计的调用统计；clear 不结束独立录制。
 - 一个 `devtoolsPlugin` 直接向 host 安装原 collector，不另建业务连接或转发 emitter。
 - 可明确选择逻辑或物理阶段；内容捕获、脱敏与远程公开各自显式控制。
-- 原 NDJSON codec 保留字节和错误链；Hub 借用已有 client 或离线记录，不负责创建连接。
+- collector 的 NDJSON 记录导入/导出保留字节和错误链，可在本地读取已有记录。
 
 ## 从这里开始
 
@@ -61,17 +61,14 @@ watch 和 recording 有各自有界保留，丢失数不能被当作零丢失保
 
 ## 保留的入口
 
-| 入口        | 用途                                                                                |
-| ----------- | ----------------------------------------------------------------------------------- |
-| 根入口      | `devtoolsPlugin`、collector/选项类型、错误身份                                      |
-| `/contract` | wire/service/record 类型、NDJSON format 与 encode/decode                            |
-| `/hub`      | `createRpcDevtoolsHub`，注册已有 client、时钟对齐、timeline/interactions 与离线导入 |
-| `/log`      | `createRpcLogProbe`，向应用提供的结构化 logger 同步交付合格字段                     |
+| 入口   | 用途                                           |
+| ------ | ---------------------------------------------- |
+| 根入口 | `devtoolsPlugin`、collector/选项类型、错误身份 |
 
-record v1 的 format 仍是 `migaia-rpc-devtools`；包改名不改变记录格式。Hub 不关闭借入 client，不补造缺失事件，也不重放业务。Log probe 不拥有文件、批处理或 flush；logger 自己负责实际 I/O 与最终 shutdown。
+record v1 的 format 仍是 `migaia-rpc-devtools`；包改名不改变记录格式。使用同一 collector 的 exportRecord/importRecord 处理记录。
 
 ## 远程查询与错误
 
 `collector.service` 可作为现有 host 的嵌套 provide 交给应用发布。授权由应用负责；`capture` 与 `exposeContent: true` 是两个独立选择。服务读取会排除其实际服务 host 的观察记录；应用决定发布到哪个既有 host。远程边界使用原 portable/wire 转换，不承诺任意 JS 图无损传输。
 
-本包 source 为 `rpc.devtools`。INVALID_OPTION、CLOSED、RECORD_ACTIVE/RECORD_NOT_ACTIVE、RECORD_FORMAT_INVALID、REDACT_FAILED、TARGET_DUPLICATE/TARGET_UNKNOWN、TARGET_RELEASE_FAILED、SERVICE_RESULT_INVALID 保持原生类型和原 cause。诊断回调失败走报告，不改变已完成的业务结果。更多完整场景见[使用指南](./USEGUIDE.md)。
+本包 source 为 `rpc.devtools`。INVALID_OPTION、CLOSED、RECORD_ACTIVE/RECORD_NOT_ACTIVE、RECORD_FORMAT_INVALID、REDACT_FAILED、SERVICE_RESULT_INVALID 保持原生类型和原 cause。诊断回调失败走报告，不改变已完成的业务结果。更多完整场景见[使用指南](./USEGUIDE.md)。

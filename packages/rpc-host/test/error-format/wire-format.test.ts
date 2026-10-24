@@ -1,11 +1,12 @@
+import { createRuntimeEndpointComposition } from '../../dist/core/runtime-api-endpoint.js'
 import { describe, expect, it, vi } from 'vitest'
 import { serializeRpcError } from '@migaia/rpc-contract'
-import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
-import { createClientEndpoint } from '../../dist/core/client.js'
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
+
 import { RpcLifecycleError, RpcRemoteError } from '../../dist/core/errors.js'
 import { abort } from '../../dist/core/middleware/abort.js'
 import { connect } from '../../dist/core/middleware/connect.js'
-import { createProviderEndpoint } from '../../dist/core/provider.js'
+
 import type { IRpcHookEvent } from '../../dist/core/typing.js'
 
 describe('one RPC wire error format', () => {
@@ -25,32 +26,38 @@ describe('one RPC wire error format', () => {
     const observedAborts: unknown[] = []
     let slowStarted: (() => void) | undefined
     let slowAborted: (() => void) | undefined
-    const server = await createProviderEndpoint({
-      id: 'wire-limits-server',
-      transport: serverTransport,
-      middlewares: [connect({ transport: serverTransport }), abort()],
-      provider: {
-        fail: (context) => {
-          throw originals[context.data as number]
-        },
-        slow: async (context) => {
-          const signal = context.signal
-          slowStarted?.()
-          if (!signal.aborted)
-            await new Promise<void>((resolve) => {
-              signal.addEventListener('abort', () => resolve(), { once: true })
-            })
-          observedAborts.push(signal.reason)
-          slowAborted?.()
-          return context.success(undefined)
+    const server = await createRuntimeEndpointComposition(
+      {
+        id: 'wire-limits-server',
+        transport: serverTransport,
+        middlewares: [connect({ transport: serverTransport }), abort()],
+        provider: {
+          fail: (context) => {
+            throw originals[context.data as number]
+          },
+          slow: async (context) => {
+            const signal = context.signal
+            slowStarted?.()
+            if (!signal.aborted)
+              await new Promise<void>((resolve) => {
+                signal.addEventListener('abort', () => resolve(), { once: true })
+              })
+            observedAborts.push(signal.reason)
+            slowAborted?.()
+            return context.success(undefined)
+          }
         }
-      }
-    })
-    const client = await createClientEndpoint({
-      id: 'wire-limits-client',
-      transport: clientTransport,
-      middlewares: [connect({ transport: clientTransport }), abort()]
-    })
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'wire-limits-client',
+        transport: clientTransport,
+        middlewares: [connect({ transport: clientTransport }), abort()]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     const serverFailures: IRpcHookEvent[] = []
     const clientFailures: IRpcHookEvent[] = []
     server.hooks.on((event) => {
@@ -148,24 +155,30 @@ describe('one RPC wire error format', () => {
       chain = parent
     }
     const deepError = chain
-    const server = await createProviderEndpoint({
-      id: 'wire-boundary-server',
-      transport: serverTransport,
-      middlewares: [connect({ transport: serverTransport }), abort()],
-      provider: {
-        plain: () => {
-          throw new Error('plain')
-        },
-        deep: () => {
-          throw deepError
+    const server = await createRuntimeEndpointComposition(
+      {
+        id: 'wire-boundary-server',
+        transport: serverTransport,
+        middlewares: [connect({ transport: serverTransport }), abort()],
+        provider: {
+          plain: () => {
+            throw new Error('plain')
+          },
+          deep: () => {
+            throw deepError
+          }
         }
-      }
-    })
-    const client = await createClientEndpoint({
-      id: 'wire-boundary-client',
-      transport: clientTransport,
-      middlewares: [connect({ transport: clientTransport }), abort()]
-    })
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'wire-boundary-client',
+        transport: clientTransport,
+        middlewares: [connect({ transport: clientTransport }), abort()]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     try {
       await expect(
         client.send('wire-boundary-server', 'plain', null, { timeoutMs: 2000 })
@@ -210,31 +223,37 @@ describe('one RPC wire error format', () => {
     const abortedPromise = new Promise<void>((resolve) => {
       aborted = resolve
     })
-    const server = await createProviderEndpoint({
-      id: 'wire-server',
-      transport: serverTransport,
-      middlewares: [connect({ transport: serverTransport }), abort()],
-      provider: {
-        fail: () => {
-          throw original
-        },
-        slow: async (context) => {
-          started?.()
-          if (!context.signal.aborted)
-            await new Promise<void>((resolve) => {
-              context.signal.addEventListener('abort', () => resolve(), { once: true })
-            })
-          receivedAbort = context.signal.reason
-          aborted?.()
-          return context.success(undefined)
+    const server = await createRuntimeEndpointComposition(
+      {
+        id: 'wire-server',
+        transport: serverTransport,
+        middlewares: [connect({ transport: serverTransport }), abort()],
+        provider: {
+          fail: () => {
+            throw original
+          },
+          slow: async (context) => {
+            started?.()
+            if (!context.signal.aborted)
+              await new Promise<void>((resolve) => {
+                context.signal.addEventListener('abort', () => resolve(), { once: true })
+              })
+            receivedAbort = context.signal.reason
+            aborted?.()
+            return context.success(undefined)
+          }
         }
-      }
-    })
-    const client = await createClientEndpoint({
-      id: 'wire-client',
-      transport: clientTransport,
-      middlewares: [connect({ transport: clientTransport }), abort()]
-    })
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'wire-client',
+        transport: clientTransport,
+        middlewares: [connect({ transport: clientTransport }), abort()]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     try {
       const response = client.send('wire-server', 'fail', null, { timeoutMs: 2000 })
       let received: unknown

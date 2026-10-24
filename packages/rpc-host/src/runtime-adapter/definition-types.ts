@@ -2,11 +2,8 @@ import type { IAbortSignal } from '@migaia/utils/promise'
 import type { IScheduler } from '@migaia/utils/scheduler'
 import type { IRpcHandshakeOffer } from '@migaia/rpc-contract'
 import type { IRpcIdempotencyStore } from '../core/idempotency-store.js'
-import type { IRuntimePeer, IRuntimePeerOptions } from '../remote/runtime-api/peer.js'
+import type { IRuntimePeerOptions } from '../remote/runtime-api/peer.js'
 import type { IRuntimePeerSourceContext } from '../remote/runtime-api/peer.js'
-import type { IRuntimePluginOptions } from '../remote/runtime-api/plugin.js'
-import type { IAdapterPeerOptions, IAdapterPeerPreparation } from './peer.js'
-import type { IAdapterBytePeerOptions } from './byte/peer.js'
 import type {
   IRuntimeByteIO,
   IRuntimeByteDiagnostics,
@@ -16,9 +13,7 @@ import type {
 import type {
   IAdapterEventEmitterMessagePort,
   IAdapterEventTargetMessagePort,
-  IAdapterInitialMessageResource,
-  IAdapterLaunchHandle,
-  IAdapterMessageResource
+  IAdapterLaunchHandle
 } from './message/types.js'
 import type { IRuntimeProviderPolicy } from './provider/governor.js'
 import type { IRuntimeProviderScope } from './provider/scope.js'
@@ -82,17 +77,6 @@ export type IAdapterDefinitionPeerOptions<TInput> = Omit<
     scope?: IRuntimeProviderScope
   }>
 
-/** Plugins use the same physical input grammar and the original Host method whitelist. */
-export type IAdapterDefinitionPluginOptions<TInput> = IRuntimePluginOptions<
-  TInput,
-  TInput,
-  TInput
-> &
-  Pick<
-    IAdapterDefinitionPeerOptions<TInput>,
-    'peerId' | 'scheduler' | 'offer' | 'auth' | 'ipc' | 'governor' | 'scope'
-  >
-
 /** A raw definition captures physical deployment and the existing borrowed admission scope. */
 export type IAdapterDefinition<
   TInput,
@@ -109,33 +93,3 @@ export type IAdapterDeploymentOptions<TInput> = Omit<
   IAdapterDefinitionPeerOptions<TInput>,
   'endpointFactory'
 >
-
-/** Native adapters retain complex real bindings while all final assembly uses one captured owner. */
-export type IAdapterTask<TInput> = Readonly<{
-  /** Captured canonical preparation associated with the original options identity. */
-  preparation: IAdapterPeerPreparation
-  /** Original managed-binding preparation operations. */
-  managed: IAdapterPeerPreparation['managed']
-  /** Original listener/session preparation operations. */
-  listener: IAdapterPeerPreparation['listener']
-  /** Assemble a Peer from one actual held message resource. */
-  resourcePeer(
-    options: IRuntimePeerOptions,
-    resource: IAdapterMessageResource
-  ): Promise<IRuntimePeer>
-  /** Open and assemble the selected raw messaging source. */
-  messagePeer(
-    options: IRuntimePeerOptions,
-    input: TInput,
-    initial?: IAdapterInitialMessageResource
-  ): Promise<IRuntimePeer>
-  /** Open and assemble ordered byte I/O through the canonical handshake. */
-  bytePeer(
-    options: IRuntimePeerOptions,
-    input: TInput,
-    local: IAdapterBytePeerOptions
-  ): Promise<IRuntimePeer>
-}>
-
-/** Original options remain the exact Host provenance carrier before any native load or option copy. */
-export type IAdapterTaskOptions = IAdapterPeerOptions

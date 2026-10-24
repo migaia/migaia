@@ -1,3 +1,5 @@
+import { threadPlugin } from '@migaia/rpc-plugin-thread'
+import { RuntimePluginKey } from '@migaia/rpc-host/plugin'
 import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
 import { it, vi } from 'vitest'
@@ -8,17 +10,16 @@ import {
   runtimeSources,
   runtimeTestHost
 } from '../../../rpc-host/test/runtime-api/fixture.js'
+import { readRuntimeOutletConnection } from '../../../rpc-host/dist/remote/runtime-api/outlet.js'
 import { readRuntimePeerConnection } from '../../../rpc-host/dist/remote/runtime-api/peer.js'
 import { threadProtocolDefinition as createThreadPlugin } from './fixtures/thread-protocol.js'
 import { type INodeThreadHandle } from '../../../rpc-plugin-thread/dist/threads/node-launcher.js'
-import { createThreadPeer } from '../../../rpc-plugin-thread/test/protocol.ts'
 import { createRuntimePeer } from '../../../rpc-host/dist/remote/runtime-api/peer.js'
 
 import {
   createNodeThreadLauncher,
   createNodeThreadChannelFactory
-} from '@migaia/rpc-plugin-thread/adapters/node'
-import type { IRuntimeDynamicSurface } from '../../../rpc-host/dist/remote/runtime-api/typing.js'
+} from '../../../rpc-plugin-thread/dist/threads/adapters/node.js'
 import { RpcCapability } from '@migaia/rpc-contract'
 import { RUNTIME_API_FIXTURE_BASE_CAPABILITIES } from '../../../rpc-host/test/runtime-api/fixture.js'
 
@@ -96,30 +97,40 @@ it('genuine native departures retain only 100 safe records and never pollute ano
   const handles: INodeThreadHandle[] = []
   /** The canonical launcher is preserved including its actual exited Promise. */
   const native = createNodeThreadLauncher()
+  /** Each actual Host owns one independent native registration. */
+  const nativeHosts = budgets.map(() =>
+    runtimeTestHost({
+      host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
+    })
+  )
   /** A genuine second registration independently proves that history is not process-global. */
   const peers = await Promise.all(
     budgets.map((budget, index) =>
-      createThreadPeer<IRuntimeDynamicSurface>({
-        self: { name: `history-${index}`, instanceId: `history-${index}` },
-        provide: { parent: { echo: () => 42 } },
-        spawn: {
-          spec: { entry, name: `history-worker-${index}` },
-          budget,
-          scheduler: systemScheduler,
-          launcher: {
-            ...native,
-            launch: async (...args) => {
-              const handle = await native.launch(...args)
-              if (index === 0) handles.push(handle)
-              return handle
-            }
+      nativeHosts[index]!.use(
+        threadPlugin({
+          self: { name: `history-${index}`, instanceId: `history-${index}` },
+          provide: { parent: { echo: () => 42 } },
+          spawn: {
+            spec: { entry, name: `history-worker-${index}` },
+            budget,
+            scheduler: systemScheduler,
+            launcher: {
+              ...native,
+              launch: async (...args) => {
+                const handle = await native.launch(...args)
+                if (index === 0) handles.push(handle)
+                return handle
+              }
+            },
+            channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),
+            supervisor: { restart: { initialDelayMs: 1, maxDelayMs: 1, maxRestarts: 110 } },
+            report: () => undefined
           },
-          channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),
-          supervisor: { restart: { initialDelayMs: 1, maxDelayMs: 1, maxRestarts: 110 } },
           report: () => undefined
-        },
-        report: () => undefined
-      })
+        })
+      ).then(
+        () => readRuntimeOutletConnection(nativeHosts[index]!.thread, RuntimePluginKey.thread)!.peer
+      )
     )
   )
   try {
@@ -175,7 +186,7 @@ it('genuine native departures retain only 100 safe records and never pollute ano
     assert.equal(retired.connections[0]!.recent.length, 100)
     assert.equal(handles.length, launches)
   } finally {
-    for (const peer of peers) await peer.close()
+    for (const host of nativeHosts) await host.dispose()
     assert.deepEqual(
       budgets.map((budget) => budget.inUse),
       [0, 0]

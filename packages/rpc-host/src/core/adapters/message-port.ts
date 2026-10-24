@@ -81,66 +81,97 @@ export type IBrowserMessagePortTransportOptions = {
 /** One diagnostic listener is identified by its original function. */
 type IRpcErrorListener = (error: unknown) => void
 
-/** Uses one channel for admission while keeping native-listener release generation-safe. */
-function createErrorListenerChannel() {
-  /** The channel is the only owner of listener registration and dispatch snapshots. */
-  const channel = createEventChannel<unknown>({
+/** One logical listener retains its wrapper identity across registration generations. */
+type IErrorListenerRecord = {
+  wrapper: (event: { value: unknown }) => void
+  generation: number
+  active: boolean
+}
+
+/** Each disposer can release only the exact listener generation that created it. */
+class ErrorListenerRegistration {
+  /** Channel membership remains the sole listener admission and size authority. */
+  #channel: ReturnType<typeof createEventChannel<unknown>>
+  /** Shared listener record advances only when the channel accepts a new registration. */
+  #record: IErrorListenerRecord
+  /** The immutable generation distinguishes an older disposer from a current registration. */
+  #generation: number
+  /** The original channel disposer owns actual listener removal. */
+  #dispose: () => void
+
+  /** Retain the native channel receipt without creating another listener or lifecycle owner. */
+  constructor(
+    channel: ReturnType<typeof createEventChannel<unknown>>,
+    record: IErrorListenerRecord,
+    generation: number,
+    dispose: () => void
+  ) {
+    this.#channel = channel
+    this.#record = record
+    this.#generation = generation
+    this.#dispose = dispose
+  }
+  /** An old or already released handle cannot detach a newer native subscription. */
+  isCurrent = (): boolean => this.#record.generation === this.#generation && this.#record.active
+  /** Return whether this exact handle removed the current channel listener. */
+  release = (): boolean => {
+    if (this.#record.generation !== this.#generation || !this.#record.active) return false
+    /** The before/after count is the original channel-owned removal receipt. */
+    const size = this.#channel.size
+    ;(0, this.#dispose)()
+    /** A stale channel disposer remains a no-op without retiring its successor. */
+    const removed = this.#channel.size < size
+    if (removed) this.#record.active = false
+    return removed
+  }
+}
+
+/** One adapter owns logical error registration while preserving native detach generations. */
+class ErrorListenerChannel {
+  /** The existing event channel alone owns admission and ordered dispatch snapshots. */
+  #channel = createEventChannel<unknown>({
     admissionPolicy: EventAdmissionPolicy.unique,
     report: () => undefined
   })
-  /** Wrapper identity and generation only guard physical port detachment. */
-  const wrappers = new WeakMap<
-    IRpcErrorListener,
-    { wrapper: (event: { value: unknown }) => void; generation: number; active: boolean }
-  >()
-  return {
-    /** Counts live channel registrations for native listener attachment decisions. */
-    get size(): number {
-      return channel.size
-    },
-    /** Admits a listener and binds its disposer to that registration generation. */
-    add(listener: IRpcErrorListener) {
-      /** One stable wrapper makes repeated public listeners equal to the channel. */
-      let record = wrappers.get(listener)
-      if (record === undefined) {
-        record = { wrapper: (event) => listener(event.value), generation: 0, active: false }
-        wrappers.set(listener, record)
-      }
-      /** A size increase distinguishes a new generation from duplicate admission. */
-      const before = channel.size
-      /** The channel-owned disposer remains bound to this exact registration. */
-      const dispose = channel.subscribe(record.wrapper)
-      if (channel.size > before) {
-        record.generation += 1
-        record.active = true
-      }
-      /** Old closures compare against this generation before detaching native hooks. */
-      const generation = record.generation
-      return {
-        isCurrent: (): boolean => record.generation === generation && record.active,
-        release: (): boolean => {
-          if (record.generation !== generation || !record.active) return false
-          /** The count comparison reports whether this handle removed its owner. */
-          const size = channel.size
-          dispose()
-          /** A stale handle is a no-op even if a newer owner uses the same function. */
-          const removed = channel.size < size
-          if (removed) record.active = false
-          return removed
-        }
-      }
-    },
-    /** Preserves the existing ordered isolation and secondary-failure collector. */
-    report(error: unknown, failures: ReturnType<typeof createListenerFailureState>): void {
-      withSnapshotEntries(channel, error, (entries) =>
-        reportListenerFailure(
-          error,
-          entries.map((entry) => () => entry.invoke()),
-          failures
-        )
-      )
-    }
+  /** Wrapper identity and generation guard physical port detachment for each original listener. */
+  #wrappers = new WeakMap<IRpcErrorListener, IErrorListenerRecord>()
+  /** Native listeners are needed exactly while this logical channel has registrations. */
+  get size(): number {
+    return this.#channel.size
   }
+  /** Admit one logical listener and bind its disposer to the resulting registration generation. */
+  add = (listener: IRpcErrorListener): ErrorListenerRegistration => {
+    /** A stable wrapper lets duplicate logical listeners reuse event-channel equality. */
+    let record = this.#wrappers.get(listener)
+    if (record === undefined) {
+      record = { wrapper: (event) => listener(event.value), generation: 0, active: false }
+      this.#wrappers.set(listener, record)
+    }
+    /** Only a size increase creates a new live registration generation. */
+    const before = this.#channel.size
+    /** The original event channel owns the exact disposer and listener lifetime. */
+    const dispose = this.#channel.subscribe(record.wrapper)
+    if (this.#channel.size > before) {
+      record.generation += 1
+      record.active = true
+    }
+    return new ErrorListenerRegistration(this.#channel, record, record.generation, dispose)
+  }
+  /** Preserve ordered failure isolation and the original secondary-error collector. */
+  report = (error: unknown, failures: ReturnType<typeof createListenerFailureState>): void => {
+    withSnapshotEntries(this.#channel, error, (entries) =>
+      reportListenerFailure(
+        error,
+        entries.map((entry) => () => entry.invoke()),
+        failures
+      )
+    )
+  }
+}
+
+/** Allocate the adapter's sole logical error-channel owner. */
+function createErrorListenerChannel() {
+  return new ErrorListenerChannel()
 }
 
 /**
@@ -148,242 +179,363 @@ function createErrorListenerChannel() {
  * close only retires this wrapper and its listeners. Native send failures retain their original
  * cause.
  */
-export function createBrowserMessagePortTransport<TTransfer = unknown, TEvent = unknown>(
+/** Allocate native carrier state before any lazy subscription is published. */
+function browserMessagePortTransportState<TTransfer = unknown, TEvent = unknown>(
   port: IBrowserMessagePortLike<TTransfer, TEvent>,
   options: IBrowserMessagePortTransportOptions = {}
-): IRpcTransport<unknown, TTransfer> {
+) {
+  /**
+   * The original logical message hub shares native receive registration without changing listener
+   * order.
+   */
   const messageListeners = createMessageListenerHub<{ data: unknown }>()
+  /**
+   * Transport error registrations preserve their original physical-listener generation and failure
+   * delivery.
+   */
   const errorListeners = createErrorListenerChannel()
+  /** Listener failures remain isolated through the original diagnostic registration owner. */
   const listenerErrors = createErrorListenerChannel()
+  /**
+   * Secondary reporter and cleanup failures stay retained until the existing failure drain observes
+   * them.
+   */
   const secondaryFailures = createListenerFailureState()
   /** The sole installed probe is replaced per observation generation. */
-  let probe: IRpcCarrierProbe | undefined
+  const probe = undefined as IRpcCarrierProbe | undefined
   /** Disposers compare generations even when the same probe object is installed twice. */
   let probeGeneration = 0
   /** Reused detail belongs to this adapter; recipients consume it synchronously. */
   const probeDetail = { [RpcCarrierDetailKey.transfers]: -1 }
+  /** Terminal admission prevents sends and subscriptions from reviving this retired carrier. */
   let closed = false
-  let closeResult: void | Promise<void>
+  /** Repeated close returns the same first cleanup result, including its Promise identity. */
+  const closeResult = undefined as void | Promise<void>
+  /** The admitted option alone decides whether wrapper retirement may close the native port. */
   const ownership = options.ownership ?? 'owned'
   /** This transport owns only its raw error subscription, never the borrowed physical port. */
-  let removeRawError: (() => void) | undefined
+  const removeRawError = undefined as (() => void) | undefined
   /** Raw carrier observation is released by this adapter's existing close owner. */
-  let removeRawProbe: (() => void) | undefined
-  const onMessage = (event: TEvent): void => {
+  const removeRawProbe = undefined as (() => void) | undefined
+
+  return {
+    messageListeners,
+    errorListeners,
+    listenerErrors,
+    secondaryFailures,
+    probe,
+    probeGeneration,
+    probeDetail,
+    closed,
+    closeResult,
+    ownership,
+    removeRawError,
+    removeRawProbe,
+    port,
+    options
+  }
+}
+
+/** Own one native carrier projection; event callbacks retain only this explicit instance. */
+class BrowserMessagePortTransport<TTransfer = unknown, TEvent = unknown> {
+  /** All mutable observation, listener and close state belongs to this native carrier. */
+  #state: ReturnType<typeof browserMessagePortTransportState<TTransfer, TEvent>>
+
+  /** Original transport metadata and callback identities remain on the same public object. */
+  readonly value: IRpcTransport<unknown, TTransfer>
+  /** Initialize state before publishing lazy native registrations or private carrier capabilities. */
+  constructor(
+    port: IBrowserMessagePortLike<TTransfer, TEvent>,
+    options: IBrowserMessagePortTransportOptions = {}
+  ) {
+    this.#state = browserMessagePortTransportState(port, options)
+
+    /** The transport retains its original own enumerable operation keys. */
+    const transport: IRpcTransport<unknown, TTransfer> = {
+      platform: RpcPlatform.messagePort,
+      topology: 'exclusive',
+      ownership: this.#state.ownership,
+      closed: false,
+      observe: this.#observe,
+      send: this.#send,
+      subscribe: this.#subscribe,
+      close: this.#close,
+      onTransportError: this.#onTransportError,
+      onListenerError: this.#onListenerError
+    }
+    Object.defineProperty(transport, 'closed', {
+      configurable: true,
+      enumerable: true,
+      get: () => {
+        return this.#state.closed
+      }
+    })
+
+    this.value = registerCloneTransferCarrier(transport)
+  }
+  /** Handle this native carrier event through its original listener failure owner. */
+  #onMessage = (event: TEvent): void => {
     let readFailed = false
     const data = safeRead<unknown>(event, 'data', ({ error }) => {
       readFailed = true
-      errorListeners.report(
+      this.#state.errorListeners.report(
         createRpcTransportError(RpcCoreErrorText.propertyReadFailed, error),
-        secondaryFailures
+        this.#state.secondaryFailures
       )
       return undefined
     })
     if (readFailed) return
-    if (probe !== undefined) {
+    if (this.#state.probe !== undefined) {
       /** One event retains the installed handle even if its callback replaces observation. */
-      const currentProbe = probe
+      const currentProbe = this.#state.probe
       try {
-        probeDetail[RpcCarrierDetailKey.transfers] = -1
+        this.#state.probeDetail[RpcCarrierDetailKey.transfers] = -1
         currentProbe.emit(
           1,
           carrierSizeBytes(data),
           RpcPlatform.messagePort,
-          probeDetail,
+          this.#state.probeDetail,
           currentProbe.capturing ? data : undefined
         )
       } catch (error) {
-        listenerErrors.report(
+        this.#state.listenerErrors.report(
           createRpcTransportError(RpcAdapterErrorText.probeFailed, error),
-          secondaryFailures
+          this.#state.secondaryFailures
         )
       }
     }
-    messageListeners.dispatch({ data }, (listener, message) => {
+    this.#state.messageListeners.dispatch({ data }, (listener, message) => {
       observeListener(
         () => listener(message),
-        (error) => listenerErrors.report(error, secondaryFailures),
-        secondaryFailures
+        (error) => this.#state.listenerErrors.report(error, this.#state.secondaryFailures),
+        this.#state.secondaryFailures
       )
     })
   }
-  const onMessageError = (): void => {
+
+  /** Handle this native carrier event through its original listener failure owner. */
+  #onMessageError = (): void => {
     const error = tagRpcError(
       new Error(RpcMessagePortErrorText.browserMessagePortDeserializeFailed),
       RpcCoreErrorCode.transport
     )
-    errorListeners.report(error, secondaryFailures)
+    this.#state.errorListeners.report(error, this.#state.secondaryFailures)
   }
-  return registerCloneTransferCarrier({
-    platform: RpcPlatform.messagePort,
-    topology: 'exclusive',
-    ownership,
-    get closed() {
-      return closed
-    },
-    /** Replace observation; the returned disposer retires only its own installation generation. */
-    observe(next) {
-      /** Registration remains inert after this adapter's terminal boundary. */
-      const generation = ++probeGeneration
-      removeRawProbe?.()
-      removeRawProbe = undefined
-      if (!closed) {
-        if (port.observe !== undefined) {
-          probe = undefined
-          removeRawProbe = port.observe(next)
-        } else probe = next
-      }
-      return () => {
-        if (generation !== probeGeneration) return
-        probe = undefined
-        removeRawProbe?.()
-        removeRawProbe = undefined
-      }
-    },
-    send(message, options?: IRpcSendOptions<TTransfer>) {
-      if (closed) throw createRpcTransportError(RpcMessagePortErrorText.browserMessagePortClosed)
-      /** Read the native transfer option once; observation cannot select a different list. */
-      const transfer = options?.transfer
-      if (probe !== undefined) {
-        /** One event retains the installed handle even if its callback replaces observation. */
-        const currentProbe = probe
-        try {
-          probeDetail[RpcCarrierDetailKey.transfers] = transfer?.length ?? 0
-          currentProbe.emit(
-            0,
-            carrierSizeBytes(message),
-            RpcPlatform.messagePort,
-            probeDetail,
-            currentProbe.capturing ? captureTransferredContent(message, transfer) : undefined
-          )
-        } catch (error) {
-          listenerErrors.report(
-            createRpcTransportError(RpcAdapterErrorText.probeFailed, error),
-            secondaryFailures
-          )
-        }
-      }
+  /** Replace observation; the returned disposer retires only its own installation generation. */
+  #observe: NonNullable<IRpcTransport<unknown, TTransfer>['observe']> = (next) => {
+    /** Registration remains inert after this adapter's terminal boundary. */
+    const generation = ++this.#state.probeGeneration
+    this.#state.removeRawProbe?.()
+    this.#state.removeRawProbe = undefined
+    if (!this.#state.closed) {
+      if (this.#state.port.observe !== undefined) {
+        this.#state.probe = undefined
+        this.#state.removeRawProbe = this.#state.port.observe(next)
+      } else this.#state.probe = next
+    }
+    return () => {
+      if (generation !== this.#state.probeGeneration) return
+      this.#state.probe = undefined
+      this.#state.removeRawProbe?.()
+      this.#state.removeRawProbe = undefined
+    }
+  }
+
+  /** Preserve the native send operation and its original registration or settlement lifetime. */
+  #send: NonNullable<IRpcTransport<unknown, TTransfer>['send']> = (
+    message,
+    options?: IRpcSendOptions<TTransfer>
+  ) => {
+    if (this.#state.closed)
+      throw createRpcTransportError(RpcMessagePortErrorText.browserMessagePortClosed)
+    /** Read the native transfer option once; observation cannot select a different list. */
+    const transfer = options?.transfer
+    if (this.#state.probe !== undefined) {
+      /** One event retains the installed handle even if its callback replaces observation. */
+      const currentProbe = this.#state.probe
       try {
-        port.postMessage(message, transfer)
+        this.#state.probeDetail[RpcCarrierDetailKey.transfers] = transfer?.length ?? 0
+        currentProbe.emit(
+          0,
+          carrierSizeBytes(message),
+          RpcPlatform.messagePort,
+          this.#state.probeDetail,
+          currentProbe.capturing ? captureTransferredContent(message, transfer) : undefined
+        )
       } catch (error) {
-        throw identifyRpcBoundaryFailure(
-          error,
-          RpcCoreErrorCode.transport,
-          RpcAdapterErrorText.nativeSendFailed
+        this.#state.listenerErrors.report(
+          createRpcTransportError(RpcAdapterErrorText.probeFailed, error),
+          this.#state.secondaryFailures
         )
-      }
-    },
-    subscribe(listener) {
-      if (closed) throw createRpcTransportError(RpcMessagePortErrorText.browserMessagePortClosed)
-      messageListeners.add(listener, () =>
-        registerListeners(
-          [
-            {
-              add: () => port.addEventListener('message', onMessage),
-              remove: () => port.removeEventListener('message', onMessage)
-            },
-            {
-              add: () => port.addEventListener('messageerror', onMessageError),
-              remove: () => port.removeEventListener('messageerror', onMessageError)
-            },
-            {
-              add: () => {
-                removeRawError = port.onError?.((error) =>
-                  errorListeners.report(error, secondaryFailures)
-                )
-              },
-              remove: () => {
-                removeRawError?.()
-                removeRawError = undefined
-              }
-            },
-            { add: () => port.start(), remove: () => undefined }
-          ],
-          { code: RpcCoreErrorCode.transport, secondaryFailures }
-        )
-      )
-      return () => {
-        if (!messageListeners.has(listener)) return
-        releaseListenerRegistration(
-          messageListeners.size === 1
-            ? [
-                () => port.removeEventListener('message', onMessage),
-                () => port.removeEventListener('messageerror', onMessageError),
-                () => {
-                  removeRawError?.()
-                  removeRawError = undefined
-                }
-              ]
-            : [],
-          () => {
-            messageListeners.remove(listener, () => undefined)
-          },
-          { code: RpcCoreErrorCode.transport, secondaryFailures }
-        )
-      }
-    },
-    close() {
-      if (closed) return closeResult
-      closed = true
-      probe = undefined
-      messageListeners.clear(() => undefined)
-      const cleanupErrors = collectListenerCleanupFailures([
-        () => {
-          removeRawProbe?.()
-          removeRawProbe = undefined
-        },
-        () => port.removeEventListener('message', onMessage),
-        () => port.removeEventListener('messageerror', onMessageError),
-        () => {
-          removeRawError?.()
-          removeRawError = undefined
-        }
-      ])
-      if (ownership === 'owned') {
-        try {
-          port.close()
-        } catch (error) {
-          cleanupErrors.push(error)
-        }
-      }
-      closeResult = drainTerminalListenerFailures(cleanupErrors, {
-        code: RpcCoreErrorCode.transport,
-        message: RpcAdapterErrorText.messagePortCleanupFailed,
-        secondaryFailures,
-        aggregateSingle: true
-      })
-      return closeResult
-    },
-    onTransportError(listener) {
-      const registration = errorListeners.add(listener)
-      return () => {
-        const deleted = registration.release()
-        drainListenerFailures([], { code: RpcCoreErrorCode.transport, secondaryFailures })
-        return deleted
-      }
-    },
-    onListenerError(listener) {
-      const registration = listenerErrors.add(listener)
-      return () => {
-        const deleted = registration.release()
-        drainListenerFailures([], { code: RpcCoreErrorCode.transport, secondaryFailures })
-        return deleted
       }
     }
-  })
+    try {
+      this.#state.port.postMessage(message, transfer)
+    } catch (error) {
+      throw identifyRpcBoundaryFailure(
+        error,
+        RpcCoreErrorCode.transport,
+        RpcAdapterErrorText.nativeSendFailed
+      )
+    }
+  }
+
+  /** Preserve the native subscribe operation and its original registration or settlement lifetime. */
+  #subscribe: NonNullable<IRpcTransport<unknown, TTransfer>['subscribe']> = (listener) => {
+    if (this.#state.closed)
+      throw createRpcTransportError(RpcMessagePortErrorText.browserMessagePortClosed)
+    this.#state.messageListeners.add(listener, () =>
+      registerListeners(
+        [
+          {
+            add: () => this.#state.port.addEventListener('message', this.#onMessage),
+            remove: () => this.#state.port.removeEventListener('message', this.#onMessage)
+          },
+          {
+            add: () => this.#state.port.addEventListener('messageerror', this.#onMessageError),
+            remove: () => this.#state.port.removeEventListener('messageerror', this.#onMessageError)
+          },
+          {
+            add: () => {
+              this.#state.removeRawError = this.#state.port.onError?.((error) =>
+                this.#state.errorListeners.report(error, this.#state.secondaryFailures)
+              )
+            },
+            remove: () => {
+              this.#state.removeRawError?.()
+              this.#state.removeRawError = undefined
+            }
+          },
+          { add: () => this.#state.port.start(), remove: () => undefined }
+        ],
+        { code: RpcCoreErrorCode.transport, secondaryFailures: this.#state.secondaryFailures }
+      )
+    )
+    return () => {
+      if (!this.#state.messageListeners.has(listener)) return
+      releaseListenerRegistration(
+        this.#state.messageListeners.size === 1
+          ? [
+              () => this.#state.port.removeEventListener('message', this.#onMessage),
+              () => this.#state.port.removeEventListener('messageerror', this.#onMessageError),
+              () => {
+                this.#state.removeRawError?.()
+                this.#state.removeRawError = undefined
+              }
+            ]
+          : [],
+        () => {
+          this.#state.messageListeners.remove(listener, () => undefined)
+        },
+        { code: RpcCoreErrorCode.transport, secondaryFailures: this.#state.secondaryFailures }
+      )
+    }
+  }
+
+  /** Preserve the native close operation and its original registration or settlement lifetime. */
+  #close: NonNullable<IRpcTransport<unknown, TTransfer>['close']> = () => {
+    if (this.#state.closed) return this.#state.closeResult
+    this.#state.closed = true
+    this.#state.probe = undefined
+    this.#state.messageListeners.clear(() => undefined)
+    const cleanupErrors = collectListenerCleanupFailures([
+      () => {
+        this.#state.removeRawProbe?.()
+        this.#state.removeRawProbe = undefined
+      },
+      () => this.#state.port.removeEventListener('message', this.#onMessage),
+      () => this.#state.port.removeEventListener('messageerror', this.#onMessageError),
+      () => {
+        this.#state.removeRawError?.()
+        this.#state.removeRawError = undefined
+      }
+    ])
+    if (this.#state.ownership === 'owned') {
+      try {
+        this.#state.port.close()
+      } catch (error) {
+        cleanupErrors.push(error)
+      }
+    }
+    this.#state.closeResult = drainTerminalListenerFailures(cleanupErrors, {
+      code: RpcCoreErrorCode.transport,
+      message: RpcAdapterErrorText.messagePortCleanupFailed,
+      secondaryFailures: this.#state.secondaryFailures,
+      aggregateSingle: true
+    })
+    return this.#state.closeResult
+  }
+
+  /**
+   * Preserve the native onTransportError operation and its original registration or settlement
+   * lifetime.
+   */
+  #onTransportError: NonNullable<IRpcTransport<unknown, TTransfer>['onTransportError']> = (
+    listener
+  ) => {
+    const registration = this.#state.errorListeners.add(listener)
+    return () => {
+      const deleted = registration.release()
+      drainListenerFailures([], {
+        code: RpcCoreErrorCode.transport,
+        secondaryFailures: this.#state.secondaryFailures
+      })
+      return deleted
+    }
+  }
+
+  /**
+   * Preserve the native onListenerError operation and its original registration or settlement
+   * lifetime.
+   */
+  #onListenerError: NonNullable<IRpcTransport<unknown, TTransfer>['onListenerError']> = (
+    listener
+  ) => {
+    const registration = this.#state.listenerErrors.add(listener)
+    return () => {
+      const deleted = registration.release()
+      drainListenerFailures([], {
+        code: RpcCoreErrorCode.transport,
+        secondaryFailures: this.#state.secondaryFailures
+      })
+      return deleted
+    }
+  }
+}
+
+/** Construct one explicit native carrier owner while preserving the original transport boundary. */
+export function createBrowserMessagePortTransport<TTransfer = unknown, TEvent = unknown>(
+  port: IBrowserMessagePortLike<TTransfer, TEvent>,
+  options: IBrowserMessagePortTransportOptions = {}
+): IRpcTransport<unknown, TTransfer> {
+  return new BrowserMessagePortTransport<TTransfer, TEvent>(port, options).value
 }
 
 /**
  * Wrap a borrowed Node MessagePort without owning physical close. The wrapper preserves native
  * message/terminal listener ownership and transfer lists; native send failures retain their cause.
  */
-export function createNodeMessagePortTransport(port: INodeMessagePortLike): IRpcTransport {
+/** Allocate native carrier state before any lazy subscription is published. */
+function nodeMessagePortTransportState(port: INodeMessagePortLike) {
+  /**
+   * The original logical message hub shares native receive registration without changing listener
+   * order.
+   */
   const messageListeners = createMessageListenerHub<{ data: unknown }>()
+  /**
+   * Transport error registrations preserve their original physical-listener generation and failure
+   * delivery.
+   */
   const errorListeners = createErrorListenerChannel()
+  /** Listener failures remain isolated through the original diagnostic registration owner. */
   const listenerErrors = createErrorListenerChannel()
+  /**
+   * Secondary reporter and cleanup failures stay retained until the existing failure drain observes
+   * them.
+   */
   const secondaryFailures = createListenerFailureState()
   /** The sole installed probe is replaced per observation generation. */
-  let probe: IRpcCarrierProbe | undefined
+  const probe = undefined as IRpcCarrierProbe | undefined
   /** Disposers compare generations even when the same probe object is installed twice. */
   let probeGeneration = 0
   /**
@@ -393,51 +545,105 @@ export function createNodeMessagePortTransport(port: INodeMessagePortLike): IRpc
   let observationRetired = false
   /** Reused detail belongs to this adapter; recipients consume it synchronously. */
   const probeDetail = { [RpcCarrierDetailKey.transfers]: -1 }
+  /** Terminal admission prevents sends and subscriptions from reviving this retired carrier. */
   let closed = false
+  /** The native close event publishes one terminal failure even if several observers remain. */
   let terminalReported = false
-  let terminalError: Error | undefined
+  /** Late transport subscribers observe the same original terminal Error instance. */
+  const terminalError = undefined as Error | undefined
 
-  const emitTransportError = (error: unknown): void => {
-    errorListeners.report(error, secondaryFailures)
+  return {
+    messageListeners,
+    errorListeners,
+    listenerErrors,
+    secondaryFailures,
+    probe,
+    probeGeneration,
+    observationRetired,
+    probeDetail,
+    closed,
+    terminalReported,
+    terminalError,
+    port
+  }
+}
+
+/** Own one native carrier projection; event callbacks retain only this explicit instance. */
+class NodeMessagePortTransport {
+  /** All mutable observation, listener and close state belongs to this native carrier. */
+  #state: ReturnType<typeof nodeMessagePortTransportState>
+
+  /** Original transport metadata and callback identities remain on the same public object. */
+  readonly value: IRpcTransport
+  /** Initialize state before publishing lazy native registrations or private carrier capabilities. */
+  constructor(port: INodeMessagePortLike) {
+    this.#state = nodeMessagePortTransportState(port)
+
+    /** The transport retains its original own enumerable operation keys. */
+    const transport: IRpcTransport = {
+      platform: RpcPlatform.messagePort,
+      topology: 'exclusive',
+      ownership: RpcTransportOwnership.borrowed,
+      closed: false,
+      observe: this.#observe,
+      close: this.#close,
+      send: this.#send,
+      subscribe: this.#subscribe,
+      onTransportError: this.#onTransportError,
+      onListenerError: this.#onListenerError
+    }
+    Object.defineProperty(transport, 'closed', {
+      configurable: true,
+      enumerable: true,
+      get: () => {
+        return this.#state.closed
+      }
+    })
+    bindNativeReplayTransport(this.#state.port, transport)
+    this.value = registerCloneTransferCarrier(transport)
+  }
+  /** Handle this native carrier event through its original listener failure owner. */
+  #emitTransportError = (error: unknown): void => {
+    this.#state.errorListeners.report(error, this.#state.secondaryFailures)
   }
 
-  const onMessage = (message: unknown): void => {
-    if (probe !== undefined) {
+  /** Handle this native carrier event through its original listener failure owner. */
+  #onMessage = (message: unknown): void => {
+    if (this.#state.probe !== undefined) {
       /** One event retains the installed handle even if its callback replaces observation. */
-      const currentProbe = probe
+      const currentProbe = this.#state.probe
       try {
-        probeDetail[RpcCarrierDetailKey.transfers] = -1
+        this.#state.probeDetail[RpcCarrierDetailKey.transfers] = -1
         currentProbe.emit(
           1,
           carrierSizeBytes(message),
           RpcPlatform.messagePort,
-          probeDetail,
+          this.#state.probeDetail,
           currentProbe.capturing ? message : undefined
         )
       } catch (error) {
-        listenerErrors.report(
+        this.#state.listenerErrors.report(
           createRpcTransportError(RpcAdapterErrorText.probeFailed, error),
-          secondaryFailures
+          this.#state.secondaryFailures
         )
       }
     }
-    messageListeners.dispatch({ data: message }, (listener, messageValue) => {
+    this.#state.messageListeners.dispatch({ data: message }, (listener, messageValue) => {
       observeListener(
         () => listener(messageValue),
-        (error) => listenerErrors.report(error, secondaryFailures),
-        secondaryFailures
+        (error) => this.#state.listenerErrors.report(error, this.#state.secondaryFailures),
+        this.#state.secondaryFailures
       )
     })
   }
-  // `error` here is an external boundary the same way a DOM event is —
-  // stringifying it must not itself throw and escape as an uncaught
-  // exception from inside Node's event emitter dispatch.
-  const onMessageError = (error?: unknown): void => {
+
+  /** Handle this native carrier event through its original listener failure owner. */
+  #onMessageError = (error?: unknown): void => {
     const detail =
       error === undefined
         ? ''
         : `: ${safeString(error, RpcCoreErrorText.unknownError, ({ error: conversionError }) => {
-            emitTransportError(
+            this.#emitTransportError(
               createRpcTransportError(
                 RpcMessagePortErrorText.messagePortDeserializeFailed(''),
                 conversionError
@@ -445,153 +651,168 @@ export function createNodeMessagePortTransport(port: INodeMessagePortLike): IRpc
             )
             return undefined
           })}`
-    emitTransportError(
+    this.#emitTransportError(
       tagRpcError(
         new Error(RpcMessagePortErrorText.messagePortDeserializeFailed(detail)),
         RpcCoreErrorCode.transport
       )
     )
   }
-  const onClose = (): void => {
-    if (terminalReported) return
-    terminalReported = true
-    closed = true
-    probe = undefined
-    terminalError = tagRpcError(
+
+  /** Handle this native carrier event through its original listener failure owner. */
+  #onClose = (): void => {
+    if (this.#state.terminalReported) return
+    this.#state.terminalReported = true
+    this.#state.closed = true
+    this.#state.probe = undefined
+    this.#state.terminalError = tagRpcError(
       new Error(RpcMessagePortErrorText.messagePortTerminated),
       RpcCoreErrorCode.transport
     )
-    emitTransportError(terminalError)
+    this.#emitTransportError(this.#state.terminalError)
   }
-
-  /** Only a previously registered native resource grants the final adapter private provenance. */
-  const transport: IRpcTransport = {
-    platform: RpcPlatform.messagePort,
-    topology: 'exclusive',
-    ownership: RpcTransportOwnership.borrowed,
-    get closed() {
-      return closed
-    },
-    /** Replace observation; the returned disposer retires only its own installation generation. */
-    observe(next) {
-      /** Registration remains inert after this adapter's terminal boundary. */
-      const generation = ++probeGeneration
-      if (!closed && !observationRetired) probe = next
-      return () => {
-        if (generation !== probeGeneration) return
-        probe = undefined
-      }
-    },
-    /** Retire only observation; the native close event keeps its original physical error ownership. */
-    close() {
-      observationRetired = true
-      probe = undefined
-    },
-    send(message, options?: IRpcSendOptions) {
-      if (closed) throw createRpcTransportError(RpcMessagePortErrorText.messagePortClosed)
-      /** Read the native transfer option once; observation cannot select a different list. */
-      const transfer = options?.transfer
-      if (probe !== undefined) {
-        /** One event retains the installed handle even if its callback replaces observation. */
-        const currentProbe = probe
-        try {
-          probeDetail[RpcCarrierDetailKey.transfers] = transfer?.length ?? 0
-          currentProbe.emit(
-            0,
-            carrierSizeBytes(message),
-            RpcPlatform.messagePort,
-            probeDetail,
-            currentProbe.capturing ? captureTransferredContent(message, transfer) : undefined
-          )
-        } catch (error) {
-          listenerErrors.report(
-            createRpcTransportError(RpcAdapterErrorText.probeFailed, error),
-            secondaryFailures
-          )
-        }
-      }
-      try {
-        port.postMessage(message, transfer)
-      } catch (error) {
-        throw identifyRpcBoundaryFailure(
-          error,
-          RpcCoreErrorCode.transport,
-          RpcAdapterErrorText.nativeSendFailed
-        )
-      }
-    },
-    // Lazily attached/detached the same way as the web-worker adapter —
-    // a client that closes must not leave the underlying port still
-    // referencing listeners it can no longer reach.
-    subscribe(listener) {
-      if (closed) throw createRpcTransportError(RpcMessagePortErrorText.messagePortClosed)
-      messageListeners.add(listener, () =>
-        registerListeners(
-          [
-            {
-              add: () => port.on('message', onMessage),
-              remove: () => port.off('message', onMessage)
-            }
-          ],
-          { code: RpcCoreErrorCode.transport, secondaryFailures }
-        )
-      )
-      return () => {
-        if (!messageListeners.has(listener)) return
-        releaseListenerRegistration(
-          messageListeners.size === 1 ? [() => port.off('message', onMessage)] : [],
-          () => {
-            messageListeners.remove(listener, () => undefined)
-          },
-          { code: RpcCoreErrorCode.transport, secondaryFailures }
-        )
-      }
-    },
-    onTransportError(listener) {
-      if (!closed && errorListeners.size === 0)
-        registerListeners(
-          [
-            {
-              add: () => port.on('messageerror', onMessageError),
-              remove: () => port.off('messageerror', onMessageError)
-            },
-            {
-              add: () => port.on('close', onClose),
-              remove: () => port.off('close', onClose)
-            }
-          ],
-          { code: RpcCoreErrorCode.transport, secondaryFailures }
-        )
-      const registration = errorListeners.add(listener)
-      if (terminalError !== undefined) {
-        observeListener(
-          () => listener(terminalError),
-          (error) => collectListenerFailure(secondaryFailures, error),
-          secondaryFailures
-        )
-      }
-      return () => {
-        if (!registration.isCurrent()) return
-        releaseListenerRegistration(
-          errorListeners.size === 1
-            ? [() => port.off('messageerror', onMessageError), () => port.off('close', onClose)]
-            : [],
-          () => {
-            registration.release()
-          },
-          { code: RpcCoreErrorCode.transport, secondaryFailures }
-        )
-      }
-    },
-    onListenerError(listener) {
-      const registration = listenerErrors.add(listener)
-      return () => {
-        const deleted = registration.release()
-        drainListenerFailures([], { code: RpcCoreErrorCode.transport, secondaryFailures })
-        return deleted
-      }
+  /** Replace observation; the returned disposer retires only its own installation generation. */
+  #observe: NonNullable<IRpcTransport['observe']> = (next) => {
+    /** Registration remains inert after this adapter's terminal boundary. */
+    const generation = ++this.#state.probeGeneration
+    if (!this.#state.closed && !this.#state.observationRetired) this.#state.probe = next
+    return () => {
+      if (generation !== this.#state.probeGeneration) return
+      this.#state.probe = undefined
     }
   }
-  bindNativeReplayTransport(port, transport)
-  return registerCloneTransferCarrier(transport)
+
+  /** Retire only observation; the native close event keeps its original physical error ownership. */
+  #close: NonNullable<IRpcTransport['close']> = () => {
+    this.#state.observationRetired = true
+    this.#state.probe = undefined
+  }
+
+  /** Preserve the native send operation and its original registration or settlement lifetime. */
+  #send: NonNullable<IRpcTransport['send']> = (message, options?: IRpcSendOptions) => {
+    if (this.#state.closed) throw createRpcTransportError(RpcMessagePortErrorText.messagePortClosed)
+    /** Read the native transfer option once; observation cannot select a different list. */
+    const transfer = options?.transfer
+    if (this.#state.probe !== undefined) {
+      /** One event retains the installed handle even if its callback replaces observation. */
+      const currentProbe = this.#state.probe
+      try {
+        this.#state.probeDetail[RpcCarrierDetailKey.transfers] = transfer?.length ?? 0
+        currentProbe.emit(
+          0,
+          carrierSizeBytes(message),
+          RpcPlatform.messagePort,
+          this.#state.probeDetail,
+          currentProbe.capturing ? captureTransferredContent(message, transfer) : undefined
+        )
+      } catch (error) {
+        this.#state.listenerErrors.report(
+          createRpcTransportError(RpcAdapterErrorText.probeFailed, error),
+          this.#state.secondaryFailures
+        )
+      }
+    }
+    try {
+      this.#state.port.postMessage(message, transfer)
+    } catch (error) {
+      throw identifyRpcBoundaryFailure(
+        error,
+        RpcCoreErrorCode.transport,
+        RpcAdapterErrorText.nativeSendFailed
+      )
+    }
+  }
+
+  /** Preserve the native subscribe operation and its original registration or settlement lifetime. */
+  #subscribe: NonNullable<IRpcTransport['subscribe']> = (listener) => {
+    if (this.#state.closed) throw createRpcTransportError(RpcMessagePortErrorText.messagePortClosed)
+    this.#state.messageListeners.add(listener, () =>
+      registerListeners(
+        [
+          {
+            add: () => this.#state.port.on('message', this.#onMessage),
+            remove: () => this.#state.port.off('message', this.#onMessage)
+          }
+        ],
+        { code: RpcCoreErrorCode.transport, secondaryFailures: this.#state.secondaryFailures }
+      )
+    )
+    return () => {
+      if (!this.#state.messageListeners.has(listener)) return
+      releaseListenerRegistration(
+        this.#state.messageListeners.size === 1
+          ? [() => this.#state.port.off('message', this.#onMessage)]
+          : [],
+        () => {
+          this.#state.messageListeners.remove(listener, () => undefined)
+        },
+        { code: RpcCoreErrorCode.transport, secondaryFailures: this.#state.secondaryFailures }
+      )
+    }
+  }
+
+  /**
+   * Preserve the native onTransportError operation and its original registration or settlement
+   * lifetime.
+   */
+  #onTransportError: NonNullable<IRpcTransport['onTransportError']> = (listener) => {
+    if (!this.#state.closed && this.#state.errorListeners.size === 0)
+      registerListeners(
+        [
+          {
+            add: () => this.#state.port.on('messageerror', this.#onMessageError),
+            remove: () => this.#state.port.off('messageerror', this.#onMessageError)
+          },
+          {
+            add: () => this.#state.port.on('close', this.#onClose),
+            remove: () => this.#state.port.off('close', this.#onClose)
+          }
+        ],
+        { code: RpcCoreErrorCode.transport, secondaryFailures: this.#state.secondaryFailures }
+      )
+    const registration = this.#state.errorListeners.add(listener)
+    if (this.#state.terminalError !== undefined) {
+      observeListener(
+        () => listener(this.#state.terminalError),
+        (error) => collectListenerFailure(this.#state.secondaryFailures, error),
+        this.#state.secondaryFailures
+      )
+    }
+    return () => {
+      if (!registration.isCurrent()) return
+      releaseListenerRegistration(
+        this.#state.errorListeners.size === 1
+          ? [
+              () => this.#state.port.off('messageerror', this.#onMessageError),
+              () => this.#state.port.off('close', this.#onClose)
+            ]
+          : [],
+        () => {
+          registration.release()
+        },
+        { code: RpcCoreErrorCode.transport, secondaryFailures: this.#state.secondaryFailures }
+      )
+    }
+  }
+
+  /**
+   * Preserve the native onListenerError operation and its original registration or settlement
+   * lifetime.
+   */
+  #onListenerError: NonNullable<IRpcTransport['onListenerError']> = (listener) => {
+    const registration = this.#state.listenerErrors.add(listener)
+    return () => {
+      const deleted = registration.release()
+      drainListenerFailures([], {
+        code: RpcCoreErrorCode.transport,
+        secondaryFailures: this.#state.secondaryFailures
+      })
+      return deleted
+    }
+  }
+}
+
+/** Construct one explicit native carrier owner while preserving the original transport boundary. */
+export function createNodeMessagePortTransport(port: INodeMessagePortLike): IRpcTransport {
+  return new NodeMessagePortTransport(port).value
 }

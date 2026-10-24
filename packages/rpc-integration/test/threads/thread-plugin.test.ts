@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 import { defineFeature, definePlugin } from '@migaia/plugin-host'
 import { createManualScheduler } from '@migaia/utils/testing'
+import { readRuntimeCarrier } from '@migaia/rpc-contract/runtime'
 import * as remoteProxy from '../../../rpc-host/dist/remote/proxy.js'
 import * as threadSupervision from '@migaia/supervision/threads'
-import { createNodeThreadChannelFactory } from '@migaia/rpc-plugin-thread/adapters/node'
+import { createNodeThreadChannelFactory } from '../../../rpc-plugin-thread/dist/threads/adapters/node.js'
 import { nativeFixture } from '../../../rpc-plugin-thread/test/threads/fixture.js'
 
 /** Public assembly must publish only after describe and use no message handshake. */
@@ -16,6 +17,20 @@ describe('thread Plugin facade', () => {
       const stream = feature.stream(['stream item'])
       expect(await stream.next()).toMatchObject({ value: 'stream item', done: false })
       await stream.return?.(undefined)
+      /** Native business and stream controls retain exact operation modes on the original Worker. */
+      const native = fixture.frames.flatMap(({ message }) => {
+        /** The canonical selector reveals metadata without parsing or copying the business payload. */
+        const selected = readRuntimeCarrier(message)
+        return selected === undefined
+          ? []
+          : [selected.frame as { kind: string; task: { method: string; mode: string } }]
+      })
+      expect(native.map(({ kind, task }) => [kind, task.method, task.mode])).toEqual([
+        ['runtime-call', 'p.read', 'request'],
+        ['runtime-call', 'p.stream', 'stream'],
+        ['runtime-control', 'p.stream', 'stream'],
+        ['runtime-control', 'p.stream', 'stream']
+      ])
       const requests = fixture.frames.filter(({ message }) => message.kind === 'request')
       expect(requests[0]?.message.method).toBe('migaia.remote.runtime.describe')
       expect(
@@ -23,7 +38,12 @@ describe('thread Plugin facade', () => {
       ).toHaveLength(1)
       expect(
         fixture.frames
-          .filter(({ message }) => message.kind !== 'request' && message.kind !== 'stream')
+          .filter(
+            ({ message }) =>
+              readRuntimeCarrier(message) === undefined &&
+              message.kind !== 'request' &&
+              message.kind !== 'stream'
+          )
           .map(({ message }) => message.kind)
       ).toEqual(['discovery', 'discovery', 'response'])
       expect(fixture.frames.some(({ message }) => message.kind === 'handshake')).toBe(false)
@@ -75,18 +95,15 @@ describe('thread Plugin facade', () => {
   })
   it('rejects scheduler mismatch before endpoint or business publication', async () => {
     const scheduler = createManualScheduler()
-    const factory = vi.fn()
     const fixture = nativeFixture({
       scheduler,
-      channelFactory: createNodeThreadChannelFactory({ scheduler: createManualScheduler() }),
-      endpointFactory: factory
+      channelFactory: createNodeThreadChannelFactory({ scheduler: createManualScheduler() })
     })
     try {
       await expect(fixture.install()).rejects.toMatchObject({
         code: 'PLUGIN_INSTALL_FAILED',
         cause: { code: 'INVALID_CONFIG' }
       })
-      expect(factory).not.toHaveBeenCalled()
       expect(fixture.frames).toHaveLength(0)
     } finally {
       await fixture.close()
@@ -94,7 +111,7 @@ describe('thread Plugin facade', () => {
   })
   it('rejects an explicitly narrowed missing baseline before endpoint creation or business frame', async () => {
     const { createNodeThreadChannelFactory } =
-      await import('@migaia/rpc-plugin-thread/adapters/node')
+      await import('../../../rpc-plugin-thread/dist/threads/adapters/node.js')
     const { systemScheduler } = await import('@migaia/utils/scheduler')
     const fixture = nativeFixture({
       channelFactory: createNodeThreadChannelFactory({

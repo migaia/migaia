@@ -1,14 +1,13 @@
 import { describe, expect, it, vi } from 'vitest'
-import { PluginHost } from '@migaia/plugin-host'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { RpcPlatform } from '@migaia/rpc-host/plugin'
 import { createConnectProcessBinding } from '../../../rpc-plugin-process/dist/process/plugin/binding.js'
-import { createProcessPlugin } from '../../../rpc-plugin-process/test/protocol.ts'
+import { createManagedRuntimePeer } from '../../../rpc-host/dist/remote/runtime-api/managed-peer.js'
 import { RpcProcessErrorCode } from '@migaia/rpc-plugin-process'
 import { byteProcessPipeline } from '../fixtures/process-diagnostics.js'
 import type { IProcessByteChannel } from '../../../rpc-plugin-process/dist/process/types.js'
 import type { IRemoteChannel } from '@migaia/rpc-host/plugin'
-import { REMOTE_FIXTURE_CONTRACT, remoteHarness } from '../../../rpc-host/test/remote/fixture.js'
+import { remoteHarness } from '../../../rpc-host/test/remote/fixture.js'
 
 /** An external process stays outside the lifetime of this owned local socket. */
 describe('process plugin connect binding', () => {
@@ -107,11 +106,8 @@ describe('process plugin connect binding', () => {
     await binding.supervisor.dispose()
   })
 
-  it('installs through the borrowed connection and leaves the external target owned elsewhere', async () => {
+  it('prepares through the borrowed connection and leaves the external target owned elsewhere', async () => {
     const fixture = remoteHarness()
-    const host = new PluginHost<Record<string, never>>({
-      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
-    })
     /** Closing the session settles the local supervisor without touching a process handle. */
     let notifyClose: (() => void) | undefined
     const rawClose = vi.fn(async () => notifyClose?.())
@@ -128,14 +124,9 @@ describe('process plugin connect binding', () => {
       close: rawClose
     }
     const dial = vi.fn(async () => raw)
-    const plugin = createProcessPlugin({
-      name: 'p',
-      contract: REMOTE_FIXTURE_CONTRACT,
-      registrationOwner: { name: 'p', host },
-      host: host.plugin,
-      endpointFactory: async () => fixture.served,
-      report: () => undefined,
-      deployment: {
+    /** The actual native binding owns the borrowed socket; the retained generation owner owns RPC. */
+    const binding = createConnectProcessBinding(
+      {
         kind: 'connect',
         address: '/tmp/external-peer.sock',
         token: 'signed-token',
@@ -155,15 +146,20 @@ describe('process plugin connect binding', () => {
             agreement: { ...fixture.channel.agreement, source: 'negotiated' as const }
           }
         }
-      }
-    })
+      },
+      () => undefined
+    )
+    /** Use the original managed endpoint injection seam without rebuilding a removed Plugin facade. */
+    const peer = await createManagedRuntimePeer(
+      { endpointFactory: async () => fixture.served, report: () => undefined },
+      binding,
+      (channel, served) => binding.bindEndpoint(channel, served)
+    )
     try {
-      const [installed] = await host.use(plugin)
-      const feature = installed.getFeature('f') as { request(params: unknown[]): Promise<unknown> }
-      expect(await feature.request(['value'])).toBe('result')
+      expect(await peer.request('p.f.request', ['value'])).toBe('result')
       expect(dial).toHaveBeenCalledTimes(1)
     } finally {
-      await host.dispose()
+      await peer.close()
     }
     expect(rawClose).toHaveBeenCalledTimes(1)
   })

@@ -1,6 +1,8 @@
+import { createRuntimeEndpointComposition } from '../../dist/core/runtime-api-endpoint.js'
+import { RpcCapability } from '@migaia/rpc-contract'
 import { describe, expect, it } from 'vitest'
-import { createFullEndpoint } from '../../dist/core/full.js'
-import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
+
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
 import { readEndpointDebugSnapshot } from '../../dist/core/internal/test-observer.js'
 import { connect } from '../../dist/core/middleware/connect.js'
 import { codec } from '../../dist/core/middleware/codec.js'
@@ -19,6 +21,66 @@ type IWireStageCounts = {
   accept: number
 }
 
+/** Original opaque payload ownership is explicit and shared only by this one acceptance case. */
+type IOpaqueFramerContext = Readonly<{
+  opaqueMessageIds: string[]
+  pendingBySource: Map<string, string[]>
+  opaqueFragments: WeakMap<object, { readonly index: number; readonly value: string }>
+  opaqueRejectError: Error
+}>
+
+/** Build the original plain framer view over explicit per-case state and caller-owned counters. */
+function createOpaqueFramer(
+  fixture: IOpaqueFramerContext,
+  counts: { frame: number; accept: number },
+  states?: string[]
+) {
+  return {
+    id: 'observer-opaque',
+    version: 1,
+    inputEncodedType: 'string' as const,
+    outputEncodedType: 'unknown' as const,
+    frame: (value: string) => {
+      counts.frame += 1
+      return [value] as const
+    },
+    accept: (value: unknown, context: IRpcFrameContext) =>
+      acceptOpaqueFrame(fixture, counts, states, value, context),
+    close: () => undefined
+  }
+}
+
+/**
+ * Decode only the original fixture-owned opaque mapping; WebRPC still cannot inspect carrier
+ * fields.
+ */
+function acceptOpaqueFrame(
+  fixture: IOpaqueFramerContext,
+  counts: { frame: number; accept: number },
+  states: string[] | undefined,
+  value: unknown,
+  context: IRpcFrameContext
+) {
+  counts.accept += 1
+  if (typeof value === 'string') return { status: 'complete' as const, value }
+  fixture.opaqueMessageIds.push(context.messageId)
+  if (!value || typeof value !== 'object')
+    return { status: 'rejected' as const, error: fixture.opaqueRejectError }
+  const frame = fixture.opaqueFragments.get(value)
+  if (!frame) return { status: 'rejected' as const, error: fixture.opaqueRejectError }
+  const pending = fixture.pendingBySource.get(context.source) ?? []
+  pending[frame.index] = frame.value
+  fixture.pendingBySource.set(context.source, pending)
+  if (pending.length !== 2) {
+    states?.push('pending')
+    return { status: 'pending' as const }
+  }
+  const complete = pending.join('')
+  fixture.pendingBySource.delete(context.source)
+  states?.push('complete')
+  return { status: 'complete' as const, value: complete }
+}
+
 describe('endpoint test-only lifecycle observer', () => {
   it('closes the selected framer once through root disposal and retains its failure', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
@@ -27,27 +89,33 @@ describe('endpoint test-only lifecycle observer', () => {
     /** Preserves the primary close failure for the Host disposal error chain. */
     const closeFailure = new Error('selected framer close failed')
     const nativeFramer = createStringFramer({ chunkBytes: 1024 })
-    const client = await createFullEndpoint({
-      id: 'close-client',
-      transport: clientTransport,
-      middlewares: [
-        codec(defineJsonCodec({ version: 1 })),
-        framer({
-          ...nativeFramer,
-          close: (reason?: unknown) => {
-            closeCalls += 1
-            nativeFramer.close(reason)
-            throw closeFailure
-          }
-        }),
-        connect({ transport: clientTransport })
-      ]
-    })
-    const server = await createFullEndpoint({
-      id: 'close-server',
-      transport: serverTransport,
-      middlewares: [connect({ transport: serverTransport })]
-    })
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'close-client',
+        transport: clientTransport,
+        middlewares: [
+          codec(defineJsonCodec({ version: 1 })),
+          framer({
+            ...nativeFramer,
+            close: (reason?: unknown) => {
+              closeCalls += 1
+              nativeFramer.close(reason)
+              throw closeFailure
+            }
+          }),
+          connect({ transport: clientTransport })
+        ]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
+    const server = await createRuntimeEndpointComposition(
+      {
+        id: 'close-server',
+        transport: serverTransport,
+        middlewares: [connect({ transport: serverTransport })]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     await expect(client.dispose()).rejects.toMatchObject({ cause: closeFailure })
     await client.dispose().catch(() => undefined)
     await server.dispose()
@@ -109,25 +177,31 @@ describe('endpoint test-only lifecycle observer', () => {
     }
     const clientComponents = createObservedComponents(clientStages)
     const serverComponents = createObservedComponents(serverStages)
-    const server = await createFullEndpoint({
-      id: 'observer-server',
-      transport: serverTransport,
-      middlewares: [
-        codec(serverComponents.codec),
-        framer(serverComponents.framer),
-        connect({ transport: serverTransport })
-      ],
-      provider: { echo: (context) => context.success(context.data) }
-    })
-    const client = await createFullEndpoint({
-      id: 'observer-client',
-      transport: clientTransport,
-      middlewares: [
-        codec(clientComponents.codec),
-        framer(clientComponents.framer),
-        connect({ transport: clientTransport })
-      ]
-    })
+    const server = await createRuntimeEndpointComposition(
+      {
+        id: 'observer-server',
+        transport: serverTransport,
+        middlewares: [
+          codec(serverComponents.codec),
+          framer(serverComponents.framer),
+          connect({ transport: serverTransport })
+        ],
+        provider: { echo: (context) => context.success(context.data) }
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'observer-client',
+        transport: clientTransport,
+        middlewares: [
+          codec(clientComponents.codec),
+          framer(clientComponents.framer),
+          connect({ transport: clientTransport })
+        ]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     try {
       await expect(client.send('observer-server', 'echo', 'warm')).resolves.toBe('warm')
       /** Keeps lifecycle/discovery traffic separate from the measured request-response. */
@@ -181,25 +255,31 @@ describe('endpoint test-only lifecycle observer', () => {
     const copiedServerNativeFramer = { ...createStringFramer({ chunkBytes: 64 }) }
     /** Prevents reassembly and close state from crossing the endpoint isolation boundary. */
     const copiedClientNativeFramer = { ...createStringFramer({ chunkBytes: 64 }) }
-    const server = await createFullEndpoint({
-      id: 'native-copy-server',
-      transport: serverTransport,
-      middlewares: [
-        codec(defineJsonCodec({ version: 1 })),
-        framer(copiedServerNativeFramer),
-        connect({ transport: serverTransport })
-      ],
-      provider: { echo: (context) => context.success(context.data) }
-    })
-    const client = await createFullEndpoint({
-      id: 'native-copy-client',
-      transport: clientTransport,
-      middlewares: [
-        codec(defineJsonCodec({ version: 1 })),
-        framer(copiedClientNativeFramer),
-        connect({ transport: clientTransport })
-      ]
-    })
+    const server = await createRuntimeEndpointComposition(
+      {
+        id: 'native-copy-server',
+        transport: serverTransport,
+        middlewares: [
+          codec(defineJsonCodec({ version: 1 })),
+          framer(copiedServerNativeFramer),
+          connect({ transport: serverTransport })
+        ],
+        provider: { echo: (context) => context.success(context.data) }
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'native-copy-client',
+        transport: clientTransport,
+        middlewares: [
+          codec(defineJsonCodec({ version: 1 })),
+          framer(copiedClientNativeFramer),
+          connect({ transport: clientTransport })
+        ]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     try {
       await expect(client.send('native-copy-server', 'echo', 'warm')).resolves.toBe('warm')
       clientPhysicalFrames = 0
@@ -262,55 +342,31 @@ describe('endpoint test-only lifecycle observer', () => {
     /** Reused native error required by rejected custom-framer results. */
     const opaqueRejectError = new Error(opaqueRejectText)
     /** Creates a custom framer whose opaque frame shape must not be interpreted by WebRPC. */
-    const createOpaqueFramer = (counts: { frame: number; accept: number }, states?: string[]) => {
-      return {
-        id: 'observer-opaque',
-        version: 1,
-        inputEncodedType: 'string' as const,
-        outputEncodedType: 'unknown' as const,
-        frame: (value: string) => {
-          counts.frame += 1
-          return [value] as const
-        },
-        accept: (value: unknown, context: IRpcFrameContext) => {
-          counts.accept += 1
-          if (typeof value === 'string') return { status: 'complete' as const, value }
-          opaqueMessageIds.push(context.messageId)
-          if (!value || typeof value !== 'object')
-            return { status: 'rejected' as const, error: opaqueRejectError }
-          const frame = opaqueFragments.get(value)
-          if (!frame) return { status: 'rejected' as const, error: opaqueRejectError }
-          const pending = pendingBySource.get(context.source) ?? []
-          pending[frame.index] = frame.value
-          pendingBySource.set(context.source, pending)
-          if (pending.length !== 2) {
-            states?.push('pending')
-            return { status: 'pending' as const }
-          }
-          const complete = pending.join('')
-          pendingBySource.delete(context.source)
-          states?.push('complete')
-          return { status: 'complete' as const, value: complete }
-        },
-        close: () => undefined
-      }
+    const opaqueFixture: IOpaqueFramerContext = {
+      opaqueMessageIds,
+      pendingBySource,
+      opaqueFragments,
+      opaqueRejectError
     }
-    const serverFramer = createOpaqueFramer(serverFrames, serverAcceptStates)
-    const server = await createFullEndpoint({
-      id: 'opaque-server',
-      transport: serverTransport,
-      middlewares: [
-        codec(defineJsonCodec({ version: 1 })),
-        framer(serverFramer),
-        connect({ transport: serverTransport })
-      ],
-      provider: {
-        echo: (context) => {
-          received.push(context.data as string)
-          return context.success(context.data)
+    const serverFramer = createOpaqueFramer(opaqueFixture, serverFrames, serverAcceptStates)
+    const server = await createRuntimeEndpointComposition(
+      {
+        id: 'opaque-server',
+        transport: serverTransport,
+        middlewares: [
+          codec(defineJsonCodec({ version: 1 })),
+          framer(serverFramer),
+          connect({ transport: serverTransport })
+        ],
+        provider: {
+          echo: (context) => {
+            received.push(context.data as string)
+            return context.success(context.data)
+          }
         }
-      }
-    })
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     try {
       /** Builds one legal canonical request with its physical-peer logical sender binding. */
       const encodeRequest = (id: string, senderId: string, payload: string) =>
@@ -384,17 +440,23 @@ describe('endpoint test-only lifecycle observer', () => {
 
   it('proves request and registry resources return to zero after disposal', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
-    const server = await createFullEndpoint({
-      id: 'server',
-      transport: serverTransport,
-      middlewares: [connect({ transport: serverTransport })],
-      provider: { echo: (context) => context.success(context.data) }
-    })
-    const client = await createFullEndpoint({
-      id: 'client',
-      transport: clientTransport,
-      middlewares: [connect({ transport: clientTransport })]
-    })
+    const server = await createRuntimeEndpointComposition(
+      {
+        id: 'server',
+        transport: serverTransport,
+        middlewares: [connect({ transport: serverTransport })],
+        provider: { echo: (context) => context.success(context.data) }
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'client',
+        transport: clientTransport,
+        middlewares: [connect({ transport: clientTransport })]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
 
     expect(readEndpointDebugSnapshot(client)).toMatchObject({
       phase: 'active',

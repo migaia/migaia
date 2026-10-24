@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest'
 import { DiscoveryRegistry } from '../../dist/core/internal/discovery-registry.js'
 import { ResourceScope } from '../../dist/core/internal/resource-scope.js'
 import { RequestReplayLedger } from '../../dist/core/internal/request-replay-ledger.js'
-import { createSettlement } from '../../dist/core/internal/settlement.js'
 import { OperationScope } from '../../dist/core/internal/operation-scope.js'
 import { RpcRouteProfile, normalizeRpcEnvelope } from '@migaia/rpc-contract'
 import { createStringFramer } from '@migaia/rpc-contract/framing'
@@ -300,43 +299,6 @@ describe('property invariants', () => {
           for (const key of overflow) expect(ledger.admit(key, 'peer', 1)).toBe(false)
           for (const key of admitted) expect(ledger.admit(key, 'peer', 999)).toBe(false)
           for (const key of admitted) expect(ledger.admit(key, 'peer', 1_000)).toBe(true)
-        }
-      ),
-      propertyParameters
-    )
-  })
-
-  it('keeps settlement exactly-once across arbitrary completion races', () => {
-    fc.assert(
-      fc.property(
-        fc.array(fc.constantFrom('resolve' as const, 'reject' as const), {
-          minLength: 1,
-          maxLength: 32
-        }),
-        (actions) => {
-          let cleanups = 0
-          let resolves = 0
-          let rejects = 0
-          const settlement = createSettlement({
-            cleanup: () => {
-              cleanups += 1
-            },
-            resolve: () => {
-              resolves += 1
-            },
-            reject: () => {
-              rejects += 1
-            }
-          })
-          const results = actions.map((action) =>
-            action === 'resolve' ? settlement.resolve(undefined) : settlement.reject(new Error())
-          )
-          const winningAction = actions[0]
-          expect(results.filter(Boolean)).toEqual([true])
-          expect(settlement.isSettled()).toBe(true)
-          expect(cleanups).toBe(1)
-          expect(resolves + rejects).toBe(1)
-          expect(winningAction === 'resolve' ? resolves : rejects).toBe(1)
         }
       ),
       propertyParameters

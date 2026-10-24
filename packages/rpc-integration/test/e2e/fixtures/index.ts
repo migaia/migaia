@@ -12,8 +12,7 @@ const scenarios: Record<string, () => Promise<unknown>> = {
   'rtc-data-channel': () => import('./rtc-data-channel.js'),
   'service-worker': () => import('./service-worker.js'),
   'shared-worker': () => import('./shared-worker.js'),
-  'window-iframe': () => import('./window-iframe.js'),
-  'web-transport': () => import('./web-transport.js')
+  'window-iframe': () => import('./window-iframe.js')
 }
 
 const load = scenarios[scenario]

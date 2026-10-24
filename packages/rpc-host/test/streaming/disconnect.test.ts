@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
 import { createComposedEndpoint } from '../../dist/core/composed.js'
 import { connect } from '../../dist/core/middleware/connect.js'
 import { streamRoots } from './fixture.js'

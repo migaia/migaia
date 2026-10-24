@@ -6,14 +6,12 @@ import { createRuntimeApiEndpoint } from '../../../../rpc-host/dist/core/runtime
 import { createEventEmitterMessageResource } from '@migaia/rpc-host/plugin'
 import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import {
-  codec,
-  framer,
-  connect,
-  abort,
-  timeout,
-  authentication
-} from '../../../../rpc-host/dist/core/index.js'
+import { codec } from '../../../../rpc-host/dist/core/middleware/codec.js'
+import { framer } from '../../../../rpc-host/dist/core/middleware/framer.js'
+import { connect } from '../../../../rpc-host/dist/core/middleware/connect.js'
+import { abort } from '../../../../rpc-host/dist/core/middleware/abort.js'
+import { timeout } from '../../../../rpc-host/dist/core/middleware/timeout.js'
+import { authentication } from '../../../../rpc-host/dist/core/middleware/authentication.js'
 import fixture from './managed-binary-key.json' with { type: 'json' }
 
 /** Original launcher metadata provides the real native address and portable business configuration. */

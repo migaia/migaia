@@ -8,13 +8,20 @@ import type { IProcessHandle } from '@migaia/supervision/process'
 import { createProcessTransport } from '../../../../rpc-plugin-process/dist/process/handshake.js'
 import { createNativeProcessOffer } from '../../../../rpc-plugin-process/dist/process/offer.js'
 import type { IProcessByteChannel } from '../../../../rpc-plugin-process/dist/process/types.js'
-import { type IProcessPluginOptions } from '../../../../rpc-plugin-process/test/protocol.ts'
-import { createNodeProcessLauncher } from '@migaia/rpc-plugin-process/adapters/node-child-process'
-import { dialProcessByteChannel } from '@migaia/rpc-plugin-process/adapters/node-socket'
-import type { IRemoteContract, IRuntimeDynamicSurface } from '@migaia/rpc-host/plugin'
+import { processPlugin } from '@migaia/rpc-plugin-process'
+import { PluginHost } from '@migaia/plugin-host'
+import type {
+  IProcessPluginEstablish,
+  ISpawnProcessPluginDeployment,
+  IConnectProcessPluginDeployment
+} from '../../../../rpc-plugin-process/dist/process/plugin/types.js'
+import { readRuntimeOutletConnection } from '../../../../rpc-host/dist/remote/runtime-api/outlet.js'
+import type { IRuntimeOutlet } from '../../../../rpc-host/dist/remote/runtime-api/outlet.js'
+import { createNodeProcessLauncher } from '../../../../rpc-plugin-process/dist/process/adapters/node-child-process.js'
+import { dialProcessByteChannel } from '../../../../rpc-plugin-process/dist/process/adapters/node-socket.js'
+import type { IRemoteContract, IRuntimePeer } from '@migaia/rpc-host/plugin'
 import { fdLauncher } from '../../bridge/fixtures/jsonrpc-process.js'
 import { createProcessJsonRpcChannel } from '../../../../rpc-plugin-process/dist/process/jsonrpc-channel.js'
-import { createProcessPeer } from '../../../../rpc-plugin-process/test/protocol.ts'
 import {
   readRuntimePeerConnection,
   prepareRuntimePeerSourceContext
@@ -146,7 +153,7 @@ function deployment(
   /** Exact public byte ports permit a physical EOF independent of endpoint abort/close messages. */
   const rawChannels: IProcessByteChannel[] = []
   const launcher = bridge ? fdLauncher() : createNodeProcessLauncher()
-  const establish: IProcessPluginOptions['deployment']['establish'] = (raw, context) => {
+  const establish: IProcessPluginEstablish = (raw, context) => {
     if (raw.kind !== 'byte') throw new TypeError('business peer requires bytes')
     rawChannels.push(raw)
     raw.onData((chunk) => stdout.push(chunk.slice()))
@@ -206,7 +213,7 @@ function deployment(
         auth: token
       }
     : { ...offer, auth: token }
-  const selected: IProcessPluginOptions['deployment'] = address
+  const selected: ISpawnProcessPluginDeployment | IConnectProcessPluginDeployment = address
     ? {
         kind: 'connect',
         wire: bridge ? 'jsonrpc' : 'native',
@@ -265,7 +272,53 @@ function deployment(
       }
   return { selected, handles, output, stdout, sent, reports, rawChannels }
 }
-/** Prepare the public process Peer and retain its exact original endpoint for control observations. */
+/** Install the genuine native definition in an ordinary Host and retain its actual Peer receipt. */
+async function installBusinessClient(
+  fixture: Pick<ReturnType<typeof deployment>, 'reports'>,
+  source: ISpawnProcessPluginDeployment | IConnectProcessPluginDeployment
+) {
+  const host = new PluginHost<Record<string, never>>({
+    execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+  })
+  const self = { name: 'caller', instanceId: 'caller' }
+  await host.use(
+    processPlugin({
+      name: 'p',
+      self,
+      ...(source.kind === 'spawn' ? { spawn: source } : { connect: { target: source } }),
+      report: (error) => {
+        fixture.reports.push(error)
+      }
+    })
+  )
+  const active = readRuntimeOutletConnection(
+    Reflect.get(host, 'process') as IRuntimeOutlet,
+    'p'
+  )!.peer
+  const accepted = readRuntimePeerConnection(active)
+  return {
+    host,
+    active,
+    runtime: {
+      endpoint: accepted.endpoint,
+      oneWay: accepted.endpoint,
+      stream: accepted.endpoint.stream
+    },
+    close: () => host.dispose()
+  }
+}
+
+/** Project only this fixture's published application payloads onto the same actual Peer operations. */
+function businessFeature(active: IRuntimePeer): IBusinessFeature {
+  return {
+    request: (params, options) => active.request('p.f.request', params, options),
+    oneWay: (params) => active.notify('p.f.oneWay', params),
+    generator: (params) => active.stream('p.f.generator', params),
+    asyncGenerator: (params) => active.stream('p.f.asyncGenerator', params)
+  }
+}
+
+/** Prepare the native Host client and retain its original endpoint for independent wire oracles. */
 async function client(
   peer: (typeof peers)[number],
   hostProfile: boolean,
@@ -275,43 +328,23 @@ async function client(
   budget?: IUnitBudget<'process'>
 ) {
   const fixture = deployment(peer, hostProfile, token, address, bridge, budget)
-  /** All native and bridge carriers use the same public Peer and original source owner. */
   const self = { name: 'caller', instanceId: 'caller' }
-  /** Bridge hello owns its proposal; native hello uses the actual installed endpoint offer. */
   const { offer: priorOffer, ...deploymentOptions } = fixture.selected
   const source = bridge
     ? deploymentOptions
     : {
         ...deploymentOptions,
-        offer: {
-          ...priorOffer!,
-          capabilities: prepareRuntimePeerSourceContext(self).capabilities
-        }
+        offer: { ...priorOffer!, capabilities: prepareRuntimePeerSourceContext(self).capabilities }
       }
-  const active = await createProcessPeer<IRuntimeDynamicSurface>({
-    self,
-    ...(source.kind === 'spawn' ? { spawn: source } : { connect: source }),
-    report: (error) => fixture.reports.push(error)
-  })
-  /** Core fault observers retain the exact endpoint accepted by the new production caller. */
-  const accepted = readRuntimePeerConnection(active)
-  /** These application payload projections preserve the original Promise and iterator. */
-  const feature: IBusinessFeature = {
-    request: (params, options) => active.request('p.f.request', params, options),
-    oneWay: (params) => active.notify('p.f.oneWay', params),
-    generator: (params) => active.stream('p.f.generator', params),
-    asyncGenerator: (params) => active.stream('p.f.asyncGenerator', params)
-  }
+  const installed = await installBusinessClient(fixture, source)
+  const active = installed.active
+  const feature = businessFeature(active)
   if (hostProfile) await active.request('migaia.remote.host.use', ['p', { local: 'value' }])
   return {
     ...fixture,
     feature,
-    runtime: {
-      endpoint: accepted.endpoint,
-      oneWay: accepted.endpoint,
-      stream: accepted.endpoint.stream
-    },
-    close: active.close,
+    runtime: installed.runtime,
+    close: installed.close,
     remove: hostProfile ? () => active.request('migaia.remote.host.unUse', ['p']) : undefined,
     inspect: hostProfile ? () => active.request('migaia.remote.host.inspect', []) : undefined
   }
@@ -456,6 +489,8 @@ export {
   client,
   business,
   deployment,
+  installBusinessClient,
+  businessFeature,
   wireFrames,
   bridgeFrames,
   assertWireGraph

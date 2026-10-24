@@ -1,10 +1,11 @@
+import { createRuntimeEndpointComposition } from '../../dist/core/runtime-api-endpoint.js'
 import assert from 'node:assert/strict'
 import { it, vi } from 'vitest'
 import { identityCodec } from '@migaia/serialize/codecs/identity/v1'
 import { messageFramerV1, remoteProcessStringFramer } from '@migaia/rpc-contract/framing'
-import { createClientEndpoint } from '../../dist/core/client.js'
-import { connect } from '../../dist/core/index.js'
-import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
+
+import { connect } from '../../dist/core/middleware/connect.js'
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
 import { createRuntimeBytePipeline } from '../../dist/runtime-adapter/byte/pipeline.js'
 import { normalizeInboundRuntimeEnvelope } from '../../dist/core/internal/inbound-normalization.js'
 import * as fast from '../../dist/core/internal/fast-path.js'
@@ -37,18 +38,21 @@ it.each(['json', 'json-custom-framer', 'live', 'copied-json'] as const)(
     const selected = vi.spyOn(fast, 'hasDecodedRuntimeMetadata')
     try {
       /** Construction installs the real receive owner on the selected public transport. */
-      const endpoint = await createClientEndpoint({
-        id: 'decoded-owner',
-        transport,
-        codec,
-        framer:
-          source === 'live'
-            ? messageFramerV1
-            : source === 'json-custom-framer'
-              ? { ...remoteProcessStringFramer }
-              : remoteProcessStringFramer,
-        middlewares: [connect()]
-      })
+      const endpoint = await createRuntimeEndpointComposition(
+        {
+          id: 'decoded-owner',
+          transport,
+          codec,
+          framer:
+            source === 'live'
+              ? messageFramerV1
+              : source === 'json-custom-framer'
+                ? { ...remoteProcessStringFramer }
+                : remoteProcessStringFramer,
+          middlewares: [connect()]
+        },
+        { agreement: { capabilities: [] }, peerId: '' }
+      ).installing
       try {
         assert.ok(selected.mock.calls.length > 0)
         /** Re-reading proof must not extend the observer's iteration while it records the call. */

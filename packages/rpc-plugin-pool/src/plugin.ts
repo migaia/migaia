@@ -3,6 +3,7 @@ import {
   runtimeQuery,
   RpcTransportMode,
   type IRpcFeaturePlugin,
+  type IRpcFeaturePluginDefinition,
   type IRpcHost,
   type IRpcHostMember
 } from '@migaia/rpc-host/plugin'
@@ -17,58 +18,74 @@ type IPoolPluginSurface = Readonly<{
   controls<T>(host: IRpcHost<T>): IRpcPoolControls
 }>
 
-/** One factory definition supplies shared feature identity while installations own separate pools. */
-export const poolPlugin: (options: IPoolPluginOptions) => IRpcFeaturePlugin & IPoolPluginSurface =
-  defineFeaturePlugin<IPoolPluginOptions, IPoolPluginSurface>((options) => {
+/** Own installation-specific controls for one configured pool feature definition. */
+class PoolInstallations {
+  /** Construction options belong to this plugin instance and retain their original read semantics. */
+  #options: IPoolPluginOptions
+  /** Only an actual installation can publish controls for that exact Host identity. */
+  #installations = new WeakMap<object, IRpcPoolControls>()
+  /** The Host receives the same one feature definition with its original typed surface. */
+  readonly definition: IRpcFeaturePluginDefinition & Readonly<{ surface: IPoolPluginSurface }>
+  /** Validate before exposing an installable definition; native members remain cold until assemble. */
+  constructor(options: IPoolPluginOptions) {
     validatePoolOptions(options)
-    /** Only this plugin instance can retrieve each installation's original scheduler controls. */
-    const installations = new WeakMap<object, IRpcPoolControls>()
-    return {
+    this.#options = options
+    this.definition = {
       name: RPC_POOL_PEER_ID,
-      surface: {
-        controls: (host) => {
-          /** A ready installation remains queryable after its pool reaches the terminal state. */
-          const controls = installations.get(host)
-          if (!controls)
-            throw tagPoolError(
-              new TypeError(RpcPoolText.controlsUnavailable),
-              RpcPoolErrorCode.invalidOptions
-            )
-          return controls
-        }
-      },
-      assemble: async (context): Promise<IRpcHostMember> => {
-        if (
-          context.transport.mode !== RpcTransportMode.spawn &&
-          context.transport.mode !== RpcTransportMode.connect
-        )
-          throw tagPoolError(
-            new TypeError(RpcPoolText.transportUnsupported),
-            RpcPoolErrorCode.transportUnsupported
-          )
-        /** The existing scheduler acquires every real member through the Host's one endpoint. */
-        const pool = await createPool(options, context.openMember)
-        /** Read the canonical local view before the Host publishes this assembled member. */
-        const base = await context.host.describe()
-        /** No new drain or cleanup receipt sits between these controls and their original scheduler. */
-        const controls: IRpcPoolControls = Object.freeze({
-          stats: pool.stats,
-          resize: pool.resize,
-          close: pool.close
-        })
-        installations.set(context.host, controls)
-        return Object.freeze({
-          id: RPC_POOL_PEER_ID,
-          request: pool.request,
-          notify: pool.notify,
-          stream: pool.stream,
-          group: pool.group,
-          outcome: pool.outcome,
-          describe: runtimeQuery(() => ({ ...base, pool: pool.stats() })),
-          on: (...args: Parameters<IRpcHostMember['on']>) => context.host.on(...args),
-          close: pool.close,
-          [Symbol.asyncDispose]: pool.close
-        })
-      }
+      surface: { controls: this.#controls },
+      assemble: this.#assemble
     }
-  })
+  }
+  /** Lookup original controls without reviving or replacing a retired pool installation. */
+  #controls = <T>(host: IRpcHost<T>): IRpcPoolControls => {
+    const controls = this.#installations.get(host)
+    if (!controls)
+      throw tagPoolError(
+        new TypeError(RpcPoolText.controlsUnavailable),
+        RpcPoolErrorCode.invalidOptions
+      )
+    return controls
+  }
+  /** Compose one real pool scheduler through the Host's existing member opener and query owner. */
+  #assemble: NonNullable<IRpcFeaturePluginDefinition['assemble']> = async (
+    context
+  ): Promise<IRpcHostMember> => {
+    if (
+      context.transport.mode !== RpcTransportMode.spawn &&
+      context.transport.mode !== RpcTransportMode.connect
+    )
+      throw tagPoolError(
+        new TypeError(RpcPoolText.transportUnsupported),
+        RpcPoolErrorCode.transportUnsupported
+      )
+    /** The existing scheduler acquires every real member through the Host's one endpoint. */
+    const pool = await createPool(this.#options, context.openMember)
+    /** Read the canonical local view before the Host publishes this assembled member. */
+    const base = await context.host.describe()
+    /** No new drain or cleanup receipt sits between these controls and their original scheduler. */
+    const controls: IRpcPoolControls = Object.freeze({
+      stats: pool.stats,
+      resize: pool.resize,
+      close: pool.close
+    })
+    this.#installations.set(context.host, controls)
+    return Object.freeze({
+      id: RPC_POOL_PEER_ID,
+      request: pool.request,
+      notify: pool.notify,
+      stream: pool.stream,
+      group: pool.group,
+      outcome: pool.outcome,
+      describe: runtimeQuery(() => ({ ...base, pool: pool.stats() })),
+      on: (...args: Parameters<IRpcHostMember['on']>) => context.host.on(...args),
+      close: pool.close,
+      [Symbol.asyncDispose]: pool.close
+    })
+  }
+}
+
+/** One definition owns distinct installation controls while each Host retains its actual pool. */
+export const poolPlugin: (options: IPoolPluginOptions) => IRpcFeaturePlugin & IPoolPluginSurface =
+  defineFeaturePlugin<IPoolPluginOptions, IPoolPluginSurface>(
+    (options) => new PoolInstallations(options).definition
+  )

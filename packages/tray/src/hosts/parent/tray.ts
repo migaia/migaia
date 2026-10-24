@@ -75,117 +75,203 @@ export function createTrayRuntime<
 >(
   options: ICreateTrayOptions<THosts, TRouting>
 ): { tray: ITray<THosts, TRouting>; host: ITrayRuntimeHost } {
-  if (!options || !Array.isArray(options.hosts)) throw createTrayError(TrayErrorCode.hostInvalid)
-  /** Branded definitions are captured once; business plugin factories stay entirely child-side. */
-  const definitions = new Map<string, IAnyTrayHost>()
-  for (const value of options.hosts) {
-    const definition = readHost(value)
-    if (definitions.has(definition.name)) throw createTrayError(TrayErrorCode.hostInvalid)
-    definitions.set(definition.name, definition)
-  }
-  for (const policy of options.routing ?? [])
-    if (!readRoutingPolicy(policy)) throw createTrayError(TrayErrorCode.routingInvalid)
-  /** One reporter carries native notices and contained lifecycle/relay failures. */
-  const report = options.report ?? defaultRpcReporter
-  /** Parent PluginHost remains separate from every instance's plain PluginHost. */
-  const host = defineHost({
-    host: {
-      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
-      diagnostic: (_message, _code, error) => {
-        if (error !== undefined) report(error)
-      }
+  const runtime = new TrayRuntime(options)
+  return { tray: runtime.tray, host: runtime.host }
+}
+/**
+ * One parent registry owns admission, subscriptions and cleanup; native generations remain
+ * SDK-owned.
+ */
+class TrayRuntime<
+  THosts extends readonly IAnyTrayHost[],
+  TRouting extends readonly ITrayRoutingPolicy[]
+> {
+  /** Original branded host/routing tuple is read only during cold construction and coroutine launch. */
+  readonly #options: ICreateTrayOptions<THosts, TRouting>
+  /** Trusted definitions retain exact identity for direct and routed admission checks. */
+  #definitions: Map<string, IAnyTrayHost>
+  /** Original contained reporter owns native and lifecycle diagnostics. */
+  #report: (error: unknown) => void
+  /** Native PluginHost installation is the existing RPC SDK prepared integration path. */
+  #host: ITrayRuntimeHost
+  /** Business metadata and receipts remain registry-owned, separate from native RPC state. */
+  #registry: ReturnType<typeof createRegistry>
+  /** Policy pick counters belong to this parent only. */
+  #routingRegistry: ReturnType<typeof createRoutingRegistry>
+  /** Generation topic memberships retain their canonical EventSubscriber owner. */
+  #topics: ReturnType<typeof createParentTopics>
+  /** Callable policy namespace shares the existing routing registry cursor. */
+  #routing: ReturnType<typeof createRoutingNamespace>
+  /** Read-only lifecycle observations remain separate from business topics. */
+  #events: ReturnType<typeof createTrayEvents>
+  /** Family receipts track actual outlet identity and release their original subscriptions. */
+  #subscriptions: Map<string, { outlet: ITrayRuntimeOutlet; release: (() => void)[] }>
+  /** Parent admission closes synchronously before any asynchronous disposal work. */
+  #disposing: boolean
+  /** Concurrent callers share exactly one original disposal promise. */
+  #disposal: Promise<void> | undefined
+  /** Relay registration must commit before runtime exposure names are consumed. */
+  #relayReady: Promise<void>
+  /** Frozen public surface retains the original own members and borrowed callback identities. */
+  #tray: ITray<THosts, TRouting>
+
+  /** Capture cold definitions and install only the original parent relay. */
+  constructor(options: ICreateTrayOptions<THosts, TRouting>) {
+    this.#options = options
+
+    if (!this.#options || !Array.isArray(this.#options.hosts))
+      throw createTrayError(TrayErrorCode.hostInvalid)
+
+    /** Branded definitions are captured once; business plugin factories stay entirely child-side. */
+    this.#definitions = new Map<string, IAnyTrayHost>()
+
+    for (const value of this.#options.hosts) {
+      const definition = readHost(value)
+      if (this.#definitions.has(definition.name)) throw createTrayError(TrayErrorCode.hostInvalid)
+      this.#definitions.set(definition.name, definition)
     }
-  }) as ITrayRuntimeHost
-  /** Registry owns only metadata, operation admission and parent-issued relay receipts. */
-  const registry = createRegistry(report, sendUncounted)
-  /** Parent registration combines explicit policies and every branded host DSL tuple. */
-  const routingRegistry = createRoutingRegistry(options.hosts, options.routing ?? [], registry)
-  /** Infrastructure delivery stays outside business-send accounting. */
-  const topics = createParentTopics(
-    registry,
-    (record, delivery) =>
-      outletOf(host, record.definition).notify(record.id, TrayInternal.deliver, delivery),
-    report
-  )
+
+    for (const policy of this.#options.routing ?? [])
+      if (!readRoutingPolicy(policy)) throw createTrayError(TrayErrorCode.routingInvalid)
+
+    /** One reporter carries native notices and contained lifecycle/relay failures. */
+    this.#report = this.#options.report ?? defaultRpcReporter
+
+    /** Parent PluginHost remains separate from every instance's plain PluginHost. */
+    this.#host = defineHost({
+      host: {
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+        diagnostic: (_message, _code, error) => {
+          if (error !== undefined) this.#report(error)
+        }
+      }
+    }) as ITrayRuntimeHost
+
+    /** Registry owns only metadata, operation admission and parent-issued relay receipts. */
+    this.#registry = createRegistry(this.#report, this.#sendUncounted)
+
+    /** Parent registration combines explicit policies and every branded host DSL tuple. */
+    this.#routingRegistry = createRoutingRegistry(
+      this.#options.hosts,
+      this.#options.routing ?? [],
+      this.#registry
+    )
+
+    /** Infrastructure delivery stays outside business-send accounting. */
+    this.#topics = createParentTopics(
+      this.#registry,
+      (record, delivery) =>
+        outletOf(this.#host, record.definition).notify(record.id, TrayInternal.deliver, delivery),
+      this.#report
+    )
+
+    /** Both forms retain one shared cursor and exact frozen own members. */
+    this.#routing = createRoutingNamespace(this.#routingRegistry.names, this.#routed)
+
+    /** Lifecycle listeners share EventSubscriber's existing owner. */
+    this.#events = createTrayEvents(this.#report)
+
+    /** Family subscription identity follows the actual outlet object's lifetime. */
+    this.#subscriptions = new Map<string, { outlet: ITrayRuntimeOutlet; release: (() => void)[] }>()
+
+    /** Closing rejects operations synchronously while disposal keeps one completion promise. */
+    this.#disposing = false
+
+    /** Concurrent dispose calls share exactly one cleanup sequence. */
+    this.#disposal = undefined
+
+    /** Install relay before runtime factories inspect their exposure names. */
+    this.#relayReady = this.#host
+      .use(
+        createRelay(
+          this.#registry,
+          this.#send,
+          this.#routingRegistry,
+          this.#definitions,
+          this.#topics,
+          this.#assertActive
+        )
+      )
+      .then(() => undefined)
+    this.#tray = this.#surface()
+  }
+
   /** Validate host identity before creating a remote; candidates are selected only at each call. */
-  const routed = (policy: string, definition: IAnyTrayHost) => {
-    assertActive()
+  #routed = (policy: string, definition: IAnyTrayHost) => {
+    this.#assertActive()
     /** Branding is checked before selecting the parent's registered host definition. */
     const admitted = readHost(definition)
-    if (definitions.get(admitted.name) !== admitted)
+    if (this.#definitions.get(admitted.name) !== admitted)
       throw createTrayError(TrayErrorCode.hostUnknown)
     /** A kept remote observes closing before candidate lookup, preserving DISPOSED precedence. */
     const pick = () => {
-      assertActive()
-      return routingRegistry.pick(admitted.name, policy)
+      this.#assertActive()
+      return this.#routingRegistry.pick(admitted.name, policy)
     }
+    /** The lazy generator borrows this immutable registry identity without a mutable receiver. */
+    const registry = this.#registry
     return createRoutedRemote(admitted.name, {
       request: async (input, callOptions) =>
-        registry.sendCounted(pick(), TrayCallKind.request, input, callOptions),
+        this.#registry.sendCounted(pick(), TrayCallKind.request, input, callOptions),
       notify: async (input, callOptions) =>
-        registry.sendCounted(pick(), TrayCallKind.notify, input, callOptions),
+        this.#registry.sendCounted(pick(), TrayCallKind.notify, input, callOptions),
       stream: (input, callOptions) =>
         (async function* () {
           return yield* registry.sendCounted(pick(), TrayCallKind.stream, input, callOptions)
         })()
     })
   }
-  /** Both forms retain one shared cursor and exact frozen own members. */
-  const routing = createRoutingNamespace(routingRegistry.names, routed)
-  /** Lifecycle listeners share EventSubscriber's existing owner. */
-  const events = createTrayEvents(report)
-  /** Family subscription identity follows the actual outlet object's lifetime. */
-  const subscriptions = new Map<string, { outlet: ITrayRuntimeOutlet; release: (() => void)[] }>()
-  /** Closing rejects operations synchronously while disposal keeps one completion promise. */
-  let disposing = false
-  /** Concurrent dispose calls share exactly one cleanup sequence. */
-  let disposal: Promise<void> | undefined
-  /** Install relay before runtime factories inspect their exposure names. */
-  const relayReady = host
-    .use(createRelay(registry, send, routingRegistry, definitions, topics, assertActive))
-    .then(() => undefined)
+
   /** Public operations cannot admit new work once the parent is closing. */
-  function assertActive(): void {
-    if (disposing) throw createTrayError(TrayErrorCode.disposed)
+  #assertActive = (): void => {
+    if (this.#disposing) throw createTrayError(TrayErrorCode.disposed)
   }
+
   /** Return a snapshot only for this original admission and an active registry. */
-  function current(record: ITrayRecord): void {
-    assertActive()
-    registry.assertCurrent(record)
+  #current = (record: ITrayRecord): void => {
+    this.#assertActive()
+    this.#registry.assertCurrent(record)
   }
+
   /** One transition emits once; safe errors are copied and frozen before any listener runs. */
-  function transition(
+  #transition = (
     record: ITrayRecord,
     state: ITrayRecord['state'],
     error?: IRuntimeEvent['error']
-  ): void {
-    if (record.removed || registry.records.get(record.id) !== record || record.state === state)
+  ): void => {
+    if (
+      record.removed ||
+      this.#registry.records.get(record.id) !== record ||
+      record.state === state
+    )
       return
     record.state = state
     const event = state === TrayInstanceState.starting ? TrayInstanceEvent.spawned : state
-    events.publish({
-      ...registry.snapshot(record),
+    this.#events.publish({
+      ...this.#registry.snapshot(record),
       event,
       ...(error === undefined ? {} : { error: Object.freeze({ ...error }) })
     })
   }
+
   /** Calls select one current RPC receipt; calls already sent remain owned by that generation. */
-  function send(record: ITrayRecord): ITraySender {
+  #send = (record: ITrayRecord): ITraySender => {
     return {
       request: (input, callOptions) =>
-        registry.sendCounted(record, TrayCallKind.request, input, callOptions),
+        this.#registry.sendCounted(record, TrayCallKind.request, input, callOptions),
       notify: (input, callOptions) =>
-        registry.sendCounted(record, TrayCallKind.notify, input, callOptions),
+        this.#registry.sendCounted(record, TrayCallKind.notify, input, callOptions),
       stream: (input, callOptions) =>
-        registry.sendCounted(record, TrayCallKind.stream, input, callOptions)
+        this.#registry.sendCounted(record, TrayCallKind.stream, input, callOptions)
     }
   }
+
   /** Native RPC dispatch keeps its existing readiness checks; accounting is solely registry-owned. */
-  function sendUncounted(record: ITrayRecord): ITraySender {
+  #sendUncounted = (record: ITrayRecord): ITraySender => {
     /** Readiness is a Tray init fact; never wait for a new generation or resend a call. */
     const ready = (input: ITrayInvocation): ITrayRuntimeOutlet => {
-      current(record)
-      const outlet = outletOf(host, record.definition)
+      this.#current(record)
+      const outlet = outletOf(this.#host, record.definition)
       if (record.state !== TrayInstanceState.ready) {
         if (record.state === TrayInstanceState.stopped && outlet) {
           try {
@@ -213,18 +299,20 @@ export function createTrayRuntime<
       }
     }
   }
+
   /** Outlet detail contains the authoritative native generation and accepted remote identity. */
-  function identify(record: ITrayRecord, detail: IRuntimeConnectionDetail): number {
+  #identify = (record: ITrayRecord, detail: IRuntimeConnectionDetail): number => {
     if (!('generation' in detail.unit) || !('instanceId' in detail.identity))
       throw createTrayError(TrayErrorCode.instanceStartFailed)
-    registry.identify(record, detail.unit.generation, detail.identity.instanceId)
+    this.#registry.identify(record, detail.unit.generation, detail.identity.instanceId)
     return detail.unit.generation
   }
+
   /** Init joins one promise per admission and native generation, never a readiness retry. */
-  async function initOnce(record: ITrayRecord, generation: number, config: unknown): Promise<void> {
+  #initOnce = async (record: ITrayRecord, generation: number, config: unknown): Promise<void> => {
     let pending = record.inits.get(generation)
     if (!pending) {
-      pending = outletOf(host, record.definition)
+      pending = outletOf(this.#host, record.definition)
         .request(record.id, TrayInternal.init, {
           id: record.id,
           host: record.definition.name,
@@ -235,31 +323,33 @@ export function createTrayRuntime<
       record.inits.set(generation, pending)
     }
     await pending
-    current(record)
+    this.#current(record)
     if (record.generation !== generation) throw createTrayError(TrayErrorCode.instanceStartFailed)
   }
+
   /** Cleanup is the first step of each Tray stop entry while the current child can still answer. */
-  async function shutdown(record: ITrayRecord, graceMs = 5000): Promise<void> {
+  #shutdown = async (record: ITrayRecord, graceMs = 5000): Promise<void> => {
     if (record.state !== TrayInstanceState.ready) return
     try {
-      await outletOf(host, record.definition).request(
+      await outletOf(this.#host, record.definition).request(
         record.id,
         TrayInternal.shutdown,
         { graceMs },
         { timeoutMs: graceMs }
       )
     } catch (error) {
-      report(error)
+      this.#report(error)
     }
   }
+
   /** Native snapshots are read only after synchronous supervisor event transitions finish. */
-  async function reconcile(record: ITrayRecord, event: IRuntimeEvent): Promise<void> {
+  #reconcile = async (record: ITrayRecord, event: IRuntimeEvent): Promise<void> => {
     await Promise.resolve()
     if (record.removed || record.management === TrayManagementMode.manual) return
-    const detail = await outletOf(host, record.definition).get(record.id)
+    const detail = await outletOf(this.#host, record.definition).get(record.id)
     if (
       record.removed ||
-      registry.records.get(record.id) !== record ||
+      this.#registry.records.get(record.id) !== record ||
       !('generation' in detail.unit)
     )
       return
@@ -270,21 +360,22 @@ export function createTrayRuntime<
     )
       return
     if (detail.unit.state === 'backoff' || detail.unit.state === 'starting')
-      transition(record, TrayInstanceState.restarting, event.error)
+      this.#transition(record, TrayInstanceState.restarting, event.error)
     else if (detail.unit.state === 'stopped')
-      transition(record, TrayInstanceState.stopped, event.error)
+      this.#transition(record, TrayInstanceState.stopped, event.error)
     else if (detail.unit.state === 'terminal')
-      transition(record, TrayInstanceState.failed, event.error)
+      this.#transition(record, TrayInstanceState.failed, event.error)
   }
+
   /** Attach to a newly created family and correlate background ready entries with their receipt. */
-  function subscribe(record: ITrayRecord): void {
+  #subscribe = (record: ITrayRecord): void => {
     const family = record.definition.runtime
-    const outlet = outletOf(host, record.definition)
-    if (subscriptions.get(family)?.outlet === outlet) return
-    for (const release of subscriptions.get(family)?.release ?? []) release()
+    const outlet = outletOf(this.#host, record.definition)
+    if (this.#subscriptions.get(family)?.outlet === outlet) return
+    for (const release of this.#subscriptions.get(family)?.release ?? []) release()
     const release = [
       outlet.on(RuntimeEventName.ready, (event) => {
-        const admitted = registry.records.get(event.name)
+        const admitted = this.#registry.records.get(event.name)
         if (
           !admitted ||
           admitted.removed ||
@@ -314,23 +405,24 @@ export function createTrayRuntime<
                 detail.identity.instanceId !== receipt.instanceId
               )
                 return
-              identify(admitted, detail)
-              await initOnce(admitted, receipt.generation, admitted.config)
-              transition(admitted, TrayInstanceState.ready)
+              this.#identify(admitted, detail)
+              await this.#initOnce(admitted, receipt.generation, admitted.config)
+              this.#transition(admitted, TrayInstanceState.ready)
             } catch (error) {
-              if (!admitted.removed && !disposing) transition(admitted, TrayInstanceState.failed)
-              report(error)
+              if (!admitted.removed && !this.#disposing)
+                this.#transition(admitted, TrayInstanceState.failed)
+              this.#report(error)
             } finally {
               admitted.management = undefined
             }
           })
-          .catch(report)
+          .catch(this.#report)
       }),
       outlet.on(RuntimeEventName.exit, (event) => {
-        const admitted = registry.records.get(event.name)
+        const admitted = this.#registry.records.get(event.name)
         if (admitted && typeof event.generation === 'number') {
-          topics.remove(admitted, event.generation)
-          registry.depart(admitted, event.generation)
+          this.#topics.remove(admitted, event.generation)
+          this.#registry.depart(admitted, event.generation)
         }
         if (
           !admitted ||
@@ -338,26 +430,27 @@ export function createTrayRuntime<
           admitted.management === TrayManagementMode.manual
         )
           return
-        void reconcile(admitted, event).catch(report)
+        void this.#reconcile(admitted, event).catch(this.#report)
       }),
       outlet.on(RuntimeEventName.terminal, (event) => {
-        const admitted = registry.records.get(event.name)
-        if (admitted) void reconcile(admitted, event).catch(report)
+        const admitted = this.#registry.records.get(event.name)
+        if (admitted) void this.#reconcile(admitted, event).catch(this.#report)
       })
     ]
-    subscriptions.set(family, { outlet, release })
+    this.#subscriptions.set(family, { outlet, release })
   }
+
   /** Coroutine settlement maps only here; parent state handling is runtime-independent. */
-  async function coroutineTask(
+  #coroutineTask = async (
     record: ITrayRecord,
     context: {
       connect: import('@migaia/rpc-plugin-coroutines').ICoroutineConnect
       signal: IAbortSignal
     }
-  ): Promise<void> {
+  ): Promise<void> => {
     const child = await serveChild(
       record.definition,
-      { report, probe: options.probe },
+      { report: this.#report, probe: this.#options.probe },
       context.connect
     )
     /** Abort resolves a cooperative task while an explicit crash retains the user's first error. */
@@ -378,60 +471,62 @@ export function createTrayRuntime<
       await child.host.dispose()
     }
   }
+
   /** Queue removal revokes metadata before awaiting the original install and resource cleanup. */
-  async function remove(record: ITrayRecord, graceMs?: number): Promise<void> {
+  #remove = async (record: ITrayRecord, graceMs?: number): Promise<void> => {
     const wasReady = record.state === TrayInstanceState.ready
-    topics.remove(record)
-    registry.revoke(record)
+    this.#topics.remove(record)
+    this.#registry.revoke(record)
     if (record.install) {
       try {
         await record.install
       } catch (error) {
-        report(error)
+        this.#report(error)
       }
     }
     if (wasReady) {
       try {
-        await outletOf(host, record.definition).request(
+        await outletOf(this.#host, record.definition).request(
           record.id,
           TrayInternal.shutdown,
           { graceMs: graceMs ?? 5000 },
           { timeoutMs: graceMs ?? 5000 }
         )
       } catch (error) {
-        report(error)
+        this.#report(error)
       }
     }
     try {
-      const result = await host.unUse(record.id)
-      if (!result.ok) for (const error of result.errors) report(error)
+      const result = await this.#host.unUse(record.id)
+      if (!result.ok) for (const error of result.errors) this.#report(error)
     } catch (error) {
-      report(error)
+      this.#report(error)
     }
-    events.publish({ ...registry.snapshot(record), event: TrayInstanceEvent.removed })
+    this.#events.publish({ ...this.#registry.snapshot(record), event: TrayInstanceEvent.removed })
   }
+
   /** Manual entries own config snapshot, cleanup, native outcome, init and returned snapshot. */
-  async function manage(
+  #manage = async (
     record: ITrayRecord,
     operation: 'restart' | 'replace',
     replacement?: { config?: unknown }
-  ): Promise<ITrayInstance> {
+  ): Promise<ITrayInstance> => {
     return record.queue.run(async () => {
-      current(record)
+      this.#current(record)
       const config =
         operation === 'replace' && replacement && Object.hasOwn(replacement, 'config')
           ? toWire(replacement.config)
           : record.config
       record.management = TrayManagementMode.manual
       try {
-        await shutdown(record)
-        transition(record, TrayInstanceState.restarting)
-        const outlet = outletOf(host, record.definition)
+        await this.#shutdown(record)
+        this.#transition(record, TrayInstanceState.restarting)
+        const outlet = outletOf(this.#host, record.definition)
         const outcome =
           operation === 'restart'
             ? await outlet.restart(record.id)
             : await outlet.replace(record.id)
-        current(record)
+        this.#current(record)
         const accepted =
           'state' in outcome ? outcome.state === SupervisorState.ready : outcome.kind === 'replaced'
         if (!accepted) {
@@ -439,8 +534,8 @@ export function createTrayRuntime<
             'state' in outcome &&
             (outcome.state === SupervisorState.idle || outcome.state === SupervisorState.stopped)
           ) {
-            transition(record, TrayInstanceState.stopped)
-            return registry.snapshot(record)
+            this.#transition(record, TrayInstanceState.stopped)
+            return this.#registry.snapshot(record)
           }
           if ('state' in outcome && outcome.state === SupervisorState.disposed)
             throw createTrayError(TrayErrorCode.disposed)
@@ -448,25 +543,25 @@ export function createTrayRuntime<
           const cause = 'error' in outcome ? outcome.error : undefined
           throw createTrayError(TrayErrorCode.instanceStartFailed, cause)
         }
-        const generation = identify(record, await outlet.get(record.id))
-        await initOnce(record, generation, config)
+        const generation = this.#identify(record, await outlet.get(record.id))
+        await this.#initOnce(record, generation, config)
         record.config = config
-        transition(record, TrayInstanceState.ready)
-        return registry.snapshot(record)
+        this.#transition(record, TrayInstanceState.ready)
+        return this.#registry.snapshot(record)
       } catch (error) {
-        if (!record.removed && !disposing) {
+        if (!record.removed && !this.#disposing) {
           await Promise.resolve()
           try {
-            const detail = await outletOf(host, record.definition).get(record.id)
+            const detail = await outletOf(this.#host, record.definition).get(record.id)
             if ('state' in detail.unit && detail.unit.state === 'stopped')
-              transition(record, TrayInstanceState.stopped)
-            else transition(record, TrayInstanceState.failed)
+              this.#transition(record, TrayInstanceState.stopped)
+            else this.#transition(record, TrayInstanceState.failed)
           } catch (secondary) {
-            report(secondary)
-            transition(record, TrayInstanceState.failed)
+            this.#report(secondary)
+            this.#transition(record, TrayInstanceState.failed)
           }
         }
-        if (disposing) throw createTrayError(TrayErrorCode.disposed)
+        if (this.#disposing) throw createTrayError(TrayErrorCode.disposed)
         if (error && typeof error === 'object' && 'source' in error && error.source === TRAY_SOURCE)
           throw error
         throw createTrayError(TrayErrorCode.instanceStartFailed, error)
@@ -475,151 +570,204 @@ export function createTrayRuntime<
       }
     })
   }
-  /** Frozen surface exposes no publisher, runtime Host or original admission token. */
-  const tray = Object.freeze({
-    routing,
-    /** Business publications follow the registry's existing closing admission boundary. */
-    publish(topic: string, payload?: unknown): void {
-      assertActive()
-      topics.publish(topic, payload)
-    },
-    /** A closing registry cannot retain new topic listeners. */
-    subscribe(topic: string, listener: import('../topics.js').ITrayTopicListener): () => void {
-      assertActive()
-      return topics.subscribe(topic, listener)
-    },
-    async spawn(name: string, spawnOptions: { id: string; config?: unknown }) {
-      assertActive()
-      const definition = definitions.get(name)
-      if (!definition) throw createTrayError(TrayErrorCode.hostUnknown)
-      if (
-        !spawnOptions ||
-        typeof spawnOptions.id !== 'string' ||
-        !spawnOptions.id ||
-        [TrayInternal.childPlugin, TrayInternal.clientPlugin, TrayInternal.relayPlugin].some(
-          (name) => name === spawnOptions.id
-        )
+  /** Assemble the exact frozen user surface; all mutable state stays with this owner. */
+  #surface = (): ITray<THosts, TRouting> => {
+    return Object.freeze({
+      routing: this.#routing,
+      /** Business publications follow the registry's existing closing admission boundary. */
+      publish: this.#publishEntry,
+      /** A closing registry cannot retain new topic listeners. */
+      subscribe: this.#subscribeEntry,
+      spawn: this.#spawnEntry,
+      instance: this.#instanceEntry,
+      list: this.#listEntry,
+      get: this.#getEntry,
+      stop: this.#stopEntry,
+      restart: this.#restartEntry,
+      replace: this.#replaceEntry,
+      remove: this.#removeEntry,
+      on: this.#events.on,
+      watch: this.#events.watch,
+      dispose: this.#disposeEntry,
+      [Symbol.asyncDispose]: this.#asyncDisposeEntry
+    }) as ITray<THosts, TRouting>
+  }
+  /** Internal consumers borrow the original receiving Host. */
+  get host(): ITrayRuntimeHost {
+    return this.#host
+  }
+  /** User facade contains no publisher, native handle or admission token. */
+  get tray(): ITray<THosts, TRouting> {
+    return this.#tray
+  }
+  /** Original publish admission and result behavior stays with this parent owner. */
+  #publishEntry = (topic: string, payload?: unknown): void => {
+    this.#assertActive()
+    this.#topics.publish(topic, payload)
+  }
+
+  /** Original subscribe admission and result behavior stays with this parent owner. */
+  #subscribeEntry = (
+    topic: string,
+    listener: import('../topics.js').ITrayTopicListener
+  ): (() => void) => {
+    this.#assertActive()
+    return this.#topics.subscribe(topic, listener)
+  }
+
+  /** Original spawn admission and result behavior stays with this parent owner. */
+  #spawnEntry = async (name: string, spawnOptions: { id: string; config?: unknown }) => {
+    this.#assertActive()
+    const definition = this.#definitions.get(name)
+    if (!definition) throw createTrayError(TrayErrorCode.hostUnknown)
+    if (
+      !spawnOptions ||
+      typeof spawnOptions.id !== 'string' ||
+      !spawnOptions.id ||
+      [TrayInternal.childPlugin, TrayInternal.clientPlugin, TrayInternal.relayPlugin].some(
+        (name) => name === spawnOptions.id
       )
-        throw createTrayError(TrayErrorCode.hostInvalid)
-      const config = toWire(spawnOptions.config)
-      const record = registry.admit(definition, spawnOptions.id, config)
-      events.publish({ ...registry.snapshot(record), event: TrayInstanceEvent.spawned })
-      try {
-        await relayReady
-        current(record)
-        record.install = host
-          .use(
-            runtimePlugin(definition, TrayRuntimeMode.parent, {
-              id: record.id,
-              report,
-              probe: options.probe,
-              task: (context) => coroutineTask(record, context)
-            })
-          )
-          .then(() => undefined)
-        await record.install
-        current(record)
-        subscribe(record)
-        const generation = identify(record, await outletOf(host, definition).get(record.id))
-        await initOnce(record, generation, config)
-        transition(record, TrayInstanceState.ready)
-        return createRemote(record.id, send(record))
-      } catch (primary) {
-        if (!record.removed) {
-          transition(record, TrayInstanceState.failed)
-          await remove(record)
-        }
-        if (disposing) throw createTrayError(TrayErrorCode.disposed)
-        throw createTrayError(TrayErrorCode.instanceStartFailed, primary)
-      }
-    },
-    instance(definition: IAnyTrayHost, id: string) {
-      assertActive()
-      const admitted = readHost(definition)
-      const record = registry.get(id)
-      if (record.definition !== admitted) throw createTrayError(TrayErrorCode.hostMismatch)
-      return createRemote(id, send(record))
-    },
-    list(filter?: { host?: string; runtime?: string; state?: string }) {
-      assertActive()
-      return Object.freeze(
-        [...registry.records.values()]
-          .filter(
-            (record) =>
-              (!filter?.host || record.definition.name === filter.host) &&
-              (!filter?.runtime || record.definition.runtime === filter.runtime) &&
-              (!filter?.state || record.state === filter.state)
-          )
-          .map(registry.snapshot)
-      )
-    },
-    async get(id: string) {
-      assertActive()
-      const record = registry.get(id)
-      const detail = await outletOf(host, record.definition).get(id)
-      current(record)
-      return Object.freeze({ ...detail, ...registry.snapshot(record) })
-    },
-    async stop(id: string, stopOptions?: { graceMs?: number }) {
-      assertActive()
-      const record = registry.get(id)
-      await record.queue.run(async () => {
-        current(record)
-        record.management = TrayManagementMode.manual
-        try {
-          await shutdown(record, stopOptions?.graceMs)
-          topics.remove(record)
-          await outletOf(host, record.definition).stop(id, stopOptions)
-          current(record)
-          transition(record, TrayInstanceState.stopped)
-        } finally {
-          record.management = undefined
-        }
-      })
-    },
-    restart(id: string) {
-      assertActive()
-      return manage(registry.get(id), 'restart')
-    },
-    replace(id: string, replacement?: { config?: unknown }) {
-      assertActive()
-      return manage(registry.get(id), 'replace', replacement)
-    },
-    remove(id: string, removeOptions?: { graceMs?: number }) {
-      assertActive()
-      const record = registry.get(id)
-      return record.queue.run(() => {
-        current(record)
-        return remove(record, removeOptions?.graceMs)
-      })
-    },
-    on: events.on,
-    watch: events.watch,
-    dispose(disposeOptions?: { graceMs?: number }): Promise<void> {
-      if (disposal) return disposal
-      disposing = true
-      disposal = (async () => {
-        const records = [...registry.records.values()]
-        for (const record of records) record.queue.close(createTrayError(TrayErrorCode.disposed))
-        await Promise.all(
-          records.map(async (record) => {
-            await record.queue.whenIdle()
-            await remove(record, disposeOptions?.graceMs)
+    )
+      throw createTrayError(TrayErrorCode.hostInvalid)
+    const config = toWire(spawnOptions.config)
+    const record = this.#registry.admit(definition, spawnOptions.id, config)
+    this.#events.publish({
+      ...this.#registry.snapshot(record),
+      event: TrayInstanceEvent.spawned
+    })
+    try {
+      await this.#relayReady
+      this.#current(record)
+      record.install = this.#host
+        .use(
+          runtimePlugin(definition, TrayRuntimeMode.parent, {
+            id: record.id,
+            report: this.#report,
+            probe: this.#options.probe,
+            task: (context) => this.#coroutineTask(record, context)
           })
         )
-        for (const subscription of subscriptions.values())
-          for (const release of subscription.release) release()
-        /** Parent-only topic users can close before relay installation commits. */
-        await relayReady
-        await host.dispose()
-        events.close()
-        topics.close()
-      })()
-      return disposal
-    },
-    [Symbol.asyncDispose](): Promise<void> {
-      return tray.dispose()
+        .then(() => undefined)
+      await record.install
+      this.#current(record)
+      this.#subscribe(record)
+      const generation = this.#identify(
+        record,
+        await outletOf(this.#host, definition).get(record.id)
+      )
+      await this.#initOnce(record, generation, config)
+      this.#transition(record, TrayInstanceState.ready)
+      return createRemote(record.id, this.#send(record))
+    } catch (primary) {
+      if (!record.removed) {
+        this.#transition(record, TrayInstanceState.failed)
+        await this.#remove(record)
+      }
+      if (this.#disposing) throw createTrayError(TrayErrorCode.disposed)
+      throw createTrayError(TrayErrorCode.instanceStartFailed, primary)
     }
-  }) as ITray<THosts, TRouting>
-  return { tray, host }
+  }
+
+  /** Original instance admission and result behavior stays with this parent owner. */
+  #instanceEntry = (definition: IAnyTrayHost, id: string) => {
+    this.#assertActive()
+    const admitted = readHost(definition)
+    const record = this.#registry.get(id)
+    if (record.definition !== admitted) throw createTrayError(TrayErrorCode.hostMismatch)
+    return createRemote(id, this.#send(record))
+  }
+
+  /** Original list admission and result behavior stays with this parent owner. */
+  #listEntry = (filter?: { host?: string; runtime?: string; state?: string }) => {
+    this.#assertActive()
+    return Object.freeze(
+      [...this.#registry.records.values()]
+        .filter(
+          (record) =>
+            (!filter?.host || record.definition.name === filter.host) &&
+            (!filter?.runtime || record.definition.runtime === filter.runtime) &&
+            (!filter?.state || record.state === filter.state)
+        )
+        .map(this.#registry.snapshot)
+    )
+  }
+
+  /** Original get admission and result behavior stays with this parent owner. */
+  #getEntry = async (id: string) => {
+    this.#assertActive()
+    const record = this.#registry.get(id)
+    const detail = await outletOf(this.#host, record.definition).get(id)
+    this.#current(record)
+    return Object.freeze({ ...detail, ...this.#registry.snapshot(record) })
+  }
+
+  /** Original stop admission and result behavior stays with this parent owner. */
+  #stopEntry = async (id: string, stopOptions?: { graceMs?: number }) => {
+    this.#assertActive()
+    const record = this.#registry.get(id)
+    await record.queue.run(async () => {
+      this.#current(record)
+      record.management = TrayManagementMode.manual
+      try {
+        await this.#shutdown(record, stopOptions?.graceMs)
+        this.#topics.remove(record)
+        await outletOf(this.#host, record.definition).stop(id, stopOptions)
+        this.#current(record)
+        this.#transition(record, TrayInstanceState.stopped)
+      } finally {
+        record.management = undefined
+      }
+    })
+  }
+
+  /** Original restart admission and result behavior stays with this parent owner. */
+  #restartEntry = (id: string) => {
+    this.#assertActive()
+    return this.#manage(this.#registry.get(id), 'restart')
+  }
+
+  /** Original replace admission and result behavior stays with this parent owner. */
+  #replaceEntry = (id: string, replacement?: { config?: unknown }) => {
+    this.#assertActive()
+    return this.#manage(this.#registry.get(id), 'replace', replacement)
+  }
+
+  /** Original remove admission and result behavior stays with this parent owner. */
+  #removeEntry = (id: string, removeOptions?: { graceMs?: number }) => {
+    this.#assertActive()
+    const record = this.#registry.get(id)
+    return record.queue.run(() => {
+      this.#current(record)
+      return this.#remove(record, removeOptions?.graceMs)
+    })
+  }
+
+  /** Original dispose admission and result behavior stays with this parent owner. */
+  #disposeEntry = (disposeOptions?: { graceMs?: number }): Promise<void> => {
+    if (this.#disposal) return this.#disposal
+    this.#disposing = true
+    this.#disposal = (async () => {
+      const records = [...this.#registry.records.values()]
+      for (const record of records) record.queue.close(createTrayError(TrayErrorCode.disposed))
+      await Promise.all(
+        records.map(async (record) => {
+          await record.queue.whenIdle()
+          await this.#remove(record, disposeOptions?.graceMs)
+        })
+      )
+      for (const subscription of this.#subscriptions.values())
+        for (const release of subscription.release) release()
+      /** Parent-only topic users can close before relay installation commits. */
+      await this.#relayReady
+      await this.#host.dispose()
+      this.#events.close()
+      this.#topics.close()
+    })()
+    return this.#disposal
+  }
+
+  /** Original asyncDispose admission and result behavior stays with this parent owner. */
+  #asyncDisposeEntry = (): Promise<void> => {
+    return this.#tray.dispose()
+  }
 }

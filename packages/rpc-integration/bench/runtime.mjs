@@ -67,16 +67,22 @@ export async function measureRuntimeUnits({
           stdio: ['ignore', 'pipe', 'pipe'],
           env: { ...process.env, IPC_BENCH_STEM: stem }
         })
-        let stdout = '',
-          stderr = ''
+        /** Each native chunk keeps its original decoding boundary without recopying prior text. */
+        const stdoutChunks = []
+        /** Stderr is joined once at physical close, before the original receipt or error reads it. */
+        const stderrChunks = []
         child.stdout.on('data', (data) => {
-          stdout += data.toString()
+          stdoutChunks.push(data.toString())
         })
         child.stderr.on('data', (data) => {
-          stderr += data.toString()
+          stderrChunks.push(data.toString())
         })
         child.once('error', reject)
         child.once('close', async (code) => {
+          /** Preserve original stream arrival order and exact per-chunk string conversion. */
+          const stdout = stdoutChunks.join('')
+          /** Both success logging and side-failure classification read these same complete bytes. */
+          const stderr = stderrChunks.join('')
           try {
             await writeFile(stem + '.stderr.log', stderr, { flag: 'wx' })
             if (code !== 0) throw new Error(IpcBenchErrorText.sideFailed(code, stderr))

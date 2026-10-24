@@ -1,120 +1,65 @@
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { PluginHost } from '@migaia/plugin-host'
-import { CapabilityLevel, createUnitBudget } from '@migaia/supervision'
-import type { IProcessHandle, IProcessSpec } from '@migaia/supervision/process'
-import { describe, expect, it, vi } from 'vitest'
-import { createProcessPlugin } from '../../../rpc-plugin-process/test/protocol.ts'
-import type { IProcessByteChannel } from '../../../rpc-plugin-process/dist/process/types.js'
-import { REMOTE_FIXTURE_CONTRACT, remoteHarness } from '../../../rpc-host/test/remote/fixture.js'
+import { describe, expect, it } from 'vitest'
+import { processPlugin } from '@migaia/rpc-plugin-process'
+import { hostFixture } from './fixtures/host-control.js'
+import { RpcCoreErrorCode, RPC_CORE_ERROR_SOURCE } from '../../../rpc-host/dist/core/errors.js'
+import { deferred } from '@migaia/utils/promise'
+import { RuntimeEventName } from '../../../rpc-host/dist/remote/runtime-api/constants.js'
 
-/** Advance promise continuations without depending on wall-clock delays. */
+/** Advance only existing asynchronous supervisor continuations without changing timer budgets. */
 async function settle(): Promise<void> {
   for (let turn = 0; turn < 30; turn += 1) await Promise.resolve()
 }
 
-/** One fake process exposes an original exit event and a separate termination port. */
-function controlledProcess(fingerprint: string) {
-  /** The test drives departure while the supervisor retains the same exit Promise. */
-  let finish!: (status: { code: number | null; signal: string | null }) => void
-  const handle: IProcessHandle = {
-    identity: { fingerprint },
-    exited: new Promise((resolve) => {
-      finish = resolve
-    }),
-    terminate: () => finish({ code: 0, signal: null })
-  }
-  return { handle, finish }
-}
-
 describe('process plugin generation lifetime', () => {
-  it('revokes on child exit and rebinds the same feature after a new describe', async () => {
-    const fixture = remoteHarness()
-    /** Preserve this existing clock identity shared by the channel and binding. */
-    const scheduler = fixture.binding.scheduler
-    // This fixture controls backoff timers while generation observers use host ordering.
+  it('revokes on child exit and rebinds the same native outlet after a new describe', async () => {
+    /** Existing fixture supplies real byte handshakes, Peers and independently controlled OS exits. */
+    const fixture = hostFixture()
+    /** Generation observers keep real host ordering while backoff remains on the original clock. */
+    const scheduler = fixture.scheduler
     scheduler.defer = systemScheduler.defer
-    const token = 'generation-token'
-    const spec: IProcessSpec = {
-      command: 'memory-child',
-      args: [],
-      env: { inherit: [], set: {} },
-      stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' },
-      bootstrap: { via: 'stdin', payload: new TextEncoder().encode(token) }
-    }
-    const children = [controlledProcess('generation-1'), controlledProcess('generation-2')]
-    /** A fresh unit is launched only after the previous unit's exit and backoff. */
-    let nextChild = 0
-    const launch = vi.fn(async () => children[nextChild++]!.handle)
-    const raw: IProcessByteChannel = {
-      kind: 'byte',
-      write: async () => undefined,
-      onData: () => () => undefined,
-      onClose: () => () => undefined,
-      close: () => undefined
-    }
-    const host = new PluginHost<Record<string, never>>({
-      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
-    })
-    const disable = vi.fn((name: string, options: { readonly policy: 'suspend' }) =>
-      host.plugin.disable(name, options)
-    )
-    const enable = vi.fn((name: string) => host.plugin.enable(name))
-    const plugin = createProcessPlugin({
-      name: 'p',
-      contract: REMOTE_FIXTURE_CONTRACT,
-      registrationOwner: { name: 'p', host },
-      host: { disable, enable },
-      endpointFactory: async () => fixture.served,
-      report: () => undefined,
-      deployment: {
-        kind: 'spawn',
-        channelKind: 'byte',
-        wire: 'native',
-        token,
+    /** Only supervisor restart policy changes; source, budget and physical assembly stay canonical. */
+    const plugin = processPlugin({
+      ...fixture.runtimeOptions,
+      spawn: {
+        ...fixture.runtimeOptions.spawn,
         supervision: {
-          id: 'generations',
-          spec,
-          budget: createUnitBudget({ kind: 'process', maxUnits: 1, scheduler }),
-          scheduler,
-          health: { check: async () => undefined },
-          launcher: {
-            capabilities: {
-              termination: CapabilityLevel.enforced,
-              'fault-isolation': CapabilityLevel.enforced,
-              'bootstrap-stdin': CapabilityLevel.enforced
-            },
-            launch
-          },
-          restart: { mode: 'on-failure', initialDelayMs: 1, maxDelayMs: 1, maxRestarts: 1 },
-          report: () => undefined
-        },
-        rawChannel: async () => raw,
-        establish: async () => ({
-          ...fixture.channel,
-          agreement: { ...fixture.channel.agreement, source: 'negotiated' as const }
-        })
+          ...fixture.runtimeOptions.spawn.supervision,
+          restart: { mode: 'on-failure', initialDelayMs: 1, maxDelayMs: 1, maxRestarts: 1 }
+        }
       }
     })
+    /** The real committed second-generation event replaces an arbitrary microtask-count guess. */
+    const rebound = deferred<void>()
+    /** This exact original outlet subscription belongs to the lifecycle case's cleanup. */
+    let stopReady: (() => void) | undefined
     try {
-      const [installed] = await host.use(plugin)
-      const feature = installed.getFeature('f') as { request(params: unknown[]): Promise<unknown> }
-      expect(await feature.request(['first'])).toBe('result')
-      children[0]!.finish({ code: 1, signal: null })
-      await settle()
-      await expect(feature.request(['during-exit'])).rejects.toMatchObject({
-        code: 'REMOTE_CLOSED'
+      await fixture.host.use(plugin)
+      /** This actual Host outlet survives the original process generation's retirement. */
+      const outlet = fixture.host.process!
+      stopReady = outlet.on(RuntimeEventName.ready, (event) => {
+        if (event.name === 'child' && event.generation === 2) rebound.resolve()
       })
-      expect(disable).toHaveBeenCalledTimes(1)
-      scheduler.advance(1)
+      expect(await outlet.request('child', 'p.f.m', ['first'])).toEqual({ ok: true })
+      fixture.crashes[0]!({ code: 1, signal: null })
       await settle()
-      expect(launch).toHaveBeenCalledTimes(2)
-      expect(enable).toHaveBeenCalledTimes(1)
-      expect(await feature.request(['second'])).toBe('result')
+      expect(() => outlet.request('child', 'p.f.m', ['during-exit'])).toThrow(
+        expect.objectContaining({
+          source: RPC_CORE_ERROR_SOURCE,
+          code: RpcCoreErrorCode.targetUnknown
+        })
+      )
+      scheduler.advance(1)
+      await rebound.promise
+      expect(fixture.launch).toHaveBeenCalledTimes(2)
+      expect(fixture.host.process).toBe(outlet)
+      expect(await outlet.request('child', 'p.f.m', ['second'])).toEqual({ ok: true })
       expect(
-        fixture.sends.filter((send) => send.method === 'migaia.remote.runtime.describe')
+        fixture.send.mock.calls.filter((send) => send[1] === 'migaia.remote.runtime.describe')
       ).toHaveLength(2)
     } finally {
-      await host.dispose()
+      stopReady?.()
+      await fixture.close()
     }
   })
 })

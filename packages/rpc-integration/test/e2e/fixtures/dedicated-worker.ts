@@ -1,4 +1,4 @@
-import { createWebWorkerTransport } from '@migaia/rpc-plugin-browser/adapters/web-worker'
+import { createWebWorkerTransport } from '@migaia/rpc-host/plugin'
 import { readEndpointDebugSnapshot } from '../../../../rpc-host/dist/core/internal/test-observer.js'
 import { createRpc, installErrorGuards } from './rpc.js'
 

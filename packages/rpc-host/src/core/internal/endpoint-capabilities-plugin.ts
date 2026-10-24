@@ -1,5 +1,5 @@
 import { createRpcError, RpcCoreErrorCode } from '../errors.js'
-import { definePlugin, type IFeatureRecord } from '@migaia/plugin-host'
+import { definePlugin, type IFeatureRecord, type IPluginHostCore } from '@migaia/plugin-host'
 
 import { RpcCoreErrorText } from '../error-text.js'
 import {
@@ -64,6 +64,325 @@ type IEndpointCapabilitiesContext = Pick<IRpcFeatureExpose, 'getKernel' | 'getPr
 }
 
 /** Builds the sole native custom-Feature bridge before endpoint activation. */
+/** The native descriptor receives lifecycle methods plus resolved outputs from its selected roots. */
+type IEndpointCapabilitiesNativeCore = IRpcPluginCore &
+  IPluginHostCore<never> &
+  Readonly<{ features: Readonly<Record<string, unknown>> }>
+
+/** Allocate definition-owned projection state once before native installation. */
+function endpointCapabilitiesState(
+  roots: Readonly<Record<string, IRpcFeature>>,
+  context: IEndpointCapabilitiesContext,
+  prepareRoots: readonly string[] = [],
+  activateRoots: readonly string[] = [],
+  sharedRoots: readonly string[] = [],
+  publicRoots: ReadonlySet<string> | undefined = undefined
+) {
+  /** First-party attachments publish these ports as ordinary PluginHost Features. */
+  const providedPortNames = getFirstPartyPortNames(roots)
+  /** Deferred port cells are allocated separately for each native installation. */
+  const portFeatures = createWebRpcPortFeatureSet(providedPortNames)
+  /** One installation-owned key snapshot becomes available before the activation Plugin runs. */
+  let publicKeys: readonly string[] = Object.freeze([])
+  /** The installed attachment lends its original diagnostic hook channel after preparation. */
+  const hooks = undefined as
+    | { on(listener: import('../typing.js').IRpcHook): () => void }
+    | undefined
+  /** Installation results supply first-party public surfaces without exposing capability methods. */
+  const preparedOutputs: Record<string, unknown> = Object.create(null)
+  /** Invokes prepared first-party attachment activation only from the final activation Plugin. */
+  let activate = (): void => undefined
+  /** Captures the final projected attachment diagnostic without adding a second registry. */
+  const snapshotReader = undefined as ReturnType<typeof getEndpointDebugSnapshotReader> | undefined
+  /** Retains the provider listener owner without widening the public capability projection. */
+  const on = undefined as ((event: string, listener: unknown) => unknown) | undefined
+
+  return {
+    providedPortNames,
+    portFeatures,
+    publicKeys,
+    hooks,
+    preparedOutputs,
+    activate,
+    snapshotReader,
+    on,
+    roots,
+    context,
+    prepareRoots,
+    activateRoots,
+    sharedRoots,
+    publicRoots
+  }
+}
+
+/**
+ * Each native installation retains its own core and port cells while sharing the definition's
+ * projection receipt.
+ */
+class EndpointCapabilitiesInstallation {
+  /**
+   * Installation-local native core and deferred port publication remain bound to this exact
+   * registration.
+   */
+  #state: {
+    owner: ReturnType<typeof endpointCapabilitiesState>
+    core: IEndpointCapabilitiesNativeCore
+    portRuntime: ReturnType<ReturnType<typeof createWebRpcPortFeatureSet>['createRuntime']>
+  }
+  /** Native PluginHost lifecycle calls these stable callbacks in the original preparation order. */
+  readonly value
+  /** Capture one native core before publishing its install, expose and activation hooks. */
+  constructor(
+    owner: ReturnType<typeof endpointCapabilitiesState>,
+    core: IEndpointCapabilitiesNativeCore
+  ) {
+    this.#state = { owner, core, portRuntime: owner.portFeatures.createRuntime() }
+    owner.activate = this.#activate
+    this.value = Object.freeze({
+      install: this.#install,
+      expose: this.#expose,
+      featureExpose: () =>
+        Object.freeze({
+          ...this.#state.portRuntime.expose,
+          getKernel: this.#state.owner.context.getKernel,
+          getPrepared: this.#state.owner.context.getPrepared,
+          getTime: () => this.#state.core.getPort(RpcPortName.time) as IRpcTimePort,
+          getCandidatePing: () =>
+            this.#state.core.getPort(RpcPortName.candidatePing) as
+              | IRpcCandidatePingPort
+              | undefined,
+          ...(this.#state.owner.context.observeOutboundCommand
+            ? { observeOutboundCommand: this.#state.owner.context.observeOutboundCommand }
+            : {})
+        })
+    })
+  }
+  /** Activate only the originally selected prepared attachments after native installation. */
+  #activate = (): void => {
+    for (const name of this.#state.owner.activateRoots) {
+      const output = this.#state.core.features[name]
+      const activateFeature = output && (output as { readonly activate?: unknown }).activate
+      if (typeof activateFeature !== 'function')
+        throw createRpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.endpointModuleInvalid)
+      activateFeature()
+    }
+  }
+  /**
+   * Runs first-party attachment preparation after middleware finalization, never in Feature
+   * factories.
+   */
+  #install = async (): Promise<Record<never, never>> => {
+    await runConstructionInstall(
+      {
+        id: this.#state.core.id,
+        transport: this.#state.core.transport,
+        control: this.#state.core.construction,
+        hooks: this.#state.core.hooks,
+        getPort: (key) => this.#state.core.getPort(key),
+        report: (error) => {
+          this.#state.core.hooks({
+            name: 'failure',
+            at: this.#state.core.construction.time.timestamp(),
+            localId: this.#state.core.id,
+            code: RpcCoreErrorCode.internal,
+            error
+          })
+        },
+        registerScope: (_scope, close, awaitClose) => {
+          this.#state.core.onDispose(async () => {
+            close()
+            await awaitClose()
+          })
+        }
+      },
+      async (scope) => {
+        for (const name of this.#state.owner.prepareRoots) {
+          const output = this.#state.core.features[name]
+          const prepare = output
+            ? (
+                output as {
+                  readonly prepare?: (
+                    scope: import('../typing.js').IRpcPluginInstallScope
+                  ) => unknown
+                }
+              ).prepare
+            : undefined
+          if (typeof prepare !== 'function')
+            throw createRpcError(
+              RpcCoreErrorCode.invalidConfig,
+              RpcCoreErrorText.endpointModuleInvalid
+            )
+          const transformedPrepare =
+            this.#state.owner.context.transformFeaturePrepare?.(name, prepare) ?? prepare
+          this.#state.owner.preparedOutputs[name] = await transformedPrepare(scope)
+          const getHooks = (this.#state.core.features[name] as { readonly getHooks?: unknown })
+            .getHooks
+          if (typeof getHooks === 'function') this.#state.owner.hooks = getHooks()
+        }
+        return {}
+      }
+    )
+    const ports = this.#collectFirstPartyPorts()
+    this.#state.portRuntime.publish(ports)
+    this.#state.core.publishPortFeatures(this.#state.portRuntime.outputs)
+    return {}
+  }
+
+  /** Collects selected first-party ports before dependent attachments install. */
+  #collectFirstPartyPorts = (): Readonly<Record<PropertyKey, unknown>> => {
+    const ports: Record<PropertyKey, unknown> = Object.create(null)
+    for (const name of this.#state.owner.sharedRoots) {
+      const output = this.#state.core.features[name]
+      const createPorts = output && (output as { readonly ports?: unknown }).ports
+      if (typeof createPorts !== 'function')
+        throw createRpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.endpointModuleInvalid)
+      const values = createPorts()
+      if (!values || typeof values !== 'object')
+        throw createRpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.endpointModuleInvalid)
+      for (const key of Reflect.ownKeys(values)) {
+        if (key in ports)
+          throw createRpcError(
+            RpcCoreErrorCode.capabilityConflict,
+            RpcCoreErrorText.endpointModuleDuplicated
+          )
+        const descriptor = Object.getOwnPropertyDescriptor(values, key)
+        if (!descriptor || !('value' in descriptor))
+          throw createRpcError(
+            RpcCoreErrorCode.invalidConfig,
+            RpcCoreErrorText.endpointModuleInvalid
+          )
+        Object.defineProperty(ports, key, descriptor)
+      }
+    }
+    const output = Object.freeze(ports)
+    return this.#state.owner.context.transformOutput?.('ports', output) ?? output
+  }
+
+  /** Feature outputs become ready after descriptor creation and before Host publication. */
+  #expose = (): Readonly<Record<string, unknown>> => {
+    const projection: Record<string, unknown> = Object.create(null)
+    for (const [name, output] of Object.entries(this.#state.core.features)) {
+      if (!Object.hasOwn(this.#state.owner.roots, name)) continue
+      if (this.#state.owner.publicRoots && !this.#state.owner.publicRoots.has(name)) continue
+      const policy = readFeaturePolicy(this.#state.owner.roots[name]!)
+      const prepared = this.#state.owner.preparedOutputs[name] as
+        | { readonly public?: object }
+        | undefined
+      const projectionSource = (prepared?.public ?? output) as object
+      const keys = policy.publicKeys ?? Object.keys(projectionSource)
+      for (const key of keys) {
+        const descriptor = Object.getOwnPropertyDescriptor(projectionSource, key)
+        if (!descriptor || !('value' in descriptor))
+          throw createRpcError(
+            RpcCoreErrorCode.invalidConfig,
+            RpcCoreErrorText.endpointModuleInvalid
+          )
+        if (key in projection)
+          throw createRpcError(
+            RpcCoreErrorCode.capabilityConflict,
+            RpcCoreErrorText.endpointModuleDuplicated
+          )
+        Object.defineProperty(projection, key, {
+          configurable: false,
+          enumerable: true,
+          value: descriptor.value,
+          writable: false
+        })
+      }
+    }
+    this.#state.owner.publicKeys = Object.freeze(Object.keys(projection))
+    const preferredSnapshotOutputs = [
+      this.#state.owner.preparedOutputs['first-party-discovery'],
+      this.#state.owner.preparedOutputs['first-party-provider'],
+      this.#state.owner.preparedOutputs['first-party-outbound']
+    ]
+    this.#state.owner.snapshotReader = undefined
+    for (const prepared of preferredSnapshotOutputs) {
+      if (!prepared) continue
+      const reader = getEndpointDebugSnapshotReader(
+        (prepared as { readonly public?: object }).public ?? (prepared as object)
+      )
+      if (reader) {
+        this.#state.owner.snapshotReader = reader
+        break
+      }
+    }
+    if (this.#state.owner.snapshotReader)
+      registerEndpointDebugSnapshot(projection, this.#state.owner.snapshotReader)
+    this.#state.owner.on = Object.values(this.#state.owner.preparedOutputs)
+      .map((prepared) => (prepared as { readonly public?: { readonly on?: unknown } }).public?.on)
+      .find(
+        (candidate): candidate is (event: string, listener: unknown) => unknown =>
+          typeof candidate === 'function'
+      )
+    const output = Object.freeze(projection)
+    return this.#state.owner.context.transformOutput?.('extension', output) ?? output
+  }
+}
+
+/**
+ * One endpoint definition owns projected public keys and references to its original attachment
+ * outputs.
+ */
+class EndpointCapabilitiesOwner {
+  /** Definition-local projection facts never leak into another endpoint's capability registration. */
+  #state: ReturnType<typeof endpointCapabilitiesState>
+  /** The original frozen bridge exposes no authority beyond the canonical PluginHost definition. */
+  readonly value: IEndpointCapabilitiesPlugin
+  /** Build the genuine native definition and retain its original diagnostic projection callbacks. */
+  constructor(
+    roots: Readonly<Record<string, IRpcFeature>>,
+    context: IEndpointCapabilitiesContext,
+    prepareRoots: readonly string[] = [],
+    activateRoots: readonly string[] = [],
+    sharedRoots: readonly string[] = [],
+    publicRoots: ReadonlySet<string> | undefined = undefined
+  ) {
+    this.#state = endpointCapabilitiesState(
+      roots,
+      context,
+      prepareRoots,
+      activateRoots,
+      sharedRoots,
+      publicRoots
+    )
+    const definition = definePlugin<
+      IRpcPluginCore,
+      Record<never, never>,
+      never,
+      string,
+      IFeatureRecord,
+      IEndpointCapabilitiesFeatureExpose,
+      Record<string, unknown>,
+      Record<never, never>
+    >(
+      'endpoint-capabilities',
+      (core) => new EndpointCapabilitiesInstallation(this.#state, core).value,
+      Object.freeze({
+        ...this.#state.roots,
+        ...this.#state.portFeatures.features
+      }) as IFeatureRecord
+    )
+    this.value = Object.freeze({
+      definition: definition as IRpcPluginConstraint,
+      getPublicKeys: (): readonly string[] => this.#state.publicKeys,
+      getSnapshotReader: () => this.#state.snapshotReader,
+      getOn: () => this.#state.on,
+      getHooks: () => this.#state.hooks,
+      /** Transfers endpoint-scoped test fault injection to native discovery's exact disposal owner. */
+      propagateDiscoveryCleanupFaults: (faults: IRpcDiscoveryCleanupFaults): void => {
+        for (const output of Object.values(this.#state.preparedOutputs)) {
+          const target = (output as { readonly cleanupTarget?: unknown }).cleanupTarget
+          if (typeof target === 'object' && target !== null)
+            registerDiscoveryCleanupFaults(target, faults)
+        }
+      },
+      activate: () => this.#state.activate()
+    })
+  }
+}
+
+/** Build the sole native custom-Feature bridge with explicit definition and installation owners. */
 export const createEndpointCapabilitiesPlugin = (
   roots: Readonly<Record<string, IRpcFeature>>,
   context: IEndpointCapabilitiesContext,
@@ -71,226 +390,15 @@ export const createEndpointCapabilitiesPlugin = (
   activateRoots: readonly string[] = [],
   sharedRoots: readonly string[] = [],
   publicRoots: ReadonlySet<string> | undefined = undefined
-): IEndpointCapabilitiesPlugin => {
-  /** First-party attachments publish these ports as ordinary PluginHost Features. */
-  const providedPortNames = getFirstPartyPortNames(roots)
-  const portFeatures = createWebRpcPortFeatureSet(providedPortNames)
-  /** One installation-owned key snapshot becomes available before the activation Plugin runs. */
-  let publicKeys: readonly string[] = Object.freeze([])
-  let hooks: { on(listener: import('../typing.js').IRpcHook): () => void } | undefined
-  /** Installation results supply first-party public surfaces without exposing capability methods. */
-  const preparedOutputs: Record<string, unknown> = Object.create(null)
-  /** Invokes prepared first-party attachment activation only from the final activation Plugin. */
-  let activate = (): void => undefined
-  /** Captures the final projected attachment diagnostic without adding a second registry. */
-  let snapshotReader: ReturnType<typeof getEndpointDebugSnapshotReader> | undefined
-  /** Retains the provider listener owner without widening the public capability projection. */
-  let on: ((event: string, listener: unknown) => unknown) | undefined
-  const definition = definePlugin<
-    IRpcPluginCore,
-    Record<never, never>,
-    never,
-    string,
-    IFeatureRecord,
-    IEndpointCapabilitiesFeatureExpose,
-    Record<string, unknown>,
-    Record<never, never>
-  >(
-    'endpoint-capabilities',
-    (core) => {
-      const portRuntime = portFeatures.createRuntime()
-      /**
-       * Runs first-party attachment preparation after middleware finalization, never in Feature
-       * factories.
-       */
-      const install = async (): Promise<Record<never, never>> => {
-        await runConstructionInstall(
-          {
-            id: core.id,
-            transport: core.transport,
-            control: core.construction,
-            hooks: core.hooks,
-            getPort: (key) => core.getPort(key),
-            report: (error) => {
-              core.hooks({
-                name: 'failure',
-                at: core.construction.time.timestamp(),
-                localId: core.id,
-                code: RpcCoreErrorCode.internal,
-                error
-              })
-            },
-            registerScope: (_scope, close, awaitClose) => {
-              core.onDispose(async () => {
-                close()
-                await awaitClose()
-              })
-            }
-          },
-          async (scope) => {
-            for (const name of prepareRoots) {
-              const output = core.features[name]
-              const prepare = output && (output as { readonly prepare?: unknown }).prepare
-              if (typeof prepare !== 'function')
-                throw createRpcError(
-                  RpcCoreErrorCode.invalidConfig,
-                  RpcCoreErrorText.endpointModuleInvalid
-                )
-              const transformedPrepare = context.transformFeaturePrepare?.(name, prepare) ?? prepare
-              preparedOutputs[name] = await transformedPrepare(scope)
-              const getHooks = (core.features[name] as { readonly getHooks?: unknown }).getHooks
-              if (typeof getHooks === 'function') hooks = getHooks()
-            }
-            return {}
-          }
-        )
-        const ports = collectFirstPartyPorts()
-        portRuntime.publish(ports)
-        core.publishPortFeatures(portRuntime.outputs)
-        return {}
-      }
-      activate = (): void => {
-        for (const name of activateRoots) {
-          const output = core.features[name]
-          const activateFeature = output && (output as { readonly activate?: unknown }).activate
-          if (typeof activateFeature !== 'function')
-            throw createRpcError(
-              RpcCoreErrorCode.invalidConfig,
-              RpcCoreErrorText.endpointModuleInvalid
-            )
-          activateFeature()
-        }
-      }
-      /** Collects selected first-party ports before dependent attachments install. */
-      const collectFirstPartyPorts = (): Readonly<Record<PropertyKey, unknown>> => {
-        const ports: Record<PropertyKey, unknown> = Object.create(null)
-        for (const name of sharedRoots) {
-          const output = core.features[name]
-          const createPorts = output && (output as { readonly ports?: unknown }).ports
-          if (typeof createPorts !== 'function')
-            throw createRpcError(
-              RpcCoreErrorCode.invalidConfig,
-              RpcCoreErrorText.endpointModuleInvalid
-            )
-          const values = createPorts()
-          if (!values || typeof values !== 'object')
-            throw createRpcError(
-              RpcCoreErrorCode.invalidConfig,
-              RpcCoreErrorText.endpointModuleInvalid
-            )
-          for (const key of Reflect.ownKeys(values)) {
-            if (key in ports)
-              throw createRpcError(
-                RpcCoreErrorCode.capabilityConflict,
-                RpcCoreErrorText.endpointModuleDuplicated
-              )
-            const descriptor = Object.getOwnPropertyDescriptor(values, key)
-            if (!descriptor || !('value' in descriptor))
-              throw createRpcError(
-                RpcCoreErrorCode.invalidConfig,
-                RpcCoreErrorText.endpointModuleInvalid
-              )
-            Object.defineProperty(ports, key, descriptor)
-          }
-        }
-        const output = Object.freeze(ports)
-        return context.transformOutput?.('ports', output) ?? output
-      }
-      /** Feature outputs become ready after descriptor creation and before Host publication. */
-      const expose = (): Readonly<Record<string, unknown>> => {
-        const projection: Record<string, unknown> = Object.create(null)
-        for (const [name, output] of Object.entries(core.features)) {
-          if (!Object.hasOwn(roots, name)) continue
-          if (publicRoots && !publicRoots.has(name)) continue
-          const policy = readFeaturePolicy(roots[name]!)
-          const prepared = preparedOutputs[name] as { readonly public?: object } | undefined
-          const projectionSource = prepared?.public ?? output
-          const keys = policy.publicKeys ?? Object.keys(projectionSource)
-          for (const key of keys) {
-            const descriptor = Object.getOwnPropertyDescriptor(projectionSource, key)
-            if (!descriptor || !('value' in descriptor))
-              throw createRpcError(
-                RpcCoreErrorCode.invalidConfig,
-                RpcCoreErrorText.endpointModuleInvalid
-              )
-            if (key in projection)
-              throw createRpcError(
-                RpcCoreErrorCode.capabilityConflict,
-                RpcCoreErrorText.endpointModuleDuplicated
-              )
-            Object.defineProperty(projection, key, {
-              configurable: false,
-              enumerable: true,
-              value: descriptor.value,
-              writable: false
-            })
-          }
-        }
-        publicKeys = Object.freeze(Object.keys(projection))
-        const preferredSnapshotOutputs = [
-          preparedOutputs['first-party-discovery'],
-          preparedOutputs['first-party-provider'],
-          preparedOutputs['first-party-outbound']
-        ]
-        snapshotReader = undefined
-        for (const prepared of preferredSnapshotOutputs) {
-          if (!prepared) continue
-          const reader = getEndpointDebugSnapshotReader(
-            (prepared as { readonly public?: object }).public ?? (prepared as object)
-          )
-          if (reader) {
-            snapshotReader = reader
-            break
-          }
-        }
-        if (snapshotReader) registerEndpointDebugSnapshot(projection, snapshotReader)
-        on = Object.values(preparedOutputs)
-          .map(
-            (prepared) => (prepared as { readonly public?: { readonly on?: unknown } }).public?.on
-          )
-          .find(
-            (candidate): candidate is (event: string, listener: unknown) => unknown =>
-              typeof candidate === 'function'
-          )
-        const output = Object.freeze(projection)
-        return context.transformOutput?.('extension', output) ?? output
-      }
-      return Object.freeze({
-        install,
-        expose,
-        featureExpose: () =>
-          Object.freeze({
-            ...portRuntime.expose,
-            getKernel: context.getKernel,
-            getPrepared: context.getPrepared,
-            getTime: () => core.getPort(RpcPortName.time) as IRpcTimePort,
-            getCandidatePing: () =>
-              core.getPort(RpcPortName.candidatePing) as IRpcCandidatePingPort | undefined,
-            ...(context.observeOutboundCommand
-              ? { observeOutboundCommand: context.observeOutboundCommand }
-              : {})
-          })
-      })
-    },
-    Object.freeze({ ...roots, ...portFeatures.features }) as IFeatureRecord
-  )
-  return Object.freeze({
-    definition: definition as IRpcPluginConstraint,
-    getPublicKeys: (): readonly string[] => publicKeys,
-    getSnapshotReader: () => snapshotReader,
-    getOn: () => on,
-    getHooks: () => hooks,
-    /** Transfers endpoint-scoped test fault injection to native discovery's exact disposal owner. */
-    propagateDiscoveryCleanupFaults: (faults: IRpcDiscoveryCleanupFaults): void => {
-      for (const output of Object.values(preparedOutputs)) {
-        const target = (output as { readonly cleanupTarget?: unknown }).cleanupTarget
-        if (typeof target === 'object' && target !== null)
-          registerDiscoveryCleanupFaults(target, faults)
-      }
-    },
-    activate: () => activate()
-  })
-}
+): IEndpointCapabilitiesPlugin =>
+  new EndpointCapabilitiesOwner(
+    roots,
+    context,
+    prepareRoots,
+    activateRoots,
+    sharedRoots,
+    publicRoots
+  ).value
 
 /**
  * Produces the sole capability Feature plus its WebRPC-only admission metadata. Feature identity,

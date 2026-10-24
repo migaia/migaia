@@ -1,12 +1,8 @@
+import { RpcCapability } from '@migaia/rpc-contract'
+import { createRuntimeEndpointComposition } from '../../dist/core/runtime-api-endpoint.js'
 import { describe, expect, it } from 'vitest'
-import { createComposedEndpoint } from '../../dist/core/composed.js'
-import { createProviderEndpoint } from '../../dist/core/provider.js'
-import { createClientEndpoint } from '../../dist/core/client.js'
-import {
-  createFirstPartyRoots,
-  type IRpcFirstPartyRootName
-} from '../../dist/core/internal/first-party-roots.js'
-import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
+
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
 import { connect } from '../../dist/core/middleware/connect.js'
 import { ping } from '../../dist/core/middleware/ping.js'
 import { abort } from '../../dist/core/middleware/abort.js'
@@ -22,22 +18,22 @@ import { abort } from '../../dist/core/middleware/abort.js'
 describe('composed inbound variation capability gating', () => {
   it('replies pong only when the receiver selected the ping() middleware', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
-    const server = await createComposedEndpoint(
+    const server = await createRuntimeEndpointComposition(
       {
         id: 'server',
         transport: serverTransport,
         middlewares: [connect({ transport: serverTransport }), ping()]
       },
-      createFirstPartyRoots(new Set<IRpcFirstPartyRootName>(['first-party-control']))
-    )
-    const client = await createComposedEndpoint(
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
+    const client = await createRuntimeEndpointComposition(
       {
         id: 'client',
         transport: clientTransport,
         middlewares: [connect({ transport: clientTransport }), ping()]
       },
-      createFirstPartyRoots(new Set<IRpcFirstPartyRootName>(['first-party-control']))
-    )
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     try {
       await expect(client.ping!('server', undefined, { timeoutMs: 2000 })).resolves.toBe(true)
     } finally {
@@ -48,22 +44,22 @@ describe('composed inbound variation capability gating', () => {
 
   it('never replies pong when the receiver did not select the ping() middleware', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
-    const server = await createComposedEndpoint(
+    const server = await createRuntimeEndpointComposition(
       {
         id: 'server-no-ping',
         transport: serverTransport,
         middlewares: [connect({ transport: serverTransport })]
       },
-      createFirstPartyRoots(new Set<IRpcFirstPartyRootName>(['first-party-control']))
-    )
-    const client = await createComposedEndpoint(
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
+    const client = await createRuntimeEndpointComposition(
       {
         id: 'client-vs-no-ping',
         transport: clientTransport,
         middlewares: [connect({ transport: clientTransport }), ping()]
       },
-      createFirstPartyRoots(new Set<IRpcFirstPartyRootName>(['first-party-control']))
-    )
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     try {
       await expect(client.ping!('server-no-ping', undefined, { timeoutMs: 60 })).resolves.toBe(
         false
@@ -82,32 +78,38 @@ describe('composed inbound variation capability gating', () => {
     const startedPromise = new Promise<void>((resolve) => {
       started = resolve
     })
-    const server = await createProviderEndpoint({
-      id: 'abort-enabled-server',
-      transport: serverTransport,
-      middlewares: [connect({ transport: serverTransport }), abort()],
-      provider: {
-        slow: async (context) => {
-          started?.()
-          await new Promise<void>((resolve) => {
-            if (context.signal.aborted) {
-              resolve()
-              return
-            }
-            context.signal.addEventListener('abort', () => resolve(), { once: true })
-            setTimeout(resolve, 400)
-          })
-          observedAborted = context.signal.aborted
-          observedReason = context.signal.reason
-          return context.success(undefined)
+    const server = await createRuntimeEndpointComposition(
+      {
+        id: 'abort-enabled-server',
+        transport: serverTransport,
+        middlewares: [connect({ transport: serverTransport }), abort()],
+        provider: {
+          slow: async (context) => {
+            started?.()
+            await new Promise<void>((resolve) => {
+              if (context.signal.aborted) {
+                resolve()
+                return
+              }
+              context.signal.addEventListener('abort', () => resolve(), { once: true })
+              setTimeout(resolve, 400)
+            })
+            observedAborted = context.signal.aborted
+            observedReason = context.signal.reason
+            return context.success(undefined)
+          }
         }
-      }
-    })
-    const client = await createClientEndpoint({
-      id: 'abort-enabled-client',
-      transport: clientTransport,
-      middlewares: [connect({ transport: clientTransport }), abort()]
-    })
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'abort-enabled-client',
+        transport: clientTransport,
+        middlewares: [connect({ transport: clientTransport }), abort()]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     try {
       const controller = new AbortController()
       const request = client.send('abort-enabled-server', 'slow', null, {
@@ -138,31 +140,37 @@ describe('composed inbound variation capability gating', () => {
     const startedPromise = new Promise<void>((resolve) => {
       started = resolve
     })
-    const server = await createProviderEndpoint({
-      id: 'abort-disabled-server',
-      transport: serverTransport,
-      middlewares: [connect({ transport: serverTransport })],
-      provider: {
-        slow: async (context) => {
-          started?.()
-          await new Promise<void>((resolve) => {
-            if (context.signal.aborted) {
-              resolve()
-              return
-            }
-            context.signal.addEventListener('abort', () => resolve(), { once: true })
-            setTimeout(resolve, 200)
-          })
-          observedAborted = context.signal.aborted
-          return context.success(undefined)
+    const server = await createRuntimeEndpointComposition(
+      {
+        id: 'abort-disabled-server',
+        transport: serverTransport,
+        middlewares: [connect({ transport: serverTransport })],
+        provider: {
+          slow: async (context) => {
+            started?.()
+            await new Promise<void>((resolve) => {
+              if (context.signal.aborted) {
+                resolve()
+                return
+              }
+              context.signal.addEventListener('abort', () => resolve(), { once: true })
+              setTimeout(resolve, 200)
+            })
+            observedAborted = context.signal.aborted
+            return context.success(undefined)
+          }
         }
-      }
-    })
-    const client = await createClientEndpoint({
-      id: 'abort-disabled-client',
-      transport: clientTransport,
-      middlewares: [connect({ transport: clientTransport }), abort()]
-    })
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'abort-disabled-client',
+        transport: clientTransport,
+        middlewares: [connect({ transport: clientTransport }), abort()]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     try {
       const controller = new AbortController()
       const request = client.send('abort-disabled-server', 'slow', null, {

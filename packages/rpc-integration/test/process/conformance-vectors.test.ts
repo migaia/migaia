@@ -6,7 +6,7 @@ import { evidence, peers } from './fixtures/conformance-business.js'
 import { randomUUID } from 'node:crypto'
 import { createProcessTransport } from '../../../rpc-plugin-process/dist/process/handshake.js'
 import { createNativeProcessOffer } from '../../../rpc-plugin-process/dist/process/offer.js'
-import { createNodeProcessLauncher } from '@migaia/rpc-plugin-process/adapters/node-child-process'
+import { createNodeProcessLauncher } from '../../../rpc-plugin-process/dist/process/adapters/node-child-process.js'
 import { endpointFor } from './peers/ts/runtime.js'
 
 /** Independent scope is frozen here, so editing the baseline artifact cannot shrink it. */

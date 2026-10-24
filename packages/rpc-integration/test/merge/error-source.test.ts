@@ -1,9 +1,11 @@
+import { createRuntimeEndpointComposition } from '../../../rpc-host/dist/core/runtime-api-endpoint.js'
+import { RpcCapability } from '@migaia/rpc-contract'
 import { describe, expect, it } from 'vitest'
 import { createDescriptor, serializeRpcError } from '@migaia/rpc-contract'
 import { RPC_CONTRACT_SOURCE as contractSource } from '@migaia/rpc-contract/errors'
-import { createFullEndpoint as createEndpoint } from '../../../rpc-host/dist/core/full.js'
+
 import { isRpcErrorInstance, RPC_CORE_ERROR_SOURCE as coreSource } from '@migaia/rpc-host'
-import { createWindowMessageTransport } from '@migaia/rpc-plugin-browser/adapters/window'
+import { createWindowMessageTransport } from '../../../rpc-plugin-browser/dist/browser/adapters/window.js'
 
 describe('source continuity through merged layers', () => {
   it('tags contract descriptor failure with contract source and original native type', () => {
@@ -21,7 +23,10 @@ describe('source continuity through merged layers', () => {
   it('tags core invalid configuration and preserves serialized source', async () => {
     let caught: unknown
     try {
-      await createEndpoint({ id: '', middlewares: [] } as never)
+      await createRuntimeEndpointComposition({ id: '', middlewares: [] } as never, {
+        agreement: { capabilities: [RpcCapability.ping] },
+        peerId: ''
+      }).installing
     } catch (error) {
       caught = error
     }

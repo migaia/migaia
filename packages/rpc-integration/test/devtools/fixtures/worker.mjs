@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { isMainThread, threadId, workerData } from 'node:worker_threads'
-import { createThreadPeer } from '../../../../rpc-plugin-thread/test/protocol.ts'
+import { createRpcHost } from '@migaia/rpc-host'
+import { threadPlugin } from '@migaia/rpc-plugin-thread'
 import { readThreadBootstrap } from '../../../../rpc-plugin-thread/dist/threads/bootstrap.js'
 import { fixtureAuthentication } from './auth.mjs'
 import { createFixtureReporter, createTraceCollector, startFixtureService } from './core.mjs'
@@ -31,9 +32,9 @@ const serviceReady = new Promise((resolve, reject) => {
 let service
 
 /** The automatic Worker Peer receives the explicit raw Endpoint trace through its original context. */
-await createThreadPeer({
+await createRpcHost({
+  plugins: [threadPlugin({ connectToParent: true, probe: collector, report: diagnostics.report })],
   authentication: fixtureAuthentication(),
-  probe: collector,
   provide: {
     /**
      * Real Worker execution supplies both the business result and native host identity.

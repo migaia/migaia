@@ -190,26 +190,53 @@ export function validateSpawnProcessPluginDeployment<THandle extends IProcessHan
     invalidOption(`${specField}.bootstrap.via`)
 }
 
+/** The single active generation owns one stderr reader subscription and reports listener failures. */
+type IProcessStderrSource = Readonly<{
+  emit(chunk: Uint8Array): void
+  subscribe(next: (chunk: Uint8Array) => void): () => void
+}>
+
 /** The active generation alone can subscribe to stderr blocks after its channel is ready. */
-function createStderrSource(report: (error: unknown) => void) {
+/** Allocate one generation stderr subscriber before installing behavior callbacks. */
+function processStderrSourceState(report: (error: unknown) => void) {
   /** A closed channel removes its subscription; pre-handshake blocks are not buffered. */
-  let listener: ((chunk: Uint8Array) => void) | undefined
-  return {
-    emit(chunk: Uint8Array): void {
-      try {
-        listener?.(chunk)
-      } catch (error) {
-        reportSafely(report, error)
-      }
-    },
-    subscribe(next: (chunk: Uint8Array) => void): () => void {
-      if (listener) invalidOption('ipc.stderr')
-      listener = next
-      return () => {
-        if (listener === next) listener = undefined
+  const listener = undefined as ((chunk: Uint8Array) => void) | undefined
+
+  return { listener, report }
+}
+
+/** Own one generation stderr subscriber; callbacks access only this explicit instance. */
+class ProcessStderrSource {
+  /** All mutable storage and original construction inputs belong to this operation. */
+  #state: ReturnType<typeof processStderrSourceState>
+  /** Preserve the original stable resource surface and callback identities. */
+  readonly value: IProcessStderrSource
+  /** Initialize owned storage before publishing the resource's callbacks. */
+  constructor(report: (error: unknown) => void) {
+    this.#state = processStderrSourceState(report)
+
+    this.value = {
+      emit: (chunk: Uint8Array): void => {
+        try {
+          ;(0, this.#state.listener)?.(chunk)
+        } catch (error) {
+          reportSafely(this.#state.report, error)
+        }
+      },
+      subscribe: (next: (chunk: Uint8Array) => void): (() => void) => {
+        if (this.#state.listener) invalidOption('ipc.stderr')
+        this.#state.listener = next
+        return () => {
+          if (this.#state.listener === next) this.#state.listener = undefined
+        }
       }
     }
   }
+}
+
+/** Construct the single owner for one generation stderr subscriber. */
+function createStderrSource(report: (error: unknown) => void): IProcessStderrSource {
+  return new ProcessStderrSource(report).value
 }
 
 /** A channel adapter receives one immutable session and the binding's scheduler identity. */
@@ -270,11 +297,12 @@ async function establishGeneration(
 }
 
 /** Maps an owned process supervisor into the one remote binding contract. */
-export function createSpawnProcessBinding<THandle extends IProcessHandle>(
+/** Allocate one native process supervisor binding before installing behavior callbacks. */
+function spawnProcessBindingState<THandle extends IProcessHandle>(
   deployment: ISpawnProcessPluginDeployment<THandle>,
   report: (error: unknown) => void,
   trackOwned = false
-): IProcessPluginBinding<THandle, IProcessSpec> {
+) {
   validateSpawnProcessPluginDeployment(deployment)
   /** Every generation receives the same caller proposal or one binding-owned default. */
   const offer = deployment.offer ?? defaultProcessOffer(deployment.token)
@@ -287,148 +315,221 @@ export function createSpawnProcessBinding<THandle extends IProcessHandle>(
   if (health === 'ping') requirePingCapabilities(offer.capabilities)
   /** Endpoints are keyed by actual supervisor handles, never by a stale generation number. */
   const channels = new WeakMap<IRemoteChannel, THandle>()
+  /** Each genuine native handle retains its own prepared channel and endpoint until adoption. */
   const readyEndpoints = new WeakMap<
     THandle,
     Readonly<{ channel: IRemoteChannel; endpoint: IRemoteServeEndpoint }>
   >()
+  /** The configured supervisor clock owns all deadlines and drain timing for this binding. */
   const scheduler = deployment.supervision.scheduler ?? systemScheduler
+  /** The existing remote binding drain tracks admitted work across the native generation lifetime. */
   const drain = createRemoteBindingDrain(scheduler, (error) => reportSafely(report, error))
+  /** The existing stderr source retains diagnostics for this binding and closes with its owner. */
   const stderr = createStderrSource(report)
+  /** The caller output hook remains attached alongside the canonical stderr observer. */
   const callerOutput = deployment.supervision.output?.onChunk
   /** Retain only a live owned unit; a borrowed binding has no corresponding termination port. */
-  let currentHandle: THandle | undefined
+  const currentHandle = undefined as THandle | undefined
   /** Escalation is idempotent per actual handle, including repeated shutdown signals. */
   const forced = new WeakSet<THandle>()
-  const supervisor = createProcessSupervisor({
-    ...deployment.supervision,
-    scheduler,
-    stop: {
-      ...deployment.supervision.stop,
-      beforeTerminate: async (unit, signal, remainingMs) => {
-        /** The selected original endpoint receives the exact remaining grace, not a Host budget. */
-        await drain.drainCurrent({ drainMs: remainingMs() })
-        if (!signal.aborted)
-          await deployment.supervision.stop?.beforeTerminate?.(unit, signal, remainingMs)
-      }
-    },
-    ...(trackOwned
-      ? {
-          async ready(unit: THandle, signal: IAbortSignal) {
-            currentHandle = unit
-            void unit.exited.then(
-              () => {
-                if (currentHandle === unit) currentHandle = undefined
-              },
-              (error) => reportSafely(report, error)
-            )
-            await deployment.supervision.ready?.(unit, signal)
-          }
-        }
-      : {}),
-    ...(health === 'ping'
-      ? {
-          health: {
-            check: (unit: THandle, signal: IAbortSignal) =>
-              checkNativePing(readyEndpoints.get(unit), signal),
-            intervalMs: DEFAULT_HEALTH_INTERVAL_MS,
-            timeoutMs: DEFAULT_HEALTH_TIMEOUT_MS,
-            failureThreshold: DEFAULT_HEALTH_FAILURE_THRESHOLD
-          }
-        }
-      : {}),
-    output: {
-      ...deployment.supervision.output,
-      onChunk(stream, chunk) {
-        try {
-          callerOutput?.(stream, chunk)
-        } catch (error) {
-          reportSafely(report, error)
-        }
-        if (stream === DrainedStream.stderr) stderr.emit(chunk)
-      }
-    }
-  })
+
   return {
-    ownership: 'owned',
-    supervisor,
+    offer,
+    health: health as IProcessPluginBinding<THandle, IProcessSpec>['health'],
+    channels,
+    readyEndpoints,
     scheduler,
-    health,
-    registrationSupervisor: registrationSupervisor(supervisor),
-    trackRequest: drain.trackCurrent,
-    forceCurrent() {
-      if (!currentHandle || forced.has(currentHandle)) return
-      const unit = currentHandle
-      forced.add(unit)
-      // Retire through the existing stop command before exit, so it is not classified as a new
-      // unexpected departure with another force teardown. The command still awaits real exited.
-      void supervisor.stop().catch((error) => reportSafely(report, error))
-      unit.terminate(TerminationMode.force)
-    },
-    drainCurrent: (options) =>
-      supervisor.state === 'ready' ? drain.drainCurrent(options) : Promise.resolve(),
-    bindEndpoint(channel, endpoint, onExecution) {
-      if (health === 'ping') requirePingEndpoint(channel, endpoint)
-      const unit = channels.get(channel)
-      if (!unit) invalidOption('deployment.establish')
-      const tracked = drain.wrap(channel, endpoint, onExecution)
-      readyEndpoints.set(unit, { channel, endpoint: tracked })
-      return tracked
-    },
-    async openChannel(unit, signal) {
-      const raw = await deployment.rawChannel(unit, signal)
-      if (raw.kind !== deployment.channelKind) {
-        await raw.close()
-        invalidOption('deployment.channelKind')
+    drain,
+    stderr,
+    callerOutput,
+    currentHandle,
+    forced,
+    deployment,
+    report,
+    trackOwned
+  }
+}
+
+/** Own one native process supervisor binding; callbacks access only this explicit instance. */
+class SpawnProcessBinding<THandle extends IProcessHandle> {
+  /** All mutable storage and original construction inputs belong to this operation. */
+  #state: ReturnType<typeof spawnProcessBindingState<THandle>>
+  /** Preserve the original stable resource surface and callback identities. */
+  readonly value: IProcessPluginBinding<THandle, IProcessSpec>
+  /** Initialize owned storage before publishing the resource's callbacks. */
+  constructor(
+    deployment: ISpawnProcessPluginDeployment<THandle>,
+    report: (error: unknown) => void,
+    trackOwned = false
+  ) {
+    this.#state = spawnProcessBindingState(deployment, report, trackOwned)
+    const supervisor = createProcessSupervisor({
+      ...this.#state.deployment.supervision,
+      scheduler: this.#state.scheduler,
+      stop: {
+        ...this.#state.deployment.supervision.stop,
+        beforeTerminate: async (unit, signal, remainingMs) => {
+          /** The selected original endpoint receives the exact remaining grace, not a Host budget. */
+          await this.#state.drain.drainCurrent({ drainMs: remainingMs() })
+          if (!signal.aborted)
+            await this.#state.deployment.supervision.stop?.beforeTerminate?.(
+              unit,
+              signal,
+              remainingMs
+            )
+        }
+      },
+      ...(this.#state.trackOwned
+        ? {
+            ready: async (unit: THandle, signal: IAbortSignal) => {
+              this.#state.currentHandle = unit
+              void unit.exited.then(
+                () => {
+                  if (this.#state.currentHandle === unit) this.#state.currentHandle = undefined
+                },
+                (error) => reportSafely(this.#state.report, error)
+              )
+              await this.#state.deployment.supervision.ready?.(unit, signal)
+            }
+          }
+        : {}),
+      ...(this.#state.health === 'ping'
+        ? {
+            health: {
+              check: (unit: THandle, signal: IAbortSignal) =>
+                checkNativePing(this.#state.readyEndpoints.get(unit), signal),
+              intervalMs: DEFAULT_HEALTH_INTERVAL_MS,
+              timeoutMs: DEFAULT_HEALTH_TIMEOUT_MS,
+              failureThreshold: DEFAULT_HEALTH_FAILURE_THRESHOLD
+            }
+          }
+        : {}),
+      output: {
+        ...this.#state.deployment.supervision.output,
+        onChunk: (stream, chunk) => {
+          try {
+            ;(0, this.#state.callerOutput)?.(stream, chunk)
+          } catch (error) {
+            reportSafely(this.#state.report, error)
+          }
+          if (stream === DrainedStream.stderr) this.#state.stderr.emit(chunk)
+        }
       }
-      const session: IProcessPluginSession = Object.freeze({
-        connectionId: defaultRpcId(),
-        sessionId: defaultRpcId(),
-        processId: unit.identity.fingerprint
-      })
-      const channel = await establishGeneration(
-        raw,
-        deployment.wire,
-        deployment.establish,
-        signal,
-        scheduler,
-        session,
-        deployment.token,
-        offer,
-        stderr.subscribe,
-        report,
-        () => Promise.resolve(raw.close())
-      )
-      channels.set(channel, unit)
-      return channel
+    })
+    this.value = {
+      ownership: 'owned',
+      supervisor,
+      scheduler: this.#state.scheduler,
+      health: this.#state.health,
+      registrationSupervisor: registrationSupervisor(supervisor),
+      trackRequest: this.#state.drain.trackCurrent,
+      forceCurrent: () => {
+        if (!this.#state.currentHandle || this.#state.forced.has(this.#state.currentHandle)) return
+        const unit = this.#state.currentHandle
+        this.#state.forced.add(unit)
+        // Retire through the existing stop command before exit, so it is not classified as a new
+        // unexpected departure with another force teardown. The command still awaits real exited.
+        void supervisor.stop().catch((error) => reportSafely(this.#state.report, error))
+        unit.terminate(TerminationMode.force)
+      },
+      drainCurrent: (options) =>
+        supervisor.state === 'ready' ? this.#state.drain.drainCurrent(options) : Promise.resolve(),
+      bindEndpoint: (channel, endpoint, onExecution) => {
+        if (this.#state.health === 'ping') requirePingEndpoint(channel, endpoint)
+        const unit = this.#state.channels.get(channel)
+        if (!unit) invalidOption('deployment.establish')
+        const tracked = this.#state.drain.wrap(channel, endpoint, onExecution)
+        this.#state.readyEndpoints.set(unit, { channel, endpoint: tracked })
+        return tracked
+      },
+      openChannel: async (unit, signal) => {
+        const raw = await this.#state.deployment.rawChannel(unit, signal)
+        if (raw.kind !== this.#state.deployment.channelKind) {
+          await raw.close()
+          invalidOption('deployment.channelKind')
+        }
+        const session: IProcessPluginSession = Object.freeze({
+          connectionId: defaultRpcId(),
+          sessionId: defaultRpcId(),
+          processId: unit.identity.fingerprint
+        })
+        const channel = await establishGeneration(
+          raw,
+          this.#state.deployment.wire,
+          this.#state.deployment.establish,
+          signal,
+          this.#state.scheduler,
+          session,
+          this.#state.deployment.token,
+          this.#state.offer,
+          this.#state.stderr.subscribe,
+          this.#state.report,
+          () => Promise.resolve(raw.close())
+        )
+        this.#state.channels.set(channel, unit)
+        return channel
+      }
     }
   }
 }
 
+/** Construct the single owner for one native process supervisor binding. */
+export function createSpawnProcessBinding<THandle extends IProcessHandle>(
+  deployment: ISpawnProcessPluginDeployment<THandle>,
+  report: (error: unknown) => void,
+  trackOwned = false
+): IProcessPluginBinding<THandle, IProcessSpec> {
+  return new SpawnProcessBinding<THandle>(deployment, report, trackOwned).value
+}
+
 /** Converts an external socket into a local unit whose exit waits for physical close. */
-function createConnectionHandle(raw: IProcessByteChannel): IProcessConnectionHandle {
+/** Allocate one external physical connection close receipt before installing behavior callbacks. */
+function processConnectionHandleState(raw: IProcessByteChannel) {
   /** The physical close notification settles the local session budget lease. */
   let settleExit!: (value: Readonly<{ reason: unknown }>) => void
+  /**
+   * One shared terminal Promise preserves native exit identity for every observer of this
+   * generation.
+   */
   const exited = new Promise<Readonly<{ reason: unknown }>>((resolve) => {
     settleExit = resolve
   })
   /** A close Promise is shared across supervisor stop, endpoint disposal, and EOF. */
-  let closing: Promise<void> | undefined
-  /** A closed dialer may notify synchronously during subscription. */
-  let unsubscribe: () => void = () => undefined
-  unsubscribe = raw.onClose((reason) => {
-    unsubscribe()
-    settleExit({ reason })
-  })
-  return {
-    identity: Object.freeze({ fingerprint: defaultRpcId() }),
-    exited,
-    channel: raw,
-    close: () =>
-      (closing ??= Promise.resolve(raw.close()).then(() => {
-        unsubscribe()
-        settleExit({ reason: undefined })
-      }))
+  const closing = undefined as Promise<void> | undefined
+
+  return { settleExit, exited, closing, raw, unsubscribe: undefined as unknown as () => void }
+}
+
+/** Own one external physical connection close receipt; callbacks access only this explicit instance. */
+class ProcessConnectionHandle {
+  /** All mutable storage and original construction inputs belong to this operation. */
+  #state: ReturnType<typeof processConnectionHandleState>
+  /** Preserve the original stable resource surface and callback identities. */
+  readonly value: IProcessConnectionHandle
+  /** Initialize owned storage before publishing the resource's callbacks. */
+  constructor(raw: IProcessByteChannel) {
+    this.#state = processConnectionHandleState(raw)
+    this.#state.unsubscribe = () => undefined
+    this.#state.unsubscribe = this.#state.raw.onClose((reason) => {
+      ;(0, this.#state.unsubscribe)()
+      ;(0, this.#state.settleExit)({ reason })
+    })
+    this.value = {
+      identity: Object.freeze({ fingerprint: defaultRpcId() }),
+      exited: this.#state.exited,
+      channel: this.#state.raw,
+      close: () =>
+        (this.#state.closing ??= Promise.resolve(this.#state.raw.close()).then(() => {
+          ;(0, this.#state.unsubscribe)()
+          ;(0, this.#state.settleExit)({ reason: undefined })
+        }))
+    }
   }
+}
+
+/** Construct the single owner for one external physical connection close receipt. */
+function createConnectionHandle(raw: IProcessByteChannel): IProcessConnectionHandle {
+  return new ProcessConnectionHandle(raw).value
 }
 
 /** Borrowed socket and adopted channel units share the same local close-only supervision profile. */
@@ -480,10 +581,11 @@ export function createProcessConnectionSupervisor<THandle extends IProcessConnec
 }
 
 /** Maps a borrowed external process to an owned, single-session socket supervisor. */
-export function createConnectProcessBinding(
+/** Allocate one borrowed process connection binding before installing behavior callbacks. */
+function connectProcessBindingState(
   deployment: IConnectProcessPluginDeployment,
   report: (error: unknown) => void
-): IProcessPluginBinding<IProcessConnectionHandle, string> {
+) {
   if (
     !deployment ||
     deployment.kind !== 'connect' ||
@@ -504,82 +606,117 @@ export function createConnectProcessBinding(
       ? 'none'
       : 'ping'
   if (health === 'ping') requirePingCapabilities(offer.capabilities)
+  /** Endpoints are keyed by actual supervisor handles, never by a stale generation number. */
   const channels = new WeakMap<IRemoteChannel, IProcessConnectionHandle>()
+  /** Each genuine native handle retains its own prepared channel and endpoint until adoption. */
   const readyEndpoints = new WeakMap<
     IProcessConnectionHandle,
     Readonly<{ channel: IRemoteChannel; endpoint: IRemoteServeEndpoint }>
   >()
+  /** The configured supervisor clock owns all deadlines and drain timing for this binding. */
   const scheduler = deployment.supervision?.scheduler ?? systemScheduler
+  /** The existing remote binding drain tracks admitted work across the native generation lifetime. */
   const drain = createRemoteBindingDrain(scheduler, (error) => reportSafely(report, error))
-  const supervisor = createProcessConnectionSupervisor(
-    deployment.address,
-    scheduler,
-    report,
-    {
-      capabilities: {},
-      async launch(address, context) {
-        const raw = await deployment.dial(address, context.signal)
-        if (context.signal.aborted) {
-          await raw.close()
-          throw resolveAbortReason(context.signal)
-        }
-        return createConnectionHandle(raw)
-      }
-    },
-    {
-      ...deployment.supervision,
-      ...(health === 'ping'
-        ? {
-            health: {
-              check: (unit: IProcessConnectionHandle, signal: IAbortSignal) =>
-                checkNativePing(readyEndpoints.get(unit), signal),
-              intervalMs: DEFAULT_HEALTH_INTERVAL_MS,
-              timeoutMs: DEFAULT_HEALTH_TIMEOUT_MS,
-              failureThreshold: DEFAULT_HEALTH_FAILURE_THRESHOLD
-            }
-          }
-        : {})
-    }
-  )
+
   return {
-    ownership: 'owned',
-    supervisor,
+    offer,
+    health: health as IProcessPluginBinding<IProcessConnectionHandle, string>['health'],
+    channels,
+    readyEndpoints,
     scheduler,
-    health,
-    registrationSupervisor: registrationSupervisor(supervisor),
-    trackRequest: drain.trackCurrent,
-    drainCurrent: (options) =>
-      supervisor.state === 'ready' ? drain.drainCurrent(options) : Promise.resolve(),
-    bindEndpoint(channel, endpoint, onExecution) {
-      if (health === 'ping') requirePingEndpoint(channel, endpoint)
-      const unit = channels.get(channel)
-      if (!unit) invalidOption('deployment.establish')
-      const tracked = drain.wrap(channel, endpoint, onExecution)
-      readyEndpoints.set(unit, { channel, endpoint: tracked })
-      return tracked
-    },
-    async openChannel(unit, signal) {
-      const session: IProcessPluginSession = Object.freeze({
-        connectionId: defaultRpcId(),
-        sessionId: unit.identity.fingerprint
-      })
-      const channel = await establishGeneration(
-        unit.channel,
-        deployment.wire,
-        deployment.establish,
-        signal,
-        scheduler,
-        session,
-        deployment.token,
-        offer,
-        () => () => undefined,
-        report,
-        unit.close
-      )
-      channels.set(channel, unit)
-      return channel
+    drain,
+    deployment,
+    report
+  }
+}
+
+/** Own one borrowed process connection binding; callbacks access only this explicit instance. */
+class ConnectProcessBinding {
+  /** All mutable storage and original construction inputs belong to this operation. */
+  #state: ReturnType<typeof connectProcessBindingState>
+  /** Preserve the original stable resource surface and callback identities. */
+  readonly value: IProcessPluginBinding<IProcessConnectionHandle, string>
+  /** Initialize owned storage before publishing the resource's callbacks. */
+  constructor(deployment: IConnectProcessPluginDeployment, report: (error: unknown) => void) {
+    this.#state = connectProcessBindingState(deployment, report)
+    const supervisor = createProcessConnectionSupervisor(
+      this.#state.deployment.address,
+      this.#state.scheduler,
+      this.#state.report,
+      {
+        capabilities: {},
+        launch: async (address, context) => {
+          const raw = await this.#state.deployment.dial(address, context.signal)
+          if (context.signal.aborted) {
+            await raw.close()
+            throw resolveAbortReason(context.signal)
+          }
+          return createConnectionHandle(raw)
+        }
+      },
+      {
+        ...this.#state.deployment.supervision,
+        ...(this.#state.health === 'ping'
+          ? {
+              health: {
+                check: (unit: IProcessConnectionHandle, signal: IAbortSignal) =>
+                  checkNativePing(this.#state.readyEndpoints.get(unit), signal),
+                intervalMs: DEFAULT_HEALTH_INTERVAL_MS,
+                timeoutMs: DEFAULT_HEALTH_TIMEOUT_MS,
+                failureThreshold: DEFAULT_HEALTH_FAILURE_THRESHOLD
+              }
+            }
+          : {})
+      }
+    )
+    this.value = {
+      ownership: 'owned',
+      supervisor,
+      scheduler: this.#state.scheduler,
+      health: this.#state.health,
+      registrationSupervisor: registrationSupervisor(supervisor),
+      trackRequest: this.#state.drain.trackCurrent,
+      drainCurrent: (options) =>
+        supervisor.state === 'ready' ? this.#state.drain.drainCurrent(options) : Promise.resolve(),
+      bindEndpoint: (channel, endpoint, onExecution) => {
+        if (this.#state.health === 'ping') requirePingEndpoint(channel, endpoint)
+        const unit = this.#state.channels.get(channel)
+        if (!unit) invalidOption('deployment.establish')
+        const tracked = this.#state.drain.wrap(channel, endpoint, onExecution)
+        this.#state.readyEndpoints.set(unit, { channel, endpoint: tracked })
+        return tracked
+      },
+      openChannel: async (unit, signal) => {
+        const session: IProcessPluginSession = Object.freeze({
+          connectionId: defaultRpcId(),
+          sessionId: unit.identity.fingerprint
+        })
+        const channel = await establishGeneration(
+          unit.channel,
+          this.#state.deployment.wire,
+          this.#state.deployment.establish,
+          signal,
+          this.#state.scheduler,
+          session,
+          this.#state.deployment.token,
+          this.#state.offer,
+          () => () => undefined,
+          this.#state.report,
+          unit.close
+        )
+        this.#state.channels.set(channel, unit)
+        return channel
+      }
     }
   }
+}
+
+/** Construct the single owner for one borrowed process connection binding. */
+export function createConnectProcessBinding(
+  deployment: IConnectProcessPluginDeployment,
+  report: (error: unknown) => void
+): IProcessPluginBinding<IProcessConnectionHandle, string> {
+  return new ConnectProcessBinding(deployment, report).value
 }
 
 /** One internal entry point keeps processHost on the same spawn and connect ownership paths. */

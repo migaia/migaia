@@ -1,24 +1,30 @@
+import { createRuntimeEndpointComposition } from '../../dist/core/runtime-api-endpoint.js'
 import { describe, expect, it } from 'vitest'
-import { createClientEndpoint } from '../../dist/core/client.js'
-import { createProviderEndpoint } from '../../dist/core/provider.js'
-import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
+
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
 import { connect } from '../../dist/core/middleware/connect.js'
 
 describe('provider event dispatch delegate', () => {
   it('delivers dispatch-only frames to the provider-owned listener registry', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
-    const server = await createProviderEndpoint({
-      id: 'event-server',
-      transport: serverTransport,
-      targetIds: ['event-client'],
-      middlewares: [connect({ transport: serverTransport })]
-    })
-    const client = await createClientEndpoint({
-      id: 'event-client',
-      transport: clientTransport,
-      targetIds: ['event-server'],
-      middlewares: [connect({ transport: clientTransport })]
-    })
+    const server = await createRuntimeEndpointComposition(
+      {
+        id: 'event-server',
+        transport: serverTransport,
+        targetIds: ['event-client'],
+        middlewares: [connect({ transport: serverTransport })]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'event-client',
+        transport: clientTransport,
+        targetIds: ['event-server'],
+        middlewares: [connect({ transport: clientTransport })]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     const frames: unknown[] = []
     const release = server.on('serialize.frame', (context) => {
       frames.push(context.data)

@@ -2,7 +2,7 @@ import type { IScheduler } from '@migaia/utils/scheduler'
 import type { IRpcHandshakeOffer, IRpcPeerInfo, IRpcPortableValue } from '@migaia/rpc-contract'
 import type { IIpcLogInstallation, IIpcLogRecord } from '../../core/plugins/flow-control.js'
 import type { IRpcTransport } from '../../core/transport.js'
-import type { IRuntimePeerSourceResult } from '../../remote/index.js'
+import type { IRuntimePeerSourceResult } from '../../remote/runtime-api/peer.js'
 
 /** Ordered physical I/O held by the adapter; labels never establish Core authority. */
 export type IRuntimeByteIO = Readonly<{

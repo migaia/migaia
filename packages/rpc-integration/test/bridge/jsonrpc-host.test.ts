@@ -1,10 +1,12 @@
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { describe, expect, it } from 'vitest'
-import { createProcessPeer } from '../../../rpc-plugin-process/test/protocol.ts'
-import type { IRuntimeProcessPeerOptions } from '../../../rpc-plugin-process/dist/process/runtime-peer.js'
-import type { IRuntimeDynamicSurface } from '@migaia/rpc-host/plugin'
-import { RemoteMethodName } from '@migaia/rpc-host/plugin'
+import { PluginHost } from '@migaia/plugin-host'
+import {
+  readRuntimeOutletConnection,
+  type IRuntimeOutlet
+} from '../../../rpc-host/dist/remote/runtime-api/outlet.js'
+import { processPlugin, type IProcessPluginOptions } from '@migaia/rpc-plugin-process'
 import { BRIDGE_CONTRACT } from './fixture.js'
 import {
   childPath,
@@ -18,7 +20,7 @@ import {
 type IWireEvent = { method: string; params?: { method?: string; args?: unknown[] } }
 
 describe('JSON-RPC process Host ownership', () => {
-  it('runs Host controls through bridge and closes bytes before owned exit without a close frame', async () => {
+  it('runs bridge business and closes bytes before owned exit without a close frame', async () => {
     /**
      * The caller supplies a real dedicated-fd launcher, distinct from the built-in unsupported fd
      * adapter.
@@ -33,7 +35,7 @@ describe('JSON-RPC process Host ownership', () => {
     /** Reports retain their original identities for failure diagnosis. */
     const reports: unknown[] = []
     /** Public Peer construction reuses the actual source, bridge handshake and native lifecycle. */
-    const options: IRuntimeProcessPeerOptions = {
+    const options: IProcessPluginOptions = {
       self: { name: 'caller', instanceId: 'caller' },
       report: (error) => reports.push(error),
       spawn: {
@@ -46,7 +48,7 @@ describe('JSON-RPC process Host ownership', () => {
           scheduler: systemScheduler,
           spec: {
             command: process.execPath,
-            args: [childPath, '--host'],
+            args: [childPath],
             env: { inherit: [], set: {} },
             stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' },
             bootstrap: { via: 'fd', fd: 3, payload: new TextEncoder().encode(token) }
@@ -87,30 +89,33 @@ describe('JSON-RPC process Host ownership', () => {
           report: (error) => reports.push(error)
         },
         rawChannel: async (handle) => (handle as IFixtureHandle).channel,
-        establish: establish([], reports, [], [], { kind: 'host', catalog: { p: BRIDGE_CONTRACT } })
+        establish: establish([], reports, [], [], { kind: 'plugin', contract: BRIDGE_CONTRACT })
       }
     }
     expect(handles).toHaveLength(0)
-    const host = await createProcessPeer<IRuntimeDynamicSurface>(options)
+    const host = new PluginHost<Record<string, never>>({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    })
+    await host.use(processPlugin({ ...options, name: 'p' }))
+    /**
+     * Only the actual managed native receipt can report unit state; the logical Host does not
+     * invent it.
+     */
+    const peer = readRuntimeOutletConnection(
+      Reflect.get(host, 'process') as IRuntimeOutlet,
+      'p'
+    )!.peer
     try {
-      expect((await host.describe()).connections[0]).toMatchObject({
+      expect((await peer.describe()).connections[0]).toMatchObject({
         unit: { state: 'ready' },
         connection: { status: 'ready' },
         health: { status: 'unavailable' }
       })
-      expect(await host.request(RemoteMethodName.hostInspect, [])).toMatchObject({ plugins: [] })
-      /** Public proxy requests follow actual describe/use negotiation with the handwritten peer. */
-      await host.request(RemoteMethodName.hostUse, ['p', { mode: 'configuration' }])
-      expect(await host.request('p.f.request', ['host-business'])).toMatchObject({
+      expect(await peer.request('p.f.request', ['host-business'])).toMatchObject({
         args: ['host-business'],
         first: 67
       })
-      expect(await host.request(RemoteMethodName.hostInspect, [])).toMatchObject({
-        plugins: [{ name: 'p', state: 'enabled', features: ['f'] }]
-      })
-      expect(await host.request(RemoteMethodName.hostUnUse, ['p'])).toEqual({ ok: true })
-      expect(await host.request(RemoteMethodName.hostInspect, [])).toMatchObject({ plugins: [] })
-      await host.close()
+      await peer.close()
       await handles[0]!.exited
       expect(order.indexOf('byte.close')).toBeLessThan(order.indexOf('process.terminate'))
       expect(writes.map((event) => event.method)).not.toContain('migaia.remote.close')
@@ -119,14 +124,7 @@ describe('JSON-RPC process Host ownership', () => {
         writes
           .filter((event) => event.method === 'migaia.invoke')
           .map((event) => event.params!.method)
-      ).toEqual([
-        'migaia.remote.host.inspect',
-        'migaia.remote.host.use',
-        'p.f.request',
-        'migaia.remote.host.inspect',
-        'migaia.remote.host.unUse',
-        'migaia.remote.host.inspect'
-      ])
+      ).toEqual(['p.f.request'])
       expect(
         writes.every((event) =>
           ['migaia.hello', 'migaia.describe', 'migaia.invoke', 'migaia.cancel'].includes(
@@ -138,7 +136,7 @@ describe('JSON-RPC process Host ownership', () => {
         true
       )
     } finally {
-      await host.close()
+      await host.dispose()
     }
   })
 })

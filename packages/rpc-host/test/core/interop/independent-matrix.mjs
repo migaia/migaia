@@ -1,3 +1,4 @@
+import { orderStringKeys } from '@migaia/utils/string'
 import { readFileSync } from 'node:fs'
 import { decode as decodeCbor, encode as encodeCbor } from 'cborg'
 import { Elysia } from 'elysia'
@@ -11,9 +12,7 @@ const canonicalizeJson = (value) =>
     ? value.map(canonicalizeJson)
     : value && typeof value === 'object'
       ? Object.fromEntries(
-          Object.keys(value)
-            .sort()
-            .map((key) => [key, canonicalizeJson(value[key])])
+          orderStringKeys(Object.keys(value)).map((key) => [key, canonicalizeJson(value[key])])
         )
       : value
 const canonicalJson = (value) => JSON.stringify(canonicalizeJson(value))
@@ -113,7 +112,7 @@ let productionModules
 const loadProductionModules = async () => {
   if (!productionModules) {
     productionModules = {
-      endpoint: await import('../../../dist/core/index.js'),
+      endpoint: await import('../../../dist/core/runtime-api-endpoint.js'),
       codecMiddleware: await import('../../../dist/core/middleware/codec.js'),
       connectMiddleware: await import('../../../dist/core/middleware/connect.js'),
       framerMiddleware: await import('../../../dist/core/middleware/framer.js'),
@@ -330,150 +329,226 @@ const toBytes = async (value) => {
   return Uint8Array.from(data)
 }
 
-/** Creates a transport that exposes one independent Elysia peer to the production endpoint. */
-const createProductionTransport = (app, codec, carrier) => {
-  const listeners = new Set()
-  const inboundObservers = new Set()
-  let socket
-  let socketReady
-  let sseAbort
-  let sseReady
-  let sseReader
-  let sseFailure
-  let sseCapture
-  const inboundCarriers = []
-  const sentCarriers = []
-  const emit = (data) => {
-    inboundCarriers.push(data)
-    for (const observer of Array.from(inboundObservers)) observer(data)
-    for (const listener of Array.from(listeners)) listener({ data })
+/** Own the real socket/SSE subscriptions used by one independent peer comparison cell. */
+class IndependentProductionTransport {
+  /** The caller owns this already-started independent application and its address. */
+  #app
+  /** Only the independently selected codec identity decides text versus binary carrier handling. */
+  #codec
+  /** The case selects one of the original physical carriers before any I/O. */
+  #carrier
+  /** Canonical endpoint callbacks receive complete physical carrier values. */
+  #listeners = new Set()
+  /** Observers record exact inbound bytes before endpoint listeners receive them. */
+  #inboundObservers = new Set()
+  /** One native socket belongs to this cell until explicit transport close. */
+  #socket
+  /** Repeated sends join the original socket-opening Promise. */
+  #socketReady
+  /** The same native cancellation owner controls the held SSE response. */
+  #sseAbort
+  /** Repeated POSTs join the original event-stream opening Promise. */
+  #sseReady
+  /** This reader alone owns event-stream input and cancellation. */
+  #sseReader
+  /** An asynchronous SSE read failure stays visible to the original boundary assertion. */
+  #sseFailure
+  /** The most recent real event preserves both its exact text and decoded carrier bytes. */
+  #sseCapture
+  /** Exact received carriers remain available to the independent comparison oracle. */
+  #inboundCarriers = []
+  /** Exact socket writes remain available to the original sent-carrier oracle. */
+  #sentCarriers = []
+  /** Own enumerable transport methods preserve the original projection and detached-call behavior. */
+  value
+
+  /**
+   * Hold one selected independent peer without opening its physical carrier.
+   *
+   * @param {{ port: number }} app Already-started independent application.
+   * @param {{ id: string }} codec Codec identity used by the original carrier comparison.
+   * @param {string} carrier Selected socket, POST, or POST/SSE case.
+   */
+  constructor(app, codec, carrier) {
+    this.#app = app
+    this.#codec = codec
+    this.#carrier = carrier
+    this.value = {
+      platform: 'MessagePort',
+      topology: 'exclusive',
+      ownership: 'owned',
+      encodedType: 'any',
+      send: (message) => this.#send(message),
+      subscribe: (listener) => {
+        this.#listeners.add(listener)
+        return () => this.#listeners.delete(listener)
+      },
+      close: () => this.#close(),
+      readInboundCarriers: () => [...this.#inboundCarriers],
+      readSentCarriers: () => [...this.#sentCarriers],
+      observeInboundCarrier: (observer) => {
+        this.#inboundObservers.add(observer)
+        return () => this.#inboundObservers.delete(observer)
+      },
+      assertCarrierBoundary: (expected, peerExpected) =>
+        this.#assertCarrierBoundary(expected, peerExpected)
+    }
   }
-  const openSocket = () => {
-    if (socketReady) return socketReady
-    socketReady = new Promise((resolve, reject) => {
-      socket = new WebSocket(`ws://localhost:${app.port}/rpc`)
-      socket.binaryType = 'arraybuffer'
-      socket.onopen = resolve
-      socket.onerror = () => reject(new Error('websocket cell failed'))
-      socket.onmessage = async (event) => {
-        emit(
-          codec.id === 'json'
+
+  /** Record and publish each complete carrier in the original observer-before-listener order. */
+  #emit(data) {
+    this.#inboundCarriers.push(data)
+    for (const observer of Array.from(this.#inboundObservers)) observer(data)
+    for (const listener of Array.from(this.#listeners)) listener({ data })
+  }
+
+  /** Open one real socket and preserve the exact cached native readiness Promise. */
+  #openSocket() {
+    if (this.#socketReady) return this.#socketReady
+    this.#socketReady = new Promise((resolve, reject) => {
+      this.#socket = new WebSocket(`ws://localhost:${this.#app.port}/rpc`)
+      this.#socket.binaryType = 'arraybuffer'
+      this.#socket.onopen = resolve
+      this.#socket.onerror = () => reject(new Error('websocket cell failed'))
+      this.#socket.onmessage = async (event) => {
+        this.#emit(
+          this.#codec.id === 'json'
             ? new TextDecoder().decode(await toBytes(event.data))
             : await toBytes(event.data)
         )
       }
     })
-    return socketReady
+    return this.#socketReady
   }
-  const openSse = () => {
-    if (sseReady) return sseReady
-    sseAbort = new AbortController()
-    sseReady = fetch(`http://localhost:${app.port}/events`, { signal: sseAbort.signal }).then(
-      (response) => {
-        if (!response.ok || !response.body) throw new Error('SSE stream failed')
-        sseReader = response.body.getReader()
-        void (async () => {
-          let buffered = ''
-          while (true) {
-            const { done, value } = await sseReader.read()
-            if (done) return
-            buffered += new TextDecoder().decode(value)
-            const events = buffered.split('\n\n')
-            buffered = events.pop() ?? ''
-            for (const event of events) {
-              const line = event.match(/^data:(.*)$/u)?.[1]
-              if (line === undefined) continue
-              const payload =
-                codec.id === 'json' ? line : Uint8Array.from(Buffer.from(line, 'base64url'))
-              sseCapture = { line, payload }
-              emit(payload)
-            }
-          }
-        })().catch((error) => {
-          sseFailure = error
-        })
+
+  /** Open one event stream and start its original independently reported reader loop. */
+  #openSse() {
+    if (this.#sseReady) return this.#sseReady
+    this.#sseAbort = new AbortController()
+    this.#sseReady = fetch(`http://localhost:${this.#app.port}/events`, {
+      signal: this.#sseAbort.signal
+    }).then((response) => {
+      if (!response.ok || !response.body) throw new Error('SSE stream failed')
+      this.#sseReader = response.body.getReader()
+      void this.#readSse().catch((error) => {
+        this.#sseFailure = error
+      })
+    })
+    return this.#sseReady
+  }
+
+  /** Decode every incoming chunk exactly as before, then scan each decoded character once. */
+  async #readSse() {
+    /** This original read loop alone owns its incomplete event, including close/reopen races. */
+    let characters = []
+    /** Two adjacent LF characters delimit one event, including a split chunk boundary. */
+    let newline = false
+    while (true) {
+      const { done, value } = await this.#sseReader.read()
+      if (done) return
+      // Preserve the original per-chunk decoder behavior, including malformed split UTF-8 input.
+      for (const character of new TextDecoder().decode(value)) {
+        if (character === '\n' && newline) {
+          characters.pop()
+          /** This exact event is materialized once rather than rescanning the whole pending prefix. */
+          const event = characters.join('')
+          characters = []
+          newline = false
+          this.#acceptSseEvent(event)
+        } else {
+          characters.push(character)
+          newline = character === '\n'
+        }
       }
-    )
-    return sseReady
+    }
   }
-  const sendPost = async (message) => {
-    if (carrier === 'post-sse') await openSse()
-    const response = await fetch(`http://localhost:${app.port}/rpc`, {
+
+  /** Preserve the original one-line data grammar and canonical binary carrier comparison. */
+  #acceptSseEvent(event) {
+    /** The existing closed event selector ignores all non-data records. */
+    const line = event.match(/^data:(.*)$/u)?.[1]
+    if (line === undefined) return
+    /** The independent peer uses original JSON text or canonical base64url bytes. */
+    const payload =
+      this.#codec.id === 'json' ? line : Uint8Array.from(Buffer.from(line, 'base64url'))
+    this.#sseCapture = { line, payload }
+    this.#emit(payload)
+  }
+
+  /** Send the original HTTP request; event-stream cases receive their answer on the held reader. */
+  async #sendPost(message) {
+    if (this.#carrier === 'post-sse') await this.#openSse()
+    /** This request and content type remain the original independent physical carrier. */
+    const response = await fetch(`http://localhost:${this.#app.port}/rpc`, {
       method: 'POST',
       headers: {
-        'content-type': codec.id === 'json' ? 'application/json' : 'application/octet-stream'
+        'content-type': this.#codec.id === 'json' ? 'application/json' : 'application/octet-stream'
       },
       body: message
     })
     if (!response.ok) throw new Error(`HTTP ${response.status}`)
-    if (carrier !== 'post-sse') {
+    if (this.#carrier !== 'post-sse') {
+      /** Materialize the real response body once before the original text/binary emission. */
       const body = new Uint8Array(await response.arrayBuffer())
-      emit(codec.id === 'json' ? new TextDecoder().decode(body) : body)
+      this.#emit(this.#codec.id === 'json' ? new TextDecoder().decode(body) : body)
     }
   }
-  const assertCarrierBoundary = (expected, peerExpected) => {
-    if (carrier !== 'post-sse') return
-    if (sseFailure) throw sseFailure
-    if (!sseCapture) throw new Error('SSE response event missing')
-    if (codec.id === 'json') {
+
+  /** Send only through this case's selected physical carrier and preserve socket trace order. */
+  async #send(message) {
+    if (this.#carrier === 'websocket') {
+      await this.#openSocket()
+      this.#socket.send(typeof message === 'string' ? message : Buffer.from(message))
+      this.#sentCarriers.push(message)
+    } else await this.#sendPost(message)
+  }
+
+  /** Keep the original exact text, byte and canonical-base64url assertions. */
+  #assertCarrierBoundary(expected, peerExpected) {
+    if (this.#carrier !== 'post-sse') return
+    if (this.#sseFailure) throw this.#sseFailure
+    if (!this.#sseCapture) throw new Error('SSE response event missing')
+    if (this.#codec.id === 'json') {
+      /** Compare the real peer's original text with both actual carrier observations. */
       const peerExpectedText =
         typeof peerExpected === 'string' ? peerExpected : new TextDecoder().decode(peerExpected)
-      if (sseCapture.line !== expected || sseCapture.line !== peerExpectedText)
+      if (this.#sseCapture.line !== expected || this.#sseCapture.line !== peerExpectedText)
         throw new Error(
-          `JSON SSE text changed at carrier boundary: ${sseCapture.line} !== ${expected}`
+          `JSON SSE text changed at carrier boundary: ${this.#sseCapture.line} !== ${expected}`
         )
       return
     }
+    /** Expected physical bytes come from the same independent peer oracle. */
     const expectedBytes = Buffer.from(peerExpected)
-    const encoded = Buffer.from(sseCapture.line, 'base64url')
-    if (encoded.toString('base64url') !== sseCapture.line)
+    /** Decode the actual event once before canonical round-trip and byte equality checks. */
+    const encoded = Buffer.from(this.#sseCapture.line, 'base64url')
+    if (encoded.toString('base64url') !== this.#sseCapture.line)
       throw new Error('binary SSE payload was not canonical base64url')
-    if (!encoded.equals(expectedBytes) || !Buffer.from(sseCapture.payload).equals(expectedBytes))
+    if (
+      !encoded.equals(expectedBytes) ||
+      !Buffer.from(this.#sseCapture.payload).equals(expectedBytes)
+    )
       throw new Error('binary SSE bytes changed at carrier boundary')
   }
-  return {
-    platform: 'MessagePort',
-    topology: 'exclusive',
-    ownership: 'owned',
-    encodedType: 'any',
-    send: async (message) => {
-      if (carrier === 'websocket') {
-        await openSocket()
-        socket.send(typeof message === 'string' ? message : Buffer.from(message))
-        sentCarriers.push(message)
-      } else {
-        await sendPost(message)
-      }
-    },
-    subscribe: (listener) => {
-      listeners.add(listener)
-      return () => listeners.delete(listener)
-    },
-    close: async () => {
-      socket?.close()
-      sseAbort?.abort()
-      await sseReader?.cancel()
-      socket = undefined
-      socketReady = undefined
-      sseAbort = undefined
-      sseReady = undefined
-      sseReader = undefined
-      listeners.clear()
-    },
-    readInboundCarriers: () => [...inboundCarriers],
-    readSentCarriers: () => [...sentCarriers],
-    observeInboundCarrier: (observer) => {
-      inboundObservers.add(observer)
-      return () => inboundObservers.delete(observer)
-    },
-    assertCarrierBoundary
+
+  /** Close original native resources in order and clear exactly the original transport fields. */
+  async #close() {
+    this.#socket?.close()
+    this.#sseAbort?.abort()
+    await this.#sseReader?.cancel()
+    this.#socket = undefined
+    this.#socketReady = undefined
+    this.#sseAbort = undefined
+    this.#sseReady = undefined
+    this.#sseReader = undefined
+    this.#listeners.clear()
   }
 }
 
 /** Runs one production-endpoint request against the independently implemented peer. */
 const runProductionCell = async (app, codecId, carrier) => {
   const codec = await createProductionCodec(codecId)
-  const transport = createProductionTransport(app, codec, carrier)
+  const transport = new IndependentProductionTransport(app, codec, carrier).value
   const modules = await loadProductionModules()
   const selectedFramer =
     codecId === 'json' ? modules.framing.createStringFramer() : modules.framing.createBinaryFramer()
@@ -502,22 +577,25 @@ const runProductionCell = async (app, codecId, carrier) => {
       }
     })
   })
-  const endpoint = await modules.endpoint.createEndpoint({
-    id: 'production',
-    transport,
-    provider: {
-      'peer-initiated': (context) => {
-        peerProviderCalls += 1
-        resolvePeerProvider()
-        return context.success(context.data)
-      }
+  const endpoint = await modules.endpoint.createRuntimeEndpointComposition(
+    {
+      id: 'production',
+      transport,
+      provider: {
+        'peer-initiated': (context) => {
+          peerProviderCalls += 1
+          resolvePeerProvider()
+          return context.success(context.data)
+        }
+      },
+      middlewares: [
+        modules.codecMiddleware.codec(codec),
+        modules.framerMiddleware.framer(selectedFramer),
+        modules.connectMiddleware.connect({ transport })
+      ]
     },
-    middlewares: [
-      modules.codecMiddleware.codec(codec),
-      modules.framerMiddleware.framer(selectedFramer),
-      modules.connectMiddleware.connect({ transport })
-    ]
-  })
+    { agreement: { capabilities: [] }, peerId: '' }
+  ).installing
   try {
     const response = await endpoint.send('peer', vector.method, vector.data)
     if (JSON.stringify(response) !== JSON.stringify(vector.data)) throw new Error('vector mismatch')

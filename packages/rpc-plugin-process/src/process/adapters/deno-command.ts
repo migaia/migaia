@@ -109,6 +109,137 @@ export type IDenoProcessHandle = IProcessHandle &
  * spawn. Only stdin bootstrap is supported, and whole-tree termination is advertised unsupported.
  * Native spawn failures are retained as causes of PROCESS_CHANNEL_CONNECT_FAILED.
  */
+/** Allocate one native generation's original launch receipts without opening a second supervisor. */
+function denoProcessGenerationState(
+  child: IDenoChild,
+  spec: Parameters<IProcessLauncher<IDenoProcessHandle>['launch']>[0],
+  context: Parameters<IProcessLauncher<IDenoProcessHandle>['launch']>[1],
+  launch: ReturnType<typeof createAdapterProcessLaunch>,
+  runtimeBootstrap: ReturnType<typeof createAdapterProcessLaunch>['bootstrap']
+) {
+  /** Stderr reads start before a potentially blocked bootstrap write. */
+  const stderrDrain =
+    spec.stdio.stderr === 'drain'
+      ? drain(child.stderr, (chunk) => context.output('stderr', chunk))
+      : Promise.resolve()
+  /** Configured stdout draining must settle before the native process exit receipt is published. */
+  const stdoutDrain =
+    spec.stdio.stdout === 'drain'
+      ? drain(child.stdout, (chunk) => context.output('stdout', chunk))
+      : Promise.resolve()
+  /**
+   * One shared terminal Promise preserves native exit identity for every observer of this
+   * generation.
+   */
+  const exited = child.status.then(async (status) => {
+    await Promise.all([stderrDrain, stdoutDrain])
+    return { code: status.code, signal: status.signal }
+  })
+
+  /** Until activation succeeds, rollback owns any newly acquired Web channel. */
+  const channel = undefined as IProcessByteChannel | undefined
+  return {
+    stderrDrain,
+    stdoutDrain,
+    exited,
+    channel,
+    child,
+    spec,
+    context,
+    launch,
+    runtimeBootstrap
+  }
+}
+
+/** Own one actual native process generation from post-spawn acquisition through supervised handoff. */
+class DenoProcessGeneration {
+  /** Raw process, bootstrap and cleanup observations belong only to this launched generation. */
+  #state: ReturnType<typeof denoProcessGenerationState>
+  /** Attach output/failure/cancellation observers in their original post-spawn order. */
+  constructor(
+    child: IDenoChild,
+    spec: Parameters<IProcessLauncher<IDenoProcessHandle>['launch']>[0],
+    context: Parameters<IProcessLauncher<IDenoProcessHandle>['launch']>[1],
+    launch: ReturnType<typeof createAdapterProcessLaunch>,
+    runtimeBootstrap: ReturnType<typeof createAdapterProcessLaunch>['bootstrap']
+  ) {
+    this.#state = denoProcessGenerationState(child, spec, context, launch, runtimeBootstrap)
+    this.#state.context.signal.addEventListener('abort', this.#onAbort, { once: true })
+    void this.#state.exited.then(
+      () => this.#state.context.signal.removeEventListener('abort', this.#onAbort),
+      () => this.#state.context.signal.removeEventListener('abort', this.#onAbort)
+    )
+  }
+  /**
+   * Finish the original startup transaction, preserving native primary failures and rollback
+   * ordering.
+   */
+  async open(): Promise<IDenoProcessHandle> {
+    try {
+      if (this.#state.spec.bootstrap?.via === 'stdin') {
+        const writer = this.#state.child.stdin.getWriter()
+        try {
+          await writer.write(
+            encodeRpcStreamFrame(
+              this.#state.runtimeBootstrap?.payload ?? this.#state.spec.bootstrap.payload
+            )
+          )
+        } finally {
+          writer.releaseLock()
+        }
+      }
+      /** Each physical stream is consumed by either channel or output, never both. */
+      this.#state.channel =
+        this.#state.spec.stdio.stdin === 'channel' && this.#state.spec.stdio.stdout === 'channel'
+          ? this.#state.launch.createWebChannel(this.#state.child.stdout, this.#state.child.stdin)
+          : undefined
+      this.#state.launch.assertActive()
+      /** Startup cancellation must not bypass graceful retirement after the handle is adopted. */
+      this.#state.context.signal.removeEventListener('abort', this.#onAbort)
+      return Object.freeze({
+        identity: Object.freeze({
+          fingerprint: this.#state.runtimeBootstrap?.self.instanceId ?? crypto.randomUUID(),
+          pid: this.#state.child.pid
+        }),
+        exited: this.#state.exited,
+        channel: this.#state.channel,
+        sampleUsage: () => sampleNativeProcess(this.#state.child.pid),
+        ...(this.#state.runtimeBootstrap
+          ? { runtimeApiIdentity: this.#state.runtimeBootstrap.self }
+          : {}),
+        terminate: this.#terminate
+      })
+    } catch (error) {
+      this.#terminate('force')
+      try {
+        await this.#state.channel?.close()
+      } catch (closeError) {
+        /** Report cleanup failure without replacing the original launch cancellation cause. */
+        hostRethrowReporter(closeError, IpcReporterContext)
+      }
+      await this.#state.exited
+      throw ((originalCause: unknown) =>
+        attachErrorIdentity(
+          new Error(
+            RpcProcessErrorText.connectFailed,
+            originalCause === undefined ? undefined : { cause: originalCause }
+          ),
+          { source: RPC_PROCESS_ERROR_SOURCE, code: RpcProcessErrorCode.connectFailed }
+        ))(error)
+    }
+  }
+  /** Preserve this generation's original native callback and its cleanup identity. */
+  #terminate = (mode: TerminationMode): void => {
+    try {
+      this.#state.child.kill(mode === 'force' ? 'SIGKILL' : 'SIGTERM')
+    } catch (error) {
+      hostRethrowReporter(error, IpcReporterContext)
+    }
+  }
+  /** Preserve this generation's original native callback and its cleanup identity. */
+  #onAbort = (): void => this.#terminate('force')
+}
+
 export function createDenoProcessLauncher(
   options: Readonly<{ runtimeApiBootstrap?: IProcessRuntimeBootstrapOptions }> = {}
 ): IProcessLauncher<IDenoProcessHandle> {
@@ -155,82 +286,8 @@ export function createDenoProcessLauncher(
             { source: RPC_PROCESS_ERROR_SOURCE, code: RpcProcessErrorCode.connectFailed }
           ))(error)
       }
-      /** Stderr reads start before a potentially blocked bootstrap write. */
-      const stderrDrain =
-        spec.stdio.stderr === 'drain'
-          ? drain(child.stderr, (chunk) => context.output('stderr', chunk))
-          : Promise.resolve()
-      const stdoutDrain =
-        spec.stdio.stdout === 'drain'
-          ? drain(child.stdout, (chunk) => context.output('stdout', chunk))
-          : Promise.resolve()
-      const exited = child.status.then(async (status) => {
-        await Promise.all([stderrDrain, stdoutDrain])
-        return { code: status.code, signal: status.signal }
-      })
-      const terminate = (mode: TerminationMode): void => {
-        try {
-          child.kill(mode === 'force' ? 'SIGKILL' : 'SIGTERM')
-        } catch (error) {
-          hostRethrowReporter(error, IpcReporterContext)
-        }
-      }
-      const onAbort = (): void => terminate('force')
-      context.signal.addEventListener('abort', onAbort, { once: true })
-      void exited.then(
-        () => context.signal.removeEventListener('abort', onAbort),
-        () => context.signal.removeEventListener('abort', onAbort)
-      )
-      /** Until activation succeeds, rollback owns any newly acquired Web channel. */
-      let channel: IProcessByteChannel | undefined
-      try {
-        if (spec.bootstrap?.via === 'stdin') {
-          const writer = child.stdin.getWriter()
-          try {
-            await writer.write(
-              encodeRpcStreamFrame(runtimeBootstrap?.payload ?? spec.bootstrap.payload)
-            )
-          } finally {
-            writer.releaseLock()
-          }
-        }
-        /** Each physical stream is consumed by either channel or output, never both. */
-        channel =
-          spec.stdio.stdin === 'channel' && spec.stdio.stdout === 'channel'
-            ? launch.createWebChannel(child.stdout, child.stdin)
-            : undefined
-        launch.assertActive()
-        /** Startup cancellation must not bypass graceful retirement after the handle is adopted. */
-        context.signal.removeEventListener('abort', onAbort)
-        return Object.freeze({
-          identity: Object.freeze({
-            fingerprint: runtimeBootstrap?.self.instanceId ?? crypto.randomUUID(),
-            pid: child.pid
-          }),
-          exited,
-          channel,
-          sampleUsage: () => sampleNativeProcess(child.pid),
-          ...(runtimeBootstrap ? { runtimeApiIdentity: runtimeBootstrap.self } : {}),
-          terminate
-        })
-      } catch (error) {
-        terminate('force')
-        try {
-          await channel?.close()
-        } catch (closeError) {
-          /** Report cleanup failure without replacing the original launch cancellation cause. */
-          hostRethrowReporter(closeError, IpcReporterContext)
-        }
-        await exited
-        throw ((originalCause: unknown) =>
-          attachErrorIdentity(
-            new Error(
-              RpcProcessErrorText.connectFailed,
-              originalCause === undefined ? undefined : { cause: originalCause }
-            ),
-            { source: RPC_PROCESS_ERROR_SOURCE, code: RpcProcessErrorCode.connectFailed }
-          ))(error)
-      }
+      /** One generation owns all post-spawn callbacks and the exact original native exit receipt. */
+      return new DenoProcessGeneration(child, spec, context, launch, runtimeBootstrap).open()
     }
   })
 }
@@ -256,6 +313,7 @@ export function openProcessStdioChannel(
       code: RpcCoreErrorCode.invalidConfig
     })
   const runtime = denoRuntime()
+  /** Until activation succeeds, rollback owns any newly acquired Web channel. */
   const channel = createAdapterWebByteIO(runtime.stdin.readable, runtime.stdout.writable)
   return receiveAdapterBootstrap(channel, options.bootstrap, options)
 }

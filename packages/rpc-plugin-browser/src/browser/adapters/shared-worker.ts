@@ -46,22 +46,123 @@ export type ISharedWorkerPort = {
  * original exception or its cause chain. Subscription registration can throw; returned disposers
  * can surface cleanup or retained reporter failures.
  */
-export function createSharedWorkerTransport(
-  port: ISharedWorkerPort
-): IRpcTransport<unknown, Transferable> {
+/** Allocate one borrowed SharedWorker carrier before installing behavior callbacks. */
+function sharedWorkerTransportState(port: ISharedWorkerPort) {
+  /** Logical message subscribers share one native listener and retain registration order. */
   const listeners = createMessageListenerHub<{
     data: unknown
     origin?: string
     source?: unknown
   }>()
+  /** Registered diagnostic callbacks receive listener failures without losing the primary error. */
   const listenerErrors = new Set<(error: unknown) => void>()
+  /** Native carrier failures fan out to the currently registered transport subscribers. */
   const transportErrors = new Set<(error: unknown) => void>()
+  /**
+   * Reporter and listener cleanup failures remain reachable until the existing failure drain
+   * observes them.
+   */
   const secondaryFailures = createListenerFailureState()
   /** Observation failures use listener reporting so Endpoint never rejects pending business calls. */
   const observation = new BrowserCarrierObservation(BrowserRpcCarrier.sharedWorker, (error) =>
     reportListenerFailure(error, listenerErrors, secondaryFailures)
   )
-  const onMessage = (event: MessageEvent<unknown> | Event): void => {
+
+  return { listeners, listenerErrors, transportErrors, secondaryFailures, observation, port }
+}
+
+/** Own one borrowed SharedWorker carrier; callbacks access only this explicit instance. */
+class SharedWorkerTransport {
+  /** All mutable storage and original construction inputs belong to this operation. */
+  #state: ReturnType<typeof sharedWorkerTransportState>
+  /** Preserve the original stable resource surface and callback identities. */
+  readonly value: IRpcTransport<unknown, Transferable>
+  /** Initialize owned storage before publishing the resource's callbacks. */
+  constructor(port: ISharedWorkerPort) {
+    this.#state = sharedWorkerTransportState(port)
+
+    this.value = {
+      platform: RpcPlatform.worker,
+      topology: 'exclusive',
+      ownership: RpcTransportOwnership.borrowed,
+      send: (message, options?: IRpcSendOptions<Transferable>) => {
+        /** Read the caller's transfer choice once, preserving getter failure and native detachment. */
+        const transfer = options?.transfer
+        /** Observe before postMessage can detach an explicitly transferred byte buffer. */
+        const probe = this.#state.observation.probe
+        if (probe !== undefined)
+          this.#state.observation.emit(probe, 0, message, undefined, transfer)
+        try {
+          this.#state.port.postMessage(message, transfer)
+        } catch (error) {
+          throw identifyRpcBoundaryFailure(
+            error,
+            RpcCoreErrorCode.transport,
+            BrowserRpcErrorText.carrierOperationFailed
+          )
+        }
+      },
+      /** Replace the single endpoint probe; disposal is generation-safe and idempotent. */
+      observe: (probe) => {
+        return this.#state.observation.observe(probe)
+      },
+      subscribe: (listener) => {
+        this.#state.listeners.add(listener, () =>
+          registerListeners(
+            [
+              { add: () => this.#state.port.start?.(), remove: () => undefined },
+              {
+                add: () => this.#state.port.addEventListener('message', this.#onMessage),
+                remove: () => this.#state.port.removeEventListener('message', this.#onMessage)
+              },
+              {
+                add: () => this.#state.port.addEventListener('messageerror', this.#onError),
+                remove: () => this.#state.port.removeEventListener('messageerror', this.#onError)
+              }
+            ],
+            { code: RpcCoreErrorCode.transport, secondaryFailures: this.#state.secondaryFailures }
+          )
+        )
+        return () => {
+          if (!this.#state.listeners.has(listener)) return
+          releaseListenerRegistration(
+            this.#state.listeners.size === 1
+              ? [
+                  () => this.#state.port.removeEventListener('message', this.#onMessage),
+                  () => this.#state.port.removeEventListener('messageerror', this.#onError)
+                ]
+              : [],
+            () => this.#state.listeners.remove(listener, () => undefined),
+            { code: RpcCoreErrorCode.transport, secondaryFailures: this.#state.secondaryFailures }
+          )
+        }
+      },
+      onListenerError: (listener) => {
+        this.#state.listenerErrors.add(listener)
+        return () => {
+          const deleted = this.#state.listenerErrors.delete(listener)
+          drainListenerFailures([], {
+            code: RpcCoreErrorCode.transport,
+            secondaryFailures: this.#state.secondaryFailures
+          })
+          return deleted
+        }
+      },
+      onTransportError: (listener) => {
+        this.#state.transportErrors.add(listener)
+        return () => {
+          const deleted = this.#state.transportErrors.delete(listener)
+          drainListenerFailures([], {
+            code: RpcCoreErrorCode.transport,
+            secondaryFailures: this.#state.secondaryFailures
+          })
+          return deleted
+        }
+      }
+    }
+  }
+
+  #onMessage = (event: MessageEvent<unknown> | Event): void => {
     let data: unknown
     let origin: string | undefined
     let source: unknown
@@ -71,100 +172,37 @@ export function createSharedWorkerTransport(
       origin = typeof eventOrigin === 'string' ? eventOrigin : undefined
       source = (event as { source?: unknown }).source
     } catch (error) {
-      reportListenerFailure(error, transportErrors, secondaryFailures)
+      reportListenerFailure(error, this.#state.transportErrors, this.#state.secondaryFailures)
       return
     }
     /** Exclusive or native-origin traffic is already admitted by this carrier. */
-    const probe = observation.probe
-    if (probe !== undefined) observation.emit(probe, 1, data, origin)
-    listeners.dispatch({ data, origin, source }, (listener, message) => {
+    const probe = this.#state.observation.probe
+    if (probe !== undefined) this.#state.observation.emit(probe, 1, data, origin)
+    this.#state.listeners.dispatch({ data, origin, source }, (listener, message) => {
       observeListener(
         () => listener(message),
-        (error) => reportListenerFailure(error, listenerErrors, secondaryFailures),
-        secondaryFailures
+        (error) =>
+          reportListenerFailure(error, this.#state.listenerErrors, this.#state.secondaryFailures),
+        this.#state.secondaryFailures
       )
     })
   }
-  const onError = (): void => {
+
+  #onError = (): void => {
     reportListenerFailure(
       attachErrorIdentity(new Error(BrowserRpcErrorText.rpcSharedWorkerMessageError), {
         source: RPC_CORE_ERROR_SOURCE,
         code: RpcCoreErrorCode.transport
       }),
-      transportErrors,
-      secondaryFailures
+      this.#state.transportErrors,
+      this.#state.secondaryFailures
     )
   }
-  return {
-    platform: RpcPlatform.worker,
-    topology: 'exclusive',
-    ownership: RpcTransportOwnership.borrowed,
-    send(message, options?: IRpcSendOptions<Transferable>) {
-      /** Read the caller's transfer choice once, preserving getter failure and native detachment. */
-      const transfer = options?.transfer
-      /** Observe before postMessage can detach an explicitly transferred byte buffer. */
-      const probe = observation.probe
-      if (probe !== undefined) observation.emit(probe, 0, message, undefined, transfer)
-      try {
-        port.postMessage(message, transfer)
-      } catch (error) {
-        throw identifyRpcBoundaryFailure(
-          error,
-          RpcCoreErrorCode.transport,
-          BrowserRpcErrorText.carrierOperationFailed
-        )
-      }
-    },
-    /** Replace the single endpoint probe; disposal is generation-safe and idempotent. */
-    observe(probe) {
-      return observation.observe(probe)
-    },
-    subscribe(listener) {
-      listeners.add(listener, () =>
-        registerListeners(
-          [
-            { add: () => port.start?.(), remove: () => undefined },
-            {
-              add: () => port.addEventListener('message', onMessage),
-              remove: () => port.removeEventListener('message', onMessage)
-            },
-            {
-              add: () => port.addEventListener('messageerror', onError),
-              remove: () => port.removeEventListener('messageerror', onError)
-            }
-          ],
-          { code: RpcCoreErrorCode.transport, secondaryFailures }
-        )
-      )
-      return () => {
-        if (!listeners.has(listener)) return
-        releaseListenerRegistration(
-          listeners.size === 1
-            ? [
-                () => port.removeEventListener('message', onMessage),
-                () => port.removeEventListener('messageerror', onError)
-              ]
-            : [],
-          () => listeners.remove(listener, () => undefined),
-          { code: RpcCoreErrorCode.transport, secondaryFailures }
-        )
-      }
-    },
-    onListenerError(listener) {
-      listenerErrors.add(listener)
-      return () => {
-        const deleted = listenerErrors.delete(listener)
-        drainListenerFailures([], { code: RpcCoreErrorCode.transport, secondaryFailures })
-        return deleted
-      }
-    },
-    onTransportError(listener) {
-      transportErrors.add(listener)
-      return () => {
-        const deleted = transportErrors.delete(listener)
-        drainListenerFailures([], { code: RpcCoreErrorCode.transport, secondaryFailures })
-        return deleted
-      }
-    }
-  }
+}
+
+/** Construct the single owner for one borrowed SharedWorker carrier. */
+export function createSharedWorkerTransport(
+  port: ISharedWorkerPort
+): IRpcTransport<unknown, Transferable> {
+  return new SharedWorkerTransport(port).value
 }

@@ -1,3 +1,4 @@
+import { orderStringKeys } from '@migaia/utils/string'
 import { normalizeRpcSerializedError } from '../error.js'
 import { normalizePortable } from '../normalize.js'
 import type { IRpcEnvelopeOptions } from '../types.js'
@@ -7,12 +8,7 @@ import {
   RpcRouteType,
   type RpcRouteType as IRpcRouteType
 } from '../wire-constants.js'
-import {
-  compareRpcFieldNames,
-  invalidRpcEnvelope,
-  normalizeRpcRoute,
-  snapshotRpcRecord
-} from './route.js'
+import { invalidRpcEnvelope, normalizeRpcRoute, snapshotRpcRecord } from './route.js'
 import type { IRpcEnvelope } from './types.js'
 
 /** Scalar domains are checked in the order listed by each envelope shape. */
@@ -154,18 +150,16 @@ export function normalizeRpcEnvelope(value: unknown, options?: IRpcEnvelopeOptio
       throw invalidRpcEnvelope(RpcEnvelopeViolation.required, `/${field}`)
   }
   const allowed = new Set<string>([...shape.required, ...(shape.optional ?? [])])
-  for (const field of Object.keys(record)
-    .filter((key) => !allowed.has(key))
-    .sort(compareRpcFieldNames))
+  for (const field of orderStringKeys(Object.keys(record).filter((key) => !allowed.has(key))))
     options?.onUnknownField?.('', field)
   for (const scalar of shape.scalars) validateTopLevelScalar(record, scalar)
   const data = snapshotRpcRecord(record.data, '/data', RpcEnvelopeViolation.route)
   if (!Object.hasOwn(data, 'route'))
     throw invalidRpcEnvelope(RpcEnvelopeViolation.required, '/data/route')
   const route = normalizeRpcRoute(data.route, kindFields.routeTypes, options)
-  for (const field of Object.keys(data)
-    .filter((key) => key !== 'route' && key !== 'payload')
-    .sort(compareRpcFieldNames))
+  for (const field of orderStringKeys(
+    Object.keys(data).filter((key) => key !== 'route' && key !== 'payload')
+  ))
     options?.onUnknownField?.('/data', field)
   const normalizedData: Record<string, unknown> = { route }
   if (Object.hasOwn(data, 'payload')) {

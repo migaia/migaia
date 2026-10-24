@@ -16,23 +16,21 @@ import type { IRemoteBinding } from '@migaia/rpc-host/plugin'
 import {
   createNodeThreadLauncher,
   createNodeThreadChannelFactory
-} from '@migaia/rpc-plugin-thread/adapters/node'
+} from '../../../rpc-plugin-thread/dist/threads/adapters/node.js'
 import { createManagedRuntimePeer } from '../../../rpc-host/dist/remote/runtime-api/managed-peer.js'
 import { createRuntimeApiEndpoint } from '../../../rpc-host/dist/core/runtime-api-endpoint.js'
 import { createRemoteRetryPort } from '../../../rpc-host/dist/remote/retry.js'
 import type { IRemoteRetryPort } from '../../../rpc-host/dist/remote/types.js'
 import { readRuntimePeerConnection } from '../../../rpc-host/dist/remote/runtime-api/peer.js'
 import { RUNTIME_API_CAPABILITIES } from '../../../rpc-host/dist/remote/runtime-api/constants.js'
-import {
-  codec,
-  framer,
-  connect,
-  abort,
-  timeout,
-  authentication,
-  type IRpcEndpoint,
-  RpcCoreErrorCode
-} from '../../../rpc-host/dist/core/index.js'
+import { codec } from '../../../rpc-host/dist/core/middleware/codec.js'
+import { framer } from '../../../rpc-host/dist/core/middleware/framer.js'
+import { connect } from '../../../rpc-host/dist/core/middleware/connect.js'
+import { abort } from '../../../rpc-host/dist/core/middleware/abort.js'
+import { timeout } from '../../../rpc-host/dist/core/middleware/timeout.js'
+import { authentication } from '../../../rpc-host/dist/core/middleware/authentication.js'
+import type { IRpcEndpoint } from '../../../rpc-host/dist/core/typing.js'
+import { RpcCoreErrorCode } from '../../../rpc-host/dist/core/errors.js'
 import fixture from './fixtures/managed-binary-key.json'
 
 /** Native data/auth profile is actually configured on both independent Worker endpoint owners. */

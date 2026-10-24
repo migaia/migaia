@@ -96,4 +96,4 @@ Ordinary PluginHost installation retains the thread outlet's stop/restart/replac
 
 host.close follows original drain before releasing the owned Worker. Termination is requested at most once; exited settles only after native exit. Late old-generation results do not reopen a closed connection. Cancelling a call, returning a stream, closing a host, and killing a Worker have different owners.
 
-The root exposes threadPlugin/isThreadChild, options, and errors. /adapters/node and /adapters/electron-main support authors needing native launcher/channel integration. Short options cover ordinary applications; browsers use browser plugins.
+The package exposes only its root: threadPlugin/isThreadChild, options, and errors. Short options cover ordinary applications; custom raw deployments use the host `/plugin` SDK. Browsers use browser plugins.

@@ -4,73 +4,99 @@ import type { IRtcDataChannelPluginOptions } from '@migaia/rpc-plugin-browser'
 type IFixtureListener = (event: MessageEvent<unknown>) => void
 
 /** A held browser resource exposes listener and close effects to ownership assertions. */
-export function messageTarget(bufferMessages = false) {
-  /** Each event kind has independent native-style subscriptions. */
+/** Allocate only this case's original observations before installing native-shaped callbacks. */
+function messageTargetFixtureState(bufferMessages = false) {
   const listeners = new Map<string, Set<IFixtureListener>>()
-  /** Outbound values expose the actual Core frames to source/origin rejection assertions. */
   const sent: unknown[] = []
-  /** Native MessagePorts queue arrivals until the subscriber starts receiving. */
   const queued: MessageEvent<unknown>[] = []
-  /** The caller controls whether the physical carrier delivers its queued messages. */
   let deliver = true
-  /** Borrowed Peer cleanup must never invoke the resource owner's close operation. */
   let closeCalls = 0
-  /** Paired resources wire only physical delivery, never handshake or runtime method dispatch. */
   let send: (message: unknown, origin?: string) => void = () => undefined
-  /** Browser-shaped resource accepted by Window, MessagePort and listener source options. */
-  const target = {
-    postMessage(message: unknown, originOrTransfer?: string | readonly Transferable[]) {
-      sent.push(message)
-      if (deliver)
-        send(message, typeof originOrTransfer === 'string' ? originOrTransfer : undefined)
-    },
-    start() {},
-    close() {
-      closeCalls += 1
-      deliver = false
-    },
-    addEventListener(type: string, listener: IFixtureListener) {
-      /** The native event kind selects the existing subscription collection. */
-      const entries = listeners.get(type) ?? new Set<IFixtureListener>()
-      entries.add(listener)
-      listeners.set(type, entries)
-      if (type === 'message' && queued.length)
-        queueMicrotask(() => {
-          for (const event of queued.splice(0))
-            for (const receiving of listeners.get('message') ?? []) receiving(event)
-        })
-    },
-    removeEventListener(type: string, listener: IFixtureListener) {
-      listeners.get(type)?.delete(listener)
-    }
-  }
-  return {
-    target,
-    sent,
-    listeners,
-    get closeCalls() {
-      return closeCalls
-    },
-    setDeliver(enabled: boolean) {
-      deliver = enabled
-    },
-    setSend(delivery: typeof send) {
-      send = delivery
-    },
-    emit(type: string, data: unknown, source?: unknown, origin = '') {
-      /** Carrier doubles copy native metadata without reading or rewriting wire frames. */
-      const event = { data, source, origin } as MessageEvent<unknown>
-      if (type === 'message' && bufferMessages && !listeners.get(type)?.size) {
-        queued.push(event)
-        return
+  return { bufferMessages, listeners, sent, queued, deliver, closeCalls, send }
+}
+
+/** Own one test resource's mutable observations without sharing a factory closure. */
+class MessageTargetFixture {
+  /** Counts, native events and construction inputs belong only to this fixture instance. */
+  #state: ReturnType<typeof messageTargetFixtureState>
+  /** Existing consumers retain the same observable fixture surface and callback identities. */
+  readonly value
+  /** Install the original native-shaped callbacks after their observations exist. */
+  constructor(bufferMessages = false) {
+    this.#state = messageTargetFixtureState(bufferMessages)
+    const target = {
+      postMessage: (message: unknown, originOrTransfer?: string | readonly Transferable[]) => {
+        this.#state.sent.push(message)
+        if (this.#state.deliver) {
+          ;(0, this.#state.send)(
+            message,
+            typeof originOrTransfer === 'string' ? originOrTransfer : undefined
+          )
+        }
+      },
+      start: () => {},
+      close: () => {
+        this.#state.closeCalls += 1
+        this.#state.deliver = false
+      },
+      addEventListener: (type: string, listener: IFixtureListener) => {
+        /** The native event kind selects the existing subscription collection. */
+        const entries = this.#state.listeners.get(type) ?? new Set<IFixtureListener>()
+        entries.add(listener)
+        this.#state.listeners.set(type, entries)
+        if (type === 'message' && this.#state.queued.length)
+          queueMicrotask(() => {
+            for (const event of this.#state.queued.splice(0))
+              for (const receiving of this.#state.listeners.get('message') ?? []) receiving(event)
+          })
+      },
+      removeEventListener: (type: string, listener: IFixtureListener) => {
+        this.#state.listeners.get(type)?.delete(listener)
       }
-      for (const listener of listeners.get(type) ?? []) listener(event)
-    },
-    connect(port: unknown) {
-      for (const listener of listeners.get('connect') ?? [])
-        listener({ ports: [port] } as unknown as MessageEvent<unknown>)
     }
+    this.value = {
+      target,
+      sent: this.#state.sent,
+      listeners: this.#state.listeners,
+      closeCalls: 0,
+      setDeliver: (enabled: boolean) => {
+        this.#state.deliver = enabled
+      },
+      setSend: (delivery: (message: unknown, origin?: string) => void) => {
+        this.#state.send = delivery
+      },
+      emit: (type: string, data: unknown, source?: unknown, origin = '') => {
+        /** Carrier doubles copy native metadata without reading or rewriting wire frames. */
+        const event = { data, source, origin } as MessageEvent<unknown>
+        if (
+          type === 'message' &&
+          this.#state.bufferMessages &&
+          !this.#state.listeners.get(type)?.size
+        ) {
+          this.#state.queued.push(event)
+          return
+        }
+        for (const listener of this.#state.listeners.get(type) ?? []) listener(event)
+      },
+      connect: (port: unknown) => {
+        for (const listener of this.#state.listeners.get('connect') ?? [])
+          listener({ ports: [port] } as unknown as MessageEvent<unknown>)
+      }
+    }
+
+    Object.defineProperties(this.value, {
+      closeCalls: {
+        get: () => {
+          return this.#state.closeCalls
+        }
+      }
+    })
   }
+}
+
+/** Create one independent owner for the existing native-boundary fixture. */
+export function messageTarget(bufferMessages = false) {
+  return new MessageTargetFixture(bufferMessages).value
 }
 
 /** Two fake realms preserve postMessage source and origin semantics through actual Core frames. */

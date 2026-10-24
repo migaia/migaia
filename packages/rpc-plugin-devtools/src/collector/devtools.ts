@@ -82,7 +82,8 @@ function captureBytes(content: unknown, view: IRpcProbeEventView): number {
  * releases retention and rejects pending watches with CLOSED, without closing any Peer/transport.
  * Pure record codecs remain callable after close.
  */
-export function createRpcDevtools(options: IRpcDevtoolsOptions = {}): IRpcDevtools {
+/** Validate collector configuration and allocate its owned storage without installing callbacks. */
+function collectorState(options: IRpcDevtoolsOptions) {
   if (typeof options !== 'object' || options === null) invalid()
   /** One capacity is shared by all main-ring columns. */
   const maxEvents = capacity(
@@ -132,7 +133,7 @@ export function createRpcDevtools(options: IRpcDevtoolsOptions = {}): IRpcDevtoo
   /** Only active watch generators enable the shared raw burst writer. */
   const watchers: CollectorWatcher[] = []
   /** One raw burst store preserves watcher ingestion independently of the main-ring capacity. */
-  let watchPending: EventRing | undefined
+  const watchPending = undefined as EventRing | undefined
   /** Pending overwrite counts raw rows whose filters are no longer recoverable. */
   let watchDropped = 0
   /** A single flag coalesces every active watcher notification within one synchronous burst. */
@@ -144,7 +145,7 @@ export function createRpcDevtools(options: IRpcDevtoolsOptions = {}): IRpcDevtoo
   /** Pause restores the user's current cold selection, including stages added after construction. */
   let pausedStages = stages
   /** Direct host ingestion follows stage changes through the public cold subscription. */
-  let releaseStages: (() => void) | undefined
+  const releaseStages = undefined as (() => void) | undefined
   /** Sequence stays monotonic across emitters with independent local sequence ids. */
   let sequence = 0
   /** Terminal closure never revives retained ownership. */
@@ -154,143 +155,269 @@ export function createRpcDevtools(options: IRpcDevtoolsOptions = {}): IRpcDevtoo
   /** Reentrant redactors/reporters cannot corrupt the active view consumption. */
   let ingesting = false
   /** The recording handle owns this exact independent ring until stop or close. */
-  let recording: EventRing | undefined
+  const recording = undefined as EventRing | undefined
   /** Filled before returning or installing the completed frozen host. */
-  let devtools: IRpcDevtools
+  const devtools = undefined as unknown as IRpcDevtools
   /** Compiled stage dispatch is checked before content or other event arguments are read. */
   let stageMask = 0
   /** Capture mask is immutable; metadata-only ingestion never reads view.content. */
   let captureMask = 0
   /** Compiled source method membership reuses defineProbe's canonical representation. */
-  let methods: ReadonlySet<string> | undefined
+  const methods = undefined as ReadonlySet<string> | undefined
   /** Full-sampling sentinel skips all hash work for the default metadata path. */
   let threshold = 0xffffffff
 
+  return {
+    maxEvents,
+    maxContentBytes,
+    maxInterned,
+    stages,
+    capture,
+    exposeContent,
+    redact,
+    onError,
+    counters,
+    names,
+    ring,
+    statistics,
+    watchers,
+    watchPending: watchPending as EventRing | undefined,
+    watchDropped,
+    watchScheduled,
+    descriptors,
+    serviceEndpoints,
+    pausedStages,
+    releaseStages: releaseStages as (() => void) | undefined,
+    sequence,
+    closed,
+    paused,
+    ingesting,
+    recording: recording as EventRing | undefined,
+    devtools,
+    stageMask,
+    captureMask,
+    methods: methods as ReadonlySet<string> | undefined,
+    threshold
+  }
+}
+
+/** Own all collector retention, sequencing and lifecycle state behind one installed probe identity. */
+class RpcDevtoolsCollector {
+  /** Storage, subscriptions and reader masks belong to this collector instance. */
+  #state: ReturnType<typeof collectorState>
+
+  /** Install the collector's public callbacks only after all owned storage is available. */
+  constructor(options: IRpcDevtoolsOptions) {
+    this.#state = collectorState(options)
+    /** All API members are constructed before defineProbe attaches to this exact host identity. */
+    const api = {
+      emit: this.#emit,
+      query: this.#query,
+      watch: this.#watch,
+      stats: () => {
+        this.#assertOpen()
+        return this.#state.statistics.snapshot(this.#state.serviceEndpoints)
+      },
+      describe: this.#describe,
+      record: this.#record,
+      exportRecord: encodeRpcDevtoolsRecord,
+      importRecord: decodeRpcDevtoolsRecord,
+      pause: this.#pause,
+      resume: this.#resume,
+      clear: this.#clear,
+      close: this.#close,
+      service: {} as IRuntimePeerProvide
+    }
+    api.service = createCollectorService(
+      {
+        describe: this.#describe,
+        query: this.#query,
+        watch: this.#watch,
+        stats: api.stats,
+        record: this.#record,
+        clear: this.#clear,
+        pause: this.#pause,
+        resume: this.#resume,
+        exportRecord: encodeRpcDevtoolsRecord,
+        stopRecord: this.#stopRecord,
+        excludeEndpoint: (endpointId: string) => {
+          this.#state.serviceEndpoints.add(endpointId)
+        }
+      },
+      this.#state.exposeContent
+    )
+    try {
+      this.#state.devtools = defineProbe(
+        {
+          stages: this.#state.stages,
+          capture: this.#state.capture,
+          methods: options.methods,
+          sample: options.sample,
+          onError: this.#state.onError,
+          describe: (descriptor) => {
+            if (!this.#state.closed) this.#state.descriptors.set(descriptor.endpointId, descriptor)
+          },
+          emit: api.emit
+        },
+        api
+      )
+    } catch (cause) {
+      invalid(cause)
+    }
+    this.#state.stageMask = readProbeStages(this.#state.devtools)
+    this.#state.releaseStages = subscribeProbeStages(this.#state.devtools, () => {
+      this.#state.stageMask = readProbeStages(this.#state.devtools)
+    })
+    this.#state.captureMask = this.#state.devtools.captureMask
+    this.#state.methods = this.#state.devtools.methods
+    this.#state.threshold = this.#state.devtools.sampleThreshold
+  }
+
+  /** Return the exact Core-branded host object installed during construction. */
+  get value(): IRpcDevtools {
+    return this.#state.devtools
+  }
+
   /** Cold operations reject terminal state with the stable package CLOSED identity. */
-  const assertOpen = (): void => {
-    if (closed)
+  #assertOpen = (): void => {
+    if (this.#state.closed)
       throw identifyDevtoolsError(new Error(CollectorText.closed), RpcDevtoolsErrorCode.closed)
   }
+
   /** A boundary snapshot prevents public result mutation from changing live loss counters. */
-  const counterSnapshot = (): IRpcDevtoolsCounters => ({
-    evicted: counters.evicted,
-    contentDropped: counters.contentDropped,
-    droppedReentrant: counters.droppedReentrant,
-    sampledOut: counters.sampledOut,
-    ignoredWhilePaused: counters.ignoredWhilePaused,
-    ignoredAfterClose: counters.ignoredAfterClose,
-    internOverflow: counters.internOverflow
+  #counterSnapshot = (): IRpcDevtoolsCounters => ({
+    evicted: this.#state.counters.evicted,
+    contentDropped: this.#state.counters.contentDropped,
+    droppedReentrant: this.#state.counters.droppedReentrant,
+    sampledOut: this.#state.counters.sampledOut,
+    ignoredWhilePaused: this.#state.counters.ignoredWhilePaused,
+    ignoredAfterClose: this.#state.counters.ignoredAfterClose,
+    internOverflow: this.#state.counters.internOverflow
   })
+
   /** Cold origin lookup includes every current retention owner and an explicitly stopping record. */
-  const carrierSequences = (active?: EventRing): ReadonlyMap<number, number> => {
+  #carrierSequences = (active?: EventRing): ReadonlyMap<number, number> => {
     /** This array exists only at a reader boundary, never for an ingested event. */
-    const owners = [ring]
-    if (recording !== undefined) owners.push(recording)
-    if (active !== undefined && active !== recording) owners.push(active)
-    if (watchPending !== undefined) owners.push(watchPending)
-    for (const watcher of watchers) owners.push(watcher.ring)
+    const owners = [this.#state.ring]
+    if (this.#state.recording !== undefined) owners.push(this.#state.recording)
+    if (active !== undefined && active !== this.#state.recording) owners.push(active)
+    if (this.#state.watchPending !== undefined) owners.push(this.#state.watchPending)
+    for (const watcher of this.#state.watchers) owners.push(watcher.ring)
     return readCarrierSequences(owners)
   }
+
   /** One prebuilt notification callback does watcher filtering and queue work off the emit stack. */
-  const notifyWatchers = (): void => {
-    watchScheduled = false
-    if (closed || watchPending === undefined) return
+  #notifyWatchers = (): void => {
+    this.#state.watchScheduled = false
+    if (this.#state.closed || this.#state.watchPending === undefined) return
     /** Resolve links before any raw origin in this synchronous burst retires. */
-    const links = carrierSequences()
+    const links = this.#carrierSequences()
     /** Raw overwrite loss is reported once to each watcher at this delivery boundary. */
-    const dropped = watchDropped
-    watchDropped = 0
-    while (watchPending.count !== 0) {
+    const dropped = this.#state.watchDropped
+    this.#state.watchDropped = 0
+    while (this.#state.watchPending.count !== 0) {
       /** Raw rows are reconstructed once, then shared by the cold watcher fan-out. */
-      const slot = watchPending.head
+      const slot = this.#state.watchPending.head
       /** The source view was consumed already; this object belongs to scheduled delivery. */
-      const view = watchPending.view(slot)
-      if (!serviceEndpoints.has(view.endpointId)) {
-        for (const watcher of watchers)
+      const view = this.#state.watchPending.view(slot)
+      if (!this.#state.serviceEndpoints.has(view.endpointId)) {
+        for (const watcher of this.#state.watchers)
           watcher.push(
             view,
-            watchPending.columns.seq[slot]!,
-            watchPending.columns.content[slot],
-            watchPending.columns.contentBytes[slot]!,
+            this.#state.watchPending.columns.seq[slot]!,
+            this.#state.watchPending.columns.content[slot],
+            this.#state.watchPending.columns.contentBytes[slot]!,
             links
           )
       }
-      watchPending.drop()
+      this.#state.watchPending.drop()
     }
-    for (const watcher of watchers) watcher.finishBurst(dropped)
+    for (const watcher of this.#state.watchers) watcher.finishBurst(dropped)
   }
+
   /** Convert only matching rows at the query boundary, using one scan and cached projections. */
-  const query = (input?: IRpcDevtoolsQuery, content = true): IRpcDevtoolsPage => {
-    assertOpen()
+  #query = (input?: IRpcDevtoolsQuery, content = true): IRpcDevtoolsPage => {
+    this.#assertOpen()
     /** Masks and string memberships compile once before scanning raw columns. */
     const filter = compileQuery(input)
     /** Results retain cached boundary objects, without creating per-query row wrappers. */
     const events: IRpcDevtoolsWireEvent[] = []
     /** Correlation is derived once from retained raw owners for this snapshot. */
-    const links = carrierSequences()
+    const links = this.#carrierSequences()
     /** Excluded rows advance the cursor while a filled page preserves the next unread row. */
     let nextSeq = filter.after
-    for (let i = 0; i < ring.count; i++) {
+    for (let i = 0; i < this.#state.ring.count; i++) {
       /** Modulo index is independent of public sequence gaps. */
-      const slot = (ring.head + i) % ring.capacity
-      if (ring.columns.seq[slot]! <= filter.after) continue
-      nextSeq = ring.columns.seq[slot]!
-      if (!serviceEndpoints.has(ring.columns.endpoint[slot]!) && matchesSlot(ring, slot, filter)) {
-        events.push(ring.event(slot, content, false, links) as IRpcDevtoolsWireEvent)
+      const slot = (this.#state.ring.head + i) % this.#state.ring.capacity
+      if (this.#state.ring.columns.seq[slot]! <= filter.after) continue
+      nextSeq = this.#state.ring.columns.seq[slot]!
+      if (
+        !this.#state.serviceEndpoints.has(this.#state.ring.columns.endpoint[slot]!) &&
+        matchesSlot(this.#state.ring, slot, filter)
+      ) {
+        events.push(this.#state.ring.event(slot, content, false, links) as IRpcDevtoolsWireEvent)
         if (events.length === filter.limit) break
       }
     }
-    return { events, nextSeq, counters: counterSnapshot() }
+    return { events, nextSeq, counters: this.#counterSnapshot() }
   }
+
   /** Watch storage and generator Promises belong solely to the explicit watch boundary. */
-  const watch = (
+  #watch = (
     input?: Omit<IRpcDevtoolsQuery, 'afterSeq' | 'limit'>,
     content = true,
     signal?: IRpcContext['signal']
   ) => {
-    assertOpen()
-    if (watchPending === undefined)
-      watchPending = new EventRing(CollectorLimit.batches * CollectorLimit.batch, names, onError)
+    this.#assertOpen()
+    if (this.#state.watchPending === undefined)
+      this.#state.watchPending = new EventRing(
+        CollectorLimit.batches * CollectorLimit.batch,
+        this.#state.names,
+        this.#state.onError
+      )
     return new CollectorWatcher(
-      names,
+      this.#state.names,
       input,
       content,
-      watchers,
-      () => sequence,
-      onError,
-      assertOpen,
+      this.#state.watchers,
+      () => this.#state.sequence,
+      this.#state.onError,
+      this.#assertOpen,
       signal
     ).iterate()
   }
+
   /** Describe retains descriptor elements by reference and supplies a fresh host clock sample. */
-  const describe = () => {
-    assertOpen()
+  #describe = () => {
+    this.#assertOpen()
     return {
       version: CollectorText.version,
       now: systemScheduler.now(),
-      paused,
-      descriptors: Array.from(descriptors.values()),
-      limits: { maxEvents, maxContentBytes },
-      counters: counterSnapshot()
+      paused: this.#state.paused,
+      descriptors: Array.from(this.#state.descriptors.values()),
+      limits: { maxEvents: this.#state.maxEvents, maxContentBytes: this.#state.maxContentBytes },
+      counters: this.#counterSnapshot()
     }
   }
+
   /** Stop is a record boundary; clearing the main ring never ends this independent window. */
-  const stopRecord = (content: boolean) => {
-    assertOpen()
-    if (!recording)
+  #stopRecord = (content: boolean) => {
+    this.#assertOpen()
+    if (!this.#state.recording)
       throw identifyDevtoolsError(
         new Error(CollectorText.recordNotActive),
         RpcDevtoolsErrorCode.recordNotActive
       )
     /** Release active ownership before exposing the stopped record. */
-    const active = recording
-    recording = undefined
-    return finishRecord(active, content, carrierSequences(active))
+    const active = this.#state.recording
+    this.#state.recording = undefined
+    return finishRecord(active, content, this.#carrierSequences(active))
   }
+
   /** A record handle can stop only the exact active ring it created. */
-  const record = (input?: Readonly<{ maxEvents?: number }>) => {
-    assertOpen()
-    if (recording)
+  #record = (input?: Readonly<{ maxEvents?: number }>) => {
+    this.#assertOpen()
+    if (this.#state.recording)
       throw identifyDevtoolsError(
         new Error(CollectorText.recordActive),
         RpcDevtoolsErrorCode.recordActive
@@ -298,231 +425,184 @@ export function createRpcDevtools(options: IRpcDevtoolsOptions = {}): IRpcDevtoo
     if (input !== undefined && (typeof input !== 'object' || input === null)) invalid()
     /** Record capacity is separate from main retention and stores the same raw field references. */
     const active = new EventRing(
-      capacity(input?.maxEvents, maxEvents, false, CollectorLimit.arrayCapacity),
-      names,
-      onError
+      capacity(input?.maxEvents, this.#state.maxEvents, false, CollectorLimit.arrayCapacity),
+      this.#state.names,
+      this.#state.onError
     )
-    recording = active
+    this.#state.recording = active
     return {
       stop: () => {
-        assertOpen()
-        if (recording !== active)
+        this.#assertOpen()
+        if (this.#state.recording !== active)
           throw identifyDevtoolsError(
             new Error(CollectorText.recordNotActive),
             RpcDevtoolsErrorCode.recordNotActive
           )
-        return stopRecord(true)
+        return this.#stopRecord(true)
       }
     }
   }
+
   /** Pause removes Core dispatch subscriptions rather than changing the business pipeline. */
-  const pause = (): void => {
-    assertOpen()
-    if (paused) return
+  #pause = (): void => {
+    this.#assertOpen()
+    if (this.#state.paused) return
     /** Stage names are reconstructed only at this cold lifecycle boundary. */
-    const current = readProbeStages(devtools)
-    pausedStages = []
+    const current = readProbeStages(this.#state.devtools)
+    this.#state.pausedStages = []
     for (let i = 0; i < RpcProbeStageName.length; i++)
-      if ((current & (1 << i)) !== 0) (pausedStages as string[]).push(RpcProbeStageName[i]!)
-    paused = true
-    devtools.setStages([])
+      if ((current & (1 << i)) !== 0)
+        (this.#state.pausedStages as string[]).push(RpcProbeStageName[i]!)
+    this.#state.paused = true
+    this.#state.devtools.setStages([])
   }
+
   /** Resume restores the selection captured by the first pause, without reviving closed storage. */
-  const resume = (): void => {
-    assertOpen()
-    if (!paused) return
-    paused = false
-    devtools.setStages(pausedStages)
+  #resume = (): void => {
+    this.#assertOpen()
+    if (!this.#state.paused) return
+    this.#state.paused = false
+    this.#state.devtools.setStages(this.#state.pausedStages)
   }
+
   /** Clear resets main retention and statistics; recorded and watch windows keep their ownership. */
-  const clear = (): void => {
-    assertOpen()
-    ring.clear()
-    statistics.clear()
-    counters.evicted = 0
-    counters.contentDropped = 0
-    counters.droppedReentrant = 0
-    counters.sampledOut = 0
-    counters.ignoredWhilePaused = 0
-    counters.ignoredAfterClose = 0
-    counters.internOverflow = 0
+  #clear = (): void => {
+    this.#assertOpen()
+    this.#state.ring.clear()
+    this.#state.statistics.clear()
+    this.#state.counters.evicted = 0
+    this.#state.counters.contentDropped = 0
+    this.#state.counters.droppedReentrant = 0
+    this.#state.counters.sampledOut = 0
+    this.#state.counters.ignoredWhilePaused = 0
+    this.#state.counters.ignoredAfterClose = 0
+    this.#state.counters.internOverflow = 0
   }
+
   /** Closure releases storage, updates subscriptions and wakes pending watcher operations. */
-  const close = (): void => {
-    if (closed) return
-    closed = true
-    devtools.setStages([])
-    releaseStages?.()
-    ring.clear()
-    statistics.clear()
-    recording?.clear()
-    watchPending?.clear()
-    recording = undefined
-    for (let i = 0; i < watchers.length; i++) watchers[i]!.close()
-    names.clear()
-    descriptors.clear()
+  #close = (): void => {
+    if (this.#state.closed) return
+    this.#state.closed = true
+    this.#state.devtools.setStages([])
+    ;(0, this.#state.releaseStages)?.()
+    this.#state.ring.clear()
+    this.#state.statistics.clear()
+    this.#state.recording?.clear()
+    this.#state.watchPending?.clear()
+    this.#state.recording = undefined
+    for (let i = 0; i < this.#state.watchers.length; i++) this.#state.watchers[i]!.close()
+    this.#state.names.clear()
+    this.#state.descriptors.clear()
   }
-  /** All API members are constructed before defineProbe attaches to this exact host identity. */
-  const api = {
-    emit: (view: IRpcProbeEventView): void => {
-      if (closed) {
-        counters.ignoredAfterClose++
+
+  /** Consume a reusable probe view into the collector's current retention owners. */
+  #emit = (view: IRpcProbeEventView): void => {
+    if (this.#state.closed) {
+      this.#state.counters.ignoredAfterClose++
+      return
+    }
+    if (this.#state.paused) {
+      this.#state.counters.ignoredWhilePaused++
+      return
+    }
+    if ((this.#state.stageMask & (1 << view.stage)) === 0) return
+    if (this.#state.serviceEndpoints.has(view.endpointId)) return
+    if (this.#state.ingesting) {
+      this.#state.counters.droppedReentrant++
+      return
+    }
+    this.#state.ingesting = true
+    try {
+      if (
+        (view.stage === RpcProbeStage.message || view.stage === RpcProbeStage.envelope) &&
+        this.#state.methods !== undefined &&
+        view.method !== undefined &&
+        !this.#state.methods.has(view.method)
+      )
+        return
+      if (
+        this.#state.threshold !== 0xffffffff &&
+        rpcProbeSampleKey(view.senderId ?? '', view.messageId ?? '') >= this.#state.threshold
+      ) {
+        this.#state.counters.sampledOut++
         return
       }
-      if (paused) {
-        counters.ignoredWhilePaused++
+      /** Content is unread in metadata mode, and remains a reference after redaction. */
+      let content: unknown
+      /** Byte charge follows the retained payload reference. */
+      let bytes = 0
+      if ((this.#state.captureMask & (1 << view.stage)) !== 0 && view.content !== undefined) {
+        content = view.content
+        if (this.#state.redact) {
+          try {
+            content = (0, this.#state.redact)(view.stage as RpcProbeStage, content)
+          } catch (cause) {
+            content = undefined
+            reportFailure(
+              identifyDevtoolsError(
+                new Error(CollectorText.redactFailed, { cause }),
+                RpcDevtoolsErrorCode.redactFailed
+              ),
+              this.#state.onError
+            )
+          }
+        }
+        if (content !== undefined) {
+          bytes = captureBytes(content, view)
+          /** Replacement credits bytes from the retiring slot before evaluating the budget. */
+          const retiredBytes =
+            this.#state.ring.count === this.#state.ring.capacity
+              ? this.#state.ring.columns.contentBytes[this.#state.ring.head]!
+              : 0
+          if (bytes > this.#state.maxContentBytes - this.#state.ring.bytes + retiredBytes) {
+            content = undefined
+            bytes = 0
+            this.#state.counters.contentDropped++
+          }
+        }
+      }
+      // A redactor or its reporter can synchronously close/pause this same collector.
+      if (this.#state.closed) {
+        this.#state.counters.ignoredAfterClose++
         return
       }
-      if ((stageMask & (1 << view.stage)) === 0) return
-      if (serviceEndpoints.has(view.endpointId)) return
-      if (ingesting) {
-        counters.droppedReentrant++
+      if (this.#state.paused) {
+        this.#state.counters.ignoredWhilePaused++
         return
       }
-      ingesting = true
-      try {
-        if (
-          (view.stage === RpcProbeStage.message || view.stage === RpcProbeStage.envelope) &&
-          methods !== undefined &&
-          view.method !== undefined &&
-          !methods.has(view.method)
-        )
-          return
-        if (
-          threshold !== 0xffffffff &&
-          rpcProbeSampleKey(view.senderId ?? '', view.messageId ?? '') >= threshold
-        ) {
-          counters.sampledOut++
-          return
+      if (this.#state.ring.count === this.#state.ring.capacity) this.#state.counters.evicted++
+      this.#state.sequence = Math.max(this.#state.sequence + 1, view.seq)
+      /** The writer returns a numeric slot and allocates no event objects. */
+      this.#state.ring.write(view, this.#state.sequence, content, bytes)
+      if (
+        view.stage === RpcProbeStage.message &&
+        view.durationMs >= 0 &&
+        view.method !== undefined &&
+        (view.outcome === RpcProbeOutcome.settled ||
+          view.outcome === RpcProbeOutcome.failed ||
+          view.outcome === RpcProbeOutcome.rejected)
+      )
+        this.#state.statistics.update(view)
+      if (this.#state.closed || this.#state.paused) return
+      this.#state.recording?.write(view, this.#state.sequence, content, bytes)
+      if (this.#state.watchers.length !== 0) {
+        if (this.#state.watchPending!.count === this.#state.watchPending!.capacity)
+          this.#state.watchDropped++
+        this.#state.watchPending!.write(view, this.#state.sequence, content, bytes)
+        if (!this.#state.watchScheduled) {
+          this.#state.watchScheduled = true
+          enqueueBatch(this.#notifyWatchers)
         }
-        /** Content is unread in metadata mode, and remains a reference after redaction. */
-        let content: unknown
-        /** Byte charge follows the retained payload reference. */
-        let bytes = 0
-        if ((captureMask & (1 << view.stage)) !== 0 && view.content !== undefined) {
-          content = view.content
-          if (redact) {
-            try {
-              content = redact(view.stage as RpcProbeStage, content)
-            } catch (cause) {
-              content = undefined
-              reportFailure(
-                identifyDevtoolsError(
-                  new Error(CollectorText.redactFailed, { cause }),
-                  RpcDevtoolsErrorCode.redactFailed
-                ),
-                onError
-              )
-            }
-          }
-          if (content !== undefined) {
-            bytes = captureBytes(content, view)
-            /** Replacement credits bytes from the retiring slot before evaluating the budget. */
-            const retiredBytes =
-              ring.count === ring.capacity ? ring.columns.contentBytes[ring.head]! : 0
-            if (bytes > maxContentBytes - ring.bytes + retiredBytes) {
-              content = undefined
-              bytes = 0
-              counters.contentDropped++
-            }
-          }
-        }
-        // A redactor or its reporter can synchronously close/pause this same collector.
-        if (closed) {
-          counters.ignoredAfterClose++
-          return
-        }
-        if (paused) {
-          counters.ignoredWhilePaused++
-          return
-        }
-        if (ring.count === ring.capacity) counters.evicted++
-        sequence = Math.max(sequence + 1, view.seq)
-        /** The writer returns a numeric slot and allocates no event objects. */
-        ring.write(view, sequence, content, bytes)
-        if (
-          view.stage === RpcProbeStage.message &&
-          view.durationMs >= 0 &&
-          view.method !== undefined &&
-          (view.outcome === RpcProbeOutcome.settled ||
-            view.outcome === RpcProbeOutcome.failed ||
-            view.outcome === RpcProbeOutcome.rejected)
-        )
-          statistics.update(view)
-        if (closed || paused) return
-        recording?.write(view, sequence, content, bytes)
-        if (watchers.length !== 0) {
-          if (watchPending!.count === watchPending!.capacity) watchDropped++
-          watchPending!.write(view, sequence, content, bytes)
-          if (!watchScheduled) {
-            watchScheduled = true
-            enqueueBatch(notifyWatchers)
-          }
-        }
-      } catch (error) {
-        reportFailure(error, onError)
-      } finally {
-        ingesting = false
       }
-    },
-    query,
-    watch,
-    stats: () => {
-      assertOpen()
-      return statistics.snapshot(serviceEndpoints)
-    },
-    describe,
-    record,
-    exportRecord: encodeRpcDevtoolsRecord,
-    importRecord: decodeRpcDevtoolsRecord,
-    pause,
-    resume,
-    clear,
-    close,
-    service: {} as IRuntimePeerProvide
+    } catch (error) {
+      reportFailure(error, this.#state.onError)
+    } finally {
+      this.#state.ingesting = false
+    }
   }
-  api.service = createCollectorService(
-    {
-      describe,
-      query,
-      watch,
-      stats: api.stats,
-      record,
-      clear,
-      pause,
-      resume,
-      exportRecord: encodeRpcDevtoolsRecord,
-      stopRecord,
-      excludeEndpoint: (endpointId: string) => {
-        serviceEndpoints.add(endpointId)
-      }
-    },
-    exposeContent
-  )
-  try {
-    devtools = defineProbe(
-      {
-        stages,
-        capture,
-        methods: options.methods,
-        sample: options.sample,
-        onError,
-        describe: (descriptor) => {
-          if (!closed) descriptors.set(descriptor.endpointId, descriptor)
-        },
-        emit: api.emit
-      },
-      api
-    )
-  } catch (cause) {
-    invalid(cause)
-  }
-  stageMask = readProbeStages(devtools)
-  releaseStages = subscribeProbeStages(devtools, () => {
-    stageMask = readProbeStages(devtools)
-  })
-  captureMask = devtools.captureMask
-  methods = devtools.methods
-  threshold = devtools.sampleThreshold
-  return devtools
+}
+
+/** Create one collector owner and return its exact Core-installed probe identity. */
+export function createRpcDevtools(options: IRpcDevtoolsOptions = {}): IRpcDevtools {
+  return new RpcDevtoolsCollector(options).value
 }

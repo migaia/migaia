@@ -26,92 +26,134 @@ async function openPool(options: IPoolPluginOptions) {
   }
 }
 
-/** A mocked public Peer owns these explicit business completion points. */
-function member(id: number, dispatches: Array<Readonly<{ id: number; value: number }>>) {
-  /** Only held request completion controls scheduling in the deterministic cases. */
-  const requests = new Map<number, PromiseWithResolvers<number>>()
-  /** Notify completion represents the original send Promise rather than provider concurrency. */
-  const notifications = new Map<number, PromiseWithResolvers<void>>()
-  /** Request rejection can retain any original peer-owned error object. */
-  const request = vi.fn<IRuntimePeer['request']>((method, payload) => {
-    /** Test business inputs are numbers, independent of any transport metadata. */
-    const value = typeof payload === 'number' ? payload : 0
-    dispatches.push({ id, value })
-    if (method !== 'hold') return Promise.resolve(value)
-    /** Each accepted hold has an independently observable completion point. */
-    const pending = Promise.withResolvers<number>()
-    requests.set(value, pending)
-    return pending.promise
-  })
-  /** The send operation remains unresolved until the fixture's caller releases it. */
-  const notify = vi.fn<IRuntimePeer['notify']>((_method, payload) => {
-    /** Numeric labels distinguish independently accepted notifications. */
-    const value = typeof payload === 'number' ? payload : 0
-    /** The public send Promise is the sole notification completion fact. */
-    const pending = Promise.withResolvers<void>()
-    notifications.set(value, pending)
-    return pending.promise
-  })
-  /** The original iterator owns its completion, early return, throw, and active cancellation. */
-  const stream = vi.fn<IRuntimePeer['stream']>((_method, payload, options) => {
-    /** One fixture item makes done and return distinct observable paths. */
-    let emitted = false
-    /** Only this iterator's own abort observation changes its next result. */
-    let failure: unknown
-    /** A defined failure flag also preserves an undefined thrown value. */
-    let failed = false
-    /** Active cancellation is implemented by the Peer fixture, not by the pool. */
-    const abort = (): void => {
-      failed = true
-      failure = options?.signal?.reason
+/** Own one mock Peer's original iterator state and active cancellation subscription. */
+class MemberStreamFixture {
+  /** Payload is case data and never transport metadata. */
+  #payload: unknown
+  /** This iterator alone observes and removes its own caller cancellation. */
+  #options: Parameters<IRuntimePeer['stream']>[2]
+  /** A single yielded item distinguishes done and early return. */
+  #emitted = false
+  /** The failed flag preserves even an undefined original abort reason. */
+  #failed = false
+  /** Retain the exact original cancellation reason for the next pull. */
+  #failure: unknown
+  /** Existing consumers see the same iterator object on every async-iterator lookup. */
+  readonly value: ReturnType<IRuntimePeer['stream']>
+  /** Attach the original abort observation without changing pre-aborted signal behavior. */
+  constructor(payload: unknown, options: Parameters<IRuntimePeer['stream']>[2]) {
+    this.#payload = payload
+    this.#options = options
+    options?.signal?.addEventListener('abort', this.#abort, { once: true })
+    this.value = {
+      [Symbol.asyncIterator]: () => this.value,
+      next: this.#next,
+      return: this.#return,
+      throw: this.#throw
     }
-    options?.signal?.addEventListener('abort', abort, { once: true })
-    /** Every terminal iterator operation removes only its own signal observer. */
-    const detach = (): void => options?.signal?.removeEventListener('abort', abort)
-    /** The public iterator returns the same object to for-await consumers. */
-    const iterator: ReturnType<IRuntimePeer['stream']> = {
-      [Symbol.asyncIterator]: () => iterator,
-      next: async () => {
-        if (failed) {
-          detach()
-          throw failure
-        }
-        if (emitted) {
-          detach()
-          return { done: true, value: undefined }
-        }
-        emitted = true
-        return { done: false, value: typeof payload === 'number' ? payload : 0 }
-      },
-      return: async () => {
-        detach()
-        return { done: true, value: undefined }
-      },
-      throw: async (error) => {
-        detach()
-        throw error
-      }
-    }
-    return iterator
-  })
-  /** Original close call counts prove retirement and final shutdown do not duplicate cleanup. */
-  const close = vi.fn<IRuntimePeer['close']>(() => Promise.resolve())
-  /** Unused query methods reject rather than inventing native state or a directory receipt. */
-  const unused = (): Promise<never> => Promise.reject(new Error('unused fixture operation'))
-  /** This complete public Peer exists only behind the explicitly mocked public factory. */
-  const peer: IRuntimePeer = {
-    self: { name: 'fixture', instanceId: `fixture-${id}` },
-    request,
-    notify,
-    stream,
-    close,
-    group: unused,
-    outcome: unused,
-    describe: unused,
-    on: () => () => undefined,
-    [Symbol.asyncDispose]: close
   }
-  return { peer, request, notify, stream, close, requests, notifications }
+  /** Cancellation changes only this iterator's next result. */
+  #abort = (): void => {
+    this.#failed = true
+    this.#failure = this.#options?.signal?.reason
+  }
+  /** Every terminal operation removes this iterator's own observer. */
+  #detach = (): void => this.#options?.signal?.removeEventListener('abort', this.#abort)
+  /** Yield the one fixture item, preserving cancellation failure identity and terminal cleanup. */
+  #next = async (): Promise<IteratorResult<number>> => {
+    if (this.#failed) {
+      this.#detach()
+      throw this.#failure
+    }
+    if (this.#emitted) {
+      this.#detach()
+      return { done: true, value: undefined }
+    }
+    this.#emitted = true
+    return { done: false, value: typeof this.#payload === 'number' ? this.#payload : 0 }
+  }
+  /** Early return detaches only this iterator's subscription. */
+  #return = async (): Promise<IteratorResult<number>> => {
+    this.#detach()
+    return { done: true, value: undefined }
+  }
+  /** Throw keeps the exact supplied error while releasing active cancellation. */
+  #throw = async (error: unknown): Promise<IteratorResult<number>> => {
+    this.#detach()
+    throw error
+  }
+}
+
+/** A mocked public Peer owns these explicit business completion points. */
+/** Allocate only this case's original observations before installing native-shaped callbacks. */
+function poolMemberFixtureState(
+  id: number,
+  dispatches: Array<Readonly<{ id: number; value: number }>>
+) {
+  const requests = new Map<number, PromiseWithResolvers<number>>()
+  const notifications = new Map<number, PromiseWithResolvers<void>>()
+  return { id, dispatches, requests, notifications }
+}
+
+/** Own one test resource's mutable observations without sharing a factory closure. */
+class PoolMemberFixture {
+  /** Counts, native events and construction inputs belong only to this fixture instance. */
+  #state: ReturnType<typeof poolMemberFixtureState>
+  /** Existing consumers retain the same observable fixture surface and callback identities. */
+  readonly value
+  /** Install the original native-shaped callbacks after their observations exist. */
+  constructor(id: number, dispatches: Array<Readonly<{ id: number; value: number }>>) {
+    this.#state = poolMemberFixtureState(id, dispatches)
+    const request = vi.fn<IRuntimePeer['request']>((method, payload) => {
+      /** Test business inputs are numbers, independent of any transport metadata. */
+      const value = typeof payload === 'number' ? payload : 0
+      this.#state.dispatches.push({ id: this.#state.id, value })
+      if (method !== 'hold') return Promise.resolve(value)
+      /** Each accepted hold has an independently observable completion point. */
+      const pending = Promise.withResolvers<number>()
+      this.#state.requests.set(value, pending)
+      return pending.promise
+    })
+    const notify = vi.fn<IRuntimePeer['notify']>((_method, payload) => {
+      /** Numeric labels distinguish independently accepted notifications. */
+      const value = typeof payload === 'number' ? payload : 0
+      /** The public send Promise is the sole notification completion fact. */
+      const pending = Promise.withResolvers<void>()
+      this.#state.notifications.set(value, pending)
+      return pending.promise
+    })
+    const stream = vi.fn<IRuntimePeer['stream']>(
+      (_method, payload, options) => new MemberStreamFixture(payload, options).value
+    )
+    const close = vi.fn<IRuntimePeer['close']>(() => Promise.resolve())
+    const unused = (): Promise<never> => Promise.reject(new Error('unused fixture operation'))
+    const peer: IRuntimePeer = {
+      self: { name: 'fixture', instanceId: `fixture-${this.#state.id}` },
+      request,
+      notify,
+      stream,
+      close,
+      group: unused,
+      outcome: unused,
+      describe: unused,
+      on: () => () => undefined,
+      [Symbol.asyncDispose]: close
+    }
+    this.value = {
+      peer,
+      request,
+      notify,
+      stream,
+      close,
+      requests: this.#state.requests,
+      notifications: this.#state.notifications
+    }
+  }
+}
+
+/** Create one independent owner for the existing native-boundary fixture. */
+function member(id: number, dispatches: Array<Readonly<{ id: number; value: number }>>) {
+  return new PoolMemberFixture(id, dispatches).value
 }
 
 /** Configure only the current test's public factory result sequence and dispatch observation. */

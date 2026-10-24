@@ -1,10 +1,10 @@
+import { processPlugin } from '@migaia/rpc-plugin-process'
+import { createRpcHost } from '@migaia/rpc-host'
 import assert from 'node:assert/strict'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { defineHost } from '@migaia/plugin-host'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { createProcessPeer } from '../../../../rpc-plugin-process/test/protocol.ts'
-import { createProcessPlugin } from '../../../../rpc-plugin-process/test/protocol.ts'
 import { createProcessTransport } from '../../../../rpc-plugin-process/dist/process/handshake.js'
 import { createNativeProcessOffer } from '../../../../rpc-plugin-process/dist/process/offer.js'
 import { threadProtocolDefinition as createThreadPlugin } from './thread-protocol.ts'
@@ -12,13 +12,13 @@ import {
   createAdapterWebThreadLauncher as createWebThreadLauncher,
   createAdapterWebThreadChannelFactory as createWebThreadChannelFactory
 } from '../../../../rpc-plugin-thread/dist/threads/web-launcher.js'
-import { createBunProcessLauncher } from '@migaia/rpc-plugin-process/adapters/bun-spawn'
-import { createDenoProcessLauncher } from '@migaia/rpc-plugin-process/adapters/deno-command'
+import { createBunProcessLauncher } from '../../../../rpc-plugin-process/dist/process/adapters/bun-spawn.js'
+import { createDenoProcessLauncher } from '../../../../rpc-plugin-process/dist/process/adapters/deno-command.js'
 
 import {
   listenProcessByteChannel,
   dialProcessByteChannel
-} from '@migaia/rpc-plugin-process/adapters/node-socket'
+} from '../../../../rpc-plugin-process/dist/process/adapters/node-socket.js'
 import { RUNTIME_API_CAPABILITIES } from '../../../../rpc-host/dist/remote/runtime-api/constants.js'
 
 /** This entire graph runs in the requested runtime, including its actual native child. */
@@ -48,7 +48,7 @@ const report = (error) =>
   })
 try {
   await host.use(
-    (mode === 'process' ? createProcessPlugin : createThreadPlugin)({
+    (mode === 'process' ? processPlugin : createThreadPlugin)({
       name: 'c',
       report,
       spawn: async (context) => {
@@ -103,8 +103,9 @@ try {
     })
   )
   await host.use(
-    createProcessPlugin({
+    processPlugin({
       name: 'listener',
+      self: { name: 'relay-server', instanceId: 'relay-server' },
       expose: ['c'],
       report,
       listen: {
@@ -131,25 +132,35 @@ try {
     })
   )
   /** A real public connect object reaches the original authenticated TCP listener. */
-  client = await createProcessPeer({
+  client = await createRpcHost({
     self: { name: 'client', instanceId: 'client-1' },
     provide: { reverse: () => 9 },
     report,
-    connect: {
-      kind: 'connect',
-      address,
-      token,
-      dial: (path, signal) => dialProcessByteChannel({ address: path, signal }),
-      establish: (raw, options) =>
-        createProcessTransport(raw, {
-          role: 'initiator',
-          offer: options.offer,
-          peerId: 'relay-server',
-          scheduler: options.scheduler,
-          ipc: { connectionId: 'relay-client', sessionId: 'relay-client', log: () => undefined },
-          report
-        })
-    }
+    plugins: [
+      processPlugin({
+        connect: {
+          target: {
+            kind: 'connect',
+            address,
+            token,
+            dial: (path, signal) => dialProcessByteChannel({ address: path, signal }),
+            establish: (raw, options) =>
+              createProcessTransport(raw, {
+                role: 'initiator',
+                offer: options.offer,
+                peerId: 'relay-server',
+                scheduler: options.scheduler,
+                ipc: {
+                  connectionId: 'relay-client',
+                  sessionId: 'relay-client',
+                  log: () => undefined
+                },
+                report
+              })
+          }
+        }
+      })
+    ]
   })
   /** Both payload levels cross A-to-B and the actual compiled B-to-C forwarding owner. */
   const payload = { marker: 'one-hop', nested: { value: mode } }

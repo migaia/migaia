@@ -37,6 +37,8 @@ import {
   batchPayloadLimit,
   readTransportCapabilities,
   readPeerTransportCapabilities,
+  readPeerTransportPipeline,
+  type IRpcPeerTransportPipeline,
   hasCloneTransferCarrier
 } from './batch-frame.js'
 import { readRuntimeCarrier } from '@migaia/rpc-contract/runtime'
@@ -302,6 +304,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     /** Established native selection can prepare directly; a genuine miss retains its continuation. */
     start(): Promise<unknown> {
       try {
+        /** The accepted original binding supplies the actual physical receiver. */
         const receiver = this.#plan.owner.#selectRuntimeReceiver(this.targetId)
         if (receiver instanceof Promise) void this.#awaitReceiver(receiver)
         else this.#prepare(receiver)
@@ -569,7 +572,9 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
 
     /** Only actual cancel transmission retains a real send continuation and failure report. */
     async #sendCancellation(reason: unknown): Promise<void> {
+      /** Inline bytes stay entirely in the original protected physical frame. */
       const envelope = this.#envelope!
+      /** Replies belong to the original consumer registry, independently from scalar pending. */
       const owner = this.#plan.owner
       try {
         await owner.sendRuntimeFrame({
@@ -633,8 +638,10 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
   /** Optional inbound/outbound protection capability. */
   readonly #authentication: IRpcAuthenticationCapability | undefined
   /** Source-less physical channels share the endpoint's authentication partition. */
+  // oxlint-disable-next-line no-unused-private-class-members -- InboundPhysicalOperation reads this lexical private member through its held original owner.
   readonly #authenticationPhysicalSession = {}
   /** Actual object sources partition authentication weakly; primitive token text grants no proof. */
+  // oxlint-disable-next-line no-unused-private-class-members -- InboundPhysicalOperation reads this lexical private member through its held original owner.
   readonly #authenticationSessions = new WeakMap<object, object>()
   /** One native claim is shared by provider and stream owners, never reconstructed from metadata. */
   readonly #native: INativeReplayReceipt | undefined
@@ -810,7 +817,8 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
       this.receiverId,
       hasCloneTransferCarrier(kernel.transport),
       this.#probe,
-      (peerId) => readPeerTransportCapabilities(kernel.transport, peerId)
+      (peerId) => readPeerTransportCapabilities(kernel.transport, peerId),
+      (peerId) => readPeerTransportPipeline(kernel.transport, peerId)
     )
     this.inboundIdentity = new InboundIdentityCoordinator({
       native: this.#native,
@@ -831,6 +839,13 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
       platform: kernel.platform,
       topology: kernel.topology
     })
+    this.#registerKernelBindings(prepared)
+  }
+
+  /** Publish this attachment's existing kernel owners, cleanup receipts, hooks and wire routes. */
+  #registerKernelBindings(prepared: IPreparedEndpoint<string>): void {
+    /** Registration stays with the same original endpoint kernel used during construction. */
+    const kernel = this.kernel
     if (this.#native)
       kernel.resources.addSync(
         NativeDefaultIdText.terminalSubscription,
@@ -853,6 +868,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     if (this.#outboundGate) {
       /** Endpoint diagnostics own their subscription until kernel scope release. */
       const unsubscribe = this.#outboundGate.onEvent((event) => {
+        /** Existing enumerable shape stays stable; replay counts are an explicit passive read. */
         const snapshot = event as { readonly name: string; readonly error?: unknown }
         this.emitDiagnostic({ name: snapshot.name, contract: event, error: snapshot.error })
       })
@@ -860,6 +876,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     }
     for (const listener of normalizeHooks(prepared.options.hooks?.listeners))
       this.#hooks.add(listener)
+    /** Capacity details are frozen numeric facts; ordinary failure hooks retain their old shape. */
     for (const event of prepared.options.initialHookEvents ?? []) this.#emit(event)
     kernel.registerRoute(RpcMessageKind.response, (message) => this.#receiveResponse(message))
     kernel.registerRoute(RpcMessageKind.variation, (message) => this.#receiveVariation(message))
@@ -875,6 +892,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
       inbound?: import('../transport.js').IRpcInboundMessage
       admission?: IInboundIdentityAdmission
     }
+    /** Inline bytes stay entirely in the original protected physical frame. */
     const envelope = record.envelope
     const route = record.route
     if (
@@ -895,6 +913,422 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
       this.#unknownFields.note(record.admission.token, 'variation', '', route.route.variation)
   }
 
+  /** Own one physical arrival through source admission, authentication, decoding and dispatch. */
+  static #InboundPhysicalOperation = class InboundPhysicalOperation {
+    /** The original attachment retains all endpoint, transport and authentication authority. */
+    #owner: RpcOutboundAttachment
+    /** The original native arrival is retained without copying source or transfer metadata. */
+    #message: IRpcInboundMessage
+    /** Synchronous physical arrival is captured before any transform can yield. */
+    #carrierSeq!: number
+    /** Every later phase asserts the same original endpoint generation. */
+    #generation!: number
+    /** The original inbound identity preparation remains the only physical source proof. */
+    #physical: IInboundIdentityPreparedSource | undefined
+    /** Proven physical-source selection lends its original codec/framer to this arrival only. */
+    #arrivalPipeline!: IRpcPeerTransportPipeline
+    /** Only the selected original decoder's exact fast-path facts may skip a metadata snapshot. */
+    #arrivalDecodedMetadata!: boolean
+    /** The genuine negotiated runtime selector decides whether this is runtime traffic. */
+    #carrier: ReturnType<typeof readRuntimeCarrier>
+    /** The original provider admission receipt owns this physical ingress until finally. */
+    #receipt: IProviderIngressReceipt | undefined
+    /** Closing releases this exact original ingress candidate while transforms wait. */
+    #closeCandidate: (() => void) | undefined
+    /** Authentication and framing update only this physical arrival's current value. */
+    #frame: unknown
+    /** The original native wrapper retains its actual backing buffers and metadata. */
+    #nativeBinary: ReturnType<typeof readRpcNativeBinary>
+    /** Only the existing binary validator can publish restored semantic data. */
+    #restoredBinary: IRpcRuntimeEnvelope | undefined
+    /** The same original auth context carries physical binding through asynchronous transforms. */
+    #authenticationContext!: import('../typing.js').IRpcAuthenticationContext
+    /** Framing and codec admission publish only this arrival's semantic decoded value. */
+    #decoded: unknown
+    /** Retain the original attachment and physical message before any admission getter executes. */
+    constructor(owner: RpcOutboundAttachment, message: IRpcInboundMessage) {
+      this.#owner = owner
+      this.#message = message
+    }
+    /** Preserve original asynchronous transform points and final ingress receipt cleanup. */
+    async receive(): Promise<void> {
+      if (!this.#prepareIngress()) return
+      try {
+        this.#prepareNativeFrame()
+        /** Native validation remains absent for ordinary frames and never changes their await path. */
+        const validate = this.#nativeBinary && this.#validateNativeBinary
+        if (this.#owner.#authentication) {
+          this.#bindReplayContext()
+          if (validate) bindAuthenticationBinaryValidation(this.#authenticationContext, validate)
+          this.#frame = await this.#owner.#authentication.unprotect(
+            this.#frame,
+            this.#authenticationContext
+          )
+          if (this.#frame === consumedAuthenticationFrame) return
+        } else if (validate) await validate(this.#frame)
+        this.#owner.#native?.observeOwner()
+        this.#owner.kernel.assertActive(this.#generation)
+        if (this.#owner.#native && !this.#owner.#native.active) return
+        if (!this.#decodeFrame()) return
+        if (this.#carrier)
+          return await this.#owner.#receiveRuntimeEnvelope(
+            this.#decoded,
+            this.#physical!,
+            this.#message,
+            this.#generation,
+            this.#authenticationContext,
+            this.#receipt!,
+            this.#restoredBinary,
+            this.#arrivalDecodedMetadata
+          )
+        /** Receive negotiated batches independently of send optimization. */
+        let members: readonly unknown[] | undefined
+        if (hasBatchAgreement(this.#owner.kernel.transport)) {
+          try {
+            members = readRpcBatchMembers(this.#decoded)
+          } catch (cause) {
+            throw createRpcSerializationError(RpcCoreErrorText.protocolEncodeFailed, cause)
+          }
+        }
+        if (!members)
+          return this.#owner.#receiveEnvelope(
+            this.#decoded,
+            this.#physical!,
+            this.#message,
+            this.#generation,
+            this.#authenticationContext
+          )
+        /**
+         * Each sibling owns its own identity lease and dispatch completion; no member awaits
+         * another.
+         */
+        const proofs = this.#owner.inboundIdentity.splitPrepared(this.#physical!, members.length)
+        await Promise.all(
+          members.map((member, index) =>
+            this.#owner.#receiveEnvelope(
+              member,
+              proofs[index]!,
+              this.#message,
+              this.#generation,
+              this.#authenticationContext,
+              members.length
+            ).catch((error: unknown) => {
+              this.#owner.emitFailure(error)
+            })
+          )
+        )
+      } finally {
+        this.#receipt?.release()
+        if (this.#closeCandidate)
+          this.#owner.kernel.closingSignal.removeEventListener('abort', this.#closeCandidate)
+      }
+    }
+    /** Capture synchronous arrival/source facts and own the original close-during-transform receipt. */
+    #prepareIngress(): boolean {
+      this.#carrierSeq =
+        this.#owner.#probe !== undefined &&
+        (this.#owner.#probe.mask & (1 << RpcProbeStage.carrier)) !== 0
+          ? this.#owner.#probe.takeInboundCarrierSeq()
+          : -1
+      this.#generation = this.#owner.kernel.generation
+      if (this.#owner.kernel.state !== 'active') return false
+      this.#owner.#native?.observeOwner()
+      if (this.#owner.#native && !this.#owner.#native.active) return false
+      this.#physical = this.#owner.inboundIdentity.prepareSource(this.#message, this.#carrierSeq)
+      if (!this.#physical) return false
+      this.#carrier = this.#owner.#runtimeCapabilities
+        ? readRuntimeCarrier(this.#physical!.data)
+        : undefined
+      this.#arrivalPipeline =
+        (this.#carrier && this.#message.peerId !== undefined
+          ? readPeerTransportPipeline(this.#owner.kernel.transport, this.#message.peerId)
+          : undefined) ?? this.#owner.#runtimeComponents
+      this.#arrivalDecodedMetadata =
+        this.#owner.#decodedMetadata &&
+        this.#arrivalPipeline.codec.encode === this.#owner.#runtimeComponents.codec.encode &&
+        this.#arrivalPipeline.codec.decode === this.#owner.#runtimeComponents.codec.decode &&
+        this.#arrivalPipeline.framer.frame === this.#owner.#runtimeComponents.framer.frame &&
+        this.#arrivalPipeline.framer.accept === this.#owner.#runtimeComponents.framer.accept
+      this.#receipt = this.#carrier
+        ? (
+            this.#owner.kernel.readOwner(EndpointOwnerKey.providerAdmission) as
+              | ProviderAdmissionRegistry
+              | undefined
+          )?.captureIngress()
+        : undefined
+      if (this.#carrier && !this.#receipt) {
+        /** Core detected its actual ingress quota; retain the original native wire identity. */
+        /** This error belongs to the provider admission attempt, not a synthetic byte frame. */
+        const error = new RangeError(RpcCoreErrorText.runtimeIngressFrameLimitExceeded)
+        registerLocalErrorWireSummary(
+          error,
+          RpcContractErrorCode.frameLimitExceeded,
+          RpcCoreErrorText.runtimeIngressFrameLimitExceeded
+        )
+        throw attachErrorIdentity(error, {
+          source: RPC_CONTRACT_SOURCE,
+          code: RpcContractErrorCode.frameLimitExceeded
+        })
+      }
+      this.#closeCandidate = this.#receipt
+        ? () => {
+            this.#receipt!.release()
+          }
+        : undefined
+      if (this.#closeCandidate)
+        this.#owner.kernel.closingSignal.addEventListener('abort', this.#closeCandidate, {
+          once: true
+        })
+      return true
+    }
+    /** Admit native wrapper capabilities, actual physical limits and the original auth context. */
+    #prepareNativeFrame(): void {
+      this.#frame = this.#carrier ? this.#carrier.frame : this.#physical!.data
+      this.#nativeBinary = this.#carrier
+        ? readRpcNativeBinary(this.#frame, this.#owner.#physicalLimit)
+        : undefined
+
+      if (this.#nativeBinary) {
+        /** A routed receiver borrows this proven physical source's actual agreement. */
+        const physicalCapabilities =
+          this.#message.peerId === undefined
+            ? undefined
+            : readPeerTransportCapabilities(this.#owner.kernel.transport, this.#message.peerId)
+        if (
+          !hasCloneTransferCarrier(this.#owner.kernel.transport) ||
+          !readAuthenticationBinaryDigest(this.#owner.#authentication) ||
+          !this.#owner.#runtimeCapabilities?.includes(RpcCapability.portableBinary) ||
+          !this.#owner.#runtimeCapabilities.includes(RpcCapability.nativeBinary) ||
+          (physicalCapabilities !== undefined &&
+            (!physicalCapabilities.includes(RpcCapability.portableBinary) ||
+              !physicalCapabilities.includes(RpcCapability.nativeBinary)))
+        )
+          throw createRpcError(
+            RpcCoreErrorCode.capabilityUnsupported,
+            RpcCoreErrorText.capabilityUnsupported
+          )
+        this.#frame = this.#nativeBinary.protectedMetadata
+      }
+      if (
+        this.#owner.#authentication &&
+        this.#owner.#probe !== undefined &&
+        (this.#owner.#probe.mask & (1 << RpcProbeStage.protected)) !== 0
+      )
+        this.#owner.#probe.protected(
+          RpcProbeDirection.inbound,
+          '',
+          carrierSizeBytes(this.#frame),
+          -1,
+          -1,
+          (this.#owner.#probe.captureMask & (1 << RpcProbeStage.protected)) !== 0
+            ? this.#frame
+            : undefined,
+          undefined,
+          undefined,
+          this.#physical!.carrierSeq
+        )
+      if (this.#carrier) {
+        /** Only original paired callables prove whole acceptance and the complete frame budget. */
+        const facts = this.#arrivalPipeline.ingressPrepare.singleFrameLimits
+        if (!facts)
+          throw createRpcError(
+            RpcCoreErrorCode.capabilityUnsupported,
+            RpcCoreErrorText.capabilityUnsupported
+          )
+        /** Sidecar properties never participate in native serialization or physical bytes. */
+        const limit = Math.min(
+          RpcBatchPhysical.maxBytes,
+          this.#owner.#physicalLimit,
+          facts.maxMessageBytes
+        )
+        if (this.#nativeBinary)
+          assertRpcNativeBinaryFrameSize(
+            this.#nativeBinary.protectedMetadata,
+            this.#nativeBinary!.sidecars.length,
+            this.#nativeBinary.backingBytes,
+            limit
+          )
+        else assertRpcPhysicalFrameSize(this.#physical!.data, limit)
+      }
+      if (
+        hasBatchAgreement(this.#owner.kernel.transport) &&
+        (this.#owner.#authentication || typeof this.#frame === 'string')
+      )
+        assertRpcPhysicalFrameSize(this.#frame, this.#owner.#physicalLimit)
+      this.#authenticationContext = {
+        direction: 'inbound' as const,
+        endpointId: this.#owner.id,
+        platform: this.#owner.kernel.platform
+      }
+    }
+    /** Restore one genuinely held native binary frame through the canonical validator. */
+    #validateNativeBinary = async (encoded: unknown): Promise<IRpcRuntimeEnvelope> => {
+      try {
+        const accepted = this.#arrivalPipeline.framer.accept(encoded, {
+          source: this.#physical!.sourceToken,
+          messageId: 'whole'
+        })
+        if (accepted.status !== 'complete')
+          throw createRpcProtocolError(RpcCoreErrorText.runtimeBinaryInvalid)
+        const manifest = this.#arrivalPipeline.codec.decode(accepted.value)
+        this.#restoredBinary = await (
+          this.#arrivalDecodedMetadata
+            ? restoreInboundDecodedRuntimeBinary
+            : restoreInboundRuntimeBinary
+        )(
+          manifest,
+          RpcBinaryStorage.native,
+          this.#nativeBinary!.sidecars,
+          this.#owner.#physicalLimit,
+          readAuthenticationBinaryDigest(this.#owner.#authentication)!
+        )
+        return this.#restoredBinary
+      } catch (cause) {
+        throw this.#owner.#authentication && isRpcBinaryIntegrityFailure(cause)
+          ? createRpcAuthenticationError(
+              RpcMiddlewareErrorText.inboundFrameAuthenticationFailed,
+              cause
+            )
+          : createRpcProtocolError(RpcCoreErrorText.runtimeBinaryInvalid, cause)
+      }
+    }
+    /** Bind the original weakly held source session and native authentication replay callbacks. */
+    #bindReplayContext(): void {
+      /** Native or absent (undefined/null) sources use the endpoint partition. */
+      let session =
+        this.#owner.#native || this.#physical!.source == null
+          ? this.#owner.#authenticationPhysicalSession
+          : undefined
+      if (
+        !session &&
+        this.#physical!.source !== null &&
+        (typeof this.#physical!.source === 'object' || typeof this.#physical!.source === 'function')
+      ) {
+        /** Actual source object is weakly owned; token text cannot create trusted sessions. */
+        const source = this.#physical!.source as object
+        session = this.#owner.#authenticationSessions.get(source)
+        if (!session) {
+          session = {}
+          this.#owner.#authenticationSessions.set(source, session)
+        }
+      }
+      if (session)
+        bindAuthenticationReplayContext(
+          this.#authenticationContext,
+          session,
+          () =>
+            this.#owner.kernel.state === 'active' &&
+            this.#owner.kernel.generation === this.#generation &&
+            (this.#owner.#native?.active ?? true),
+          this.#owner.kernel.topology !== 'exclusive' && this.#physical!.source == null
+            ? {
+                receiverId: this.#owner.receiverId,
+                unknown: (nonce, counter) =>
+                  this.#owner.#pipeline
+                    .sendAuthenticationControl({
+                      control: RpcAuthenticationControl.unknown,
+                      echoNonce: nonce,
+                      counter,
+                      receiverId: this.#owner.receiverId
+                    })
+                    .catch((error) => this.#owner.emitFailure(error))
+              }
+            : undefined
+        )
+    }
+    /** Decode only a complete admitted frame; pending/rejected framing does not dispatch a message. */
+    #decodeFrame(): boolean {
+      if (this.#nativeBinary) {
+        if (!this.#restoredBinary)
+          throw createRpcProtocolError(RpcCoreErrorText.runtimeBinaryInvalid)
+        this.#decoded = this.#restoredBinary
+        if (
+          this.#owner.#probe !== undefined &&
+          (this.#owner.#probe.mask & (1 << RpcProbeStage.encoded)) !== 0
+        )
+          this.#owner.#probe.encoded(
+            RpcProbeDirection.inbound,
+            this.#restoredBinary.id,
+            carrierSizeBytes(this.#frame),
+            (this.#owner.#probe.captureMask & (1 << RpcProbeStage.encoded)) !== 0
+              ? this.#frame
+              : undefined,
+            this.#restoredBinary.task.method,
+            this.#restoredBinary.route.senderId
+          )
+      } else if (this.#owner.#fast && !this.#carrier)
+        this.#decoded = this.#arrivalPipeline.codec.decode(this.#frame)
+      else {
+        const preparedFrame = this.#arrivalPipeline.ingressPrepare(this.#frame, {
+          source: this.#physical!.sourceToken,
+          messageId: 'whole'
+        })
+        if (
+          this.#owner.#probe !== undefined &&
+          (this.#owner.#probe.mask & (1 << RpcProbeStage.frame)) !== 0
+        ) {
+          /** Only the exact native pair supplies a snapshotted chunk; custom frames remain opaque. */
+          const fragment =
+            this.#arrivalPipeline.ingressPrepare.nativeOutputDomain !== undefined &&
+            this.#arrivalPipeline.ingressPrepare.singleFrameLimits !== undefined
+              ? (preparedFrame.frame as { index?: number; count?: number } | null)
+              : undefined
+          this.#owner.#probe.frame(
+            RpcProbeDirection.inbound,
+            preparedFrame.messageId,
+            carrierSizeBytes(preparedFrame.frame),
+            typeof fragment?.index === 'number' ? fragment.index : -1,
+            typeof fragment?.count === 'number' ? fragment.count : -1,
+            (this.#owner.#probe.captureMask & (1 << RpcProbeStage.frame)) !== 0
+              ? preparedFrame.frame
+              : undefined,
+            undefined,
+            undefined,
+            this.#physical!.carrierSeq
+          )
+        }
+        const accepted = this.#arrivalPipeline.framer.accept(preparedFrame.frame, {
+          source: this.#physical!.sourceToken,
+          messageId: preparedFrame.messageId
+        })
+        if (accepted.status === 'pending') return false
+        if (accepted.status === 'rejected') {
+          this.#owner.emitFailure(accepted.error, RpcCoreErrorCode.transport)
+          return false
+        }
+        if (
+          this.#owner.#probe !== undefined &&
+          (this.#owner.#probe.mask & (1 << RpcProbeStage.encoded)) !== 0
+        )
+          this.#owner.#probe.encoded(
+            RpcProbeDirection.inbound,
+            preparedFrame.messageId,
+            carrierSizeBytes(accepted.value),
+            (this.#owner.#probe.captureMask & (1 << RpcProbeStage.encoded)) !== 0
+              ? accepted.value
+              : undefined
+          )
+        this.#decoded = this.#arrivalPipeline.codec.decode(accepted.value)
+      }
+      if (
+        this.#owner.#fast &&
+        !this.#carrier &&
+        !this.#nativeBinary &&
+        this.#owner.#probe !== undefined &&
+        (this.#owner.#probe.mask & (1 << RpcProbeStage.encoded)) !== 0
+      )
+        this.#owner.#probe.encoded(
+          RpcProbeDirection.inbound,
+          '',
+          carrierSizeBytes(this.#frame),
+          (this.#owner.#probe.captureMask & (1 << RpcProbeStage.encoded)) !== 0
+            ? this.#frame
+            : undefined
+        )
+      return true
+    }
+  }
+
   /** Installs the one physical receiver after all selected routes exist. */
   activate(): void {
     if (this.#activated) return
@@ -906,363 +1340,8 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     const activation = createEndpointTransportActivation(
       this.kernel.transport,
       {
-        receive: async (message) => {
-          /**
-           * Snapshot the synchronous carrier arrival before any native or authentication work
-           * yields.
-           */
-          const carrierSeq =
-            this.#probe !== undefined && (this.#probe.mask & (1 << RpcProbeStage.carrier)) !== 0
-              ? this.#probe.takeInboundCarrierSeq()
-              : -1
-          const generation = this.kernel.generation
-          if (this.kernel.state !== 'active') return
-          this.#native?.observeOwner()
-          if (this.#native && !this.#native.active) return
-          const physical = this.inboundIdentity.prepareSource(message, carrierSeq)
-          if (!physical) return
-          /** Default traffic never probes a new selector unless the actual base was negotiated. */
-          const carrier = this.#runtimeCapabilities ? readRuntimeCarrier(physical.data) : undefined
-          /** Capture arrival in the existing provider scope before any transform can yield. */
-          const receipt = carrier
-            ? (
-                this.kernel.readOwner(EndpointOwnerKey.providerAdmission) as
-                  | ProviderAdmissionRegistry
-                  | undefined
-              )?.captureIngress()
-            : undefined
-          if (carrier && !receipt) {
-            /** Core detected its actual ingress quota; retain the original native wire identity. */
-            /** This error belongs to the provider admission attempt, not a synthetic byte frame. */
-            const error = new RangeError(RpcCoreErrorText.runtimeIngressFrameLimitExceeded)
-            registerLocalErrorWireSummary(
-              error,
-              RpcContractErrorCode.frameLimitExceeded,
-              RpcCoreErrorText.runtimeIngressFrameLimitExceeded
-            )
-            throw attachErrorIdentity(error, {
-              source: RPC_CONTRACT_SOURCE,
-              code: RpcContractErrorCode.frameLimitExceeded
-            })
-          }
-          /** Closing withdraws exact candidates while a caller-owned asynchronous transform waits. */
-          const closeCandidate = receipt
-            ? () => {
-                receipt.release()
-              }
-            : undefined
-          if (closeCandidate)
-            this.kernel.closingSignal.addEventListener('abort', closeCandidate, { once: true })
-          try {
-            let frame = carrier ? carrier.frame : physical.data
-            /** Native wrapper admission belongs to the same physical receipt, before authentication. */
-            const nativeBinary = carrier
-              ? readRpcNativeBinary(frame, this.#physicalLimit)
-              : undefined
-            /**
-             * Only this private accepted validator can supply an already restored semantic
-             * envelope.
-             */
-            let restoredBinary: IRpcRuntimeEnvelope | undefined
-            if (nativeBinary) {
-              /** A routed receiver borrows this proven physical source's actual agreement. */
-              const physicalCapabilities =
-                message.peerId === undefined
-                  ? undefined
-                  : readPeerTransportCapabilities(this.kernel.transport, message.peerId)
-              if (
-                !hasCloneTransferCarrier(this.kernel.transport) ||
-                !readAuthenticationBinaryDigest(this.#authentication) ||
-                !this.#runtimeCapabilities?.includes(RpcCapability.portableBinary) ||
-                !this.#runtimeCapabilities.includes(RpcCapability.nativeBinary) ||
-                (physicalCapabilities !== undefined &&
-                  (!physicalCapabilities.includes(RpcCapability.portableBinary) ||
-                    !physicalCapabilities.includes(RpcCapability.nativeBinary)))
-              )
-                throw createRpcError(
-                  RpcCoreErrorCode.capabilityUnsupported,
-                  RpcCoreErrorText.capabilityUnsupported
-                )
-              frame = nativeBinary.protectedMetadata
-            }
-            if (
-              this.#authentication &&
-              this.#probe !== undefined &&
-              (this.#probe.mask & (1 << RpcProbeStage.protected)) !== 0
-            )
-              this.#probe.protected(
-                RpcProbeDirection.inbound,
-                '',
-                carrierSizeBytes(frame),
-                -1,
-                -1,
-                (this.#probe.captureMask & (1 << RpcProbeStage.protected)) !== 0
-                  ? frame
-                  : undefined,
-                undefined,
-                undefined,
-                physical.carrierSeq
-              )
-            if (carrier) {
-              /**
-               * Only original paired callables prove whole acceptance and the complete frame
-               * budget.
-               */
-              const facts = this.#components.ingressPrepare.singleFrameLimits
-              if (!facts)
-                throw createRpcError(
-                  RpcCoreErrorCode.capabilityUnsupported,
-                  RpcCoreErrorText.capabilityUnsupported
-                )
-              /** Sidecar properties never participate in native serialization or physical bytes. */
-              const limit = Math.min(
-                RpcBatchPhysical.maxBytes,
-                this.#physicalLimit,
-                facts.maxMessageBytes
-              )
-              if (nativeBinary)
-                assertRpcNativeBinaryFrameSize(
-                  nativeBinary.protectedMetadata,
-                  nativeBinary.sidecars.length,
-                  nativeBinary.backingBytes,
-                  limit
-                )
-              else assertRpcPhysicalFrameSize(physical.data, limit)
-            }
-            if (
-              hasBatchAgreement(this.kernel.transport) &&
-              (this.#authentication || typeof frame === 'string')
-            )
-              assertRpcPhysicalFrameSize(frame, this.#physicalLimit)
-            /** Private physical binding follows this exact context through async transforms. */
-            const authenticationContext = {
-              direction: 'inbound' as const,
-              endpointId: this.id,
-              platform: this.kernel.platform
-            }
-            /** Verify native bytes before admission or replay. */
-            const validate =
-              nativeBinary &&
-              (async (encoded: unknown): Promise<IRpcRuntimeEnvelope> => {
-                try {
-                  const accepted = this.#runtimeComponents.framer.accept(encoded, {
-                    source: physical.sourceToken,
-                    messageId: 'whole'
-                  })
-                  if (accepted.status !== 'complete')
-                    throw createRpcProtocolError(RpcCoreErrorText.runtimeBinaryInvalid)
-                  const manifest = this.#runtimeComponents.codec.decode(accepted.value)
-                  restoredBinary = await (
-                    this.#decodedMetadata
-                      ? restoreInboundDecodedRuntimeBinary
-                      : restoreInboundRuntimeBinary
-                  )(
-                    manifest,
-                    RpcBinaryStorage.native,
-                    nativeBinary.sidecars,
-                    this.#physicalLimit,
-                    readAuthenticationBinaryDigest(this.#authentication)!
-                  )
-                  return restoredBinary
-                } catch (cause) {
-                  throw this.#authentication && isRpcBinaryIntegrityFailure(cause)
-                    ? createRpcAuthenticationError(
-                        RpcMiddlewareErrorText.inboundFrameAuthenticationFailed,
-                        cause
-                      )
-                    : createRpcProtocolError(RpcCoreErrorText.runtimeBinaryInvalid, cause)
-                }
-              })
-            if (this.#authentication) {
-              /** Native or absent (undefined/null) sources use the endpoint partition. */
-              let session =
-                this.#native || physical.source == null
-                  ? this.#authenticationPhysicalSession
-                  : undefined
-              if (
-                !session &&
-                physical.source !== null &&
-                (typeof physical.source === 'object' || typeof physical.source === 'function')
-              ) {
-                /** Actual source object is weakly owned; token text cannot create trusted sessions. */
-                const source = physical.source as object
-                session = this.#authenticationSessions.get(source)
-                if (!session) {
-                  session = {}
-                  this.#authenticationSessions.set(source, session)
-                }
-              }
-              if (session)
-                bindAuthenticationReplayContext(
-                  authenticationContext,
-                  session,
-                  () =>
-                    this.kernel.state === 'active' &&
-                    this.kernel.generation === generation &&
-                    (this.#native?.active ?? true),
-                  this.kernel.topology !== 'exclusive' && physical.source == null
-                    ? {
-                        receiverId: this.receiverId,
-                        unknown: (nonce, counter) =>
-                          this.#pipeline
-                            .sendAuthenticationControl({
-                              control: RpcAuthenticationControl.unknown,
-                              echoNonce: nonce,
-                              counter,
-                              receiverId: this.receiverId
-                            })
-                            .catch((error) => this.emitFailure(error))
-                      }
-                    : undefined
-                )
-              if (validate) bindAuthenticationBinaryValidation(authenticationContext, validate)
-              frame = await this.#authentication.unprotect(frame, authenticationContext)
-              if (frame === consumedAuthenticationFrame) return
-            } else if (validate) await validate(frame)
-            this.#native?.observeOwner()
-            this.kernel.assertActive(generation)
-            if (this.#native && !this.#native.active) return
-            /** Private component proof omits generic whole-frame fanout, never semantic admission. */
-            let decoded: unknown
-            if (nativeBinary) {
-              if (!restoredBinary)
-                throw createRpcProtocolError(RpcCoreErrorText.runtimeBinaryInvalid)
-              decoded = restoredBinary
-              if (
-                this.#probe !== undefined &&
-                (this.#probe.mask & (1 << RpcProbeStage.encoded)) !== 0
-              )
-                this.#probe.encoded(
-                  RpcProbeDirection.inbound,
-                  restoredBinary.id,
-                  carrierSizeBytes(frame),
-                  (this.#probe.captureMask & (1 << RpcProbeStage.encoded)) !== 0
-                    ? frame
-                    : undefined,
-                  restoredBinary.task.method,
-                  restoredBinary.route.senderId
-                )
-            } else if (this.#fast && !carrier) decoded = this.#runtimeComponents.codec.decode(frame)
-            else {
-              const preparedFrame = this.#runtimeComponents.ingressPrepare(frame, {
-                source: physical.sourceToken,
-                messageId: 'whole'
-              })
-              if (
-                this.#probe !== undefined &&
-                (this.#probe.mask & (1 << RpcProbeStage.frame)) !== 0
-              ) {
-                /**
-                 * Only the exact native pair supplies a snapshotted chunk; custom frames remain
-                 * opaque.
-                 */
-                const fragment =
-                  this.#runtimeComponents.ingressPrepare.nativeOutputDomain !== undefined &&
-                  this.#runtimeComponents.ingressPrepare.singleFrameLimits !== undefined
-                    ? (preparedFrame.frame as { index?: number; count?: number } | null)
-                    : undefined
-                this.#probe.frame(
-                  RpcProbeDirection.inbound,
-                  preparedFrame.messageId,
-                  carrierSizeBytes(preparedFrame.frame),
-                  typeof fragment?.index === 'number' ? fragment.index : -1,
-                  typeof fragment?.count === 'number' ? fragment.count : -1,
-                  (this.#probe.captureMask & (1 << RpcProbeStage.frame)) !== 0
-                    ? preparedFrame.frame
-                    : undefined,
-                  undefined,
-                  undefined,
-                  physical.carrierSeq
-                )
-              }
-              const accepted = this.#runtimeComponents.framer.accept(preparedFrame.frame, {
-                source: physical.sourceToken,
-                messageId: preparedFrame.messageId
-              })
-              if (accepted.status === 'pending') return
-              if (accepted.status === 'rejected') {
-                this.emitFailure(accepted.error, RpcCoreErrorCode.transport)
-                return
-              }
-              if (
-                this.#probe !== undefined &&
-                (this.#probe.mask & (1 << RpcProbeStage.encoded)) !== 0
-              )
-                this.#probe.encoded(
-                  RpcProbeDirection.inbound,
-                  preparedFrame.messageId,
-                  carrierSizeBytes(accepted.value),
-                  (this.#probe.captureMask & (1 << RpcProbeStage.encoded)) !== 0
-                    ? accepted.value
-                    : undefined
-                )
-              decoded = this.#runtimeComponents.codec.decode(accepted.value)
-            }
-            if (
-              this.#fast &&
-              !carrier &&
-              !nativeBinary &&
-              this.#probe !== undefined &&
-              (this.#probe.mask & (1 << RpcProbeStage.encoded)) !== 0
-            )
-              this.#probe.encoded(
-                RpcProbeDirection.inbound,
-                '',
-                carrierSizeBytes(frame),
-                (this.#probe.captureMask & (1 << RpcProbeStage.encoded)) !== 0 ? frame : undefined
-              )
-            if (carrier)
-              return await this.#receiveRuntimeEnvelope(
-                decoded,
-                physical,
-                message,
-                generation,
-                authenticationContext,
-                receipt!,
-                restoredBinary
-              )
-            /** Receive negotiated batches independently of send optimization. */
-            let members: readonly unknown[] | undefined
-            if (hasBatchAgreement(this.kernel.transport)) {
-              try {
-                members = readRpcBatchMembers(decoded)
-              } catch (cause) {
-                throw createRpcSerializationError(RpcCoreErrorText.protocolEncodeFailed, cause)
-              }
-            }
-            if (!members)
-              return this.#receiveEnvelope(
-                decoded,
-                physical,
-                message,
-                generation,
-                authenticationContext
-              )
-            /**
-             * Each sibling owns its own identity lease and dispatch completion; no member awaits
-             * another.
-             */
-            const proofs = this.inboundIdentity.splitPrepared(physical, members.length)
-            await Promise.all(
-              members.map((member, index) =>
-                this.#receiveEnvelope(
-                  member,
-                  proofs[index]!,
-                  message,
-                  generation,
-                  authenticationContext,
-                  members.length
-                ).catch((error: unknown) => {
-                  this.emitFailure(error)
-                })
-              )
-            )
-          } finally {
-            receipt?.release()
-            if (closeCandidate)
-              this.kernel.closingSignal.removeEventListener('abort', closeCandidate)
-          }
-        },
+        receive: (message) =>
+          new RpcOutboundAttachment.#InboundPhysicalOperation(this, message).receive(),
         transportError: (error) => {
           /** Settle with the original transport error before retirement can emit a lifecycle abort. */
           this.#failAll(error)
@@ -1278,6 +1357,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
   }
 
   /** Admit one independent semantic frame through the original auth, identity and route owners. */
+  // oxlint-disable-next-line no-unused-private-class-members -- InboundPhysicalOperation reads this lexical private member through its held original owner.
   async #receiveRuntimeEnvelope(
     decoded: unknown,
     physical: IInboundIdentityPreparedSource,
@@ -1285,7 +1365,8 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     generation: number,
     authenticationContext: import('../typing.js').IRpcAuthenticationContext,
     receipt: IProviderIngressReceipt,
-    restoredBinary?: IRpcRuntimeEnvelope
+    restoredBinary?: IRpcRuntimeEnvelope,
+    decodedMetadata = this.#decodedMetadata
   ): Promise<void> {
     /** Closed metadata, task association and portable payloads are checked before identity leases. */
     /** The independent binary parser is selected only by its own protected profile. */
@@ -1305,7 +1386,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
       try {
         const normalized = normalizeInboundDecodedRuntimeBinaryEnvelope(
           await (
-            this.#decodedMetadata ? restoreInboundDecodedRuntimeBinary : restoreInboundRuntimeBinary
+            decodedMetadata ? restoreInboundDecodedRuntimeBinary : restoreInboundRuntimeBinary
           )(decoded, RpcBinaryStorage.inline, [], this.#physicalLimit)
         )
         envelope = normalized instanceof Promise ? await normalized : normalized
@@ -1317,7 +1398,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
         throw createRpcProtocolError(RpcCoreErrorText.runtimeBinaryInvalid, cause)
       }
     } else {
-      const normalized = this.#decodedMetadata
+      const normalized = decodedMetadata
         ? normalizeInboundDecodedRuntimeEnvelope(decoded)
         : normalizeInboundRuntimeEnvelope(decoded)
       if (normalized instanceof Promise) {
@@ -1600,6 +1681,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
         : /** Wire durations are integers; rounding down never extends the original logical budget. */
           { timeoutMs: Math.floor(options.timeoutMs) })
     }
+    /** Every explicitly requested capability must be present in the actual completed intersection. */
     const required = runtimeOperationCapabilities(mode, wireOptions, options.signal !== undefined)
     if (required.some((capability) => !this.#runtimeCapabilities?.includes(capability)))
       throw createRpcError(
@@ -1683,9 +1765,11 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
       envelope: IRpcRuntimeEnvelope
       admission: IInboundIdentityAdmission
     }
+    /** Inline bytes stay entirely in the original protected physical frame. */
     const envelope = record.envelope
     if (envelope.kind !== RpcRuntimeKind.outcome) return
     if (envelope.operation === RpcRuntimeOperation.lookup) {
+      /** The original final controller performs authentication/task/start fencing for credits. */
       const provider = this.kernel.readOwner(EndpointOwnerKey.providerAttachment) as
         | { receiveRuntimeOutcome(message: unknown): Promise<void> }
         | undefined
@@ -1722,6 +1806,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
       envelope: IRpcRuntimeEnvelope
       admission: IInboundIdentityAdmission
     }
+    /** Inline bytes stay entirely in the original protected physical frame. */
     const envelope = record.envelope
     if (envelope.kind !== RpcRuntimeKind.control) return
     if (envelope.operation === RpcRuntimeOperation.stream) {
@@ -1746,6 +1831,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
       return
     }
     if (envelope.operation === RpcRuntimeOperation.cancel) {
+      /** The original final controller performs authentication/task/start fencing for credits. */
       const provider = this.kernel.readOwner(EndpointOwnerKey.providerAttachment) as
         | { receiveRuntimeControl(message: unknown): Promise<void> }
         | undefined
@@ -1782,6 +1868,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
    * Normalizes and admits one semantic member through the existing owner, independently of
    * siblings.
    */
+  // oxlint-disable-next-line no-unused-private-class-members -- InboundPhysicalOperation reads this lexical private member through its held original owner.
   async #receiveEnvelope(
     decoded: unknown,
     physical: IInboundIdentityPreparedSource,
@@ -1790,6 +1877,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
     authenticationContext: import('../typing.js').IRpcAuthenticationContext,
     members = -1
   ): Promise<void> {
+    /** Inline bytes stay entirely in the original protected physical frame. */
     let envelope: IRpcEnvelope
     /** Unknown fields are reported after normalize returns its once-read kind. */
     const ignored: Array<readonly [string, string]> = []
@@ -1913,6 +2001,7 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
       this.#fast
     )
     try {
+      /** Notify's deadline ends at physical send; it never imposes a provider business deadline. */
       const remaining = operation.remaining(timeoutMs)
       operation.assertActive(this.kernel.generation)
       if (remaining === 0) throw createRpcTimeoutError()
@@ -1940,6 +2029,298 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
       // Preserve the normal request's original finally reaction and release synchronous admission failures.
       operation.finish()
       throw error
+    }
+  }
+
+  /** Own one ordinary request's pending settlement, cancellation and physical-send admission. */
+  static #RequestOperation = class RequestOperation<T> {
+    /** The original attachment remains the only transport, replay and endpoint lifecycle owner. */
+    #owner: RpcOutboundAttachment
+    /** The logical target stays fixed while asynchronous discovery chooses its physical receiver. */
+    #targetId: string
+    /** The admitted method is reused for wire capture, validation and probe correlation. */
+    #method: string
+    /** The original payload is retained until the established outbound codec captures it. */
+    #data: unknown
+    /** The caller options retain their original reads during deadline and physical-write admission. */
+    #options: ISendOptions
+    /** The admitted signal list defines cancellation sources and registration order. */
+    #signals: readonly NonNullable<ISendOptions['signal']>[]
+    /** The existing lifecycle operation owns request generation and terminal cleanup. */
+    #operation: OperationScope
+    /** The reserved correlation id joins pending settlement to replay ownership. */
+    #taskId: string
+    /** The original monotonic start time measures this request without another clock read. */
+    #probeStartedAt: number
+    /** The original endpoint timer receipt owns this request deadline. */
+    #timer: IEndpointTimer | undefined
+    /** First completion wins and prevents duplicate pending/replay release. */
+    #settled: boolean = false
+    /** A hostile reason getter cannot reenter this abort settlement. */
+    #abortHandling: boolean = false
+    /** A queued physical send observes the exact original terminal refusal. */
+    #settlementError: unknown
+    /** Only the original physical writer can mark that sending has started. */
+    #startedSending: boolean = false
+    /** Only actually admitted listeners are removed in original reverse order. */
+    #registeredSignals: NonNullable<ISendOptions['signal']>[] = []
+    /** The original native Promise resolves with the exact provider result. */
+    #resolve!: (value: T | PromiseLike<T>) => void
+    /** Rejection preserves the original request, cancellation or transport reason. */
+    #reject!: (reason?: unknown) => void
+    /** The caller observes one native settlement Promise from this operation. */
+    readonly promise: Promise<T>
+    /** Capture the admitted operation before registering any listeners or starting physical work. */
+    constructor(
+      owner: RpcOutboundAttachment,
+      targetId: string,
+      method: string,
+      data: unknown,
+      options: ISendOptions,
+      signals: readonly NonNullable<ISendOptions['signal']>[],
+      operation: OperationScope,
+      taskId: string,
+      probeStartedAt: number
+    ) {
+      this.#owner = owner
+      this.#targetId = targetId
+      this.#method = method
+      this.#data = data
+      this.#options = options
+      this.#signals = signals
+      this.#operation = operation
+      this.#taskId = taskId
+      this.#probeStartedAt = probeStartedAt
+      this.promise = new Promise<T>((resolve, reject) => {
+        this.#resolve = resolve
+        this.#reject = reject
+        this.#run()
+      })
+    }
+    /** Register original pending/abort/deadline ownership before selecting the receiver. */
+    #run(): void {
+      this.#owner.#pending.set(this.#taskId, {
+        targetId: this.#targetId,
+        method: this.#method,
+        resolve: this.#settleResolve,
+        reject: this.#settleReject,
+        cleanup: this.#cleanup
+      })
+      try {
+        for (const signal of this.#signals) {
+          this.#registeredSignals.push(signal)
+          signal.addEventListener('abort', this.#onAbort, { once: true })
+          if (signal.aborted) this.#onAbort()
+          if (this.#settled) return
+        }
+      } catch (error) {
+        this.#settleReject(
+          createRpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.abortSignalInvalid, error)
+        )
+        return
+      }
+      if (this.#settled) return
+      if (this.#options.timeoutMs !== false && this.#options.timeoutMs !== undefined)
+        this.#timer = this.#owner.kernel.time.setTimeout(() => {
+          this.#notifyRemoteAbort()
+          this.#settleReject(createRpcTimeoutError())
+        }, this.#options.timeoutMs)
+      void this.#owner
+        .resolveReceiver(
+          this.#targetId,
+          (this.#options as ISendOptions & { receiverId?: string }).receiverId
+        )
+        .then(this.#sendToReceiver)
+        .catch(this.#settleReject)
+    }
+    /** Validate original terminal, cancellation and generation facts at physical admission. */
+    #assertCanSend = (): void => {
+      if (this.#settled) throw this.#settlementError
+      if (this.#options.signal?.aborted) throw createRpcAbortError()
+      this.#operation.assertActive(this.#owner.kernel.generation)
+      this.#owner.kernel.assertActive()
+    }
+
+    /** Capture the original request envelope and hand it to the one canonical physical sender. */
+    #sendToReceiver = (receiver: IOutboundReceiver): void | Promise<void> => {
+      if (this.#settled) return
+      const request = {
+        kind: 'request' as const,
+        id: this.#taskId,
+        method: this.#method,
+        data: {
+          route: {
+            profile: RpcRouteProfile,
+            type: 'request' as const,
+            applicationVersion: this.#owner.#version,
+            senderId: this.#owner.id,
+            targetId: this.#targetId,
+            ...(receiver.receiverId === undefined ? {} : { receiverId: receiver.receiverId }),
+            sentAt: this.#owner.kernel.time.timestamp(),
+            ...(this.#options.timeoutMs === false || this.#options.timeoutMs === undefined
+              ? {}
+              : {
+                  timeoutMs: Math.ceil(this.#operation.remaining(this.#options.timeoutMs) as number)
+                }),
+            ...(this.#options.idempotencyKey === undefined
+              ? {}
+              : { idempotencyKey: this.#options.idempotencyKey }),
+            ...(this.#options.trace === undefined ? {} : { trace: this.#options.trace })
+          },
+          ...(this.#data === undefined ? {} : { payload: this.#data as IRpcPortableValue })
+        }
+      }
+
+      /** Keep the queue signal lazy on the original operation, independent of getter receiver. */
+      const operation = this.#operation
+      return this.#owner.#pipeline.send(
+        createOutboundEnvelope(request, this.#options),
+        this.#options,
+        this.#owner.#outboundGate
+          ? {
+              get queueSignal() {
+                return operation.signal
+              },
+              signals: this.#signals,
+              assertCanSend: this.#assertCanSend
+            }
+          : undefined,
+        this.#owner.#outboundGate
+          ? () => {
+              this.#assertCanSend()
+              /**
+               * Notify's deadline ends at physical send; it never imposes a provider business
+               * deadline.
+               */
+              const remaining = this.#operation.remaining(this.#options.timeoutMs)
+              if (remaining === 0) throw createRpcTimeoutError()
+              request.data.route.sentAt = this.#owner.kernel.time.timestamp()
+              if (typeof remaining === 'number')
+                (request.data.route as { timeoutMs?: number }).timeoutMs = Math.ceil(remaining)
+              return createOutboundEnvelope(request, this.#options)
+            }
+          : undefined,
+        () => {
+          this.#startedSending = true
+        }
+      )
+    }
+
+    /** Release the exact original timer, listeners, pending slot and replay reservation. */
+    #cleanup = (): void => {
+      if (this.#timer !== undefined) this.#owner.kernel.time.clearTimeout(this.#timer)
+      for (const signal of this.#registeredSignals.reverse()) {
+        try {
+          signal.removeEventListener('abort', this.#onAbort)
+        } catch (error) {
+          this.#owner.emitFailure(error)
+        }
+      }
+      this.#registeredSignals.length = 0
+      this.#owner.#pending.delete(this.#taskId)
+      this.#owner.#replay.releaseId(this.#taskId)
+    }
+    /** Commit the first failure before diagnostics and native rejection. */
+    #settleReject = (error: unknown): void => {
+      if (this.#settled) return
+      this.#settled = true
+      this.#settlementError = error
+      this.#cleanup()
+      if (
+        this.#owner.#probe !== undefined &&
+        (this.#owner.#probe.mask & (1 << RpcProbeStage.message)) !== 0
+      )
+        this.#owner.#probe.message(
+          RpcProbeDirection.outbound,
+          RpcProbeKind.request,
+          RpcProbeOutcome.failed,
+          this.#taskId,
+          this.#method,
+          this.#owner.id,
+          this.#targetId,
+          this.#options.trace,
+          this.#probeStartedAt < 0
+            ? 0
+            : this.#owner.kernel.time.scheduler.now() - this.#probeStartedAt,
+          undefined,
+          error
+        )
+      this.#reject(error)
+    }
+    /** Commit the original successful value and operation mark before native resolution. */
+    #settleResolve = (value: unknown): void => {
+      if (this.#settled) return
+      this.#settled = true
+      this.#cleanup()
+      this.#operation.markSuccess()
+      if (
+        this.#owner.#probe !== undefined &&
+        (this.#owner.#probe.mask & (1 << RpcProbeStage.message)) !== 0
+      )
+        this.#owner.#probe.message(
+          RpcProbeDirection.outbound,
+          RpcProbeKind.request,
+          RpcProbeOutcome.settled,
+          this.#taskId,
+          this.#method,
+          this.#owner.id,
+          this.#targetId,
+          this.#options.trace,
+          this.#probeStartedAt < 0
+            ? 0
+            : this.#owner.kernel.time.scheduler.now() - this.#probeStartedAt,
+          undefined,
+          undefined
+        )
+      this.#resolve(value as T)
+    }
+    /** Notify only an actually started provider through the original abort variation route. */
+    #notifyRemoteAbort = (reason?: unknown): void => {
+      if (!this.#owner.#abortEnabled) return
+      if (this.#owner.#outboundGate && !this.#startedSending) return
+      void this.#owner
+        .resolveReceiver(this.#targetId)
+        .then((receiver) => {
+          const payload =
+            reason === undefined
+              ? undefined
+              : normalizeAbortReason(reason, (failure) =>
+                  this.#owner.emitFailure(failure.error, RpcCoreErrorCode.payloadInvalid)
+                )
+          return this.#owner.#pipeline.send(
+            createOutboundEnvelope({
+              kind: 'variation',
+              id: this.#taskId,
+              data: {
+                route: {
+                  profile: RpcRouteProfile,
+                  type: 'variation',
+                  applicationVersion: this.#owner.#version,
+                  senderId: this.#owner.id,
+                  targetId: this.#targetId,
+                  receiverId: receiver.receiverId,
+                  sentAt: this.#owner.kernel.time.timestamp(),
+                  variation: RpcControl.abort
+                },
+                ...(payload === undefined ? {} : { payload })
+              }
+            })
+          )
+        })
+        .catch((error) => this.#owner.#reportOutboundFailure(error))
+    }
+    /**
+     * Read the selected outside abort once, then reject through this operation's original
+     * settlement.
+     */
+    #onAbort = (): void => {
+      if (this.#settled || this.#abortHandling) return
+      this.#abortHandling = true
+      /** Read the selected signal once for both the remote notification and local rejection. */
+      const aborted = this.#registeredSignals.find((signal) => signal.aborted)
+      const reason = aborted === undefined ? undefined : resolveAbortReason(aborted)
+      this.#notifyRemoteAbort(reason)
+      this.#settleReject(createRpcAbortError(undefined, undefined, reason))
     }
   }
 
@@ -1980,207 +2361,17 @@ export class RpcOutboundAttachment implements IOutboundAttachmentHost {
         undefined,
         undefined
       )
-    return new Promise<T>((resolve, reject) => {
-      let timer: IEndpointTimer | undefined
-      let settled = false
-      /** Prevents a hostile reason getter from reentering abort settlement. */
-      let abortHandling = false
-      let settlementError: unknown
-      let startedSending = false
-      const registeredSignals: NonNullable<ISendOptions['signal']>[] = []
-      const cleanup = (): void => {
-        if (timer !== undefined) this.kernel.time.clearTimeout(timer)
-        for (const signal of registeredSignals.reverse()) {
-          try {
-            signal.removeEventListener('abort', onAbort)
-          } catch (error) {
-            this.emitFailure(error)
-          }
-        }
-        registeredSignals.length = 0
-        this.#pending.delete(taskId)
-        this.#replay.releaseId(taskId)
-      }
-      const settleReject = (error: unknown): void => {
-        if (settled) return
-        settled = true
-        settlementError = error
-        cleanup()
-        if (this.#probe !== undefined && (this.#probe.mask & (1 << RpcProbeStage.message)) !== 0)
-          this.#probe.message(
-            RpcProbeDirection.outbound,
-            RpcProbeKind.request,
-            RpcProbeOutcome.failed,
-            taskId,
-            method,
-            this.id,
-            targetId,
-            options.trace,
-            probeStartedAt < 0 ? 0 : this.kernel.time.scheduler.now() - probeStartedAt,
-            undefined,
-            error
-          )
-        reject(error)
-      }
-      const settleResolve = (value: unknown): void => {
-        if (settled) return
-        settled = true
-        cleanup()
-        operation.markSuccess()
-        if (this.#probe !== undefined && (this.#probe.mask & (1 << RpcProbeStage.message)) !== 0)
-          this.#probe.message(
-            RpcProbeDirection.outbound,
-            RpcProbeKind.request,
-            RpcProbeOutcome.settled,
-            taskId,
-            method,
-            this.id,
-            targetId,
-            options.trace,
-            probeStartedAt < 0 ? 0 : this.kernel.time.scheduler.now() - probeStartedAt,
-            undefined,
-            undefined
-          )
-        resolve(value as T)
-      }
-      // Matches legacy `notifyRemoteAbort()`: told the remote provider to cancel its active
-      // controller whenever this caller settles a request early for a reason the remote cannot
-      // otherwise observe (caller abort signal or caller-side timeout) — never on success, remote
-      // failure, or transport failure, which the remote already knows about from its own send.
-      const notifyRemoteAbort = (reason?: unknown): void => {
-        if (!this.#abortEnabled) return
-        if (this.#outboundGate && !startedSending) return
-        void this.resolveReceiver(targetId)
-          .then((receiver) => {
-            const payload =
-              reason === undefined
-                ? undefined
-                : normalizeAbortReason(reason, (failure) =>
-                    this.emitFailure(failure.error, RpcCoreErrorCode.payloadInvalid)
-                  )
-            return this.#pipeline.send(
-              createOutboundEnvelope({
-                kind: 'variation',
-                id: taskId,
-                data: {
-                  route: {
-                    profile: RpcRouteProfile,
-                    type: 'variation',
-                    applicationVersion: this.#version,
-                    senderId: this.id,
-                    targetId,
-                    receiverId: receiver.receiverId,
-                    sentAt: this.kernel.time.timestamp(),
-                    variation: RpcControl.abort
-                  },
-                  ...(payload === undefined ? {} : { payload })
-                }
-              })
-            )
-          })
-          .catch((error) => this.#reportOutboundFailure(error))
-      }
-      const onAbort = (): void => {
-        if (settled || abortHandling) return
-        abortHandling = true
-        /** Read the selected signal once for both the remote notification and local rejection. */
-        const aborted = registeredSignals.find((signal) => signal.aborted)
-        const reason = aborted === undefined ? undefined : resolveAbortReason(aborted)
-        notifyRemoteAbort(reason)
-        settleReject(createRpcAbortError(undefined, undefined, reason))
-      }
-      this.#pending.set(taskId, {
-        targetId,
-        method,
-        resolve: settleResolve,
-        reject: settleReject,
-        cleanup
-      })
-      try {
-        for (const signal of signals) {
-          registeredSignals.push(signal)
-          signal.addEventListener('abort', onAbort, { once: true })
-          if (signal.aborted) onAbort()
-          if (settled) return
-        }
-      } catch (error) {
-        settleReject(
-          createRpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.abortSignalInvalid, error)
-        )
-        return
-      }
-      if (settled) return
-      if (options.timeoutMs !== false && options.timeoutMs !== undefined)
-        timer = this.kernel.time.setTimeout(() => {
-          notifyRemoteAbort()
-          settleReject(createRpcTimeoutError())
-        }, options.timeoutMs)
-      void this.resolveReceiver(
-        targetId,
-        (options as ISendOptions & { receiverId?: string }).receiverId
-      )
-        .then((receiver) => {
-          if (settled) return
-          const request = {
-            kind: 'request' as const,
-            id: taskId,
-            method,
-            data: {
-              route: {
-                profile: RpcRouteProfile,
-                type: 'request' as const,
-                applicationVersion: this.#version,
-                senderId: this.id,
-                targetId,
-                ...(receiver.receiverId === undefined ? {} : { receiverId: receiver.receiverId }),
-                sentAt: this.kernel.time.timestamp(),
-                ...(options.timeoutMs === false || options.timeoutMs === undefined
-                  ? {}
-                  : { timeoutMs: Math.ceil(operation.remaining(options.timeoutMs) as number) }),
-                ...(options.idempotencyKey === undefined
-                  ? {}
-                  : { idempotencyKey: options.idempotencyKey }),
-                ...(options.trace === undefined ? {} : { trace: options.trace })
-              },
-              ...(data === undefined ? {} : { payload: data as IRpcPortableValue })
-            }
-          }
-          const assertCanSend = (): void => {
-            if (settled) throw settlementError
-            if (options.signal?.aborted) throw createRpcAbortError()
-            operation.assertActive(this.kernel.generation)
-            this.kernel.assertActive()
-          }
-          return this.#pipeline.send(
-            createOutboundEnvelope(request, options),
-            options,
-            this.#outboundGate
-              ? {
-                  get queueSignal() {
-                    return operation.signal
-                  },
-                  signals,
-                  assertCanSend
-                }
-              : undefined,
-            this.#outboundGate
-              ? () => {
-                  assertCanSend()
-                  const remaining = operation.remaining(options.timeoutMs)
-                  if (remaining === 0) throw createRpcTimeoutError()
-                  request.data.route.sentAt = this.kernel.time.timestamp()
-                  if (typeof remaining === 'number')
-                    (request.data.route as { timeoutMs?: number }).timeoutMs = Math.ceil(remaining)
-                  return createOutboundEnvelope(request, options)
-                }
-              : undefined,
-            () => {
-              startedSending = true
-            }
-          )
-        })
-        .catch(settleReject)
-    })
+    return new RpcOutboundAttachment.#RequestOperation<T>(
+      this,
+      targetId,
+      method,
+      data,
+      options,
+      signals,
+      operation,
+      taskId,
+      probeStartedAt
+    ).promise
   }
 
   /** Sends one dispatch-only request without creating pending response state. */

@@ -1,21 +1,13 @@
+import { createRuntimeEndpointComposition } from '../../../dist/core/runtime-api-endpoint.js'
+import { RpcCapability } from '@migaia/rpc-contract'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { execFileSync } from 'node:child_process'
-import { resolve } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
-import { createMemoryTransportPair } from '../../../dist/core/adapters/memory.js'
+import { createMemoryTransportPair } from '../../fixtures/memory-transport.js'
 import { messageFramer } from '@migaia/rpc-contract/framing/v1'
 import { createStringFramer } from '@migaia/rpc-contract/framing'
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
-import { createComposedEndpoint } from '../../../dist/core/composed.js'
 import { createEndpointKernel } from '../../../dist/core/endpoint-kernel.js'
-import { createClientEndpoint } from '../../../dist/core/client.js'
-import { createFullEndpoint } from '../../../dist/core/full.js'
-import { createProviderEndpoint } from '../../../dist/core/provider.js'
-import { createClientFirstPartyRoots } from '../../../dist/core/internal/client-first-party-roots.js'
-import {
-  createFirstPartyRoots,
-  type IRpcFirstPartyRootName
-} from '../../../dist/core/internal/first-party-roots.js'
+
 import { authentication } from '../../../dist/core/middleware/authentication.js'
 import { readEndpointDebugSnapshot } from '../../../dist/core/internal/test-observer.js'
 import { RpcCanonicalChunkAttachment as RpcChunkAttachment } from '../../../dist/core/internal/canonical-chunk-attachment.js'
@@ -34,115 +26,13 @@ import type {
   IRpcOutboundCommand,
   IRpcOutboundOperationsPort
 } from '../../../dist/core/internal/plugin-shared-keys.js'
-import {
-  clientRuntimeOwnerKeys,
-  coreRuntimeOwnerKeys,
-  customRuntimeOwnerKeys,
-  defaultRuntimeOwnerKeys,
-  observeRuntimeOwnerAllocation,
-  providerRuntimeOwnerKeys
-} from '../fixtures/tree-shaking/runtime-owner-topology.js'
-
-type IRetainedReport = {
-  readonly root: {
-    readonly moduleCount: number
-    readonly rawBytes: number
-    readonly gzipBytes: number
-    readonly endpointStaticImportCount: number
-  }
-  readonly modules: readonly string[]
-  readonly moduleAttribution: readonly {
-    readonly module: string
-    readonly originalBytes: number
-    readonly renderedBytes: number
-  }[]
-}
-
-type IReviewedBaseline = {
-  readonly root: IRetainedReport['root']
-  readonly modules: readonly string[]
-}
-
-type IPostMigrationCandidate = {
-  readonly status: 'approved'
-  readonly provenanceDigest: string
-  readonly oldTuple: IRetainedReport['root']
-  readonly newTuple: IRetainedReport['root']
-  readonly addedModules: readonly { readonly module: string }[]
-  readonly removedModules: readonly { readonly module: string }[]
-}
-
-const workspaceRoot = resolve(import.meta.dirname, '../../../../..')
 
 /** Runs the reviewed root bundler probe used for the retained-size decision. */
-function readLiveReport(): IRetainedReport {
-  const script = resolve(import.meta.dirname, '../tree-shaking-baseline.mjs')
-  return JSON.parse(
-    execFileSync(process.execPath, [script], { cwd: workspaceRoot, encoding: 'utf8' })
-  ) as IRetainedReport
-}
 
 /** Normalizes the historical absolute module paths before comparing retained identity. */
-function normalizeModulePath(module: string): string {
-  const relative = module.includes('/packages/')
-    ? module.slice(module.indexOf('/packages/') + 1)
-    : module
-  return relative.startsWith('packages/rpc/') || relative.startsWith('packages/rpc-host/')
-    ? relative
-    : relative.startsWith('packages/')
-      ? `workspace:${relative}`
-      : relative
-}
 
 /** Verifies the retained/allocation attribution against the approved live graph. */
 describe('retained and allocation attribution', () => {
-  it('binds pending byte drift to the current and historical retained graphs', async () => {
-    const historicalBaseline = (await import(
-      '../fixtures/tree-shaking/pre-migration-tree-shaking-baseline.json',
-      {
-        with: { type: 'json' }
-      }
-    )) as { readonly default: IReviewedBaseline }
-    const candidate = (await import('../fixtures/tree-shaking/post-migration-candidate.json', {
-      with: { type: 'json' }
-    })) as { readonly default: IPostMigrationCandidate }
-    const custody = (await import('../fixtures/tree-shaking/intended-cost-custody-baseline.json', {
-      with: { type: 'json' }
-    })) as {
-      readonly default: {
-        readonly successorTuple: IRetainedReport['root']
-        readonly moduleLedger: readonly { readonly module: string }[]
-      }
-    }
-    const live = readLiveReport()
-    const liveModules = new Set(live.modules.map(normalizeModulePath))
-    const custodyModules = custody.default.moduleLedger.map(({ module }) => module)
-
-    expect(candidate.default.status).toBe('approved')
-    expect(candidate.default.oldTuple).toEqual(historicalBaseline.default.root)
-    expect(candidate.default.newTuple).toEqual({
-      moduleCount: 121,
-      rawBytes: 475725,
-      gzipBytes: 113838,
-      endpointStaticImportCount: 12
-    })
-    // The custody artifact records the immutable historical successor, not the live bundle.
-    expect(custodyModules).toHaveLength(custody.default.successorTuple.moduleCount)
-    expect(new Set(custodyModules).size).toBe(custodyModules.length)
-    expect(live.moduleAttribution).toHaveLength(live.modules.length)
-    expect(
-      live.moduleAttribution.every(
-        ({ originalBytes, renderedBytes }) => originalBytes >= 0 && renderedBytes >= 0
-      )
-    ).toBe(true)
-    expect(live.moduleAttribution.some(({ originalBytes }) => originalBytes > 0)).toBe(true)
-    expect(
-      live.moduleAttribution
-        .slice(0, 5)
-        .every(({ module }) => liveModules.has(normalizeModulePath(module)))
-    ).toBe(true)
-  })
-
   it('closes source identity and variation terminal branches with one owner', async () => {
     const identities = new SourceIdentityRegistry()
     const firstSource = {}
@@ -219,94 +109,30 @@ describe('retained and allocation attribution', () => {
     }
   })
 
-  it('proves selected endpoint owner allocation is unique and attributable', async () => {
-    const observed = await observeRuntimeOwnerAllocation()
-    expect(observed.core).toEqual(coreRuntimeOwnerKeys)
-    expect(observed.client).toEqual(clientRuntimeOwnerKeys)
-    expect(observed.provider).toEqual(providerRuntimeOwnerKeys)
-    expect(observed.full).toEqual(defaultRuntimeOwnerKeys)
-    expect(observed.custom).toEqual(customRuntimeOwnerKeys)
-    const [coreTransport] = createMemoryTransportPair()
-    const core = await createComposedEndpoint(
-      {
-        id: 'core-allocation',
-        transport: coreTransport,
-        middlewares: [connect({ transport: coreTransport })]
-      },
-      createClientFirstPartyRoots()
-    )
-    const [clientTransport] = createMemoryTransportPair()
-    const client = await createClientEndpoint({
-      id: 'client-allocation',
-      transport: clientTransport,
-      middlewares: [connect({ transport: clientTransport })]
-    })
-    const [providerTransport] = createMemoryTransportPair()
-    const provider = await createProviderEndpoint({
-      id: 'provider-allocation',
-      transport: providerTransport,
-      middlewares: [connect({ transport: providerTransport })]
-    })
-    const [fullTransport] = createMemoryTransportPair()
-    const full = await createFullEndpoint({
-      id: 'full-allocation',
-      transport: fullTransport,
-      middlewares: [connect({ transport: fullTransport })]
-    })
-    const [customTransport] = createMemoryTransportPair()
-    const custom = await createComposedEndpoint(
-      {
-        id: 'custom-allocation',
-        transport: customTransport,
-        middlewares: [connect({ transport: customTransport })]
-      },
-      createFirstPartyRoots(
-        new Set<IRpcFirstPartyRootName>([
-          'first-party-chunk',
-          'first-party-outbound',
-          'first-party-provider',
-          'first-party-discovery',
-          'first-party-control'
-        ])
-      )
-    )
-
-    expect(readEndpointDebugSnapshot(core)?.owners).toEqual(coreRuntimeOwnerKeys)
-    expect(readEndpointDebugSnapshot(client)?.owners).toEqual(clientRuntimeOwnerKeys)
-    expect(readEndpointDebugSnapshot(provider)?.owners).toEqual(providerRuntimeOwnerKeys)
-    expect(readEndpointDebugSnapshot(full)?.owners).toEqual(defaultRuntimeOwnerKeys)
-    expect(readEndpointDebugSnapshot(custom)?.owners).toEqual(customRuntimeOwnerKeys)
-    for (const endpoint of [core, client, provider, full, custom]) {
-      const owners = readEndpointDebugSnapshot(endpoint)?.owners ?? []
-      expect(new Set(owners).size).toBe(owners.length)
-    }
-    await Promise.all([
-      core.dispose(),
-      client.dispose(),
-      provider.dispose(),
-      full.dispose(),
-      custom.dispose()
-    ])
-  })
-
   it('exercises composed discovery and chunk settlement through the shared kernel', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
-    const server = await createFullEndpoint({
-      id: 'chunk-server',
-      transport: serverTransport,
-      codec: defineJsonCodec({ version: 1 }),
-      framer: createStringFramer({ chunkBytes: 8 }),
-      middlewares: [connect({ transport: serverTransport })],
-      provider: { echo: (context) => context.success(context.data) }
-    })
-    const client = await createFullEndpoint({
-      id: 'chunk-client',
-      targetIds: ['chunk-server'],
-      transport: clientTransport,
-      codec: defineJsonCodec({ version: 1 }),
-      framer: createStringFramer({ chunkBytes: 8 }),
-      middlewares: [connect({ transport: clientTransport })]
-    })
+    const server = await createRuntimeEndpointComposition(
+      {
+        id: 'chunk-server',
+        transport: serverTransport,
+        codec: defineJsonCodec({ version: 1 }),
+        framer: createStringFramer({ chunkBytes: 8 }),
+        middlewares: [connect({ transport: serverTransport })],
+        provider: { echo: (context) => context.success(context.data) }
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'chunk-client',
+        targetIds: ['chunk-server'],
+        transport: clientTransport,
+        codec: defineJsonCodec({ version: 1 }),
+        framer: createStringFramer({ chunkBytes: 8 }),
+        middlewares: [connect({ transport: clientTransport })]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
 
     try {
       await expect(
@@ -354,36 +180,42 @@ describe('retained and allocation attribution', () => {
         return candidate.value
       }
     })
-    const server = await createFullEndpoint({
-      id: 'unauthenticated-chunk-server',
-      transport: serverTransport,
-      codec: defineJsonCodec({ version: 1 }),
-      framer: createStringFramer({
-        chunkBytes: 1,
-        maxMessageBytes: 1_024,
-        assemblyTimeoutMs: 50,
-        schedule: () => {
-          assemblyTimers += 1
-          return Object.freeze({})
-        },
-        cancel: () => undefined
-      }),
-      middlewares: [connect({ transport: serverTransport }), signed],
-      provider: {
-        echo: (context) => {
-          providerCalls += 1
-          return context.success(context.data)
+    const server = await createRuntimeEndpointComposition(
+      {
+        id: 'unauthenticated-chunk-server',
+        transport: serverTransport,
+        codec: defineJsonCodec({ version: 1 }),
+        framer: createStringFramer({
+          chunkBytes: 1,
+          maxMessageBytes: 1_024,
+          assemblyTimeoutMs: 50,
+          schedule: () => {
+            assemblyTimers += 1
+            return Object.freeze({})
+          },
+          cancel: () => undefined
+        }),
+        middlewares: [connect({ transport: serverTransport }), signed],
+        provider: {
+          echo: (context) => {
+            providerCalls += 1
+            return context.success(context.data)
+          }
         }
-      }
-    })
-    const client = await createFullEndpoint({
-      id: 'unauthenticated-chunk-client',
-      targetIds: ['unauthenticated-chunk-server'],
-      transport: forgedTransport,
-      codec: defineJsonCodec({ version: 1 }),
-      framer: createStringFramer({ chunkBytes: 1, maxMessageBytes: 1_024 }),
-      middlewares: [connect({ transport: forgedTransport }), signed]
-    })
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'unauthenticated-chunk-client',
+        targetIds: ['unauthenticated-chunk-server'],
+        transport: forgedTransport,
+        codec: defineJsonCodec({ version: 1 }),
+        framer: createStringFramer({ chunkBytes: 1, maxMessageBytes: 1_024 }),
+        middlewares: [connect({ transport: forgedTransport }), signed]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
 
     try {
       await expect(
@@ -406,36 +238,42 @@ describe('retained and allocation attribution', () => {
             options
           )
       }
-      const goodServer = await createFullEndpoint({
-        id: 'unauthenticated-chunk-good-server',
-        transport: goodServerTransport,
-        codec: defineJsonCodec({ version: 1 }),
-        framer: createStringFramer({
-          chunkBytes: 1,
-          maxMessageBytes: 1_024,
-          assemblyTimeoutMs: 50,
-          schedule: () => {
-            assemblyTimers += 1
-            return Object.freeze({})
-          },
-          cancel: () => undefined
-        }),
-        middlewares: [connect({ transport: goodServerTransport }), signed],
-        provider: {
-          echo: (context) => {
-            providerCalls += 1
-            return context.success(context.data)
+      const goodServer = await createRuntimeEndpointComposition(
+        {
+          id: 'unauthenticated-chunk-good-server',
+          transport: goodServerTransport,
+          codec: defineJsonCodec({ version: 1 }),
+          framer: createStringFramer({
+            chunkBytes: 1,
+            maxMessageBytes: 1_024,
+            assemblyTimeoutMs: 50,
+            schedule: () => {
+              assemblyTimers += 1
+              return Object.freeze({})
+            },
+            cancel: () => undefined
+          }),
+          middlewares: [connect({ transport: goodServerTransport }), signed],
+          provider: {
+            echo: (context) => {
+              providerCalls += 1
+              return context.success(context.data)
+            }
           }
-        }
-      })
-      const goodClient = await createFullEndpoint({
-        id: 'unauthenticated-chunk-good-client',
-        targetIds: ['unauthenticated-chunk-good-server'],
-        transport: goodClientTransport,
-        codec: defineJsonCodec({ version: 1 }),
-        framer: createStringFramer({ chunkBytes: 1, maxMessageBytes: 1_024 }),
-        middlewares: [connect({ transport: goodClientTransport }), signed]
-      })
+        },
+        { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+      ).installing
+      const goodClient = await createRuntimeEndpointComposition(
+        {
+          id: 'unauthenticated-chunk-good-client',
+          targetIds: ['unauthenticated-chunk-good-server'],
+          transport: goodClientTransport,
+          codec: defineJsonCodec({ version: 1 }),
+          framer: createStringFramer({ chunkBytes: 1, maxMessageBytes: 1_024 }),
+          middlewares: [connect({ transport: goodClientTransport }), signed]
+        },
+        { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+      ).installing
       try {
         await expect(
           goodClient.send('unauthenticated-chunk-good-server', 'echo', 'fragmented', {
@@ -454,24 +292,33 @@ describe('retained and allocation attribution', () => {
 
   it('keeps multi-receiver fanout isolated and settles an aborted request once', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
-    const first = await createFullEndpoint({
-      id: 'multi-first',
-      transport: serverTransport,
-      middlewares: [connect({ transport: serverTransport })],
-      provider: { echo: (context) => context.success('first') }
-    })
-    const second = await createFullEndpoint({
-      id: 'multi-second',
-      transport: serverTransport,
-      middlewares: [connect({ transport: serverTransport })],
-      provider: { echo: (context) => context.success('second') }
-    })
-    const client = await createFullEndpoint({
-      id: 'multi-client',
-      targetIds: ['multi-first', 'multi-second'],
-      transport: clientTransport,
-      middlewares: [connect({ transport: clientTransport })]
-    })
+    const first = await createRuntimeEndpointComposition(
+      {
+        id: 'multi-first',
+        transport: serverTransport,
+        middlewares: [connect({ transport: serverTransport })],
+        provider: { echo: (context) => context.success('first') }
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
+    const second = await createRuntimeEndpointComposition(
+      {
+        id: 'multi-second',
+        transport: serverTransport,
+        middlewares: [connect({ transport: serverTransport })],
+        provider: { echo: (context) => context.success('second') }
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'multi-client',
+        targetIds: ['multi-first', 'multi-second'],
+        transport: clientTransport,
+        middlewares: [connect({ transport: clientTransport })]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     try {
       const fanout = await client.sendAll('echo', null)
       expect(Object.values(fanout.fulfilled).sort()).toEqual(['first', 'second'])
@@ -483,23 +330,29 @@ describe('retained and allocation attribution', () => {
     expect(readEndpointDebugSnapshot(second)).toMatchObject({ phase: 'disposed', pending: 0 })
 
     const [abortClientTransport, abortServerTransport] = createMemoryTransportPair()
-    const abortServer = await createFullEndpoint({
-      id: 'abort-server',
-      transport: abortServerTransport,
-      middlewares: [connect({ transport: abortServerTransport }), abort()],
-      provider: {
-        echo: async (context) => {
-          await new Promise((resolve) => setTimeout(resolve, 20))
-          return context.success(context.data)
+    const abortServer = await createRuntimeEndpointComposition(
+      {
+        id: 'abort-server',
+        transport: abortServerTransport,
+        middlewares: [connect({ transport: abortServerTransport }), abort()],
+        provider: {
+          echo: async (context) => {
+            await new Promise((resolve) => setTimeout(resolve, 20))
+            return context.success(context.data)
+          }
         }
-      }
-    })
-    const abortClient = await createFullEndpoint({
-      id: 'abort-client',
-      targetIds: ['abort-server'],
-      transport: abortClientTransport,
-      middlewares: [connect({ transport: abortClientTransport }), abort()]
-    })
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
+    const abortClient = await createRuntimeEndpointComposition(
+      {
+        id: 'abort-client',
+        targetIds: ['abort-server'],
+        transport: abortClientTransport,
+        middlewares: [connect({ transport: abortClientTransport }), abort()]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     const controller = new AbortController()
     const request = abortClient.send('abort-server', 'echo', 'late', {
       signal: controller.signal

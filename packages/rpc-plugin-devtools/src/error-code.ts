@@ -1,13 +1,13 @@
 /** Registry identity shared by all devtools errors; consumers classify the source/code pair. */
 export const ERROR_SOURCE = 'rpc.devtools'
 
-/** Public code owner for the record contract and the collector/hub lifecycle. */
+/** Public code owner for the record contract and collector lifecycle. */
 export const RpcDevtoolsErrorCode = {
   /** Captured service data cannot be encoded; inspect cause or disable content exposure. */
   serviceResultInvalid: 'SERVICE_RESULT_INVALID',
-  /** Collector/hub options violate their supported domain; fix the option before construction. */
+  /** Collector options violate their supported domain; fix the option before construction. */
   invalidOption: 'INVALID_OPTION',
-  /** Collector or hub is closed; create a new instance rather than reviving retained resources. */
+  /** Collector is closed; create a new instance rather than reviving retained resources. */
   closed: 'CLOSED',
   /** A recording already owns the collector; stop it before starting another. */
   recordActive: 'RECORD_ACTIVE',
@@ -16,16 +16,7 @@ export const RpcDevtoolsErrorCode = {
   /** Record header or NDJSON is invalid; inspect cause and supply a version-1 record. */
   recordFormatInvalid: 'RECORD_FORMAT_INVALID',
   /** Redaction failed; report the original cause and discard content (collector). */
-  redactFailed: 'REDACT_FAILED',
-  /** A hub target name is registered; remove it before replacement. */
-  targetDuplicate: 'TARGET_DUPLICATE',
-  /** A hub operation names an unknown target; register it before use. */
-  targetUnknown: 'TARGET_UNKNOWN',
-  /**
-   * Hub close reports failed target iterator returns; inspect original cause/errors and fix
-   * cleanup.
-   */
-  targetReleaseFailed: 'TARGET_RELEASE_FAILED'
+  redactFailed: 'REDACT_FAILED'
 } as const
 
 /** Semantic code union retains the registry's exact value spelling. */

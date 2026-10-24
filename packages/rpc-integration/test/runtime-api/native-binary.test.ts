@@ -5,6 +5,10 @@ import { fileURLToPath } from 'node:url'
 import { MessageChannel } from 'node:worker_threads'
 import { it, vi } from 'vitest'
 import { systemScheduler } from '@migaia/utils/scheduler'
+import { createUnitBudget } from '@migaia/supervision'
+import { threadPlugin } from '@migaia/rpc-plugin-thread'
+import { RuntimePluginKey } from '@migaia/rpc-host/plugin'
+import { readRuntimeOutletConnection } from '../../../rpc-host/dist/remote/runtime-api/outlet.js'
 import { authentication } from '../../../rpc-host/dist/core/middleware/authentication.js'
 import {
   createRpcIdempotencyStore,
@@ -18,35 +22,32 @@ import {
   type IRuntimePeerOptions
 } from '../../../rpc-host/dist/remote/runtime-api/peer.js'
 import { readRuntimePeerConnection } from '../../../rpc-host/dist/remote/runtime-api/peer.js'
-import { createProcessPeer } from '../../../rpc-plugin-process/test/protocol.ts'
 import { createProcessTransport } from '../../../rpc-plugin-process/dist/process/handshake.js'
 import { createNativeProcessOffer } from '../../../rpc-plugin-process/dist/process/offer.js'
 import { nativeBytePair } from '../process/fixtures/native-runtime.js'
+import { assertRuntimeTransferDisabled } from '../../../rpc-host/dist/core/internal/runtime-call-options.js'
 import { createRpcStreamFrameDecoder } from '@migaia/rpc-contract/framing/stream'
 import { readRuntimeCarrier } from '@migaia/rpc-contract/runtime'
-import { createThreadPeer } from '../../../rpc-plugin-thread/test/protocol.ts'
 import {
   createNodeThreadLauncher,
   createNodeThreadChannelFactory
-} from '@migaia/rpc-plugin-thread/adapters/node'
+} from '../../../rpc-plugin-thread/dist/threads/adapters/node.js'
 import { RpcCapability } from '@migaia/rpc-contract'
 import type { IRuntimeDynamicSurface } from '../../../rpc-host/dist/remote/runtime-api/typing.js'
 import { RUNTIME_API_CAPABILITIES } from '../../../rpc-host/dist/remote/runtime-api/constants.js'
-import { runtimeSources } from '../../../rpc-host/test/runtime-api/fixture.js'
+import { runtimeSources, runtimeTestHost } from '../../../rpc-host/test/runtime-api/fixture.js'
 import { RpcNativeBinaryKind, RpcBinaryProfile, RpcBinaryStorage } from '@migaia/rpc-contract/wire'
 import { readAuthenticationEnvelope } from '../../../rpc-host/dist/core/middleware/authentication-envelope.js'
 import * as authenticationReplay from '../../../rpc-host/dist/core/internal/authentication-replay.js'
 import { RpcCoreErrorCode } from '../../../rpc-host/dist/core/errors.js'
 import { createRuntimeApiEndpoint } from '../../../rpc-host/dist/core/runtime-api-endpoint.js'
-import {
-  codec,
-  framer,
-  connect,
-  abort,
-  timeout,
-  hooks,
-  type IRpcEndpoint
-} from '../../../rpc-host/dist/core/index.js'
+import { codec } from '../../../rpc-host/dist/core/middleware/codec.js'
+import { framer } from '../../../rpc-host/dist/core/middleware/framer.js'
+import { connect } from '../../../rpc-host/dist/core/middleware/connect.js'
+import { abort } from '../../../rpc-host/dist/core/middleware/abort.js'
+import { timeout } from '../../../rpc-host/dist/core/middleware/timeout.js'
+import { hooks } from '../../../rpc-host/dist/core/middleware/hooks.js'
+import type { IRpcEndpoint } from '../../../rpc-host/dist/core/typing.js'
 
 /** Both source offers request the exact native profile; no platform label grants this capability. */
 const capabilities = [
@@ -286,20 +287,33 @@ it('default public Thread Peer negotiates native clone for Worker request, respo
   const channels = createNodeThreadChannelFactory({ scheduler: systemScheduler })
   /** Fixture reports remain independent evidence of receiver failures. */
   const reports: unknown[] = []
-  /** Real source preparation carries the public factory's trusted bootstrap into the Worker. */
-  const peer = await createThreadPeer<IRuntimeDynamicSurface>({
-    self: { name: 'native-default-parent', instanceId: 'native-default-parent' },
-    provide: { parentEcho: () => 'native-default-parent' },
-    spawn: async (context) => {
-      const launcher = createNodeThreadLauncher({ runtimeApi: context })
-      handle = await launcher.launch(
-        { entry, name: 'native-default-child' },
-        { signal: new AbortController().signal }
-      )
-      return channels.open(handle, new AbortController().signal)
-    },
-    report: (error) => reports.push(error)
+  /** Actual Host installation supplies the trusted native launcher context and owns rollback. */
+  const host = runtimeTestHost({
+    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   })
+  /** The managed source retains the original independent native handle and channel observation. */
+  const native = createNodeThreadLauncher()
+  /** The outlet lends its actual managed Peer, preserving iterator and physical channel contracts. */
+  const peer = await host
+    .use(
+      threadPlugin({
+        self: { name: 'native-default-parent', instanceId: 'native-default-parent' },
+        provide: { parentEcho: () => 'native-default-parent' },
+        spawn: {
+          spec: { entry, name: 'native-default-child' },
+          budget: createUnitBudget({ kind: 'thread', maxUnits: 1 }),
+          scheduler: systemScheduler,
+          launcher: {
+            ...native,
+            launch: async (spec, context) => (handle = await native.launch(spec, context))
+          },
+          channelFactory: channels,
+          report: (error) => reports.push(error)
+        },
+        report: (error) => reports.push(error)
+      })
+    )
+    .then(() => readRuntimeOutletConnection(host.thread, RuntimePluginKey.thread)!.peer!)
   /** Read the accepted physical channel; a descriptive platform label alone grants no native right. */
   const channel = readRuntimePeerConnection(peer).channel
   /** Native responses/items are observed after the Worker's genuine postMessage boundary. */
@@ -366,7 +380,7 @@ it('default public Thread Peer negotiates native clone for Worker request, respo
     send.mockRestore()
     remove()
     try {
-      await peer.close()
+      await host.dispose()
     } finally {
       handle?.terminate()
       await handle?.exited
@@ -435,7 +449,7 @@ it('process byte carriers keep inline binary despite bilateral native capability
   /** Both genuine process factories negotiate native support while retaining real byte transports. */
   const peers = await Promise.all(
     [0, 1].map((index) =>
-      createProcessPeer<IRuntimeDynamicSurface>({
+      createRuntimePeer<IRuntimeDynamicSurface>({
         self: { name: `byte-${index}`, instanceId: `byte-${index}` },
         provide: { echo: (value: unknown) => value },
         connect: (context) =>
@@ -615,12 +629,15 @@ it.each(['request', 'notify', 'stream', 'group'] as const)(
   'process %s rejects every own transfer field before native send or detach',
   async (mode) => {
     /**
-     * The actual process public factory must enforce its family contract even on a capable test
-     * carrier.
+     * The canonical process transfer guard must reject own fields even on a capable native test
+     * carrier; real process byte channels never grant transfer capability.
      */
     const fixture = await nativePair(
       undefined,
-      (options) => createProcessPeer<IRuntimeDynamicSurface>(options) as Promise<IRuntimePeer>
+      (options) =>
+        createRuntimePeer<IRuntimeDynamicSurface>(options, {
+          restrictTransfer: assertRuntimeTransferDisabled
+        }) as Promise<IRuntimePeer>
     )
     const send = vi.spyOn(fixture.transports[0]!, 'send')
     try {

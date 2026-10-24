@@ -1,7 +1,7 @@
 import { readRuntimeOutletConnection } from '../../../rpc-host/dist/remote/runtime-api/outlet.js'
 import { runtimeTestHost } from '../../../rpc-host/test/runtime-api/fixture.js'
 import assert from 'node:assert/strict'
-import { it } from 'vitest'
+import { it, expect } from 'vitest'
 import { defineFeature, definePlugin } from '@migaia/plugin-host'
 import { threadProtocolDefinition as createThreadPlugin } from './fixtures/thread-protocol.js'
 import type { IThreadProtocolOptions as IRuntimeThreadPluginOptions } from './fixtures/thread-protocol.js'
@@ -118,10 +118,12 @@ it('method-level expose admits only add, and whole plus method is one union', as
     assert.equal(installed, true, 'method-level whitelist configures a real connection')
     calls.length = 0
     assert.equal(await owners[1].thread!.request('remote', 'math.add'), 42)
-    await assert.rejects(
-      Promise.resolve().then(() => owners[1].thread!.request('remote', 'math.sub')),
-      { code: 'PROVIDER_NOT_FOUND' }
-    )
+    await expect(owners[1].thread!.request('remote', 'math.sub')).rejects.toMatchObject({
+      source: 'rpc.endpoint',
+      code: 'INTERNAL',
+      name: 'RpcRemoteError',
+      cause: { source: 'rpc.endpoint', code: 'TARGET_UNKNOWN' }
+    })
     assert.deepEqual(calls, ['add'], 'unlisted provider never executes')
     await Promise.all(owners.map((owner) => owner.unUse('remote')))
     carriers.push(await attach(owners, { expose: ['math', 'math.add'] }))

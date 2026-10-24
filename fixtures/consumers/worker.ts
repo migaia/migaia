@@ -1,4 +1,4 @@
-import { createWebWorkerTransport } from '@migaia/rpc-plugin-browser/adapters/web-worker'
+import { dedicatedWorkerPlugin } from '@migaia/rpc-plugin-browser'
 import { indexedDbHost } from '@migaia/storage-web/indexed-db'
 import { memoryStorageHost } from '@migaia/storage-web/memory'
 import { WorkerAdapter } from '@migaia/store-worker'
@@ -6,8 +6,9 @@ import { sharedInt32 } from '@migaia/store-shared'
 
 declare const self: DedicatedWorkerGlobalScope
 
-const transport = createWebWorkerTransport(self)
-transport.send({ kind: 'worker-consumer-contract' })
+/** The current cold transport definition borrows the real Worker parent only during installation. */
+const plugin = dedicatedWorkerPlugin({ worker: self })
+void plugin
 
 // storage-web 在 Worker 上下文里可用的部分：IndexedDB 有，localStorageHost/
 // sessionStorageHost/document.cookie 没有（Worker 全局没有 document，

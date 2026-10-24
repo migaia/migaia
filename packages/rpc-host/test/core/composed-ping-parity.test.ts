@@ -1,11 +1,12 @@
+import { createRuntimeEndpointComposition } from '../../dist/core/runtime-api-endpoint.js'
+import { RpcCapability } from '@migaia/rpc-contract'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { describe, expect, it, vi } from 'vitest'
-import { createFullEndpoint } from '../../dist/core/full.js'
-import { createEndpoint } from '../../dist/core/index.js'
-import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
+
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
 import { connect } from '../../dist/core/middleware/connect.js'
 import { ping } from '../../dist/core/middleware/ping.js'
-import { uuid } from '../../dist/core/middleware/uuid.js'
+import { uuid } from '../fixtures/core-role/uuid.js'
 import { RpcError, RpcContractError } from '../../dist/core/errors.js'
 import {
   readEndpointDebugSnapshot,
@@ -15,22 +16,21 @@ import {
 import type { IRpcTransport } from '../../dist/core/transport.js'
 
 /**
- * Regression gate: exercises the composed root (`createEndpoint`/`createFullEndpoint`) so a future
- * regression in the migrated `ping()` capability gate, identifier validation, or per-call
- * `timeoutMs`/`signal` handling fails a test instead of passing silently.
+ * Regression gate: exercises the actual runtime composition so a future regression in the migrated
+ * `ping()` capability gate, identifier validation, or per-call `timeoutMs`/`signal` handling fails
+ * a test instead of passing silently.
  */
 describe('composed root ping() parity', () => {
-  it('root createEndpoint is the same value as createFullEndpoint', () => {
-    expect(createEndpoint).toBe(createFullEndpoint)
-  })
-
   it('throws MIDDLEWARE_MISSING synchronously when the ping capability is not selected', async () => {
     const [clientTransport] = createMemoryTransportPair()
-    const client = await createFullEndpoint({
-      id: 'client-no-ping',
-      transport: clientTransport,
-      middlewares: [connect({ transport: clientTransport })]
-    })
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'client-no-ping',
+        transport: clientTransport,
+        middlewares: [connect({ transport: clientTransport })]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     // `client`'s inferred type correctly has no `ping` member here: with no `ping()` middleware
     // selected, `IFactoryPingCapability<TMiddlewares>` is `false` and `IWebRpcPingEndpointSurface`
     // resolves to `{}` (see src/typing.ts). That is the real, load-bearing negative-capability
@@ -57,11 +57,14 @@ describe('composed root ping() parity', () => {
 
   it('throws CONTRACT_INVALID synchronously for an empty targetId', async () => {
     const [clientTransport] = createMemoryTransportPair()
-    const client = await createFullEndpoint({
-      id: 'client-empty-target',
-      transport: clientTransport,
-      middlewares: [connect({ transport: clientTransport }), ping()]
-    })
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'client-empty-target',
+        transport: clientTransport,
+        middlewares: [connect({ transport: clientTransport }), ping()]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     try {
       let thrown: unknown
       try {
@@ -81,11 +84,14 @@ describe('composed root ping() parity', () => {
 
   it('honors a per-call timeoutMs shorter than the fixed legacy default', async () => {
     const [clientTransport] = createMemoryTransportPair()
-    const client = await createFullEndpoint({
-      id: 'client-fast-timeout',
-      transport: clientTransport,
-      middlewares: [connect({ transport: clientTransport }), ping()]
-    })
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'client-fast-timeout',
+        transport: clientTransport,
+        middlewares: [connect({ transport: clientTransport }), ping()]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     try {
       const start = Date.now()
       const settled = await client.ping('unreachable', undefined, { timeoutMs: 25 })
@@ -99,11 +105,14 @@ describe('composed root ping() parity', () => {
 
   it('settles false immediately when the abort signal is already aborted', async () => {
     const [clientTransport] = createMemoryTransportPair()
-    const client = await createFullEndpoint({
-      id: 'client-aborted-signal',
-      transport: clientTransport,
-      middlewares: [connect({ transport: clientTransport }), ping()]
-    })
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'client-aborted-signal',
+        transport: clientTransport,
+        middlewares: [connect({ transport: clientTransport }), ping()]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     try {
       const controller = new AbortController()
       controller.abort()
@@ -117,11 +126,14 @@ describe('composed root ping() parity', () => {
 
   it('settles false when the abort signal fires before the timeout', async () => {
     const [clientTransport] = createMemoryTransportPair()
-    const client = await createFullEndpoint({
-      id: 'client-abort-races-timeout',
-      transport: clientTransport,
-      middlewares: [connect({ transport: clientTransport }), ping()]
-    })
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'client-abort-races-timeout',
+        transport: clientTransport,
+        middlewares: [connect({ transport: clientTransport }), ping()]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     try {
       const controller = new AbortController()
       const result = client.ping('unreachable', undefined, {
@@ -152,23 +164,29 @@ describe('composed root ping() parity', () => {
     }
     let variationId = 0
     try {
-      const client = await createFullEndpoint({
-        id: 'client-same-tick-ping',
-        transport: clientTransport,
-        middlewares: [
-          connect({ transport: clientTransport }),
-          ping(),
-          uuid({
-            generate: ({ variation }) =>
-              variation === 'variation' ? `same-tick-${++variationId}` : `unused-${variation}`
-          })
-        ] as const
-      })
-      const server = await createFullEndpoint({
-        id: 'server-same-tick-ping',
-        transport: serverTransport,
-        middlewares: [connect({ transport: serverTransport }), ping()]
-      })
+      const client = await createRuntimeEndpointComposition(
+        {
+          id: 'client-same-tick-ping',
+          transport: clientTransport,
+          middlewares: [
+            connect({ transport: clientTransport }),
+            ping(),
+            uuid({
+              generate: ({ variation }) =>
+                variation === 'variation' ? `same-tick-${++variationId}` : `unused-${variation}`
+            })
+          ] as const
+        },
+        { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+      ).installing
+      const server = await createRuntimeEndpointComposition(
+        {
+          id: 'server-same-tick-ping',
+          transport: serverTransport,
+          middlewares: [connect({ transport: serverTransport }), ping()]
+        },
+        { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+      ).installing
       try {
         await expect(
           Promise.all([client.ping('server-same-tick-ping'), client.ping('server-same-tick-ping')])
@@ -194,15 +212,18 @@ describe('composed root ping() parity', () => {
         return clientTransport.send(message, options)
       }
     }
-    const client = await createFullEndpoint({
-      id: 'client-ping-collision',
-      transport: instrumentedTransport,
-      middlewares: [
-        connect({ transport: instrumentedTransport }),
-        ping(),
-        uuid({ generate: ({ variation }) => `${variation}-constant` })
-      ] as const
-    })
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'client-ping-collision',
+        transport: instrumentedTransport,
+        middlewares: [
+          connect({ transport: instrumentedTransport }),
+          ping(),
+          uuid({ generate: ({ variation }) => `${variation}-constant` })
+        ] as const
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     const timeEvents: IRpcTimePortEvent[] = []
     const unregisterTimeObserver = registerEndpointTimePortObserver(client, (event) => {
       timeEvents.push(event)

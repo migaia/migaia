@@ -108,167 +108,228 @@ export function createRuntime<
     readonly report?: (error: unknown) => void
   }> = {}
 ): IRuntime<ITrayHostReadyPlugins<THost>, ITrayHostSourceOf<THost>> {
-  if (!host || typeof host !== 'object') throw createTrayError(TrayErrorCode.runtimeContractInvalid)
-  const bridge = readRuntimeBridge(host as object)
-  if (!bridge) throw createTrayError(TrayErrorCode.runtimeContractInvalid)
-  const shutdown = options.shutdown ?? { mode: TrayShutdownMode['strict-drain'] }
-  const active = new Map<number, ReturnType<typeof createAbortController>>()
-  const inFlight = new Set<Promise<unknown>>()
-  let state: 'active' | 'closing' | 'terminal' = 'active'
-  let runId = 0
-  let disposal: Promise<IRuntimeDisposalResult> | undefined
-  const report = (error: unknown): void => {
+  return new RuntimeOwner(host, options).runtime as IRuntime<
+    ITrayHostReadyPlugins<THost>,
+    ITrayHostSourceOf<THost>
+  >
+}
+/** Exact-generation run owner borrows Host leases and never duplicates Host lifecycle. */
+class RuntimeOwner {
+  /** Original managed Host is borrowed, never disposed by Runtime. */
+  readonly #host: Pick<ITrayHost<any, any, any>, 'on'>
+  /** Cold shutdown/report policy remains unchanged for this Runtime. */
+  readonly #options: Readonly<{
+    shutdown?: IRuntimeShutdownOptions
+    report?: (error: unknown) => void
+  }>
+  /** Authenticated internal bridge retains exact generation and callback admission authority. */
+  #bridge: NonNullable<ReturnType<typeof readRuntimeBridge>>
+  /** Selected shutdown policy controls only this Runtime's wait behavior. */
+  #shutdown: IRuntimeShutdownOptions
+  /** Cooperative abort controllers track admitted callbacks until true settlement. */
+  #active: Map<number, ReturnType<typeof createAbortController>>
+  /** Strict drain joins the original completion Promises without recreating them. */
+  #inFlight: Set<Promise<unknown>>
+  /** Runtime admission closes independently of the borrowed Host's lifetime. */
+  #state: 'active' | 'closing' | 'terminal'
+  /** Every admitted callback consumes one monotonic run identity. */
+  #runId: number
+  /** Concurrent dispose callers share exactly one original Promise. */
+  #disposal: Promise<IRuntimeDisposalResult> | undefined
+  /** Original Host lifecycle observer is released when Runtime ends. */
+  #unsubscribe: () => void
+  /** Public object keeps its original own getters and bound methods. */
+  #runtime: IRuntime
+  /** Validate original Host provenance before registering any observer or accepting work. */
+  constructor(
+    host: Pick<ITrayHost<any, any, any>, 'on'>,
+    options: Readonly<{ shutdown?: IRuntimeShutdownOptions; report?: (error: unknown) => void }>
+  ) {
+    this.#host = host
+    this.#options = options
+    if (!this.#host || typeof this.#host !== 'object')
+      throw createTrayError(TrayErrorCode.runtimeContractInvalid)
+    this.#bridge = readRuntimeBridge(this.#host as object)!
+    if (!this.#bridge) throw createTrayError(TrayErrorCode.runtimeContractInvalid)
+    this.#shutdown = this.#options.shutdown ?? { mode: TrayShutdownMode['strict-drain'] }
+    this.#active = new Map<number, ReturnType<typeof createAbortController>>()
+    this.#inFlight = new Set<Promise<unknown>>()
+    this.#state = 'active'
+    this.#runId = 0
+    this.#disposal = undefined
+    this.#unsubscribe = this.#host.on('disposing', () => {
+      this.#state = this.#state === 'active' ? 'closing' : this.#state
+      for (const controller of this.#active.values()) controller.abort()
+    })
+    this.#runtime = this.#surface() as unknown as IRuntime
+  }
+  /** Reporter failures remain observer-only, preserving the original containment boundary. */
+  #report = (error: unknown): void => {
     try {
-      options.report?.(error)
+      this.#options.report?.(error)
     } catch {
       // Reporter failures remain observer-only.
     }
   }
-  const unsubscribe = host.on('disposing', () => {
-    state = state === 'active' ? 'closing' : state
-    for (const controller of active.values()) controller.abort()
-  })
-  const runtime = {
-    get state() {
-      return state
-    },
-    get activeRuns() {
-      return active.size
-    },
-    run<TName extends string, TResult>(
-      name: TName,
-      runOptions: IRuntimeRunOptions,
-      execute: (context: IRuntimeRunContext) => TResult | PromiseLike<TResult>
-    ): Promise<TResult> {
-      if (state !== 'active') return Promise.reject(createTrayError(TrayErrorCode.runtimeDisposed))
-      if (
-        !runOptions ||
-        (runOptions.timeoutMs !== false &&
-          (typeof runOptions.timeoutMs !== 'number' ||
-            !Number.isFinite(runOptions.timeoutMs) ||
-            runOptions.timeoutMs < 0)) ||
-        typeof execute !== 'function'
-      )
-        return Promise.reject(createTrayError(TrayErrorCode.runtimeContractInvalid))
-      const controller = createAbortController()
-      const id = ++runId
-      const deadlineAt =
-        runOptions.timeoutMs === false ? undefined : systemScheduler.now() + runOptions.timeoutMs
-      const timeoutTask =
-        runOptions.timeoutMs === false
-          ? undefined
-          : systemScheduler.schedule(() => controller.abort(), runOptions.timeoutMs)
-      const onAbort = (): void => controller.abort(runOptions.signal?.reason)
-      runOptions.signal?.addEventListener('abort', onAbort, { once: true })
-      if (runOptions.signal?.aborted) onAbort()
-      let leased: ReturnType<typeof bridge.acquire>
-      try {
-        leased = bridge.acquire(name)
-      } catch (error) {
-        timeoutTask?.cancel()
-        report(error)
-        runOptions.signal?.removeEventListener('abort', onAbort)
-        return Promise.reject(attachTrayError(error, TrayErrorCode.runtimeAborted) as Error)
-      }
-      active.set(id, controller)
-      bridge.beginRun?.(name)
-      let result: TResult | PromiseLike<TResult>
-      const selfStates: ISelfMutationState[] = []
-      let callbackSettled = false
-      bridge.enterCallback?.(name)
-      try {
-        result = execute({
-          runId: id,
-          plugin: name,
-          extensions: leased.extensions,
-          signal: controller.signal,
-          deadlineAt,
-          self: createSelfMutationCapability(
-            id,
-            name,
-            leased.generation,
-            bridge,
-            selfStates,
-            () => callbackSettled
+  /** Acquire one exact generation lease and retain it until real callback settlement. */
+  #runEntry = <TName extends string, TResult>(
+    name: TName,
+    runOptions: IRuntimeRunOptions,
+    execute: (context: IRuntimeRunContext) => TResult | PromiseLike<TResult>
+  ): Promise<TResult> => {
+    if (this.#state !== 'active')
+      return Promise.reject(createTrayError(TrayErrorCode.runtimeDisposed))
+    if (
+      !runOptions ||
+      (runOptions.timeoutMs !== false &&
+        (typeof runOptions.timeoutMs !== 'number' ||
+          !Number.isFinite(runOptions.timeoutMs) ||
+          runOptions.timeoutMs < 0)) ||
+      typeof execute !== 'function'
+    )
+      return Promise.reject(createTrayError(TrayErrorCode.runtimeContractInvalid))
+    const controller = createAbortController()
+    const id = ++this.#runId
+    const deadlineAt =
+      runOptions.timeoutMs === false ? undefined : systemScheduler.now() + runOptions.timeoutMs
+    const timeoutTask =
+      runOptions.timeoutMs === false
+        ? undefined
+        : systemScheduler.schedule(() => controller.abort(), runOptions.timeoutMs)
+    const onAbort = (): void => controller.abort(runOptions.signal?.reason)
+    runOptions.signal?.addEventListener('abort', onAbort, { once: true })
+    if (runOptions.signal?.aborted) onAbort()
+    let leased: ReturnType<NonNullable<ReturnType<typeof readRuntimeBridge>>['acquire']>
+    try {
+      leased = this.#bridge.acquire(name)
+    } catch (error) {
+      timeoutTask?.cancel()
+      this.#report(error)
+      runOptions.signal?.removeEventListener('abort', onAbort)
+      return Promise.reject(attachTrayError(error, TrayErrorCode.runtimeAborted) as Error)
+    }
+    this.#active.set(id, controller)
+    this.#bridge.beginRun?.(name)
+    let result: TResult | PromiseLike<TResult>
+    const selfStates: ISelfMutationState[] = []
+    let callbackSettled = false
+    this.#bridge.enterCallback?.(name)
+    try {
+      result = execute({
+        runId: id,
+        plugin: name,
+        extensions: leased.extensions,
+        signal: controller.signal,
+        deadlineAt,
+        self: createSelfMutationCapability(
+          id,
+          name,
+          leased.generation,
+          this.#bridge,
+          selfStates,
+          () => callbackSettled
+        )
+      })
+    } catch (error) {
+      this.#bridge.exitCallback?.(name)
+      callbackSettled = true
+      timeoutTask?.cancel()
+      leased.release()
+      this.#bridge.endRun?.(name)
+      this.#active.delete(id)
+      runOptions.signal?.removeEventListener('abort', onAbort)
+      for (const ticket of selfStates) void settleSelfMutation(ticket)
+      return Promise.reject(attachTrayError(error, TrayErrorCode.runtimeExecutionFailed) as Error)
+    }
+    const probe = probeThenable(result)
+    this.#bridge.exitCallback?.(name)
+    const settled =
+      probe.kind === ThenableProbeKind.thenable
+        ? assimilateCapturedThen<TResult>(probe.thenFn, result)
+        : probe.kind === ThenableProbeKind.failed
+          ? Promise.reject(probe.error)
+          : Promise.resolve(result)
+    const completion = settled
+      .then(
+        (value) => value,
+        (error) => {
+          if (
+            error &&
+            typeof error === 'object' &&
+            (error as { readonly source?: unknown }).source === TRAY_SOURCE &&
+            typeof (error as { readonly code?: unknown }).code === 'string'
           )
-        })
-      } catch (error) {
-        bridge.exitCallback?.(name)
-        callbackSettled = true
+            throw error
+          throw attachTrayError(error, TrayErrorCode.runtimeExecutionFailed)
+        }
+      )
+      .finally(() => {
         timeoutTask?.cancel()
+        callbackSettled = true
         leased.release()
-        bridge.endRun?.(name)
-        active.delete(id)
+        this.#bridge.endRun?.(name)
+        this.#active.delete(id)
         runOptions.signal?.removeEventListener('abort', onAbort)
         for (const ticket of selfStates) void settleSelfMutation(ticket)
-        return Promise.reject(attachTrayError(error, TrayErrorCode.runtimeExecutionFailed) as Error)
-      }
-      const probe = probeThenable(result)
-      bridge.exitCallback?.(name)
-      const settled =
-        probe.kind === ThenableProbeKind.thenable
-          ? assimilateCapturedThen<TResult>(probe.thenFn, result)
-          : probe.kind === ThenableProbeKind.failed
-            ? Promise.reject(probe.error)
-            : Promise.resolve(result)
-      const completion = settled
-        .then(
-          (value) => value,
-          (error) => {
-            if (
-              error &&
-              typeof error === 'object' &&
-              (error as { readonly source?: unknown }).source === TRAY_SOURCE &&
-              typeof (error as { readonly code?: unknown }).code === 'string'
-            )
-              throw error
-            throw attachTrayError(error, TrayErrorCode.runtimeExecutionFailed)
-          }
-        )
-        .finally(() => {
-          timeoutTask?.cancel()
-          callbackSettled = true
-          leased.release()
-          bridge.endRun?.(name)
-          active.delete(id)
-          runOptions.signal?.removeEventListener('abort', onAbort)
-          for (const ticket of selfStates) void settleSelfMutation(ticket)
-        })
-      inFlight.add(completion)
-      void completion.then(
-        () => inFlight.delete(completion),
-        () => inFlight.delete(completion)
-      )
-      return completion
-    },
-    dispose(): Promise<IRuntimeDisposalResult> {
-      if (disposal) return disposal
-      state = 'closing'
-      for (const controller of active.values()) controller.abort()
-      disposal = (async () => {
-        try {
-          if (shutdown.mode === TrayShutdownMode['strict-drain']) {
-            await Promise.all(
-              [...inFlight].map(async (pending) => {
-                try {
-                  await pending
-                } catch (error) {
-                  report(error)
-                }
-              })
-            )
-          }
-          return Object.freeze({ state: 'terminal' as const, cleanupComplete: active.size === 0 })
-        } finally {
-          unsubscribe()
-          state = 'terminal'
+      })
+    this.#inFlight.add(completion)
+    void completion.then(
+      () => this.#inFlight.delete(completion),
+      () => this.#inFlight.delete(completion)
+    )
+    return completion
+  }
+  /** Close Runtime admission once, abort cooperative signals and join strict-drain callbacks. */
+  #disposeEntry = (): Promise<IRuntimeDisposalResult> => {
+    if (this.#disposal) return this.#disposal
+    this.#state = 'closing'
+    for (const controller of this.#active.values()) controller.abort()
+    this.#disposal = (async () => {
+      try {
+        if (this.#shutdown.mode === TrayShutdownMode['strict-drain']) {
+          await Promise.all(
+            [...this.#inFlight].map(async (pending) => {
+              try {
+                await pending
+              } catch (error) {
+                this.#report(error)
+              }
+            })
+          )
         }
-      })()
-      return disposal
-    },
-    [Symbol.asyncDispose]() {
-      return runtime.dispose().then(() => undefined)
+        return Object.freeze({
+          state: 'terminal' as const,
+          cleanupComplete: this.#active.size === 0
+        })
+      } finally {
+        this.#unsubscribe()
+        this.#state = 'terminal'
+      }
+    })()
+    return this.#disposal
+  }
+  /** Await the shared Runtime disposal result while discarding its observation value. */
+  #asyncDisposeEntry = () => {
+    return this.#runtime.dispose().then(() => undefined)
+  }
+  /** Assemble the original callable surface while all mutable state remains explicit. */
+  #surface() {
+    const readState = () => this.#state
+    const readActiveRuns = () => this.#active.size
+    return {
+      get state() {
+        return readState()
+      },
+      get activeRuns() {
+        return readActiveRuns()
+      },
+      run: this.#runEntry,
+      dispose: this.#disposeEntry,
+      [Symbol.asyncDispose]: this.#asyncDisposeEntry
     }
   }
-  return runtime as unknown as IRuntime<ITrayHostReadyPlugins<THost>, ITrayHostSourceOf<THost>>
+  /** Public facade never exposes the borrowed Host or internal bridge. */
+  get runtime() {
+    return this.#runtime
+  }
 }

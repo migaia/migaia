@@ -1,3 +1,4 @@
+import { orderStringKeys } from '@migaia/utils/string'
 import { decodeUtf8, isUint8Array, utf8ByteLength } from '@migaia/utils/bytes'
 import { createContractError } from './contract-error.js'
 import { deserializeRpcError, normalizeRpcSerializedError } from './error.js'
@@ -25,7 +26,6 @@ import {
   RpcWireLimit,
   type RpcHandshakeReason as IRpcHandshakeReason
 } from './wire-constants.js'
-import { compareRpcFieldNames } from './v1/route.js'
 import { RpcWireErrorViolation } from './wire-error-constants.js'
 
 /** One supported protocol version and its highest minor version. */
@@ -230,10 +230,10 @@ export function redactHandshake(
   if (record !== undefined) {
     const names = Object.keys(record)
     summary.fields = Object.freeze(
-      names
-        .filter((field) => HANDSHAKE_FIELDS.has(field))
-        .sort(compareRpcFieldNames)
-        .slice(0, REDACTION_LIMIT.maxFields)
+      orderStringKeys(names.filter((field) => HANDSHAKE_FIELDS.has(field))).slice(
+        0,
+        REDACTION_LIMIT.maxFields
+      )
     )
     const unknownFieldCount = names.length - summary.fields.length
     if (unknownFieldCount > 0) summary.unknownFieldCount = unknownFieldCount
@@ -297,9 +297,7 @@ function redactChild(value: unknown, path: IRpcHandshakeRedactionPath): IRpcHand
             : []
     const known = new Set<string>(allowed)
     const names = Object.keys(value as Record<string, unknown>)
-    summary.fields = Object.freeze(
-      names.filter((field) => known.has(field)).sort(compareRpcFieldNames)
-    )
+    summary.fields = Object.freeze(orderStringKeys(names.filter((field) => known.has(field))))
     const unknown = names.length - summary.fields.length
     if (unknown > 0) summary.unknownFieldCount = unknown
   }
@@ -383,9 +381,7 @@ function unknownFields(
   options?: IRpcEnvelopeOptions
 ): void {
   const known = new Set(allowed)
-  for (const field of Object.keys(record)
-    .filter((key) => !known.has(key))
-    .sort(compareRpcFieldNames))
+  for (const field of orderStringKeys(Object.keys(record).filter((key) => !known.has(key))))
     options?.onUnknownField?.(pointer, field)
 }
 
@@ -721,16 +717,22 @@ export function acceptRpcHandshake(
     )
   if (remote.protocol !== RpcProtocol.id)
     return { ok: false, ...incompatible(RpcHandshakeReason.protocol) }
-  const shared = remote.versions
-    .filter((version) => localOffer.versions.some((candidate) => candidate.major === version.major))
-    .sort((a, b) => b.major - a.major)[0]
+  /** One index preserves the local version identity without a peer-sized cross product. */
+  const localVersions = new Map(localOffer.versions.map((version) => [version.major, version]))
+  /** Only the highest shared major matters; ties retain the original first remote version. */
+  let shared: IRpcHandshakeVersion | undefined
+  for (const version of remote.versions)
+    if (localVersions.has(version.major) && (shared === undefined || version.major > shared.major))
+      shared = version
   if (!shared) return { ok: false, ...incompatible(RpcHandshakeReason.version) }
-  const localVersion = localOffer.versions.find((version) => version.major === shared.major)!
-  const codec = remote.codecs.find((candidate) => localOffer.codecs.includes(candidate))
+  /** Native Set lookup retains the responder's original remote preference order. */
+  const localCodecs = new Set(localOffer.codecs)
+  /** Capability order is remote order, never Set or sorted order. */
+  const localCapabilities = new Set(localOffer.capabilities)
+  const localVersion = localVersions.get(shared.major)!
+  const codec = remote.codecs.find((candidate) => localCodecs.has(candidate))
   if (!codec) return { ok: false, ...incompatible(RpcHandshakeReason.protocol) }
-  const capabilities = remote.capabilities.filter((capability) =>
-    localOffer.capabilities.includes(capability)
-  )
+  const capabilities = remote.capabilities.filter((capability) => localCapabilities.has(capability))
   const agreement: IRpcHandshakeAgreement = Object.freeze({
     major: shared.major,
     minor: Math.min(shared.minor, localVersion.minor),
@@ -794,12 +796,14 @@ export function completeRpcHandshake(
       )
     )
   const offeredVersion = localOffer.versions.find((version) => version.major === remote.major)
+  /** The accept subset is checked once against the original local capability proposal. */
+  const localCapabilities = new Set(localOffer.capabilities)
   if (
     remote.protocol !== RpcProtocol.id ||
     !offeredVersion ||
     remote.minor > offeredVersion.minor ||
     !localOffer.codecs.includes(remote.codec) ||
-    remote.capabilities.some((capability) => !localOffer.capabilities.includes(capability))
+    remote.capabilities.some((capability) => !localCapabilities.has(capability))
   )
     throw handshakeInvalid(
       RpcHandshakeViolation.mismatch,

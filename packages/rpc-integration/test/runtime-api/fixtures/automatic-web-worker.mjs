@@ -1,8 +1,10 @@
-import { createThreadPeer } from '../../../../rpc-plugin-thread/test/protocol.ts'
+import { createRpcHost } from '@migaia/rpc-host'
+import { threadPlugin } from '@migaia/rpc-plugin-thread'
 
 /** Capture genuine worker bootstrap before the module's first top-level await. */
 let initialized
-initialized = createThreadPeer({
+initialized = createRpcHost({
+  plugins: [threadPlugin({ connectToParent: true })],
   provide: {
     /** Genuine reverse dispatch is independent from bootstrap-returned identity labels. */
     probe: async (value) => {

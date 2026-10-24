@@ -1,7 +1,7 @@
 import { installPage } from './page-common.mjs'
 import { peerOptions } from './rpc.mjs'
 import { BrowserBenchText } from './text.mjs'
-import { createThreadPeer } from '../../../../../rpc-plugin-thread/test/protocol.ts'
+import { createRuntimePeer } from '../../../../../rpc-host/dist/remote/runtime-api/peer.js'
 import {
   createAdapterWebThreadLauncher as createWebThreadLauncher,
   createAdapterWebThreadChannelFactory as createWebThreadChannelFactory
@@ -20,8 +20,8 @@ installPage('/worker-rpc.js', async (createWorker, payload, classification) => {
       return createWorker()
     }
   }
-  /** Actual bootstrap, capabilities, directory and endpoint belong to the public factory. */
-  const peer = await createThreadPeer({
+  /** Actual bootstrap, capabilities, directory and endpoint belong to the canonical raw Peer owner. */
+  const peer = await createRuntimePeer({
     ...options,
     self: { name: 'page', instanceId: 'page' },
     spawn: async (context) => {

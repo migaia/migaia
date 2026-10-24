@@ -334,6 +334,8 @@ impl Parser<'_> {
         self.byte(b'{')?;
         self.space();
         let mut values = Vec::new();
+        // Duplicate admission is independent of the ordered object representation.
+        let mut names = std::collections::HashSet::new();
         if self.bytes.get(self.offset) == Some(&b'}') {
             self.offset += 1;
             return Ok(Value::Object(values));
@@ -341,10 +343,7 @@ impl Parser<'_> {
         loop {
             self.space();
             let key = self.string()?;
-            if values
-                .iter()
-                .any(|(name, _): &(String, Value)| name == &key)
-            {
+            if !names.insert(key.clone()) {
                 return Err("duplicate JSON field");
             }
             self.space();

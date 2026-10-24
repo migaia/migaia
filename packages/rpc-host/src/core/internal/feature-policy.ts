@@ -158,9 +158,39 @@ export function createInvalidFeatureError(): RpcError {
   return createRpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.endpointModuleInvalid)
 }
 
+/** Snapshot indexes lend only membership facts to the original ordered validation pass. */
+type IFeatureClaimIndex = Readonly<{
+  sharedOwners: ReadonlyMap<PropertyKey, IRpcClaimAdmission | false>
+  declaredProvides: ReadonlySet<string>
+  declaredPublicKeys: ReadonlySet<string>
+}>
+
+/** Index already snapshotted cross-record claims once without changing rejection precedence. */
+function indexFeatureClaims(admitted: readonly IRpcClaimAdmission[]): IFeatureClaimIndex {
+  /** Complete sharing indexes are read only after every hostile declaration was snapshotted. */
+  const sharedOwners = new Map<PropertyKey, IRpcClaimAdmission | false>()
+  /** These complete inventories answer cross-record claims while the validation loop keeps order. */
+  const declaredProvides = new Set<string>()
+  /** Future public keys are visible to valid expose claims without revisiting every declaration. */
+  const declaredPublicKeys = new Set<string>()
+  for (const definition of admitted) {
+    for (const provided of definition.sharedProvides ?? []) {
+      /** Repeated keys in the same declaration retain the original cross-owner-only check. */
+      const previous = sharedOwners.get(provided)
+      sharedOwners.set(
+        provided,
+        previous === undefined || previous === definition ? definition : false
+      )
+    }
+    for (const provided of definition.claims.provides) declaredProvides.add(provided)
+    for (const key of definition.claims.publicKeys) declaredPublicKeys.add(key)
+  }
+  return { sharedOwners, declaredProvides, declaredPublicKeys }
+}
+
 /**
- * Validates static WebRPC publication and sharing claims without consulting any lifecycle owner.
- * Both native middleware and transitional descriptors use this one policy gate.
+ * Validate static publication and sharing claims in original order, without a lifecycle owner.
+ * Native middleware and transitional descriptors share this same admission boundary.
  */
 export function preflightFeatureClaims(
   definitions: readonly IRpcClaimAdmission[],
@@ -169,6 +199,7 @@ export function preflightFeatureClaims(
   const requireCompleteGraph = options.requireCompleteGraph ?? true
   /** Freeze hostile admission fields before cross-record checks can misattribute their owner. */
   const admitted = definitions.map(snapshotFeatureClaimAdmission)
+  const { sharedOwners, declaredProvides, declaredPublicKeys } = indexFeatureClaims(admitted)
   const names = new Set<string>()
   const routes = new Set<string>()
   const provides = new Set<string>()
@@ -222,18 +253,16 @@ export function preflightFeatureClaims(
           roleSchema.sharedOptionalConsumes
         )
       }
-      if (definition.sharedProvides?.some((key) => definition.sharedConsumes?.includes(key)))
+      /** Local self-consumption keeps its original rejection before cross-owner conflict checks. */
+      const localConsumes = new Set(definition.sharedConsumes ?? [])
+      if (definition.sharedProvides?.some((key) => localConsumes.has(key)))
         throw createRpcConfigurationError(RpcCoreErrorText.endpointModuleInvalid)
       if (claims.activator) activators += 1
       for (const provided of definition.sharedProvides ?? [])
-        if (
-          admitted.some(
-            (item) => item !== definition && item.sharedProvides?.includes(provided) === true
-          )
-        )
+        if (sharedOwners.get(provided) === false)
           throw createRpcConfigurationError(RpcCoreErrorText.endpointModuleInvalid)
       for (const consumed of definition.sharedConsumes ?? [])
-        if (!admitted.some((item) => item.sharedProvides?.includes(consumed) === true))
+        if (!sharedOwners.has(consumed))
           throw createRpcConfigurationError(RpcCoreErrorText.endpointModuleInvalid)
       for (const route of claims.routes) {
         if (routes.has(route))
@@ -252,13 +281,10 @@ export function preflightFeatureClaims(
       }
       if (requireCompleteGraph) {
         for (const exposedKey of claims.exposedKeys)
-          if (
-            !publicKeys.has(exposedKey) &&
-            !admitted.some((item) => item.claims.publicKeys.includes(exposedKey))
-          )
+          if (!publicKeys.has(exposedKey) && !declaredPublicKeys.has(exposedKey))
             throw createRpcConfigurationError(RpcCoreErrorText.endpointModuleInvalid)
         for (const consumed of claims.consumes)
-          if (!admitted.some((item) => item.claims.provides.includes(consumed)))
+          if (!declaredProvides.has(consumed))
             throw createRpcConfigurationError(RpcCoreErrorText.endpointModuleInvalid)
       }
     }

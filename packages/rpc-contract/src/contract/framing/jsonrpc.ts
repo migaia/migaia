@@ -106,85 +106,127 @@ function parseLength(header: Uint8Array): number {
  * UTF-8 or JSON. finish() detects a truncated tail without closing; close() releases retained
  * state. This differs from the native length-prefix decoder's first-error callback contract.
  */
-export function createJsonRpcFrameDecoder(): IJsonRpcFrameDecoder {
+/** Allocate one Content-Length byte decoder before installing behavior callbacks. */
+function jsonRpcFrameDecoderState() {
   /** Header has a fixed budget; body allocation starts only after length validation. */
   const header = new Uint8Array(JsonRpcLimit.headerBytes)
   /** Track incremental header occupancy against the fixed allocation. */
   let headerUsed = 0
   /** Exactly one body buffer is owned until its complete parsed value is returned. */
-  let body: Uint8Array | undefined
+  const body = undefined as Uint8Array | undefined
   /** Track body completion without reallocating accumulated chunks. */
   let bodyUsed = 0
   /** Closing drops retained bytes and makes later chunks inert. */
   let closed = false
-  return {
-    push(chunk) {
-      /** Complete values are delivered in the same order as bytes within this read. */
-      const values: unknown[] = []
-      let offset = 0
-      while (!closed && offset < chunk.length) {
-        if (!body) {
-          if (headerUsed === header.length) throw createJsonRpcFrameError()
-          /** Consume one header byte so CRLF boundaries survive arbitrary read splits. */
-          const byte = chunk[offset++]!
-          header[headerUsed++] = byte
-          if (byte === 10 && (headerUsed < 2 || header[headerUsed - 2] !== 13))
-            throw createJsonRpcFrameError()
+
+  return { header, headerUsed, body, bodyUsed, closed }
+}
+
+/** Own one Content-Length byte decoder; callbacks access only this explicit instance. */
+class JsonRpcFrameDecoder {
+  /** All mutable storage and original construction inputs belong to this operation. */
+  #state: ReturnType<typeof jsonRpcFrameDecoderState>
+  /** Preserve the original stable resource surface and callback identities. */
+  readonly value: IJsonRpcFrameDecoder
+  /** Initialize owned storage before publishing the resource's callbacks. */
+  constructor() {
+    this.#state = jsonRpcFrameDecoderState()
+
+    this.value = {
+      push: (chunk) => {
+        /** Complete values are delivered in the same order as bytes within this read. */
+        const values: unknown[] = []
+        let offset = 0
+        while (!this.#state.closed && offset < chunk.length) {
+          if (!this.#state.body) {
+            if (this.#state.headerUsed === this.#state.header.length)
+              throw createJsonRpcFrameError()
+            /** Consume one header byte so CRLF boundaries survive arbitrary read splits. */
+            const byte = chunk[offset++]!
+            this.#state.header[this.#state.headerUsed++] = byte
+            if (
+              byte === 10 &&
+              (this.#state.headerUsed < 2 || this.#state.header[this.#state.headerUsed - 2] !== 13)
+            )
+              throw createJsonRpcFrameError()
+            if (
+              this.#state.headerUsed >= 4 &&
+              this.#state.header[this.#state.headerUsed - 4] === 13 &&
+              this.#state.header[this.#state.headerUsed - 3] === 10 &&
+              this.#state.header[this.#state.headerUsed - 2] === 13 &&
+              byte === 10
+            )
+              this.#state.body = new Uint8Array(
+                parseLength(this.#state.header.subarray(0, this.#state.headerUsed))
+              )
+            continue
+          }
+          /** Copy only the currently available body segment; no quadratic reallocation. */
+          const count = Math.min(
+            this.#state.body.length - this.#state.bodyUsed,
+            chunk.length - offset
+          )
+          this.#state.body.set(chunk.subarray(offset, offset + count), this.#state.bodyUsed)
+          offset += count
+          this.#state.bodyUsed += count
+          if (this.#state.bodyUsed !== this.#state.body.length) continue
+          /** BOM is invalid even though TextDecoder ordinarily strips it. */
           if (
-            headerUsed >= 4 &&
-            header[headerUsed - 4] === 13 &&
-            header[headerUsed - 3] === 10 &&
-            header[headerUsed - 2] === 13 &&
-            byte === 10
+            this.#state.body[0] === 0xef &&
+            this.#state.body[1] === 0xbb &&
+            this.#state.body[2] === 0xbf
           )
-            body = new Uint8Array(parseLength(header.subarray(0, headerUsed)))
-          continue
+            throw createJsonRpcFrameError()
+          /** Hold decoded JSON text only while parsing the current complete body. */
+          let text: string
+          try {
+            text = new TextDecoder(RPC_FRAME_TEXT_ENCODING, { fatal: true }).decode(
+              this.#state.body
+            )
+          } catch (cause) {
+            throw createJsonRpcFrameError(cause)
+          }
+          try {
+            values.push(JSON.parse(text) as unknown)
+          } catch (cause) {
+            /** Preserve only engine diagnostics that cannot quote four input code units. */
+            throw createJsonRpcFrameError(
+              cause instanceof Error && isExcerptFree(cause.message, text)
+                ? cause
+                : redactHandshake(text)
+            )
+          }
+          this.#state.headerUsed = 0
+          this.#state.body = undefined
+          this.#state.bodyUsed = 0
         }
-        /** Copy only the currently available body segment; no quadratic reallocation. */
-        const count = Math.min(body.length - bodyUsed, chunk.length - offset)
-        body.set(chunk.subarray(offset, offset + count), bodyUsed)
-        offset += count
-        bodyUsed += count
-        if (bodyUsed !== body.length) continue
-        /** BOM is invalid even though TextDecoder ordinarily strips it. */
-        if (body[0] === 0xef && body[1] === 0xbb && body[2] === 0xbf)
+        return values
+      },
+      finish: () => {
+        if (!this.#state.closed && (this.#state.headerUsed !== 0 || this.#state.body !== undefined))
           throw createJsonRpcFrameError()
-        /** Hold decoded JSON text only while parsing the current complete body. */
-        let text: string
-        try {
-          text = new TextDecoder(RPC_FRAME_TEXT_ENCODING, { fatal: true }).decode(body)
-        } catch (cause) {
-          throw createJsonRpcFrameError(cause)
-        }
-        try {
-          values.push(JSON.parse(text) as unknown)
-        } catch (cause) {
-          /** Preserve only engine diagnostics that cannot quote four input code units. */
-          throw createJsonRpcFrameError(
-            cause instanceof Error && isExcerptFree(cause.message, text)
-              ? cause
-              : redactHandshake(text)
-          )
-        }
-        headerUsed = 0
-        body = undefined
-        bodyUsed = 0
-      }
-      return values
-    },
-    finish() {
-      if (!closed && (headerUsed !== 0 || body !== undefined)) throw createJsonRpcFrameError()
-    },
-    close() {
-      closed = true
-      headerUsed = 0
-      body = undefined
-      bodyUsed = 0
-    },
-    get bufferedBytes() {
-      return headerUsed + bodyUsed
+      },
+      close: () => {
+        this.#state.closed = true
+        this.#state.headerUsed = 0
+        this.#state.body = undefined
+        this.#state.bodyUsed = 0
+      },
+      bufferedBytes: 0
     }
+    Object.defineProperties(this.value, {
+      bufferedBytes: {
+        get: () => {
+          return this.#state.headerUsed + this.#state.bodyUsed
+        }
+      }
+    })
   }
+}
+
+/** Construct the single owner for one Content-Length byte decoder. */
+export function createJsonRpcFrameDecoder(): IJsonRpcFrameDecoder {
+  return new JsonRpcFrameDecoder().value
 }
 
 export * from './jsonrpc-profile.js'

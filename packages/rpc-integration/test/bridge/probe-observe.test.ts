@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import type { IRpcCarrierProbe } from '@migaia/rpc-host/probe'
-import { bridgeFixture, flush, request } from './fixture.js'
+import { BridgeFixture, flush, request } from './fixture.js'
 
 describe('JSON-RPC carrier observation', () => {
   it('exposes direct observation on the canonical translation transport', async () => {
     /** The existing foreign-peer fixture drives the real canonical bridge, without probe-core. */
-    const fixture = bridgeFixture()
+    const fixture = new BridgeFixture()
     /** The negotiated channel must expose observation without an additional transport wrapper. */
     const channel = await fixture.open()
     /**

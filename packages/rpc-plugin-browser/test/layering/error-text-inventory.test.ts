@@ -19,17 +19,6 @@ describe('error text inventory', () => {
       '[rpc] shared worker message error'
     )
     expect(
-      BrowserRpcErrorText.webTransportDatagramStreamEnded,
-      'webTransportDatagramStreamEnded'
-    ).toBe('WebTransport datagram stream ended')
-    expect(BrowserRpcErrorText.webTransportIsClosed, 'webTransportIsClosed').toBe(
-      'WebTransport is closed'
-    )
-    expect(
-      BrowserRpcErrorText.webTransportRequiresUint8ArrayEncodedMessages,
-      'webTransportRequiresUint8ArrayEncodedMessages'
-    ).toBe('WebTransport requires Uint8Array encoded messages')
-    expect(
       BrowserRpcErrorText.receiverIsRequiredOutsideAWindowLikeRealm,
       'receiverIsRequiredOutsideAWindowLikeRealm'
     ).toBe('receiver is required outside a window-like realm')

@@ -5,7 +5,7 @@ import type { ICanonicalEventChannel } from '@migaia/event-subscriber'
 import type { IRpcEventListener, IRpcProvider, IRpcProviderResult } from '../typing.js'
 import { probeThenable, ThenableProbeKind, assimilateCapturedThen } from '@migaia/utils/function'
 import type { IRpcContext, IRpcProviderLimits, IRpcIdempotencyConfig } from '../typing.js'
-import type { IProviderAdmissionScope } from './provider-admission.js'
+import type { IProviderAdmissionScope, IProviderConnectionQuota } from './provider-admission.js'
 import type { IRpcRouteHeader } from '@migaia/rpc-contract'
 import {
   registerLocalErrorWireSummary,
@@ -328,15 +328,27 @@ export function readProviderIdentity(context: IRpcContext): string | undefined {
   return providerInvocation.get(context)?.peerKey
 }
 
+/** Native sessions retain iterator return values only on their original generation-aware profile. */
+export function projectNativeStreamResult<T>(value: T, context: IRpcContext): T | undefined {
+  return context.targetGeneration === undefined ? undefined : value
+}
+
 /** Original physical-session policies borrow their existing quota, store and lifetime owners. */
 export type IProviderSessionPolicy = Readonly<{
   providerAdmission?: IProviderAdmissionScope
+  /** The actual accepted physical channel lends a separate capacity key to the same Core lease. */
+  connectionQuota?: IProviderConnectionQuota
   /** An uncommitted Host replacement must not tighten the live original quota resource. */
   commitPolicy?(): boolean
   limits?: IRpcProviderLimits
   idempotency?: IRpcIdempotencyConfig
   provider?(original: IRpcProvider): IRpcProvider
   enterStream?(context: IRpcContext): (succeeded: boolean) => void
+  /** The original native policy projects only iterator.done values before their physical reply. */
+  streamResult?(
+    value: IRpcPortableValue | undefined,
+    context: IRpcContext
+  ): IRpcPortableValue | undefined
   /** Outgoing streams settle against the drain of their exact physical target session. */
   enterStreamConsumer?(): () => void
 }>

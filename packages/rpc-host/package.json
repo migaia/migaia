@@ -28,18 +28,6 @@
       "types": "./dist/core/probe/index.d.ts",
       "default": "./dist/core/probe/index.js"
     },
-    "./stream": {
-      "types": "./dist/core/stream/index.d.ts",
-      "default": "./dist/core/stream/index.js"
-    },
-    "./adapters/memory": {
-      "types": "./dist/core/adapters/memory.d.ts",
-      "default": "./dist/core/adapters/memory.js"
-    },
-    "./testing": {
-      "types": "./dist/testing/index.d.ts",
-      "default": "./dist/testing/index.js"
-    },
     "./plugin": {
       "types": "./dist/plugin/index.d.ts",
       "default": "./dist/plugin/index.js"

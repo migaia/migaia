@@ -3,11 +3,9 @@ import { createHash } from 'node:crypto'
 import { it, vi } from 'vitest'
 import vectors from '../../schema/vectors/runtime-api.json'
 import { normalizeRuntimeEnvelope } from '@migaia/rpc-contract/runtime'
-import {
-  prepareRpcBinary,
-  restoreRpcBinary,
-  type IRpcBinaryDataCodec
-} from '@migaia/rpc-contract/binary'
+import { prepareWithBinaryDataCodec } from '../../../rpc-contract/test/runtime-api/binary-operation.js'
+import { restoreRpcBinary } from '../../../rpc-contract/dist/contract/runtime-api/binary.js'
+import type { IRpcBinaryDataCodec } from '../../../rpc-contract/dist/contract/runtime-api/binary-data-codec.js'
 import { RpcBinaryStorage } from '@migaia/rpc-contract/wire'
 import { Buffer } from 'node:buffer'
 import { PassThrough } from 'node:stream'
@@ -131,7 +129,7 @@ for (const size of [64 * 1024, 1024 * 1024]) {
     })
     try {
       /** The original prepare visitor emits both the tags and their root construction bounds. */
-      const prepared = await prepareRpcBinary(
+      const prepared = await prepareWithBinaryDataCodec(
         input,
         RpcBinaryStorage.inline,
         undefined,
@@ -190,12 +188,17 @@ it('private owned capture preserves public preparation shape and native digest o
   /** All preparation paths share the original admitted semantic source. */
   const input = envelope({ first, view: new Uint8Array(first, 1, 2), second })
   /** The same source without an internal capture retains the public result geometry. */
-  const ordinary = await prepareRpcBinary(input, RpcBinaryStorage.native, undefined, digest)
+  const ordinary = await prepareWithBinaryDataCodec(
+    input,
+    RpcBinaryStorage.native,
+    undefined,
+    digest
+  )
   /** Only actual digest invocations enter this ordered record. */
   const order: ArrayBuffer[] = []
   /** Prehash must occur once before the first real digest starts. */
   let beforeDigest = 0
-  const prepared = await prepareRpcBinary(
+  const prepared = await prepareWithBinaryDataCodec(
     input,
     RpcBinaryStorage.native,
     undefined,

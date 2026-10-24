@@ -23,14 +23,6 @@
     ".": {
       "types": "./dist/threads/index.d.ts",
       "default": "./dist/threads/index.js"
-    },
-    "./adapters/node": {
-      "types": "./dist/threads/adapters/node.d.ts",
-      "default": "./dist/threads/adapters/node.js"
-    },
-    "./adapters/electron-main": {
-      "types": "./dist/threads/adapters/electron-main.d.ts",
-      "default": "./dist/threads/adapters/electron-main.js"
     }
   },
   "publishConfig": {

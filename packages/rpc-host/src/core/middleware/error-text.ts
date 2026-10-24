@@ -105,54 +105,6 @@ export const RpcMiddlewareErrorText = {
    */
   connectIdentifierMustBeAFunction: 'connect identifier must be a function',
   /**
-   * Stable core error text consumed by core/middleware/contract.ts; preserves its existing
-   * caller-facing wording.
-   */
-  contractDescriptorIsInvalid: 'contract descriptor is invalid',
-  /**
-   * Stable core error text consumed by core/middleware/contract.ts; preserves its existing
-   * caller-facing wording.
-   */
-  contractDescriptorIsUnreadable: 'contract descriptor is unreadable',
-  /**
-   * Stable core error text consumed by core/middleware/contract.ts; preserves its existing
-   * caller-facing wording.
-   */
-  schemasMustBeAnObject: 'schemas must be an object',
-  /**
-   * Stable core error text consumed by core/middleware/contract.ts; preserves its existing
-   * caller-facing wording.
-   */
-  schemaDescriptorInvalid: (method: string): string => `schema descriptor is invalid: ${method}`,
-  /**
-   * Stable core error text consumed by core/middleware/contract.ts; preserves its existing
-   * caller-facing wording.
-   */
-  contractSchemasMustContainParamsResultSchemasWithParseFunctions:
-    'contract.schemas must contain params/result schemas with parse functions',
-  /**
-   * Stable core error text consumed by core/middleware/contract.ts; preserves its existing
-   * caller-facing wording.
-   */
-  contractAcceptVersionsMustContainNonEmptyStrings:
-    'contract.acceptVersions must contain non-empty strings',
-  /**
-   * Stable core error text consumed by core/middleware/contract.ts; preserves its existing
-   * caller-facing wording.
-   */
-  contractAcceptVersionsIsUnreadable: 'contract.acceptVersions is unreadable',
-  /**
-   * Stable core error text consumed by core/middleware/contract.ts; preserves its existing
-   * caller-facing wording.
-   */
-  contractVersionMustBeANonEmptyString: 'contract version must be a non-empty string',
-  /**
-   * Stable core error text consumed by core/middleware/contract.ts; preserves its existing
-   * caller-facing wording.
-   */
-  maxIdentifierLengthMustBeAPositiveSafeInteger:
-    'maxIdentifierLength must be a positive safe integer',
-  /**
    * Stable core error text consumed by core/middleware/hooks.ts; preserves its existing
    * caller-facing wording.
    */
@@ -186,20 +138,5 @@ export const RpcMiddlewareErrorText = {
    * Stable core error text consumed by core/middleware/timeout.ts; preserves its existing
    * caller-facing wording.
    */
-  timeoutMsMustBeFalseOrANonNegativeNumber: 'timeoutMs must be false or a non-negative number',
-  /**
-   * Stable core error text consumed by core/middleware/uuid.ts; preserves its existing
-   * caller-facing wording.
-   */
-  uuidDescriptorIsInvalid: 'uuid descriptor is invalid',
-  /**
-   * Stable core error text consumed by core/middleware/uuid.ts; preserves its existing
-   * caller-facing wording.
-   */
-  uuidDescriptorIsUnreadable: 'uuid descriptor is unreadable',
-  /**
-   * Stable core error text consumed by core/middleware/uuid.ts; preserves its existing
-   * caller-facing wording.
-   */
-  uuidGenerateMustBeAFunction: 'uuid generate must be a function'
+  timeoutMsMustBeFalseOrANonNegativeNumber: 'timeoutMs must be false or a non-negative number'
 } as const

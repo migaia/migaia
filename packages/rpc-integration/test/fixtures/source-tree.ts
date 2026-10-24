@@ -32,50 +32,71 @@ export function childNodes(node: Node): Node[] {
  * @param source Source text; node offsets index into it.
  */
 export function parseSourceTree(filename: string, source: string): ISourceTree {
-  const { program, comments } = parseSync(filename, source)
-  /** Node to nearest enclosing node. */
-  const parents = new Map<Node, Node>()
-  /** Depth-first node order. */
-  const nodes: Node[] = []
-  /** Visits one node and records it as the parent of each child node. */
-  const enter = (node: Node): void => {
-    nodes.push(node)
+  return new SourceTree(filename, source)
+}
+
+/** Owns one parser result and its parent/comment indexes for the source-shape guards. */
+class SourceTree implements ISourceTree {
+  /** Exact source text remains paired with the parser offsets that index it. */
+  readonly #source: string
+  /** Comments stay in parser source order for logarithmic predecessor lookup. */
+  readonly #comments: ReturnType<typeof parseSync>['comments']
+  /** Parent identity is indexed once during the depth-first walk. */
+  readonly #parents = new Map<Node, Node>()
+  /** Root parser identity is exposed unchanged to the guards. */
+  readonly program: Program
+  /** Original depth-first order is collected once and retained by this parsed tree. */
+  readonly nodes: Node[] = []
+
+  /** Parses one file, retaining the original node identities and exact source offsets. */
+  constructor(filename: string, source: string) {
+    const { program, comments } = parseSync(filename, source)
+    this.program = program
+    this.#comments = comments
+    this.#source = source
+    this.#enter(program)
+  }
+
+  /** Visits each child once and records its nearest enclosing node. */
+  #enter(node: Node): void {
+    this.nodes.push(node)
     for (const child of childNodes(node)) {
-      parents.set(child, node)
-      enter(child)
+      this.#parents.set(child, node)
+      this.#enter(child)
     }
   }
-  enter(program)
-  /** Index of the last comment ending at or before `offset` (comments are in source order). */
-  const lastCommentBefore = (offset: number): number => {
+
+  /** Finds the last comment ending before one source offset without scanning earlier comments. */
+  #lastCommentBefore(offset: number): number {
     let low = 0
-    let high = comments.length - 1
+    let high = this.#comments.length - 1
     let found = -1
     while (low <= high) {
       const middle = (low + high) >> 1
-      if (comments[middle]!.end <= offset) {
+      if (this.#comments[middle]!.end <= offset) {
         found = middle
         low = middle + 1
       } else high = middle - 1
     }
     return found
   }
-  return {
-    program,
-    nodes,
-    parentOf: (node) => parents.get(node),
-    textOf: (node) => source.slice(node.start, node.end),
-    leadingCommentsOf: (node) => {
-      /** Comments directly before the node, collected backwards while only whitespace separates. */
-      const leading: string[] = []
-      let end = node.start
-      for (let index = lastCommentBefore(node.start); index >= 0; index--) {
-        const comment = comments[index]!
-        if (source.slice(comment.end, end).trim() !== '') break
-        leading.unshift(source.slice(comment.start, comment.end))
-        end = comment.start
-      }
-      return leading.join('\n')
+
+  /** Reads the original parent node without exposing the mutable index. */
+  parentOf = (node: Node): Node | undefined => this.#parents.get(node)
+
+  /** Reads exact source text rather than regenerating an equivalent AST spelling. */
+  textOf = (node: Node): string => this.#source.slice(node.start, node.end)
+
+  /** Collects adjacent comments backwards, then reverses once to preserve source order in O(n). */
+  leadingCommentsOf = (node: Node): string => {
+    const leading: string[] = []
+    let end = node.start
+    for (let index = this.#lastCommentBefore(node.start); index >= 0; index--) {
+      const comment = this.#comments[index]!
+      if (this.#source.slice(comment.end, end).trim() !== '') break
+      leading.push(this.#source.slice(comment.start, comment.end))
+      end = comment.start
     }
+    return leading.reverse().join('\n')
   }
 }

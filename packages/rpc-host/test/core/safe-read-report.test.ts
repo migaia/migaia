@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { safeRead } from '../../dist/core/transport-kit.js'
+import { safeRead } from '../../dist/core/internal/safe-value.js'
 
 describe('public safeRead failure channel', () => {
   it('does not touch primitives and reads a normal object once', () => {

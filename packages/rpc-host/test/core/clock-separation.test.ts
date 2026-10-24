@@ -1,15 +1,16 @@
+import { createRuntimeEndpointComposition } from '../../dist/core/runtime-api-endpoint.js'
+import { RpcCapability } from '@migaia/rpc-contract'
 import { readFileSync, readdirSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { parseSync, Visitor, type Expression, type Node, type VisitorObject } from 'oxc-parser'
 import { describe, expect, it, vi } from 'vitest'
 import { type IScheduler } from '@migaia/utils/scheduler'
 import { createManualScheduler } from '@migaia/utils/testing'
-import { createEndpoint } from '../../dist/core/index.js'
+
 import { RpcConfigurationError, RpcTimeoutError } from '../../dist/core/errors.js'
-import { createComposedEndpoint } from '../../dist/core/composed.js'
-import { createFullEndpoint } from '../../dist/core/full.js'
-import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
-import { createClientFirstPartyRoots } from '../../dist/core/internal/client-first-party-roots.js'
+
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
+
 import { abort } from '../../dist/core/middleware/abort.js'
 import { connect } from '../../dist/core/middleware/connect.js'
 import { hooks } from '../../dist/core/middleware/hooks.js'
@@ -76,20 +77,39 @@ let idSequence = 0
 
 /** A wall clock whose readings are recorded and whose next value can be replaced. */
 function recordingWallClock(next?: () => number) {
-  /** Every value returned by `timestamp()`. */
-  const readings: number[] = []
-  /** Mutable source of the next reading; defaults to an increasing epoch sequence. */
-  let source = next ?? (() => WALL_BASE + readings.length)
-  return {
-    readings,
-    setSource(value: () => number) {
-      source = value
-    },
-    wallClock: {
-      timestamp: () => {
-        const value = source()
-        readings.push(value)
-        return value
+  return new RecordingWallClock(next).value
+}
+
+/** One controlled clock owns original source replacement and the exact returned reading history. */
+class RecordingWallClock {
+  /** Every original timestamp result remains observable in insertion order. */
+  readonly #readings: number[] = []
+  /** Only setSource replaces the original next-reading operation. */
+  #source: () => number
+  /** Preserve original own readings/setSource/wallClock key order and receiver-independent methods. */
+  readonly value: {
+    readings: number[]
+    setSource(value: () => number): void
+    wallClock: { timestamp(): number }
+  }
+  /** Capture the original default or supplied source without taking a reading. */
+  constructor(next?: () => number) {
+    this.#source = next ?? (() => WALL_BASE + this.#readings.length)
+    this.value = RecordingWallClock.#view(this)
+  }
+  /** Expose only original observations and controls while state belongs to the named owner. */
+  static #view(owner: RecordingWallClock) {
+    return {
+      readings: owner.#readings,
+      setSource(value: () => number) {
+        owner.#source = value
+      },
+      wallClock: {
+        timestamp: () => {
+          const value = (0, owner.#source)()
+          owner.#readings.push(value)
+          return value
+        }
       }
     }
   }
@@ -145,7 +165,7 @@ async function lateConstructionFailure(options: {
   const lateError = new Error('late construction failure')
   const [transport] = createMemoryTransportPair()
   const listeners = options.listeners
-  const construction = createComposedEndpoint(
+  const construction = createRuntimeEndpointComposition(
     {
       id: `clock-construction-${idSequence++}`,
       transport,
@@ -160,8 +180,8 @@ async function lateConstructionFailure(options: {
       ],
       construction: { signal: controller.signal }
     },
-    createClientFirstPartyRoots()
-  )
+    { agreement: { capabilities: [] }, peerId: '' }
+  ).installing
   await started
   controller.abort('construction cancelled')
   await expect(construction).rejects.toMatchObject({ code: 'CANCELLED' })
@@ -211,29 +231,35 @@ describe('endpoint clocks: wall clock stamps diagnostics, scheduler owns deadlin
         return clientBase.send(message, options)
       }
     }
-    const server = await createEndpoint({
-      id: 'clock-server',
-      transport: serverTransport,
-      scheduler,
-      wallClock: clock.wallClock,
-      provider: {
-        fail: (context) => context.failed('expected failure', 'EXPECTED_FAILURE'),
-        hang: () => new Promise<never>(() => undefined)
+    const server = await createRuntimeEndpointComposition(
+      {
+        id: 'clock-server',
+        transport: serverTransport,
+        scheduler,
+        wallClock: clock.wallClock,
+        provider: {
+          fail: (context) => context.failed('expected failure', 'EXPECTED_FAILURE'),
+          hang: () => new Promise<never>(() => undefined)
+        },
+        middlewares: [connect({ transport: serverTransport }), abort()]
       },
-      middlewares: [connect({ transport: serverTransport }), abort()]
-    })
-    const client = await createEndpoint({
-      id: 'clock-client',
-      transport: clientTransport,
-      scheduler,
-      wallClock: clock.wallClock,
-      middlewares: [
-        hooks({ listeners: [(event) => void events.push(event)] }),
-        connect({ transport: clientTransport }),
-        abort(),
-        timeout()
-      ]
-    })
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'clock-client',
+        transport: clientTransport,
+        scheduler,
+        wallClock: clock.wallClock,
+        middlewares: [
+          hooks({ listeners: [(event) => void events.push(event)] }),
+          connect({ transport: clientTransport }),
+          abort(),
+          timeout()
+        ]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     try {
       await expect(client.send('clock-server', 'fail', null)).rejects.toBeDefined()
       /** Wire sentAt of the failure response. */
@@ -318,27 +344,33 @@ describe('endpoint clocks: wall clock stamps diagnostics, scheduler owns deadlin
     }
     /** Provider invocations of the replayed method. */
     let calls = 0
-    const server = await createEndpoint({
-      id: 'clock-replay-server',
-      transport: serverBase,
-      scheduler,
-      wallClock,
-      provider: {
-        count: (context) => {
-          calls += 1
-          return context.success(calls)
+    const server = await createRuntimeEndpointComposition(
+      {
+        id: 'clock-replay-server',
+        transport: serverBase,
+        scheduler,
+        wallClock,
+        provider: {
+          count: (context) => {
+            calls += 1
+            return context.success(calls)
+          },
+          hang: () => new Promise<never>(() => undefined)
         },
-        hang: () => new Promise<never>(() => undefined)
+        middlewares: [connect({ transport: serverBase })]
       },
-      middlewares: [connect({ transport: serverBase })]
-    })
-    const client = await createEndpoint({
-      id: 'clock-replay-client',
-      transport: clientTransport,
-      scheduler,
-      wallClock,
-      middlewares: [connect({ transport: clientTransport }), timeout()]
-    })
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'clock-replay-client',
+        transport: clientTransport,
+        scheduler,
+        wallClock,
+        middlewares: [connect({ transport: clientTransport }), timeout()]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     try {
       const pending = client.send('clock-replay-server', 'hang', null, { timeoutMs: 50 })
       const outcome = pending.catch((error: unknown) => error)
@@ -373,12 +405,15 @@ describe('endpoint clocks: wall clock stamps diagnostics, scheduler owns deadlin
 
   it('admits fractional monotonic schedulers and rejects malformed schedulers and wall clocks', async () => {
     const manual = createManualScheduler()
-    const fractional = await createEndpoint({
-      id: 'clock-fractional',
-      transport: silentTransport(),
-      scheduler: { now: () => 1.5, schedule: manual.schedule },
-      middlewares: [connect()]
-    })
+    const fractional = await createRuntimeEndpointComposition(
+      {
+        id: 'clock-fractional',
+        transport: silentTransport(),
+        scheduler: { now: () => 1.5, schedule: manual.schedule },
+        middlewares: [connect()]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     await fractional.dispose()
 
     const thrown = new Error('wall clock failed')
@@ -399,12 +434,15 @@ describe('endpoint clocks: wall clock stamps diagnostics, scheduler owns deadlin
       ]
     ]
     for (const [label, fields] of invalid) {
-      const failure = await createEndpoint({
-        id: `clock-invalid-${idSequence++}`,
-        transport: silentTransport(),
-        middlewares: [connect()],
-        ...(fields as object)
-      }).catch((error: unknown) => error)
+      const failure = await createRuntimeEndpointComposition(
+        {
+          id: `clock-invalid-${idSequence++}`,
+          transport: silentTransport(),
+          middlewares: [connect()],
+          ...(fields as object)
+        },
+        { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+      ).installing.catch((error: unknown) => error)
       expect(failure, label).toBeInstanceOf(RpcConfigurationError)
       expect(failure, label).toMatchObject({ code: 'INVALID_CONFIG' })
       if (label === 'throwing wall clock') expect((failure as Error).cause).toBe(thrown)
@@ -564,24 +602,30 @@ describe('server metadata times follow the endpoint scheduler', () => {
     const clock = recordingWallClock(() => WALL_BASE)
     const [clientTransport, serverTransport] = createMemoryTransportPair()
     discoveryAttachments.length = 0
-    const client = await createFullEndpoint({
-      id: 'clock-meta-client',
-      transport: clientTransport,
-      scheduler,
-      wallClock: clock.wallClock,
-      middlewares: [connect({ transport: clientTransport }), ping()] as const
-    })
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'clock-meta-client',
+        transport: clientTransport,
+        scheduler,
+        wallClock: clock.wallClock,
+        middlewares: [connect({ transport: clientTransport }), ping()] as const
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     /** The client's discovery attachment; the first one constructed. */
     const clientDiscovery = discoveryAttachments[0] as {
       getServerList(targetId?: string): readonly IRpcServerMetadata[]
     }
-    const server = await createFullEndpoint({
-      id: 'clock-meta-server',
-      transport: serverTransport,
-      scheduler,
-      wallClock: clock.wallClock,
-      middlewares: [connect({ transport: serverTransport }), ping()] as const
-    })
+    const server = await createRuntimeEndpointComposition(
+      {
+        id: 'clock-meta-server',
+        transport: serverTransport,
+        scheduler,
+        wallClock: clock.wallClock,
+        middlewares: [connect({ transport: serverTransport }), ping()] as const
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     try {
       expect(clientDiscovery).toBeDefined()
       await expect(client.ping!('clock-meta-server', undefined, { timeoutMs: 100 })).resolves.toBe(

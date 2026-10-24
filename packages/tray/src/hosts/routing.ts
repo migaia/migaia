@@ -22,61 +22,75 @@ export function createRoutingRegistry(
   declared: readonly ITrayRoutingPolicy[],
   registry: ITrayRegistry
 ) {
-  /** Policy authority is held by identity; only its portable name crosses RPC. */
-  const policies = new Map<string, ITrayRoutingPolicy>()
-  for (const policy of [
-    ...builtInRouting,
-    ...declared,
-    ...hosts.flatMap((host) => host.routing ?? [])
-  ]) {
-    if (
-      !readRoutingPolicy(policy) ||
-      (policies.has(policy.name) && policies.get(policy.name) !== policy)
-    )
-      throw createTrayError(TrayErrorCode.routingInvalid)
-    policies.set(policy.name, policy)
-  }
-  /** Host/policy sequences count picks independently while both namespace forms share them. */
-  const sequences = new Map<string, Map<string, number>>()
-  return {
-    names: Object.freeze([...policies.keys()]),
-    /** Read ready candidates at call time; selection never retries or migrates a call. */
-    pick(host: string, name: string): ITrayRecord {
-      const policy = policies.get(name)
-      if (!policy) throw createTrayError(TrayErrorCode.routingUnknown)
-      /** Map insertion order is the admission's spawn order. */
-      const candidates: ITrayRecord[] = []
-      for (const record of registry.records.values())
-        if (
-          record.definition.name === host &&
-          record.state === TrayInstanceState.ready &&
-          !record.removed
-        )
-          candidates.push(record)
-      if (!candidates.length) throw createTrayError(TrayErrorCode.hostUnavailable)
-      /** Sequence state belongs to this registry and one host name. */
-      let hostSequences = sequences.get(host)
-      if (!hostSequences) {
-        hostSequences = new Map()
-        sequences.set(host, hostSequences)
-      }
-      /** Increment before invoking the user callback so every attempted pick is counted. */
-      const sequence = hostSequences.get(name) ?? 0
-      hostSequences.set(name, sequence + 1)
-      /** Candidate snapshots cannot mutate registry metadata. */
-      let id: string
-      try {
-        id = readRoutingPolicy(policy)!(
-          Object.freeze(candidates.map(registry.snapshot)),
-          Object.freeze({ host, sequence })
-        )
-      } catch (error) {
-        throw createTrayError(TrayErrorCode.routingInvalid, error)
-      }
-      const selected = candidates.find((record) => record.id === id)
-      if (!selected) throw createTrayError(TrayErrorCode.routingInvalid)
-      return selected
+  return new RoutingRegistry(hosts, declared, registry)
+}
+/** Owns policy authority and per-host cursors; candidate membership remains registry-owned. */
+class RoutingRegistry {
+  /** Branded identity is checked before any policy can participate in routing. */
+  readonly #policies = new Map<string, ITrayRoutingPolicy>()
+  /** Pick attempts count independently for each host/policy pair. */
+  readonly #sequences = new Map<string, Map<string, number>>()
+  /** Ready candidates are read from the current admission owner on every pick. */
+  readonly #registry: ITrayRegistry
+  /** Frozen names define both callable namespace forms without exposing policy callbacks. */
+  readonly names: readonly string[]
+  /** Capture all declared policies in original order and reject duplicate authority. */
+  constructor(
+    hosts: readonly IAnyTrayHost[],
+    declared: readonly ITrayRoutingPolicy[],
+    registry: ITrayRegistry
+  ) {
+    this.#registry = registry
+    for (const policy of [
+      ...builtInRouting,
+      ...declared,
+      ...hosts.flatMap((host) => host.routing ?? [])
+    ]) {
+      if (
+        !readRoutingPolicy(policy) ||
+        (this.#policies.has(policy.name) && this.#policies.get(policy.name) !== policy)
+      )
+        throw createTrayError(TrayErrorCode.routingInvalid)
+      this.#policies.set(policy.name, policy)
     }
+    this.names = Object.freeze([...this.#policies.keys()])
+  }
+  /** Pick one current ready admission; business calls never retry or migrate. */
+  pick = (host: string, name: string): ITrayRecord => {
+    const policy = this.#policies.get(name)
+    if (!policy) throw createTrayError(TrayErrorCode.routingUnknown)
+    /** Map insertion order is the admission's spawn order. */
+    const candidates: ITrayRecord[] = []
+    for (const record of this.#registry.records.values())
+      if (
+        record.definition.name === host &&
+        record.state === TrayInstanceState.ready &&
+        !record.removed
+      )
+        candidates.push(record)
+    if (!candidates.length) throw createTrayError(TrayErrorCode.hostUnavailable)
+    /** Sequence state belongs to this registry and one host name. */
+    let hostSequences = this.#sequences.get(host)
+    if (!hostSequences) {
+      hostSequences = new Map()
+      this.#sequences.set(host, hostSequences)
+    }
+    /** Increment before invoking the user callback so every attempted pick is counted. */
+    const sequence = hostSequences.get(name) ?? 0
+    hostSequences.set(name, sequence + 1)
+    /** Candidate snapshots cannot mutate registry metadata. */
+    let id: string
+    try {
+      id = readRoutingPolicy(policy)!(
+        Object.freeze(candidates.map(this.#registry.snapshot)),
+        Object.freeze({ host, sequence })
+      )
+    } catch (error) {
+      throw createTrayError(TrayErrorCode.routingInvalid, error)
+    }
+    const selected = candidates.find((record) => record.id === id)
+    if (!selected) throw createTrayError(TrayErrorCode.routingInvalid)
+    return selected
   }
 }
 

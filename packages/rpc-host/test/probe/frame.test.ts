@@ -1,4 +1,8 @@
-import { carrierSizeBytes } from '../../dist/adapter/internal-advanced.js'
+import { createProbeEmitter, bindInstalledProbe } from '../../dist/core/internal/probe-emitter.js'
+import { systemScheduler } from '@migaia/utils/scheduler'
+import { createRuntimeEndpointComposition } from '../../dist/core/runtime-api-endpoint.js'
+import { RpcCapability } from '@migaia/rpc-contract'
+import { carrierSizeBytes } from '../../dist/core/adapters/probe-content.js'
 import { describe, expect, it, vi } from 'vitest'
 import { identityCodec } from '@migaia/serialize/codecs/identity/v1'
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
@@ -8,20 +12,18 @@ import { bindRpcFrameIngress, createStringFramer } from '@migaia/rpc-contract/fr
 import { messageFramer } from '@migaia/rpc-contract/framing/v1'
 import {
   defineProbe,
-  probePlugin,
-  snapshotProbeEvent,
   RpcProbeDirection,
   RpcProbeStage,
   type IRpcProbeEventView,
   type IRpcProbeStageName
 } from '../../dist/core/probe/index.js'
-import { createProbeEmitter } from '../../dist/core/internal/probe-emitter.js'
 import { RpcOutboundSender } from '../../dist/core/internal/outbound-sender.js'
 import type { IRpcSelectedComponents } from '../../dist/core/internal/endpoint-options.js'
 import type { IRpcOutboundTransport } from '../../dist/core/internal/outbound-sender.js'
 import type { IRpcAuthenticationCapability } from '../../dist/core/typing.js'
-import { createEndpoint, connect } from '../../dist/core/index.js'
-import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
+
+import { connect } from '../../dist/core/middleware/connect.js'
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
 import { codec } from '../../dist/core/middleware/codec.js'
 import { framer } from '../../dist/core/middleware/framer.js'
 import { authentication } from '../../dist/core/middleware/authentication.js'
@@ -95,7 +97,7 @@ function observedSender(options: {
     stages: ['envelope', 'encoded', 'frame', 'protected'],
     capture: options.capture,
     redact: options.redact,
-    emit: (view) => options.events.push(snapshotProbeEvent(view))
+    emit: (view) => options.events.push(Object.freeze({ ...view }))
   })
   /** Only the fixture clock is substituted; dispatch is the production emitter. */
   const emitter = createProbeEmitter([probe], () => 1, 'frame-caller')
@@ -161,13 +163,13 @@ describe('probe-core outbound frames', () => {
     const callerProbe = defineProbe({
       stages: ['envelope', 'encoded', 'frame', 'protected'],
       capture: ['frame', 'protected'],
-      emit: (view) => callerEvents.push(snapshotProbeEvent(view))
+      emit: (view) => callerEvents.push(Object.freeze({ ...view }))
     })
     /** Provider-side stages exercise actual unprotect, reassembly and decoding. */
     const providerProbe = defineProbe({
       stages: ['envelope', 'encoded', 'frame', 'protected'],
       capture: ['frame', 'protected'],
-      emit: (view) => providerEvents.push(snapshotProbeEvent(view))
+      emit: (view) => providerEvents.push(Object.freeze({ ...view }))
     })
     /** Each endpoint retains its own real replay/authentication capability and transform order. */
     const security = () =>
@@ -180,38 +182,51 @@ describe('probe-core outbound frames', () => {
       })
     /** Core's own reference adapter supplies a real inbound transport boundary. */
     const [left, right] = createMemoryTransportPair()
+    /** Actual endpoint emitters observe this same authenticated physical transport pair. */
+    bindInstalledProbe(
+      right,
+      createProbeEmitter([providerProbe], systemScheduler.now, 'paired-provider')
+    )
+    bindInstalledProbe(
+      left,
+      createProbeEmitter([callerProbe], systemScheduler.now, 'paired-caller')
+    )
     /** One provider invocation must see and return the original business payload. */
     let calls = 0
     /** The canonical JSON codec and canonical string framer create exactly three physical chunks. */
-    const server = await createEndpoint({
-      id: 'paired-provider',
-      transport: right,
-      middlewares: [
-        connect(),
-        codec(defineJsonCodec({ version: 1 })),
-        framer(createStringFramer({ chunkBytes: 512, maxMessageBytes: 8192 })),
-        security(),
-        probePlugin(providerProbe)
-      ],
-      provider: {
-        echo: (context) => {
-          calls += 1
-          return context.success(context.data)
+    const server = await createRuntimeEndpointComposition(
+      {
+        id: 'paired-provider',
+        transport: right,
+        middlewares: [
+          connect(),
+          codec(defineJsonCodec({ version: 1 })),
+          framer(createStringFramer({ chunkBytes: 512, maxMessageBytes: 8192 })),
+          security()
+        ],
+        provider: {
+          echo: (context) => {
+            calls += 1
+            return context.success(context.data)
+          }
         }
-      }
-    })
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     /** The independent caller owns matching public component and authentication ports. */
-    const client = await createEndpoint({
-      id: 'paired-caller',
-      transport: left,
-      middlewares: [
-        connect(),
-        codec(defineJsonCodec({ version: 1 })),
-        framer(createStringFramer({ chunkBytes: 512, maxMessageBytes: 8192 })),
-        security(),
-        probePlugin(callerProbe)
-      ]
-    })
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'paired-caller',
+        transport: left,
+        middlewares: [
+          connect(),
+          codec(defineJsonCodec({ version: 1 })),
+          framer(createStringFramer({ chunkBytes: 512, maxMessageBytes: 8192 })),
+          security()
+        ]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     try {
       /** Padding exceeds two chunk widths after route encoding, while staying below three widths. */
       const payload = { business: 'unchanged', padding: 'x'.repeat(1024) }

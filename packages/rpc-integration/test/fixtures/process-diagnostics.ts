@@ -1,15 +1,29 @@
+import { defineTransportPlugin, createAdapterDeployment } from '@migaia/rpc-host/plugin'
+import { vi } from 'vitest'
+import { readEndpointOwner } from '../../../rpc-host/dist/core/internal/endpoint-projection.js'
+import { EndpointOwnerKey } from '../../../rpc-host/dist/core/endpoint-kernel.js'
+import { ProviderAdmissionRegistry } from '../../../rpc-host/dist/core/internal/provider-admission.js'
+import type { ProviderExecutor } from '../../../rpc-host/dist/core/internal/provider-executor.js'
+import type {
+  ProviderRegistry,
+  IProviderSessionPolicy
+} from '../../../rpc-host/dist/core/internal/provider.js'
+import type { ResourceScope } from '../../../rpc-host/dist/core/internal/resource-scope.js'
+import {
+  readRuntimePeerConnection,
+  type IRuntimePeer
+} from '../../../rpc-host/dist/remote/runtime-api/peer.js'
+import { readAdapterDeployment } from '../../../rpc-host/dist/runtime-adapter/deployment.js'
+import { readRpcPluginMetadata } from '../../../rpc-host/dist/plugin/metadata.js'
 import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
-import { type IRpcTransport } from '../../../rpc-host/dist/core/index.js'
+import type { IRpcTransport } from '../../../rpc-host/dist/core/transport.js'
 import type { IProcessCommonOptions } from '../../../rpc-plugin-process/dist/process/types.js'
 import { RpcPlatform } from '@migaia/rpc-host/plugin'
 import {
   createRuntimeMessageConnection,
   type IRuntimeByteDiagnostics
 } from '@migaia/rpc-host/plugin'
-import { captureProcessTask } from '../../../rpc-plugin-process/test/protocol.ts'
 import type { IRuntimeMessageIO } from '../../../rpc-host/dist/runtime-adapter/byte/types.js'
-import type { IRuntimePeerOptions } from '@migaia/rpc-host/plugin'
-import { createProcessListenerPeer } from '../../../rpc-plugin-process/test/protocol.ts'
 import {
   bindRuntimeByteWire,
   bindRuntimeMessageTransport
@@ -60,6 +74,71 @@ export const remoteProcessJsonCodec = byteProcessPipeline.codec
 /** Existing static message assertions observe the same canonical identity/message component pair. */
 export const messageProcessPipeline = runtimeMessagePipeline
 
+/** Each actual executor is observed once even when multiple native sessions share its kernel. */
+const admissionObservations = new WeakMap<ProviderExecutor<string>, ProcessAdmissionObservation>()
+
+/** Capture only registry returns from real execution; observation never prepares or commits policy. */
+class ProcessAdmissionObservation {
+  /** Policy identity selects the exact registry already chosen by its actual provider execution. */
+  readonly #byPolicy = new WeakMap<IProviderSessionPolicy, ProviderAdmissionRegistry>()
+  /** The canonical kernel lifetime restores its original executor callback exactly once. */
+  readonly close: () => void
+
+  /** Retain the original receiver, call count and return value through a call-through spy. */
+  constructor(executor: ProviderExecutor<string>) {
+    /** This exact callback is the only code allowed to resolve the held native admission scope. */
+    const original = executor.options.sessionAdmission!
+    /** One existing execution call is forwarded once, before its returned registry is recorded. */
+    const spy = vi.spyOn(executor.options, 'sessionAdmission').mockImplementation((policy) => {
+      /** Preserve its real receiver without invoking policy preparation an additional time. */
+      const selected = Reflect.apply(original, executor.options, [policy])
+      if (selected instanceof ProviderAdmissionRegistry) this.#byPolicy.set(policy, selected)
+      return selected
+    })
+    this.close = () => spy.mockRestore()
+  }
+
+  /** Read an already observed execution choice; absent observations remain visibly absent. */
+  read(policy: IProviderSessionPolicy): ProviderAdmissionRegistry | undefined {
+    return this.#byPolicy.get(policy)
+  }
+}
+
+/** Observe one genuine shared kernel without constructing an endpoint, scope or provider policy. */
+function observeProcessSessionAdmission(peer: IRuntimePeer): void {
+  /** The accepted member retains its original canonical endpoint projection ancestry. */
+  const endpoint = readRuntimePeerConnection(peer).endpoint
+  /** This is the executor that actually dispatches the native session's business frames. */
+  const executor = readEndpointOwner<ProviderExecutor<string>>(endpoint, 'provider-executor')!
+  if (admissionObservations.has(executor)) return
+  /** The original kernel retires this test observation with its real resources. */
+  const observation = new ProcessAdmissionObservation(executor)
+  admissionObservations.set(executor, observation)
+  readEndpointOwner<ResourceScope>(endpoint, EndpointOwnerKey.resourceScope)!.addSync(
+    'fixture native admission observation',
+    observation.close
+  )
+}
+
+/** Read only the registry previously returned by actual execution for this current native policy. */
+export function readObservedProcessSessionAdmission(
+  peer: IRuntimePeer
+): ProviderAdmissionRegistry | undefined {
+  /** Canonical connection identity selects the real Host session, rather than a fixture selector. */
+  const connection = readRuntimePeerConnection(peer)
+  /** Policy lookup reads the Host's existing session Map and performs no preparation or commit. */
+  const policy = readEndpointOwner<ProviderRegistry>(
+    connection.endpoint,
+    EndpointOwnerKey.providerRegistry
+  )!.sessionPolicy?.(connection.peerId)
+  /** Multiple accepted sessions may share the same original executor and admission registry. */
+  const executor = readEndpointOwner<ProviderExecutor<string>>(
+    connection.endpoint,
+    'provider-executor'
+  )!
+  return policy ? admissionObservations.get(executor)?.read(policy) : undefined
+}
+
 /** Construct a genuine Core fixed-profile channel over the fixture's actual held message I/O. */
 export function createProcessFixtureChannel(
   io: IRuntimeMessageIO,
@@ -80,12 +159,48 @@ export function createProcessFixtureChannel(
   )
 }
 
-/** Keep the real Process listener while Core retains its genuine opaque preparation internally. */
-export function createProcessFixtureListenerPeer(
-  options: IRuntimePeerOptions,
-  ingress: Parameters<typeof createProcessListenerPeer>[1]
+/**
+ * Observe only actual SDK accept receipts; no endpoint, Peer, directory or service is constructed.
+ * The fixture keeps each genuine member for the original provider-admission identity assertions.
+ */
+export function observeProcessListenerSessions(
+  plugin: import('@migaia/rpc-host/plugin').IRpcTransportPlugin,
+  sessions: import('../../../rpc-host/dist/remote/runtime-api/peer.js').IRuntimePeer[]
 ) {
-  return createProcessListenerPeer(options, ingress, captureProcessTask(options))
+  /** The caller supplies only the current native process definition, already admitted by the SDK. */
+  const metadata = readRpcPluginMetadata(plugin)! as Extract<
+    NonNullable<ReturnType<typeof readRpcPluginMetadata>>,
+    { kind: 'transport' }
+  >
+  /** This is the original canonical listener recipe, including governor/drain/handshake ownership. */
+  const recipe = readAdapterDeployment(metadata.definition.deployment)!
+  /** Explicit immutable inputs retain only the genuine recipe and caller-owned receipt observations. */
+  const observation = { recipe, sessions }
+  return defineTransportPlugin({
+    ...metadata.definition,
+    deployment: createAdapterDeployment({
+      ...recipe,
+      listen: (context, accept) =>
+        observation.recipe.listen!(context, (channel, preparation) => {
+          /** Return this exact native accept Promise; observation never replaces its settlement. */
+          const accepted = accept(channel, preparation)
+          /**
+           * Original listener consumes failure; this reaction records successful native identity
+           * only.
+           */
+          void accepted.then(
+            (session) => {
+              /** Host retains genuine Peer connection metadata on this exact accepted member. */
+              const peer = session.peer as unknown as IRuntimePeer
+              observeProcessSessionAdmission(peer)
+              observation.sessions.push(peer)
+            },
+            () => undefined
+          )
+          return accepted
+        })
+    })
+  })
 }
 
 /** Supply only the moved diagnostic/presentation arguments to the same private byte mechanism. */

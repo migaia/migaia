@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict'
 import { MessageChannel } from 'node:worker_threads'
 import { describe, it } from 'vitest'
-import { authentication } from '../../dist/core/index.js'
+import { authentication } from '../../dist/core/middleware/authentication.js'
 import { bindAuthenticationReplayContext } from '../../dist/core/internal/authentication-replay.js'
 import { RequestReplayLedger } from '../../dist/core/internal/request-replay-ledger.js'
 import type {
   IRpcAuthenticationCapability,
   IRpcAuthenticationContext
-} from '../../dist/core/index.js'
+} from '../../dist/core/typing.js'
 import { installPlugin } from '../core/middleware/helpers.js'
 
 /**

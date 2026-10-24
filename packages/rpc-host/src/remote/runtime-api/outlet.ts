@@ -28,7 +28,7 @@ import type {
 import type { IPluginConstraint, IPluginRuntimeSharedSlot } from '@migaia/plugin-host'
 import type { IRpcPortableValue } from '@migaia/rpc-contract'
 import { serializeRpcError } from '../../core/internal/error-wire-metadata.js'
-import { RpcCoreErrorCode } from '../../core/index.js'
+import { RpcCoreErrorCode } from '../../core/errors.js'
 import type { IRuntimeCallOptions } from './typing.js'
 import type { IRuntimePeerDescription, IRuntimePeerIdentity } from './description.js'
 import type { IRuntimePeer } from './peer.js'
@@ -205,7 +205,7 @@ export type IRuntimeOutlet = Pick<IRuntimeEventPublisher, 'on' | 'watch'> &
         >['options'],
         'timeoutMs'
       > &
-        Pick<import('../../core/index.js').ISendOptions, 'timeoutMs' | 'signal' | 'transfer'>
+        Pick<import('../../core/typing.js').ISendOptions, 'timeoutMs' | 'signal' | 'transfer'>
     ): Promise<readonly IRpcRuntimeStepOutcome[]>
     /** Read the selected provider's original result store without admission or execution. */
     outcome(
@@ -223,22 +223,36 @@ export type IRuntimeOutlet = Pick<IRuntimeEventPublisher, 'on' | 'watch'> &
   }>
 
 /** Select a committed exact receipt before forwarding the original callable operation. */
-export function createRuntimeOutlet(
-  slot: IPluginRuntimeSharedSlot<IRuntimeOutlet>,
-  self: IRuntimePeerIdentity,
-  kind: keyof typeof RuntimePluginKey
-): IRuntimeOutlet {
-  /** One publisher belongs to this actual shared facade throughout its original slot lifetime. */
-  const events = createRuntimeEventPublisher()
-  /** All availability and Host closing checks remain in the original shared-slot owner. */
-  const selected = (target: IRuntimeTarget<string>): IRuntimePluginConnection => {
+/** Own the actual shared-slot facade's cold selection and lifecycle subscriber ports. */
+class RuntimeOutlet {
+  /** PluginHost remains the sole availability, publication, registration and closing authority. */
+  #slot: IPluginRuntimeSharedSlot<IRuntimeOutlet>
+  /** Safe local identity is captured from this genuine Host's shared slot. */
+  #self: IRuntimePeerIdentity
+  /** The installed physical family alone grants platform-specific control options. */
+  #kind: keyof typeof RuntimePluginKey
+  /** One local publisher belongs to this facade for its entire original shared-slot lifetime. */
+  #events = createRuntimeEventPublisher()
+
+  /** Capture existing committed selection and native lifecycle ports without another registry. */
+  constructor(
+    slot: IPluginRuntimeSharedSlot<IRuntimeOutlet>,
+    self: IRuntimePeerIdentity,
+    kind: keyof typeof RuntimePluginKey
+  ) {
+    this.#slot = slot
+    this.#self = self
+    this.#kind = kind
+  }
+  /** Select one original committed receipt, preserving ambiguous/unknown target diagnostics. */
+  #selected = (target: IRuntimeTarget<string>): IRuntimePluginConnection => {
     /** Instance identity is checked through the same index, then correlated with its declared name. */
     const name = typeof target === 'string' ? target : target?.name
     const id = typeof target === 'string' ? target : target?.instanceId
     if (typeof name !== 'string' || !name || typeof id !== 'string' || !id)
       throw createRpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.targetInvalid)
     /** The canonical index rejects multiple matches without selecting a winner. */
-    const connection = slot.find(id)
+    const connection = this.#slot.find(id)
     if (connection === null)
       throw createRpcError(RpcCoreErrorCode.capabilityConflict, RuntimeApiErrorText.targetAmbiguous)
     if (!connection)
@@ -247,12 +261,12 @@ export function createRuntimeOutlet(
       throw createRpcError(RpcCoreErrorCode.targetUnknown, RuntimeApiErrorText.targetUnknown)
     return connection as IRuntimePluginConnection
   }
-  /** Execution authority is looked up on committed registration metadata before native side effects. */
-  const controlled = (name: string): IRuntimeControlledRegistration => {
+  /** Native side effects require exact committed execution metadata from the original slot. */
+  #controlled = (name: string): IRuntimeControlledRegistration => {
     if (typeof name !== 'string' || !name)
       throw createRpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.targetInvalid)
-    slot.find(name)
-    const records = (slot.registered() as readonly IRuntimePluginRegistration[]).filter(
+    this.#slot.find(name)
+    const records = (this.#slot.registered() as readonly IRuntimePluginRegistration[]).filter(
       (record) => record.name === name
     )
     if (records.length !== 1)
@@ -267,173 +281,202 @@ export function createRuntimeOutlet(
       throw createRpcError(RpcCoreErrorCode.capabilityConflict, RuntimeApiErrorText.controlBorrowed)
     return record as IRuntimeControlledRegistration
   }
-  /** Public operations preserve their original callables; private seams belong to this facade only. */
-  const facade: IRuntimeOutlet = Object.freeze({
-    on: events.on,
-    watch: events.watch,
-    stop: (name, options) => {
-      /** Platform configuration errors precede execution selection and original queue admission. */
-      if (
-        (options?.graceMs !== undefined &&
-          (!Number.isFinite(options.graceMs) || options.graceMs < 0)) ||
-        (options &&
-          Object.hasOwn(options, 'signal') &&
-          (kind !== RuntimePluginKey.process || options.signal !== RuntimeProcessSignal.graceful))
-      )
-        throw createRpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.stopInvalid)
-      return controlled(name).execution.stop(
-        options?.graceMs === undefined ? undefined : { graceMs: options.graceMs }
-      )
-    },
-    kill: (name) => controlled(name).execution.kill(),
-    restart: (name) => {
-      /** Native readiness precedes channel preparation; join the exact existing resource owner. */
-      const record = controlled(name)
-      return record.execution.restart().then(async (outcome) => {
-        if (outcome.state === 'ready') await record.whenReady?.()
+  /** Delegate stop to the exact committed native execution without another command owner. */
+  #stop: IRuntimeOutlet['stop'] = (name, options) => {
+    /** Platform configuration errors precede execution selection and original queue admission. */
+    if (
+      (options?.graceMs !== undefined &&
+        (!Number.isFinite(options.graceMs) || options.graceMs < 0)) ||
+      (options &&
+        Object.hasOwn(options, 'signal') &&
+        (this.#kind !== RuntimePluginKey.process ||
+          options.signal !== RuntimeProcessSignal.graceful))
+    )
+      throw createRpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.stopInvalid)
+    return this.#controlled(name).execution.stop(
+      options?.graceMs === undefined ? undefined : { graceMs: options.graceMs }
+    )
+  }
+
+  /** Delegate kill to the exact committed native execution without another command owner. */
+  #kill: IRuntimeOutlet['kill'] = (name) => this.#controlled(name).execution.kill()
+
+  /** Delegate restart to the exact committed native execution without another command owner. */
+  #restart: IRuntimeOutlet['restart'] = (name) => {
+    /** Native readiness precedes channel preparation; join the exact existing resource owner. */
+    const record = this.#controlled(name)
+    return record.execution.restart().then(async (outcome) => {
+      if (outcome.state === 'ready') await record.whenReady?.()
+      return outcome
+    })
+  }
+
+  /** Delegate replace to the exact committed native execution without another command owner. */
+  #replace: IRuntimeOutlet['replace'] = (name, spec) => {
+    /** Return the original outcome only after the replacement's outlet receipt is addressable. */
+    const record = this.#controlled(name)
+    /** Only the installed source interprets its opaque spec; the generic outlet owns publication. */
+    const replacement =
+      spec === undefined
+        ? undefined
+        : record.prepareReplacement
+          ? record.prepareReplacement(spec)
+          : spec
+    return record.execution
+      .replace(replacement === undefined ? undefined : { spec: replacement })
+      .then(async (outcome) => {
+        if (outcome.kind === 'replaced') await record.whenReady?.()
         return outcome
       })
-    },
-    replace: (name, spec) => {
-      /** Return the original outcome only after the replacement's outlet receipt is addressable. */
-      const record = controlled(name)
-      /** Only the installed source interprets its opaque spec; the generic outlet owns publication. */
-      const replacement =
-        spec === undefined
-          ? undefined
-          : record.prepareReplacement
-            ? record.prepareReplacement(spec)
-            : spec
-      return record.execution
-        .replace(replacement === undefined ? undefined : { spec: replacement })
-        .then(async (outcome) => {
-          if (outcome.kind === 'replaced') await record.whenReady?.()
-          return outcome
-        })
-    },
-    request: (target, method, payload, options) =>
-      selected(target).peer.request(method, payload, options),
-    notify: (target, method, payload, options) =>
-      selected(target).peer.notify(method, payload, options),
-    stream: (target, method, payload, options) =>
-      selected(target).peer.stream(method, payload, options),
-    group: (target, steps, options) => selected(target).peer.group(steps, options),
-    outcome: (target, idempotencyKey) => selected(target).peer.outcome(idempotencyKey),
-    list: (async (options?: IRuntimeListOptions) => {
-      validateFilter(options?.filter)
-      /** This is the original committed reservation inventory, independent from readiness indexes. */
-      const records = slot.registered() as readonly IRuntimePluginRegistration[]
-      /**
-       * Names can be filtered before asynchronous resource reads without touching business
-       * admission.
-       */
-      const selected = records.filter((record) => {
-        const name = options?.filter?.name
-        return (
-          !name ||
-          ('exact' in name ? record.name === name.exact : record.name.startsWith(name.prefix!))
-        )
-      })
-      /**
-       * Each exact registered Peer captures its own native generation before its cold sampler
-       * awaits.
-       */
-      const details = await Promise.all(
-        selected.map(async (record) => (await record.peer.describe()).connections)
+  }
+
+  /** Read cold actual native details from the original committed reservations. */
+  #list: IRuntimeOutlet['list'] = (async (options?: IRuntimeListOptions) => {
+    validateFilter(options?.filter)
+    /** This is the original committed reservation inventory, independent from readiness indexes. */
+    const records = this.#slot.registered() as readonly IRuntimePluginRegistration[]
+    /** Names can be filtered before asynchronous resource reads without touching business admission. */
+    const selected = records.filter((record) => {
+      const name = options?.filter?.name
+      return (
+        !name ||
+        ('exact' in name ? record.name === name.exact : record.name.startsWith(name.prefix!))
       )
-      /**
-       * State, local source kind and connection direction are separate canonical axes, combined by
-       * AND.
-       */
-      const connections = details.flat().filter((detail) => {
-        const filter = options?.filter
-        return (
-          (!filter?.state || ('state' in detail.unit && detail.unit.state === filter.state)) &&
-          (!filter?.kind || detail.kind === filter.kind) &&
-          (!filter?.direction || detail.direction === filter.direction)
-        )
-      })
-      return runtimeQueryOutput(
-        Object.freeze({ self, connections: Object.freeze(connections) }),
-        options
+    })
+    /** Each exact registered Peer captures its own native generation before its cold sampler awaits. */
+    const details = await Promise.all(
+      selected.map(async (record) => (await record.peer.describe()).connections)
+    )
+    /**
+     * State, local source kind and connection direction are separate canonical axes, combined by
+     * AND.
+     */
+    const connections = details.flat().filter((detail) => {
+      const filter = options?.filter
+      return (
+        (!filter?.state || ('state' in detail.unit && detail.unit.state === filter.state)) &&
+        (!filter?.kind || detail.kind === filter.kind) &&
+        (!filter?.direction || detail.direction === filter.direction)
       )
-    }) as IRuntimeListQuery,
-    get: (async (target: IRuntimeTarget<string>, options?: IRuntimeQueryOptions) => {
-      /** A name addresses its original registration even while its native unit is unavailable. */
-      const name = typeof target === 'string' ? target : target?.name
-      const id = typeof target === 'string' ? target : target?.instanceId
-      if (typeof name !== 'string' || !name || typeof id !== 'string' || !id)
-        throw createRpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.targetInvalid)
-      /** Captured reservations cannot select later installations while resource sampling awaits. */
-      const records = slot.registered() as readonly IRuntimePluginRegistration[]
-      /** Exact instance identity has the same precedence as the original ready index. */
-      const ids = records.filter(
-        (record) =>
-          record.instanceIds().includes(id) && (typeof target === 'string' || record.name === name)
+    })
+    return runtimeQueryOutput(
+      Object.freeze({ self: this.#self, connections: Object.freeze(connections) }),
+      options
+    )
+  }) as IRuntimeListQuery
+
+  /** Select the exact committed instance/name before sampling its original native receipt. */
+  #get: IRuntimeOutlet['get'] = (async (
+    target: IRuntimeTarget<string>,
+    options?: IRuntimeQueryOptions
+  ) => {
+    /** A name addresses its original registration even while its native unit is unavailable. */
+    const name = typeof target === 'string' ? target : target?.name
+    const id = typeof target === 'string' ? target : target?.instanceId
+    if (typeof name !== 'string' || !name || typeof id !== 'string' || !id)
+      throw createRpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.targetInvalid)
+    /** Captured reservations cannot select later installations while resource sampling awaits. */
+    const records = this.#slot.registered() as readonly IRuntimePluginRegistration[]
+    /** Exact instance identity has the same precedence as the original ready index. */
+    const ids = records.filter(
+      (record) =>
+        record.instanceIds().includes(id) && (typeof target === 'string' || record.name === name)
+    )
+    /** Name selection never samples unrelated registered execution units. */
+    const candidates =
+      typeof target === 'string' && ids.length === 0
+        ? records.filter((record) => record.name === name)
+        : ids
+    if (candidates.length !== 1)
+      throw createRpcError(
+        candidates.length ? RpcCoreErrorCode.capabilityConflict : RpcCoreErrorCode.targetUnknown,
+        candidates.length ? RuntimeApiErrorText.targetAmbiguous : RuntimeApiErrorText.targetUnknown
       )
-      /** Name selection never samples unrelated registered execution units. */
-      const candidates =
-        typeof target === 'string' && ids.length === 0
-          ? records.filter((record) => record.name === name)
-          : ids
-      if (candidates.length !== 1)
-        throw createRpcError(
-          candidates.length ? RpcCoreErrorCode.capabilityConflict : RpcCoreErrorCode.targetUnknown,
-          candidates.length
-            ? RuntimeApiErrorText.targetAmbiguous
-            : RuntimeApiErrorText.targetUnknown
+    /** This exact Peer captures one original native receipt before its own sampler awaits. */
+    const details = (await candidates[0]!.peer.describe()).connections
+    const matches = ids.length
+      ? details.filter(
+          (detail) => 'instanceId' in detail.identity && detail.identity.instanceId === id
         )
-      /** This exact Peer captures one original native receipt before its own sampler awaits. */
-      const details = (await candidates[0]!.peer.describe()).connections
-      const matches = ids.length
-        ? details.filter(
-            (detail) => 'instanceId' in detail.identity && detail.identity.instanceId === id
-          )
-        : details
-      if (matches.length !== 1)
-        throw createRpcError(
-          matches.length ? RpcCoreErrorCode.capabilityConflict : RpcCoreErrorCode.targetUnknown,
-          matches.length ? RuntimeApiErrorText.targetAmbiguous : RuntimeApiErrorText.targetUnknown
+      : details
+    if (matches.length !== 1)
+      throw createRpcError(
+        matches.length ? RpcCoreErrorCode.capabilityConflict : RpcCoreErrorCode.targetUnknown,
+        matches.length ? RuntimeApiErrorText.targetAmbiguous : RuntimeApiErrorText.targetUnknown
+      )
+    return runtimeQueryOutput(matches[0]!, options)
+  }) as IRuntimeTargetQuery
+
+  /** Snapshot ready exact receipts and retain independent original one-way outcomes. */
+  #broadcast: IRuntimeOutlet['broadcast'] = async (method, payload, options) => {
+    /** Snapshot only ready exact receipts; later joins cannot enter this explicit one-way send. */
+    const connections = this.#slot.values().filter((value) => {
+      /** The original instance index preserves distinct ready sessions with an ambiguous name. */
+      const connection = value as IRuntimePluginConnection
+      return this.#slot.find(connection.instanceId) === connection
+    }) as readonly IRuntimePluginConnection[]
+    /** Every member records success or a reported original failure in snapshot order. */
+    const results: IRuntimeBroadcastResult[] = []
+    for (const connection of connections) {
+      try {
+        if (this.#slot.find(connection.instanceId) !== connection)
+          throw createRpcError(RpcCoreErrorCode.targetUnknown, RuntimeApiErrorText.targetUnknown)
+        await connection.peer.notify(method, payload, options)
+        results.push(Object.freeze({ instanceId: connection.instanceId, ok: true }))
+      } catch (error) {
+        connection.report(error)
+        results.push(
+          Object.freeze({
+            instanceId: connection.instanceId,
+            ok: false,
+            error: serializeRpcError(error, {
+              report: ({ error: failure }) => connection.report(failure)
+            }) as IRpcPortableValue
+          })
         )
-      return runtimeQueryOutput(matches[0]!, options)
-    }) as IRuntimeTargetQuery,
-    broadcast: async (method, payload, options) => {
-      /** Snapshot only ready exact receipts; later joins cannot enter this explicit one-way send. */
-      const connections = slot.values().filter((value) => {
-        /** The original instance index preserves distinct ready sessions with an ambiguous name. */
-        const connection = value as IRuntimePluginConnection
-        return slot.find(connection.instanceId) === connection
-      }) as readonly IRuntimePluginConnection[]
-      /** Every member records success or a reported original failure in snapshot order. */
-      const results: IRuntimeBroadcastResult[] = []
-      for (const connection of connections) {
-        try {
-          if (slot.find(connection.instanceId) !== connection)
-            throw createRpcError(RpcCoreErrorCode.targetUnknown, RuntimeApiErrorText.targetUnknown)
-          await connection.peer.notify(method, payload, options)
-          results.push(Object.freeze({ instanceId: connection.instanceId, ok: true }))
-        } catch (error) {
-          connection.report(error)
-          results.push(
-            Object.freeze({
-              instanceId: connection.instanceId,
-              ok: false,
-              error: serializeRpcError(error, {
-                report: ({ error: failure }) => connection.report(failure)
-              }) as IRpcPortableValue
-            })
-          )
-        }
       }
-      return Object.freeze(results)
     }
-  })
-  eventPublisher.set(facade, events)
-  connectionReader.set(
-    facade,
-    (target: string) => slot.find(target) as IRuntimePluginConnection | null | undefined
-  )
-  return facade
+    return Object.freeze(results)
+  }
+
+  /** Publish the original frozen own-property callables; private readers borrow the same slot. */
+  surface(): IRuntimeOutlet {
+    /** Hot calls remain direct delegates and allocate no facade Promise or bound function. */
+    const facade: IRuntimeOutlet = Object.freeze({
+      on: this.#events.on,
+      watch: this.#events.watch,
+      stop: this.#stop,
+      kill: this.#kill,
+      restart: this.#restart,
+      replace: this.#replace,
+      request: (target, method, payload, options) =>
+        this.#selected(target).peer.request(method, payload, options),
+      notify: (target, method, payload, options) =>
+        this.#selected(target).peer.notify(method, payload, options),
+      stream: (target, method, payload, options) =>
+        this.#selected(target).peer.stream(method, payload, options),
+      group: (target, steps, options) => this.#selected(target).peer.group(steps, options),
+      outcome: (target, idempotencyKey) => this.#selected(target).peer.outcome(idempotencyKey),
+      list: this.#list,
+      get: this.#get,
+      broadcast: this.#broadcast
+    })
+    eventPublisher.set(facade, this.#events)
+    connectionReader.set(
+      facade,
+      (target: string) => this.#slot.find(target) as IRuntimePluginConnection | null | undefined
+    )
+    return facade
+  }
+}
+
+/** Reuse the original shared-slot authority for exact native calls and cold detail reads. */
+export function createRuntimeOutlet(
+  slot: IPluginRuntimeSharedSlot<IRuntimeOutlet>,
+  self: IRuntimePeerIdentity,
+  kind: keyof typeof RuntimePluginKey
+): IRuntimeOutlet {
+  return new RuntimeOutlet(slot, self, kind).surface()
 }
 
 /** TypeScript declaration merging exposes only actually committed optional runtime outlets. */

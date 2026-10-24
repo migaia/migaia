@@ -3,6 +3,50 @@ import { createRtcDataChannelTransport } from '../../../src/browser/adapters/rtc
 
 type IListener = (event: unknown) => void
 
+/** Allocate only this case's original observations before installing native-shaped callbacks. */
+function rtcChannelFixtureState() {
+  const listeners = new Map<string, Set<IListener>>()
+  return { listeners }
+}
+
+/** Own one test resource's mutable observations without sharing a factory closure. */
+class RtcChannelFixture {
+  /** Counts, native events and construction inputs belong only to this fixture instance. */
+  #state: ReturnType<typeof rtcChannelFixtureState>
+  /** Existing consumers retain the same observable fixture surface and callback identities. */
+  readonly value: {
+    readonly channel: {
+      readonly readyState: string
+      send(data: string): void
+      addEventListener(type: string, listener: IListener): void
+      removeEventListener(type: string, listener: IListener): void
+    }
+    readonly emit: (type: string, event?: unknown) => void
+  }
+  /** Install the original native-shaped callbacks after their observations exist. */
+  constructor() {
+    this.#state = rtcChannelFixtureState()
+    const channel = {
+      readyState: 'open',
+      send: () => {},
+      addEventListener: (type: string, listener: IListener) => {
+        let entries = this.#state.listeners.get(type)
+        if (!entries) this.#state.listeners.set(type, (entries = new Set()))
+        entries.add(listener)
+      },
+      removeEventListener: (type: string, listener: IListener) => {
+        this.#state.listeners.get(type)?.delete(listener)
+      }
+    }
+    this.value = { channel, emit: this.#emit }
+  }
+  /** Drive the original fixture operation through its sole state owner. */
+  #emit = (type: string, event?: unknown): void => {
+    for (const listener of this.#state.listeners.get(type) ?? []) listener(event)
+  }
+}
+
+/** Create one independent owner for the existing native-boundary fixture. */
 function makeChannel(): {
   readonly channel: {
     readonly readyState: string
@@ -12,23 +56,7 @@ function makeChannel(): {
   }
   readonly emit: (type: string, event?: unknown) => void
 } {
-  const listeners = new Map<string, Set<IListener>>()
-  const emit = (type: string, event?: unknown): void => {
-    for (const listener of listeners.get(type) ?? []) listener(event)
-  }
-  const channel = {
-    readyState: 'open',
-    send() {},
-    addEventListener(type: string, listener: IListener) {
-      let entries = listeners.get(type)
-      if (!entries) listeners.set(type, (entries = new Set()))
-      entries.add(listener)
-    },
-    removeEventListener(type: string, listener: IListener) {
-      listeners.get(type)?.delete(listener)
-    }
-  }
-  return { channel, emit }
+  return new RtcChannelFixture().value
 }
 
 describe('RTCDataChannel transport', () => {

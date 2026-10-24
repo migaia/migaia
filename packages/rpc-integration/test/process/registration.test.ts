@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import {
   dialProcessByteChannel,
   listenProcessByteChannel
-} from '@migaia/rpc-plugin-process/adapters/node-socket'
+} from '../../../rpc-plugin-process/dist/process/adapters/node-socket.js'
 import { createProcessTransport } from '../../../rpc-plugin-process/dist/process/handshake.js'
 import { createNativeProcessOffer } from '../../../rpc-plugin-process/dist/process/offer.js'
 import { listenProcessRegistrations } from '../../../rpc-plugin-process/dist/process/resilience/rendezvous.js'

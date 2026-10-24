@@ -1,15 +1,16 @@
+import { createRuntimeEndpointComposition } from '../../../dist/core/runtime-api-endpoint.js'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { createEndpointTimePort } from '../../../dist/core/internal/time-port.js'
 import { describe, expect, it, vi } from 'vitest'
 import { createWebRpcPluginHost } from '../../../dist/core/internal/web-rpc-plugin-host.js'
-import { createComposedEndpoint } from '../../../dist/core/composed.js'
+
 import { defineFeature } from '../../../dist/core/feature.js'
-import { createClientFirstPartyRoots } from '../../../dist/core/internal/client-first-party-roots.js'
+
 import { RpcCoreErrorCode, RpcLifecycleError } from '../../../dist/core/errors.js'
 import { RpcCoreErrorText } from '../../../dist/core/error-text.js'
 import { connect } from '../../../dist/core/middleware/connect.js'
-import { createMemoryTransportPair } from '../../../dist/core/adapters/memory.js'
+import { createMemoryTransportPair } from '../../fixtures/memory-transport.js'
 import { createConstructionControl } from '../../../dist/core/internal/construction-install.js'
 import { createEndpointProjection } from '../../../dist/core/internal/endpoint-projection.js'
 import type { IRpcPluginConstraint } from '../../../dist/core/internal/plugin-contract.js'
@@ -143,15 +144,15 @@ describe('canonical endpoint projection', () => {
       }
     }
     try {
-      const construction = createComposedEndpoint(
+      const construction = createRuntimeEndpointComposition(
         {
           id: 'projection-hostile',
           transport,
           middlewares: [connect({ transport })],
           features: [hostileProjectionFeature] as const
         },
-        createClientFirstPartyRoots()
-      )
+        { agreement: { capabilities: [] }, peerId: '' }
+      ).installing
       await expect(construction).rejects.toMatchObject({
         code: RpcCoreErrorCode.invalidConfig,
         message: RpcCoreErrorText.endpointModuleInvalid

@@ -5,11 +5,9 @@ import { describe, expect, it, vi } from 'vitest'
 import { configDefaults } from 'vitest/config'
 import { StandardCapability } from '@migaia/supervision'
 import { ProcessCapability } from '@migaia/supervision/process'
-import { createNodeProcessLauncher } from '@migaia/rpc-plugin-process/adapters/node-child-process'
-import { createBunProcessLauncher } from '@migaia/rpc-plugin-process/adapters/bun-spawn'
-import { createWindowsJobProcessLauncher } from '@migaia/rpc-plugin-process/adapters/windows-job'
-import { createElectronUtilityProcessLauncher } from '@migaia/rpc-plugin-process/adapters/electron-utility-process'
-import { createNodeThreadLauncher } from '@migaia/rpc-plugin-thread/adapters/node'
+import { createNodeProcessLauncher } from '../../../rpc-plugin-process/dist/process/adapters/node-child-process.js'
+import { createBunProcessLauncher } from '../../../rpc-plugin-process/dist/process/adapters/bun-spawn.js'
+import { createNodeThreadLauncher } from '../../../rpc-plugin-thread/dist/threads/adapters/node.js'
 import { createAdapterWebThreadLauncher as createWebThreadLauncher } from '../../../rpc-plugin-thread/dist/threads/web-launcher.js'
 
 /** The same unpackaged admission gate runs before the real business and performance runners. */
@@ -168,19 +166,6 @@ describe('conformance toolchain and platform evidence boundaries', () => {
         [ProcessCapability.bootstrapStdin]: 'enforced',
         [ProcessCapability.bootstrapFd]: 'unsupported'
       })
-    expect(Object.values(createWindowsJobProcessLauncher().capabilities)).toEqual(
-      expect.arrayContaining(['unsupported'])
-    )
-    expect(
-      Object.values(createWindowsJobProcessLauncher().capabilities).every(
-        (level) => level === 'unsupported'
-      )
-    ).toBe(true)
-    expect(createElectronUtilityProcessLauncher().capabilities).toMatchObject({
-      termination: 'unsupported',
-      [ProcessCapability.bootstrapStdin]: 'unsupported',
-      [ProcessCapability.bootstrapFd]: 'unsupported'
-    })
     expect(createNodeThreadLauncher().capabilities).toMatchObject({
       termination: 'enforced',
       'exit-observation': 'enforced',
@@ -201,8 +186,7 @@ describe('conformance toolchain and platform evidence boundaries', () => {
     for (const path of [
       '../../../rpc-plugin-thread/test/threads/platform-capabilities.test.ts',
       '../../../rpc-plugin-thread/test/threads/fixtures/web-runtime-parent.mjs',
-      '../../../rpc-plugin-process/test/process/platform-capabilities.test.ts',
-      '../../../rpc-plugin-process/test/process/platform-cleanup.test.ts'
+      '../../../rpc-plugin-process/test/process/socket-close-ownership.test.ts'
     ])
       expect(existsSync(new URL(path, import.meta.url))).toBe(true)
   })

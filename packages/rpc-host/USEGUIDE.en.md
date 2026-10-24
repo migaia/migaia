@@ -120,6 +120,25 @@ export const declarations = typegenFeature({
 
 Install declarations in plugins. write is application-owned output; this example displays filename and text, while the application chooses actual file I/O. Generation follows accepted directories regardless of peer language. Method input/output/yield schemas come from the real contract description; a new generation writes only after acceptance. Uninstall stops further writes, and output failures reach host.report.
 
+## Observe the same host
+
+Install an observation definition through a genuine feature, borrowing the host’s existing endpoint. Keep only needed fields. Event views are valid during `emit`; copy fields before retaining them for later use.
+
+```ts doc-test=check
+import { defineProbe } from '@migaia/rpc-host/probe'
+import { defineFeaturePlugin } from '@migaia/rpc-host/plugin'
+
+export const observation = defineFeaturePlugin({
+  name: 'application-observer',
+  probe: defineProbe({
+    stages: ['message', 'peer'],
+    emit: (view) => console.log({ ...view })
+  })
+})
+```
+
+Include observation alongside the transport in the host’s plugins. Host closure releases its observation subscriptions. Observer failures use the existing report channel without taking ownership of business resources.
+
 ## Migrating from old packages
 
 Rename packages first: rpc-core→rpc-host, rpc-process→rpc-plugin-process, rpc-threads→rpc-plugin-thread, rpc-browser→rpc-plugin-browser, rpc-pool→rpc-plugin-pool, rpc-devtools→rpc-plugin-devtools. Coroutines live in rpc-plugin-coroutines. Old names below identify migrations rather than compatibility entries.

@@ -122,4 +122,4 @@ Existing drain handles accepted requests/providers/streams before releasing a li
 
 Responsive same-name sessions reject a candidate with HOST_PEER_NAME_DUPLICATE. A dead session or failed/expired original ping retires normally before admission, without a background heartbeat. Missing business targets use TARGET_UNKNOWN; reconcile uncertain work before retrying.
 
-Native errors use rpc.transport.process; host/call and managed failures can retain rpc.endpoint/rpc.remote. Branch on source/code rather than text and preserve native TypeError/AbortError and the whole cause chain. Node/Bun/Deno, Electron utility process, and Windows Job behavior depends on real adapter capabilities; permissions/limits do not invent native isolation.
+Native errors use rpc.transport.process; host/call and managed failures can retain rpc.endpoint/rpc.remote. Branch on source/code rather than text and preserve native TypeError/AbortError and the whole cause chain. Node/Bun/Deno behavior depends on real adapter capabilities; Electron uses the Node I/O path. Permissions/limits do not invent native isolation.

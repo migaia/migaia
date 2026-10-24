@@ -1,11 +1,16 @@
+import { createRuntimeEndpointComposition } from '../../dist/core/runtime-api-endpoint.js'
+import { RpcCapability } from '@migaia/rpc-contract'
+import { runtimeSources } from '../runtime-api/fixture.js'
+import { RUNTIME_API_CAPABILITIES } from '../../dist/remote/runtime-api/constants.js'
+import { createRuntimePeer } from '../../dist/remote/runtime-api/peer.js'
 import { expect, it, vi } from 'vitest'
-import { createEndpoint, connect } from '../../dist/core/index.js'
-import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
+
+import { connect } from '../../dist/core/middleware/connect.js'
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
 import {
   defineProbe,
   readProbeStages,
   subscribeProbeStages,
-  snapshotProbeEvent,
   RpcProbeDirection,
   RpcProbeKind,
   RpcProbeStage,
@@ -13,7 +18,6 @@ import {
   type IRpcProbeEventView
 } from '../../dist/core/probe/index.js'
 import { RpcEnvelopeKind, RpcRouteProfile, RpcRouteType } from '@migaia/rpc-contract'
-import { createPeerPair } from '../../dist/testing/index.js'
 import { readRuntimePeerEndpoint } from '../../dist/remote/runtime-api/peer.js'
 import { readEndpointOwner } from '../../dist/core/internal/endpoint-projection.js'
 import { EndpointOwnerKey } from '../../dist/core/endpoint-kernel.js'
@@ -42,18 +46,24 @@ it('provides the actual serving endpoint identity', async () => {
   /** Existing memory transport exercises the provider context through the public endpoint. */
   const [left, right] = createMemoryTransportPair()
   /** Provider identity comes from its executor rather than the request sender. */
-  const server = await createEndpoint({
-    id: 'r3-server',
-    transport: right,
-    middlewares: [connect()],
-    provider: { identity: (context) => context.success(context.localEndpointId) }
-  })
+  const server = await createRuntimeEndpointComposition(
+    {
+      id: 'r3-server',
+      transport: right,
+      middlewares: [connect()],
+      provider: { identity: (context) => context.success(context.localEndpointId) }
+    },
+    { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+  ).installing
   /** Caller retains a distinct identity to detect accidental sender-id forwarding. */
-  const client = await createEndpoint({
-    id: 'r3-client',
-    transport: left,
-    middlewares: [connect()]
-  })
+  const client = await createRuntimeEndpointComposition(
+    {
+      id: 'r3-client',
+      transport: left,
+      middlewares: [connect()]
+    },
+    { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+  ).installing
   try {
     expect(await client.send('r3-server', 'identity', undefined)).toBe('r3-server')
   } finally {
@@ -69,7 +79,7 @@ it('preserves variation identity through both real Peer directions and method fi
     defineProbe({
       stages: RpcProbeStageName,
       methods: ['echo'],
-      emit: (view) => events.push(snapshotProbeEvent(view))
+      emit: (view) => events.push(Object.freeze({ ...view }))
     })
   )
   /** Existing side spreading forwards the original probes without widening the public pair helper. */
@@ -78,7 +88,22 @@ it('preserves variation identity through both real Peer directions and method fi
     b: { provide: {}, probe: probes[1]! }
   }
   /** The public pair creates original runtime Peers on the canonical reference memory carrier. */
-  const pair = await createPeerPair(configurations)
+  const pairOptions = configurations
+  /** Reuse the independently negotiated sources and actual canonical Peer constructors. */
+  const pairChannel = runtimeSources(RUNTIME_API_CAPABILITIES, RUNTIME_API_CAPABILITIES)
+  const [a, b] = await Promise.all([
+    createRuntimePeer({
+      ...pairOptions.a,
+      self: { name: 'a', instanceId: 'test-pair-a' },
+      connect: pairChannel.sources[0]
+    }),
+    createRuntimePeer({
+      ...pairOptions.b,
+      self: { name: 'b', instanceId: 'test-pair-b' },
+      connect: pairChannel.sources[1]
+    })
+  ])
+  const pair = { a, b }
   /** Stable local fixture data distinguishes a registered subtype from the cancelled echo payload. */
   const variationFixture = { user: 'user-observation', held: 'held-variation' } as const
   /** Existing private readers expose the genuine controls without installing a test dispatcher. */

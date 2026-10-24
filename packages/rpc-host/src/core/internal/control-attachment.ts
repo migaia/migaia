@@ -1,3 +1,4 @@
+import { orderStringKeys } from '@migaia/utils/string'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import {
   createRpcContractError,
@@ -369,7 +370,7 @@ export class RpcControlAttachment {
       })
       return
     }
-    for (const field of fields.filter((value) => value !== 'drainMs').sort())
+    for (const field of orderStringKeys(fields.filter((value) => value !== 'drainMs')))
       this.#ports.outboundOperations.noteUnknownField(peerKey, 'variation', '/data/payload', field)
     this.#ports.outboundOperations.send({
       kind: 'diagnostic',

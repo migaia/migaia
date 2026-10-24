@@ -1,9 +1,14 @@
+import { createRpcHost } from '@migaia/rpc-host'
+import { processPlugin } from '@migaia/rpc-plugin-process'
 import assert from 'node:assert/strict'
 import { it, vi } from 'vitest'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { RpcCapability } from '@migaia/rpc-contract'
 import { RpcCoreErrorCode } from '../../../rpc-host/dist/core/errors.js'
-import { createProcessFixtureListenerPeer as createProcessListenerPeer } from '../fixtures/process-diagnostics.js'
+import {
+  observeProcessListenerSessions,
+  readObservedProcessSessionAdmission
+} from '../fixtures/process-diagnostics.js'
 import { createProcessResilience } from '../../../rpc-plugin-process/dist/process/resilience/index.js'
 import { RpcProcessErrorCode } from '../../../rpc-plugin-process/dist/process/error-code.js'
 import { createProcessError } from '../../../rpc-plugin-process/dist/process/error.js'
@@ -12,19 +17,12 @@ import { createProcessTransport } from '../../../rpc-plugin-process/dist/process
 import {
   dialProcessByteChannel,
   listenProcessByteChannel
-} from '@migaia/rpc-plugin-process/adapters/node-socket'
+} from '../../../rpc-plugin-process/dist/process/adapters/node-socket.js'
 import {
   createRuntimePeer,
   type IRuntimePeer
 } from '../../../rpc-host/dist/remote/runtime-api/peer.js'
-import {
-  readRuntimePeerConnection,
-  readRuntimePeerSessions
-} from '../../../rpc-host/dist/remote/runtime-api/peer.js'
 import { RUNTIME_API_FIXTURE_BASE_CAPABILITIES as RUNTIME_API_CAPABILITIES } from '../../../rpc-host/test/runtime-api/fixture.js'
-import { readEndpointOwner } from '../../../rpc-host/dist/core/internal/endpoint-projection.js'
-import { EndpointOwnerKey } from '../../../rpc-host/dist/core/endpoint-kernel.js'
-import type { ProviderAdmissionRegistry } from '../../../rpc-host/dist/core/internal/provider-admission.js'
 
 it.each(['rate', 'payload', 'fail-stop', 'queued-cancel', 'rollover'] as const)(
   'real native group %s preserves exact original quota ownership',
@@ -66,58 +64,64 @@ it.each(['rate', 'payload', 'fail-stop', 'queued-cancel', 'rollover'] as const)(
     /** Cleanup observes the original pending request even when an assertion fails. */
     let holding: Promise<unknown> | undefined
     /** This accepted endpoint uses the same original provider wrappers as native production. */
-    const server = await createProcessListenerPeer(
-      {
-        self: { name: 'group-provider', instanceId: 'group-provider' },
-        provide: {
-          baseline: () => 42,
-          first: () => {
-            effects.push('first')
-            return 1
-          },
-          second: () => {
-            effects.push('second')
-            if (policy === 'fail-stop')
-              throw createProcessError(RpcProcessErrorCode.healthPingFailed)
-            return 2
-          },
-          hold: async () => {
-            effects.push('hold')
-            await held
-            return 3
-          }
+    /** Only genuine SDK accepted Peer receipts support the original admission identity oracle. */
+    const acceptedSessions: IRuntimePeer[] = []
+    const server = await createRpcHost({
+      self: { name: 'group-provider', instanceId: 'group-provider' },
+      provide: {
+        baseline: () => 42,
+        first: () => {
+          effects.push('first')
+          return 1
         },
-        report: (error) => failures.push(error)
+        second: () => {
+          effects.push('second')
+          if (policy === 'fail-stop') throw createProcessError(RpcProcessErrorCode.healthPingFailed)
+          return 2
+        },
+        hold: async () => {
+          effects.push('hold')
+          await held
+          return 3
+        }
       },
-      {
-        kind: 'listener',
-        address: 'tcp://127.0.0.1:0',
-        scheduler,
-        resilience,
-        listen: async (options) => {
-          /** The actual address belongs to this freshly bound listener. */
-          const listener = await listenProcessByteChannel(options)
-          address = listener.address
-          return listener
-        },
-        verify: (auth) => {
-          assert.equal(auth, 'group-admission-fixture')
-          return 'verified-group-principal'
-        },
-        offer: createNativeProcessOffer({
-          peer: { id: 'group-provider', runtime: 'node' },
-          capabilities
-        }),
-        createConnectionContext: () => ({
-          peerId: 'group-caller',
-          ipc: {
-            connectionId: 'group-connection',
-            sessionId: 'group-session',
-            log: () => undefined
-          }
-        })
-      }
-    )
+      report: (error) => failures.push(error),
+      plugins: [
+        observeProcessListenerSessions(
+          processPlugin({
+            listen: {
+              kind: 'listener',
+              address: 'tcp://127.0.0.1:0',
+              scheduler,
+              resilience,
+              listen: async (options) => {
+                /** The actual address belongs to this freshly bound listener. */
+                const listener = await listenProcessByteChannel(options)
+                address = listener.address
+                return listener
+              },
+              verify: (auth) => {
+                assert.equal(auth, 'group-admission-fixture')
+                return 'verified-group-principal'
+              },
+              offer: createNativeProcessOffer({
+                peer: { id: 'group-provider', runtime: 'node' },
+                capabilities
+              }),
+              createConnectionContext: () => ({
+                peerId: 'group-caller',
+                ipc: {
+                  connectionId: 'group-connection',
+                  sessionId: 'group-session',
+                  log: () => undefined
+                }
+              })
+            }
+          }),
+          acceptedSessions
+        )
+      ]
+    })
     /** Only this actual connected Peer can send the tested physical group frame. */
     let client: IRuntimePeer | undefined
     try {
@@ -143,12 +147,9 @@ it.each(['rate', 'payload', 'fail-stop', 'queued-cancel', 'rollover'] as const)(
       offset = 60_000
       assert.equal(await client.request('baseline'), 42)
       /** The accepted endpoint's actual lease owner proves queued admission and cleanup. */
-      const accepted = readRuntimePeerSessions(server)![0]!
+      const accepted = acceptedSessions[0]!
       /** Policy assertions inspect the production owner, never a fixture quota replacement. */
-      const admission = readEndpointOwner<ProviderAdmissionRegistry>(
-        readRuntimePeerConnection(accepted).endpoint,
-        EndpointOwnerKey.providerAdmission
-      )!
+      const admission = readObservedProcessSessionAdmission(accepted)!
       if (policy === 'queued-cancel' || policy === 'rollover') {
         holding = client.request('hold', undefined, { orderKey: 'queue' })
         void holding.catch(() => undefined)

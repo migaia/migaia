@@ -1,3 +1,5 @@
+import { createRuntimeEndpointComposition } from '../../../rpc-host/dist/core/runtime-api-endpoint.js'
+import { RpcCapability } from '@migaia/rpc-contract'
 import assert from 'node:assert/strict'
 import { createHmac } from 'node:crypto'
 import { MessageChannel } from 'node:worker_threads'
@@ -6,8 +8,9 @@ import { systemScheduler } from '@migaia/utils/scheduler'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { describe, it } from 'vitest'
 import { createNodeThreadChannel } from '../../../rpc-plugin-thread/dist/threads/channel.js'
-import { createFullEndpoint as createEndpoint } from '../../../rpc-host/dist/core/full.js'
-import { authentication, connect } from '../../../rpc-host/dist/core/index.js'
+
+import { authentication } from '../../../rpc-host/dist/core/middleware/authentication.js'
+import { connect } from '../../../rpc-host/dist/core/middleware/connect.js'
 import { readAuthenticationEnvelope } from '../../../rpc-host/dist/core/middleware/authentication-envelope.js'
 
 /** A public fixture key proves whole-frame coverage without using or recording any credential. */
@@ -65,24 +68,30 @@ describe('real physical authentication', () => {
           return frame.value
         }
       })
-    const server = await createEndpoint({
-      id: 'server',
-      transport: serverChannel.transport,
-      scheduler,
-      middlewares: [connect({ transport: serverChannel.transport }), signed(true)],
-      provider: {
-        echo(context) {
-          const key = context.data as string
-          counts.set(key, (counts.get(key) ?? 0) + 1)
-          return context.success(key)
+    const server = await createRuntimeEndpointComposition(
+      {
+        id: 'server',
+        transport: serverChannel.transport,
+        scheduler,
+        middlewares: [connect({ transport: serverChannel.transport }), signed(true)],
+        provider: {
+          echo(context) {
+            const key = context.data as string
+            counts.set(key, (counts.get(key) ?? 0) + 1)
+            return context.success(key)
+          }
         }
-      }
-    })
-    const client = await createEndpoint({
-      id: 'client',
-      transport: clientChannel.transport,
-      middlewares: [connect({ transport: clientChannel.transport }), signed(false)]
-    })
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'client',
+        transport: clientChannel.transport,
+        middlewares: [connect({ transport: clientChannel.transport }), signed(false)]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     const remove = server.hooks.on((event) => {
       if (event.name === 'failure') failures.push(event.error)
     })

@@ -2,90 +2,133 @@ import type { IAbortSignal } from '@migaia/utils/promise'
 import { createEventHub } from '@migaia/event-subscriber'
 import { TrayInstanceEvent } from '../constants.js'
 import type { ITrayInstanceEventRecord, ITrayInstanceEventRecord as IRecord } from '../typing.js'
-/** Lifecycle publisher remains private; the facade exposes only on/watch operations. */
+
+/** Lifecycle publisher stays private; facade users borrow only observation operations. */
 export function createTrayEvents(report: (error: unknown) => void) {
-  /** EventSubscriber owns listener snapshots, throwing-listener reporting and release receipts. */
-  const hub = createEventHub<Record<string, IRecord>>({
-    report: ({ error }) => report(error),
-    terminalReport: report
-  })
-  /** Watches own only their bounded unread observation queue and pending reads. */
-  const watches = new Set<() => void>()
-  /** Closed observation channels settle watches without waiting for another lifecycle event. */
-  let closed = false
-  return {
-    /** Freeze before first listener so subsequent listeners and watches observe the same record. */
-    publish(event: IRecord): void {
-      if (closed) return
-      try {
-        hub.publish(event.event, Object.freeze(event))
-      } catch (error) {
-        report(error)
-      }
-    },
-    on(event: TrayInstanceEvent, listener: (event: IRecord) => void): () => void {
-      return hub.subscribe(event, (value) => listener(value.value))
-    },
-    watch(options?: { signal?: IAbortSignal }): AsyncIterableIterator<ITrayInstanceEventRecord> {
-      /** The view retains the latest 100 unread observations; it is not a durable event journal. */
-      const queue: IRecord[] = []
-      /** Each waiting caller receives the next event in arrival order. */
-      const pending: ((value: IteratorResult<IRecord>) => void)[] = []
-      /** Receipts release the existing hub listeners on return, abort or owner close. */
-      const releases: (() => void)[] = []
-      /** Watch termination is local iterator state, not a native lifecycle state. */
-      let finished = closed
-      /** Settle every pending read and release only this watch's subscriptions. */
-      const finish = (): void => {
-        if (finished) return
-        finished = true
-        for (const release of releases) release()
-        options?.signal?.removeEventListener('abort', finish)
-        watches.delete(finish)
-        queue.length = 0
-        for (const resolve of pending.splice(0)) resolve({ done: true, value: undefined })
-      }
-      if (!closed && !options?.signal?.aborted) {
-        for (const name of Object.values(TrayInstanceEvent))
-          releases.push(
-            hub.subscribe(name, (context) => {
-              const read = pending.shift()
-              if (read) read({ done: false, value: context.value })
-              else {
-                if (queue.length === 100) queue.shift()
-                queue.push(context.value)
-              }
-            })
-          )
-        watches.add(finish)
-        options?.signal?.addEventListener('abort', finish, { once: true })
-      } else finished = true
-      return {
-        [Symbol.asyncIterator]() {
-          return this
-        },
-        next() {
-          if (finished) return Promise.resolve({ done: true, value: undefined })
-          const value = queue.shift()
-          return value
-            ? Promise.resolve({ done: false, value })
-            : new Promise((resolve) => pending.push(resolve))
-        },
-        return() {
-          finish()
-          return Promise.resolve({ done: true, value: undefined })
-        },
-        throw(error: unknown) {
-          finish()
-          return Promise.reject(error)
-        }
-      }
-    },
-    close(): void {
-      if (closed) return
-      for (const finish of watches) finish()
-      closed = true
-      hub.clear()
+  return new TrayEvents(report)
+}
+
+/** One lifecycle observation owner contains listeners and all live watch iterators. */
+class TrayEvents {
+  /** EventSubscriber retains listener snapshot, rejection and unsubscribe semantics. */
+  readonly #hub: ReturnType<typeof createEventHub<Record<string, IRecord>>>
+  /** Each watch supplies its own idempotent termination receipt. */
+  readonly #watches = new Set<() => void>()
+  /** Closed observation channels settle pending reads without another lifecycle event. */
+  #closed = false
+  /** Original report observer contains synchronous publisher failures. */
+  readonly #report: (error: unknown) => void
+
+  /** Capture one original event hub and its error-reporting boundary. */
+  constructor(report: (error: unknown) => void) {
+    this.#report = report
+    this.#hub = createEventHub<Record<string, IRecord>>({
+      report: ({ error }) => report(error),
+      terminalReport: report
+    })
+  }
+  /** Freeze before first listener so all listeners and watches observe the same record. */
+  publish = (event: IRecord): void => {
+    if (this.#closed) return
+    try {
+      this.#hub.publish(event.event, Object.freeze(event))
+    } catch (error) {
+      this.#report(error)
     }
+  }
+  /** Preserve the original contained listener subscription and exact release receipt. */
+  on = (event: TrayInstanceEvent, listener: (event: IRecord) => void): (() => void) =>
+    this.#hub.subscribe(event, (value) => listener(value.value))
+  /** Each call owns its bounded unread observations and independent pending reads. */
+  watch = (options?: { signal?: IAbortSignal }): AsyncIterableIterator<ITrayInstanceEventRecord> =>
+    new TrayEventWatch(this.#hub, this.#watches, this.#closed, options?.signal)
+  /** Terminate every current watch before releasing the original hub. */
+  close = (): void => {
+    if (this.#closed) return
+    for (const finish of this.#watches) finish()
+    this.#closed = true
+    this.#hub.clear()
+  }
+}
+
+/** One watch owns iterator-local state, never native lifecycle or durable event history. */
+class TrayEventWatch implements AsyncIterableIterator<IRecord> {
+  /** Exactly the latest 100 unread observations are retained; shifts have constant bounded cost. */
+  readonly #queue: IRecord[] = []
+  /** Concurrent next callers are correlated without shifting a growing pending array. */
+  readonly #pending = new Map<number, (value: IteratorResult<IRecord>) => void>()
+  /** Monotonic issuance identifies each pending read until it settles. */
+  #issued = 0
+  /** Next pending reply preserves the original FIFO iterator semantics. */
+  #received = 0
+  /** Releases belong only to this watch's original EventSubscriber subscriptions. */
+  readonly #releases: (() => void)[] = []
+  /** Original signal owns only this watch's cancellation observation. */
+  readonly #signal: IAbortSignal | undefined
+  /** Parent inventory retains only still-live watch termination receipts. */
+  readonly #watches: Set<() => void>
+  /** A finished iterator never accepts more observations or pending reads. */
+  #finished: boolean
+
+  /** Subscribe to the fixed lifecycle event domain, or start already finished after close/abort. */
+  constructor(
+    hub: ReturnType<typeof createEventHub<Record<string, IRecord>>>,
+    watches: Set<() => void>,
+    closed: boolean,
+    signal?: IAbortSignal
+  ) {
+    this.#watches = watches
+    this.#signal = signal
+    this.#finished = closed
+    if (!closed && !signal?.aborted) {
+      for (const name of Object.values(TrayInstanceEvent))
+        this.#releases.push(hub.subscribe(name, (context) => this.#accept(context.value)))
+      watches.add(this.#finish)
+      signal?.addEventListener('abort', this.#finish, { once: true })
+    } else this.#finished = true
+  }
+  /** Deliver one observation to the first waiter, or retain it within the fixed 100-record budget. */
+  #accept(value: IRecord): void {
+    const read = this.#pending.get(this.#received)
+    if (read) {
+      this.#pending.delete(this.#received++)
+      read({ done: false, value })
+    } else {
+      if (this.#queue.length === 100) this.#queue.shift()
+      this.#queue.push(value)
+    }
+  }
+  /** Release this watch once and settle every pending read as complete. */
+  #finish = (): void => {
+    if (this.#finished) return
+    this.#finished = true
+    for (const release of this.#releases) release()
+    this.#signal?.removeEventListener('abort', this.#finish)
+    this.#watches.delete(this.#finish)
+    this.#queue.length = 0
+    for (const resolve of this.#pending.values()) resolve({ done: true, value: undefined })
+    this.#pending.clear()
+  };
+  /** Iterator identity remains stable for the lifetime of this watch. */
+  [Symbol.asyncIterator](): AsyncIterableIterator<IRecord> {
+    return this
+  }
+  /** Return the oldest unread observation or await one original lifecycle event. */
+  next(): Promise<IteratorResult<IRecord>> {
+    if (this.#finished) return Promise.resolve({ done: true, value: undefined })
+    const value = this.#queue.shift()
+    return value
+      ? Promise.resolve({ done: false, value })
+      : new Promise((resolve) => this.#pending.set(this.#issued++, resolve))
+  }
+  /** Caller return releases only this watch and completes every queued read. */
+  return(): Promise<IteratorResult<IRecord>> {
+    this.#finish()
+    return Promise.resolve({ done: true, value: undefined })
+  }
+  /** Caller throw releases the watch while preserving the supplied rejection identity. */
+  throw(error: unknown): Promise<IteratorResult<IRecord>> {
+    this.#finish()
+    return Promise.reject(error)
   }
 }

@@ -1,3 +1,4 @@
+import { orderStringKeys } from '@migaia/utils/string'
 import { invalidRpcStream } from '../stream-error.js'
 import { registerRpcStreamParser } from '../stream-lazy.js'
 export { invalidRpcStream } from '../stream-error.js'
@@ -67,7 +68,7 @@ export function normalizeStreamPayload(
         : event === RpcStreamEvent.cancel
           ? 'reason'
           : undefined
-  for (const key of Object.keys(record).sort()) {
+  for (const key of orderStringKeys(Object.keys(record))) {
     if (key !== 'event' && key !== 'seq' && key !== allowed)
       throw invalidRpcStream(RpcStreamViolation.field, `/${key}`)
   }

@@ -1,7 +1,8 @@
+import { createRuntimeEndpointComposition } from '../../dist/core/runtime-api-endpoint.js'
 import { describe, expect, it } from 'vitest'
-import { createComposedEndpoint, type IRpcCoreConfig } from '../../dist/core/composed.js'
-import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
-import { createClientFirstPartyRoots } from '../../dist/core/internal/client-first-party-roots.js'
+import { type IRpcCoreConfig } from '../../dist/core/composed.js'
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
+
 import { connect } from '../../dist/core/middleware/connect.js'
 import { hooks } from '../../dist/core/middleware/hooks.js'
 import type { IRpcHookEvent, IRpcPlugin } from '../../dist/core/typing.js'
@@ -71,7 +72,7 @@ describe('real construction diagnostic reporter', () => {
     const pendingMiddleware = createPendingMiddleware(resolveStarted, pending, () => {
       cleanupCalls += 1
     })
-    const construction = createComposedEndpoint(
+    const construction = createRuntimeEndpointComposition(
       createConfig(
         controller.signal,
         [
@@ -82,8 +83,8 @@ describe('real construction diagnostic reporter', () => {
         undefined,
         pendingMiddleware
       ),
-      createClientFirstPartyRoots()
-    )
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
 
     await started
     controller.abort('construction cancelled')
@@ -123,7 +124,7 @@ describe('real construction diagnostic reporter', () => {
     const events: IRpcHookEvent[] = []
     const hookErrors: unknown[] = []
     const pendingMiddleware = createPendingMiddleware(resolveStarted, pending, () => undefined)
-    const construction = createComposedEndpoint(
+    const construction = createRuntimeEndpointComposition(
       createConfig(
         controller.signal,
         [
@@ -142,8 +143,8 @@ describe('real construction diagnostic reporter', () => {
         },
         pendingMiddleware
       ),
-      createClientFirstPartyRoots()
-    )
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
 
     await started
     controller.abort()
@@ -168,7 +169,7 @@ describe('real construction diagnostic reporter', () => {
         throw primaryFailure
       }
     }
-    const construction = createComposedEndpoint(
+    const construction = createRuntimeEndpointComposition(
       {
         id: `construction-primary-${idSequence++}`,
         transport,
@@ -184,8 +185,8 @@ describe('real construction diagnostic reporter', () => {
           failing
         ]
       },
-      createClientFirstPartyRoots()
-    )
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
 
     await expect(construction).rejects.toBe(primaryFailure)
     expect(events.filter((event) => event.error === primaryFailure)).toHaveLength(0)

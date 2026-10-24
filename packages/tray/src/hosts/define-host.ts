@@ -120,11 +120,14 @@ export function defineTrayHost<
     throw createTrayError(TrayErrorCode.hostInvalid)
   /** Exposes are exact plugin.Feature paths, with unique values and no internal prefix. */
   const exposes: string[] = []
+  /** Membership checks stay constant-time while the array retains public declaration order. */
+  const exposed = new Set<string>()
   for (const expose of copyArray(fields.exposes)) {
-    if (typeof expose !== 'string' || !/^[^.]+\.[^.]+$/.test(expose) || exposes.includes(expose))
+    if (typeof expose !== 'string' || !/^[^.]+\.[^.]+$/.test(expose) || exposed.has(expose))
       throw createTrayError(TrayErrorCode.hostInvalid)
     if (reservedPlugins.has(expose.split('.')[0]!))
       throw createTrayError(TrayErrorCode.reservedName)
+    exposed.add(expose)
     exposes.push(expose)
   }
   /** Routing identities are copied as data before their private authority is checked. */

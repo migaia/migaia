@@ -158,6 +158,381 @@ export async function dialProcessByteChannel(
  * serviceId enables matching stale Unix-owner recovery, not a guarantee against external path
  * races.
  */
+/**
+ * Listener-owned state is shared explicitly with pending sockets until authentication transfers
+ * ownership.
+ */
+type INodeSocketListenerScope = {
+  options: Parameters<IListenProcessByteChannel>[0]
+  address: INodeSocketAddress
+  pendingSet: Set<(reason: unknown) => Promise<void>>
+  closed: boolean
+  closeReason: unknown
+}
+
+/** Own one accepted native socket until its responder handshake transfers the ready channel. */
+class NodeSocketCandidate {
+  /** The listener alone owns terminal state and pending-candidate membership. */
+  #scope: INodeSocketListenerScope
+  /** The accepted socket has one canonical byte IO owner. */
+  #raw: IProcessByteChannel
+  /** This candidate changes ownership only after the responder handshake completes. */
+  #state: 'pending' | 'accepting' | 'ready' | 'closed' = 'pending'
+  /** Listener cancellation rejects the same in-flight handshake race. */
+  #rejectClose: ((reason: unknown) => void) | undefined
+  /** This receipt is observed even before accept attaches its race. */
+  #listenerClosed: Promise<never>
+  /** The exact candidate passed to the caller retains stable accept and close callbacks. */
+  readonly value: IProcessPendingByteConnection
+  /** Acquire raw IO and its cancellation receipt before publishing a candidate. */
+  constructor(scope: INodeSocketListenerScope, socket: Socket) {
+    this.#scope = scope
+    this.#raw = socketChannel(socket)
+    this.#listenerClosed = new Promise<never>((_resolve, reject) => {
+      this.#rejectClose = reject
+    })
+    void this.#listenerClosed.catch(() => undefined)
+    scope.pendingSet.add(this.#closePending)
+    this.value = Object.freeze({
+      accept: this.#accept,
+      close: () =>
+        this.#closePending(
+          attachErrorIdentity(new Error(RpcProcessErrorText.channelClosed), {
+            source: RPC_PROCESS_ERROR_SOURCE,
+            code: RpcProcessErrorCode.channelClosed
+          })
+        )
+    })
+  }
+  /** Re-read mutable state after asynchronous handshake work. */
+  #wasClosed = (): boolean => this.#state === 'closed'
+  /** Close only listener-owned candidates; ready channels retain their adopting owner. */
+  #closePending = async (reason: unknown): Promise<void> => {
+    if (this.#state === 'ready' || this.#state === 'closed') return
+    this.#state = 'closed'
+    this.#scope.pendingSet.delete(this.#closePending)
+    this.#rejectClose?.(
+      ((originalCause: unknown) =>
+        attachErrorIdentity(
+          new Error(
+            RpcProcessErrorText.channelClosed,
+            originalCause === undefined ? undefined : { cause: originalCause }
+          ),
+          { source: RPC_PROCESS_ERROR_SOURCE, code: RpcProcessErrorCode.channelClosed }
+        ))(reason)
+    )
+    await this.#raw.close()
+  }
+  /** Authenticate one pending socket and transfer ownership only after the original close checks. */
+  #accept = async (acceptOptions: Parameters<IProcessPendingByteConnection['accept']>[0]) => {
+    if (this.#state !== 'pending' || this.#scope.closed)
+      throw ((originalCause: unknown) =>
+        attachErrorIdentity(
+          new Error(
+            RpcProcessErrorText.channelClosed,
+            originalCause === undefined ? undefined : { cause: originalCause }
+          ),
+          { source: RPC_PROCESS_ERROR_SOURCE, code: RpcProcessErrorCode.channelClosed }
+        ))(this.#scope.closeReason)
+    this.#state = 'accepting'
+    /** The verifier's principal is retained only for this accepted connection. */
+    let principalId: string | undefined
+    try {
+      const channel = await Promise.race([
+        createProcessTransport(this.#raw, {
+          ...acceptOptions,
+          role: 'responder',
+          auth: {
+            mode: 'required',
+            verify: async (auth, peer) => {
+              if (this.#scope.closed || this.#state === 'closed')
+                throw ((originalCause: unknown) =>
+                  attachErrorIdentity(
+                    new Error(
+                      RpcProcessErrorText.channelClosed,
+                      originalCause === undefined ? undefined : { cause: originalCause }
+                    ),
+                    {
+                      source: RPC_PROCESS_ERROR_SOURCE,
+                      code: RpcProcessErrorCode.channelClosed
+                    }
+                  ))(this.#scope.closeReason)
+              const verified = await this.#scope.options.auth.verify(auth, peer)
+              if (typeof verified !== 'string' || verified.length === 0)
+                throw attachErrorIdentity(new TypeError(RpcProcessErrorText.authRejected), {
+                  source: RPC_PROCESS_ERROR_SOURCE,
+                  code: RpcProcessErrorCode.authRejected
+                })
+              principalId = verified
+              return verified
+            }
+          }
+        }),
+        this.#listenerClosed
+      ])
+      if (this.#scope.closed || this.#wasClosed()) {
+        await channel.close()
+        throw ((originalCause: unknown) =>
+          attachErrorIdentity(
+            new Error(
+              RpcProcessErrorText.channelClosed,
+              originalCause === undefined ? undefined : { cause: originalCause }
+            ),
+            { source: RPC_PROCESS_ERROR_SOURCE, code: RpcProcessErrorCode.channelClosed }
+          ))(this.#scope.closeReason)
+      }
+      this.#state = 'ready'
+      this.#scope.pendingSet.delete(this.#closePending)
+      return Object.freeze({ channel, principalId: principalId! })
+    } catch (error) {
+      await this.#closePending(error)
+      throw this.#scope.closed
+        ? ((originalCause: unknown) =>
+            attachErrorIdentity(
+              new Error(
+                RpcProcessErrorText.channelClosed,
+                originalCause === undefined ? undefined : { cause: originalCause }
+              ),
+              { source: RPC_PROCESS_ERROR_SOURCE, code: RpcProcessErrorCode.channelClosed }
+            ))(this.#scope.closeReason)
+        : error
+    }
+  }
+  /** Deliver the candidate after native accept, then close any candidate the caller did not accept. */
+  publish(): void {
+    void Promise.resolve()
+      .then(() => this.#scope.options.onConnection(this.value))
+      .then(
+        () => {
+          if (this.#state === 'pending') void this.value.close()
+        },
+        (error: unknown) => {
+          reportSafely(this.#scope.options.report, error)
+          void this.#closePending(error)
+        }
+      )
+  }
+}
+
+/** Own the native listening socket, Unix identity and still-pending handshake candidates. */
+class NodeSocketListener {
+  /** Pending membership and terminal state are shared with candidates through one explicit context. */
+  #scope: INodeSocketListenerScope
+  /** Native listener close never closes already adopted sockets. */
+  #server: Server
+  /** Only a service-labelled Unix path participates in owner-record recovery. */
+  #managedPath: string | undefined
+  /** The original bound Unix path is retained without shortening caller addresses. */
+  #unixPath: string | undefined
+  /** Native close is checked against the exact original inode. */
+  #boundIdentity: Awaited<ReturnType<typeof lstat>> | undefined
+  /** The original Unix ownership record is removed only after pending sockets settle. */
+  #ownerRecord: IUnixSocketRecord | undefined
+  /** Every close caller observes the same cleanup transaction. */
+  #closePromise: Promise<void> | undefined
+  /** Prepare native callbacks without starting a second listener lifecycle. */
+  constructor(options: Parameters<IListenProcessByteChannel>[0], address: INodeSocketAddress) {
+    this.#scope = { options, address, pendingSet: new Set(), closed: false, closeReason: undefined }
+    this.#server = createServer((socket) => {
+      if (this.#scope.closed) {
+        socket.destroy()
+        return
+      }
+      new NodeSocketCandidate(this.#scope, socket).publish()
+    })
+    this.#server.on('error', (error) =>
+      reportSafely(
+        this.#scope.options.report,
+        tagNativeProcessError(error, RpcProcessErrorCode.listenFailed)
+      )
+    )
+  }
+  /** Bind and record the original native socket identity before exposing the listener. */
+  async open(): Promise<IProcessByteListener> {
+    this.#managedPath =
+      this.#scope.address.kind === 'path' &&
+      !this.#scope.address.path.startsWith('\\\\.\\pipe\\') &&
+      this.#scope.options.serviceId
+        ? this.#scope.address.path
+        : undefined
+    if (this.#managedPath) {
+      try {
+        await prepareUnixSocketPath(this.#managedPath, this.#scope.options.serviceId!)
+      } catch (error) {
+        throw tagNativeProcessError(error as Error, RpcProcessErrorCode.listenFailed)
+      }
+    } else if (
+      this.#scope.address.kind === 'path' &&
+      !this.#scope.address.path.startsWith('\\\\.\\pipe\\')
+    ) {
+      /** Existing paths are never removed or claimed as this listener's own. */
+      let occupied = false
+      try {
+        await lstat(this.#scope.address.path)
+        occupied = true
+      } catch (error) {
+        if (!(error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT'))
+          throw ((originalCause: unknown) =>
+            attachErrorIdentity(
+              new Error(
+                RpcProcessErrorText.listenFailed,
+                originalCause === undefined ? undefined : { cause: originalCause }
+              ),
+              { source: RPC_PROCESS_ERROR_SOURCE, code: RpcProcessErrorCode.listenFailed }
+            ))(error)
+      }
+      if (occupied)
+        throw attachErrorIdentity(new Error(RpcProcessErrorText.listenFailed), {
+          source: RPC_PROCESS_ERROR_SOURCE,
+          code: RpcProcessErrorCode.listenFailed
+        })
+    }
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const failed = (error: Error): void => reject(error)
+        this.#server.once('error', failed)
+        this.#server.listen(
+          this.#scope.address.kind === 'path'
+            ? { path: this.#scope.address.path }
+            : { host: this.#scope.address.host, port: this.#scope.address.port },
+          () => {
+            this.#server.off('error', failed)
+            resolve()
+          }
+        )
+      })
+    } catch (error) {
+      throw ((originalCause: unknown) =>
+        attachErrorIdentity(
+          new Error(
+            RpcProcessErrorText.listenFailed,
+            originalCause === undefined ? undefined : { cause: originalCause }
+          ),
+          { source: RPC_PROCESS_ERROR_SOURCE, code: RpcProcessErrorCode.listenFailed }
+        ))(error)
+    }
+    this.#unixPath =
+      this.#scope.address.kind === 'path' && !this.#scope.address.path.startsWith('\\\\.\\pipe\\')
+        ? this.#scope.address.path
+        : undefined
+
+    if (this.#unixPath) {
+      try {
+        this.#boundIdentity = await lstat(this.#unixPath)
+      } catch (error) {
+        this.#server.close()
+        throw ((originalCause: unknown) =>
+          attachErrorIdentity(
+            new Error(
+              RpcProcessErrorText.listenFailed,
+              originalCause === undefined ? undefined : { cause: originalCause }
+            ),
+            { source: RPC_PROCESS_ERROR_SOURCE, code: RpcProcessErrorCode.listenFailed }
+          ))(error)
+      }
+    }
+
+    if (this.#managedPath) {
+      try {
+        this.#ownerRecord = await recordUnixSocketOwner(
+          this.#managedPath,
+          this.#scope.options.serviceId!
+        )
+      } catch (error) {
+        this.#server.close()
+        throw ((originalCause: unknown) =>
+          attachErrorIdentity(
+            new Error(
+              RpcProcessErrorText.listenFailed,
+              originalCause === undefined ? undefined : { cause: originalCause }
+            ),
+            { source: RPC_PROCESS_ERROR_SOURCE, code: RpcProcessErrorCode.listenFailed }
+          ))(error)
+      }
+    }
+    /** Port zero is replaced with the actual loopback port exposed by Node. */
+    const bound = this.#server.address()
+    const boundAddress =
+      this.#scope.address.kind === 'tcp' && bound && typeof bound !== 'string'
+        ? `tcp://${this.#scope.address.host === '::1' ? '[::1]' : this.#scope.address.host}:${bound.port}`
+        : this.#scope.options.address
+    this.#scope.options.signal?.addEventListener('abort', this.#onAbort, { once: true })
+    if (this.#scope.options.signal?.aborted) await this.#close()
+    return Object.freeze({ address: boundAddress, close: this.#close })
+  }
+  /** Stop accepts, settle pending handshakes and remove only this listener's ownership record. */
+  #close = (): Promise<void> => {
+    if (this.#closePromise) return this.#closePromise
+    this.#scope.closed = true
+    this.#scope.closeReason = attachErrorIdentity(new Error(RpcProcessErrorText.channelClosed), {
+      source: RPC_PROCESS_ERROR_SOURCE,
+      code: RpcProcessErrorCode.channelClosed
+    })
+    this.#closePromise = (async () => {
+      /** Node/libuv unlinks its original bind path even if a successor has replaced the inode. */
+      /** A different dev/ino marks a successor whose disappearance must be reported. */
+      let successor: Awaited<ReturnType<typeof lstat>> | undefined
+      if (this.#unixPath && this.#boundIdentity) {
+        try {
+          /** The last observable path identity precedes Node's non-atomic native close. */
+          const current = await lstat(this.#unixPath)
+          if (current.dev !== this.#boundIdentity.dev || current.ino !== this.#boundIdentity.ino)
+            successor = current
+        } catch (error) {
+          if (!(error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT'))
+            reportSafely(
+              this.#scope.options.report,
+              ((originalCause: unknown) =>
+                attachErrorIdentity(
+                  new Error(
+                    RpcProcessErrorText.listenFailed,
+                    originalCause === undefined ? undefined : { cause: originalCause }
+                  ),
+                  { source: RPC_PROCESS_ERROR_SOURCE, code: RpcProcessErrorCode.listenFailed }
+                ))(error)
+            )
+        }
+      }
+      this.#server.close()
+      if (this.#unixPath && successor) {
+        try {
+          await lstat(this.#unixPath)
+        } catch (error) {
+          /** Report this known native limitation once; do not recreate a foreign inode. */
+          reportSafely(
+            this.#scope.options.report,
+            ((originalCause: unknown) =>
+              attachErrorIdentity(
+                new Error(
+                  RpcProcessErrorText.listenFailed,
+                  originalCause === undefined ? undefined : { cause: originalCause }
+                ),
+                { source: RPC_PROCESS_ERROR_SOURCE, code: RpcProcessErrorCode.listenFailed }
+              ))(error)
+          )
+        }
+      }
+      await Promise.all(
+        [...this.#scope.pendingSet].map((release) => release(this.#scope.closeReason))
+      )
+      /** Node owns removal of a Unix socket path created by this server. */
+      if (this.#managedPath && this.#ownerRecord) {
+        try {
+          await removeUnixSocketOwner(this.#managedPath, this.#ownerRecord)
+        } catch (error) {
+          reportSafely(this.#scope.options.report, error)
+        }
+      }
+      this.#scope.options.signal?.removeEventListener('abort', this.#onAbort)
+    })()
+    return this.#closePromise
+  }
+  /** External cancellation joins the one existing close transaction. */
+  #onAbort = (): void => {
+    void this.#close()
+  }
+}
+
 export const listenProcessByteChannel: IListenProcessByteChannel = async (
   options
 ): Promise<IProcessByteListener> => {
@@ -184,316 +559,8 @@ export const listenProcessByteChannel: IListenProcessByteChannel = async (
       ))(
       ((read) => (read.threw ? read.error : read.value))(tryReadProperty(options.signal, 'reason'))
     )
-  /** Only connections without a completed accept remain owned by this listener. */
-  const pendingSet = new Set<(reason: unknown) => Promise<void>>()
-  /** Closing state precedes OS close, so racing accepts see the same terminal reason. */
-  let closed = false
-  let closeReason: unknown
-  let closePromise: Promise<void> | undefined
-  /** This server never reads or writes a business frame itself. */
-  const server: Server = createServer((socket) => {
-    if (closed) {
-      socket.destroy()
-      return
-    }
-    const raw = socketChannel(socket)
-    /** State transfers ownership only after responder handshake fulfills. */
-    let state: 'pending' | 'accepting' | 'ready' | 'closed' = 'pending'
-    /** Re-read mutable state after asynchronous handshake work. */
-    const wasClosed = (): boolean => state === 'closed'
-    /** Listener close can reject an in-flight handshake immediately. */
-    let rejectClose: ((reason: unknown) => void) | undefined
-    const listenerClosed = new Promise<never>((_resolve, reject) => {
-      rejectClose = reject
-    })
-    /** Observe a close even before accept attaches to the race. */
-    void listenerClosed.catch(() => undefined)
-    const closePending = async (reason: unknown): Promise<void> => {
-      if (state === 'ready' || state === 'closed') return
-      state = 'closed'
-      pendingSet.delete(closePending)
-      rejectClose?.(
-        ((originalCause: unknown) =>
-          attachErrorIdentity(
-            new Error(
-              RpcProcessErrorText.channelClosed,
-              originalCause === undefined ? undefined : { cause: originalCause }
-            ),
-            { source: RPC_PROCESS_ERROR_SOURCE, code: RpcProcessErrorCode.channelClosed }
-          ))(reason)
-      )
-      await raw.close()
-    }
-    pendingSet.add(closePending)
-    const pending: IProcessPendingByteConnection = Object.freeze({
-      async accept(acceptOptions) {
-        if (state !== 'pending' || closed)
-          throw ((originalCause: unknown) =>
-            attachErrorIdentity(
-              new Error(
-                RpcProcessErrorText.channelClosed,
-                originalCause === undefined ? undefined : { cause: originalCause }
-              ),
-              { source: RPC_PROCESS_ERROR_SOURCE, code: RpcProcessErrorCode.channelClosed }
-            ))(closeReason)
-        state = 'accepting'
-        /** The verifier's principal is retained only for this accepted connection. */
-        let principalId: string | undefined
-        try {
-          const channel = await Promise.race([
-            createProcessTransport(raw, {
-              ...acceptOptions,
-              role: 'responder',
-              auth: {
-                mode: 'required',
-                async verify(auth, peer) {
-                  if (closed || state === 'closed')
-                    throw ((originalCause: unknown) =>
-                      attachErrorIdentity(
-                        new Error(
-                          RpcProcessErrorText.channelClosed,
-                          originalCause === undefined ? undefined : { cause: originalCause }
-                        ),
-                        {
-                          source: RPC_PROCESS_ERROR_SOURCE,
-                          code: RpcProcessErrorCode.channelClosed
-                        }
-                      ))(closeReason)
-                  const verified = await options.auth.verify(auth, peer)
-                  if (typeof verified !== 'string' || verified.length === 0)
-                    throw attachErrorIdentity(new TypeError(RpcProcessErrorText.authRejected), {
-                      source: RPC_PROCESS_ERROR_SOURCE,
-                      code: RpcProcessErrorCode.authRejected
-                    })
-                  principalId = verified
-                  return verified
-                }
-              }
-            }),
-            listenerClosed
-          ])
-          if (closed || wasClosed()) {
-            await channel.close()
-            throw ((originalCause: unknown) =>
-              attachErrorIdentity(
-                new Error(
-                  RpcProcessErrorText.channelClosed,
-                  originalCause === undefined ? undefined : { cause: originalCause }
-                ),
-                { source: RPC_PROCESS_ERROR_SOURCE, code: RpcProcessErrorCode.channelClosed }
-              ))(closeReason)
-          }
-          state = 'ready'
-          pendingSet.delete(closePending)
-          return Object.freeze({ channel, principalId: principalId! })
-        } catch (error) {
-          await closePending(error)
-          throw closed
-            ? ((originalCause: unknown) =>
-                attachErrorIdentity(
-                  new Error(
-                    RpcProcessErrorText.channelClosed,
-                    originalCause === undefined ? undefined : { cause: originalCause }
-                  ),
-                  { source: RPC_PROCESS_ERROR_SOURCE, code: RpcProcessErrorCode.channelClosed }
-                ))(closeReason)
-            : error
-        }
-      },
-      close: () =>
-        closePending(
-          attachErrorIdentity(new Error(RpcProcessErrorText.channelClosed), {
-            source: RPC_PROCESS_ERROR_SOURCE,
-            code: RpcProcessErrorCode.channelClosed
-          })
-        )
-    })
-    void Promise.resolve()
-      .then(() => options.onConnection(pending))
-      .then(
-        () => {
-          if (state === 'pending') void pending.close()
-        },
-        (error: unknown) => {
-          reportSafely(options.report, error)
-          void closePending(error)
-        }
-      )
-  })
-  /** Listener errors after bind are diagnostic; they never close ready channels. */
-  server.on('error', (error) =>
-    reportSafely(options.report, tagNativeProcessError(error, RpcProcessErrorCode.listenFailed))
-  )
-  const managedPath =
-    address.kind === 'path' && !address.path.startsWith('\\\\.\\pipe\\') && options.serviceId
-      ? address.path
-      : undefined
-  if (managedPath) {
-    try {
-      await prepareUnixSocketPath(managedPath, options.serviceId!)
-    } catch (error) {
-      throw tagNativeProcessError(error as Error, RpcProcessErrorCode.listenFailed)
-    }
-  } else if (address.kind === 'path' && !address.path.startsWith('\\\\.\\pipe\\')) {
-    /** Existing paths are never removed or claimed as this listener's own. */
-    let occupied = false
-    try {
-      await lstat(address.path)
-      occupied = true
-    } catch (error) {
-      if (!(error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT'))
-        throw ((originalCause: unknown) =>
-          attachErrorIdentity(
-            new Error(
-              RpcProcessErrorText.listenFailed,
-              originalCause === undefined ? undefined : { cause: originalCause }
-            ),
-            { source: RPC_PROCESS_ERROR_SOURCE, code: RpcProcessErrorCode.listenFailed }
-          ))(error)
-    }
-    if (occupied)
-      throw attachErrorIdentity(new Error(RpcProcessErrorText.listenFailed), {
-        source: RPC_PROCESS_ERROR_SOURCE,
-        code: RpcProcessErrorCode.listenFailed
-      })
-  }
-  try {
-    await new Promise<void>((resolve, reject) => {
-      const failed = (error: Error): void => reject(error)
-      server.once('error', failed)
-      server.listen(
-        address.kind === 'path'
-          ? { path: address.path }
-          : { host: address.host, port: address.port },
-        () => {
-          server.off('error', failed)
-          resolve()
-        }
-      )
-    })
-  } catch (error) {
-    throw ((originalCause: unknown) =>
-      attachErrorIdentity(
-        new Error(
-          RpcProcessErrorText.listenFailed,
-          originalCause === undefined ? undefined : { cause: originalCause }
-        ),
-        { source: RPC_PROCESS_ERROR_SOURCE, code: RpcProcessErrorCode.listenFailed }
-      ))(error)
-  }
-  /** All Unix listeners retain their bound inode without shortening the caller's address. */
-  const unixPath =
-    address.kind === 'path' && !address.path.startsWith('\\\\.\\pipe\\') ? address.path : undefined
-  /** Identity distinguishes this socket from a successor created before native close. */
-  let boundIdentity: Awaited<ReturnType<typeof lstat>> | undefined
-  if (unixPath) {
-    try {
-      boundIdentity = await lstat(unixPath)
-    } catch (error) {
-      server.close()
-      throw ((originalCause: unknown) =>
-        attachErrorIdentity(
-          new Error(
-            RpcProcessErrorText.listenFailed,
-            originalCause === undefined ? undefined : { cause: originalCause }
-          ),
-          { source: RPC_PROCESS_ERROR_SOURCE, code: RpcProcessErrorCode.listenFailed }
-        ))(error)
-    }
-  }
-  /** The exact inode is recorded before exposing this listener as recoverable. */
-  let ownerRecord: IUnixSocketRecord | undefined
-  if (managedPath) {
-    try {
-      ownerRecord = await recordUnixSocketOwner(managedPath, options.serviceId!)
-    } catch (error) {
-      server.close()
-      throw ((originalCause: unknown) =>
-        attachErrorIdentity(
-          new Error(
-            RpcProcessErrorText.listenFailed,
-            originalCause === undefined ? undefined : { cause: originalCause }
-          ),
-          { source: RPC_PROCESS_ERROR_SOURCE, code: RpcProcessErrorCode.listenFailed }
-        ))(error)
-    }
-  }
-  /** Port zero is replaced with the actual loopback port exposed by Node. */
-  const bound = server.address()
-  const boundAddress =
-    address.kind === 'tcp' && bound && typeof bound !== 'string'
-      ? `tcp://${address.host === '::1' ? '[::1]' : address.host}:${bound.port}`
-      : options.address
-  const close = (): Promise<void> => {
-    if (closePromise) return closePromise
-    closed = true
-    closeReason = attachErrorIdentity(new Error(RpcProcessErrorText.channelClosed), {
-      source: RPC_PROCESS_ERROR_SOURCE,
-      code: RpcProcessErrorCode.channelClosed
-    })
-    closePromise = (async () => {
-      /** Node/libuv unlinks its original bind path even if a successor has replaced the inode. */
-      /** A different dev/ino marks a successor whose disappearance must be reported. */
-      let successor: Awaited<ReturnType<typeof lstat>> | undefined
-      if (unixPath && boundIdentity) {
-        try {
-          /** The last observable path identity precedes Node's non-atomic native close. */
-          const current = await lstat(unixPath)
-          if (current.dev !== boundIdentity.dev || current.ino !== boundIdentity.ino)
-            successor = current
-        } catch (error) {
-          if (!(error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT'))
-            reportSafely(
-              options.report,
-              ((originalCause: unknown) =>
-                attachErrorIdentity(
-                  new Error(
-                    RpcProcessErrorText.listenFailed,
-                    originalCause === undefined ? undefined : { cause: originalCause }
-                  ),
-                  { source: RPC_PROCESS_ERROR_SOURCE, code: RpcProcessErrorCode.listenFailed }
-                ))(error)
-            )
-        }
-      }
-      server.close()
-      if (unixPath && successor) {
-        try {
-          await lstat(unixPath)
-        } catch (error) {
-          /** Report this known native limitation once; do not recreate a foreign inode. */
-          reportSafely(
-            options.report,
-            ((originalCause: unknown) =>
-              attachErrorIdentity(
-                new Error(
-                  RpcProcessErrorText.listenFailed,
-                  originalCause === undefined ? undefined : { cause: originalCause }
-                ),
-                { source: RPC_PROCESS_ERROR_SOURCE, code: RpcProcessErrorCode.listenFailed }
-              ))(error)
-          )
-        }
-      }
-      await Promise.all([...pendingSet].map((release) => release(closeReason)))
-      /** Node owns removal of a Unix socket path created by this server. */
-      if (managedPath && ownerRecord) {
-        try {
-          await removeUnixSocketOwner(managedPath, ownerRecord)
-        } catch (error) {
-          reportSafely(options.report, error)
-        }
-      }
-      options.signal?.removeEventListener('abort', onAbort)
-    })()
-    return closePromise
-  }
-  const onAbort = (): void => {
-    void close()
-  }
-  options.signal?.addEventListener('abort', onAbort, { once: true })
-  if (options.signal?.aborted) await close()
-  return Object.freeze({ address: boundAddress, close })
+
+  return new NodeSocketListener(options, address).open()
 }
 
 /** The moved socket resource operation keeps native dependencies in this owning public entry. */

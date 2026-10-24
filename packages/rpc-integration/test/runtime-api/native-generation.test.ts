@@ -1,3 +1,5 @@
+import { threadPlugin } from '@migaia/rpc-plugin-thread'
+import { RuntimePluginKey } from '@migaia/rpc-host/plugin'
 import assert from 'node:assert/strict'
 import { it, vi } from 'vitest'
 import {
@@ -11,12 +13,10 @@ import { fileURLToPath } from 'node:url'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { createThreadPeer } from '../../../rpc-plugin-thread/test/protocol.ts'
 import {
   createNodeThreadLauncher,
   createNodeThreadChannelFactory
-} from '@migaia/rpc-plugin-thread/adapters/node'
-import type { IRuntimeDynamicSurface } from '../../../rpc-host/dist/remote/runtime-api/typing.js'
+} from '../../../rpc-plugin-thread/dist/threads/adapters/node.js'
 import {
   readRuntimeLaunchContext,
   withRuntimeLaunchContext
@@ -170,19 +170,27 @@ it.each(['signal', 'deadline'] as const)(
   async (intent) => {
     /** A real managed source exercises the registration's original retry and terminal owners. */
     const budget = createUnitBudget({ kind: 'thread', maxUnits: 1, launchRate: false })
-    const peer = await createThreadPeer<IRuntimeDynamicSurface>({
-      spawn: {
-        spec: {
-          entry: fileURLToPath(new URL('./fixtures/runtime-api-worker.mjs', import.meta.url))
-        },
-        budget,
-        scheduler: systemScheduler,
-        launcher: createNodeThreadLauncher(),
-        channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),
-        report: () => undefined
-      },
-      report: () => undefined
+    /** The real Host owns native install, restart and final rollback. */
+    const nativeHost = runtimeTestHost({
+      host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
     })
+    const peer = await nativeHost
+      .use(
+        threadPlugin({
+          spawn: {
+            spec: {
+              entry: fileURLToPath(new URL('./fixtures/runtime-api-worker.mjs', import.meta.url))
+            },
+            budget,
+            scheduler: systemScheduler,
+            launcher: createNodeThreadLauncher(),
+            channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),
+            report: () => undefined
+          },
+          report: () => undefined
+        })
+      )
+      .then(() => readRuntimeOutletConnection(nativeHost.thread, RuntimePluginKey.thread)!.peer!)
     assert.equal(await peer.request('count'), 0)
     const cancel = new AbortController()
     /** A failure before the real start barrier keeps its package/code classification visible. */
@@ -238,7 +246,7 @@ it.each(['signal', 'deadline'] as const)(
         assert.deepEqual(outcome.outcome.completion, { ok: true, result: 42 })
     } finally {
       await peer.request('release').catch(() => undefined)
-      await peer.close()
+      await nativeHost.dispose()
       await pending
     }
     assert.equal(budget.inUse, 0)
@@ -318,38 +326,48 @@ it('managed native request cannot silently drop an explicitly unsupported order 
   const budget = createUnitBudget({ kind: 'thread', maxUnits: 1, launchRate: false })
   const native = createNodeThreadLauncher()
   let calls = 0
-  const peer = await createThreadPeer<IRuntimeDynamicSurface>({
-    spawn: {
-      spec: { entry: fileURLToPath(new URL('./fixtures/managed-worker.mjs', import.meta.url)) },
-      budget,
-      scheduler: systemScheduler,
-      launcher: {
-        ...native,
-        launch: (spec, request) => {
-          const context = readRuntimeLaunchContext(request)!
-          return withRuntimeLaunchContext(
-            request,
-            {
-              ...context,
-              capabilities: context.capabilities.filter((value) => value !== RpcCapability.order)
-            },
-            () => native.launch(spec, request)
-          )
-        }
-      },
-      channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),
-      report: () => undefined
-    },
-    provide: {
-      parent: {
-        echo: () => {
-          calls++
-          return 42
-        }
-      }
-    },
-    report: () => undefined
+  /** The real Host owns native install, restart and final rollback. */
+  const nativeHost = runtimeTestHost({
+    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   })
+  const peer = await nativeHost
+    .use(
+      threadPlugin({
+        spawn: {
+          spec: { entry: fileURLToPath(new URL('./fixtures/managed-worker.mjs', import.meta.url)) },
+          budget,
+          scheduler: systemScheduler,
+          launcher: {
+            ...native,
+            launch: (spec, request) => {
+              const context = readRuntimeLaunchContext(request)!
+              return withRuntimeLaunchContext(
+                request,
+                {
+                  ...context,
+                  capabilities: context.capabilities.filter(
+                    (value) => value !== RpcCapability.order
+                  )
+                },
+                () => native.launch(spec, request)
+              )
+            }
+          },
+          channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),
+          report: () => undefined
+        },
+        provide: {
+          parent: {
+            echo: () => {
+              calls++
+              return 42
+            }
+          }
+        },
+        report: () => undefined
+      })
+    )
+    .then(() => readRuntimeOutletConnection(nativeHost.thread, RuntimePluginKey.thread)!.peer!)
   try {
     await peer.request('probe', 'ordinary')
     calls = 0
@@ -360,7 +378,7 @@ it('managed native request cannot silently drop an explicitly unsupported order 
     )
     assert.equal(calls, 0)
   } finally {
-    await peer.close()
+    await nativeHost.dispose()
   }
   assert.equal(budget.inUse, 0)
 })

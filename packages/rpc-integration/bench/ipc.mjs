@@ -1,5 +1,6 @@
 import { IpcBenchErrorText } from './error-text.mjs'
 import { IpcW3Reference } from './text.mjs'
+import { orderStatistic } from './cross-runtime/statistics.mjs'
 /**
  * Bare-side measurement core for the conformance IPC driver. Channel launch, codec, peer, isolation
  * and PID observer belong to the caller. This module does not freeze support units or claim
@@ -103,9 +104,10 @@ export function judgeBudgetPairs(rounds, scenario, floor, guard) {
   })
   /** Arithmetic medians retain all three pairs; no failed round can be discarded. */
   const median = (values) => {
-    const sorted = [...values].sort((a, b) => a - b)
-    const middle = Math.floor(sorted.length / 2)
-    return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2
+    const middle = Math.floor(values.length / 2)
+    return values.length % 2
+      ? orderStatistic(values, middle)
+      : (orderStatistic(values, middle - 1) + orderStatistic(values, middle)) / 2
   }
   /** Every PID role retains its own ratio instead of hiding it in the process total. */
   const mediansByRole = (key) =>
@@ -199,7 +201,7 @@ export function judgeBaselineRegression(rounds, baseline, noiseBand) {
     return nearestRank(rpc.latenciesNs, 0.5, options) / denominator
   })
   /** Three original pairs determine the median without selecting a favorable launch. */
-  const candidateRatio = [...ratiosByRound].sort((a, b) => a - b)[1]
+  const candidateRatio = orderStatistic(ratiosByRound, 1)
   /** A positive change means worse normalized RPC latency than the original frozen baseline data. */
   const relativeChange = candidateRatio / baseline.p50Ratio - 1
   return {
@@ -289,7 +291,7 @@ export function judgeSdkRegression(rounds, baseline, noise) {
        * The same three-round median as the original baseline never selects a replacement
        * measurement.
        */
-      const candidate = [...valuesByRound].sort((a, b) => a - b)[1]
+      const candidate = orderStatistic(valuesByRound, 1)
       /** Lower throughput is worse; latency has the opposite direction. */
       const relativeChange =
         metric === 'throughputPerSecond' ? 1 - candidate / frozen : candidate / frozen - 1
@@ -349,9 +351,8 @@ export function nearestRank(values, quantile, options = {}) {
     values.some((v) => !Number.isFinite(v) || (options.allowClockResolutionZero ? v < 0 : v <= 0))
   )
     throw new TypeError(IpcBenchErrorText.latency)
-  /** Sorting a copy preserves the caller-owned chronological raw observations. */
-  const ordered = [...values].sort((a, b) => a - b)
-  return ordered[Math.ceil(quantile * ordered.length) - 1]
+  /** Exact selection leaves the caller-owned chronological raw observations unchanged. */
+  return orderStatistic(values, Math.ceil(quantile * values.length) - 1)
 }
 
 /**
@@ -594,9 +595,10 @@ export function judgePairs(rounds) {
   })
   /** Median is arithmetic mean of two central values for an even retained round count. */
   const median = (values) => {
-    const sorted = [...values].sort((a, b) => a - b)
-    const index = Math.floor(sorted.length / 2)
-    return sorted.length % 2 ? sorted[index] : (sorted[index - 1] + sorted[index]) / 2
+    const index = Math.floor(values.length / 2)
+    return values.length % 2
+      ? orderStatistic(values, index)
+      : (orderStatistic(values, index - 1) + orderStatistic(values, index)) / 2
   }
   const ratios = Object.fromEntries(
     Object.keys(IpcBenchThreshold).map((key) => [
@@ -628,31 +630,12 @@ export function judgePairs(rounds) {
  */
 async function pairedMain() {
   /** Fixed flags select registered cells; they do not invent payloads or relax budgets. */
-  const args = process.argv.slice(2)
-  /** Selection defaults to the entire sequential inventory for the existing public script. */
-  let scenario = 'sequential'
-  /** One explicit ID lets the root split the full matrix into bounded exclusive windows. */
-  let selectedId
-  /** Complete raw sides are saved before their summaries, never discarded after failure. */
-  let output
-  /** The serial window supplies its own baseline calibration; historical noise is never substituted. */
-  let noisePath
-  /** Candidate collection precedes the one final SDK freeze; it never claims a relative PASS. */
-  let freezeSdk = false
-  /** Preparation checks capabilities before freezing the formal inventory. */
-  let prepare = false
-  /** Listing never starts a measured side. */
-  let list = false
-  for (let index = 0; index < args.length; index++) {
-    if (args[index] === '--scenario') scenario = args[++index]
-    else if (args[index] === '--unit') selectedId = args[++index]
-    else if (args[index] === '--output') output = args[++index]
-    else if (args[index] === '--noise') noisePath = args[++index]
-    else if (args[index] === '--freeze-sdk') freezeSdk = true
-    else if (args[index] === '--prepare') prepare = true
-    else if (args[index] === '--list') list = true
-    else throw new Error(IpcBenchErrorText.inventory)
-  }
+  /** Admission parses only the original CLI before reading inventories or launching a peer. */
+  const invocation = readPairedInvocation(process.argv.slice(2))
+  /** Only output receives the original lazily allocated temporary directory. */
+  let { output } = invocation
+  /** Frozen invocation selection remains immutable through the original measurement transaction. */
+  const { scenario, selectedId, noisePath, freezeSdk, prepare, list } = invocation
   const { readFile, writeFile, mkdir, mkdtemp } = await import('node:fs/promises')
   const { fileURLToPath } = await import('node:url')
   const { join } = await import('node:path')
@@ -725,52 +708,17 @@ async function pairedMain() {
   output ??= await mkdtemp(join(tmpdir(), 'rpc-da1-raw-'))
   await mkdir(output, { recursive: true })
   /** Each actual side owns its endpoint PIDs; the coordinator and observer are never charged. */
-  const run = (unit, side, round) =>
-    new Promise((resolve, reject) => {
-      /** File identity also carries the native peer's out-of-band boundary snapshots. */
-      const stem = output
-        ? join(output, unit.id.replaceAll(':', '-') + '-' + round + '-' + side)
-        : undefined
-      const command = [
-        ...(unit.executableArgs ?? []),
-        fileURLToPath(new URL('./ipc-side.mjs', import.meta.url)),
-        JSON.stringify({ unit, side, options: { check: prepare, samples: 1000, warmup: 100 } })
-      ]
-      const child = spawn(unit.executable, command, {
-        stdio: ['ignore', 'pipe', 'pipe'],
-        env: { ...process.env, ...(stem ? { IPC_BENCH_STEM: stem } : {}) }
-      })
-      let stdout = '',
-        stderr = ''
-      child.stdout.on('data', (chunk) => {
-        stdout += chunk.toString()
-      })
-      child.stderr.on('data', (chunk) => {
-        stderr += chunk.toString()
-      })
-      child.once('error', reject)
-      child.once('close', async (code) => {
-        try {
-          if (output) await writeFile(stem + '.stderr.log', stderr)
-          if (code !== 0) throw new Error(IpcBenchErrorText.sideFailed(code, stderr))
-          const receipt = JSON.parse(stdout)
-          if (output)
-            await writeFile(
-              stem + '.json',
-              JSON.stringify({
-                ...receipt,
-                execution: {
-                  command: [unit.executable, ...command],
-                  inventorySHA256: createHash('sha256').update(inventoryBytes).digest('hex')
-                }
-              })
-            )
-          resolve(receipt)
-        } catch (error) {
-          reject(error)
-        }
-      })
-    })
+  /** Explicit immutable launch inputs retain the original native side ownership boundary. */
+  const runContext = {
+    output,
+    prepare,
+    inventoryBytes,
+    join,
+    fileURLToPath,
+    spawn,
+    writeFile,
+    createHash
+  }
   let failed = false
   for (const unit of units) {
     /** Three retained alternating pairs are final; measurement failures never select replacements. */
@@ -781,7 +729,7 @@ async function pairedMain() {
         const round = { order }
         rounds.push(round)
         for (const side of order) {
-          round[side] = await run(unit, side, index)
+          round[side] = await runPairedSide(runContext, unit, side, index)
           if (!output)
             console.log(
               JSON.stringify({ ...round[side], round: index, type: 'bench-side-receipt' })
@@ -789,32 +737,13 @@ async function pairedMain() {
         }
       }
       /** Browser and native observations use the same budget judge with actual per-PID attribution. */
-      const judged = prepare
-        ? { status: 'prepared' }
-        : judgeBudgetPairs(
-            rounds,
-            scenario === 'concurrency'
-              ? 'concurrency'
-              : unit.payloadBytes <= 1024
-                ? 'small'
-                : 'large',
-            unit.throughputFloor,
-            {
-              ...(scenario === 'deno'
-                ? {}
-                : {
-                    ...resolveBaselineGuard(unit.id, baseline, noise)
-                  }),
-              ...(sdkBaseline
-                ? {
-                    sdk: {
-                      baseline: sdkBaseline.cells[unit.id],
-                      noise: noise.sdkCells[unit.id]
-                    }
-                  }
-                : {})
-            }
-          )
+      const judged = judgePairedUnit(unit, rounds, {
+        prepare,
+        scenario,
+        baseline,
+        noise,
+        sdkBaseline
+      })
       const result = {
         ...judged,
         type: 'bench-unit',
@@ -852,6 +781,133 @@ async function pairedMain() {
     }
   }
   if (failed) process.exitCode = 1
+}
+
+/**
+ * @param {object} unit Original fixed cell. @param {object[]} rounds Complete retained pairs.
+ * @param {object} context Original admitted baseline/noise inputs. @returns {object} Unchanged
+ *   budget verdict.
+ */
+function judgePairedUnit(unit, rounds, context) {
+  /** Immutable original guard inputs remain explicit rather than captured from the CLI coordinator. */
+  const { prepare, scenario, baseline, noise, sdkBaseline } = context
+  return prepare
+    ? { status: 'prepared' }
+    : judgeBudgetPairs(
+        rounds,
+        scenario === 'concurrency' ? 'concurrency' : unit.payloadBytes <= 1024 ? 'small' : 'large',
+        unit.throughputFloor,
+        {
+          ...(scenario === 'deno'
+            ? {}
+            : {
+                ...resolveBaselineGuard(unit.id, baseline, noise)
+              }),
+          ...(sdkBaseline
+            ? {
+                sdk: {
+                  baseline: sdkBaseline.cells[unit.id],
+                  noise: noise.sdkCells[unit.id]
+                }
+              }
+            : {})
+        }
+      )
+}
+
+/**
+ * @param {string[]} args Original CLI arguments. @returns {object} Original validated selection
+ *   state.
+ */
+function readPairedInvocation(args) {
+  /** Selection defaults to the entire sequential inventory for the existing public script. */
+  let scenario = 'sequential'
+  /** One explicit ID lets the root split the full matrix into bounded exclusive windows. */
+  let selectedId
+  /** Complete raw sides are saved before their summaries, never discarded after failure. */
+  let output
+  /** The serial window supplies its own baseline calibration; historical noise is never substituted. */
+  let noisePath
+  /** Candidate collection precedes the one final SDK freeze; it never claims a relative PASS. */
+  let freezeSdk = false
+  /** Preparation checks capabilities before freezing the formal inventory. */
+  let prepare = false
+  /** Listing never starts a measured side. */
+  let list = false
+  for (let index = 0; index < args.length; index++) {
+    if (args[index] === '--scenario') scenario = args[++index]
+    else if (args[index] === '--unit') selectedId = args[++index]
+    else if (args[index] === '--output') output = args[++index]
+    else if (args[index] === '--noise') noisePath = args[++index]
+    else if (args[index] === '--freeze-sdk') freezeSdk = true
+    else if (args[index] === '--prepare') prepare = true
+    else if (args[index] === '--list') list = true
+    else throw new Error(IpcBenchErrorText.inventory)
+  }
+  return { scenario, selectedId, output, noisePath, freezeSdk, prepare, list }
+}
+
+/**
+ * @param {object} context Original admitted launch inputs. @param {object} unit Fixed cell. @param
+ *   {string} side Original arm. @param {number} round Pair position. @returns {Promise<object>}
+ *   Same original native side receipt.
+ */
+function runPairedSide(context, unit, side, round) {
+  /** Filesystem and native launch owners are passed explicitly rather than captured from the driver. */
+  const { output, prepare, inventoryBytes, join, fileURLToPath, spawn, writeFile, createHash } =
+    context
+  return new Promise((resolve, reject) => {
+    /** File identity also carries the native peer's out-of-band boundary snapshots. */
+    const stem = output
+      ? join(output, unit.id.replaceAll(':', '-') + '-' + round + '-' + side)
+      : undefined
+    const command = [
+      ...(unit.executableArgs ?? []),
+      fileURLToPath(new URL('./ipc-side.mjs', import.meta.url)),
+      JSON.stringify({ unit, side, options: { check: prepare, samples: 1000, warmup: 100 } })
+    ]
+    const child = spawn(unit.executable, command, {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: { ...process.env, ...(stem ? { IPC_BENCH_STEM: stem } : {}) }
+    })
+    /** Individual physical chunks retain original decoding and are joined only at native close. */
+    const stdoutChunks = [],
+      stderrChunks = []
+    child.stdout.on('data', (chunk) => {
+      stdoutChunks.push(chunk.toString())
+    })
+    child.stderr.on('data', (chunk) => {
+      stderrChunks.push(chunk.toString())
+    })
+    child.once('error', reject)
+    child.once('close', async (code) => {
+      try {
+        /**
+         * Final native output keeps the original per-fragment text decoding and concatenation
+         * order.
+         */
+        const stdout = stdoutChunks.join(''),
+          stderr = stderrChunks.join('')
+        if (output) await writeFile(stem + '.stderr.log', stderr)
+        if (code !== 0) throw new Error(IpcBenchErrorText.sideFailed(code, stderr))
+        const receipt = JSON.parse(stdout)
+        if (output)
+          await writeFile(
+            stem + '.json',
+            JSON.stringify({
+              ...receipt,
+              execution: {
+                command: [unit.executable, ...command],
+                inventorySHA256: createHash('sha256').update(inventoryBytes).digest('hex')
+              }
+            })
+          )
+        resolve(receipt)
+      } catch (error) {
+        reject(error)
+      }
+    })
+  })
 }
 
 /** Imports by preparation tests and bare-side modules never execute a measured window. */

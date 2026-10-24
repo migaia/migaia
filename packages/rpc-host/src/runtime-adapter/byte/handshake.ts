@@ -20,10 +20,10 @@ import {
   RpcReservedKind,
   RpcCapability
 } from '@migaia/rpc-contract'
-import { RpcCoreErrorCode } from '../../core/index.js'
+import { RpcCoreErrorCode } from '../../core/errors.js'
 import { tagRpcError } from '../../core/errors.js'
 import { IpcReporterContext } from '../../core/plugins/reporter-context.js'
-import type { IRemoteChannel } from '../../remote/index.js'
+import type { IRemoteChannel } from '../../remote/types.js'
 import { bindRuntimeByteWire, deferRuntimeByteReceive, type IRuntimeByteWire } from './carrier.js'
 import { createRuntimeDiagnosticError } from './diagnostics.js'
 import { attachIpcConnection } from './ipc-connection.js'

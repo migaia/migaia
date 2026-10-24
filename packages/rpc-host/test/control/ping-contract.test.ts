@@ -1,7 +1,9 @@
+import { createRuntimeEndpointComposition } from '../../dist/core/runtime-api-endpoint.js'
+import { RpcCapability } from '@migaia/rpc-contract'
 import { describe, expect, it, vi } from 'vitest'
 import { normalizeRpcEnvelope, RpcControl } from '@migaia/rpc-contract'
-import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
-import { createEndpoint } from '../../dist/core/index.js'
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
+
 import { connect } from '../../dist/core/middleware/connect.js'
 import { hooks } from '../../dist/core/middleware/hooks.js'
 import { ping } from '../../dist/core/middleware/ping.js'
@@ -28,20 +30,26 @@ describe('ping and unknown variation controls', () => {
       }
     }
     const events: IRpcHookEvent[] = []
-    const server = await createEndpoint({
-      id: 'server',
-      transport: captureServer,
-      middlewares: [
-        connect({ transport: captureServer }),
-        ping(),
-        hooks({ listeners: (event) => void events.push(event) })
-      ] as const
-    })
-    const client = await createEndpoint({
-      id: 'client',
-      transport: captureClient,
-      middlewares: [connect({ transport: captureClient }), ping()] as const
-    })
+    const server = await createRuntimeEndpointComposition(
+      {
+        id: 'server',
+        transport: captureServer,
+        middlewares: [
+          connect({ transport: captureServer }),
+          ping(),
+          hooks({ listeners: (event) => void events.push(event) })
+        ] as const
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'client',
+        transport: captureClient,
+        middlewares: [connect({ transport: captureClient }), ping()] as const
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     try {
       expect(await client.ping('server', undefined, { timeoutMs: 100 })).toBe(true)
       const controls = sent

@@ -82,4 +82,4 @@ Native structured clone does not automatically permit RPC ownership transfer. Tr
 
 Browser source/carrier errors use `rpc.transport.browser`; general handshake/call errors can use `rpc.endpoint` or `rpc.remote`. Inspect source/code/cause. Missing sources, missing Window origins, and unreliable RTC settings reject at their original admission boundary.
 
-The root exports seven plugins, options, and error identity. `/adapters/window`, `shared-worker`, `service-worker`, `broadcast-channel`, `web-transport`, `rtc-data-channel`, `message-port`, and `web-worker` remain author entries for explicit lower-level carrier work. Applications install the matching plugin directly on a host. See the [usage guide](./USEGUIDE.en.md).
+The root exports seven plugins, options, and error identity. Plugins reuse package-owned carrier implementations internally; custom raw deployments use the `@migaia/rpc-host/plugin` SDK. See the [usage guide](./USEGUIDE.en.md).

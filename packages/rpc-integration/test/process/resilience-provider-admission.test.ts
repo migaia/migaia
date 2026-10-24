@@ -1,11 +1,11 @@
 import { createManualScheduler } from '@migaia/utils/testing'
 import { describe, expect, it, vi } from 'vitest'
 import { type IRpcContext } from '@migaia/rpc-host'
-import {
-  type IRpcEndpoint,
-  type IRpcProvider,
-  type IRpcProviderResult
-} from '../../../rpc-host/dist/core/index.js'
+import type {
+  IRpcEndpoint,
+  IRpcProvider,
+  IRpcProviderResult
+} from '../../../rpc-host/dist/core/typing.js'
 import type { IRemoteServeEndpoint } from '@migaia/rpc-host/plugin'
 import { createProcessProviderAdmission } from '../../../rpc-plugin-process/dist/process/resilience/provider-admission.js'
 import { createProcessSessionManager } from '../../../rpc-plugin-process/dist/process/resilience/session.js'
@@ -13,7 +13,7 @@ import { createProcessTransport } from '../../../rpc-plugin-process/dist/process
 import { createNativeProcessOffer } from '../../../rpc-plugin-process/dist/process/offer.js'
 import { nativeBytePair, nativeEndpoint } from './fixtures/native-runtime.js'
 import { RpcCoreErrorCode, RPC_CORE_ERROR_SOURCE } from '@migaia/rpc-host'
-import { deserializeRpcError } from '../../../rpc-host/dist/core/index.js'
+import { deserializeRpcError } from '../../../rpc-host/dist/core/internal/error-wire-metadata.js'
 import { createRpcTimeoutError, RpcTimeoutError } from '../../../rpc-host/dist/core/errors.js'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import { createListenerFailure } from '@migaia/rpc-host/plugin'
@@ -26,54 +26,83 @@ async function flush(): Promise<void> {
 
 /** Observe actual provider registration and inbound activity without a platform adapter. */
 async function fixture(maxCallsPerMinute: number) {
-  const scheduler = createManualScheduler()
-  const options = createProcessSessionManager({
-    scheduler,
-    report: () => undefined,
-    maxCallsPerMinute,
-    idleTimeoutMs: 100
-  }).options
-  let onFrame: ((message: unknown) => void) | undefined
-  let provider: IRpcProvider | undefined
-  const close = vi.fn(async () => undefined)
-  /** The governor observes the original Core transport constructed over held fixture message I/O. */
-  const channel = await createProcessFixtureChannel(
-    {
-      kind: 'message',
-      send: () => undefined,
-      onMessage(listener) {
-        onFrame = listener
-        return () => {
-          onFrame = undefined
-        }
-      },
-      onClose: () => () => undefined,
-      close: () => undefined
-    },
-    { peerId: 'provider-admission-fixture', scheduler }
-  )
-  const endpoint = {
-    endpoint: {
-      provide(_method: string, next: IRpcProvider) {
-        provider = next
-      }
-    } as unknown as IRpcEndpoint
-  } as IRemoteServeEndpoint
-  const admission = createProcessProviderAdmission(channel, options, scheduler, close, vi.fn())
-  admission.wrap(endpoint).endpoint.provide('request', () => ({ ok: true, data: 'done' }))
-  const context = {
+  /** This fixture only observes the actual provider-admission owner and original held ports. */
+  const observation = new ProviderAdmissionFixture(maxCallsPerMinute)
+  await observation.prepare()
+  return observation
+}
+
+/** One controlled registration and inbound source keeps original provider-policy observations. */
+class ProviderAdmissionFixture {
+  /** Original deterministic clock remains independent from Promise continuation flushing. */
+  readonly scheduler = createManualScheduler()
+  /** Only the genuine channel subscription changes this held inbound frame callback. */
+  #onFrame: ((message: unknown) => void) | undefined
+  /** The actual admission wrapper installs the same original provider function. */
+  #provider: IRpcProvider | undefined
+  /** The canonical session manager still owns all original rate and idle policy. */
+  readonly #options: ReturnType<typeof createProcessSessionManager>['options']
+  /** Original session retirement remains directly observable and independently controlled. */
+  readonly close = vi.fn(async () => undefined)
+  /** The original provider context is reused for every controlled policy invocation. */
+  readonly context = {
     data: ['ok'],
     signal: new AbortController().signal,
     success: (data: unknown) => ({ ok: true, data })
   } as unknown as IRpcContext
-  return {
-    admission,
-    close,
-    context,
-    frame: () => onFrame?.({}),
-    provider: () => provider!,
-    scheduler
+  /** Native policy remains the actual production admission owner, not a fixture replacement. */
+  admission!: ReturnType<typeof createProcessProviderAdmission>
+
+  /** Capture original session policy without opening a channel or registering a provider. */
+  constructor(maxCallsPerMinute: number) {
+    this.#options = createProcessSessionManager({
+      scheduler: this.scheduler,
+      report: () => undefined,
+      maxCallsPerMinute,
+      idleTimeoutMs: 100
+    }).options
   }
+  /** Construct the same genuine held channel and let production wrap its original provider port. */
+  async prepare(): Promise<void> {
+    /** Core still owns transport admission over these exact held message operations. */
+    const channel = await createProcessFixtureChannel(
+      {
+        kind: 'message',
+        send: () => undefined,
+        onMessage: (listener) => {
+          this.#onFrame = listener
+          return () => {
+            this.#onFrame = undefined
+          }
+        },
+        onClose: () => () => undefined,
+        close: () => undefined
+      },
+      { peerId: 'provider-admission-fixture', scheduler: this.scheduler }
+    )
+    /** Only provider registration is observed; the original admission wrapper is unchanged. */
+    const endpoint = {
+      endpoint: {
+        provide: (_method: string, next: IRpcProvider) => {
+          this.#provider = next
+        }
+      } as unknown as IRpcEndpoint
+    } as IRemoteServeEndpoint
+    this.admission = createProcessProviderAdmission(
+      channel,
+      this.#options,
+      this.scheduler,
+      this.close,
+      vi.fn()
+    )
+    this.admission.wrap(endpoint).endpoint.provide('request', () => ({ ok: true, data: 'done' }))
+  }
+  /** Deliver the same original inbound activity to the currently installed native subscription. */
+  readonly frame = (): void => {
+    this.#onFrame?.({})
+  }
+  /** Read the exact provider installed by the actual policy wrapper. */
+  readonly provider = (): IRpcProvider => this.#provider!
 }
 
 describe('process session provider admission', () => {

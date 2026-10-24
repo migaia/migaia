@@ -1,3 +1,4 @@
+import { RpcTransportMode } from '@migaia/rpc-host/plugin'
 import { detectServerRuntime } from '@migaia/utils'
 import {
   createEventEmitterMessageResource,
@@ -121,7 +122,7 @@ export function threadPlugin(options: IThreadPluginOptions): IRpcTransportPlugin
   })
   return defineTransportPlugin({
     name: configured.name ?? RuntimePluginKey.thread,
-    mode: parent === true ? 'connect-to-parent' : 'spawn',
+    mode: parent === true ? RpcTransportMode['connect-to-parent'] : RpcTransportMode.spawn,
     ...(configured.expose ? { expose: configured.expose } : {}),
     ...(configured.connect ? { connect: configured.connect } : {}),
     deployment

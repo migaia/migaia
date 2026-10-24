@@ -91,15 +91,15 @@ export type IRuntimeThreadPeerOptions<THandle extends IThreadHandle = IThreadHan
  * Open only native supervision/channel recipes; both assemblies retain this same sole lifecycle
  * owner.
  */
-export function createThreadSourceBinding<THandle extends IThreadHandle>(
+/**
+ * Allocate one native thread source binding and its health/drain lookups before installing behavior
+ * callbacks.
+ */
+function threadSourceBindingState<THandle extends IThreadHandle>(
   source: IRuntimeThreadSpawn<THandle>,
   prepareLauncher: IAdapterPeerPreparation['launcher'],
   connectTimeoutMs?: number
-): IRemoteBinding<THandle, IThreadSpec> &
-  Readonly<{
-    bindEndpoint: ReturnType<typeof createAdapterBindingDrain>['wrap']
-    drainCurrent: ReturnType<typeof createAdapterBindingDrain>['drainCurrent']
-  }> {
+) {
   /** Snapshot binding inputs in the original order before constructing its lifecycle owners. */
   const sourceOptions = { ...source, launcher: prepareLauncher(source.launcher) }
   /** Portable admission precedes construction of the canonical lifecycle owner. */
@@ -117,78 +117,133 @@ export function createThreadSourceBinding<THandle extends IThreadHandle>(
     THandle,
     Readonly<{ channel: IRemoteChannel; endpoint: IRemoteServeEndpoint }>
   >()
-  /** The original prepared launcher preserves context, actual lease and caller-selected policy. */
-  const supervisor = createThreadSupervisor({
-    ...sourceOptions.supervisor,
-    id: sourceOptions.supervisor?.id ?? createAdapterId(),
-    launcher: sourceOptions.launcher,
+
+  return {
+    sourceOptions,
     spec,
-    budget: sourceOptions.budget,
-    scheduler: sourceOptions.scheduler,
-    report: sourceOptions.report,
-    health:
-      sourceOptions.health ??
-      (defaultHealth
-        ? {
-            async check(unit, signal) {
-              /**
-               * Startup remains governed by the original preparation deadline until binding
-               * completes.
-               */
-              const ready = readyEndpoints.get(unit)
-              if (!ready) return
-              if (
-                await ready.endpoint.endpoint.ping(ready.channel.peerId, undefined, {
-                  timeoutMs: false,
-                  signal
-                })
-              )
-                return
-              if (signal.aborted) throw readAdapterAbortReason(signal)
-              throw createAdapterTransportError(ThreadErrorText.healthPingFailed)
-            }
-          }
-        : undefined),
-    stop: {
-      ...sourceOptions.supervisor?.stop,
-      beforeTerminate: async (unit, signal, remainingMs) => {
-        await drain.drainCurrent({ drainMs: remainingMs() })
-        if (!signal.aborted)
-          await sourceOptions.supervisor?.stop?.beforeTerminate?.(unit, signal, remainingMs)
-      }
-    }
-  })
-  /** Runtime source owns the only Thread binding; remote still owns generation and retry. */
-  const binding: IRemoteBinding<THandle, IThreadSpec> &
-    Readonly<{ bindEndpoint: typeof drain.wrap; drainCurrent: typeof drain.drainCurrent }> = {
-    ownership: 'owned',
-    bindEndpoint(channel, endpoint, onExecution) {
-      if (defaultHealth) {
-        if (
-          !channel.agreement.capabilities.includes(RpcCapability.ping) ||
-          typeof endpoint.endpoint.ping !== 'function'
-        )
-          invalidThreadConfig('health', ThreadErrorText.healthPingUnavailable)
-        readyEndpoints.set(channels.get(channel)!, { channel, endpoint })
-      }
-      return drain.wrap(channel, endpoint, onExecution)
-    },
-    trackRequest: drain.trackCurrent,
-    drainCurrent: drain.drainCurrent,
-    supervisor,
-    scheduler: sourceOptions.scheduler,
-    openChannel(handle, signal) {
-      /** Existing observed-exit and custom-health paths retain the original factory Promise. */
-      const opening =
-        connectTimeoutMs === undefined
-          ? sourceOptions.channelFactory.open(handle, signal)
-          : sourceOptions.channelFactory.open(handle, signal, connectTimeoutMs)
-      if (!defaultHealth) return opening
-      return opening.then((channel) => {
-        channels.set(channel, handle)
-        return channel
-      })
-    }
+    drain,
+    defaultHealth,
+    channels,
+    readyEndpoints,
+    source,
+    prepareLauncher,
+    connectTimeoutMs
   }
-  return binding
+}
+
+/**
+ * Own one native thread source binding and its health/drain lookups; callbacks access only this
+ * explicit instance.
+ */
+class ThreadSourceBinding<THandle extends IThreadHandle> {
+  /** All mutable storage and original construction inputs belong to this operation. */
+  #state: ReturnType<typeof threadSourceBindingState<THandle>>
+  /** Preserve the original stable resource surface and callback identities. */
+  readonly value: IRemoteBinding<THandle, IThreadSpec> &
+    Readonly<{
+      bindEndpoint: ReturnType<typeof createAdapterBindingDrain>['wrap']
+      drainCurrent: ReturnType<typeof createAdapterBindingDrain>['drainCurrent']
+    }>
+  /** Initialize owned storage before publishing the resource's callbacks. */
+  constructor(
+    source: IRuntimeThreadSpawn<THandle>,
+    prepareLauncher: IAdapterPeerPreparation['launcher'],
+    connectTimeoutMs?: number
+  ) {
+    this.#state = threadSourceBindingState(source, prepareLauncher, connectTimeoutMs)
+    /** The original prepared launcher preserves context, actual lease and caller-selected policy. */
+    const supervisor = createThreadSupervisor({
+      ...this.#state.sourceOptions.supervisor,
+      id: this.#state.sourceOptions.supervisor?.id ?? createAdapterId(),
+      launcher: this.#state.sourceOptions.launcher,
+      spec: this.#state.spec,
+      budget: this.#state.sourceOptions.budget,
+      scheduler: this.#state.sourceOptions.scheduler,
+      report: this.#state.sourceOptions.report,
+      health:
+        this.#state.sourceOptions.health ??
+        (this.#state.defaultHealth
+          ? {
+              check: async (unit, signal) => {
+                /**
+                 * Startup remains governed by the original preparation deadline until binding
+                 * completes.
+                 */
+                const ready = this.#state.readyEndpoints.get(unit)
+                if (!ready) return
+                if (
+                  await ready.endpoint.endpoint.ping(ready.channel.peerId, undefined, {
+                    timeoutMs: false,
+                    signal
+                  })
+                )
+                  return
+                if (signal.aborted) throw readAdapterAbortReason(signal)
+                throw createAdapterTransportError(ThreadErrorText.healthPingFailed)
+              }
+            }
+          : undefined),
+      stop: {
+        ...this.#state.sourceOptions.supervisor?.stop,
+        beforeTerminate: async (unit, signal, remainingMs) => {
+          await this.#state.drain.drainCurrent({ drainMs: remainingMs() })
+          if (!signal.aborted)
+            await this.#state.sourceOptions.supervisor?.stop?.beforeTerminate?.(
+              unit,
+              signal,
+              remainingMs
+            )
+        }
+      }
+    })
+    /** Runtime source owns the only Thread binding; remote still owns generation and retry. */
+    const binding: ReturnType<typeof createThreadSourceBinding<THandle>> = {
+      ownership: 'owned',
+      bindEndpoint: (channel, endpoint, onExecution) => {
+        if (this.#state.defaultHealth) {
+          if (
+            !channel.agreement.capabilities.includes(RpcCapability.ping) ||
+            typeof endpoint.endpoint.ping !== 'function'
+          )
+            invalidThreadConfig('health', ThreadErrorText.healthPingUnavailable)
+          this.#state.readyEndpoints.set(this.#state.channels.get(channel)!, { channel, endpoint })
+        }
+        return this.#state.drain.wrap(channel, endpoint, onExecution)
+      },
+      trackRequest: this.#state.drain.trackCurrent,
+      drainCurrent: this.#state.drain.drainCurrent,
+      supervisor,
+      scheduler: this.#state.sourceOptions.scheduler,
+      openChannel: (handle, signal) => {
+        /** Existing observed-exit and custom-health paths retain the original factory Promise. */
+        const opening =
+          this.#state.connectTimeoutMs === undefined
+            ? this.#state.sourceOptions.channelFactory.open(handle, signal)
+            : this.#state.sourceOptions.channelFactory.open(
+                handle,
+                signal,
+                this.#state.connectTimeoutMs
+              )
+        if (!this.#state.defaultHealth) return opening
+        return opening.then((channel) => {
+          this.#state.channels.set(channel, handle)
+          return channel
+        })
+      }
+    }
+    this.value = binding
+  }
+}
+
+/** Construct the single owner for one native thread source binding and its health/drain lookups. */
+export function createThreadSourceBinding<THandle extends IThreadHandle>(
+  source: IRuntimeThreadSpawn<THandle>,
+  prepareLauncher: IAdapterPeerPreparation['launcher'],
+  connectTimeoutMs?: number
+): IRemoteBinding<THandle, IThreadSpec> &
+  Readonly<{
+    bindEndpoint: ReturnType<typeof createAdapterBindingDrain>['wrap']
+    drainCurrent: ReturnType<typeof createAdapterBindingDrain>['drainCurrent']
+  }> {
+  return new ThreadSourceBinding<THandle>(source, prepareLauncher, connectTimeoutMs).value
 }

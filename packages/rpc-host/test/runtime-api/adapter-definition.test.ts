@@ -2,8 +2,8 @@ import type { IAbortSignal } from '@migaia/utils/promise'
 import { Worker } from 'node:worker_threads'
 import { defineHost, definePlugin } from '@migaia/plugin-host'
 import { it, expect, vi, type MockInstance } from 'vitest'
-import { constructDefinitionPlugin } from '../../dist/runtime-adapter/definition.js'
-import { defineMessageAdapter } from '../../dist/adapter.js'
+import { defineTransportPlugin } from '../../dist/plugin/define.js'
+import { defineMessageAdapter } from '../../dist/runtime-adapter/definition.js'
 
 it('Host cancellation during actual launch terminates the unit once and retains its reason', async () => {
   /** This physical unit is constructed only by the SDK's actual launch callback. */
@@ -59,11 +59,14 @@ it('Host cancellation during actual launch terminates the unit once and retains 
     }
   })
   /** SDK Plugin installation is the genuine provenance path that carries initialSignal to Core. */
-  const sdkPlugin = constructDefinitionPlugin(adapter, {
+  const sdkPlugin = defineTransportPlugin({
     name: 'cancelled-launch',
-    spawn: 'unit',
-    peerId: 'not-yet-connected',
-    report: (error) => reports.push(error)
+    mode: 'spawn',
+    deployment: adapter.deployment({
+      spawn: 'unit',
+      peerId: 'not-yet-connected',
+      report: (error) => reports.push(error)
+    })
   })
   /** Pass the original Host core directly to the real SDK hook and observe its exact attempt. */
   const plugin = definePlugin({

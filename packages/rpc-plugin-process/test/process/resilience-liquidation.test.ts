@@ -6,38 +6,57 @@ import { type IProcessDependencyHostPort } from '../../dist/process/resilience/t
 import { type IProcessRegistrationBinding } from '../../dist/process/resilience/types.js'
 
 /** One fake terminal source preserves supervision's own zero-minute report. */
-function terminalSource(report: (error: unknown) => void) {
+/** Allocate only this case's original observations before installing native-shaped callbacks. */
+function terminalSourceFixtureState(report: (error: unknown) => void) {
   let callback: (event: { entry: number; error: unknown }) => void = () => undefined
-  const binding: IProcessRegistrationBinding = {
-    ownership: 'spawn-owned',
-    health: 'ping',
-    supervisor: {
-      restart: async () => ({ state: 'terminal' }),
-      inspect: () => ({
-        kind: 'fixture',
-        state: 'terminal' as const,
-        generation: 1,
-        failuresInWindow: 0,
-        terminalEntries: 1,
-        degraded: [],
-        abandoned: 0
-      }),
-      onTerminal(listener) {
-        callback = listener
-        return () => {
-          callback = () => undefined
-        }
-      },
-      dispose: async () => undefined
+  return { report, callback }
+}
+
+/** Own one test resource's mutable observations without sharing a factory closure. */
+class TerminalSourceFixture {
+  /** Counts, native events and construction inputs belong only to this fixture instance. */
+  #state: ReturnType<typeof terminalSourceFixtureState>
+  /** Existing consumers retain the same observable fixture surface and callback identities. */
+  readonly value
+  /** Install the original native-shaped callbacks after their observations exist. */
+  constructor(report: (error: unknown) => void) {
+    this.#state = terminalSourceFixtureState(report)
+    const binding: IProcessRegistrationBinding = {
+      ownership: 'spawn-owned',
+      health: 'ping',
+      supervisor: {
+        restart: async () => ({ state: 'terminal' }),
+        inspect: () => ({
+          kind: 'fixture',
+          state: 'terminal' as const,
+          generation: 1,
+          failuresInWindow: 0,
+          terminalEntries: 1,
+          degraded: [],
+          abandoned: 0
+        }),
+        onTerminal: (listener) => {
+          this.#state.callback = listener
+          return () => {
+            this.#state.callback = () => undefined
+          }
+        },
+        dispose: async () => undefined
+      }
+    }
+    this.value = {
+      binding,
+      enter: (error: unknown) => {
+        ;(0, this.#state.report)(error)
+        ;(0, this.#state.callback)({ entry: 1, error })
+      }
     }
   }
-  return {
-    binding,
-    enter(error: unknown) {
-      report(error)
-      callback({ entry: 1, error })
-    }
-  }
+}
+
+/** Create one independent owner for the existing native-boundary fixture. */
+function terminalSource(report: (error: unknown) => void) {
+  return new TerminalSourceFixture(report).value
 }
 
 /** All terminal subscriber and liquidation continuations settle without wall time. */

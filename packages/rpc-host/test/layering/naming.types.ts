@@ -6,25 +6,25 @@ export type { IWebRpcCoreConfig as ILayeringOld001 } from '../../dist/core/compo
 export type { IWebRpcKernelSurface as ILayeringOld002 } from '../../dist/core/composed.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcRootProjection as ILayeringOld003 } from '../../dist/core/composed.js'
-export type { IRpcCoreErrorCode as ILayeringNew004 } from '../../dist/core/index.js'
+export type { IRpcCoreErrorCode as ILayeringNew004 } from '../../dist/core/errors.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcErrorCode as ILayeringOld004 } from '../../dist/core/error-code.js'
-export type { IRpcCleanupError as ILayeringNew005 } from '../../dist/core/index.js'
+export type { IRpcCleanupError as ILayeringNew005 } from '../../dist/core/errors.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcCleanupError as ILayeringOld005 } from '../../dist/core/errors.js'
-export type { IRpcError as ILayeringNew006 } from '../../dist/core/index.js'
+export type { IRpcError as ILayeringNew006 } from '../../dist/core/errors.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcError as ILayeringOld006 } from '../../dist/core/errors.js'
-export type { IRpcCoreErrorCode as ILayeringNew007 } from '../../dist/core/index.js'
+export type { IRpcCoreErrorCode as ILayeringNew007 } from '../../dist/core/errors.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcErrorCode as ILayeringOld007 } from '../../dist/core/errors.js'
-export type { IRpcFeature as ILayeringNew008 } from '../../dist/core/index.js'
+export type { IRpcFeature as ILayeringNew008 } from '../../dist/core/feature.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcFeature as ILayeringOld008 } from '../../dist/core/feature.js'
-export type { IRpcFeatureDefinition as ILayeringNew009 } from '../../dist/core/index.js'
+export type { IRpcFeatureDefinition as ILayeringNew009 } from '../../dist/core/feature.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcFeatureDefinition as ILayeringOld009 } from '../../dist/core/feature.js'
-export type { IRpcFeatureSurface as ILayeringNew010 } from '../../dist/core/index.js'
+export type { IRpcFeatureSurface as ILayeringNew010 } from '../../dist/core/feature.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcFeatureSurface as ILayeringOld010 } from '../../dist/core/feature.js'
 export type { IRpcFiniteFeatureTuple as ILayeringNew011 } from '../../dist/core/feature.js'
@@ -33,42 +33,42 @@ export type { IWebRpcFiniteFeatureTuple as ILayeringOld011 } from '../../dist/co
 export type { IRpcOneWayOptions as ILayeringNew012 } from '../../dist/core/features/one-way.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcOneWayOptions as ILayeringOld012 } from '../../dist/core/features/one-way.js'
-export type { IRpcCleanupError as ILayeringNew013 } from '../../dist/core/index.js'
+export type { IRpcCleanupError as ILayeringNew013 } from '../../dist/core/errors.js'
 // @ts-expect-error removes the old public type name.
-export type { IWebRpcCleanupError as ILayeringOld013 } from '../../dist/core/index.js'
-export type { IRpcError as ILayeringNew014 } from '../../dist/core/index.js'
+export type { IWebRpcCleanupError as ILayeringOld013 } from '../../dist/core/errors.js'
+export type { IRpcError as ILayeringNew014 } from '../../dist/core/errors.js'
 // @ts-expect-error removes the old public type name.
-export type { IWebRpcError as ILayeringOld014 } from '../../dist/core/index.js'
-export type { IRpcCoreErrorCode as ILayeringNew015 } from '../../dist/core/index.js'
+export type { IWebRpcError as ILayeringOld014 } from '../../dist/core/errors.js'
+export type { IRpcCoreErrorCode as ILayeringNew015 } from '../../dist/core/errors.js'
 // @ts-expect-error removes the old public type name.
-export type { IWebRpcErrorCode as ILayeringOld015 } from '../../dist/core/index.js'
-export type { IRpcFeature as ILayeringNew016 } from '../../dist/core/index.js'
+export type { IWebRpcErrorCode as ILayeringOld015 } from '../../dist/core/errors.js'
+export type { IRpcFeature as ILayeringNew016 } from '../../dist/core/feature.js'
 // @ts-expect-error removes the old public type name.
-export type { IWebRpcFeature as ILayeringOld016 } from '../../dist/core/index.js'
-export type { IRpcFeatureDefinition as ILayeringNew017 } from '../../dist/core/index.js'
+export type { IWebRpcFeature as ILayeringOld016 } from '../../dist/core/feature.js'
+export type { IRpcFeatureDefinition as ILayeringNew017 } from '../../dist/core/feature.js'
 // @ts-expect-error removes the old public type name.
-export type { IWebRpcFeatureDefinition as ILayeringOld017 } from '../../dist/core/index.js'
-export type { IRpcFeatureSurface as ILayeringNew018 } from '../../dist/core/index.js'
+export type { IWebRpcFeatureDefinition as ILayeringOld017 } from '../../dist/core/feature.js'
+export type { IRpcFeatureSurface as ILayeringNew018 } from '../../dist/core/feature.js'
 // @ts-expect-error removes the old public type name.
-export type { IWebRpcFeatureSurface as ILayeringOld018 } from '../../dist/core/index.js'
-export type { IRpcMiddlewareCore as ILayeringNew019 } from '../../dist/core/index.js'
+export type { IWebRpcFeatureSurface as ILayeringOld018 } from '../../dist/core/feature.js'
+export type { IRpcMiddlewareCore as ILayeringNew019 } from '../../dist/core/middleware.js'
 // @ts-expect-error removes the old public type name.
-export type { IWebRpcMiddlewareCore as ILayeringOld019 } from '../../dist/core/index.js'
-export type { IRpcMiddlewareDescriptor as ILayeringNew020 } from '../../dist/core/index.js'
+export type { IWebRpcMiddlewareCore as ILayeringOld019 } from '../../dist/core/middleware.js'
+export type { IRpcMiddlewareDescriptor as ILayeringNew020 } from '../../dist/core/middleware.js'
 // @ts-expect-error removes the old public type name.
-export type { IWebRpcMiddlewareDescriptor as ILayeringOld020 } from '../../dist/core/index.js'
-export type { IRpcNativeMiddleware as ILayeringNew021 } from '../../dist/core/index.js'
+export type { IWebRpcMiddlewareDescriptor as ILayeringOld020 } from '../../dist/core/middleware.js'
+export type { IRpcNativeMiddleware as ILayeringNew021 } from '../../dist/core/middleware.js'
 // @ts-expect-error removes the old public type name.
-export type { IWebRpcNativeMiddleware as ILayeringOld021 } from '../../dist/core/index.js'
-export type { IRpcSendOptions as ILayeringNew022 } from '../../dist/core/index.js'
+export type { IWebRpcNativeMiddleware as ILayeringOld021 } from '../../dist/core/middleware.js'
+export type { IRpcSendOptions as ILayeringNew022 } from '../../dist/core/transport.js'
 // @ts-expect-error removes the old public type name.
-export type { IWebRpcSendOptions as ILayeringOld022 } from '../../dist/core/index.js'
-export type { IRpcTransport as ILayeringNew023 } from '../../dist/core/index.js'
+export type { IWebRpcSendOptions as ILayeringOld022 } from '../../dist/core/transport.js'
+export type { IRpcTransport as ILayeringNew023 } from '../../dist/core/transport.js'
 // @ts-expect-error removes the old public type name.
-export type { IWebRpcTransport as ILayeringOld023 } from '../../dist/core/index.js'
-export type { IRpcTransportTopologyValue as ILayeringNew024 } from '../../dist/core/index.js'
+export type { IWebRpcTransport as ILayeringOld023 } from '../../dist/core/transport.js'
+export type { IRpcTransportTopologyValue as ILayeringNew024 } from '../../dist/core/transport-constants.js'
 // @ts-expect-error removes the old public type name.
-export type { IWebRpcTransportTopology as ILayeringOld024 } from '../../dist/core/index.js'
+export type { IWebRpcTransportTopology as ILayeringOld024 } from '../../dist/core/typing.js'
 export type { IRpcConstructionControl as ILayeringNew025 } from '../../dist/core/internal/construction-install.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcConstructionControl as ILayeringOld025 } from '../../dist/core/internal/construction-install.js'
@@ -99,15 +99,6 @@ export type { IWebRpcFeaturePolicy as ILayeringOld033 } from '../../dist/core/in
 export type { IRpcNativeRoleClaimSource as ILayeringNew034 } from '../../dist/core/internal/feature-policy.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcNativeRoleClaimSource as ILayeringOld034 } from '../../dist/core/internal/feature-policy.js'
-export type { IRpcFirstPartyRootName as ILayeringNew035 } from '../../dist/core/internal/first-party-roots.js'
-// @ts-expect-error removes the old public type name.
-export type { IWebRpcFirstPartyRootName as ILayeringOld035 } from '../../dist/core/internal/first-party-roots.js'
-export type { IRpcFirstPartyRoots as ILayeringNew036 } from '../../dist/core/internal/first-party-roots.js'
-// @ts-expect-error removes the old public type name.
-export type { IWebRpcFirstPartyRoots as ILayeringOld036 } from '../../dist/core/internal/first-party-roots.js'
-export type { IRpcPublicFirstPartyRootNames as ILayeringNew037 } from '../../dist/core/internal/first-party-roots.js'
-// @ts-expect-error removes the old public type name.
-export type { IWebRpcPublicFirstPartyRootNames as ILayeringOld037 } from '../../dist/core/internal/first-party-roots.js'
 export type { IRpcHookFailureReporter as ILayeringNew038 } from '../../dist/core/internal/hooks.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcHookFailureReporter as ILayeringOld038 } from '../../dist/core/internal/hooks.js'
@@ -282,13 +273,13 @@ export type { IWebRpcMiddlewareComponentContribution as ILayeringOld094 } from '
 export type { IRpcMiddlewareComponentPolicy as ILayeringNew095 } from '../../dist/core/middleware.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcMiddlewareComponentPolicy as ILayeringOld095 } from '../../dist/core/middleware.js'
-export type { IRpcMiddlewareCore as ILayeringNew096 } from '../../dist/core/index.js'
+export type { IRpcMiddlewareCore as ILayeringNew096 } from '../../dist/core/middleware.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcMiddlewareCore as ILayeringOld096 } from '../../dist/core/middleware.js'
-export type { IRpcMiddlewareDescriptor as ILayeringNew097 } from '../../dist/core/index.js'
+export type { IRpcMiddlewareDescriptor as ILayeringNew097 } from '../../dist/core/middleware.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcMiddlewareDescriptor as ILayeringOld097 } from '../../dist/core/middleware.js'
-export type { IRpcNativeMiddleware as ILayeringNew098 } from '../../dist/core/index.js'
+export type { IRpcNativeMiddleware as ILayeringNew098 } from '../../dist/core/middleware.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcNativeMiddleware as ILayeringOld098 } from '../../dist/core/middleware.js'
 export type { IRpcMessageKind as ILayeringNew099 } from '../../dist/core/semantic-constants.js'
@@ -315,10 +306,10 @@ export type { IWebRpcTransportTopologyValue as ILayeringOld106 } from '@migaia/r
 export type { IRpcInboundMessage as ILayeringNew107 } from '../../dist/core/transport.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcInboundMessage as ILayeringOld107 } from '../../dist/core/transport.js'
-export type { IRpcSendOptions as ILayeringNew108 } from '../../dist/core/index.js'
+export type { IRpcSendOptions as ILayeringNew108 } from '../../dist/core/transport.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcSendOptions as ILayeringOld108 } from '../../dist/core/transport.js'
-export type { IRpcTransport as ILayeringNew109 } from '../../dist/core/index.js'
+export type { IRpcTransport as ILayeringNew109 } from '../../dist/core/transport.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcTransport as ILayeringOld109 } from '../../dist/core/transport.js'
 export type { IRpcTransportEncoding as ILayeringNew110 } from '../../dist/core/transport.js'
@@ -327,169 +318,169 @@ export type { IWebRpcTransportEncoding as ILayeringOld110 } from '../../dist/cor
 export type { IRpcTransportOwnership as ILayeringNew111 } from '../../dist/core/transport.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcTransportOwnership as ILayeringOld111 } from '../../dist/core/transport.js'
-export type { IRpcTransportTopologyValue as ILayeringNew112 } from '../../dist/core/index.js'
+export type { IRpcTransportTopologyValue as ILayeringNew112 } from '../../dist/core/transport-constants.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcTransportTopology as ILayeringOld112 } from '../../dist/core/transport.js'
-export type { IRpcAbortCapability as ILayeringNew113 } from '../../dist/core/index.js'
+export type { IRpcAbortCapability as ILayeringNew113 } from '../../dist/core/typing.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcAbortCapability as ILayeringOld113 } from '../../dist/core/typing.js'
 // @ts-expect-error The structural signal is owned by @migaia/utils as IAbortSignal; rpc-host keeps no copy.
-export type { IRpcAbortSignal as ILayeringNew114 } from '../../dist/core/index.js'
+export type { IRpcAbortSignal as ILayeringNew114 } from '../../dist/core/typing.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcAbortSignal as ILayeringOld114 } from '../../dist/core/typing.js'
-export type { IRpcAuthenticationCapability as ILayeringNew115 } from '../../dist/core/index.js'
+export type { IRpcAuthenticationCapability as ILayeringNew115 } from '../../dist/core/typing.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcAuthenticationCapability as ILayeringOld115 } from '../../dist/core/typing.js'
-export type { IRpcAuthenticationConfig as ILayeringNew116 } from '../../dist/core/index.js'
+export type { IRpcAuthenticationConfig as ILayeringNew116 } from '../../dist/core/typing.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcAuthenticationConfig as ILayeringOld116 } from '../../dist/core/typing.js'
-export type { IRpcAuthenticationContext as ILayeringNew117 } from '../../dist/core/index.js'
+export type { IRpcAuthenticationContext as ILayeringNew117 } from '../../dist/core/typing.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcAuthenticationContext as ILayeringOld117 } from '../../dist/core/typing.js'
-export type { IRpcAuthenticationTransform as ILayeringNew118 } from '../../dist/core/index.js'
+export type { IRpcAuthenticationTransform as ILayeringNew118 } from '../../dist/core/typing.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcAuthenticationTransform as ILayeringOld118 } from '../../dist/core/typing.js'
-export type { IRpcAutomaticConnectControl as ILayeringNew119 } from '../../dist/core/index.js'
+export type { IRpcAutomaticConnectControl as ILayeringNew119 } from '../../dist/core/typing.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcAutomaticConnectControl as ILayeringOld119 } from '../../dist/core/typing.js'
-export type { IRpcConnectCapability as ILayeringNew120 } from '../../dist/core/index.js'
+export type { IRpcConnectCapability as ILayeringNew120 } from '../../dist/core/typing.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcConnectCapability as ILayeringOld120 } from '../../dist/core/typing.js'
-export type { IRpcConnectConfig as ILayeringNew121 } from '../../dist/core/index.js'
+export type { IRpcConnectConfig as ILayeringNew121 } from '../../dist/core/typing.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcConnectConfig as ILayeringOld121 } from '../../dist/core/typing.js'
-export type { IRpcConnectContext as ILayeringNew122 } from '../../dist/core/index.js'
+export type { IRpcConnectContext as ILayeringNew122 } from '../../dist/core/typing.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcConnectContext as ILayeringOld122 } from '../../dist/core/typing.js'
-export type { IRpcConnectControl as ILayeringNew123 } from '../../dist/core/index.js'
+export type { IRpcConnectControl as ILayeringNew123 } from '../../dist/core/typing.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcConnectControl as ILayeringOld123 } from '../../dist/core/typing.js'
-export type { IRpcConnectControlForMode as ILayeringNew124 } from '../../dist/core/index.js'
+export type { IRpcConnectControlForMode as ILayeringNew124 } from '../../dist/core/typing.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcConnectControlForMode as ILayeringOld124 } from '../../dist/core/typing.js'
-export type { IRpcContext as ILayeringNew125 } from '../../dist/core/index.js'
+export type { IRpcContext as ILayeringNew125 } from '../../dist/core/typing.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcContext as ILayeringOld125 } from '../../dist/core/typing.js'
-export type { IRpcContractCapability as ILayeringNew126 } from '../../dist/core/index.js'
+export type { IRpcContractCapability as ILayeringNew126 } from '../../dist/core/typing.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcContractCapability as ILayeringOld126 } from '../../dist/core/typing.js'
-export type { IRpcContractConfig as ILayeringNew127 } from '../../dist/core/index.js'
+export type { IRpcContractConfig as ILayeringNew127 } from '../../dist/core/typing.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcContractConfig as ILayeringOld127 } from '../../dist/core/typing.js'
-export type { IRpcDiscoveryCandidate as ILayeringNew128 } from '../../dist/core/index.js'
+export type { IRpcDiscoveryCandidate as ILayeringNew128 } from '../../dist/core/typing.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcDiscoveryCandidate as ILayeringOld128 } from '../../dist/core/typing.js'
-export type { IRpcDiscoveryControl as ILayeringNew129 } from '../../dist/core/index.js'
+export type { IRpcDiscoveryControl as ILayeringNew129 } from '../../dist/core/typing.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcDiscoveryControl as ILayeringOld129 } from '../../dist/core/typing.js'
-export type { IRpcDiscoveryMode as ILayeringNew130 } from '../../dist/core/index.js'
+export type { IRpcDiscoveryMode as ILayeringNew130 } from '../../dist/core/typing.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcDiscoveryMode as ILayeringOld130 } from '../../dist/core/typing.js'
-export type { IRpcEndpoint as ILayeringNew131 } from '../../dist/core/index.js'
+export type { IRpcEndpoint as ILayeringNew131 } from '../../dist/core/typing.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcEndpoint as ILayeringOld131 } from '../../dist/core/typing.js'
-export type { IRpcEndpointFactory as ILayeringNew132 } from '../../dist/core/index.js'
+export type { IRpcEndpointFactory as ILayeringNew132 } from '../../dist/core/typing.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcEndpointFactory as ILayeringOld132 } from '../../dist/core/typing.js'
-export type { IRpcEventListener as ILayeringNew133 } from '../../dist/core/index.js'
+export type { IRpcEventListener as ILayeringNew133 } from '../../dist/core/typing.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcEventListener as ILayeringOld133 } from '../../dist/core/typing.js'
-export type { IRpcFactoryConfig as ILayeringNew134 } from '../../dist/core/index.js'
+export type { IRpcFactoryConfig as ILayeringNew134 } from '../../dist/core/typing.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcFactoryConfig as ILayeringOld134 } from '../../dist/core/typing.js'
-export type { IRpcFanoutResult as ILayeringNew135 } from '../../dist/core/index.js'
+export type { IRpcFanoutResult as ILayeringNew135 } from '../../dist/core/typing.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcFanoutResult as ILayeringOld135 } from '../../dist/core/typing.js'
-export type { IRpcFeatureConfig as ILayeringNew136 } from '../../dist/core/index.js'
+export type { IRpcFeatureConfig as ILayeringNew136 } from '../../dist/core/typing.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcFeatureConfig as ILayeringOld136 } from '../../dist/core/typing.js'
-export type { IRpcHook as ILayeringNew137 } from '../../dist/core/index.js'
+export type { IRpcHook as ILayeringNew137 } from '../../dist/core/typing.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcHook as ILayeringOld137 } from '../../dist/core/typing.js'
-export type { IRpcHookEvent as ILayeringNew138 } from '../../dist/core/index.js'
+export type { IRpcHookEvent as ILayeringNew138 } from '../../dist/core/typing.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcHookEvent as ILayeringOld138 } from '../../dist/core/typing.js'
-export type { IRpcHooksConfig as ILayeringNew139 } from '../../dist/core/index.js'
+export type { IRpcHooksConfig as ILayeringNew139 } from '../../dist/core/typing.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcHooksConfig as ILayeringOld139 } from '../../dist/core/typing.js'
-export type { IRpcInboundDiscoveryQuery as ILayeringNew140 } from '../../dist/core/index.js'
+export type { IRpcInboundDiscoveryQuery as ILayeringNew140 } from '../../dist/core/typing.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcInboundDiscoveryQuery as ILayeringOld140 } from '../../dist/core/typing.js'
-export type { IRpcManualConnectControl as ILayeringNew141 } from '../../dist/core/index.js'
+export type { IRpcManualConnectControl as ILayeringNew141 } from '../../dist/core/typing.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcManualConnectControl as ILayeringOld141 } from '../../dist/core/typing.js'
-export type { IRpcMethodSchema as ILayeringNew142 } from '../../dist/core/index.js'
+export type { IRpcMethodSchema as ILayeringNew142 } from '../../dist/core/typing.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcMethodSchema as ILayeringOld142 } from '../../dist/core/typing.js'
-export type { IRpcMiddleware as ILayeringNew143 } from '../../dist/core/index.js'
+export type { IRpcMiddleware as ILayeringNew143 } from '../../dist/core/typing.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcMiddleware as ILayeringOld143 } from '../../dist/core/typing.js'
-export type { IRpcPingCapability as ILayeringNew144 } from '../../dist/core/index.js'
+export type { IRpcPingCapability as ILayeringNew144 } from '../../dist/core/typing.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcPingCapability as ILayeringOld144 } from '../../dist/core/typing.js'
-export type { IRpcPingEndpointSurface as ILayeringNew145 } from '../../dist/core/index.js'
+export type { IRpcPingEndpointSurface as ILayeringNew145 } from '../../dist/core/typing.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcPingEndpointSurface as ILayeringOld145 } from '../../dist/core/typing.js'
-export type { IRpcPingOptions as ILayeringNew146 } from '../../dist/core/index.js'
+export type { IRpcPingOptions as ILayeringNew146 } from '../../dist/core/typing.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcPingOptions as ILayeringOld146 } from '../../dist/core/typing.js'
-export type { IRpcPlatformValue as ILayeringNew147 } from '../../dist/core/index.js'
+export type { IRpcPlatformValue as ILayeringNew147 } from '../../dist/core/transport-constants.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcPlatform as ILayeringOld147 } from '../../dist/core/typing.js'
-export type { IRpcPlugin as ILayeringNew148 } from '../../dist/core/index.js'
+export type { IRpcPlugin as ILayeringNew148 } from '../../dist/core/typing.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcPlugin as ILayeringOld148 } from '../../dist/core/typing.js'
-export type { IRpcPluginClaims as ILayeringNew149 } from '../../dist/core/index.js'
+export type { IRpcPluginClaims as ILayeringNew149 } from '../../dist/core/typing.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcPluginClaims as ILayeringOld149 } from '../../dist/core/typing.js'
-export type { IRpcPluginInstallResult as ILayeringNew150 } from '../../dist/core/index.js'
+export type { IRpcPluginInstallResult as ILayeringNew150 } from '../../dist/core/typing.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcPluginInstallResult as ILayeringOld150 } from '../../dist/core/typing.js'
-export type { IRpcPluginInstallScope as ILayeringNew151 } from '../../dist/core/index.js'
+export type { IRpcPluginInstallScope as ILayeringNew151 } from '../../dist/core/typing.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcPluginInstallScope as ILayeringOld151 } from '../../dist/core/typing.js'
-export type { IRpcPluginMetadata as ILayeringNew152 } from '../../dist/core/index.js'
+export type { IRpcPluginMetadata as ILayeringNew152 } from '../../dist/core/typing.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcPluginMetadata as ILayeringOld152 } from '../../dist/core/typing.js'
-export type { IRpcProtocolCapability as ILayeringNew153 } from '../../dist/core/index.js'
+export type { IRpcProtocolCapability as ILayeringNew153 } from '../../dist/core/typing.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcProtocolCapability as ILayeringOld153 } from '../../dist/core/typing.js'
-export type { IRpcProtocolConfig as ILayeringNew154 } from '../../dist/core/index.js'
+export type { IRpcProtocolConfig as ILayeringNew154 } from '../../dist/core/typing.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcProtocolConfig as ILayeringOld154 } from '../../dist/core/typing.js'
-export type { IRpcProvider as ILayeringNew155 } from '../../dist/core/index.js'
+export type { IRpcProvider as ILayeringNew155 } from '../../dist/core/typing.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcProvider as ILayeringOld155 } from '../../dist/core/typing.js'
-export type { IRpcProviderLimits as ILayeringNew156 } from '../../dist/core/index.js'
+export type { IRpcProviderLimits as ILayeringNew156 } from '../../dist/core/typing.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcProviderLimits as ILayeringOld156 } from '../../dist/core/typing.js'
-export type { IRpcProviderResult as ILayeringNew157 } from '../../dist/core/index.js'
+export type { IRpcProviderResult as ILayeringNew157 } from '../../dist/core/typing.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcProviderResult as ILayeringOld157 } from '../../dist/core/typing.js'
-export type { IRpcError as ILayeringNew158 } from '../../dist/core/index.js'
+export type { IRpcError as ILayeringNew158 } from '../../dist/core/errors.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcPublicError as ILayeringOld158 } from '../../dist/core/typing.js'
-export type { IRpcSchema as ILayeringNew159 } from '../../dist/core/index.js'
+export type { IRpcSchema as ILayeringNew159 } from '../../dist/core/typing.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcSchema as ILayeringOld159 } from '../../dist/core/typing.js'
-export type { IRpcSchemaIssue as ILayeringNew160 } from '../../dist/core/index.js'
+export type { IRpcSchemaIssue as ILayeringNew160 } from '../../dist/core/typing.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcSchemaIssue as ILayeringOld160 } from '../../dist/core/typing.js'
-export type { IRpcServerMetadata as ILayeringNew161 } from '../../dist/core/index.js'
+export type { IRpcServerMetadata as ILayeringNew161 } from '../../dist/core/typing.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcServerMetadata as ILayeringOld161 } from '../../dist/core/typing.js'
-export type { IRpcTimeoutCapability as ILayeringNew162 } from '../../dist/core/index.js'
+export type { IRpcTimeoutCapability as ILayeringNew162 } from '../../dist/core/typing.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcTimeoutCapability as ILayeringOld162 } from '../../dist/core/typing.js'
-export type { IRpcTimeoutConfig as ILayeringNew163 } from '../../dist/core/index.js'
+export type { IRpcTimeoutConfig as ILayeringNew163 } from '../../dist/core/typing.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcTimeoutConfig as ILayeringOld163 } from '../../dist/core/typing.js'
-export type { IRpcUniqueTargetIdContext as ILayeringNew164 } from '../../dist/core/index.js'
+export type { IRpcUniqueTargetIdContext as ILayeringNew164 } from '../../dist/core/typing.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcUniqueTargetIdContext as ILayeringOld164 } from '../../dist/core/typing.js'
-export type { IRpcUuidConfig as ILayeringNew165 } from '../../dist/core/index.js'
+export type { IRpcUuidConfig as ILayeringNew165 } from '../../dist/core/typing.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcUuidConfig as ILayeringOld165 } from '../../dist/core/typing.js'
-export type { IRpcUuidContext as ILayeringNew166 } from '../../dist/core/index.js'
+export type { IRpcUuidContext as ILayeringNew166 } from '../../dist/core/typing.js'
 // @ts-expect-error removes the old public type name.
 export type { IWebRpcUuidContext as ILayeringOld166 } from '../../dist/core/typing.js'

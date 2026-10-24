@@ -142,61 +142,146 @@ export function createBinaryFramer<const TOptions extends IRpcFramerOptions = IR
 }
 
 /** Builds one profile while keeping framing independent from semantic and codec layers. */
-function createFragmentFramer<TKind extends 'string' | 'binary', TEncoded extends IEncoded>(
+/** Allocate one source-scoped fragment reassembly lifetime before installing behavior callbacks. */
+function fragmentFramerState<TKind extends 'string' | 'binary', TEncoded extends IEncoded>(
   kind: TKind,
   input: IRpcFramerOptions | undefined,
   lengthOf: (value: TEncoded) => number,
   slice: (value: TEncoded, start: number, end: number) => TEncoded
-): IValidatedFramer<TEncoded, TEncoded | IFrame> {
+) {
+  /** A frozen option snapshot fixes frame and retention budgets for this one framer. */
   const options = snapshotOptions(input)
+  /** Source and message identifiers isolate incomplete fragment buffers from unrelated senders. */
   const buffers = new Map<string, Map<string, IBuffer<TEncoded>>>()
   /** Keep opaque source/message lookup separate from global eviction order. */
   const terminal = new Map<string, Map<string, ITerminalState>>()
   /** Map key order avoids scanning or moving the bounded recent-terminal entries. */
   const terminalOrder = new Map<ITerminalState, undefined>()
+  /** Aggregate retained payload bytes enforce the framer-wide memory budget. */
   let bufferedBytes = 0
+  /** The active-message count enforces the concurrent incomplete-message limit. */
   let activeBuffers = 0
+  /** Terminal admission state prevents this owner from accepting work after its resource is closed. */
   let closed = false
+
+  return {
+    options,
+    buffers,
+    terminal,
+    terminalOrder,
+    bufferedBytes,
+    activeBuffers,
+    closed,
+    kind,
+    input,
+    lengthOf,
+    slice
+  }
+}
+
+/** Own one source-scoped fragment reassembly lifetime; callbacks access only this explicit instance. */
+class FragmentFramer<TKind extends 'string' | 'binary', TEncoded extends IEncoded> {
+  /** All mutable storage and original construction inputs belong to this operation. */
+  #state: ReturnType<typeof fragmentFramerState<TKind, TEncoded>>
+  /** Preserve the original stable resource surface and callback identities. */
+  readonly value: IValidatedFramer<TEncoded, TEncoded | IFrame>
+  /** Initialize owned storage before publishing the resource's callbacks. */
+  constructor(
+    kind: TKind,
+    input: IRpcFramerOptions | undefined,
+    lengthOf: (value: TEncoded) => number,
+    slice: (value: TEncoded, start: number, end: number) => TEncoded
+  ) {
+    this.#state = fragmentFramerState(kind, input, lengthOf, slice)
+    /** Records the actual native output union without inferring it from descriptor metadata. */
+    const nativeOutputDomain: IRpcNativeFrameOutputDomain = Object.freeze({
+      kind: 'carrier-or-fragment',
+      carrierEncodedType: this.#state.kind === 'string' ? 'string' : 'uint8array'
+    })
+    registerNativeRpcFrameIngress(
+      this.#accept,
+      this.#frame,
+      (value, context) => {
+        if (
+          (this.#state.kind === 'string' && typeof value === 'string') ||
+          (this.#state.kind === 'binary' &&
+            typeof value === 'object' &&
+            value !== null &&
+            isUint8Array(value))
+        )
+          return Object.freeze({ frame: value, messageId: context.messageId })
+        let snapshot: IFrameSnapshot | undefined
+        try {
+          snapshot =
+            typeof value === 'object' && value !== null ? snapshotFrame(value as IFrame) : undefined
+        } catch (cause) {
+          const error = createContractError(RpcContractErrorCode.invalidFrame, cause)
+          throw error
+        }
+        return Object.freeze({
+          frame: snapshot ? Object.freeze(snapshot) : Object.freeze({}),
+          messageId:
+            typeof snapshot?.messageId === 'string' ? snapshot.messageId : context.messageId
+        })
+      },
+      nativeOutputDomain
+    )
+    registerRpcSingleFrameFacts(this.#accept, this.#frame, {
+      maxConcurrentMessages: this.#state.options.maxConcurrentMessages,
+      maxMessageBytes: this.#state.options.maxMessageBytes
+    })
+    this.value = Object.freeze({
+      ...createDescriptor('message', 1),
+      inputEncodedType: this.#state.kind === 'string' ? 'string' : 'uint8array',
+      outputEncodedType: this.#state.kind === 'string' ? 'string' : 'uint8array',
+      frame: this.#frame,
+      accept: this.#accept,
+      close: this.#close
+    }) as IValidatedFramer<TEncoded, TEncoded | IFrame>
+  }
   /** Retain only a bounded recent terminal history for late-frame rejection. */
-  const markTerminal = (source: string, messageId: string, didExpire: boolean): void => {
+  #markTerminal = (source: string, messageId: string, didExpire: boolean): void => {
     /** The original nested owner keeps source/message pairs collision-free. */
-    let sourceTerminal = terminal.get(source)
+    let sourceTerminal = this.#state.terminal.get(source)
     if (!sourceTerminal) {
       sourceTerminal = new Map<string, ITerminalState>()
-      terminal.set(source, sourceTerminal)
+      this.#state.terminal.set(source, sourceTerminal)
     }
     /** Reuse the canonical entry so updating a terminal also refreshes its insertion order. */
     let state = sourceTerminal.get(messageId)
     if (state) {
-      terminalOrder.delete(state)
+      this.#state.terminalOrder.delete(state)
       state.didExpire = didExpire
     } else {
       state = { source, messageId, didExpire }
       sourceTerminal.set(messageId, state)
     }
-    terminalOrder.set(state, undefined)
-    while (terminalOrder.size > options.maxConcurrentMessages * 2) {
+    this.#state.terminalOrder.set(state, undefined)
+    while (this.#state.terminalOrder.size > this.#state.options.maxConcurrentMessages * 2) {
       /** The first Map key is the same oldest source/message pair the prior array retained. */
-      const oldest = terminalOrder.keys().next().value
+      const oldest = this.#state.terminalOrder.keys().next().value
       if (!oldest) break
-      terminalOrder.delete(oldest)
+      this.#state.terminalOrder.delete(oldest)
       /** Remove only the corresponding nested source entry; other sources remain independent. */
-      const oldestMap = terminal.get(oldest.source)
+      const oldestMap = this.#state.terminal.get(oldest.source)
       oldestMap?.delete(oldest.messageId)
-      if (oldestMap?.size === 0) terminal.delete(oldest.source)
+      if (oldestMap?.size === 0) this.#state.terminal.delete(oldest.source)
     }
   }
-  const sourceBuffers = (source: string): Map<string, IBuffer<TEncoded>> => {
-    let result = buffers.get(source)
+
+  #sourceBuffers = (source: string): Map<string, IBuffer<TEncoded>> => {
+    let result = this.#state.buffers.get(source)
     if (!result) {
       result = new Map<string, IBuffer<TEncoded>>()
-      buffers.set(source, result)
+      this.#state.buffers.set(source, result)
     }
     return result
   }
-  const schedule = (callback: () => void, delay: number): unknown => {
+
+  #schedule = (callback: () => void, delay: number): unknown => {
     try {
-      if (options.schedule) return options.schedule(callback, delay)
+      if (this.#state.options.schedule) return this.#state.options.schedule(callback, delay)
+      /** Revoke assembly ownership and account once before a user cancel callback can reenter. */
       const timer = (
         globalThis as unknown as { setTimeout?: (task: () => void, timeout: number) => unknown }
       ).setTimeout
@@ -206,15 +291,18 @@ function createFragmentFramer<TKind extends 'string' | 'binary', TEncoded extend
       throw identifyContractCallbackFailure(error)
     }
   }
-  const cancel = (handle: unknown): void => {
-    if (options.cancel) options.cancel(handle)
+
+  #cancel = (handle: unknown): void => {
+    if (this.#state.options.cancel) this.#state.options.cancel(handle)
     else {
+      /** Revoke assembly ownership and account once before a user cancel callback can reenter. */
       const timer = (globalThis as unknown as { clearTimeout?: (value: unknown) => void })
         .clearTimeout
       timer?.(handle)
     }
   }
-  const reportCleanupFailure = (error: unknown): void => {
+
+  #reportCleanupFailure = (error: unknown): void => {
     /** Reuse utils' terminal host observation when the optional host reporter cannot accept it. */
     const failure = identifyContractCallbackFailure(error)
     observeThenableRejection(undefined, { error: failure }, (primary) => {
@@ -230,37 +318,44 @@ function createFragmentFramer<TKind extends 'string' | 'binary', TEncoded extend
       }
     })
   }
-  const clearBuffer = (source: string, messageId: string): void => {
-    const sourceMap = buffers.get(source)
+
+  #clearBuffer = (source: string, messageId: string): void => {
+    const sourceMap = this.#state.buffers.get(source)
     const buffer = sourceMap?.get(messageId)
     if (!sourceMap || !buffer) return
     /** Revoke assembly ownership and account once before a user cancel callback can reenter. */
     const timer = buffer.timer
     buffer.timer = undefined
-    bufferedBytes -= buffer.bytes
+    this.#state.bufferedBytes -= buffer.bytes
     sourceMap.delete(messageId)
-    if (sourceMap.size === 0) buffers.delete(source)
-    activeBuffers -= 1
+    if (sourceMap.size === 0) this.#state.buffers.delete(source)
+    this.#state.activeBuffers -= 1
     if (timer !== undefined) {
       try {
-        cancel(timer)
+        this.#cancel(timer)
       } catch (error) {
-        reportCleanupFailure(error)
+        this.#reportCleanupFailure(error)
       }
     }
   }
-  const frame = (value: TEncoded, context: IRpcFrameContext): readonly (TEncoded | IFrame)[] => {
-    const size = lengthOf(value)
-    if (!Number.isSafeInteger(size) || size > options.maxMessageBytes)
+
+  #frame = (value: TEncoded, context: IRpcFrameContext): readonly (TEncoded | IFrame)[] => {
+    /** Whole carriers have the same message ceiling as fragmented and outbound messages. */
+    const size = (0, this.#state.lengthOf)(value)
+    if (!Number.isSafeInteger(size) || size > this.#state.options.maxMessageBytes)
       throw createContractError(RpcContractErrorCode.frameLimitExceeded)
-    if (size <= options.chunkBytes) return [value]
-    const count = Math.ceil(size / options.chunkBytes)
-    if (count > options.maxChunks)
+    if (size <= this.#state.options.chunkBytes) return [value]
+    const count = Math.ceil(size / this.#state.options.chunkBytes)
+    if (count > this.#state.options.maxChunks)
       throw createContractError(RpcContractErrorCode.frameLimitExceeded)
     const frames: IFrame[] = []
     for (let index = 0; index < count; index += 1) {
-      const start = index * options.chunkBytes
-      const data = slice(value, start, Math.min(size, start + options.chunkBytes))
+      const start = index * this.#state.options.chunkBytes
+      const data = (0, this.#state.slice)(
+        value,
+        start,
+        Math.min(size, start + this.#state.options.chunkBytes)
+      )
       frames.push(
         Object.freeze({
           kind: 'rpc.frame.v1',
@@ -274,16 +369,20 @@ function createFragmentFramer<TKind extends 'string' | 'binary', TEncoded extend
     }
     return frames
   }
-  const accept = (value: unknown, context: IRpcFrameContext): IRpcFrameAcceptResult<TEncoded> => {
-    if (closed)
+
+  #accept = (value: unknown, context: IRpcFrameContext): IRpcFrameAcceptResult<TEncoded> => {
+    if (this.#state.closed)
       return { status: 'rejected', error: createContractError(RpcContractErrorCode.invalidFrame) }
     if (
-      (kind === 'string' && typeof value === 'string') ||
-      (kind === 'binary' && typeof value === 'object' && value !== null && isUint8Array(value))
+      (this.#state.kind === 'string' && typeof value === 'string') ||
+      (this.#state.kind === 'binary' &&
+        typeof value === 'object' &&
+        value !== null &&
+        isUint8Array(value))
     ) {
       /** Whole carriers have the same message ceiling as fragmented and outbound messages. */
-      const size = lengthOf(value as TEncoded)
-      if (!Number.isSafeInteger(size) || size > options.maxMessageBytes)
+      const size = (0, this.#state.lengthOf)(value as TEncoded)
+      if (!Number.isSafeInteger(size) || size > this.#state.options.maxMessageBytes)
         return {
           status: 'rejected',
           error: createContractError(RpcContractErrorCode.frameLimitExceeded)
@@ -310,14 +409,14 @@ function createFragmentFramer<TKind extends 'string' | 'binary', TEncoded extend
       snapshot.index < 0 ||
       snapshot.count <= 0 ||
       snapshot.index >= snapshot.count ||
-      snapshot.count > options.maxChunks ||
+      snapshot.count > this.#state.options.maxChunks ||
       typeof snapshot.length !== 'number' ||
       !Number.isSafeInteger(snapshot.length)
     )
       return { status: 'rejected', error: createContractError(RpcContractErrorCode.invalidFrame) }
     if (
-      (kind === 'string' && typeof snapshot.data !== 'string') ||
-      (kind === 'binary' &&
+      (this.#state.kind === 'string' && typeof snapshot.data !== 'string') ||
+      (this.#state.kind === 'binary' &&
         (typeof snapshot.data !== 'object' ||
           snapshot.data === null ||
           !isUint8Array(snapshot.data)))
@@ -326,15 +425,19 @@ function createFragmentFramer<TKind extends 'string' | 'binary', TEncoded extend
     const index = snapshot.index as number
     const count = snapshot.count as number
     const length = snapshot.length as number
-    const bytes = lengthOf(snapshot.data as TEncoded)
-    if (length <= 0 || length > options.maxMessageBytes || bytes > options.chunkBytes)
+    const bytes = (0, this.#state.lengthOf)(snapshot.data as TEncoded)
+    if (
+      length <= 0 ||
+      length > this.#state.options.maxMessageBytes ||
+      bytes > this.#state.options.chunkBytes
+    )
       return {
         status: 'rejected',
         error: createContractError(RpcContractErrorCode.frameLimitExceeded)
       }
     const source = context.source
     const messageId = snapshot.messageId as string
-    const terminalState = terminal.get(source)?.get(messageId)?.didExpire
+    const terminalState = this.#state.terminal.get(source)?.get(messageId)?.didExpire
     if (terminalState !== undefined)
       return {
         status: 'rejected',
@@ -344,12 +447,12 @@ function createFragmentFramer<TKind extends 'string' | 'binary', TEncoded extend
             : RpcContractErrorCode.invalidFrame
         )
       }
-    let buffer = buffers.get(source)?.get(messageId)
+    let buffer = this.#state.buffers.get(source)?.get(messageId)
     if (!buffer) {
       if (
         index !== 0 ||
-        activeBuffers >= options.maxConcurrentMessages ||
-        bufferedBytes + bytes > options.maxBufferedBytes
+        this.#state.activeBuffers >= this.#state.options.maxConcurrentMessages ||
+        this.#state.bufferedBytes + bytes > this.#state.options.maxBufferedBytes
       )
         return {
           status: 'rejected',
@@ -360,23 +463,26 @@ function createFragmentFramer<TKind extends 'string' | 'binary', TEncoded extend
           )
         }
       buffer = { count, expectedLength: length, parts: [], bytes: 0, next: 0 }
-      buffer.timer = schedule(() => {
-        if (!buffers.get(source)?.has(messageId)) return
-        clearBuffer(source, messageId)
-        markTerminal(source, messageId, true)
-      }, options.assemblyTimeoutMs)
-      sourceBuffers(source).set(messageId, buffer)
-      activeBuffers += 1
+      buffer.timer = this.#schedule(() => {
+        if (!this.#state.buffers.get(source)?.has(messageId)) return
+        this.#clearBuffer(source, messageId)
+        this.#markTerminal(source, messageId, true)
+      }, this.#state.options.assemblyTimeoutMs)
+      this.#sourceBuffers(source).set(messageId, buffer)
+      this.#state.activeBuffers += 1
     }
     if (buffer.count !== count || buffer.expectedLength !== length || index !== buffer.next)
       return { status: 'rejected', error: createContractError(RpcContractErrorCode.invalidFrame) }
     buffer.parts.push(snapshot.data as TEncoded)
     buffer.next += 1
     buffer.bytes += bytes
-    bufferedBytes += bytes
-    if (buffer.bytes > options.maxMessageBytes || bufferedBytes > options.maxBufferedBytes) {
-      clearBuffer(source, messageId)
-      markTerminal(source, messageId, false)
+    this.#state.bufferedBytes += bytes
+    if (
+      buffer.bytes > this.#state.options.maxMessageBytes ||
+      this.#state.bufferedBytes > this.#state.options.maxBufferedBytes
+    ) {
+      this.#clearBuffer(source, messageId)
+      this.#markTerminal(source, messageId, false)
       return {
         status: 'rejected',
         error: createContractError(RpcContractErrorCode.frameLimitExceeded)
@@ -384,15 +490,16 @@ function createFragmentFramer<TKind extends 'string' | 'binary', TEncoded extend
     }
     if (buffer.next !== buffer.count) return { status: 'pending' }
     /** String length is checked after joining, preserving the original surrogate behavior. */
-    let complete = kind === 'string' ? ((buffer.parts as string[]).join('') as TEncoded) : undefined
+    let complete =
+      this.#state.kind === 'string' ? ((buffer.parts as string[]).join('') as TEncoded) : undefined
     /** Re-read actual binary lengths before allocating; declared totals never pad or overrun. */
-    let actualLength = complete === undefined ? 0 : lengthOf(complete)
-    if (kind === 'binary') {
+    let actualLength = complete === undefined ? 0 : (0, this.#state.lengthOf)(complete)
+    if (this.#state.kind === 'binary') {
       for (const part of buffer.parts as Uint8Array[]) actualLength += part.byteLength
     }
     if (actualLength !== buffer.expectedLength) {
-      clearBuffer(source, messageId)
-      markTerminal(source, messageId, false)
+      this.#clearBuffer(source, messageId)
+      this.#markTerminal(source, messageId, false)
       return { status: 'rejected', error: createContractError(RpcContractErrorCode.invalidFrame) }
     }
     if (complete === undefined) {
@@ -406,59 +513,29 @@ function createFragmentFramer<TKind extends 'string' | 'binary', TEncoded extend
       }
       complete = output as TEncoded
     }
-    clearBuffer(source, messageId)
-    markTerminal(source, messageId, false)
+    this.#clearBuffer(source, messageId)
+    this.#markTerminal(source, messageId, false)
     return { status: 'complete', value: complete }
   }
-  const close = (): void => {
-    closed = true
-    for (const [source, sourceMap] of buffers) {
-      for (const messageId of sourceMap.keys()) clearBuffer(source, messageId)
+
+  #close = (): void => {
+    this.#state.closed = true
+    for (const [source, sourceMap] of this.#state.buffers) {
+      for (const messageId of sourceMap.keys()) this.#clearBuffer(source, messageId)
     }
-    terminal.clear()
-    terminalOrder.clear()
+    this.#state.terminal.clear()
+    this.#state.terminalOrder.clear()
   }
-  /** Records the actual native output union without inferring it from descriptor metadata. */
-  const nativeOutputDomain: IRpcNativeFrameOutputDomain = Object.freeze({
-    kind: 'carrier-or-fragment',
-    carrierEncodedType: kind === 'string' ? 'string' : 'uint8array'
-  })
-  registerNativeRpcFrameIngress(
-    accept,
-    frame,
-    (value, context) => {
-      if (
-        (kind === 'string' && typeof value === 'string') ||
-        (kind === 'binary' && typeof value === 'object' && value !== null && isUint8Array(value))
-      )
-        return Object.freeze({ frame: value, messageId: context.messageId })
-      let snapshot: IFrameSnapshot | undefined
-      try {
-        snapshot =
-          typeof value === 'object' && value !== null ? snapshotFrame(value as IFrame) : undefined
-      } catch (cause) {
-        const error = createContractError(RpcContractErrorCode.invalidFrame, cause)
-        throw error
-      }
-      return Object.freeze({
-        frame: snapshot ? Object.freeze(snapshot) : Object.freeze({}),
-        messageId: typeof snapshot?.messageId === 'string' ? snapshot.messageId : context.messageId
-      })
-    },
-    nativeOutputDomain
-  )
-  registerRpcSingleFrameFacts(accept, frame, {
-    maxConcurrentMessages: options.maxConcurrentMessages,
-    maxMessageBytes: options.maxMessageBytes
-  })
-  return Object.freeze({
-    ...createDescriptor('message', 1),
-    inputEncodedType: kind === 'string' ? 'string' : 'uint8array',
-    outputEncodedType: kind === 'string' ? 'string' : 'uint8array',
-    frame,
-    accept,
-    close
-  }) as IValidatedFramer<TEncoded, TEncoded | IFrame>
+}
+
+/** Construct the single owner for one source-scoped fragment reassembly lifetime. */
+function createFragmentFramer<TKind extends 'string' | 'binary', TEncoded extends IEncoded>(
+  kind: TKind,
+  input: IRpcFramerOptions | undefined,
+  lengthOf: (value: TEncoded) => number,
+  slice: (value: TEncoded, start: number, end: number) => TEncoded
+): IValidatedFramer<TEncoded, TEncoded | IFrame> {
+  return new FragmentFramer<TKind, TEncoded>(kind, input, lengthOf, slice).value
 }
 
 /** Snapshot every frame field once so validation cannot race hostile accessors. */

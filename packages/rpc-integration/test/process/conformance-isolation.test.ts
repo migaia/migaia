@@ -16,24 +16,26 @@ import { createProcessResilience } from '../../../rpc-plugin-process/dist/proces
 import {
   dialProcessByteChannel,
   listenProcessByteChannel
-} from '@migaia/rpc-plugin-process/adapters/node-socket'
+} from '../../../rpc-plugin-process/dist/process/adapters/node-socket.js'
 import {
   client,
   peers,
   evidence,
   wireFrames,
   deployment,
-  contract
+  installBusinessClient,
+  businessFeature
 } from './fixtures/conformance-business.js'
-import { PluginHost } from '@migaia/plugin-host'
-import {
-  adoptHostRegistration,
-  type IAdoptedHostRegistration
-} from '../../../rpc-plugin-process/test/protocol.ts'
 import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
 import { createManualScheduler } from '@migaia/utils/testing'
-import { createProcessPlugin } from '../../../rpc-plugin-process/test/protocol.ts'
-import { endpointFor } from './peers/ts/runtime.js'
+import { deferred } from '@migaia/utils/promise'
+import { matrixEndpoint } from './matrix-fixture.js'
+import { serveProcessSessions } from '../../../rpc-plugin-process/dist/process/plugin/serve.js'
+import {
+  createRuntimePeer,
+  readRuntimePeerConnection,
+  prepareRuntimePeerSourceContext
+} from '../../../rpc-host/dist/remote/runtime-api/peer.js'
 
 /** Observe actual child descriptors; lsof is never used as a simulated admission counter. */
 function descriptors(pid: number): number {
@@ -63,35 +65,58 @@ async function observedClient(token: string, address: string, scheduler?: ISched
       return establish(channel, context)
     }
   }
-  /** An actual PluginHost installs the same public process facade used by the business matrix. */
-  const host = new PluginHost<Record<string, never>>({
-    execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
-  })
-  /** The timeout oracle uses this exact public endpoint already owned by the installed facade. */
-  let runtime: Awaited<ReturnType<typeof endpointFor>> | undefined
-  /** No alternate replay or idempotency implementation participates in this fixture. */
-  const definition = createProcessPlugin({
-    name: 'p',
-    contract,
-    registrationOwner: { name: 'p', host },
-    host: host.plugin,
-    deployment: selected,
-    endpointFactory: async (channel) => {
-      runtime = await endpointFor(channel, 'caller')
-      return runtime
-    },
-    report: (error) => fixture.reports.push(error)
-  })
-  /** The installed feature is the production proxy, rather than a test provider stand-in. */
-  const [installed] = await host.use(definition)
+  if (scheduler) {
+    /**
+     * This deadline oracle needs the actual Core endpoint clock; the public Host owns a system
+     * clock.
+     */
+    const signal = new AbortController().signal
+    const channel = await selected.establish(await selected.dial(address, signal), {
+      role: 'initiator',
+      signal,
+      scheduler,
+      token,
+      session: { connectionId: 'deadline-caller', sessionId: 'deadline-caller' },
+      offer: {
+        ...selected.offer!,
+        capabilities: prepareRuntimePeerSourceContext({ name: 'caller', instanceId: 'caller' })
+          .capabilities
+      }
+    })
+    /**
+     * Reuse the actual accepted channel and production Peer owner without a second endpoint or
+     * dispatcher.
+     */
+    const active = await createRuntimePeer(
+      {
+        self: { name: 'caller', instanceId: 'caller' },
+        report: (error) => {
+          fixture.reports.push(error)
+        }
+      },
+      { channel }
+    )
+    const accepted = readRuntimePeerConnection(active)
+    return {
+      ...fixture,
+      raw: raw!,
+      runtime: {
+        endpoint: accepted.endpoint,
+        oneWay: accepted.endpoint,
+        stream: accepted.endpoint.stream
+      },
+      feature: businessFeature(active),
+      close: active.close
+    }
+  }
+  /** The actual ordinary Host shares the same native client owner as the foreign business matrix. */
+  const installed = await installBusinessClient(fixture, selected)
   return {
     ...fixture,
     raw: raw!,
-    runtime: runtime!,
-    feature: installed!.getFeature('f') as Awaited<ReturnType<typeof client>>['feature'],
-    close: async () => {
-      await host.dispose()
-    }
+    runtime: installed.runtime,
+    feature: businessFeature(installed.active),
+    close: installed.close
   }
 }
 
@@ -129,61 +154,81 @@ function noSecret(value: unknown, secret: string): void {
 
 /** Start a borrowed child with credentials inherited through one private read-only descriptor. */
 async function listener(mode: string) {
-  /** Temporary files and socket belong only to this fixture. */
   const directory = await mkdtemp(join(tmpdir(), 'rpc-hi-'))
-  /** Unique authentication sentinels distinguish principals without being process metadata. */
-  const tokens = { alice: randomUUID(), bob: randomUUID() }
-  /** Private descriptor input contains credentials; only the child reads this content. */
-  const authPath = join(directory, 'auth')
-  writeFileSync(authPath, JSON.stringify(tokens), { mode: 0o600 })
-  /** The child never receives a token in arguments or environment. */
-  const descriptor = openSync(authPath, 'r')
-  /** Physical rendezvous location carries no business or authentication material. */
-  const address = join(directory, 'peer.sock')
-  /** This fixture owns the external PID; processPlugin clients only borrow its sockets. */
-  const child = spawn(process.execPath, [...fixturePeer.args, mode, address], {
-    stdio: ['ignore', 'pipe', 'pipe', descriptor]
-  })
-  closeSync(descriptor)
-  /** The inherited open descriptor survives unlink; no private credential file remains on disk. */
-  unlinkSync(authPath)
-  /** All raw outputs survive success and failure for precise child-side diagnosis. */
-  const stdout: Buffer[] = []
-  /** Listener diagnostics must contain no credential substring. */
-  const stderr: Buffer[] = []
-  child.stdout!.on('data', (chunk: Buffer) => stdout.push(chunk))
-  child.stderr!.on('data', (chunk: Buffer) => stderr.push(chunk))
-  /** Readiness is an explicit child receipt rather than a timing assumption. */
-  await new Promise<void>((resolve, reject) => {
-    /** The ready output can arrive across chunks. */
-    const onData = () => {
-      if (Buffer.concat(stderr).includes('ISOLATION_READY:')) {
-        child.stderr!.off('data', onData)
-        resolve()
-      }
-    }
-    child.stderr!.on('data', onData)
-    child.once('exit', (code) => reject(new Error(`isolation child exited before ready: ${code}`)))
-    child.once('error', reject)
-  })
-  return {
-    child,
-    address,
-    tokens,
-    close: async () => {
-      /** Client sockets are closed by their owners before this fixture stops its external PID. */
-      const exited = once(child, 'exit')
-      child.kill('SIGTERM')
-      await exited
-      try {
-        writeFileSync(join(evidence, `isolation-${mode}.stdout.log`), Buffer.concat(stdout))
-        writeFileSync(join(evidence, `isolation-${mode}.stderr.log`), Buffer.concat(stderr))
-        noSecret(Buffer.concat(stderr).toString(), tokens.alice)
-        noSecret(Buffer.concat(stderr).toString(), tokens.bob)
-      } finally {
-        /** The exited child no longer owns a socket within this fixture-created directory. */
-        await rm(directory, { recursive: true, force: true })
-      }
+  const active = new IsolationListener(mode, directory)
+  await active.ready()
+  return active
+}
+
+/** Owns only the external isolation peer, credentials and original stdout/stderr evidence. */
+class IsolationListener {
+  /** Existing fixture mode selects session/principal provider behavior in the real child. */
+  readonly #mode: string
+  /** Temporary auth/socket files belong only to this external peer owner. */
+  readonly #directory: string
+  /** Native stdout chunks are retained unchanged until physical exit. */
+  readonly #stdout: Buffer[] = []
+  /** Full stderr evidence remains independent from the bounded readiness sentinel carry. */
+  readonly #stderr: Buffer[] = []
+  /** Only the last marker-length minus one characters cross native chunk boundaries. */
+  #readyTail = ''
+  /** Readiness has one original child receipt, never a guessed scheduling delay. */
+  readonly #prepared = deferred<void>()
+  /** Unique authentication sentinels never enter child argv, environment or public logs. */
+  readonly tokens = { alice: randomUUID(), bob: randomUUID() }
+  /** Borrowed clients receive only this physical rendezvous address. */
+  readonly address: string
+  /** External ownership retains the actual process handle through physical exit. */
+  readonly child: ReturnType<typeof spawn>
+
+  /** Open the original private descriptor and attach native observations before awaiting readiness. */
+  constructor(mode: string, directory: string) {
+    this.#mode = mode
+    this.#directory = directory
+    this.address = join(directory, 'peer.sock')
+    const authPath = join(directory, 'auth')
+    writeFileSync(authPath, JSON.stringify(this.tokens), { mode: 0o600 })
+    const descriptor = openSync(authPath, 'r')
+    this.child = spawn(process.execPath, [...fixturePeer.args, mode, this.address], {
+      stdio: ['ignore', 'pipe', 'pipe', descriptor]
+    })
+    closeSync(descriptor)
+    unlinkSync(authPath)
+    this.child.stdout!.on('data', (chunk: Buffer) => this.#stdout.push(chunk))
+    this.child.stderr!.on('data', (chunk: Buffer) => this.#observeStderr(chunk))
+    this.child.once('exit', (code) =>
+      this.#prepared.reject(new Error(`isolation child exited before ready: ${code}`))
+    )
+    this.child.once('error', this.#prepared.reject)
+  }
+  /** Match a split ASCII marker with O(total bytes) work while preserving full raw chunks. */
+  #observeStderr(chunk: Buffer): void {
+    this.#stderr.push(chunk)
+    const marker = 'ISOLATION_READY:'
+    const text = this.#readyTail + chunk.toString()
+    if (text.includes(marker)) this.#prepared.resolve()
+    this.#readyTail = text.slice(-(marker.length - 1))
+  }
+  /** Join the actual peer readiness receipt before clients may borrow its socket. */
+  ready(): Promise<void> {
+    return this.#prepared.promise
+  }
+  /** Stop only the owned PID after clients close, then retain exact redacted diagnostic evidence. */
+  close = async (): Promise<void> => {
+    const exited = once(this.child, 'exit')
+    this.child.kill('SIGTERM')
+    await exited
+    try {
+      const stderr = Buffer.concat(this.#stderr)
+      writeFileSync(
+        join(evidence, `isolation-${this.#mode}.stdout.log`),
+        Buffer.concat(this.#stdout)
+      )
+      writeFileSync(join(evidence, `isolation-${this.#mode}.stderr.log`), stderr)
+      noSecret(stderr.toString(), this.tokens.alice)
+      noSecret(stderr.toString(), this.tokens.bob)
+    } finally {
+      await rm(this.#directory, { recursive: true, force: true })
     }
   }
 }
@@ -194,23 +239,17 @@ async function stats(active: Pick<Awaited<ReturnType<typeof client>>, 'feature'>
 }
 
 describe('real process session and principal isolation', () => {
-  it('no-token reverse native registration never resolves permission, constructs endpoint or installs plugin', async () => {
+  it('no-token native listener never constructs an endpoint or publishes a service', async () => {
     /** The reverse-registration socket is owned by the original authenticated listener. */
     const directory = await mkdtemp(join(tmpdir(), 'rpc-hi-reverse-'))
-    /** The target Host begins empty; an actual use observer detects any unauthorized installation. */
-    const host = new PluginHost<Record<string, never>>({
-      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
-    })
-    /** Installation observes the real Host method rather than substituting a fake target. */
-    const use = vi.spyOn(host, 'use')
+    /** Native authentication must finish before this real endpoint constructor can run. */
+    const endpointFactory = vi.fn((channel: Parameters<typeof matrixEndpoint>[0]) =>
+      matrixEndpoint(channel)
+    )
+    /** No unauthorized candidate may publish a real provider service. */
+    const ready = vi.fn()
     /** Responder reports preserve native authentication error identity. */
     const reports: unknown[] = []
-    /** Permission selection is allowed only after authenticated pending.accept. */
-    const resolveRegistration = vi.fn(() => ({ targetHost: host, name: 'p', contract }))
-    /** No unauthorized candidate may reach endpoint construction. */
-    const endpointFactory = vi.fn((channel: Parameters<typeof endpointFor>[0]) =>
-      endpointFor(channel, 'server')
-    )
     /** Native required authentication rejects absent credentials before any Host adoption path. */
     const verify = (auth: unknown) => {
       if (auth !== 'reverse-required') throw new TypeError('reverse credential required')
@@ -221,32 +260,26 @@ describe('real process session and principal isolation', () => {
       scheduler: systemScheduler,
       report: (error) => reports.push(error)
     })
-    /** Retain actual adoption cleanup even if this negative assertion unexpectedly admits a peer. */
-    const adopted = new Set<IAdoptedHostRegistration>()
-    const service = await resilience.listenRegistrations({
-      address: join(directory, 'reverse.sock'),
-      serviceId: 'rpc-hi-reverse',
-      listen: listenProcessByteChannel,
-      verifyToken: verify,
-      offer: createNativeProcessOffer({ peer: { id: 'server', runtime: 'node' } }),
-      createConnectionContext: () => ({
-        peerId: 'caller',
-        ipc: { connectionId: 'reverse', sessionId: 'reverse', log: () => undefined }
-      }),
-      scheduler: systemScheduler,
-      wire: 'native',
-      onCandidate: (candidate) =>
-        adoptHostRegistration(
-          candidate,
-          {
-            endpointFactory,
-            report: (error) => reports.push(error),
-            registrations: { resolveRegistration }
-          },
-          resilience,
-          adopted
-        )
-    })
+    const service = await serveProcessSessions(
+      {
+        kind: 'listener',
+        address: join(directory, 'reverse.sock'),
+        listen: listenProcessByteChannel,
+        verify,
+        offer: createNativeProcessOffer({ peer: { id: 'server', runtime: 'node' } }),
+        createConnectionContext: () => ({
+          peerId: 'caller',
+          ipc: { connectionId: 'reverse', sessionId: 'reverse', log: () => undefined }
+        }),
+        scheduler: systemScheduler
+      },
+      endpointFactory,
+      ready,
+      resilience,
+      (error) => {
+        reports.push(error)
+      }
+    )
     /** This actual reverse candidate sends a valid native hello without an auth field. */
     const raw = await dialProcessByteChannel({ address: join(directory, 'reverse.sock') })
     try {
@@ -262,16 +295,14 @@ describe('real process session and principal isolation', () => {
         code: 'HANDSHAKE_REJECTED',
         cause: { code: 'PROCESS_CHANNEL_AUTH_REJECTED' }
       })
-      expect(resolveRegistration).not.toHaveBeenCalled()
       expect(endpointFactory).not.toHaveBeenCalled()
-      expect(use).not.toHaveBeenCalled()
+      expect(ready).not.toHaveBeenCalled()
       writeFileSync(
         join(evidence, 'isolation-reverse.receipt.json'),
         JSON.stringify(
           {
-            permission: resolveRegistration.mock.calls.length,
             endpoints: endpointFactory.mock.calls.length,
-            installs: use.mock.calls.length,
+            publications: ready.mock.calls.length,
             reports: reports.map((error) => serializeRpcError(error, { report: () => undefined }))
           },
           null,
@@ -281,9 +312,7 @@ describe('real process session and principal isolation', () => {
     } finally {
       await raw.close()
       await service.close()
-      await Promise.all([...adopted].map((entry) => entry.close()))
       await resilience.close()
-      await host.dispose()
       /** The listener closes before its fixture-created rendezvous directory is removed. */
       await rm(directory, { recursive: true, force: true })
     }
@@ -517,23 +546,10 @@ describe('real process session and principal isolation', () => {
         })
       }
     }
-    /** A real local Host owns public proxy installation and cleanup. */
-    const host = new PluginHost<Record<string, never>>({
-      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
-    })
-    /** The public process plugin owns the actual launcher, endpoint and generation subscriptions. */
-    const definition = createProcessPlugin({
-      name: 'p',
-      contract,
-      registrationOwner: { name: 'p', host },
-      host: host.plugin,
-      deployment: selected,
-      endpointFactory: (channel) => endpointFor(channel, 'caller'),
-      report: (error) => fixture.reports.push(error)
-    })
+    /** This original native source uses the same actual ordinary Host client as all business peers. */
+    const installed = await installBusinessClient(fixture, selected)
     try {
-      const [installed] = await host.use(definition)
-      const feature = installed!.getFeature('f') as Awaited<ReturnType<typeof client>>['feature']
+      const feature = businessFeature(installed.active)
       expect(await feature.request(['stderr'])).toBe(true)
       const stderr = records.filter((record) => (record as { name: string }).name === 'ipc.stderr')
       expect(stderr.length).toBeGreaterThanOrEqual(Math.ceil(token.length / 3))
@@ -549,7 +565,7 @@ describe('real process session and principal isolation', () => {
         JSON.stringify({ identity, records }, null, 2)
       )
     } finally {
-      await host.dispose()
+      await installed.close()
       for (const handle of fixture.handles) await handle.exited
       /**
        * Raw secret-bearing stderr is deliberately not persisted; the redacted receipt is
@@ -647,10 +663,10 @@ describe('real process session and principal isolation', () => {
       const otherClosed = vi.fn()
       first.raw.onClose(offenderClosed)
       other.raw.onClose(otherClosed)
-      const sessions: Array<Pick<Awaited<ReturnType<typeof client>>, 'feature' | 'close'>> = [
-        first,
-        other
-      ]
+      const sessions: Array<{
+        feature: Awaited<ReturnType<typeof client>>['feature']
+        close(): Promise<unknown>
+      }> = [first, other]
       /**
        * Finally may release a failed oracle's local waits without changing the deadline
        * observation.
@@ -732,10 +748,10 @@ describe('real process session and principal isolation', () => {
       first.raw.onClose(firstClosed)
       other.raw.onClose(otherClosed)
       /** New described sessions are released together with the initial facade owners. */
-      const sessions: Array<Pick<Awaited<ReturnType<typeof client>>, 'feature' | 'close'>> = [
-        first,
-        other
-      ]
+      const sessions: Array<{
+        feature: Awaited<ReturnType<typeof client>>['feature']
+        close(): Promise<unknown>
+      }> = [first, other]
       try {
         const initial = (await first.feature.request(['identity'])) as IResult
         const unaffected = (await other.feature.request(['other-identity'])) as IResult

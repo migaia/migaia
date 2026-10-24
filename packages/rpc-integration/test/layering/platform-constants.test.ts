@@ -1,11 +1,13 @@
+import { createRuntimeEndpointComposition } from '../../../rpc-host/dist/core/runtime-api-endpoint.js'
+import { RpcCapability } from '@migaia/rpc-contract'
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { parseSync, Visitor } from 'oxc-parser'
 import { describe, expect, it } from 'vitest'
-import { createFullEndpoint as createEndpoint } from '../../../rpc-host/dist/core/full.js'
-import { connect } from '../../../rpc-host/dist/core/index.js'
+
+import { connect } from '../../../rpc-host/dist/core/middleware/connect.js'
 import { RpcPlatform } from '@migaia/rpc-host/plugin'
-import { type IRpcTransport } from '../../../rpc-host/dist/core/index.js'
+import type { IRpcTransport } from '../../../rpc-host/dist/core/transport.js'
 
 /** All core source files, excluding declaration output. */
 const coreRoot = join(import.meta.dirname, '../../../rpc-host/src/core')
@@ -63,11 +65,14 @@ describe('platform constant ownership', () => {
           return () => undefined
         }
       }
-      const endpoint = await createEndpoint({
-        id: `platform-${platform}`,
-        transport,
-        middlewares: [connect({ transport })]
-      })
+      const endpoint = await createRuntimeEndpointComposition(
+        {
+          id: `platform-${platform}`,
+          transport,
+          middlewares: [connect({ transport })]
+        },
+        { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+      ).installing
       await endpoint.dispose()
     }
     const invalid = {
@@ -78,11 +83,14 @@ describe('platform constant ownership', () => {
       }
     } as unknown as IRpcTransport
     await expect(
-      createEndpoint({
-        id: 'invalid-platform',
-        transport: invalid,
-        middlewares: [connect({ transport: invalid })]
-      })
+      createRuntimeEndpointComposition(
+        {
+          id: 'invalid-platform',
+          transport: invalid,
+          middlewares: [connect({ transport: invalid })]
+        },
+        { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+      ).installing
     ).rejects.toBeDefined()
   })
 })

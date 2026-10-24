@@ -3,9 +3,9 @@ import { mkdtemp, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { setTimeout as delay } from 'node:timers/promises'
-import { createNodeThreadLauncher } from '@migaia/rpc-plugin-thread/adapters/node'
+import { createNodeThreadLauncher } from '../../../rpc-plugin-thread/dist/threads/adapters/node.js'
 import { createNodeThreadChannel } from '../../../rpc-plugin-thread/dist/threads/channel.js'
-import { createNodeProcessLauncher } from '@migaia/rpc-plugin-process/adapters/node-child-process'
+import { createNodeProcessLauncher } from '../../../rpc-plugin-process/dist/process/adapters/node-child-process.js'
 import { createProcessTransport } from '../../../rpc-plugin-process/dist/process/handshake.js'
 import { createNativeProcessOffer } from '../../../rpc-plugin-process/dist/process/offer.js'
 import { systemScheduler } from '@migaia/utils/scheduler'
@@ -19,55 +19,131 @@ import { nativeEndpoint } from '../../../rpc-host/test/replay-window/native-runt
  * @returns {Promise<object>} Fixture session whose close releases only its own native resource.
  * @throws {Error} Original launcher, handshake or endpoint construction failure.
  */
-export async function nativeSession(mode, options = {}) {
-  const entry = options.entry ?? fileURLToPath(new URL('./native-peer.mjs', import.meta.url))
-  /** Fixture readiness belongs to an isolated host temporary directory, independent of docs. */
-  const directory = await mkdtemp(join(tmpdir(), 'rpc-native-ready-'))
-  const config = {
-    required: options.required === true,
-    ready: join(directory, 'peer.json'),
-    diagnostic: options.diagnostic === true,
-    controlledClock: options.controlledClock === true,
-    keepAlive: options.keepAlive === true,
-    retired: join(directory, 'retired.json'),
-    ...(options.telemetry ? { telemetry: options.telemetry } : {}),
-    ...(process.env.RPC_REPLAY_MUTANT ? { mutant: process.env.RPC_REPLAY_MUTANT } : {})
+/** @typedef {ReturnType<typeof nativeState>} INativeState */
+/**
+ * @param {'process' | 'worker'} mode Physical path. @param {object} options Original fixture
+ *   controls. @param {string} directory Owned ready-receipt directory. @returns {object} Explicit
+ *   native preparation context.
+ */
+function nativeState(mode, options, directory) {
+  return {
+    mode,
+    options,
+    entry: options.entry ?? fileURLToPath(new URL('./native-peer.mjs', import.meta.url)),
+    config: {
+      required: options.required === true,
+      ready: join(directory, 'peer.json'),
+      diagnostic: options.diagnostic === true,
+      controlledClock: options.controlledClock === true,
+      keepAlive: options.keepAlive === true,
+      retired: join(directory, 'retired.json'),
+      ...(options.telemetry ? { telemetry: options.telemetry } : {}),
+      ...(process.env.RPC_REPLAY_MUTANT ? { mutant: process.env.RPC_REPLAY_MUTANT } : {})
+    },
+    signal: new AbortController().signal,
+    diagnostics: [],
+    captures: [],
+    handle: undefined,
+    channel: undefined,
+    runtime: undefined,
+    peerReady: undefined
   }
-  const signal = new AbortController().signal
-  const diagnostics = []
-  let handle
-  let channel
-  try {
-    if (mode === 'worker') {
-      handle = await createNodeThreadLauncher().launch({ entry, data: config }, { signal })
-      channel = createNodeThreadChannel(handle.port, 'peer', { scheduler: systemScheduler })
+}
+/**
+ * @param {INativeState} state Original native source and negotiation inputs. @returns
+ *   {Promise<void>}
+ */
+async function acquireNative(state) {
+  if (state.mode === 'worker') {
+    state.handle = await createNodeThreadLauncher().launch(
+      { entry: state.entry, data: state.config },
+      { signal: state.signal }
+    )
+    state.channel = createNodeThreadChannel(state.handle.port, 'peer', {
+      scheduler: systemScheduler
+    })
+  } else {
+    state.handle = await createNodeProcessLauncher().launch(
+      {
+        command: process.execPath,
+        args: [...process.execArgv, state.entry],
+        env: { inherit: ['PATH'], set: {} },
+        stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' },
+        bootstrap: { via: 'stdin', payload: new TextEncoder().encode(JSON.stringify(state.config)) }
+      },
+      {
+        signal: state.signal,
+        output: (stream, chunk) =>
+          state.diagnostics.push({ stream, message: new TextDecoder().decode(chunk) })
+      }
+    )
+    state.channel = await createProcessTransport(state.handle.channel, {
+      role: 'initiator',
+      peerId: 'peer',
+      offer: createNativeProcessOffer({
+        peer: { id: 'parent', runtime: 'node' },
+        stream: true,
+        ...(state.config.required ? { auth: 'replay-r12-public-token' } : {})
+      }),
+      ipc: { connectionId: 'parent-1', sessionId: 'parent-1', log: () => undefined },
+      report: (error) => state.diagnostics.push({ message: String(error) })
+    })
+  }
+}
+/** @param {INativeState} state Passive byte/message capture sink. @returns {void} */
+function installNativeCapture(state) {
+  if (state.options.capture) {
+    if (state.mode === 'worker') {
+      const post = state.handle.port.postMessage
+      state.handle.port.postMessage = (value, transfer) => {
+        state.captures.push(structuredClone(value))
+        return post(value, transfer)
+      }
     } else {
-      handle = await createNodeProcessLauncher().launch(
-        {
-          command: process.execPath,
-          args: [...process.execArgv, entry],
-          env: { inherit: ['PATH'], set: {} },
-          stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' },
-          bootstrap: { via: 'stdin', payload: new TextEncoder().encode(JSON.stringify(config)) }
-        },
-        {
-          signal,
-          output: (stream, chunk) =>
-            diagnostics.push({ stream, message: new TextDecoder().decode(chunk) })
-        }
-      )
-      channel = await createProcessTransport(handle.channel, {
-        role: 'initiator',
-        peerId: 'peer',
-        offer: createNativeProcessOffer({
-          peer: { id: 'parent', runtime: 'node' },
-          stream: true,
-          ...(config.required ? { auth: 'replay-r12-public-token' } : {})
-        }),
-        ipc: { connectionId: 'parent-1', sessionId: 'parent-1', log: () => undefined },
-        report: (error) => diagnostics.push({ message: String(error) })
-      })
+      const write = state.handle.channel.write
+      state.handle.channel.write = (value) => {
+        state.captures.push(value.slice())
+        return write(value)
+      }
     }
+  }
+}
+/** @param {INativeState} state Original file-receipt readiness. @returns {Promise<void>} */
+async function readNativeReady(state) {
+  state.peerReady = undefined
+  for (let attempt = 0; attempt < 500; attempt++) {
+    try {
+      state.peerReady = JSON.parse(await readFile(state.config.ready, 'utf8'))
+      break
+    } catch (error) {
+      if (error.code !== 'ENOENT' || attempt === 499) throw error
+      await delay(10)
+    }
+  }
+}
+/** @param {INativeState} state Original physical ownership graph. @returns {Promise<void>} */
+async function closeNative(state) {
+  try {
+    await state.runtime.endpoint.dispose()
+    await state.channel.close()
+  } finally {
+    state.handle.terminate(state.mode === 'process' ? 'force' : undefined)
+    await state.handle.exited
+  }
+}
+/**
+ * Launch the original process or Worker and negotiate its canonical native endpoint.
+ *
+ * @param {'process' | 'worker'} mode Physical native path.
+ * @param {object} [options] Existing endpoint and fixture options.
+ * @returns {Promise<object>} Original native handles, passive observations and cleanup.
+ * @throws {Error} Original launch/negotiation failure.
+ */
+export async function nativeSession(mode, options = {}) {
+  const directory = await mkdtemp(join(tmpdir(), 'rpc-native-ready-'))
+  const state = nativeState(mode, options, directory)
+  try {
+    await acquireNative(state)
     const {
       required: _required,
       capture: _capture,
@@ -78,63 +154,33 @@ export async function nativeSession(mode, options = {}) {
       entry: _entry,
       ...endpointOptions
     } = options
-    /** Passive capture wraps the owned physical write, leaving the frozen final transport exact. */
-    const captures = []
-    if (options.capture) {
-      if (mode === 'worker') {
-        const post = handle.port.postMessage
-        handle.port.postMessage = (value, transfer) => {
-          captures.push(structuredClone(value))
-          return post(value, transfer)
-        }
-      } else {
-        const write = handle.channel.write
-        handle.channel.write = (value) => {
-          captures.push(value.slice())
-          return write(value)
-        }
-      }
-    }
-    const runtime = await nativeEndpoint(channel, 'parent', endpointOptions)
-    let peerReady
-    for (let attempt = 0; attempt < 500; attempt++) {
-      try {
-        peerReady = JSON.parse(await readFile(config.ready, 'utf8'))
-        break
-      } catch (error) {
-        if (error.code !== 'ENOENT' || attempt === 499) throw error
-        await delay(10)
-      }
-    }
-    await runtime.endpoint.send('peer', 'echo', 'ready', { timeoutMs: 5000 })
+    installNativeCapture(state)
+    state.runtime = await nativeEndpoint(state.channel, 'parent', endpointOptions)
+    await readNativeReady(state)
+    await state.runtime.endpoint.send('peer', 'echo', 'ready', { timeoutMs: 5000 })
     return {
-      ...runtime,
-      channel,
-      handle,
-      diagnostics,
-      peerReady,
-      fixturePaths: { ready: config.ready, retired: config.retired },
-      captures,
+      ...state.runtime,
+      channel: state.channel,
+      handle: state.handle,
+      diagnostics: state.diagnostics,
+      peerReady: state.peerReady,
+      fixturePaths: { ready: state.config.ready, retired: state.config.retired },
+      captures: state.captures,
       replay: (value) =>
-        mode === 'worker' ? handle.port.postMessage(value) : handle.channel.write(value),
-      async close() {
-        try {
-          await runtime.endpoint.dispose()
-          await channel.close()
-        } finally {
-          handle.terminate(mode === 'process' ? 'force' : undefined)
-          await handle.exited
-        }
-      }
+        state.mode === 'worker'
+          ? state.handle.port.postMessage(value)
+          : state.handle.channel.write(value),
+      close: () => closeNative(state)
     }
   } catch (error) {
     process.stderr.write(
-      JSON.stringify({ stage: 'native-fixture-failed', mode, diagnostics }) + '\n'
+      JSON.stringify({ stage: 'native-fixture-failed', mode, diagnostics: state.diagnostics }) +
+        '\n'
     )
-    if (channel) await channel.close()
-    if (handle) {
-      handle.terminate(mode === 'process' ? 'force' : undefined)
-      await handle.exited
+    if (state.channel) await state.channel.close()
+    if (state.handle) {
+      state.handle.terminate(mode === 'process' ? 'force' : undefined)
+      await state.handle.exited
     }
     throw error
   }

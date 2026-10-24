@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest'
-import { createWindowMessageTransport } from '@migaia/rpc-plugin-browser/adapters/window'
+import { createWindowMessageTransport } from '../../dist/browser/adapters/window.js'
 import { GlobalScopeKind } from '@migaia/utils'
 
 /** Scope selection is observed at the existing utils boundary, without a second detector. */

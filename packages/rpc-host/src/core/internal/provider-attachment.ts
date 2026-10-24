@@ -79,6 +79,16 @@ export type IRpcProviderPorts = {
   readonly variationCoordinator: IRpcVariationCoordinatorPort
 }
 
+/** Intersect explicit logical limits; invalid session values still reach Core's original validator. */
+function intersectProviderLimit(
+  root: number | undefined,
+  session: number | undefined
+): number | undefined {
+  if (session === undefined) return root
+  if (root === undefined || !Number.isSafeInteger(session) || session < 1) return session
+  return Math.min(root, session)
+}
+
 /** Canonical provider attachment with an inseparable replay/admission/identity/executor closure. */
 export class RpcProviderAttachment {
   /** The provider and executor share one construction-cached endpoint emitter. */
@@ -177,7 +187,39 @@ export class RpcProviderAttachment {
         return receipt && !receipt.active ? undefined : receipt?.qualified === true
       }
     )
-    this.#executor = new ProviderExecutor({
+    this.#executor = this.#createExecutor(kernel, prepared, maxIngress)
+    /** Physical retirement drops only this provider's ledger before any late cleanup can return. */
+    const native = nativeReplayReceipt(kernel.transport)
+    if (native)
+      kernel.resources.addSync(
+        NativeDefaultIdText.providerTerminalSubscription,
+        native.onRetire(() => this.#replay.clear())
+      )
+    if (kernel.readOwner(EndpointOwnerKey.outboundAttachment))
+      kernel.registerOwner(EndpointOwnerKey.providerAttachment, this)
+    kernel.registerOwner(EndpointOwnerKey.providerRegistry, this.#registry)
+    kernel.registerOwner('request-replay', this.#replay)
+    kernel.registerOwner(EndpointOwnerKey.providerAdmission, this.#runtimeAdmission)
+    kernel.registerOwner('provider-controllers', this.#controllers)
+    kernel.registerOwner('provider-executor', this.#executor)
+    kernel.registerRoute(RpcMessageKind.request, (message) => this.#receiveRequest(message))
+    kernel.registerRoute(RpcRuntimeKind.call, (message) => this.#receiveRuntime(message))
+    kernel.registerRoute(RpcRuntimeKind.group, (message) => this.#receiveRuntime(message))
+    this.#releaseAbortHandler = this.#variations.admit({
+      operation: 'register',
+      variation: RpcControl.abort,
+      handler: (message, peerKey) => this.#receiveAbort(message, peerKey)
+    }) as () => void
+    for (const [method, provider] of snapshotProviderEntries(prepared.providers))
+      this.provide(method, provider)
+  }
+  /** Configure the canonical executor only after replay, admission and identity owners exist. */
+  #createExecutor(
+    kernel: IEndpointKernelHost,
+    prepared: IPreparedEndpoint<string>,
+    maxIngress: number | undefined
+  ): ProviderExecutor<string> {
+    return new ProviderExecutor({
       probe: this.#probe,
       fast: hasFastEndpoint(prepared.options),
       /** Borrow only the once-selected factory response format, never caller/wire policy. */
@@ -198,8 +240,14 @@ export class RpcProviderAttachment {
         policy.providerAdmission
           ? prepareProviderAdmissionScope(
               policy.providerAdmission,
-              policy.limits?.maxGlobal,
-              policy.limits?.maxPerPeer,
+              intersectProviderLimit(
+                prepared.options.providerLimits?.maxGlobal,
+                policy.limits?.maxGlobal
+              ),
+              intersectProviderLimit(
+                prepared.options.providerLimits?.maxPerPeer,
+                policy.limits?.maxPerPeer
+              ),
               maxIngress,
               policy.commitPolicy?.() ?? true
             )
@@ -264,30 +312,6 @@ export class RpcProviderAttachment {
       responseReceiverId: (request) =>
         authenticationReplyReceiverId(request.envelope) ?? request.route.route.senderId
     })
-    /** Physical retirement drops only this provider's ledger before any late cleanup can return. */
-    const native = nativeReplayReceipt(kernel.transport)
-    if (native)
-      kernel.resources.addSync(
-        NativeDefaultIdText.providerTerminalSubscription,
-        native.onRetire(() => this.#replay.clear())
-      )
-    if (kernel.readOwner(EndpointOwnerKey.outboundAttachment))
-      kernel.registerOwner(EndpointOwnerKey.providerAttachment, this)
-    kernel.registerOwner(EndpointOwnerKey.providerRegistry, this.#registry)
-    kernel.registerOwner('request-replay', this.#replay)
-    kernel.registerOwner(EndpointOwnerKey.providerAdmission, this.#runtimeAdmission)
-    kernel.registerOwner('provider-controllers', this.#controllers)
-    kernel.registerOwner('provider-executor', this.#executor)
-    kernel.registerRoute(RpcMessageKind.request, (message) => this.#receiveRequest(message))
-    kernel.registerRoute(RpcRuntimeKind.call, (message) => this.#receiveRuntime(message))
-    kernel.registerRoute(RpcRuntimeKind.group, (message) => this.#receiveRuntime(message))
-    this.#releaseAbortHandler = this.#variations.admit({
-      operation: 'register',
-      variation: RpcControl.abort,
-      handler: (message, peerKey) => this.#receiveAbort(message, peerKey)
-    }) as () => void
-    for (const [method, provider] of snapshotProviderEntries(prepared.providers))
-      this.provide(method, provider)
   }
 
   /** Registers one provider and preserves duplicate-owner failure semantics. */

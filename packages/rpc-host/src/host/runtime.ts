@@ -14,16 +14,14 @@ import {
   rejectRuntimeApiCapability,
   createRuntimeApiEndpoint
 } from '../core/runtime-api-endpoint.js'
-import {
-  codec,
-  framer,
-  abort,
-  timeout,
-  hooks,
-  ping,
-  connect,
-  authentication
-} from '../core/index.js'
+import { codec } from '../core/middleware/codec.js'
+import { framer } from '../core/middleware/framer.js'
+import { abort } from '../core/middleware/abort.js'
+import { timeout } from '../core/middleware/timeout.js'
+import { hooks } from '../core/middleware/hooks.js'
+import { ping } from '../core/middleware/ping.js'
+import { connect } from '../core/middleware/connect.js'
+import { authentication } from '../core/middleware/authentication.js'
 import { createAuthenticationNonce } from '../core/middleware/authentication-envelope.js'
 import {
   createRpcError,
@@ -92,6 +90,8 @@ import {
   RuntimeEventName,
   RuntimeQueryClock,
   RuntimeQueryStatus,
+  RuntimeSourceKind,
+  RuntimeConnectionDirection,
   RUNTIME_API_SCHEMA_VERSION
 } from '../remote/runtime-api/constants.js'
 import type { IRuntimePluginConnection } from '../remote/runtime-api/outlet.js'
@@ -117,7 +117,10 @@ import {
   openAdapterMessageBootstrapSource,
   type IAdapterMessageBootstrapSource
 } from '../runtime-adapter/message/bootstrap-source.js'
-import { readRuntimePreparationContext } from '../remote/runtime-api/launch-context.js'
+import {
+  readRuntimePreparationContext,
+  withRuntimePreparationContext
+} from '../remote/runtime-api/launch-context.js'
 import { resolveAbortReason } from '../core/internal/async-control.js'
 import { createHostMultiplexTransport } from '../runtime-adapter/host-multiplex.js'
 import {
@@ -130,6 +133,7 @@ import type {
   IRpcHostMember,
   IRpcTransportPluginDefinition
 } from '../plugin/types.js'
+import { RpcTransportMode } from '../plugin/types.js'
 import type { IRpcHost, IRpcHostOptions, IRpcHostFeatureContext } from './types.js'
 import { HostErrorText } from './error-text.js'
 import type { IRpcFanoutResult } from '../core/typing.js'
@@ -187,143 +191,201 @@ export type IRpcHostRuntime = Readonly<{
   featureContext(onDispose: (dispose: () => void | Promise<void>) => void): IRpcHostFeatureContext
 }>
 
-/** Create one canonical endpoint and project its physical sessions through the host call surface. */
-export function createRuntimeHost(
-  options: IRpcHostOptions,
-  definition: IRpcTransportPluginDefinition,
-  features: readonly IRpcFeaturePluginDefinition[],
-  nodeId = createAuthenticationNonce(),
-  onConnection?: (connection: IRuntimePluginConnection) => () => void,
-  selfDefaulted = options.self === undefined,
-  assemblyHost?: () => IRpcHost<unknown>
-): IRpcHostRuntime {
+/** A managed member retains one original native close attempt, including its rejected Promise. */
+class ManagedMemberClose {
+  /** Closing releases this exact binding holder rather than the shared Host endpoint. */
+  readonly #peer: IRuntimePeer
+  /** Pool rollback and Host fallback join the original attempt once it starts. */
+  #closing: Promise<void> | undefined
+
+  /** The genuine managed facade remains the sole native release authority. */
+  constructor(peer: IRuntimePeer) {
+    this.#peer = peer
+  }
+
+  /** A rejected or pending original close still counts as an already-started attempt. */
+  readonly started = (): boolean => this.#closing !== undefined
+
+  /** Retain the exact native Promise without wrapping or replacing its rejection. */
+  readonly close = (): Promise<void> => (this.#closing ??= this.#peer.close())
+}
+
+/** One canonical installed Host owns all session, provider and lifetime state. */
+class RuntimeHost implements IRpcHostRuntime {
+  /** Original constructor input is retained by this runtime owner for its full installed lifetime. */
+  readonly #options: IRpcHostOptions
+
+  /** Original constructor input is retained by this runtime owner for its full installed lifetime. */
+  readonly #definition: IRpcTransportPluginDefinition
+
+  /** Original constructor input is retained by this runtime owner for its full installed lifetime. */
+  readonly #features: readonly IRpcFeaturePluginDefinition[]
+
+  /** Original constructor input is retained by this runtime owner for its full installed lifetime. */
+  readonly #nodeId: string
+
+  /** Original constructor input is retained by this runtime owner for its full installed lifetime. */
+  readonly #onConnection: ((connection: IRuntimePluginConnection) => () => void) | undefined
+
+  /** Original constructor input is retained by this runtime owner for its full installed lifetime. */
+  readonly #selfDefaulted: boolean
+
+  /** Original constructor input is retained by this runtime owner for its full installed lifetime. */
+  readonly #assemblyHost: (() => IRpcHost<unknown>) | undefined
+
   /** Contributions configure existing canonical roots before their sole construction. */
-  const contributions = features
-    .map((feature) => feature.contribution)
-    .filter((value) => value !== undefined)
+  #contributions
+
   /** Native Host provenance remains associated with the exact ordinary options carrier. */
-  let preparation = readRuntimePreparationContext(options)
+  #preparation
+
   /** One selected authentication profile controls both local offer and canonical middleware. */
-  const credentials =
-    options.authentication ??
-    contributions.find((value) => value.authentication !== undefined)?.authentication
+  #credentials
+
   /** Safe explicit identity is fixed; a default may be replaced only by actual bootstrap authority. */
-  let source = prepareRuntimePeerSourceContext(options.self, true, credentials)
+  #source
+
   /** Native installation owns cancellation; every physical opening receives this same lifetime. */
-  const controller = createAbortController()
+  #controller
+
   /** A reporter failure follows the existing terminal observation policy. */
-  const report = (error: unknown): void => {
+  #report = (error: unknown): void => {
     try {
-      ;(options.report ?? defaultRpcReporter)(error)
+      ;(this.#options.report ?? defaultRpcReporter)(error)
     } catch (failure) {
       hostRethrowReporter(failure, IpcReporterContext)
     }
   }
+
   /** The canonical inherited budget is captured once for all requests on this fixed feature set. */
-  const defaultTimeout = readRuntimeDefaultTimeout({
-    defaultTimeoutMs:
-      options.defaultTimeoutMs ??
-      contributions.find((value) => value.defaultTimeoutMs !== undefined)?.defaultTimeoutMs
-  })
+  #defaultTimeout
+
   /** Ordinary hot requests reuse the original immutable default options instead of rebuilding them. */
-  const callTimeout = prepareRuntimeCallTimeout(defaultTimeout)
+  #callTimeout
+
   /** The actual transport adapter selects framing for each held physical source. */
-  let multiplex: ReturnType<typeof createHostMultiplexTransport> | undefined
+  #multiplex: ReturnType<typeof createHostMultiplexTransport> | undefined
+
   /** Only pre-identity bootstrap acquisition owns this raw resource before channel handoff. */
-  let bootstrapSource: IAdapterByteBootstrapSource | IAdapterMessageBootstrapSource | undefined
+  #bootstrapSource: IAdapterByteBootstrapSource | IAdapterMessageBootstrapSource | undefined
+
   /** Both bootstrap variants close the same raw resource that supplied their admitted identity. */
-  const closeBootstrapSource = async (): Promise<void> => {
-    if (!bootstrapSource) return
-    const message = readAdapterMessageBootstrapSource(bootstrapSource)
+  #closeBootstrapSource = async (): Promise<void> => {
+    if (!this.#bootstrapSource) return
+    const message = readAdapterMessageBootstrapSource(this.#bootstrapSource)
     if (message) await message.resource.close()
     else
       await readAdapterByteBootstrapSource(
-        bootstrapSource as IAdapterByteBootstrapSource
+        this.#bootstrapSource as IAdapterByteBootstrapSource
       ).io.close()
   }
+
   /** Physical session receipts are the sole accepted directory/lifetime inventory. */
-  const sessions = new Map<string, IHostSession>()
+  #sessions
+
   /** Only simultaneous same-name admission probes need a temporary exclusion token. */
-  const probing = new Set<string>()
+  #probing
+
   /** Directory subscribers own observation only, with no copied membership state. */
-  const accepted = new Set<(description: IRuntimePeerDescription) => unknown>()
+  #accepted
+
   /** Held own-data capability trees retain their original connection generation. */
-  const peers: Record<string, object> = Object.create(null)
+  #peers: Record<string, object>
+
   /** The original emitter is constructed only after native bootstrap selects the final identity. */
-  let probe: IProbeEmitter | undefined
+  #probe: IProbeEmitter | undefined
+
   /** Canonical kernel cleanup and failed construction share this idempotent binding release. */
-  let releaseProbe: (() => void) | undefined
+  #releaseProbe: (() => void) | undefined
+
   /** Lifecycle observations reuse the canonical event publisher. */
-  const eventsPublisher = createRuntimeEventPublisher(() => probe)
+  #eventsPublisher
+
   /** Provider generation belongs to this one endpoint, independent of physical attempt counters. */
-  let generation: IRpcRuntimeGeneration = {
-    kind: RpcRuntimeGenerationKind.session,
-    value: 0,
-    providerId: source.self.instanceId
-  }
+  #generation: IRpcRuntimeGeneration
+
   /** Assembly results may replace the direct-target projection without replacing physical sessions. */
-  let assembled: IRpcHostMember | undefined
+  #assembled: IRpcHostMember | undefined
+
   /** The original managed facade retains supervision, generation readiness and retry authority. */
-  let managedPeer: IRuntimePeer | undefined
+  #managedPeer: IRuntimePeer | undefined
+
   /** Its logical direct name survives a transient physical rebind, as on the original registration. */
-  let managedName: string | undefined
+  #managedName: string | undefined
+
   /** Original registration/event subscriptions are released before its holder closes. */
-  const managedSubscriptions: (() => void)[] = []
+  #managedSubscriptions: (() => void)[]
+
   /** Each original holder remains the sole owner of one managed transport opening. */
-  const managedMembers: Readonly<{
+  #managedMembers: Readonly<{
     started(): boolean
     close(): Promise<void>
-  }>[] = []
+  }>[]
+
   /** A listener remains owned by this transport installation. */
-  let listener: { close(): void | Promise<void> } | undefined
+  #listener: { close(): void | Promise<void> } | undefined
+
   /** Host close publishes one completion before invoking any user cleanup. */
-  let closing: Promise<void> | undefined
+  #closing: Promise<void> | undefined
+
   /** The endpoint is constructed only by start, after genuine native installation begins. */
-  let endpoint!: ReturnType<typeof createRuntimeApiEndpoint>
+  #endpoint!: ReturnType<typeof createRuntimeApiEndpoint>
+
   /** The original outbound attachment owns all correlation, replay and runtime generations. */
-  let outbound!: RpcOutboundAttachment
+  #outbound!: RpcOutboundAttachment
+
   /** The original registry holds local, namespace and explicitly captured forward providers. */
-  let registry!: ProviderRegistry
+  #registry!: ProviderRegistry
+
   /** The one shared provider compiler remains reusable by standalone peer construction. */
-  let assembly!: ReturnType<typeof prepareRuntimeProviderAssembly>
+  #assembly!: ReturnType<typeof prepareRuntimeProviderAssembly>
+
   /** Every start caller joins the same native opening rather than acquiring duplicate resources. */
-  let starting: Promise<void> | undefined
+  #starting: Promise<void> | undefined
+
   /** Native source preparation has one genuine token; copied empty objects confer no authority. */
-  const deployment = readAdapterDeployment(definition.deployment)
+  #deployment
 
   /** A direct target must be ready on its original physical channel at this exact call. */
-  const live = (session: IHostSession): boolean =>
+  #live = (session: IHostSession): boolean =>
     Boolean(session.connection && !session.closing && !session.channel.transport.closed)
+
   /** Target names are the remote handshake name, never the local plugin registration. */
-  const byName = (name: string): IHostSession | undefined => {
-    for (const session of sessions.values())
-      if (session.direct && session.name === name && live(session)) return session
+  #byName = (name: string): IHostSession | undefined => {
+    for (const session of this.#sessions.values())
+      if (session.direct && session.name === name && this.#live(session)) return session
     return undefined
   }
+
   /** Existing target diagnostics preserve their canonical semantic code and text. */
-  const unknown = (_name: string): never => {
+  #unknown = (_name: string): never => {
     throw createRpcError(RpcCoreErrorCode.targetUnknown, RuntimeApiErrorText.targetUnknown)
   }
+
   /** Direct calls select one current accepted receipt, with no waiting or retargeting. */
-  const direct = (name: string): IRuntimePeer => {
-    if (closing) throw createRpcLifecycleError(RpcCoreErrorText.endpointDisposed)
-    if (assembled?.id === name) return assembled as unknown as IRuntimePeer
+  #direct = (name: string): IRuntimePeer => {
+    if (this.#closing) throw createRpcLifecycleError(RpcCoreErrorText.endpointDisposed)
+    if (this.#assembled?.id === name) return this.#assembled as unknown as IRuntimePeer
     /** Existing names retain priority; endpoint ids still select only live direct sessions. */
-    const addressed = sessions.get(name)
-    const session = byName(name) ?? (addressed?.direct && live(addressed) ? addressed : undefined)
-    return session?.connection?.peer ?? session?.peer ?? unknown(name)
+    const addressed = this.#sessions.get(name)
+    const session =
+      this.#byName(name) ?? (addressed?.direct && this.#live(addressed) ? addressed : undefined)
+    return session?.connection?.peer ?? session?.peer ?? this.#unknown(name)
   }
+
   /** Build a per-connection snapshot; accepted peers are never hot-updated within a generation. */
-  const description = (peerId?: string): IRuntimePeerDescription =>
+  #description = (peerId?: string): IRuntimePeerDescription =>
     normalizeRuntimeDescription({
       schemaVersion: RUNTIME_API_SCHEMA_VERSION,
-      self: multiplex!.supports(peerId ?? '', RpcCapability.generation)
-        ? { ...source.self, generation }
-        : source.self,
-      ...(multiplex!.supports(peerId ?? '', RpcCapability.forwardRoute) ? { nodeId } : {}),
+      self: this.#multiplex!.supports(peerId ?? '', RpcCapability.generation)
+        ? { ...this.#source.self, generation: this.#generation }
+        : this.#source.self,
+      ...(this.#multiplex!.supports(peerId ?? '', RpcCapability.forwardRoute)
+        ? { nodeId: this.#nodeId }
+        : {}),
       methods: describeRuntimeMethods(
-        assembly.methods(),
-        multiplex!.supports(peerId ?? '', RpcCapability.stream)
+        this.#assembly.methods(),
+        this.#multiplex!.supports(peerId ?? '', RpcCapability.stream)
       ).map((method) => {
         if (method.forwardedVia === undefined || namespaceSegment.test(method.forwardedVia))
           return method
@@ -331,8 +393,9 @@ export function createRuntimeHost(
         return description
       })
     })
+
   /** A captured capability uses canonical forwarding and may never follow a same-name successor. */
-  const forward = (
+  #forward = (
     session: IHostSession,
     method: IRuntimePeerDescription['methods'][number],
     name: string,
@@ -345,12 +408,12 @@ export function createRuntimeHost(
       name,
       method: method.name,
       forwardedVia: targetName,
-      nodeId,
+      nodeId: this.#nodeId,
       supportedModes: method.supportedModes,
       ...(!held
         ? {
             readDescription: () => {
-              const current = byName(targetName)
+              const current = this.#byName(targetName)
               return (
                 current &&
                 readRuntimePeerConnection(current.peer!).description!.methods.find(
@@ -381,8 +444,9 @@ export function createRuntimeHost(
             }
           }),
       slot: () => {
-        const current = byName(targetName)
-        if (!current || (heldSession !== undefined && current !== heldSession)) unknown(targetName)
+        const current = this.#byName(targetName)
+        if (!current || (heldSession !== undefined && current !== heldSession))
+          this.#unknown(targetName)
         const declaration = readRuntimePeerConnection(current!.peer!).description?.methods.find(
           (entry) => entry.name === method.name
         )
@@ -395,8 +459,9 @@ export function createRuntimeHost(
       }
     }
   }
+
   /** One provider tree builder keeps physical and logical capabilities on the same own-data rules. */
-  const projectMethods = (
+  #projectMethods = (
     methods: IRuntimePeerDescription['methods'],
     callable: (method: IRuntimePeerDescription['methods'][number]) => unknown
   ): object => {
@@ -417,28 +482,36 @@ export function createRuntimeHost(
     }
     return tree
   }
+
   /** A physical capability retains the same original forwarding receipt and generation check. */
-  const project = (session: IHostSession): object =>
-    projectMethods(readRuntimePeerConnection(session.peer!).description!.methods, (method) => {
-      const entry = forward(session, method, method.name, true)
-      /** Generated routes admit every mode; their default capability call remains a scalar request. */
-      const streaming =
-        method.supportedModes.every((mode) => mode === RuntimeApiMode.stream) ||
-        method.yield !== undefined
-      return retainRuntimeForwardMethod((payload?: unknown) => {
-        try {
-          const current = entry.slot().peer
-          return streaming
-            ? current.stream(method.name, payload)
-            : current.request(method.name, payload)
-        } catch (error) {
-          if (streaming) throw error
-          return Promise.reject(error)
-        }
-      }, entry)
-    })
+  #project = (session: IHostSession): object =>
+    this.#projectMethods(
+      readRuntimePeerConnection(session.peer!).description!.methods,
+      (method) => {
+        const entry = this.#forward(session, method, method.name, true)
+        /**
+         * Generated routes admit every mode; their default capability call remains a scalar
+         * request.
+         */
+        const streaming =
+          method.supportedModes.every((mode) => mode === RuntimeApiMode.stream) ||
+          method.yield !== undefined
+        return retainRuntimeForwardMethod((payload?: unknown) => {
+          try {
+            const current = entry.slot().peer
+            return streaming
+              ? current.stream(method.name, payload)
+              : current.request(method.name, payload)
+          } catch (error) {
+            if (streaming) throw error
+            return Promise.reject(error)
+          }
+        }, entry)
+      }
+    )
+
   /** Resolve the longest accepted namespace after the canonical exact-local lookup has failed. */
-  const resolveNamespace = (method: string) => {
+  #resolveNamespace = (method: string) => {
     if (
       method.length > RpcWireLimit.maxIdentifierChars ||
       !method.split('.').every((part) => namespaceSegment.test(part))
@@ -448,60 +521,67 @@ export function createRuntimeHost(
       return undefined
     const names = [
       ...new Set(
-        assembly
+        this.#assembly
           .methods()
           .filter((entry) => entry.kind === 'forward')
           .map((entry) => (entry as IRuntimeForwardMethodEntry).forwardedVia)
       ),
-      ...[...sessions.values()]
+      ...[...this.#sessions.values()]
         .map((session) => session.name)
         .filter((name): name is string => name !== undefined)
     ]
-    const name = names
-      .filter((name) => method.startsWith(`${name}.`))
-      .sort((left, right) => right.length - left.length)[0]
-    if (!name) unknown(method)
-    const session = byName(name!) ?? unknown(name!)
+    /** Longest prefix selection preserves the first equal-length match in one traversal. */
+    let name: string | undefined
+    for (const candidate of names)
+      if (
+        method.startsWith(`${candidate}.`) &&
+        (name === undefined || candidate.length > name.length)
+      )
+        name = candidate
+    if (!name) this.#unknown(method)
+    const session = this.#byName(name!) ?? this.#unknown(name!)
     const selected = readRuntimePeerConnection(session.peer!).description!.methods.find(
       (entry) => entry.name === method.slice(name!.length + 1)
     )
     if (!selected)
       throw createRpcError(RpcCoreErrorCode.providerNotFound, RuntimeApiErrorText.methodUnavailable)
-    assembly.append([forward(session, selected, method, false)])
-    return registry.providers.get(method)
+    this.#assembly.append([this.#forward(session, selected, method, false)])
+    return this.#registry.providers.get(method)
   }
+
   /** Closing a physical receipt never disposes the host's one shared endpoint. */
-  const retire = (session: IHostSession, reason?: unknown): Promise<void> => {
+  #retire = (session: IHostSession, reason?: unknown): Promise<void> => {
     if (session.closing) return session.closing
     const completion = deferred<void>()
     session.closing = completion.promise
     /** Only an unaccepted candidate waits for its already-running directory reply's actual write. */
     const release = (): void => {
-      if (session.peer && probe && (probe.mask & (1 << RpcProbeStage.peer)) !== 0)
-        probe.peer(RuntimeProbeLifecycle.closing, session.channel.peerId, reason)
-      if (sessions.get(session.channel.peerId) === session) sessions.delete(session.channel.peerId)
+      if (session.peer && this.#probe && (this.#probe.mask & (1 << RpcProbeStage.peer)) !== 0)
+        this.#probe.peer(RuntimeProbeLifecycle.closing, session.channel.peerId, reason)
+      if (this.#sessions.get(session.channel.peerId) === session)
+        this.#sessions.delete(session.channel.peerId)
       const departed = reason ?? createRpcLifecycleError(RpcCoreErrorText.endpointDisposed)
       session.reason = departed
       for (const observe of Array.from(session.departures)) {
         try {
           observe(departed)
         } catch (failure) {
-          report(failure)
+          this.#report(failure)
         }
       }
       session.departures.clear()
-      outbound?.retireRuntimeTarget(session.channel.peerId, departed)
-      readEndpointOwner<RpcStreamOwner>(endpoint, EndpointOwnerKey.streamOwner)?.retireTarget(
+      this.#outbound?.retireRuntimeTarget(session.channel.peerId, departed)
+      readEndpointOwner<RpcStreamOwner>(this.#endpoint, EndpointOwnerKey.streamOwner)?.retireTarget(
         session.channel.peerId,
         departed
       )
       session.withdraw?.()
-      if (session.name && peers[session.name] && byName(session.name) === undefined)
-        delete peers[session.name]
+      if (session.name && this.#peers[session.name] && this.#byName(session.name) === undefined)
+        delete this.#peers[session.name]
       try {
         session.detach()
       } catch (error) {
-        report(error)
+        this.#report(error)
       }
       void Promise.resolve()
         .then(async () => {
@@ -510,7 +590,7 @@ export function createRuntimeHost(
         })
         .then(completion.resolve, completion.reject)
       if (!session.managed && session.peer && session.name)
-        eventsPublisher.publish(
+        this.#eventsPublisher.publish(
           {
             type: RuntimeEventName.exit,
             name: session.name,
@@ -518,9 +598,9 @@ export function createRuntimeHost(
             generation: 0,
             timestamp: session.channel.scheduler.now(),
             clock: RuntimeQueryClock.scheduler,
-            ...(reason === undefined ? {} : { error: runtimeErrorIdentity(reason, report) })
+            ...(reason === undefined ? {} : { error: runtimeErrorIdentity(reason, this.#report) })
           },
-          report
+          this.#report
         )
     }
     if (!session.peer && session.replySettled)
@@ -528,8 +608,9 @@ export function createRuntimeHost(
     else release()
     return completion.promise
   }
+
   /** Name arbitration uses one existing ping, and lets only the winning candidate publish. */
-  const admitName = (session: IHostSession, name: string): Promise<void> => {
+  #admitName = (session: IHostSession, name: string): Promise<void> => {
     if (!session.direct) {
       session.name = name
       return Promise.resolve()
@@ -541,8 +622,8 @@ export function createRuntimeHost(
     void Promise.resolve()
       .then(async () => {
         if (session.name === name) return
-        if (probing.has(name)) throw createPeerNameDuplicateError()
-        const previous = [...sessions.values()].find(
+        if (this.#probing.has(name)) throw createPeerNameDuplicateError()
+        const previous = [...this.#sessions.values()].find(
           (candidate) =>
             candidate !== session &&
             candidate.direct &&
@@ -552,30 +633,31 @@ export function createRuntimeHost(
         if (previous) {
           if (!previous.peer) throw createPeerNameDuplicateError()
           if (!previous.channel.transport.closed) {
-            probing.add(name)
+            this.#probing.add(name)
             try {
               let alive = false
               try {
-                alive = await endpoint.ping!(previous.channel.peerId, undefined, {
-                  timeoutMs: definition.connect?.timeoutMs ?? 10_000
+                alive = await this.#endpoint.ping!(previous.channel.peerId, undefined, {
+                  timeoutMs: this.#definition.connect?.timeoutMs ?? 10_000
                 })
               } catch (failure) {
-                report(failure)
+                this.#report(failure)
               }
               if (alive) throw createPeerNameDuplicateError()
-              await retire(previous)
+              await this.#retire(previous)
             } finally {
-              probing.delete(name)
+              this.#probing.delete(name)
             }
-          } else await retire(previous)
+          } else await this.#retire(previous)
         }
         session.name = name
       })
       .then(completion.resolve, completion.reject)
     return completion.promise
   }
+
   /** Publish the original prepared receipt only after the accepting owner commits readiness. */
-  const publishSession = async (
+  #publishSession = async (
     session: IHostSession,
     publishedPeer = session.peer!,
     publishedGeneration = 0
@@ -587,47 +669,64 @@ export function createRuntimeHost(
       identity: remote.self,
       description: remote,
       peer: publishedPeer,
-      report
+      report: this.#report
     })
-    /** Hidden members retain genuine readiness observation without becoming public direct targets. */
-    if (probe && (probe.mask & (1 << RpcProbeStage.peer)) !== 0)
-      probe.peer(RuntimeEventName.ready, session.channel.peerId, undefined)
+    /** Hidden members have no public ready event; direct sessions use the publisher below once. */
+    if (!session.direct && this.#probe && (this.#probe.mask & (1 << RpcProbeStage.peer)) !== 0)
+      this.#probe.peer(RuntimeEventName.ready, session.channel.peerId, undefined)
     if (!session.direct) return
-    session.withdraw = onConnection?.(session.connection)
+    session.withdraw = (0, this.#onConnection)?.(session.connection)
     if (session.direct) {
-      Object.defineProperty(peers, remote.self.name, {
-        value: project(session),
+      Object.defineProperty(this.#peers, remote.self.name, {
+        value: this.#project(session),
         enumerable: true,
         configurable: true
       })
+      /** One accepted catalog snapshot suffices for every method in this arriving session. */
+      const existingMethods = new Set(this.#assembly.methods().map((entry) => entry.name))
       const additions = remote.methods
         .filter(
           (method) =>
             namespaceSegment.test(remote.self.name) &&
             `${remote.self.name}.${method.name}`.length <= RpcWireLimit.maxIdentifierChars &&
-            !registry.providers.has(`${remote.self.name}.${method.name}`) &&
-            !assembly.methods().some((entry) => entry.name === `${remote.self.name}.${method.name}`)
+            !this.#registry.providers.has(`${remote.self.name}.${method.name}`) &&
+            !existingMethods.has(`${remote.self.name}.${method.name}`)
         )
-        .map((method) => forward(session, method, `${remote.self.name}.${method.name}`, false))
-      if (additions.length) assembly.append(additions)
+        .map((method) =>
+          this.#forward(session, method, `${remote.self.name}.${method.name}`, false)
+        )
+      if (additions.length) this.#assembly.append(additions)
     }
-    for (const observe of Array.from(accepted)) {
+    for (const observe of Array.from(this.#accepted)) {
       try {
         await observe(remote)
       } catch (error) {
-        report(error)
+        this.#report(error)
       }
     }
-    eventsPublisher.publish(
+    this.#eventsPublisher.publish(
       runtimeReadyEvent(remote.self.name, publishedPeer, publishedGeneration),
-      report
+      this.#report
     )
   }
-  /**
-   * A fresh raw channel joins the existing endpoint before the original bilateral directory
-   * exchange.
-   */
-  const accept = async (
+
+  /** Preserve source metadata from the genuine installed mode while the Peer borrows a channel. */
+  #connectionOrigin = () => {
+    if (this.#definition.mode === RpcTransportMode.listen)
+      return { kind: RuntimeSourceKind.listen, direction: RuntimeConnectionDirection.listen }
+    if (this.#definition.mode === RpcTransportMode.spawn)
+      return { kind: RuntimeSourceKind.spawn, direction: RuntimeConnectionDirection.spawned }
+    return {
+      kind: RuntimeSourceKind.connect,
+      direction:
+        this.#definition.mode === RpcTransportMode['connect-to-parent']
+          ? RuntimeConnectionDirection.spawnedBy
+          : RuntimeConnectionDirection.connect
+    }
+  }
+
+  /** Join the original shared endpoint without replacing native admission or close ownership. */
+  #accept = async (
     channel: IRuntimePeerSourceResult,
     directTarget = true,
     preparation?: Readonly<{
@@ -637,17 +736,17 @@ export function createRuntimeHost(
       policy?: IAdapterDeploymentEndpointPreparation
     }>
   ): Promise<IRpcHostMember> => {
-    if (closing) {
+    if (this.#closing) {
       await channel.close()
       throw createRpcLifecycleError(RpcCoreErrorText.endpointDisposed)
     }
     try {
-      multiplex!.assertAttach(channel.peerId)
+      this.#multiplex!.assertAttach(channel.peerId)
     } catch (primary) {
       try {
         await channel.close()
       } catch (cleanup) {
-        report(cleanup)
+        this.#report(cleanup)
       }
       throw primary
     }
@@ -658,15 +757,16 @@ export function createRuntimeHost(
       ...(preparation?.managed ? { managed: true } : {}),
       departures: new Set()
     }
-    sessions.set(channel.peerId, session)
+    this.#sessions.set(channel.peerId, session)
     try {
       /** The accepted native source contributes its original execution policy exactly once. */
       const nativePolicy =
-        preparation?.policy ?? deployment?.prepareEndpoint?.(channel, options.providerLimits)
+        preparation?.policy ??
+        this.#deployment?.prepareEndpoint?.(channel, this.#options.providerLimits)
       session.execution = nativePolicy?.execution
       /** This view preserves the same kernel while native rollback can only retire its own session. */
       const borrowed = Object.freeze(
-        Object.create(endpoint, { dispose: { value: () => retire(session) } })
+        Object.create(this.#endpoint, { dispose: { value: () => this.#retire(session) } })
       )
       /** Native health/drain views compose around a session-only disposal boundary. */
       const wrap = (served: IRemoteServeEndpoint): IRemoteServeEndpoint => {
@@ -678,103 +778,120 @@ export function createRuntimeHost(
         const native = nativePolicy?.wrapEndpoint?.(served, onExecution) ?? served
         return preparation?.wrapEndpoint?.(native, onExecution) ?? native
       }
-      session.detach = multiplex!.attach(channel)
-      const peer = await createRuntimePeer(
-        {
-          self: source.self,
-          defaultTimeoutMs:
-            options.defaultTimeoutMs ??
-            contributions.find((value) => value.defaultTimeoutMs !== undefined)?.defaultTimeoutMs,
-          report
-        },
-        {
-          channel: preparation?.managed ? { ...channel, close: undefined } : channel,
-          wrapEndpoint: wrap,
-          endpoint: { endpoint: borrowed, oneWay: endpoint, stream: endpoint.stream },
-          assembly,
-          generation,
-          nodeId,
-          hostSession: true,
-          restrictTransfer: (callOptions) => {
-            if (
-              callOptions &&
-              Object.hasOwn(callOptions, 'transfer') &&
-              !multiplex!.supports(channel.peerId, RpcCapability.transfer)
-            )
-              rejectRuntimeApiCapability()
-          },
-          signal: preparation?.signal ?? controller.signal,
-          description: () => description(channel.peerId)
-        }
+      session.detach = this.#multiplex!.attach(channel)
+      /**
+       * Original source provenance survives borrowing instead of defaulting every session to
+       * connect.
+       */
+      const peerOptions = {
+        self: this.#source.self,
+        defaultTimeoutMs:
+          this.#options.defaultTimeoutMs ??
+          this.#contributions.find((value) => value.defaultTimeoutMs !== undefined)
+            ?.defaultTimeoutMs,
+        report: this.#report
+      }
+      const peer = await withRuntimePreparationContext(
+        peerOptions,
+        { connectionOrigin: this.#connectionOrigin },
+        () =>
+          createRuntimePeer(peerOptions, {
+            channel: preparation?.managed ? { ...channel, close: undefined } : channel,
+            wrapEndpoint: wrap,
+            endpoint: { endpoint: borrowed, oneWay: this.#endpoint, stream: this.#endpoint.stream },
+            assembly: this.#assembly,
+            generation: this.#generation,
+            nodeId: this.#nodeId,
+            hostSession: true,
+            restrictTransfer: (callOptions) => {
+              if (
+                callOptions &&
+                Object.hasOwn(callOptions, 'transfer') &&
+                !this.#multiplex!.supports(channel.peerId, RpcCapability.transfer)
+              )
+                rejectRuntimeApiCapability()
+            },
+            signal: preparation?.signal ?? this.#controller.signal,
+            description: () => this.#description(channel.peerId)
+          })
       )
       const remote = readRuntimePeerConnection(peer).description!
-      if (probe && (probe.mask & (1 << RpcProbeStage.peer)) !== 0) {
-        probe.peer(RuntimeProbeLifecycle.handshake, channel.peerId, undefined)
-        probe.peer(RuntimeProbeLifecycle.directory, channel.peerId, undefined)
+      if (this.#probe && (this.#probe.mask & (1 << RpcProbeStage.peer)) !== 0) {
+        this.#probe.peer(RuntimeProbeLifecycle.handshake, channel.peerId, undefined)
+        this.#probe.peer(RuntimeProbeLifecycle.directory, channel.peerId, undefined)
       }
-      await admitName(session, remote.self.name)
+      await this.#admitName(session, remote.self.name)
+      /**
+       * Readiness follows the original local directory reply physical write, not only its remote
+       * receipt.
+       */
+      await session.replySettled
       session.peer = peer
-      if (!session.managed) await publishSession(session)
+      if (!session.managed) await this.#publishSession(session)
       const member = Object.freeze({
         ...peer,
         id: remote.self.name,
-        close: () => retire(session),
-        [Symbol.asyncDispose]: () => retire(session)
+        close: () => this.#retire(session),
+        [Symbol.asyncDispose]: () => this.#retire(session)
       })
       retainRuntimeSessionConnection(member, peer)
       return member
     } catch (error) {
       try {
-        await retire(session, error)
+        await this.#retire(session, error)
       } catch (cleanup) {
-        report(cleanup)
+        this.#report(cleanup)
       }
       throw error
     }
   }
+
   /** Read numeric generation from the accepted wire owner; no host retry counter is introduced. */
-  const sessionGeneration = (session: IHostSession): number =>
+  #sessionGeneration = (session: IHostSession): number =>
     readRuntimePeerConnection(session.peer!).description?.self.generation?.value ?? 0
+
   /**
    * Retry is opt-in and delegates capture, keys, timeout and the replay decision to canonical
    * owners.
    */
-  const request = (
+  #request = (
     peer: IRuntimePeer,
     method: string,
     payload?: unknown,
     callOptions?: Parameters<IRuntimePeer['request']>[2]
   ) => {
-    const session = Array.from(sessions.values()).find((candidate) => candidate.peer === peer)
-    const suppliedPort = contributions.find((value) => value.retryPort !== undefined)?.retryPort
-    if (!session || (!suppliedPort && !contributions.some((value) => value.retry)))
+    const session = Array.from(this.#sessions.values()).find((candidate) => candidate.peer === peer)
+    const suppliedPort = this.#contributions.find(
+      (value) => value.retryPort !== undefined
+    )?.retryPort
+    if (!session || (!suppliedPort && !this.#contributions.some((value) => value.retry)))
       return peer.request(method, payload, callOptions)
     if (
       callOptions &&
       Object.hasOwn(callOptions, 'transfer') &&
-      !multiplex!.supports(session.channel.peerId, RpcCapability.transfer)
+      !this.#multiplex!.supports(session.channel.peerId, RpcCapability.transfer)
     )
       rejectRuntimeApiCapability()
     if (!session.retryRequest) {
       /** Original ready/exit publications are observed without owning a reconnect state machine. */
       const current = () =>
-        byName(session.name!) ??
+        this.#byName(session.name!) ??
         (() => {
           throw createRemoteLayerError(RpcRemoteLayerErrorCode.closed, session.reason, {
-            generation: sessionGeneration(session)
+            generation: this.#sessionGeneration(session)
           })
         })()
       const events: IRemoteGenerationEvents = {
         current: () => {
-          const active = byName(session.name!)
+          const active = this.#byName(session.name!)
           return {
-            generation: active ? sessionGeneration(active) : sessionGeneration(session),
+            generation: active ? this.#sessionGeneration(active) : this.#sessionGeneration(session),
             active: active !== undefined
           }
         },
         onLeave: (generation, observe) => {
-          const active = byName(session.name!)
-          if (!active || sessionGeneration(active) !== generation) {
+          const active = this.#byName(session.name!)
+          if (!active || this.#sessionGeneration(active) !== generation) {
             observe(session.reason)
             return () => undefined
           }
@@ -785,33 +902,35 @@ export function createRuntimeHost(
         },
         whenReady: (_afterGeneration, signal) =>
           new Promise<number>((resolve, reject) => {
-            const existing = byName(session.name!)
+            const existing = this.#byName(session.name!)
             if (existing && existing !== session) {
-              resolve(sessionGeneration(existing))
+              resolve(this.#sessionGeneration(existing))
               return
             }
             const stopped = () => {
               remove()
               reject(
-                signal?.aborted ? resolveAbortReason(signal) : resolveAbortReason(controller.signal)
+                signal?.aborted
+                  ? resolveAbortReason(signal)
+                  : resolveAbortReason(this.#controller.signal)
               )
             }
-            const ready = eventsPublisher.on(RuntimeEventName.ready, (event) => {
+            const ready = this.#eventsPublisher.on(RuntimeEventName.ready, (event) => {
               if (event.name !== session.name) return
-              const accepted = byName(session.name!)
+              const accepted = this.#byName(session.name!)
               if (!accepted || accepted === session) return
               remove()
-              resolve(sessionGeneration(accepted))
+              resolve(this.#sessionGeneration(accepted))
             })
             const remove = () => {
               ready()
               signal?.removeEventListener('abort', stopped)
-              controller.signal.removeEventListener('abort', stopped)
+              this.#controller.signal.removeEventListener('abort', stopped)
             }
-            if (signal?.aborted || controller.signal.aborted) stopped()
+            if (signal?.aborted || this.#controller.signal.aborted) stopped()
             else {
               signal?.addEventListener('abort', stopped, { once: true })
-              controller.signal.addEventListener('abort', stopped, { once: true })
+              this.#controller.signal.addEventListener('abort', stopped, { once: true })
             }
           })
       }
@@ -823,7 +942,7 @@ export function createRuntimeHost(
             const active = current()
             const receipt = readRuntimePeerConnection(active.peer!)
             return {
-              number: sessionGeneration(active),
+              number: this.#sessionGeneration(active),
               channel: receipt.channel,
               endpoint: receipt.endpoint as never
             }
@@ -842,7 +961,7 @@ export function createRuntimeHost(
           },
           validateOptions: (value) =>
             assertTimeout((value as Parameters<IRuntimePeer['request']>[2])?.timeoutMs),
-          timeout: (value) => (value === false ? undefined : (value ?? defaultTimeout)),
+          timeout: (value) => (value === false ? undefined : (value ?? this.#defaultTimeout)),
           closed: (generation, cause) =>
             createRemoteLayerError(RpcRemoteLayerErrorCode.closed, cause, { generation }),
           departureCause: () => session.reason,
@@ -850,53 +969,65 @@ export function createRuntimeHost(
             throw error
           }
         },
-        report,
+        this.#report,
         suppliedPort
       )
     }
-    return session.retryRequest(method, payload, callTimeout(callOptions))
+    return session.retryRequest(method, payload, this.#callTimeout(callOptions))
   }
+
   /** Fanout captures target identity once and retains independent original settlement values. */
-  const targets = (): readonly Readonly<{ id: string; peer: IRuntimePeer }>[] => {
-    if (closing) throw createRpcLifecycleError(RpcCoreErrorText.endpointDisposed)
-    if (assembled) return [{ id: assembled.id, peer: assembled as unknown as IRuntimePeer }]
-    if (managedPeer && managedName) return [{ id: managedName, peer: managedPeer }]
-    return [...sessions.values()]
-      .filter((session) => session.direct && live(session))
+  #targets = (): readonly Readonly<{ id: string; peer: IRuntimePeer }>[] => {
+    if (this.#closing) throw createRpcLifecycleError(RpcCoreErrorText.endpointDisposed)
+    if (this.#assembled)
+      return [{ id: this.#assembled.id, peer: this.#assembled as unknown as IRuntimePeer }]
+    if (this.#managedPeer && this.#managedName)
+      return [{ id: this.#managedName, peer: this.#managedPeer }]
+    return [...this.#sessions.values()]
+      .filter((session) => session.direct && this.#live(session))
       .map((session) => ({ id: session.name!, peer: session.connection?.peer ?? session.peer! }))
   }
+
   /** Reject unsupported ownership options before async fanout can turn admission into a result. */
-  const admitTransfer = (callOptions: object | undefined, target?: string): void => {
-    if (!callOptions || !Object.hasOwn(callOptions, 'transfer') || assembled) return
+  #admitTransfer = (callOptions: object | undefined, target?: string): void => {
+    if (!callOptions || !Object.hasOwn(callOptions, 'transfer') || this.#assembled) return
     /** Explicit names retain priority over an endpoint-id fallback, including unusual user names. */
-    const addressed = target === undefined ? undefined : (byName(target) ?? sessions.get(target))
-    for (const session of target === undefined ? sessions.values() : addressed ? [addressed] : [])
+    const addressed =
+      target === undefined ? undefined : (this.#byName(target) ?? this.#sessions.get(target))
+    for (const session of target === undefined
+      ? this.#sessions.values()
+      : addressed
+        ? [addressed]
+        : [])
       if (
         session.direct &&
-        live(session) &&
-        !multiplex!.supports(session.channel.peerId, RpcCapability.transfer)
+        this.#live(session) &&
+        !this.#multiplex!.supports(session.channel.peerId, RpcCapability.transfer)
       )
         rejectRuntimeApiCapability()
   }
+
   /** Direct dispatch keeps its original Promise rejection timing for non-transfer target failures. */
-  const sendRequest = async (
+  #sendRequest = async (
     target: string,
     method: string,
     payload?: unknown,
     callOptions?: Parameters<IRuntimePeer['request']>[2]
-  ) => request(direct(target), method, payload, callOptions)
+  ) => this.#request(this.#direct(target), method, payload, callOptions)
+
   /** Records use the endpoint's canonical key grammar and have no inherited dictionary members. */
-  const fanout = <T>(): {
+  #fanout = <T>(): {
     fulfilled: Partial<Record<string, T>>
     rejected: Partial<Record<string, unknown>>
   } => ({ fulfilled: Object.create(null), rejected: Object.create(null) })
+
   /** Scalar and Promise operations preserve single-target behavior and isolate multiple targets. */
-  const broadcast = async <T>(
+  #broadcast = async <T>(
     operation: (peer: IRuntimePeer) => T | Promise<T>
   ): Promise<T | IRpcFanoutResult<T>> => {
-    const selected = targets()
+    const selected = this.#targets()
     if (selected.length === 1) return operation(selected[0]!.peer)
-    const result = fanout<T>()
+    const result = this.#fanout<T>()
     await Promise.all(
       selected.map(async ({ id, peer }) => {
         const key = JSON.stringify(['target', id])
@@ -909,45 +1040,46 @@ export function createRuntimeHost(
     )
     return result
   }
+
   /** Open each task with the original managed factory while borrowing this host's single endpoint. */
-  const openManaged = async (
+  #openManaged = async (
     context: IAdapterDeploymentContext,
     directTarget: boolean
   ): Promise<IRpcHostMember> => {
-    const native = await deployment!.managed!(context)
+    const native = await this.#deployment!.managed!(context)
     /** One binding retains its preceding accepted receipt until the next native generation opens. */
     let precedingSession: IRpcHostMember | undefined
     const peer = await createManagedRuntimePeer(
       {
-        self: source.self,
-        provide: options.provide,
-        authentication: credentials,
-        defaultTimeoutMs: defaultTimeout,
-        providerLimits: options.providerLimits,
-        contract: options.contract,
-        report,
-        keyFactory: native.keyFactory ?? deployment!.runtimeOptions?.keyFactory,
+        self: this.#source.self,
+        provide: this.#options.provide,
+        authentication: this.#credentials,
+        defaultTimeoutMs: this.#defaultTimeout,
+        providerLimits: this.#options.providerLimits,
+        contract: this.#options.contract,
+        report: this.#report,
+        keyFactory: native.keyFactory ?? this.#deployment!.runtimeOptions?.keyFactory,
         retryPort:
-          contributions.find((value) => value.retryPort !== undefined)?.retryPort ??
+          this.#contributions.find((value) => value.retryPort !== undefined)?.retryPort ??
           native.retryPort ??
-          deployment!.runtimeOptions?.retryPort,
+          this.#deployment!.runtimeOptions?.retryPort,
         callDeadlineCapMs: native.callDeadlineCapMs
       },
       native.binding,
       native.bindEndpoint,
       {
-        ...preparation,
+        ...this.#preparation,
         prepareReplacement: native.prepareReplacement,
-        initialSignal: controller.signal,
-        lifecycleSignal: controller.signal,
+        initialSignal: this.#controller.signal,
+        lifecycleSignal: this.#controller.signal,
         prepareRuntime: async (channel, signal) => {
           /** Abandoned native work can outlive its logical session; its successor owns this slot. */
           try {
             await precedingSession?.close()
           } catch (cleanup) {
-            report(cleanup)
+            this.#report(cleanup)
           }
-          precedingSession = await accept(channel, directTarget, {
+          precedingSession = await this.#accept(channel, directTarget, {
             managed: true,
             signal,
             ...(native.bindEndpoint
@@ -970,18 +1102,18 @@ export function createRuntimeHost(
      */
     const committed = async (currentPeer: IRuntimePeer, number: number): Promise<void> => {
       const receipt = readRuntimePeerConnection(currentPeer)
-      const session = sessions.get(receipt.peerId)
-      if (!session || closing) return
+      const session = this.#sessions.get(receipt.peerId)
+      if (!session || this.#closing) return
       session.direct = directTarget
-      if (directTarget) managedName = receipt.description!.self.name
+      if (directTarget) this.#managedName = receipt.description!.self.name
       registration.events.onLeave(number, (reason) => {
-        void retire(session, reason).catch(report)
+        void this.#retire(session, reason).catch(this.#report)
       })
-      await publishSession(session, peer, number)
+      await this.#publishSession(session, peer, number)
     }
-    managedSubscriptions.push(
+    this.#managedSubscriptions.push(
       registration.onReady((peer, number) => {
-        void committed(peer, number).catch(report)
+        void committed(peer, number).catch(this.#report)
       })
     )
     if (directTarget)
@@ -991,53 +1123,52 @@ export function createRuntimeHost(
         RuntimeEventName.degraded,
         RuntimeEventName.terminal
       ])
-        managedSubscriptions.push(
+        this.#managedSubscriptions.push(
           peer.on(event, (observation) =>
-            eventsPublisher.publish(
-              { ...observation, name: managedName ?? observation.name },
-              report
+            this.#eventsPublisher.publish(
+              { ...observation, name: this.#managedName ?? observation.name },
+              this.#report
             )
           )
         )
-    /** Pool rollback and host fallback join one original native close attempt, including rejection. */
-    let memberClosing: Promise<void> | undefined
-    /** This receipt releases only this binding's canonical holder and never the shared endpoint. */
-    const closeMember = (): Promise<void> => (memberClosing ??= peer.close())
+    /** Pool rollback and Host fallback retain the exact original native close attempt. */
+    const receipt = new ManagedMemberClose(peer)
+    /** This member releases only its binding's holder and never the shared endpoint. */
     const member = Object.freeze({
       ...peer,
       id: readRuntimePeerConnection(peer).description!.self.name,
-      close: closeMember,
-      [Symbol.asyncDispose]: closeMember
+      close: receipt.close,
+      [Symbol.asyncDispose]: receipt.close
     })
-    managedMembers.push({ started: () => memberClosing !== undefined, close: closeMember })
-    if (directTarget) managedPeer = peer
+    this.#managedMembers.push(receipt)
+    if (directTarget) this.#managedPeer = peer
     await committed(registration.currentPeer(), registration.events.current().generation)
     retainRuntimeSessionConnection(member, peer)
     return member
   }
 
   /** Close prevents late admission and releases every acquired resource despite cleanup failures. */
-  const close = (): Promise<void> => {
-    if (closing) return closing
+  readonly close = (): Promise<void> => {
+    if (this.#closing) return this.#closing
     const completion = deferred<void>()
-    closing = completion.promise
-    eventsPublisher.close()
+    this.#closing = completion.promise
+    this.#eventsPublisher.close()
     void Promise.resolve()
       .then(async () => {
         const failures: unknown[] = []
         /** The original assembler drains accepted work while all member channels remain usable. */
         try {
-          await assembled?.close()
+          await this.#assembled?.close()
         } catch (error) {
           failures.push(error)
         }
-        for (const dispose of managedSubscriptions.splice(0))
+        for (const dispose of this.#managedSubscriptions.splice(0))
           try {
             dispose()
           } catch (error) {
             failures.push(error)
           }
-        for (const member of managedMembers.splice(0).reverse())
+        for (const member of this.#managedMembers.splice(0).reverse())
           try {
             if (!member.started()) await member.close()
           } catch (error) {
@@ -1045,31 +1176,31 @@ export function createRuntimeHost(
           }
         /** Native listener sessions drain their own generations before the fallback retirement. */
         try {
-          await listener?.close()
+          await this.#listener?.close()
         } catch (error) {
           failures.push(error)
         }
         /** Acquisition cancellation follows native drains while their actual channels remain live. */
-        controller.abort(createRpcLifecycleError(RpcCoreErrorText.endpointDisposed))
-        for (const session of [...sessions.values()].reverse())
+        this.#controller.abort(createRpcLifecycleError(RpcCoreErrorText.endpointDisposed))
+        for (const session of [...this.#sessions.values()].reverse())
           try {
-            await retire(session)
+            await this.#retire(session)
           } catch (error) {
             failures.push(error)
           }
         try {
-          await endpoint?.dispose()
+          await this.#endpoint?.dispose()
         } catch (error) {
           failures.push(error)
         }
         try {
-          releaseProbe?.()
-          await multiplex?.close()
-          await closeBootstrapSource()
+          this.#releaseProbe?.()
+          await this.#multiplex?.close()
+          await this.#closeBootstrapSource()
         } catch (error) {
           failures.push(error)
         }
-        accepted.clear()
+        this.#accepted.clear()
         /** A single canonical lifecycle diagnostic already retains its exact native cleanup leaves. */
         if (failures.length === 1 && failures[0] instanceof RpcLifecycleError) throw failures[0]
         if (failures.length)
@@ -1082,392 +1213,477 @@ export function createRuntimeHost(
       .then(completion.resolve, completion.reject)
     return completion.promise
   }
-  /** The public runtime surface is later installed on the same genuine native Host handle. */
-  const host = {
-    get self() {
-      return source.self
-    },
-    peers,
-    on: eventsPublisher.on,
-    close,
-    [Symbol.asyncDispose]: close,
-    provide: (provide: IRuntimePeerProvide) => assembly.append(compileRuntimeMethods(provide)),
-    request: (
-      method: string,
-      payload?: unknown,
-      callOptions?: Parameters<IRuntimePeer['request']>[2]
-    ) => {
-      admitTransfer(callOptions)
-      return broadcast((peer) => request(peer, method, payload, callOptions))
-    },
-    notify: (
-      method: string,
-      payload?: unknown,
-      callOptions?: Parameters<IRpcHost['notify']>[2]
-    ) => {
-      admitTransfer(callOptions, callOptions?.targetId)
-      return callOptions?.targetId === undefined
-        ? broadcast((peer) => peer.notify(method, payload, callOptions))
-        : direct(callOptions.targetId).notify(method, payload, callOptions)
-    },
-    stream: (
-      method: string,
-      payload?: unknown,
-      callOptions?: Parameters<IRuntimePeer['stream']>[2]
-    ) => {
-      admitTransfer(callOptions)
-      const selected = targets()
-      if (selected.length === 1) return selected[0]!.peer.stream(method, payload, callOptions)
-      const result = fanout<ReturnType<IRuntimePeer['stream']>>()
-      for (const { id, peer } of selected)
-        try {
-          result.fulfilled[JSON.stringify(['target', id])] = peer.stream(
-            method,
-            payload,
-            callOptions
-          )
-        } catch (error) {
-          result.rejected[JSON.stringify(['target', id])] = error
-        }
-      return result
-    },
-    group: (
-      steps: Parameters<IRuntimePeer['group']>[0],
-      callOptions?: Parameters<IRuntimePeer['group']>[1]
-    ) => {
-      admitTransfer(callOptions)
-      return broadcast((peer) => peer.group(steps, callOptions))
-    },
-    outcome: (key: string) => broadcast((peer) => peer.outcome(key)),
-    send: (
-      target: string,
-      method: string,
-      payload?: unknown,
-      callOptions?: Parameters<IRuntimePeer['request']>[2]
-    ) => {
-      admitTransfer(callOptions, target)
-      return sendRequest(target, method, payload, callOptions)
-    },
-    dispatch: (target: string, method: string, payload?: unknown) => {
-      try {
-        void direct(target).notify(method, payload).catch(report)
-      } catch (error) {
-        report(error)
-      }
-    },
-    describe: runtimeQuery(async () => {
-      /** Local identity, provider inventory and counters remain the canonical fresh safe view. */
-      const local = runtimeDetail(
-        description(),
-        [...sessions.values()]
-          .filter((session) => session.direct && live(session))
-          .map((session) =>
-            runtimeConnectionDetail(
-              readRuntimePeerConnection(session.peer!).directory,
-              RuntimeQueryStatus.ready,
-              { report, counters: runtimeCounters(endpoint) }
-            )
-          ),
-        [],
-        undefined,
-        runtimeCounters(endpoint)
-      )
-      if (!assembled) return local
-      /** Only the assembler's own safe state projection augments the local view. */
-      const detail = await assembled.describe()
-      return detail.pool === undefined ? local : Object.freeze({ ...local, pool: detail.pool })
-    })
-  } as IRpcHost<unknown>
 
-  return {
-    host,
-    close,
-    featureContext: (onDispose) => ({
-      host,
-      report,
-      onDispose,
-      directories: {
-        current: () =>
-          [...sessions.values()]
-            .filter((session) => live(session))
-            .map((session) => readRuntimePeerConnection(session.peer!).description!),
-        onAccepted: (observe) => {
-          accepted.add(observe)
-          return () => {
-            accepted.delete(observe)
+  /** The public runtime surface is later installed on the same genuine native Host handle. */
+  readonly host: IRpcHost<unknown>
+
+  /** Project the public Host onto this runtime without copying its mutable ownership facts. */
+  #createHost = (): IRpcHost<unknown> => {
+    return Object.defineProperty(
+      {
+        self: undefined,
+        peers: this.#peers,
+        on: this.#eventsPublisher.on,
+        close: this.close,
+        [Symbol.asyncDispose]: this.close,
+        provide: (provide: IRuntimePeerProvide) =>
+          this.#assembly.append(compileRuntimeMethods(provide)),
+        request: (
+          method: string,
+          payload?: unknown,
+          callOptions?: Parameters<IRuntimePeer['request']>[2]
+        ) => {
+          this.#admitTransfer(callOptions)
+          return this.#broadcast((peer) => this.#request(peer, method, payload, callOptions))
+        },
+        notify: (
+          method: string,
+          payload?: unknown,
+          callOptions?: Parameters<IRpcHost['notify']>[2]
+        ) => {
+          this.#admitTransfer(callOptions, callOptions?.targetId)
+          return callOptions?.targetId === undefined
+            ? this.#broadcast((peer) => peer.notify(method, payload, callOptions))
+            : this.#direct(callOptions.targetId).notify(method, payload, callOptions)
+        },
+        stream: (
+          method: string,
+          payload?: unknown,
+          callOptions?: Parameters<IRuntimePeer['stream']>[2]
+        ) => {
+          this.#admitTransfer(callOptions)
+          const selected = this.#targets()
+          if (selected.length === 1) return selected[0]!.peer.stream(method, payload, callOptions)
+          const result = this.#fanout<ReturnType<IRuntimePeer['stream']>>()
+          for (const { id, peer } of selected)
+            try {
+              result.fulfilled[JSON.stringify(['target', id])] = peer.stream(
+                method,
+                payload,
+                callOptions
+              )
+            } catch (error) {
+              result.rejected[JSON.stringify(['target', id])] = error
+            }
+          return result
+        },
+        group: (
+          steps: Parameters<IRuntimePeer['group']>[0],
+          callOptions?: Parameters<IRuntimePeer['group']>[1]
+        ) => {
+          this.#admitTransfer(callOptions)
+          return this.#broadcast((peer) => peer.group(steps, callOptions))
+        },
+        outcome: (key: string) => this.#broadcast((peer) => peer.outcome(key)),
+        send: (
+          target: string,
+          method: string,
+          payload?: unknown,
+          callOptions?: Parameters<IRuntimePeer['request']>[2]
+        ) => {
+          this.#admitTransfer(callOptions, target)
+          return this.#sendRequest(target, method, payload, callOptions)
+        },
+        dispatch: (target: string, method: string, payload?: unknown) => {
+          try {
+            void this.#direct(target).notify(method, payload).catch(this.#report)
+          } catch (error) {
+            this.#report(error)
           }
+        },
+        describe: runtimeQuery(async () => {
+          /** Local identity, provider inventory and counters remain the canonical fresh safe view. */
+          const local = runtimeDetail(
+            this.#description(),
+            [...this.#sessions.values()]
+              .filter((session) => session.direct && this.#live(session))
+              .map((session) =>
+                runtimeConnectionDetail(
+                  readRuntimePeerConnection(session.peer!).directory,
+                  RuntimeQueryStatus.ready,
+                  { report: this.#report, counters: runtimeCounters(this.#endpoint) }
+                )
+              ),
+            [],
+            undefined,
+            runtimeCounters(this.#endpoint)
+          )
+          if (!this.#assembled) return local
+          /** Only the assembler's own safe state projection augments the local view. */
+          const detail = await this.#assembled.describe()
+          return detail.pool === undefined ? local : Object.freeze({ ...local, pool: detail.pool })
+        })
+      },
+      'self',
+      { get: () => this.#source.self, enumerable: true, configurable: true }
+    ) as unknown as IRpcHost<unknown>
+  }
+
+  /** Expose read-only directory observation and the existing feature disposal registration. */
+  readonly featureContext: IRpcHostRuntime['featureContext'] = (onDispose) => ({
+    host: this.host,
+    report: this.#report,
+    onDispose,
+    directories: {
+      current: () =>
+        [...this.#sessions.values()]
+          .filter((session) => this.#live(session))
+          .map((session) => readRuntimePeerConnection(session.peer!).description!),
+      onAccepted: (observe) => {
+        this.#accepted.add(observe)
+        return () => {
+          this.#accepted.delete(observe)
         }
       }
-    }),
-    start: (initialSignal) => {
-      if (starting) return starting
-      /** Native installation cancellation ends after preparation; Host lifetime remains attached. */
-      let detachInitialSignal: (() => void) | undefined
-      starting = Promise.resolve()
-        .then(async () => {
-          preparation ??= readRuntimePreparationContext(options)
-          if (!deployment)
-            throw createRpcError(RpcCoreErrorCode.invalidConfig, HostErrorText.deploymentInvalid)
-          for (const signal of [
-            options.signal,
-            preparation?.initialSignal,
-            preparation?.lifecycleSignal,
-            initialSignal
-          ]) {
-            if (!signal) continue
-            const cancel = () => controller.abort(resolveAbortReason(signal))
-            if (signal.aborted) cancel()
-            else signal.addEventListener('abort', cancel, { once: true })
-            /** A later Host mutation must not supersede a successfully installed byte connection. */
-            if (
-              (signal === preparation?.initialSignal || signal === initialSignal) &&
-              signal !== options.signal &&
-              signal !== preparation?.lifecycleSignal
-            )
-              detachInitialSignal = () => signal.removeEventListener('abort', cancel)
-            else
-              preparation?.own?.(async () => {
-                signal.removeEventListener('abort', cancel)
-              })
-          }
-          /** Context snapshots read final identity only after the actual bootstrap preparation. */
-          const context = (): IAdapterDeploymentContext => ({
-            ...source,
-            signal: controller.signal,
-            connectTimeoutMs: definition.connect?.timeoutMs,
-            report,
-            ...(endpoint
-              ? {
-                  ownClose: (close: () => void | Promise<void>) => {
-                    readEndpointOwner<ResourceScope>(
-                      endpoint!,
-                      EndpointOwnerKey.resourceScope
-                    )!.add(EndpointResourceLabel.transportSubscription, close, 'critical')
-                  }
-                }
-              : {}),
-            configuredReport: options.report,
-            features: options.plugins.filter(
-              (plugin) => readRpcPluginMetadata(plugin)?.kind === 'feature'
-            ) as readonly import('../plugin/types.js').IRpcFeaturePlugin[],
-            launcher: (launcher, childName) =>
-              prepareAdapterPeer(
-                { self: source.self, authentication: credentials },
-                source.self.name
-              ).launcher(launcher, childName)
-          })
-          if (deployment.bootstrap) {
-            bootstrapSource = await deployment.bootstrap(context())
-            try {
-              /**
-               * The real first frame is the sole authority for a default child's
-               * identity/generation.
-               */
-              const prepared =
-                readAdapterMessageBootstrapSource(bootstrapSource)?.preparation.initial ??
-                readAdapterByteBootstrapSource(bootstrapSource as IAdapterByteBootstrapSource)
-                  .bootstrap
-              if (
-                !selfDefaulted &&
-                (source.self.name !== prepared.self.name ||
-                  source.self.instanceId !== prepared.self.instanceId)
-              )
-                throw createRpcError(
-                  RpcCoreErrorCode.invalidConfig,
-                  RuntimeApiErrorText.identityInvalid
-                )
-              source = prepareRuntimePeerSourceContext(prepared.self, true, credentials)
-              generation = prepared.generation ?? {
-                kind: RpcRuntimeGenerationKind.session,
-                value: 0,
-                providerId: source.self.instanceId
-              }
-              if (controller.signal.aborted)
-                throw createRpcAbortError(
-                  undefined,
-                  undefined,
-                  resolveAbortReason(controller.signal)
-                )
-            } catch (primary) {
-              try {
-                await closeBootstrapSource()
-              } catch (cleanup) {
-                report(cleanup)
-              }
-              bootstrapSource = undefined
-              throw primary
-            }
-          }
-          multiplex = createHostMultiplexTransport(source.self, report)
-          /** Native options and feature slots lend their exact genuine registered probe objects. */
-          const probes = [
-            deployment.runtimeOptions?.probe,
-            ...features.flatMap((feature) => [feature.probe, feature.contribution?.probe])
-          ].flatMap((configured) =>
-            configured === undefined
-              ? []
-              : Array.isArray(configured)
-                ? configured
-                : [configured as IRpcProbe]
-          )
-          if (probes.length) {
-            probe = createProbeEmitter(
-              probes,
-              () => multiplex!.channel.scheduler.now(),
-              source.self.instanceId
-            )
-            probe.peerOwned = true
-            probe.authentication = credentials?.encrypt
-              ? 'encrypt-sign'
-              : credentials
-                ? 'sign'
-                : 'none'
-            releaseProbe = bindInstalledProbe(multiplex.channel.transport, probe)
-          }
-          endpoint = createRuntimeApiEndpoint(
-            {
-              id: source.self.instanceId,
-              scheduler: multiplex!.channel.scheduler,
-              transport: multiplex!.channel.transport,
-              providerLimits: options.providerLimits,
-              middlewares: [
-                codec(multiplex!.channel.pipeline.codec),
-                framer(multiplex!.channel.pipeline.framer),
-                ...(credentials ? [authentication(credentials)] : []),
-                abort(),
-                timeout(),
-                hooks({ onHookError: report }),
-                ping(),
-                connect({ transport: multiplex!.channel.transport }),
-                ...contributions.flatMap((value) => value.middlewares ?? [])
-              ],
-              features: contributions.flatMap((value) => value.features ?? [])
-            },
-            {
-              ...multiplex!.channel,
-              supportsPeer: multiplex!.supports,
-              chunk: contributions.find((value) => value.chunk)?.chunk,
-              hostRegistration: preparation?.providerAdmissionRegistration
-            },
-            preparation?.providerAdmission
-          )
-          await endpoint.ready
-          outbound = readEndpointOwner<RpcOutboundAttachment>(
-            endpoint,
-            EndpointOwnerKey.outboundAttachment
-          )!
-          outbound.configureRuntime(generation)
-          registry = readEndpointOwner<ProviderRegistry>(
-            endpoint,
-            EndpointOwnerKey.providerRegistry
-          )!
-          assembly = prepareRuntimeProviderAssembly({
-            methods: compileRuntimeMethods(options.provide, options.contract),
-            streams: true,
-            localOutcomes: true,
-            supports: (peerId, capability) => multiplex!.supports(peerId ?? '', capability),
-            remoteNode: (peerId) => sessions.get(peerId ?? '')?.remoteNode,
-            bindRemoteNode: (peerId, value) => {
-              const session = sessions.get(peerId ?? '')
-              if (session) session.remoteNode = value
-            },
-            describe: description,
-            acceptCaller: async (context) => {
-              const supplied =
-                typeof context.data === 'object' && context.data !== null
-                  ? Reflect.get(context.data, 'self')
-                  : undefined
-              if (supplied === undefined) return
-              const identity = prepareRuntimePeerSourceContext(supplied).self
-              if (identity.instanceId !== context.senderId)
-                throw createRpcError(
-                  RpcCoreErrorCode.invalidConfig,
-                  RuntimeApiErrorText.identityInvalid
-                )
-              const session = sessions.get(context.senderId)
-              if (session) {
-                if (!session.peer) session.replySettled ??= whenProviderReplySettled(context)
-                await admitName(session, identity.name)
-              }
-            }
-          })
-          assembly.install(endpoint)
-          registry.runtimeResolve = resolveNamespace
-          registry.sessionPolicy = (senderId) => sessions.get(senderId)?.execution
-          multiplex!.channel.activateReceive?.()
-          multiplex!.onDeparture((peerId, error) => {
-            const session = sessions.get(peerId)
-            if (session) void retire(session, error).catch(report)
-          })
-          const preparedContext = context()
-          const assembler = features.find((feature) => feature.assemble)
-          if (assembler) {
-            try {
-              assembled = await assembler.assemble!({
-                host: assemblyHost?.() ?? host,
-                transport: { name: definition.name, mode: definition.mode },
-                openMember: async () =>
-                  deployment.managed
-                    ? openManaged(preparedContext, false)
-                    : accept(await deployment.open(preparedContext), false)
-              })
-              /**
-               * Method names come from accepted members; invocation always re-enters the one
-               * assembler.
-               */
-              const methods = new Map<string, IRuntimePeerDescription['methods'][number]>()
-              for (const session of sessions.values())
-                if (!session.direct && live(session))
-                  for (const method of readRuntimePeerConnection(session.peer!).description!
-                    .methods)
-                    if (!methods.has(method.name)) methods.set(method.name, method)
-              Object.defineProperty(peers, assembled.id, {
-                value: projectMethods([...methods.values()], (method) => {
-                  /** The logical capability never captures a physical member or a private proof. */
-                  const streaming =
-                    method.supportedModes.every((mode) => mode === RuntimeApiMode.stream) ||
-                    method.yield !== undefined
-                  return (payload?: unknown) =>
-                    streaming
-                      ? assembled!.stream(method.name, payload)
-                      : assembled!.request(method.name, payload)
-                }),
-                enumerable: true,
-                configurable: true
-              })
-            } catch (failure) {
-              const cleanup: unknown[] = []
-              for (const session of [...sessions.values()].reverse())
-                try {
-                  await retire(session)
-                } catch (error) {
-                  cleanup.push(error)
-                }
-              if (cleanup.length) report(new AggregateError(cleanup, HostErrorText.cleanupFailed))
-              throw failure
-            }
-          } else if (deployment.managed) await openManaged(preparedContext, true)
-          else if (definition.mode === 'listen' && deployment.listen)
-            listener = await deployment.listen(preparedContext, async (channel, policy) => {
-              const peer = await accept(channel, true, { policy })
-              return { peer, endpoint: readRuntimePeerEndpoint(peer as unknown as IRuntimePeer) }
-            })
-          else if (bootstrapSource) {
-            const channel = readAdapterMessageBootstrapSource(bootstrapSource)
-              ? await openAdapterMessageBootstrapSource(
-                  bootstrapSource as IAdapterMessageBootstrapSource,
-                  preparedContext
-                )
-              : await openAdapterByteBootstrapSource(
-                  bootstrapSource as IAdapterByteBootstrapSource,
-                  preparedContext
-                )
-            bootstrapSource = undefined
-            await accept(channel)
-          } else await accept(await deployment.open(preparedContext))
+    }
+  })
+
+  /** Only native-installation signals are detached after the single opening settles. */
+  #detachInitialSignal: (() => void) | undefined
+
+  /** Install cancellation subscriptions before any native source acquisition. */
+  #attachInitialSignals(initialSignal?: IAbortSignal): void {
+    this.#preparation ??= readRuntimePreparationContext(this.#options)
+    if (!this.#deployment)
+      throw createRpcError(RpcCoreErrorCode.invalidConfig, HostErrorText.deploymentInvalid)
+    for (const signal of [
+      this.#options.signal,
+      this.#preparation?.initialSignal,
+      this.#preparation?.lifecycleSignal,
+      initialSignal
+    ]) {
+      if (!signal) continue
+      const cancel = () => this.#controller.abort(resolveAbortReason(signal))
+      if (signal.aborted) cancel()
+      else signal.addEventListener('abort', cancel, { once: true })
+      /** A later Host mutation must not supersede a successfully installed byte connection. */
+      if (
+        (signal === this.#preparation?.initialSignal || signal === initialSignal) &&
+        signal !== this.#options.signal &&
+        signal !== this.#preparation?.lifecycleSignal
+      )
+        this.#detachInitialSignal = () => signal.removeEventListener('abort', cancel)
+      else
+        this.#preparation?.own?.(async () => {
+          signal.removeEventListener('abort', cancel)
         })
-        .finally(() => detachInitialSignal?.())
-      return starting
     }
   }
+
+  /** Context snapshots read final identity only after the actual bootstrap preparation. */
+  #deploymentContext = (): IAdapterDeploymentContext => ({
+    ...this.#source,
+    signal: this.#controller.signal,
+    connectTimeoutMs: this.#definition.connect?.timeoutMs,
+    report: this.#report,
+    ...(this.#endpoint
+      ? {
+          ownClose: (close: () => void | Promise<void>) => {
+            readEndpointOwner<ResourceScope>(this.#endpoint!, EndpointOwnerKey.resourceScope)!.add(
+              EndpointResourceLabel.transportSubscription,
+              close,
+              'critical'
+            )
+          }
+        }
+      : {}),
+    configuredReport: this.#options.report,
+    features: this.#options.plugins.filter(
+      (plugin) => readRpcPluginMetadata(plugin)?.kind === 'feature'
+    ) as readonly import('../plugin/types.js').IRpcFeaturePlugin[],
+    launcher: (launcher, childName) =>
+      prepareAdapterPeer(
+        { self: this.#source.self, authentication: this.#credentials },
+        this.#source.self.name
+      ).launcher(launcher, childName)
+  })
+
+  /** Bootstrap bytes or messages determine the final native identity before endpoint creation. */
+  async #bootstrapIdentity(): Promise<void> {
+    if (this.#deployment!.bootstrap) {
+      this.#bootstrapSource = await this.#deployment!.bootstrap(this.#deploymentContext())
+      try {
+        /** The real first frame is the sole authority for a default child's identity/generation. */
+        const prepared =
+          readAdapterMessageBootstrapSource(this.#bootstrapSource)?.preparation.initial ??
+          readAdapterByteBootstrapSource(this.#bootstrapSource as IAdapterByteBootstrapSource)
+            .bootstrap
+        if (
+          !this.#selfDefaulted &&
+          (this.#source.self.name !== prepared.self.name ||
+            this.#source.self.instanceId !== prepared.self.instanceId)
+        )
+          throw createRpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.identityInvalid)
+        this.#source = prepareRuntimePeerSourceContext(prepared.self, true, this.#credentials)
+        this.#generation = prepared.generation ?? {
+          kind: RpcRuntimeGenerationKind.session,
+          value: 0,
+          providerId: this.#source.self.instanceId
+        }
+        if (this.#controller.signal.aborted)
+          throw createRpcAbortError(
+            undefined,
+            undefined,
+            resolveAbortReason(this.#controller.signal)
+          )
+      } catch (primary) {
+        try {
+          await this.#closeBootstrapSource()
+        } catch (cleanup) {
+          this.#report(cleanup)
+        }
+        this.#bootstrapSource = undefined
+        throw primary
+      }
+    }
+  }
+
+  /** Create and activate the sole endpoint, its provider registry and original physical multiplex. */
+  async #installEndpoint(): Promise<void> {
+    this.#multiplex = createHostMultiplexTransport(this.#source.self, this.#report)
+    /** Native options and feature slots lend their exact genuine registered probe objects. */
+    const probes = [
+      this.#deployment!.runtimeOptions?.probe,
+      ...this.#features.flatMap((feature) => [feature.probe, feature.contribution?.probe])
+    ].flatMap((configured) =>
+      configured === undefined
+        ? []
+        : Array.isArray(configured)
+          ? configured
+          : [configured as IRpcProbe]
+    )
+    if (probes.length) {
+      this.#probe = createProbeEmitter(
+        probes,
+        () => this.#multiplex!.channel.scheduler.now(),
+        this.#source.self.instanceId
+      )
+      this.#probe.peerOwned = true
+      this.#probe.authentication = this.#credentials?.encrypt
+        ? 'encrypt-sign'
+        : this.#credentials
+          ? 'sign'
+          : 'none'
+      this.#releaseProbe = bindInstalledProbe(this.#multiplex.channel.transport, this.#probe)
+    }
+    this.#endpoint = createRuntimeApiEndpoint(
+      {
+        id: this.#source.self.instanceId,
+        scheduler: this.#multiplex!.channel.scheduler,
+        transport: this.#multiplex!.channel.transport,
+        providerLimits: this.#options.providerLimits,
+        middlewares: [
+          codec(this.#multiplex!.channel.pipeline.codec),
+          framer(this.#multiplex!.channel.pipeline.framer),
+          ...(this.#credentials ? [authentication(this.#credentials)] : []),
+          abort(),
+          timeout(),
+          hooks({ onHookError: this.#report }),
+          ping(),
+          connect({ transport: this.#multiplex!.channel.transport }),
+          ...this.#contributions.flatMap((value) => value.middlewares ?? [])
+        ],
+        features: this.#contributions.flatMap((value) => value.features ?? [])
+      },
+      {
+        ...this.#multiplex!.channel,
+        supportsPeer: this.#multiplex!.supports,
+        chunk: this.#contributions.find((value) => value.chunk)?.chunk,
+        hostRegistration: this.#preparation?.providerAdmissionRegistration
+      },
+      this.#preparation?.providerAdmission
+    )
+    await this.#endpoint.ready
+    this.#outbound = readEndpointOwner<RpcOutboundAttachment>(
+      this.#endpoint,
+      EndpointOwnerKey.outboundAttachment
+    )!
+    this.#outbound.configureRuntime(this.#generation)
+    this.#registry = readEndpointOwner<ProviderRegistry>(
+      this.#endpoint,
+      EndpointOwnerKey.providerRegistry
+    )!
+    this.#assembly = prepareRuntimeProviderAssembly({
+      methods: compileRuntimeMethods(this.#options.provide, this.#options.contract),
+      streams: true,
+      localOutcomes: true,
+      supports: (peerId, capability) => this.#multiplex!.supports(peerId ?? '', capability),
+      remoteNode: (peerId) => this.#sessions.get(peerId ?? '')?.remoteNode,
+      bindRemoteNode: (peerId, value) => {
+        const session = this.#sessions.get(peerId ?? '')
+        if (session) session.remoteNode = value
+      },
+      describe: this.#description,
+      acceptCaller: async (context) => {
+        const supplied =
+          typeof context.data === 'object' && context.data !== null
+            ? Reflect.get(context.data, 'self')
+            : undefined
+        if (supplied === undefined) return
+        const identity = prepareRuntimePeerSourceContext(supplied).self
+        if (identity.instanceId !== context.senderId)
+          throw createRpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.identityInvalid)
+        const session = this.#sessions.get(context.senderId)
+        if (session) {
+          if (!session.peer) session.replySettled ??= whenProviderReplySettled(context)
+          await this.#admitName(session, identity.name)
+        }
+      }
+    })
+    this.#assembly.install(this.#endpoint)
+    this.#registry.runtimeResolve = this.#resolveNamespace
+    this.#registry.sessionPolicy = (senderId) => this.#sessions.get(senderId)?.execution
+    this.#multiplex!.channel.activateReceive?.()
+    this.#multiplex!.onDeparture((peerId, error) => {
+      const session = this.#sessions.get(peerId)
+      if (session) void this.#retire(session, error).catch(this.#report)
+    })
+  }
+
+  /** Open the selected native deployment after canonical providers and receive ownership exist. */
+  async #openDeployment(preparedContext: IAdapterDeploymentContext): Promise<void> {
+    const assembler = this.#features.find((feature) => feature.assemble)
+    if (assembler) {
+      try {
+        this.#assembled = await assembler.assemble!({
+          host: (0, this.#assemblyHost)?.() ?? this.host,
+          transport: { name: this.#definition.name, mode: this.#definition.mode },
+          openMember: async () =>
+            this.#deployment!.managed
+              ? this.#openManaged(preparedContext, false)
+              : this.#accept(await this.#deployment!.open(preparedContext), false)
+        })
+        /** Method names come from accepted members; invocation always re-enters the one assembler. */
+        const methods = new Map<string, IRuntimePeerDescription['methods'][number]>()
+        for (const session of this.#sessions.values())
+          if (!session.direct && this.#live(session))
+            for (const method of readRuntimePeerConnection(session.peer!).description!.methods)
+              if (!methods.has(method.name)) methods.set(method.name, method)
+        Object.defineProperty(this.#peers, this.#assembled.id, {
+          value: this.#projectMethods([...methods.values()], (method) => {
+            /** The logical capability never captures a physical member or a private proof. */
+            const streaming =
+              method.supportedModes.every((mode) => mode === RuntimeApiMode.stream) ||
+              method.yield !== undefined
+            return (payload?: unknown) =>
+              streaming
+                ? this.#assembled!.stream(method.name, payload)
+                : this.#assembled!.request(method.name, payload)
+          }),
+          enumerable: true,
+          configurable: true
+        })
+      } catch (failure) {
+        const cleanup: unknown[] = []
+        for (const session of [...this.#sessions.values()].reverse())
+          try {
+            await this.#retire(session)
+          } catch (error) {
+            cleanup.push(error)
+          }
+        if (cleanup.length) this.#report(new AggregateError(cleanup, HostErrorText.cleanupFailed))
+        throw failure
+      }
+    } else if (this.#deployment!.managed) await this.#openManaged(preparedContext, true)
+    else if (this.#definition.mode === 'listen' && this.#deployment!.listen)
+      this.#listener = await this.#deployment!.listen(preparedContext, async (channel, policy) => {
+        const peer = await this.#accept(channel, true, { policy })
+        return { peer, endpoint: readRuntimePeerEndpoint(peer as unknown as IRuntimePeer) }
+      })
+    else if (this.#bootstrapSource) {
+      const channel = readAdapterMessageBootstrapSource(this.#bootstrapSource)
+        ? await openAdapterMessageBootstrapSource(
+            this.#bootstrapSource as IAdapterMessageBootstrapSource,
+            preparedContext
+          )
+        : await openAdapterByteBootstrapSource(
+            this.#bootstrapSource as IAdapterByteBootstrapSource,
+            preparedContext
+          )
+      this.#bootstrapSource = undefined
+      await this.#accept(channel)
+    } else await this.#accept(await this.#deployment!.open(preparedContext))
+  }
+
+  /** Join one canonical opening and preserve its original completion identity. */
+  readonly start: IRpcHostRuntime['start'] = (initialSignal) => {
+    if (this.#starting) return this.#starting
+    this.#starting = Promise.resolve()
+      .then(async () => {
+        this.#attachInitialSignals(initialSignal)
+        await this.#bootstrapIdentity()
+        await this.#installEndpoint()
+        await this.#openDeployment(this.#deploymentContext())
+      })
+      .finally(() => this.#detachInitialSignal?.())
+    return this.#starting
+  }
+
+  /** Capture immutable inputs and initialize state in the original construction order. */
+  constructor(
+    options: IRpcHostOptions,
+    definition: IRpcTransportPluginDefinition,
+    features: readonly IRpcFeaturePluginDefinition[],
+    nodeId = createAuthenticationNonce(),
+    onConnection?: (connection: IRuntimePluginConnection) => () => void,
+    selfDefaulted = options.self === undefined,
+    assemblyHost?: () => IRpcHost<unknown>
+  ) {
+    this.#options = options
+    this.#definition = definition
+    this.#features = features
+    this.#nodeId = nodeId
+    this.#onConnection = onConnection
+    this.#selfDefaulted = selfDefaulted
+    this.#assemblyHost = assemblyHost
+    this.#contributions = this.#features
+      .map((feature) => feature.contribution)
+      .filter((value) => value !== undefined)
+    this.#preparation = readRuntimePreparationContext(this.#options)
+    this.#credentials =
+      this.#options.authentication ??
+      this.#contributions.find((value) => value.authentication !== undefined)?.authentication
+    this.#source = prepareRuntimePeerSourceContext(this.#options.self, true, this.#credentials)
+    this.#controller = createAbortController()
+    this.#defaultTimeout = readRuntimeDefaultTimeout({
+      defaultTimeoutMs:
+        this.#options.defaultTimeoutMs ??
+        this.#contributions.find((value) => value.defaultTimeoutMs !== undefined)?.defaultTimeoutMs
+    })
+    this.#callTimeout = prepareRuntimeCallTimeout(this.#defaultTimeout)
+    this.#sessions = new Map<string, IHostSession>()
+    this.#probing = new Set<string>()
+    this.#accepted = new Set<(description: IRuntimePeerDescription) => unknown>()
+    this.#peers = Object.create(null)
+    this.#eventsPublisher = createRuntimeEventPublisher(() => this.#probe)
+    this.#generation = {
+      kind: RpcRuntimeGenerationKind.session,
+      value: 0,
+      providerId: this.#source.self.instanceId
+    }
+    this.#managedSubscriptions = []
+    this.#managedMembers = []
+    this.#deployment = readAdapterDeployment(this.#definition.deployment)
+    this.host = this.#createHost()
+  }
+}
+
+export function createRuntimeHost(
+  options: IRpcHostOptions,
+  definition: IRpcTransportPluginDefinition,
+  features: readonly IRpcFeaturePluginDefinition[],
+  nodeId = createAuthenticationNonce(),
+  onConnection?: (connection: IRuntimePluginConnection) => () => void,
+  selfDefaulted = options.self === undefined,
+  assemblyHost?: () => IRpcHost<unknown>
+): IRpcHostRuntime {
+  return new RuntimeHost(
+    options,
+    definition,
+    features,
+    nodeId,
+    onConnection,
+    selfDefaulted,
+    assemblyHost
+  )
 }

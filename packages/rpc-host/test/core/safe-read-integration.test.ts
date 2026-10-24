@@ -1,7 +1,8 @@
+import { createRuntimeEndpointComposition } from '../../dist/core/runtime-api-endpoint.js'
 import { describe, expect, it } from 'vitest'
 import { normalizeRpcEnvelope, reachRpcError } from '@migaia/rpc-contract'
-import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
-import { createClientEndpoint } from '../../dist/core/client.js'
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
+
 import { createEndpointKernel } from '../../dist/core/endpoint-kernel.js'
 import { RpcConstructionError } from '../../dist/core/errors.js'
 import { connect } from '../../dist/core/middleware/connect.js'
@@ -32,11 +33,14 @@ describe('safeRead integration boundaries', () => {
     })
     let received: unknown
     try {
-      await createClientEndpoint({
-        id: 'hostile-transport',
-        transport,
-        middlewares: [connect({ transport })]
-      })
+      await createRuntimeEndpointComposition(
+        {
+          id: 'hostile-transport',
+          transport,
+          middlewares: [connect({ transport })]
+        },
+        { agreement: { capabilities: [] }, peerId: '' }
+      ).installing
     } catch (error) {
       received = error
     }

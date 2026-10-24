@@ -11,7 +11,8 @@ import { cpus, freemem, hostname, loadavg, platform, release, totalmem } from 'n
 import { dirname, join, resolve } from 'node:path'
 import { performance } from 'node:perf_hooks'
 import { fileURLToPath } from 'node:url'
-import { createRpcDevtools } from '../dist/index.js'
+import { createRpcDevtools } from '../dist/collector/devtools.js'
+import { orderStringKeys } from '@migaia/utils/string'
 import {
   RpcProbeStage,
   RpcProbeDirection,
@@ -56,18 +57,32 @@ if (typeof globalThis.gc !== 'function')
  * Read built JavaScript deterministically without running a second code path.
  *
  * @param {string} directory Built directory beneath this package.
- * @returns {{ path: string; source: string }[]} Sorted source inputs for the dist hash/audit.
+ * @returns {{ path: string; source: string }[]} UTF-16 ordered source inputs for the dist
+ *   hash/audit.
  */
 function builtSources(directory) {
-  /** Only built JS participates; declarations and source maps do not alter execution. */
-  const files = []
+  /** One physical traversal produces unique complete paths without recopying descendant arrays. */
+  const files = new Map()
+  collectBuiltSources(directory, files)
+  /** Artifact hash manifests now use stable UTF-16 order instead of locale-dependent collation. */
+  return orderStringKeys([...files.keys()]).map((path) => files.get(path))
+}
+
+/**
+ * Capture every built JS file once in the original package-owned source inventory.
+ *
+ * @param {string} directory Current physical directory beneath this package.
+ * @param {Map<string, { path: string; source: string }>} files Unique original filesystem paths.
+ * @returns {void} Declarations and source maps remain excluded as before.
+ */
+function collectBuiltSources(directory, files) {
   for (const entry of readdirSync(directory, { withFileTypes: true })) {
     /** Each child remains beneath the package dist owner. */
     const path = join(directory, entry.name)
-    if (entry.isDirectory()) files.push(...builtSources(path))
-    else if (entry.name.endsWith('.js')) files.push({ path, source: readFileSync(path, 'utf8') })
+    if (entry.isDirectory()) collectBuiltSources(path, files)
+    else if (entry.name.endsWith('.js'))
+      files.set(path, { path, source: readFileSync(path, 'utf8') })
   }
-  return files.sort((left, right) => left.path.localeCompare(right.path))
 }
 
 /** Ordered exact executable bytes identify this benchmark's artifact, rather than source HEAD. */
@@ -211,7 +226,11 @@ if (configurationFailures.length === 0) {
   }
 }
 
-/** Sorted A/A cells report their median as well as the worst observed throughput. */
+/**
+ * Sorted A/A cells report their median and worst throughput. The sole cells.push is inside the
+ * repeat < repeats loop above, and repeats is the compile-time constant 3, so this sort has at most
+ * three entries. It is not a sort over the dynamically growing measured events or samples.
+ */
 const rates = cells.map((cell) => cell.eventsPerSecond).sort((left, right) => left - right)
 /** Source audit is external evidence, not a fabricated dynamic allocation counter. */
 const staticAuditPath = process.env.RPC_DEVTOOLS_INGEST_AUDIT

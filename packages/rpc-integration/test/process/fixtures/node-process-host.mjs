@@ -1,25 +1,27 @@
+import { RpcCapability } from '@migaia/rpc-contract'
 import { readFileSync } from 'node:fs'
 import { defineFeature, definePlugin, PluginHost } from '@migaia/plugin-host'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import {
   dialProcessByteChannel,
   listenProcessByteChannel
-} from '@migaia/rpc-plugin-process/adapters/node-socket'
+} from '../../../../rpc-plugin-process/dist/process/adapters/node-socket.js'
 import { createProcessTransport } from '../../../../rpc-plugin-process/dist/process/handshake.js'
 import { createNativeProcessOffer } from '../../../../rpc-plugin-process/dist/process/offer.js'
-import { serveRemotePlugin } from '../../../../rpc-host/dist/remote/serve-plugin.js'
-import { createProcessPlugin } from '../../../../rpc-plugin-process/test/protocol.ts'
+import { createRuntimePeer } from '../../../../rpc-host/dist/remote/runtime-api/peer.js'
+import { processPlugin } from '@migaia/rpc-plugin-process'
+import { createRpcHost } from '@migaia/rpc-host'
 import { RUNTIME_API_BASE_CAPABILITIES } from '../../../../rpc-host/dist/remote/runtime-api/constants.js'
 import { RpcProcessErrorCode } from '@migaia/rpc-plugin-process'
 import { createProcessError } from '../../../../rpc-plugin-process/dist/process/error.js'
 import { createComposedEndpoint } from '../../../../rpc-host/dist/core/composed.js'
-import { createFirstPartyRoots } from '../../../../rpc-host/dist/core/internal/first-party-roots.js'
+import { createRuntimeFeatureRoots } from '../../../../rpc-host/dist/core/runtime-api-endpoint.js'
 import { createStreamFeature } from '../../../../rpc-host/dist/core/stream/index.js'
-import { codec } from '../../../../rpc-host/dist/core/index.js'
-import { framer } from '../../../../rpc-host/dist/core/index.js'
-import { abort } from '../../../../rpc-host/dist/core/index.js'
-import { connect } from '../../../../rpc-host/dist/core/index.js'
-import { ping } from '../../../../rpc-host/dist/core/index.js'
+import { codec } from '../../../../rpc-host/dist/core/middleware/codec.js'
+import { framer } from '../../../../rpc-host/dist/core/middleware/framer.js'
+import { abort } from '../../../../rpc-host/dist/core/middleware/abort.js'
+import { connect } from '../../../../rpc-host/dist/core/middleware/connect.js'
+import { ping } from '../../../../rpc-host/dist/core/middleware/ping.js'
 
 /** One canonical catalog fixture is shared with the real stdio and Unix clients. */
 const catalog = JSON.parse(
@@ -41,56 +43,86 @@ const readyText = JSON.parse(
     'utf8'
   )
 )
-/** This target starts empty; every installed definition must come through the local resolver. */
+/** Native business is registered locally before a physical transport is published. */
 const host = new PluginHost({
   execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
 })
-/** Counters distinguish actual provider execution from cached results on another connection. */
-let calls = 0
-/** Resolver calls distinguish local authority from portable declarations. */
-let resolutions = 0
-/** Disposal counts prove remote unUse executes local cleanup exactly once. */
-let disposals = 0
-/** Portable configuration is retained only as fixture result data. */
-let portableConfig = null
-/** Held business requests let real connections exercise provider concurrency and drain. */
-const held = new Set()
-/** A stable trusted definition lets the canonical remote owner share one installation. */
+
+/** Own real provider invocations independently of each authenticated connection's replay ledger. */
+class HostBusiness {
+  /** Invocation count distinguishes actual execution from a cached connection result. */
+  #calls = 0
+  /** Actual local application disposal is separate from any remote control protocol. */
+  #disposals = 0
+  /**
+   * Held providers let real callers exercise admission and drain without synthetic endpoint work.
+   *
+   * @type {Set<() => void>}
+   */
+  #held = new Set()
+  /**
+   * Preserve actual PID/value, held-call and release behavior under the same scalar provider.
+   *
+   * @param {unknown} input Original wire payload or one-off fixture command.
+   * @returns {Promise<
+   *   | { calls: number }
+   *   | { pid: number; value: string; input: unknown; calls: number; disposals: number }
+   * >}
+   */
+  request = async (input) => {
+    if (input === 'count') return { calls: this.#calls }
+    if (input === 'delay') await new Promise((resolve) => setTimeout(resolve, 25))
+    if (input === 'release-held') {
+      for (const resume of this.#held) resume()
+      this.#held.clear()
+    }
+    /** Increment at provider admission, before a deliberately held invocation suspends. */
+    const invocation = ++this.#calls
+    if (input === 'hold') await new Promise((resolve) => this.#held.add(resolve))
+    return {
+      pid: process.pid,
+      value: process.env.RPC_VALUE ?? 'child',
+      input,
+      calls: invocation,
+      disposals: this.#disposals
+    }
+  };
+  /**
+   * Streaming retains the caller payload through the actual wire generator path.
+   *
+   * @param {unknown} input Original wire payload retained by the stream oracle.
+   * @returns {Generator<unknown, void, unknown>}
+   */
+  *generator(input) {
+    yield input
+  }
+  /**
+   * Count the original local application's real dispose callback once.
+   *
+   * @returns {void}
+   */
+  dispose() {
+    this.#disposals += 1
+  }
+}
+/** Every native session uses these same actual local application methods. */
+const business = new HostBusiness()
+/** Ordinary PluginHost installation owns application lifetime before native exposure. */
 const definition = definePlugin({
   name: 'p',
   features: {
     f: defineFeature(() => ({
-      request: async (input) => {
-        if (input === 'count') return { calls }
-        if (input === 'delay') await new Promise((resolve) => setTimeout(resolve, 25))
-        if (input === 'release-held') {
-          for (const resume of held) resume()
-          held.clear()
-        }
-        const invocation = ++calls
-        if (input === 'hold') await new Promise((resolve) => held.add(resolve))
-        return {
-          pid: process.pid,
-          value: process.env.RPC_VALUE ?? 'child',
-          input,
-          config: portableConfig,
-          calls: invocation,
-          resolutions,
-          disposals
-        }
-      },
-      generator: function* (input) {
-        yield input
-      }
+      request: business.request,
+      generator: (input) => business.generator(input)
     }))
   },
   install: (core) => {
-    core.onDispose(() => {
-      disposals += 1
-    })
+    core.onDispose(() => business.dispose())
     return {}
   }
 })
+/** Local registration never relies on the removed remote catalog resolver or host-use command. */
+const [installed] = await host.use(definition)
 /** Errors preserve their canonical public text while bootstrap/token payloads remain private. */
 const report = (error) => process.stderr.write(`${String(error)}\n`)
 /** Both ingress modes use the same native offer and process session owner. */
@@ -126,19 +158,20 @@ const ingress = address
 /**
  * Compose the actual core endpoint retained by reverse Plugin registration.
  *
- * @param {import('../../../dist/remote/types.js').IRemoteChannel} channel
+ * @param {import('../../../../rpc-host/dist/remote/types.js').IRemoteChannel} channel
  * @param {Parameters<
- *   import('../../../dist/process/plugin/types.js').IProcessServeEndpointFactory
+ *   import('../../../../rpc-plugin-process/dist/process/plugin/types.js').IProcessServeEndpointFactory
  * >[2]} [session]
- * @returns {Promise<import('../../../dist/remote/types.js').IRemoteServeEndpoint>}
+ * @returns {Promise<import('../../../../rpc-host/dist/remote/types.js').IRemoteServeEndpoint>}
  */
 async function createEndpoint(channel, session) {
-  const roots = createFirstPartyRoots(new Set(['first-party-provider', 'first-party-control']))
-  const endpoint = await createComposedEndpoint(
+  /** Production owns the one outbound/provider graph; foreign control tests retain legacy streams. */
+  const { roots, options } = createRuntimeFeatureRoots(
     {
       id: process.env.RPC_REGISTRATION_ADDRESS ? 'registration-peer' : 'host-child',
       scheduler: channel.scheduler,
       transport: channel.transport,
+      features: channel.features,
       ...(session ? { idempotency: session.idempotency, providerLimits: session.limits } : {}),
       middlewares: [
         codec(channel.pipeline.codec),
@@ -148,22 +181,21 @@ async function createEndpoint(channel, session) {
         ping()
       ]
     },
-    {
-      ...roots,
-      'first-party-stream': createStreamFeature(
-        roots['first-party-outbound'],
-        roots['first-party-provider']
-      ),
-      'channel-ipc-log': channel.features[0],
-      'channel-ipc-gate': channel.features[1]
-    }
+    channel
   )
-  return { endpoint, stream: endpoint.stream }
+  /** Legacy foreign peers negotiate stream without the separate runtimeApi capability. */
+  const endpoint = await createComposedEndpoint(options, {
+    ...roots,
+    'first-party-stream': createStreamFeature(
+      roots['first-party-outbound'],
+      roots['first-party-provider']
+    )
+  })
+  return { endpoint, oneWay: endpoint, stream: endpoint.stream }
 }
 
 /** Reverse mode initiates once, then serves only its approved Plugin contract on that channel. */
 if (process.env.RPC_REGISTRATION_ADDRESS) {
-  await host.use(definition)
   const raw = await dialProcessByteChannel({ address: process.env.RPC_REGISTRATION_ADDRESS })
   const id = crypto.randomUUID()
   const channel = await createProcessTransport(raw, {
@@ -171,26 +203,32 @@ if (process.env.RPC_REGISTRATION_ADDRESS) {
     offer: createNativeProcessOffer({
       peer: { id: 'registration-peer', runtime: 'node' },
       auth: process.env.RPC_HOST_TOKEN,
-      stream: true
+      stream: true,
+      capabilities: [RpcCapability.runtimeApi]
     }),
     peerId: 'registration-server',
     scheduler: systemScheduler,
     ipc: { connectionId: id, sessionId: id, log: () => undefined },
     report
   })
-  const service = await serveRemotePlugin({
-    host,
-    contract: process.env.RPC_BAD_DESCRIPTION
-      ? {
-          ...catalog.p,
-          features: { f: { methods: { request: { mode: 'request', idempotent: false } } } }
-        }
-      : catalog.p,
-    endpoint: await createEndpoint(channel),
-    report
-  })
+  /** Reverse registration serves this actual local provider through the canonical runtime Peer. */
+  const localFeature = installed.getFeature('f')
+  /** A malformed description deliberately omits the original required generator. */
+  const provide = {
+    p: { f: process.env.RPC_BAD_DESCRIPTION ? { request: localFeature.request } : localFeature }
+  }
+  /** The real Peer owns its negotiated directory, endpoint and physical resource. */
+  const peer = await createRuntimePeer(
+    {
+      self: { name: 'registration-peer', instanceId: 'registration-peer' },
+      provide,
+      contract: catalog.p,
+      report
+    },
+    { channel, endpoint: await createEndpoint(channel) }
+  )
   channel.transport.onTransportError(() => {
-    void service.close().then(
+    void peer.close().then(
       () => process.exit(0),
       (error) => {
         report(error)
@@ -200,31 +238,20 @@ if (process.env.RPC_REGISTRATION_ADDRESS) {
   })
   process.stderr.write('registration-peer-ready\n')
 } else {
-  /** Both sources use the same trusted local resolver; executable definitions stay local. */
-  await host.use(
-    createProcessPlugin({
-      name: address ? 'listener' : 'parent',
-      host,
-      ...(address ? { self: { name: 'host-child', instanceId: 'host-child' } } : {}),
-      expose: ['host', 'p'],
-      catalog,
-      report,
-      resolvePlugin: (_name, config) => {
-        resolutions += 1
-        if (process.env.RPC_RESOLVER_MODE === 'wrong-name')
-          return definePlugin({ name: 'wrong', install: () => ({}) })
-        if (process.env.RPC_RESOLVER_MODE === 'promise') return Promise.resolve(definition)
-        if (process.env.RPC_RESOLVER_MODE === 'invalid') return null
-        if (process.env.RPC_RESOLVER_MODE === 'throw')
-          throw createProcessError(
-            RpcProcessErrorCode.hostInvalidOption,
-            createProcessError(RpcProcessErrorCode.channelClosed)
-          )
-        portableConfig = config ?? null
-        return definition
-      },
-      ...(address ? { listen: ingress } : {})
-    })
-  )
+  /** Preserve the fixed nested foreign business paths through the actual public Host provider. */
+  await createRpcHost({
+    /** A socket listener chooses its identity; automatic stdio adopts the original launch identity. */
+    ...(address ? { self: { name: 'host-child', instanceId: 'host-child' } } : {}),
+    provide: { p: { f: installed.getFeature('f') } },
+    contract: catalog.p,
+    report,
+    plugins: [
+      processPlugin({
+        name: address ? 'listener' : 'parent',
+        report,
+        ...(address ? { listen: ingress } : { connectToParent: true })
+      })
+    ]
+  })
   process.stderr.write(readyText.committed)
 }

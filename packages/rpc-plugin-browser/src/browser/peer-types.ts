@@ -1,7 +1,7 @@
 import type { IWindowMessageTarget, IWindowMessageReceiver } from './adapters/window.js'
 import type { ISharedWorkerPort } from './adapters/shared-worker.js'
 import type { IRTCDataChannel } from './adapters/rtc-data-channel.js'
-import type { IWebWorkerLikePort } from './adapters/web-worker.js'
+import type { IWebWorkerLikePort } from '@migaia/rpc-host/plugin'
 import type { IBrowserPluginOptions } from './plugin-types.js'
 
 /**

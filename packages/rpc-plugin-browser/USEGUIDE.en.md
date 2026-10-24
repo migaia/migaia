@@ -163,4 +163,4 @@ connect.timeoutMs bounds identity and capability negotiation. Per-call timeoutMs
 
 Source/carrier errors use rpc.transport.browser. Shared RPC and handshake errors retain rpc.endpoint, rpc.remote, and their original cause graphs. Match source/code rather than message alone, and preserve native error types, stacks, and causes.
 
-An ordinary PluginHost can install the same transport definition; name/expose control its registration and exposed methods. Carrier authors can use this package's eight /adapters/* entries and the host /plugin SDK's safe raw deployment tools. Applications need no separate endpoint factory.
+An ordinary PluginHost can install the same transport definition; name/expose control its registration and exposed methods. Custom carriers use the host `/plugin` SDK raw deployment tools. Applications install the matching browser plugin.

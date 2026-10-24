@@ -3,23 +3,21 @@ import { MessageChannel } from 'node:worker_threads'
 import { encode } from 'cborg'
 import { createRuntimePeer } from '../../../../rpc-host/dist/remote/runtime-api/peer.js'
 import { createRuntimeApiEndpoint } from '../../../../rpc-host/dist/core/runtime-api-endpoint.js'
-import {
-  codec,
-  framer,
-  authentication,
-  abort,
-  timeout,
-  hooks,
-  ping,
-  connect
-} from '../../../../rpc-host/dist/core/index.js'
+import { codec } from '../../../../rpc-host/dist/core/middleware/codec.js'
+import { framer } from '../../../../rpc-host/dist/core/middleware/framer.js'
+import { authentication } from '../../../../rpc-host/dist/core/middleware/authentication.js'
+import { abort } from '../../../../rpc-host/dist/core/middleware/abort.js'
+import { timeout } from '../../../../rpc-host/dist/core/middleware/timeout.js'
+import { hooks } from '../../../../rpc-host/dist/core/middleware/hooks.js'
+import { ping } from '../../../../rpc-host/dist/core/middleware/ping.js'
+import { connect } from '../../../../rpc-host/dist/core/middleware/connect.js'
 import { RpcProbeStageName } from '@migaia/rpc-host/probe'
 import { createNativeProcessOffer } from '../../../../rpc-plugin-process/dist/process/offer.js'
 import { createProcessTransport } from '../../../../rpc-plugin-process/dist/process/handshake.js'
 import {
   listenProcessByteChannel,
   dialProcessByteChannel
-} from '@migaia/rpc-plugin-process/adapters/node-socket'
+} from '../../../../rpc-plugin-process/dist/process/adapters/node-socket.js'
 import {
   CapabilityLevel,
   StandardCapability,
@@ -29,8 +27,7 @@ import {
 import { createNodeThreadChannel } from '../../../../rpc-plugin-thread/dist/threads/channel.js'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'
-import { createRpcDevtoolsHub } from '@migaia/rpc-plugin-devtools/hub'
-import { decodeRpcDevtoolsRecord } from '@migaia/rpc-plugin-devtools/contract'
+import { decodeRpcDevtoolsRecord } from '../../../../rpc-plugin-devtools/dist/contract/record-codec.js'
 import { fixtureAuthentication, reportFailure } from './auth.mjs'
 import { FixtureMethod, FixtureTrace, fixtureServiceId, fixtureServiceClientId } from './text.mjs'
 
@@ -48,15 +45,14 @@ const CoreFixture = {
 }
 
 /**
- * Prove genuine local capture and a nonempty service-record/offline-hub boundary before live query.
- * Captured content is kept by the collector; the original service alone owns portable conversion.
+ * Prove genuine local capture and a nonempty service-record boundary before live query. Captured
+ * content is kept by the collector; the original service alone owns portable conversion.
  *
  * @returns {Promise<{
  *   events: number
  *   frameEvents: number
  *   protectedEvents: number
  *   localFrameDiffersFromProtected: boolean
- *   orderedTimeline: boolean
  *   recordingEvents: number
  *   recordingSequencePreserved: boolean
  *   metadataContentHidden: boolean
@@ -80,8 +76,6 @@ export async function observedCore() {
     maxContentBytes: 1_048_576,
     onError: reportFailure
   }).collector
-  /** Hub creates no connections; it receives only the application's actual service client. */
-  const hub = createRpcDevtoolsHub({ onError: reportFailure })
   /** Successfully opened Peers retain their original close operations for final cleanup. */
   const peers = []
   try {
@@ -161,7 +155,6 @@ export async function observedCore() {
     /** The nonempty recording is decoded by the canonical frozen record owner. */
     const recording = decodeRpcDevtoolsRecord(text)
     assert.ok(recording.events.length > 0)
-    hub.importRecord(CoreFixture.offline, text)
     /** Only the explicit acceptance tuple is compared; original event content is never cloned. */
     const expectedSequence = recording.events.map((event) => [
       event.seq,
@@ -170,54 +163,41 @@ export async function observedCore() {
       event.outcome,
       event.method
     ])
-    /** Offline import must preserve the actual recorded sequence, including missing optional fields. */
-    const actualSequence = hub
-      .timeline({ targets: [CoreFixture.offline] })
-      .map((item) => [
-        item.event.seq,
-        item.event.stage,
-        item.event.kind,
-        item.event.outcome,
-        item.event.method
-      ])
+    /** Match decoded recording tuples to the original local collector rows from the same window. */
+    const retained = new Map(events.map((event) => [event.seq, event]))
+    const actualSequence = recording.events.map((event) => {
+      const original = retained.get(event.seq)
+      assert.ok(original)
+      return [original.seq, original.stage, original.kind, original.outcome, original.method]
+    })
     assert.deepEqual(actualSequence, expectedSequence)
     /** Evidence is emitted only after each applicable local/record assertion actually passes. */
     console.error(
       JSON.stringify({
-        acceptance: 'applicable direct-Core local capture and service-record/offline-hub',
+        acceptance: 'applicable direct-Core local capture and service-record',
         result,
         localEvents: events.length,
         localFrameEvents: frames.length,
         localProtectedEvents: protectedEvents.length,
         localFrameDiffersFromProtected: true,
         remoteRecordEvents: recording.events.length,
-        offlineSequencePreserved: true,
+        recordingSequencePreserved: true,
         liveServiceQuery: 'next real assertion'
       })
     )
-    /** The original genuine service query remains unchanged; no fixture result adaptation is used. */
-    await hub.addTarget(CoreFixture.target, {
-      request: (method, payload) =>
-        serviceClient.request(CoreFixture.servicePrefix + method, payload),
-      stream: (method, payload) => serviceClient.stream(CoreFixture.servicePrefix + method, payload)
-    })
-    /** Service-owned metadata must remain nonempty, ordered and free of captured content. */
-    const timeline = hub.timeline({ targets: [CoreFixture.target] })
-    assert.ok(timeline.length > 0)
-    for (const item of timeline) assert.equal(Object.hasOwn(item.event, 'content'), false)
-    for (let index = 1; index < timeline.length; index++)
-      assert.ok(timeline[index].alignedAt >= timeline[index - 1].alignedAt)
-    await hub.close()
+    /** Query the retained service directly through the genuine connected client. */
+    const page = await serviceClient.request(CoreFixture.servicePrefix + 'query')
+    assert.ok(page.events.length > 0)
+    for (const event of page.events) assert.equal(Object.hasOwn(event, 'content'), false)
     collector.close()
     /** Closed observation must leave the same genuine public business call result unchanged. */
     const afterCollectorClose = await client.request(FixtureMethod.increment, 40)
     assert.equal(afterCollectorClose, result)
     return {
-      events: timeline.length,
+      events: page.events.length,
       frameEvents: frames.length,
       protectedEvents: protectedEvents.length,
       localFrameDiffersFromProtected: true,
-      orderedTimeline: true,
       recordingEvents: recording.events.length,
       recordingSequencePreserved: true,
       metadataContentHidden: true,
@@ -225,7 +205,6 @@ export async function observedCore() {
       afterCollectorClose
     }
   } finally {
-    await hub.close()
     collector.close()
     await Promise.all(peers.map((peer) => peer.close()))
     business.port1.close()
@@ -572,7 +551,7 @@ export async function proveFixtureSelfFilter(collector, report) {
 }
 
 /**
- * Inspect the real live targets after their catch-up queries complete, without guessed delays.
+ * Inspect real service snapshots after the two known business calls complete.
  *
  * @param {readonly { host: string; peer: import('@migaia/rpc-host/plugin').IRuntimePeer }[]} services
  *   Connected unprobed service clients.
@@ -580,137 +559,141 @@ export async function proveFixtureSelfFilter(collector, report) {
  * @param {(error: unknown) => void} report Original strict parent reporter.
  * @returns {Promise<{
  *   hops: object[]
- *   orderedTimeline: boolean
  *   recordingEvents: number
  *   recordingSequencePreserved: boolean
  * }>}
  *   Actual two-hop, carrier and record evidence.
- * @throws {Error} Original live service, hub, codec, assertion or cleanup failure.
+ * @throws {Error} Original live service, codec or assertion failure.
  */
-export async function proveLiveTrace(services, recording, report) {
-  /** The hub receives already connected clients and never acquires a transport itself. */
-  const hub = createRpcDevtoolsHub({ onError: report })
-  try {
-    for (const service of services)
-      await hub.addTarget(service.host, {
-        request: (method, payload) =>
-          service.peer.request(FixtureTrace.servicePrefix + method, payload),
-        stream: (method, payload) =>
-          service.peer.stream(FixtureTrace.servicePrefix + method, payload)
-      })
-    /** Only genuine caller-provided trace membership may select the two actual interactions. */
-    const interactions = hub.interactions(FixtureTrace.id)
-    assert.equal(interactions.length, 2)
-    assert.deepEqual(
-      interactions.map((hop) => hop.method).sort(),
-      [FixtureMethod.cascade, FixtureMethod.increment].sort()
-    )
-    /** Receipt projections exist only at this explicit acceptance boundary. */
-    const hops = interactions.map((hop) => {
-      assert.equal(hop.oneSided, false)
-      assert.ok(
-        hop.events.some(
-          (item) =>
-            item.event.stage === 'message' &&
-            item.event.direction === 'outbound' &&
-            item.event.kind === 'request'
-        )
-      )
-      assert.ok(
-        hop.events.some(
-          (item) =>
-            item.event.stage === 'message' &&
-            item.event.direction === 'inbound' &&
-            item.event.kind === 'request'
-        )
-      )
-      /** Each hop retains actual production at all five physical/logical expansion stages. */
-      const stages = [...new Set(hop.events.map((item) => item.event.stage))]
-      for (const stage of ['envelope', 'encoded', 'frame', 'protected', 'carrier'])
-        assert.ok(stages.includes(stage))
-      /** Carrier provenance is checked in both directions inside the exact same interaction. */
-      const outgoing = hop.events.filter(
-        (item) => item.event.stage === 'carrier' && item.event.direction === 'outbound'
-      )
-      const incoming = hop.events.filter(
-        (item) => item.event.stage === 'carrier' && item.event.direction === 'inbound'
-      )
-      assert.ok(outgoing.length > 0)
-      assert.ok(incoming.length > 0)
-      for (const item of outgoing) {
-        assert.equal(item.event.trace, FixtureTrace.id)
-        assert.ok(item.event.messageId)
-        assert.ok(item.event.senderId)
-      }
-      for (const item of incoming)
-        assert.ok(
-          hop.events.some(
-            (linked) =>
-              linked.target === item.target &&
-              (linked.event.stage === 'protected' || linked.event.stage === 'frame') &&
-              linked.event.carrierSeq === item.event.seq
-          )
-        )
-      /** Compare the clear/protected representations of one matching actual outbound frame. */
-      const frame = hop.events.find(
-        (item) => item.event.stage === 'frame' && item.event.direction === 'outbound'
-      )
-      assert.ok(frame)
-      const protectedFrame = hop.events.find(
-        (item) =>
-          item.event.stage === 'protected' &&
-          item.event.direction === 'outbound' &&
-          item.target === frame.target &&
-          item.event.endpointId === frame.event.endpointId &&
-          item.event.messageId === frame.event.messageId &&
-          item.event.chunk?.index === frame.event.chunk?.index
-      )
-      assert.ok(protectedFrame)
-      assert.notEqual(frame.event.content, undefined)
-      assert.notEqual(protectedFrame.event.content, undefined)
-      assert.notDeepEqual(frame.event.content, protectedFrame.event.content)
-      return {
-        method: hop.method,
-        stages,
-        outboundCarriers: outgoing.length,
-        inboundCarriers: incoming.length,
-        frameContentDiffers: true
-      }
+export async function proveLiveTrace(services, recording, _report) {
+  /** Each service supplies its original collector rows; no aggregated timeline is introduced. */
+  const snapshots = await Promise.all(
+    services.map(async (service) => {
+      const page = await service.peer.request(FixtureTrace.servicePrefix + 'query')
+      // This fixed three-host scenario emits fewer than the service's one-thousand-row page bound.
+      assert.ok(page.events.length < 1000)
+      return { target: service.host, events: page.events }
     })
-    /** Aligned ordering is tested on the actual trace-filtered live timeline. */
-    const timeline = hub.timeline({ trace: FixtureTrace.id })
-    assert.ok(timeline.length > 0)
-    for (let i = 1; i < timeline.length; i++)
-      assert.ok(timeline[i].alignedAt >= timeline[i - 1].alignedAt)
-    /** Only the public record codec restores the actual exported parent window. */
-    const decoded = decodeRpcDevtoolsRecord(recording)
-    assert.ok(decoded.events.length > 0)
-    hub.importRecord(FixtureTrace.offline, recording)
-    /** The oracle compares only the specified stable tuple, without cloning retained content. */
-    const expected = decoded.events.map((event) => [
-      event.seq,
-      event.stage,
-      event.kind,
-      event.outcome,
-      event.method
-    ])
-    const actual = hub
-      .timeline({ targets: [FixtureTrace.offline] })
-      .map((item) => [
-        item.event.seq,
-        item.event.stage,
-        item.event.kind,
-        item.event.outcome,
-        item.event.method
-      ])
-    assert.deepEqual(actual, expected)
-    return {
-      hops,
-      orderedTimeline: true,
-      recordingEvents: decoded.events.length,
-      recordingSequencePreserved: true
-    }
-  } finally {
-    await hub.close()
+  )
+  /** Exactly two known business calls are asserted through their actual sender/message identities. */
+  const hops = [FixtureMethod.cascade, FixtureMethod.increment].map((method) =>
+    proveHop(snapshots, method)
+  )
+  /** Restore the service-exported window and compare it to its original parent query rows. */
+  const decoded = decodeRpcDevtoolsRecord(recording)
+  assert.ok(decoded.events.length > 0)
+  const parent = snapshots.find((snapshot) => snapshot.target === FixtureTrace.host.parent)
+  assert.ok(parent)
+  const retained = new Map(parent.events.map((event) => [event.seq, event]))
+  for (const event of decoded.events) {
+    const original = retained.get(event.seq)
+    assert.ok(original)
+    assert.deepEqual(
+      [original.seq, original.stage, original.kind, original.outcome, original.method],
+      [event.seq, event.stage, event.kind, event.outcome, event.method]
+    )
+  }
+  return { hops, recordingEvents: decoded.events.length, recordingSequencePreserved: true }
+}
+
+/**
+ * Assert one of the fixture's two actual calls, including identity-free inbound carrier provenance.
+ *
+ * @param {readonly {
+ *   target: string
+ *   events: readonly import('../../../../rpc-plugin-devtools/dist/contract/wire.js').IRpcDevtoolsWireEvent[]
+ * }[]} snapshots
+ *   Original service pages.
+ * @param {string} method One known fixture business method.
+ * @returns {object} Counts and stages supported by the actual call's retained events.
+ * @throws {Error} A missing logical side, carrier link or protected representation fails the
+ *   fixture.
+ */
+function proveHop(snapshots, method) {
+  /** The sender/message pair comes from an actual outbound logical request, never a guessed id. */
+  const origin = snapshots
+    .flatMap((snapshot) => snapshot.events)
+    .find(
+      (event) =>
+        event.trace === FixtureTrace.id &&
+        event.method === method &&
+        event.stage === 'message' &&
+        event.direction === 'outbound' &&
+        event.kind === 'request'
+    )
+  assert.ok(origin?.senderId)
+  assert.ok(origin.messageId)
+  /** Each host's carrier ordinals are compared only within that same host's original page. */
+  const events = snapshots.flatMap((snapshot) => {
+    const direct = snapshot.events.filter(
+      (event) => event.senderId === origin.senderId && event.messageId === origin.messageId
+    )
+    const directRows = new Set(direct)
+    const carriers = new Set(
+      direct.flatMap((event) => (event.carrierSeq === undefined ? [] : [event.carrierSeq]))
+    )
+    return snapshot.events
+      .filter(
+        (event) =>
+          directRows.has(event) ||
+          carriers.has(event.seq) ||
+          (event.carrierSeq !== undefined && carriers.has(event.carrierSeq))
+      )
+      .map((event) => ({ target: snapshot.target, event }))
+  })
+  assert.ok(
+    events.some(
+      (item) =>
+        item.event.stage === 'message' &&
+        item.event.direction === 'inbound' &&
+        item.event.kind === 'request'
+    )
+  )
+  const stages = [...new Set(events.map((item) => item.event.stage))]
+  for (const stage of ['envelope', 'encoded', 'frame', 'protected', 'carrier'])
+    assert.ok(stages.includes(stage))
+  const outgoing = events.filter(
+    (item) => item.event.stage === 'carrier' && item.event.direction === 'outbound'
+  )
+  const incoming = events.filter(
+    (item) => item.event.stage === 'carrier' && item.event.direction === 'inbound'
+  )
+  assert.ok(outgoing.length > 0)
+  assert.ok(incoming.length > 0)
+  for (const item of outgoing) {
+    assert.equal(item.event.trace, FixtureTrace.id)
+    assert.ok(item.event.messageId)
+    assert.ok(item.event.senderId)
+  }
+  /** Index physical links once, preserving the assertion without a carrier-by-all-events scan. */
+  const links = new Set(
+    events
+      .filter((item) => item.event.stage === 'protected' || item.event.stage === 'frame')
+      .map((item) => JSON.stringify([item.target, item.event.carrierSeq]))
+  )
+  for (const item of incoming) assert.ok(links.has(JSON.stringify([item.target, item.event.seq])))
+  const frame = events.find(
+    (item) => item.event.stage === 'frame' && item.event.direction === 'outbound'
+  )
+  assert.ok(frame)
+  const protectedFrame = events.find(
+    (item) =>
+      item.event.stage === 'protected' &&
+      item.event.direction === 'outbound' &&
+      item.target === frame.target &&
+      item.event.endpointId === frame.event.endpointId &&
+      item.event.messageId === frame.event.messageId &&
+      item.event.chunk?.index === frame.event.chunk?.index
+  )
+  assert.ok(protectedFrame)
+  assert.notEqual(frame.event.content, undefined)
+  assert.notEqual(protectedFrame.event.content, undefined)
+  assert.notDeepEqual(frame.event.content, protectedFrame.event.content)
+  return {
+    method,
+    stages,
+    outboundCarriers: outgoing.length,
+    inboundCarriers: incoming.length,
+    frameContentDiffers: true
   }
 }

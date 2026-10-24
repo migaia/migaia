@@ -1,5 +1,5 @@
 /// <reference lib="webworker" />
-import { createServiceWorkerTransport } from '@migaia/rpc-plugin-browser/adapters/service-worker'
+import { createServiceWorkerTransport } from '../../../../rpc-plugin-browser/dist/browser/adapters/service-worker.js'
 import { readEndpointDebugSnapshot } from '../../../../rpc-host/dist/core/internal/test-observer.js'
 import { createRpc, echoProvider, terminalProviders } from './rpc.js'
 

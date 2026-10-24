@@ -34,15 +34,19 @@ it('native endpoint reports the seeded genuine allocator exhaustion once with th
     const transport = createNodeMessagePortTransport(port1)
     /** No exhausted allocation may reach the actual native physical writer. */
     const written = vi.spyOn(port1, 'postMessage')
-    const { createEndpoint } = await import('../../dist/core/index.js')
+    const { createRuntimeEndpointComposition } =
+      await import('../../dist/core/runtime-api-endpoint.js')
     const { connect } = await import('../../dist/core/middleware/connect.js')
     /** Consumes the real default allocator with only its starting counter seeded. */
-    const endpoint = await createEndpoint({
-      id: 'exhausted',
-      transport,
-      targetIds: ['peer'],
-      middlewares: [connect({ transport })]
-    })
+    const endpoint = await createRuntimeEndpointComposition(
+      {
+        id: 'exhausted',
+        transport,
+        targetIds: ['peer'],
+        middlewares: [connect({ transport })]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     /** The production hook must see the same branded error that rejects the business request. */
     const reported: unknown[] = []
     /** Releases the observer before endpoint disposal. */

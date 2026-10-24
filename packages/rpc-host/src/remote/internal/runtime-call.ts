@@ -14,6 +14,7 @@ import type {
 } from '@migaia/rpc-contract/runtime'
 import { RpcCapability } from '@migaia/rpc-contract/wire'
 import { RpcRuntimeMode } from '@migaia/rpc-contract/wire'
+import { RuntimeApiErrorText } from '../runtime-api/constants.js'
 import { normalizePortable } from '@migaia/rpc-contract/portable'
 import { hasRpcBinaryEnvelope } from '@migaia/rpc-contract/binary/inspect'
 import type { IRpcEndpoint, ISendOptions } from '../../core/typing.js'
@@ -190,6 +191,37 @@ function sendInput(
     : result
 }
 
+/** One admitted forwarded operation retains its exact generation-leave observation. */
+class ForwardedRuntimeRequest {
+  /** Leave wins over either fulfillment or rejection after the admitted operation settles. */
+  #retired: Error | undefined
+  /** The exact original listener receipt is removed by Promise.finally with its bare receiver. */
+  #unsubscribe: () => void
+
+  /** Subscribe only after the original request has already entered native tracking. */
+  constructor(events: ICallEvents, generation: number) {
+    this.#unsubscribe = events.onLeave(generation, (reason) => {
+      this.#retired = createProviderGenerationRetired(reason)
+    })
+  }
+
+  /** Keep the original completion chain and cleanup settlement semantics. */
+  observe(operation: Promise<IRpcPortableValue>): Promise<IRpcPortableValue> {
+    return operation.then(this.#fulfilled, this.#rejected).finally(this.#unsubscribe)
+  }
+
+  /** Retirement is checked only after the original physical operation fulfills. */
+  #fulfilled = (value: IRpcPortableValue): IRpcPortableValue => {
+    if (this.#retired) throw this.#retired
+    return value
+  }
+
+  /** Preserve the original rejection unless this admitted generation has already retired. */
+  #rejected = (error: unknown): never => {
+    throw this.#retired ?? error
+  }
+}
+
 /** Coordinate the original managed request with one Core-owned snapshot across Remote retries. */
 function requestBound(
   binding: ICoreRuntimeCallBinding,
@@ -237,21 +269,7 @@ function requestBound(
         sendInput(active, input, callOptions, mode, declaration?.forwardedVia !== undefined)
       const operation = binding.trackRequest ? binding.trackRequest(invoke) : invoke()
       if (!forwarded) return operation
-      let retired: Error | undefined
-      const unsubscribe = binding.events.onLeave(active.number, (reason) => {
-        retired = createProviderGenerationRetired(reason)
-      })
-      return operation
-        .then(
-          (result) => {
-            if (retired) throw retired
-            return result
-          },
-          (error) => {
-            throw retired ?? error
-          }
-        )
-        .finally(unsubscribe)
+      return new ForwardedRuntimeRequest(binding.events, active.number).observe(operation)
     }
     const deadlineAt = timeoutMs === undefined ? undefined : binding.scheduler.now() + timeoutMs
     /**
@@ -311,28 +329,62 @@ function requestBound(
   }
 }
 
-/** Remote keeps the original lazy registration controls; Core owns its one captured consumer. */
-function streamBound(
-  binding: ICoreRuntimeCallBinding,
-  method: string,
-  payload: unknown,
-  options: ICoreRuntimeCallOptions
-): IRuntimeReadyConsumer {
-  let consumer: IRuntimeReadyConsumer | undefined
-  let retired: Error | undefined
-  let unsubscribe: (() => void) | undefined
-  const current = (): IRuntimeReadyConsumer => {
-    if (consumer) return consumer
-    const input = createRuntimeRequestInput(method, payload, true, options)
-    const declaration = binding.declaration(method, 'stream')
-    binding.validateOptions(options)
-    binding.guard?.(method, 'stream', binding.observedGeneration())
-    const active = binding.current()
-    const timeoutMs = binding.timeout(options.timeoutMs)
+/** One lazy stream consumer owns generation retirement and its original observation receipt. */
+class BoundRuntimeStream {
+  /** The original binding remains sole current-generation, retry and clock authority. */
+  #binding: ICoreRuntimeCallBinding
+  /** Method admission remains lazy until first read or canonical forwarding preparation. */
+  #method: string
+  /** Original payload is captured once by the canonical request-input owner at preparation. */
+  #payload: unknown
+  /** Original options preserve forwarding and transfer provenance. */
+  #options: ICoreRuntimeCallOptions
+  /** The one actual consumer is created lazily and reused by every iterator operation. */
+  #consumer: IRuntimeReadyConsumer | undefined
+  /** A retired forwarded generation retains its original failure precedence. */
+  #retired: Error | undefined
+  /** The original leave subscription is removed on completion, rejection or failed preparation. */
+  #unsubscribe: (() => void) | undefined
+  /** The public iterator keeps the original own operation callbacks and frozen projection. */
+  readonly iterator: IRuntimeReadyConsumer
+
+  /** Retain immutable call inputs without touching declarations, guards or the physical source. */
+  constructor(
+    binding: ICoreRuntimeCallBinding,
+    method: string,
+    payload: unknown,
+    options: ICoreRuntimeCallOptions
+  ) {
+    this.#binding = binding
+    this.#method = method
+    this.#payload = payload
+    this.#options = options
+    /** Short iterator callbacks delegate lifecycle changes to this named operation owner. */
+    const facade: IRuntimeReadyConsumer = {
+      next: () => this.#observe(() => this.#current().next()),
+      return: (value?: IRpcPortableValue) => this.#observe(() => this.#current().return!(value)),
+      throw: (reason?: unknown) => this.#observe(() => this.#current().throw!(reason)),
+      [Symbol.asyncIterator]() {
+        return this
+      }
+    }
+    retainRuntimeStreamPreparation(facade, this.#prepare)
+    this.iterator = Object.freeze(facade)
+  }
+
+  /** Prepare the one original native or legacy consumer at its existing lazy admission point. */
+  #current(): IRuntimeReadyConsumer {
+    if (this.#consumer) return this.#consumer
+    const input = createRuntimeRequestInput(this.#method, this.#payload, true, this.#options)
+    const declaration = this.#binding.declaration(this.#method, 'stream')
+    this.#binding.validateOptions(this.#options)
+    this.#binding.guard?.(this.#method, 'stream', this.#binding.observedGeneration())
+    const active = this.#binding.current()
+    const timeoutMs = this.#binding.timeout(this.#options.timeoutMs)
     const callOptions = retainForwardOptions(
-      options,
-      retainRuntimeTransferOptions(options, {
-        ...options,
+      this.#options,
+      retainRuntimeTransferOptions(this.#options, {
+        ...this.#options,
         ...(timeoutMs === undefined ? {} : { timeoutMs })
       })
     )
@@ -341,65 +393,72 @@ function streamBound(
       active.endpoint,
       EndpointOwnerKey.outboundAttachment
     )
-    if (!owner || !outbound) unsupported()
+    if (!owner) unsupported()
     const native =
       active.channel.agreement.capabilities.includes(RpcCapability.portableBinary) ||
       callOptions.orderKey !== undefined ||
       callOptions.cancel !== undefined ||
       Object.hasOwn(callOptions, 'transfer')
     if (native) {
+      if (!outbound) unsupported()
       const generation = outbound.runtimeTargetGeneration(active.channel.peerId)
       if (!generation) unsupported()
-      consumer = owner.openRuntime(
+      this.#consumer = owner.openRuntime(
         active.channel.peerId,
-        method,
+        this.#method,
         input.payload,
         generation,
         callOptions as IRpcRuntimeSendOptions
       ) as IRuntimeReadyConsumer
-    } else
-      consumer = (active.endpoint as unknown as { stream: IRpcStreamRuntime }).stream.open(
+    } else {
+      if (this.#options.idempotencyKey !== undefined) unsupported()
+      this.#consumer = (active.endpoint as unknown as { stream: IRpcStreamRuntime }).stream.open(
         active.channel.peerId,
-        declaration?.stream ?? method,
+        declaration?.stream ?? this.#method,
         input.payload,
         callOptions
       ) as IRuntimeReadyConsumer
-    if (isRelay(payload, options))
-      unsubscribe = binding.events.onLeave(active.number, (reason) => {
-        retired = createProviderGenerationRetired(reason)
+    }
+    if (isRelay(this.#payload, this.#options))
+      this.#unsubscribe = this.#binding.events.onLeave(active.number, (reason) => {
+        this.#retired = createProviderGenerationRetired(reason)
       })
-    return consumer
+    return this.#consumer
   }
-  const observe = async (
+
+  /** Observe original iterator completion and preserve retirement-over-operation error precedence. */
+  async #observe(
     operation: () => Promise<IteratorResult<IRpcPortableValue>>
-  ): Promise<IteratorResult<IRpcPortableValue>> => {
+  ): Promise<IteratorResult<IRpcPortableValue>> {
     try {
       const result = await operation()
-      if (result.done) unsubscribe?.()
+      if (result.done) (0, this.#unsubscribe)?.()
       return result
     } catch (error) {
-      unsubscribe?.()
-      throw retired ?? error
+      ;(0, this.#unsubscribe)?.()
+      throw this.#retired ?? error
     }
   }
-  const facade: IRuntimeReadyConsumer = {
-    next: () => observe(() => current().next()),
-    return: (value?: IRpcPortableValue) => observe(() => current().return!(value)),
-    throw: (reason?: unknown) => observe(() => current().throw!(reason)),
-    [Symbol.asyncIterator]() {
-      return this
-    }
-  }
-  /** Forwarding prepares the same lazy consumer even when no ordering or cancellation opts in. */
-  retainRuntimeStreamPreparation(facade, async () => {
+
+  /** Forwarding prepares the same lazy consumer even without ordering or cancellation options. */
+  #prepare = async (): Promise<void> => {
     try {
-      await prepareRuntimeStreamConsumer(current())
+      await prepareRuntimeStreamConsumer(this.#current())
     } catch (error) {
-      unsubscribe?.()
-      throw retired ?? error
+      ;(0, this.#unsubscribe)?.()
+      throw this.#retired ?? error
     }
-  })
-  return Object.freeze(facade)
+  }
+}
+
+/** Remote keeps its original lazy registration controls while this resource owns the consumer. */
+function streamBound(
+  binding: ICoreRuntimeCallBinding,
+  method: string,
+  payload: unknown,
+  options: ICoreRuntimeCallOptions
+): IRuntimeReadyConsumer {
+  return new BoundRuntimeStream(binding, method, payload, options).iterator
 }
 
 /** Remote coordinates Core capture with its original retry and lazy stream resources. */
@@ -416,167 +475,196 @@ export function createRuntimeBindingCalls(binding: ICoreRuntimeCallBinding) {
   })
 }
 
-/** Direct Peer operators retain each original transfer/timeout/route/capture prefix. */
-export function createRuntimePeerCalls(
-  config: Readonly<{
-    /** The held native owner supplies only its original transfer rejection policy. */
-    restrictTransfer?: (options: object | undefined) => void
-    callTimeout: (options?: ICoreRuntimeCallOptions) => ICoreRuntimeCallOptions
-    route: (method: string, mode: 'request' | 'notify' | 'stream') => void
-    ready: Pick<IRpcEndpoint, 'send' | 'group' | 'outcome'> &
-      Readonly<{
-        sendOneWay(
-          targetId: string,
-          method: string,
-          data: unknown,
-          options?: ISendOptions
-        ): Promise<void>
-        stream?: IRpcStreamRuntime
-      }>
-    runtimeOutbound?: RpcOutboundAttachment
-    peerId: string
-    generation?: IRpcRuntimeGeneration
-    supportsBinary: boolean
-    supportsStream: boolean
-    routes: ReadonlyMap<string, Readonly<{ stream: string; forwardedVia?: unknown }>>
-  }>
-) {
-  const {
-    restrictTransfer,
-    callTimeout,
-    route,
-    ready,
-    runtimeOutbound,
-    supportsBinary,
-    supportsStream,
-    routes
-  } = config
-  const channel = { peerId: config.peerId }
-  const remote = { self: { generation: config.generation } }
-  return Object.freeze({
-    request: (method: string, payload?: unknown, callOptions?: ICoreRuntimeCallOptions) => {
-      restrictTransfer?.(callOptions)
-      callOptions = callTimeout(callOptions)
-      route(method, RpcRuntimeMode.request)
-      if (
-        supportsBinary ||
-        callOptions?.orderKey !== undefined ||
-        callOptions?.cancel !== undefined ||
-        (callOptions !== undefined && Object.hasOwn(callOptions, 'transfer'))
-      ) {
-        if (!runtimeOutbound || !remote.self.generation) rejectRuntimeApiCapability()
-        return runtimeOutbound.sendRuntimeOperation(
-          channel.peerId,
-          remote.self.generation,
-          'request',
-          createRuntimeRequestInput(
-            method,
-            payload,
-            supportsBinary || rejectRuntimeApiCapability,
-            callOptions
-          ),
-          callOptions
-        ) as Promise<IRpcPortableValue | undefined>
-      }
-      /** Original legacy framing retains its depth-two payload boundary without a facade walk. */
-      const input = createRuntimeRequestInput(
-        method,
-        payload,
-        supportsBinary || rejectRuntimeApiCapability,
-        callOptions,
-        2
-      )
-      const result = ready.send<IRpcPortableValue | undefined>(
-        channel.peerId,
-        method,
-        input.payload,
-        retainRuntimeRequestInput(retainForwardOptions(callOptions, { ...callOptions }), input)
-      )
-      return routes.get(method)?.forwardedVia || isForwardedPayload(callOptions, payload)
-        ? result.catch(restoreForwardError)
-        : result
-    },
-    notify: (method: string, payload?: unknown, callOptions?: ICoreRuntimeCallOptions) => {
-      restrictTransfer?.(callOptions)
-      route(method, RpcRuntimeMode.notify)
-      /**
-       * Plain notify has no binary result; its existing physical/forward completion path stays
-       * intact.
-       */
-      const normalizedPayload = isForwardedPayload(callOptions, payload)
-        ? (payload as IRpcPortableValue | undefined)
-        : payloadValue(payload, supportsBinary)
-      if (
-        hasRpcBinaryEnvelope({ payload: normalizedPayload }) ||
-        callOptions?.orderKey !== undefined ||
-        callOptions?.cancel !== undefined ||
-        (callOptions !== undefined && Object.hasOwn(callOptions, 'transfer'))
-      ) {
-        if (!runtimeOutbound || !remote.self.generation) rejectRuntimeApiCapability()
-        return runtimeOutbound.sendRuntimeOperation(
-          channel.peerId,
-          remote.self.generation,
-          'notify',
-          { method, payload: normalizedPayload },
-          callOptions,
-          isForwardedPayload(callOptions, payload)
-        ) as Promise<void>
-      }
-      /**
-       * The private forward operation awaits C's existing provider response, unlike ordinary
-       * notify.
-       */
-      if (isForwardedPayload(callOptions, payload))
-        return ready
-          .send(channel.peerId, method, payload, callOptions)
-          .then(() => undefined, restoreForwardError)
-      return ready.sendOneWay(channel.peerId, method, normalizedPayload, callOptions)
-    },
-    stream: (method: string, payload?: unknown, callOptions?: ICoreRuntimeCallOptions) => {
-      restrictTransfer?.(callOptions)
-      callOptions = callTimeout(callOptions)
-      if (!supportsStream) rejectRuntimeApiCapability()
-      route(method, RpcRuntimeMode.stream)
-      if (
-        supportsBinary ||
-        callOptions?.orderKey !== undefined ||
-        callOptions?.cancel !== undefined ||
-        (callOptions !== undefined && Object.hasOwn(callOptions, 'transfer'))
-      ) {
-        if (!runtimeOutbound || !remote.self.generation) rejectRuntimeApiCapability()
-        /** The same canonical stream owner retains its existing consumer and single-credit loop. */
-        const owner = readEndpointOwner<RpcStreamOwner>(ready, EndpointOwnerKey.streamOwner)
-        if (!owner) rejectRuntimeApiCapability()
-        return owner.openRuntime(
-          channel.peerId,
+/** Immutable inputs borrowed from the genuine endpoint and generation owners. */
+type IRuntimePeerCallConfig = Readonly<{
+  /** The held native owner supplies only its original transfer rejection policy. */
+  restrictTransfer?: (options: object | undefined) => void
+  callTimeout: (options?: ICoreRuntimeCallOptions) => ICoreRuntimeCallOptions
+  route: (method: string, mode: 'request' | 'notify' | 'stream') => void
+  ready: Pick<IRpcEndpoint, 'send' | 'group' | 'outcome'> &
+    Readonly<{
+      sendOneWay(
+        targetId: string,
+        method: string,
+        data: unknown,
+        options?: ISendOptions
+      ): Promise<void>
+      stream?: IRpcStreamRuntime
+    }>
+  runtimeOutbound?: RpcOutboundAttachment
+  peerId: string
+  generation?: IRpcRuntimeGeneration
+  supportsBinary: boolean
+  supportsStream: boolean
+  routes: ReadonlyMap<string, Readonly<{ stream: string; forwardedVia?: unknown }>>
+}>
+
+/** One named call operator owns its original endpoint/registration context and callback identities. */
+class RuntimePeerCalls {
+  /** The exact original context retains transfer, route, clock and receiver policy. */
+  #config: IRuntimePeerCallConfig
+
+  /** Retain original owner inputs without preparing a request, stream or native generation. */
+  constructor(config: IRuntimePeerCallConfig) {
+    this.#config = {
+      restrictTransfer: config.restrictTransfer,
+      callTimeout: config.callTimeout,
+      route: config.route,
+      ready: config.ready,
+      runtimeOutbound: config.runtimeOutbound,
+      supportsBinary: config.supportsBinary,
+      supportsStream: config.supportsStream,
+      routes: config.routes,
+      peerId: config.peerId,
+      generation: config.generation
+    }
+  }
+
+  /** Preserve the original request admission, failure and resource boundary. */
+  request = (method: string, payload?: unknown, callOptions?: ICoreRuntimeCallOptions) => {
+    ;(0, this.#config.restrictTransfer)?.(callOptions)
+    callOptions = (0, this.#config.callTimeout)(callOptions)
+    ;(0, this.#config.route)(method, RpcRuntimeMode.request)
+    if (
+      this.#config.supportsBinary ||
+      callOptions?.orderKey !== undefined ||
+      callOptions?.cancel !== undefined ||
+      (callOptions !== undefined && Object.hasOwn(callOptions, 'transfer'))
+    ) {
+      if (!this.#config.runtimeOutbound || !this.#config.generation) rejectRuntimeApiCapability()
+      return this.#config.runtimeOutbound.sendRuntimeOperation(
+        this.#config.peerId,
+        this.#config.generation,
+        'request',
+        createRuntimeRequestInput(
           method,
-          payloadValue(payload, supportsBinary),
-          remote.self.generation,
+          payload,
+          this.#config.supportsBinary || rejectRuntimeApiCapability,
           callOptions
-        )
-      }
-      return ready.stream!.open(
-        channel.peerId,
-        routes.get(method)!.stream,
+        ),
+        callOptions
+      ) as Promise<IRpcPortableValue | undefined>
+    }
+    /** Original legacy framing retains its depth-two payload boundary without a facade walk. */
+    const input = createRuntimeRequestInput(
+      method,
+      payload,
+      this.#config.supportsBinary || rejectRuntimeApiCapability,
+      callOptions,
+      2
+    )
+    const result = this.#config.ready.send<IRpcPortableValue | undefined>(
+      this.#config.peerId,
+      method,
+      input.payload,
+      retainRuntimeRequestInput(retainForwardOptions(callOptions, { ...callOptions }), input)
+    )
+    return this.#config.routes.get(method)?.forwardedVia || isForwardedPayload(callOptions, payload)
+      ? result.catch(restoreForwardError)
+      : result
+  }
+
+  /** Preserve the original notify admission, failure and resource boundary. */
+  notify = (method: string, payload?: unknown, callOptions?: ICoreRuntimeCallOptions) => {
+    ;(0, this.#config.restrictTransfer)?.(callOptions)
+    ;(0, this.#config.route)(method, RpcRuntimeMode.notify)
+    /**
+     * Plain notify has no binary result; its existing physical/forward completion path stays
+     * intact.
+     */
+    const normalizedPayload = isForwardedPayload(callOptions, payload)
+      ? (payload as IRpcPortableValue | undefined)
+      : payloadValue(payload, this.#config.supportsBinary)
+    if (
+      hasRpcBinaryEnvelope({ payload: normalizedPayload }) ||
+      callOptions?.orderKey !== undefined ||
+      callOptions?.cancel !== undefined ||
+      (callOptions !== undefined && Object.hasOwn(callOptions, 'transfer'))
+    ) {
+      if (!this.#config.runtimeOutbound || !this.#config.generation) rejectRuntimeApiCapability()
+      return this.#config.runtimeOutbound.sendRuntimeOperation(
+        this.#config.peerId,
+        this.#config.generation,
+        'notify',
+        { method, payload: normalizedPayload },
+        callOptions,
         isForwardedPayload(callOptions, payload)
-          ? (payload as IRpcPortableValue | undefined)
-          : payloadValue(payload, supportsBinary),
+      ) as Promise<void>
+    }
+    /** The private forward operation awaits C's existing provider response, unlike ordinary notify. */
+    if (isForwardedPayload(callOptions, payload))
+      return this.#config.ready
+        .send(this.#config.peerId, method, payload, callOptions)
+        .then(() => undefined, restoreForwardError)
+    return this.#config.ready.sendOneWay(
+      this.#config.peerId,
+      method,
+      normalizedPayload,
+      callOptions
+    )
+  }
+
+  /** Preserve the original stream admission, failure and resource boundary. */
+  stream = (method: string, payload?: unknown, callOptions?: ICoreRuntimeCallOptions) => {
+    ;(0, this.#config.restrictTransfer)?.(callOptions)
+    callOptions = (0, this.#config.callTimeout)(callOptions)
+    if (!this.#config.supportsStream) rejectRuntimeApiCapability()
+    ;(0, this.#config.route)(method, RpcRuntimeMode.stream)
+    if (
+      this.#config.supportsBinary ||
+      callOptions?.orderKey !== undefined ||
+      callOptions?.cancel !== undefined ||
+      (callOptions !== undefined && Object.hasOwn(callOptions, 'transfer'))
+    ) {
+      if (!this.#config.runtimeOutbound || !this.#config.generation) rejectRuntimeApiCapability()
+      /** The same canonical stream owner retains its existing consumer and single-credit loop. */
+      const owner = readEndpointOwner<RpcStreamOwner>(
+        this.#config.ready,
+        EndpointOwnerKey.streamOwner
+      )
+      if (!owner) rejectRuntimeApiCapability()
+      return owner.openRuntime(
+        this.#config.peerId,
+        method,
+        payloadValue(payload, this.#config.supportsBinary),
+        this.#config.generation,
         callOptions
       )
-    },
-    group: (steps: readonly IRpcRuntimeStep[], callOptions?: IRpcRuntimeSendOptions) => {
-      restrictTransfer?.(callOptions)
-      if (!runtimeOutbound || !remote.self.generation) rejectRuntimeApiCapability()
-      /** Snapshot the owning grammar before any route read can execute a user getter. */
-      const normalized = captureRuntimeGroupSteps(steps)
-      for (const step of normalized) route(step.method, RpcRuntimeMode.request)
-      return ready.group(channel.peerId, normalized, callOptions)
-    },
-    outcome: (idempotencyKey: string) => {
-      if (!runtimeOutbound || !remote.self.generation) rejectRuntimeApiCapability()
-      return ready.outcome(channel.peerId, idempotencyKey)
     }
-  })
+    /** Legacy open has no request reply when the accepted directory declares no stream handler. */
+    const declaration = this.#config.routes.get(method)
+    if (!declaration)
+      throw createRpcError(RpcCoreErrorCode.providerNotFound, RuntimeApiErrorText.methodUnavailable)
+    return this.#config.ready.stream!.open(
+      this.#config.peerId,
+      declaration.stream,
+      isForwardedPayload(callOptions, payload)
+        ? (payload as IRpcPortableValue | undefined)
+        : payloadValue(payload, this.#config.supportsBinary),
+      callOptions
+    )
+  }
+
+  /** Preserve the original group admission, failure and resource boundary. */
+  group = (steps: readonly IRpcRuntimeStep[], callOptions?: IRpcRuntimeSendOptions) => {
+    ;(0, this.#config.restrictTransfer)?.(callOptions)
+    if (!this.#config.runtimeOutbound || !this.#config.generation) rejectRuntimeApiCapability()
+    /** Snapshot the owning grammar before any this.#config.route read can execute a user getter. */
+    const normalized = captureRuntimeGroupSteps(steps)
+    for (const step of normalized) (0, this.#config.route)(step.method, RpcRuntimeMode.request)
+    return this.#config.ready.group(this.#config.peerId, normalized, callOptions)
+  }
+
+  /** Preserve the original outcome admission, failure and resource boundary. */
+  outcome = (idempotencyKey: string) => {
+    if (!this.#config.runtimeOutbound || !this.#config.generation) rejectRuntimeApiCapability()
+    return this.#config.ready.outcome(this.#config.peerId, idempotencyKey)
+  }
+}
+
+/** Project the same frozen call operations from their named context owner. */
+export function createRuntimePeerCalls(config: IRuntimePeerCallConfig) {
+  return Object.freeze(new RuntimePeerCalls(config))
 }
 
 /** Original native drain operation shape, held once rather than reconstructed for each request. */
@@ -589,99 +677,137 @@ type ICoreRequestTracker = {
     options: ICoreRuntimeCallOptions
   ): Promise<T>
 }
-/** Managed prefixes delegate to the original Remote registration and direct Peer operations. */
-export function createManagedRuntimeCalls(
-  config: Readonly<{
-    /** The held native owner supplies only its original transfer rejection policy. */
-    restrictTransfer?: (options: object | undefined) => void
-    callTimeout: (options?: ICoreRuntimeCallOptions) => ICoreRuntimeCallOptions
-    callDeadlineCapMs?: number
-    trackRequest?: ICoreRequestTracker
-    registration: Readonly<{
-      invokeRequest(
-        method: string,
-        payload: unknown,
-        options?: ICoreRuntimeCallOptions,
-        mode?: 'request' | 'notify'
-      ): Promise<IRpcPortableValue>
-      invokeStream(
-        method: string,
-        payload: unknown,
-        options?: ICoreRuntimeCallOptions
-      ): AsyncIterableIterator<IRpcPortableValue>
-      invokeGroup(
-        steps: readonly IRpcRuntimeStep[],
-        options?: IRpcRuntimeSendOptions
-      ): Promise<readonly IRpcRuntimeStepOutcome[]>
-      currentPeer(): ReturnType<typeof createRuntimePeerCalls>
-      /** True while the next generation is starting and no current Peer exists. */
-      readonly restarting: boolean
-    }>
+/** Immutable inputs borrowed from the genuine endpoint and generation owners. */
+type IManagedRuntimeCallConfig = Readonly<{
+  /** The held native owner supplies only its original transfer rejection policy. */
+  restrictTransfer?: (options: object | undefined) => void
+  callTimeout: (options?: ICoreRuntimeCallOptions) => ICoreRuntimeCallOptions
+  callDeadlineCapMs?: number
+  trackRequest?: ICoreRequestTracker
+  registration: Readonly<{
+    invokeRequest(
+      method: string,
+      payload: unknown,
+      options?: ICoreRuntimeCallOptions,
+      mode?: 'request' | 'notify'
+    ): Promise<IRpcPortableValue>
+    invokeStream(
+      method: string,
+      payload: unknown,
+      options?: ICoreRuntimeCallOptions
+    ): AsyncIterableIterator<IRpcPortableValue>
+    invokeGroup(
+      steps: readonly IRpcRuntimeStep[],
+      options?: IRpcRuntimeSendOptions
+    ): Promise<readonly IRpcRuntimeStepOutcome[]>
+    currentPeer(): ReturnType<typeof createRuntimePeerCalls>
+    /** True while the next generation is starting and no current Peer exists. */
+    readonly restarting: boolean
   }>
-) {
-  const { restrictTransfer, callTimeout, registration } = config
-  const binding = { trackRequest: config.trackRequest }
-  const request = (method: string, payload: unknown, callOptions: ICoreRuntimeCallOptions) =>
-    registration.invokeRequest(method, payload, callOptions)
-  /**
-   * While the next generation is starting there is no current Peer. That is a passing state of a
-   * live registration, not invalid caller input, so notify, group and outcome reject instead of
-   * throwing; a closed or stopped registration keeps its synchronous REMOTE_CLOSED admission
-   * failure.
-   */
-  const notifyCurrent = (
+}>
+
+/** One named call operator owns its original endpoint/registration context and callback identities. */
+class ManagedRuntimeCalls {
+  /** The exact original context retains transfer, route, clock and receiver policy. */
+  #config: IManagedRuntimeCallConfig
+  /** The original transfer callback is captured once and invoked with its bare receiver. */
+  #restrictTransfer: IManagedRuntimeCallConfig['restrictTransfer']
+  /** Default call options keep the original captured timeout callback identity. */
+  #callTimeout: IManagedRuntimeCallConfig['callTimeout']
+  /** Exact registration identity is captured before native tracker construction. */
+  #registration: IManagedRuntimeCallConfig['registration']
+  /** Preserve the original trackRequest receiver record and native drain callback. */
+  #binding: { trackRequest: ICoreRequestTracker | undefined }
+
+  /** Retain original owner inputs without preparing a request, stream or native generation. */
+  constructor(config: IManagedRuntimeCallConfig) {
+    this.#config = config
+    this.#restrictTransfer = config.restrictTransfer
+    this.#callTimeout = config.callTimeout
+    this.#registration = config.registration
+    this.#binding = { trackRequest: config.trackRequest }
+  }
+
+  /** Original request dispatch retains its existing restart/error timing. */
+  #request = (method: string, payload: unknown, callOptions: ICoreRuntimeCallOptions) =>
+    this.#registration.invokeRequest(method, payload, callOptions)
+
+  /** Original notifyCurrent dispatch retains its existing restart/error timing. */
+  #notifyCurrent = (
     method: string,
     payload: unknown,
     callOptions: ICoreRuntimeCallOptions | undefined
   ): Promise<void> =>
-    registration.restarting
+    this.#registration.restarting
       ? new Promise<void>((resolve) => {
-          resolve(registration.currentPeer().notify(method, payload, callOptions))
+          resolve(this.#registration.currentPeer().notify(method, payload, callOptions))
         })
-      : registration.currentPeer().notify(method, payload, callOptions)
-  /**
-   * While restarting, the lazy registration stream reports unavailability at its first read, so
-   * creating the stream does not throw for that passing state.
-   */
-  const streamCurrent = (method: string, payload: unknown, callOptions: ICoreRuntimeCallOptions) =>
-    registration.restarting
-      ? registration.invokeStream(method, payload, callOptions)
-      : registration.currentPeer().stream(method, payload, callOptions)
-  return Object.freeze({
-    request: (method: string, payload?: unknown, callOptions?: ICoreRuntimeCallOptions) => {
-      restrictTransfer?.(callOptions)
-      /** Logical retry settlement must finish before native drain can retire its generation. */
-      return binding.trackRequest
-        ? binding.trackRequest(request, method, payload, callTimeout(callOptions))
-        : request(method, payload, callTimeout(callOptions))
-    },
-    notify: (method: string, payload?: unknown, callOptions?: ICoreRuntimeCallOptions) => {
-      restrictTransfer?.(callOptions)
-      return isForwardedPayload(callOptions, payload)
-        ? registration.invokeRequest(method, payload, callOptions, 'notify').then(() => undefined)
-        : notifyCurrent(method, payload, callOptions)
-    },
-    stream: (method: string, payload?: unknown, callOptions?: ICoreRuntimeCallOptions) => {
-      restrictTransfer?.(callOptions)
-      return isForwardedPayload(callOptions, payload) || config.callDeadlineCapMs !== undefined
-        ? registration.invokeStream(method, payload, callTimeout(callOptions))
-        : streamCurrent(method, payload, callTimeout(callOptions))
-    },
-    group: (steps: readonly IRpcRuntimeStep[], callOptions?: IRpcRuntimeSendOptions) => {
-      restrictTransfer?.(callOptions)
-      return registration.restarting
-        ? new Promise<readonly IRpcRuntimeStepOutcome[]>((resolve) => {
-            resolve(registration.invokeGroup(steps, callOptions))
-          })
-        : registration.invokeGroup(steps, callOptions)
-    },
-    outcome: (key: string) =>
-      registration.restarting
-        ? new Promise<Awaited<ReturnType<ReturnType<typeof registration.currentPeer>['outcome']>>>(
-            (resolve) => {
-              resolve(registration.currentPeer().outcome(key))
-            }
-          )
-        : registration.currentPeer().outcome(key)
-  })
+      : this.#registration.currentPeer().notify(method, payload, callOptions)
+
+  /** Original streamCurrent dispatch retains its existing restart/error timing. */
+  #streamCurrent = (method: string, payload: unknown, callOptions: ICoreRuntimeCallOptions) =>
+    this.#registration.restarting
+      ? this.#registration.invokeStream(method, payload, callOptions)
+      : this.#registration.currentPeer().stream(method, payload, callOptions)
+
+  /** Preserve the original request admission, failure and resource boundary. */
+  request = (method: string, payload?: unknown, callOptions?: ICoreRuntimeCallOptions) => {
+    ;(0, this.#restrictTransfer)?.(callOptions)
+    /** Logical retry settlement must finish before native drain can retire its generation. */
+    return this.#binding.trackRequest
+      ? this.#binding.trackRequest(
+          this.#request,
+          method,
+          payload,
+          (0, this.#callTimeout)(callOptions)
+        )
+      : this.#request(method, payload, (0, this.#callTimeout)(callOptions))
+  }
+
+  /** Preserve the original notify admission, failure and resource boundary. */
+  notify = (method: string, payload?: unknown, callOptions?: ICoreRuntimeCallOptions) => {
+    ;(0, this.#restrictTransfer)?.(callOptions)
+    return isForwardedPayload(callOptions, payload)
+      ? this.#registration
+          .invokeRequest(method, payload, callOptions, 'notify')
+          .then(() => undefined)
+      : this.#notifyCurrent(method, payload, callOptions)
+  }
+
+  /** Preserve the original stream admission, failure and resource boundary. */
+  stream = (method: string, payload?: unknown, callOptions?: ICoreRuntimeCallOptions) => {
+    ;(0, this.#restrictTransfer)?.(callOptions)
+    return isForwardedPayload(callOptions, payload) || this.#config.callDeadlineCapMs !== undefined
+      ? this.#registration.invokeStream(method, payload, (0, this.#callTimeout)(callOptions))
+      : this.#streamCurrent(method, payload, (0, this.#callTimeout)(callOptions))
+  }
+
+  /** Preserve the original group admission, failure and resource boundary. */
+  group = (steps: readonly IRpcRuntimeStep[], callOptions?: IRpcRuntimeSendOptions) => {
+    ;(0, this.#restrictTransfer)?.(callOptions)
+    return this.#registration.restarting
+      ? new Promise<readonly IRpcRuntimeStepOutcome[]>((resolve) => {
+          resolve(this.#registration.invokeGroup(steps, callOptions))
+        })
+      : this.#registration.invokeGroup(steps, callOptions)
+  }
+
+  /** Preserve the original outcome admission, failure and resource boundary. */
+  outcome = (key: string) =>
+    this.#registration.restarting
+      ? new Promise<
+          Awaited<
+            ReturnType<
+              ReturnType<IManagedRuntimeCallConfig['registration']['currentPeer']>['outcome']
+            >
+          >
+        >((resolve) => {
+          resolve(this.#registration.currentPeer().outcome(key))
+        })
+      : this.#registration.currentPeer().outcome(key)
+}
+
+/** Project the same frozen call operations from their named context owner. */
+export function createManagedRuntimeCalls(config: IManagedRuntimeCallConfig) {
+  return Object.freeze(new ManagedRuntimeCalls(config))
 }

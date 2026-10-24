@@ -2,7 +2,7 @@ import { describe, expect, expectTypeOf, it } from 'vitest'
 import { setTimeout as delay } from 'node:timers/promises'
 import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'
 import { createRpcHost } from '@migaia/rpc-host'
-import { type IRpcFanoutResult } from '../../../rpc-host/dist/core/index.js'
+import type { IRpcFanoutResult } from '../../../rpc-host/dist/core/typing.js'
 import {
   windowPlugin,
   sharedWorkerPlugin,
@@ -21,21 +21,40 @@ type IFixtureApi = {
 }
 
 /** Business providers expose observable notify and stream results through the public Peer only. */
-function providers() {
-  /** Notification order stays observable without relying on send completion as provider completion. */
+/** Allocate only this case's original observations before installing native-shaped callbacks. */
+function browserProviderFixtureState() {
   const recorded: string[] = []
-  return {
-    echo: (value: string) => value,
-    record: (value: string) => {
-      recorded.push(value)
-    },
-    recorded: () => [...recorded],
-    values: async function* (value: number) {
-      yield value
-      yield value + 1
-    },
-    hold: () => new Promise<void>(() => undefined)
+  return { recorded }
+}
+
+/** Own one test resource's mutable observations without sharing a factory closure. */
+class BrowserProviderFixture {
+  /** Counts, native events and construction inputs belong only to this fixture instance. */
+  #state: ReturnType<typeof browserProviderFixtureState>
+  /** Existing consumers retain the same observable fixture surface and callback identities. */
+  readonly value
+  /** Install the original native-shaped callbacks after their observations exist. */
+  constructor() {
+    this.#state = browserProviderFixtureState()
+
+    this.value = {
+      echo: (value: string) => value,
+      record: (value: string) => {
+        this.#state.recorded.push(value)
+      },
+      recorded: () => [...this.#state.recorded],
+      values: async function* (value: number) {
+        yield value
+        yield value + 1
+      },
+      hold: () => new Promise<void>(() => undefined)
+    }
   }
+}
+
+/** Create one independent owner for the existing native-boundary fixture. */
+function providers() {
+  return new BrowserProviderFixture().value
 }
 
 describe('browser Runtime Peer', () => {

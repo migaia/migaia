@@ -32,54 +32,57 @@ def schema_value(value, depth=0):
     if isinstance(value, list):
         return ("array", tuple(schema_value(item, depth + 1) for item in value))
     if isinstance(value, dict):
-        return ("object", tuple((key, schema_value(item, depth + 1)) for key, item in sorted(value.items())))
+        return ("object", frozenset((key, schema_value(item, depth + 1)) for key, item in value.items()))
     raise ValueError("invalid method")
+
+
+def _visit_runtime_schema(schema, path, nodes, references):
+    """Walk one schema using the caller-owned node/reference context."""
+    if not isinstance(schema, dict) or set(schema) - SCHEMA_KEYS:
+        return False
+    nodes.add(path)
+    for key, child in schema.items():
+        if key == "type":
+            values = child if isinstance(child, list) else [child]
+            if not values or any(not isinstance(item, str) or item not in SCHEMA_TYPES for item in values) or len(set(values)) != len(values):
+                return False
+        elif key in ("properties", "$defs"):
+            if not isinstance(child, dict):
+                return False
+            for name, member in child.items():
+                pointer = name.replace("~", "~0").replace("/", "~1")
+                if not _visit_runtime_schema(member, f"{path}/{key}/{pointer}", nodes, references):
+                    return False
+        elif key == "required":
+            if not isinstance(child, list) or any(not isinstance(item, str) for item in child) or len(set(child)) != len(child):
+                return False
+        elif key == "items":
+            if not _visit_runtime_schema(child, f"{path}/items", nodes, references):
+                return False
+        elif key == "enum":
+            if not isinstance(child, list) or not child:
+                return False
+            values = [schema_value(item) for item in child]
+            if len(set(values)) != len(values):
+                return False
+        elif key == "anyOf":
+            if not isinstance(child, list) or not child or any(not _visit_runtime_schema(member, f"{path}/anyOf/{index}", nodes, references) for index, member in enumerate(child)):
+                return False
+        elif key == "$ref":
+            if not isinstance(child, str) or not child.startswith("#/$defs/") or re.search(r"~(?![01])", child):
+                return False
+            references.append(child[1:])
+    return True
 
 
 def valid_runtime_schema(value):
     """Validate schema nodes and local references without following references or executing text."""
     nodes, references = set(), []
 
-    def visit(schema, path):
-        if not isinstance(schema, dict) or set(schema) - SCHEMA_KEYS:
-            return False
-        nodes.add(path)
-        for key, child in schema.items():
-            if key == "type":
-                values = child if isinstance(child, list) else [child]
-                if not values or any(not isinstance(item, str) or item not in SCHEMA_TYPES for item in values) or len(set(values)) != len(values):
-                    return False
-            elif key in ("properties", "$defs"):
-                if not isinstance(child, dict):
-                    return False
-                for name, member in child.items():
-                    pointer = name.replace("~", "~0").replace("/", "~1")
-                    if not visit(member, f"{path}/{key}/{pointer}"):
-                        return False
-            elif key == "required":
-                if not isinstance(child, list) or any(not isinstance(item, str) for item in child) or len(set(child)) != len(child):
-                    return False
-            elif key == "items":
-                if not visit(child, f"{path}/items"):
-                    return False
-            elif key == "enum":
-                if not isinstance(child, list) or not child:
-                    return False
-                values = [schema_value(item) for item in child]
-                if len(set(values)) != len(values):
-                    return False
-            elif key == "anyOf":
-                if not isinstance(child, list) or not child or any(not visit(member, f"{path}/anyOf/{index}") for index, member in enumerate(child)):
-                    return False
-            elif key == "$ref":
-                if not isinstance(child, str) or not child.startswith("#/$defs/") or re.search(r"~(?![01])", child):
-                    return False
-                references.append(child[1:])
-        return True
 
     try:
         schema_value(value)
-        return visit(value, "") and all(reference in nodes for reference in references)
+        return _visit_runtime_schema(value, "", nodes, references) and all(reference in nodes for reference in references)
     except (ValueError, TypeError, RecursionError):
         return False
 

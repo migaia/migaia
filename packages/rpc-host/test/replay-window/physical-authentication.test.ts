@@ -1,3 +1,5 @@
+import { createRuntimeEndpointComposition } from '../../dist/core/runtime-api-endpoint.js'
+import { RpcCapability } from '@migaia/rpc-contract'
 import assert from 'node:assert/strict'
 import { createHmac } from 'node:crypto'
 import { MessageChannel } from 'node:worker_threads'
@@ -5,16 +7,16 @@ import { setImmediate as nextTurn } from 'node:timers/promises'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { describe, it } from 'vitest'
 import { createNodeMessagePortTransport } from '../../dist/core/adapters/message-port.js'
-import { createEndpoint } from '../../dist/core/index.js'
-import { authentication } from '../../dist/core/index.js'
-import { connect } from '../../dist/core/index.js'
+
+import { authentication } from '../../dist/core/middleware/authentication.js'
+import { connect } from '../../dist/core/middleware/connect.js'
 import {
   readAuthenticationEnvelope,
   RpcAuthenticationEnvelope
 } from '../../dist/core/middleware/authentication-envelope.js'
 import { setAuthenticationReplayCounter } from '../../dist/core/internal/authentication-replay.js'
 import { RpcMiddlewareErrorText } from '../../dist/core/middleware/error-text.js'
-import type { IRpcAuthenticationCapability, IRpcPlugin } from '../../dist/core/index.js'
+import type { IRpcAuthenticationCapability, IRpcPlugin } from '../../dist/core/typing.js'
 
 /** The optional frozen baseline changes only the authentication owner, never production source. */
 const authenticationOwner = process.env.RPC_REPLAY_BASE
@@ -84,22 +86,28 @@ describe('replay-window r12 real MessagePort authentication', () => {
       captured = value
       return send(value, options)
     }
-    const server = await createEndpoint({
-      id: 'tamper-server',
-      transport: serverTransport,
-      middlewares: [connect({ transport: serverTransport }), signed()],
-      provider: {
-        echo: (context) => {
-          providers++
-          return context.success(context.data)
+    const server = await createRuntimeEndpointComposition(
+      {
+        id: 'tamper-server',
+        transport: serverTransport,
+        middlewares: [connect({ transport: serverTransport }), signed()],
+        provider: {
+          echo: (context) => {
+            providers++
+            return context.success(context.data)
+          }
         }
-      }
-    })
-    const client = await createEndpoint({
-      id: 'tamper-client',
-      transport: clientTransport,
-      middlewares: [connect({ transport: clientTransport }), signed(true)]
-    })
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'tamper-client',
+        transport: clientTransport,
+        middlewares: [connect({ transport: clientTransport }), signed(true)]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     /** Existing hooks retain original coded errors for identity and cause assertions. */
     const inboundFailures: unknown[] = []
     const outboundFailures: unknown[] = []
@@ -232,27 +240,33 @@ describe('replay-window r12 real MessagePort authentication', () => {
       return send(value, options)
     }
     /** Server receives the actual physical request and returns the original user payload. */
-    const server = await createEndpoint({
-      id: 'physical-server',
-      transport: serverTransport,
-      scheduler,
-      middlewares: [connect({ transport: serverTransport }), signed()],
-      provider: {
-        echo: (context) => {
-          providers += 1
-          return context.success(context.data)
+    const server = await createRuntimeEndpointComposition(
+      {
+        id: 'physical-server',
+        transport: serverTransport,
+        scheduler,
+        middlewares: [connect({ transport: serverTransport }), signed()],
+        provider: {
+          echo: (context) => {
+            providers += 1
+            return context.success(context.data)
+          }
         }
-      }
-    })
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     /**
      * Client sends through canonical encode/framing/protect rather than manually constructing an
      * envelope.
      */
-    const client = await createEndpoint({
-      id: 'physical-client',
-      transport: clientTransport,
-      middlewares: [connect({ transport: clientTransport }), signed()]
-    })
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'physical-client',
+        transport: clientTransport,
+        middlewares: [connect({ transport: clientTransport }), signed()]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     /** Hook collection preserves the production authentication rejection/reporting path. */
     const release = server.hooks.on((event) => {
       if (

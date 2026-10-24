@@ -1,3 +1,9 @@
+import { createRuntimeApiEndpoint } from '../../dist/core/runtime-api-endpoint.js'
+import { hooks } from '../../dist/core/middleware/hooks.js'
+import { timeout } from '../../dist/core/middleware/timeout.js'
+import { abort } from '../../dist/core/middleware/abort.js'
+import { connect } from '../../dist/core/middleware/connect.js'
+import { createRuntimeEndpointComposition } from '../../dist/core/runtime-api-endpoint.js'
 import { MessageChannel } from 'node:worker_threads'
 import { AdapterNodeThreadParentChannel } from '../../../rpc-plugin-thread/dist/threads/node-parent.js'
 import { createRequire } from 'node:module'
@@ -8,13 +14,14 @@ import { RpcCapability, rpcProtocolV1, type IRpcEnvelope } from '@migaia/rpc-con
 import { messageFramerV1 } from '@migaia/rpc-contract/framing'
 import { RpcBinaryProfile } from '@migaia/rpc-contract/wire'
 import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'
-import * as core from '../../dist/core/index.js'
-import * as adapterSdk from '../../dist/adapter.js'
-import * as adapter from '../../dist/adapter/internal-advanced.js'
-import * as remote from '../../dist/remote/index.js'
-import * as provider from '../../dist/core/features/provider.js'
-import { createClientEndpoint } from '../../dist/core/client.js'
-import type { IRpcContext, IRpcEndpoint, IRpcTransport } from '../../dist/core/index.js'
+import * as core from '../../dist/index.js'
+import * as adapterSdk from '../../dist/plugin/index.js'
+import * as adapter from '../../dist/plugin/index.js'
+import * as remote from '../../dist/remote/runtime-api/peer.js'
+import * as provider from '../../dist/features/index.js'
+
+import type { IRpcContext, IRpcEndpoint } from '../../dist/core/typing.js'
+import type { IRpcTransport } from '../../dist/core/transport.js'
 import { EndpointOwnerKey } from '../../dist/core/endpoint-kernel.js'
 import { readEndpointOwner } from '../../dist/core/internal/endpoint-projection.js'
 import { hasBatchAgreement, hasCloneTransferCarrier } from '../../dist/core/internal/batch-frame.js'
@@ -92,11 +99,14 @@ describe('public adapter resource boundaries', () => {
       /** This adapter copy was never constructed by Core. */
       const foreign = foreignTransport(channel.transport)
       /** Ordinary endpoint admission must not convert its labels into transport qualification. */
-      const endpoint = await createClientEndpoint({
-        id: 'boundary-copy',
-        transport: foreign,
-        middlewares: [core.connect()]
-      })
+      const endpoint = await createRuntimeEndpointComposition(
+        {
+          id: 'boundary-copy',
+          transport: foreign,
+          middlewares: [connect()]
+        },
+        { agreement: { capabilities: [] }, peerId: '' }
+      ).installing
       try {
         expect(hasBatchAgreement(foreign)).toBe(false)
         expect(hasCloneTransferCarrier(foreign)).toBe(false)
@@ -119,15 +129,18 @@ describe('public adapter resource boundaries', () => {
         const copiedFramer = { ...messageFramerV1 }
         /** The real qualified carrier ensures construction consults the fast-component reader. */
         /** Restore the observer even if the ordinary component constructor rejects. */
-        let endpoint: Awaited<ReturnType<typeof createClientEndpoint>> | undefined
+        let endpoint: { dispose(): Promise<void> } | undefined
         try {
-          endpoint = await createClientEndpoint({
-            id: 'boundary-components',
-            transport: channel.transport,
-            codec: writer === 'registerFastCodec' ? copiedCodec : identityCodec,
-            framer: writer === 'registerFastFramer' ? copiedFramer : messageFramerV1,
-            middlewares: [core.connect()]
-          })
+          endpoint = await createRuntimeEndpointComposition(
+            {
+              id: 'boundary-components',
+              transport: channel.transport,
+              codec: writer === 'registerFastCodec' ? copiedCodec : identityCodec,
+              framer: writer === 'registerFastFramer' ? copiedFramer : messageFramerV1,
+              middlewares: [connect()]
+            },
+            { agreement: { capabilities: [] }, peerId: '' }
+          ).installing
           expect(proof.mock.calls.length).toBeGreaterThan(0)
           /** Freeze observed calls before rechecking, since the spy records those checks too. */
           const observedCalls = proof.mock.calls.slice()
@@ -151,11 +164,14 @@ describe('public adapter resource boundaries', () => {
       expectPrivateWriter(writer)
       await withHeldChannel(async (channel) => {
         /** Ordinary endpoint construction claims the exact Core-created transport's real owner. */
-        const owner = await createClientEndpoint({
-          id: 'boundary-owner',
-          transport: channel.transport,
-          middlewares: [core.connect()]
-        })
+        const owner = await createRuntimeEndpointComposition(
+          {
+            id: 'boundary-owner',
+            transport: channel.transport,
+            middlewares: [connect()]
+          },
+          { agreement: { capabilities: [] }, peerId: '' }
+        ).installing
         /** A fake initializer is descriptive user data, not a call into a trust writer. */
         const initialize = vi.fn(() => ({ alive: () => true, exclusive: () => true }))
         /** The copied methods still address the real resource, without copying its private receipt. */
@@ -163,11 +179,14 @@ describe('public adapter resource boundaries', () => {
         try {
           expect(nativeReplayReceipt(channel.transport)?.qualified).toBe(true)
           /** A normal operation over the foreign transport cannot bind the original private receipt. */
-          const endpoint = await createClientEndpoint({
-            id: 'boundary-foreign',
-            transport: foreign,
-            middlewares: [core.connect()]
-          })
+          const endpoint = await createRuntimeEndpointComposition(
+            {
+              id: 'boundary-foreign',
+              transport: foreign,
+              middlewares: [connect()]
+            },
+            { agreement: { capabilities: [] }, peerId: '' }
+          ).installing
           try {
             expect(nativeReplayReceipt(foreign)).toBeUndefined()
             expect(initialize).not.toHaveBeenCalled()
@@ -189,11 +208,14 @@ describe('public adapter resource boundaries', () => {
         objectPort: { protocol: rpcProtocolV1, codec: identityCodec, framer: messageFramerV1 }
       })
       /** Its normal endpoint still selects the public frame path. */
-      const endpoint = await createClientEndpoint({
-        id: 'boundary-object',
-        transport: foreign,
-        middlewares: [core.connect()]
-      })
+      const endpoint = await createRuntimeEndpointComposition(
+        {
+          id: 'boundary-object',
+          transport: foreign,
+          middlewares: [connect()]
+        },
+        { agreement: { capabilities: [] }, peerId: '' }
+      ).installing
       try {
         expect(
           readJsonObjectPort(foreign, rpcProtocolV1, identityCodec, messageFramerV1)
@@ -236,11 +258,14 @@ describe('public adapter resource boundaries', () => {
         Object.defineProperty(foreign, Symbol.for('rpc-provider-preflight'), { value: policy })
         Object.defineProperty(foreign, Symbol.for('rpc-provider-bulk-admission'), { value: policy })
         /** The ordinary provider API stores the actual supplied callback in its normal registry. */
-        const endpoint = await core.createFullEndpoint({
-          id: 'boundary-provider',
-          transport: channel.transport,
-          middlewares: [core.connect()]
-        })
+        const endpoint = await createRuntimeEndpointComposition(
+          {
+            id: 'boundary-provider',
+            transport: channel.transport,
+            middlewares: [connect()]
+          },
+          { agreement: { capabilities: [] }, peerId: '' }
+        ).installing
         try {
           endpoint.provide('foreign', foreign)
           /** This is the original private registry reader, not an alternate test admission seam. */
@@ -327,14 +352,14 @@ describe('public adapter resource boundaries', () => {
              * Only normal configuration enters Core; no private class or snapshot helper is
              * supplied.
              */
-            const endpoint = core.createRuntimeApiEndpoint(
+            const endpoint = createRuntimeApiEndpoint(
               {
                 id: 'boundary-left',
                 transport: channel.transport,
                 targetIds: [channel.peerId],
                 codec,
                 framer: channel.pipeline.framer,
-                middlewares: [core.abort(), core.timeout(), core.hooks(), core.connect()]
+                middlewares: [abort(), timeout(), hooks(), connect()]
               },
               channel
             )

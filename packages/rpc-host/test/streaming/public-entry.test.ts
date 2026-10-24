@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { connect } from '../../dist/core/index.js'
-import { createMemoryTransportPair } from '@migaia/rpc-host/adapters/memory'
+import { connect } from '../../dist/core/middleware/connect.js'
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
 import { createComposedEndpoint } from '../../dist/core/composed.js'
 import { createOutboundFeature } from '../../dist/core/features/outbound.js'
-import { createProviderFeature } from '../../dist/core/features/provider.js'
+import { createProviderFeature } from '../../dist/core/internal/provider-feature.js'
 import { createCanonicalChunkFeature, createStreamFeature } from '../../dist/core/stream/index.js'
 
 /** Proves a package consumer can build both stream peers using published subpaths. */

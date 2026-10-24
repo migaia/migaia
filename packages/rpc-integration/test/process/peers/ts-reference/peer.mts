@@ -263,21 +263,25 @@ export function negotiate(initiator: IRecord, responder: IRecord): IRecord | und
   if (initiator.protocol !== responder.protocol) return undefined
   const versions = initiator.versions as Array<{ major: number; minor: number }>
   const offered = responder.versions as Array<{ major: number; minor: number }>
-  const common = versions
-    .filter((version) => offered.some((candidate) => candidate.major === version.major))
-    .sort((a, b) => b.major - a.major)[0]
+  /** Index responder choices once; validation has already rejected duplicate majors. */
+  const offeredByMajor = new Map(offered.map((candidate) => [candidate.major, candidate]))
+  /** One pass selects the highest shared major without sorting arbitrary peer input. */
+  let common: { major: number; minor: number } | undefined
+  for (const version of versions)
+    if (offeredByMajor.has(version.major) && (common === undefined || version.major > common.major))
+      common = version
   if (common === undefined) return undefined
-  const chosen = offered.find((candidate) => candidate.major === common.major)!
-  const codec = (initiator.codecs as string[]).find((value) =>
-    (responder.codecs as string[]).includes(value)
-  )
+  const chosen = offeredByMajor.get(common.major)!
+  const offeredCodecs = new Set(responder.codecs as string[])
+  const codec = (initiator.codecs as string[]).find((value) => offeredCodecs.has(value))
   if (codec === undefined) return undefined
+  const offeredCapabilities = new Set(responder.capabilities as string[])
   return {
     major: common.major,
     minor: Math.min(common.minor, chosen.minor),
     codec,
     capabilities: (initiator.capabilities as string[]).filter((value) =>
-      (responder.capabilities as string[]).includes(value)
+      offeredCapabilities.has(value)
     )
   }
 }
@@ -360,102 +364,145 @@ function rejectEnvelope(fromBatch: boolean): void {
 }
 
 /** Serves one authenticated native connection with no child process or secret logging. */
-async function respond(source: Readable, destination: Writable): Promise<void> {
-  const reader = new FrameReader(source)
-  let first: unknown
-  try {
-    first = await readJson(reader, 65_536)
-  } catch {
-    throw new PeerFault('HANDSHAKE_INVALID')
-  }
-  const violation = validateHello(first)
-  if (violation !== undefined) throw new PeerFault('HANDSHAKE_INVALID')
-  const hello = first as IRecord
-  const agreement = negotiate(hello, localOffer('ts-peer'))
-  if (agreement === undefined || !supportsBaseline(agreement)) {
-    await writeJson(destination, {
-      kind: 'handshake',
-      step: 'reject',
-      protocol: 'migaia.rpc',
-      error: {
-        source: 'rpc.contract',
-        code: 'HANDSHAKE_INCOMPATIBLE',
-        name: 'Error',
-        message: 'rpc handshake incompatible',
-        stack: 'Error: rpc handshake incompatible'
-      }
-    })
-    throw new PeerFault('HANDSHAKE_INVALID')
-  }
-  await writeJson(destination, {
-    kind: 'handshake',
-    step: 'accept',
-    protocol: 'migaia.rpc',
-    ...agreement,
-    peer: { id: 'ts-peer', runtime: 'node' }
-  })
-  /** One-way receipt count is independently queryable by a later request. */
-  let oneWayCount = 0
-  /** Cancelable deferred calls keyed by their request id. */
-  const pending = new Map<
+/** Validated semantic identity after the independent envelope entry guard. */
+type IReferenceInbound = IRecord & { id: string; data: IRecord }
+
+/** Independent foreign native responder; never imports a production protocol implementation. */
+class ReferenceResponder {
+  /** Original framed reader retains physical chunk boundaries and terminal failure identity. */
+  readonly #reader: FrameReader
+  /** Actual native writer remains the only channel output authority. */
+  readonly #destination: Writable
+  /** Negotiated values are retained only after validating the independent hello grammar. */
+  #agreement!: IRecord
+  /** Accepted one-way business receipt count is queryable by a later request. */
+  #oneWayCount = 0
+  /** Cancelable deferred calls retain the original timer and completion promise. */
+  readonly #pending = new Map<
     string,
     { timer: NodeJS.Timeout; done: Promise<void>; finish: () => void }
   >()
-  /** Abort ids that may arrive before their matching request. */
-  const cancelledIds = new Set<string>()
-  /** A negotiated close stops new work but keeps the receive loop alive for abort. */
-  let closing = false
-  /** Deadline signal for the current close drain, if announced. */
-  let drain: Promise<void> | undefined
-  /** Timer owned by the current close drain. */
-  let drainTimer: NodeJS.Timeout | undefined
-  /** Physical batch members share this connection's existing semantic dispatch and original order. */
-  let batchMembers: unknown[] = []
-  while (true) {
-    if (closing && pending.size === 0) break
-    /** Member-local semantic failure must not reject later envelopes from the same physical frame. */
-    const fromBatch = batchMembers.length > 0
-    const value = fromBatch
-      ? batchMembers.shift()
-      : closing && drain !== undefined
-        ? await Promise.race([
-            readJson(reader),
-            drain.then(() => undefined),
-            Promise.all([...pending.values()].map((task) => task.done)).then(() => undefined)
-          ])
-        : await readJson(reader)
-    if (value === undefined) break
-    if (!fromBatch && isRecord(value) && value.kind === 'batch') {
+  /** Bounded early abort ids preserve cancellation before matching request arrival. */
+  readonly #cancelledIds = new Set<string>()
+  /** Close stops new work while leaving physical receive active for abort. */
+  #closing = false
+  /** Current close-drain deadline races the original reader. */
+  #drain: Promise<void> | undefined
+  /** Deadline timer is cleared after orderly loop completion. */
+  #drainTimer: NodeJS.Timeout | undefined
+  /** Physical members keep their original order without shifting a growing array. */
+  #batchMembers: unknown[] = []
+  /** One monotonic cursor consumes each admitted batch member once. */
+  #batchCursor = 0
+
+  /** Borrows original streams; the caller retains native socket/process ownership. */
+  constructor(source: Readable, destination: Writable) {
+    this.#reader = new FrameReader(source)
+    this.#destination = destination
+  }
+  /** Validate and accept exactly the original independent native handshake. */
+  async #handshake(): Promise<void> {
+    let first: unknown
+    try {
+      first = await readJson(this.#reader, 65_536)
+    } catch {
+      throw new PeerFault('HANDSHAKE_INVALID')
+    }
+    const violation = validateHello(first)
+    if (violation !== undefined) throw new PeerFault('HANDSHAKE_INVALID')
+    const hello = first as IRecord
+    const agreement = negotiate(hello, localOffer('ts-peer'))
+    if (agreement === undefined || !supportsBaseline(agreement)) {
+      await writeJson(this.#destination, {
+        kind: 'handshake',
+        step: 'reject',
+        protocol: 'migaia.rpc',
+        error: {
+          source: 'rpc.contract',
+          code: 'HANDSHAKE_INCOMPATIBLE',
+          name: 'Error',
+          message: 'rpc handshake incompatible',
+          stack: 'Error: rpc handshake incompatible'
+        }
+      })
+      throw new PeerFault('HANDSHAKE_INVALID')
+    }
+    this.#agreement = agreement
+    await writeJson(this.#destination, {
+      kind: 'handshake',
+      step: 'accept',
+      protocol: 'migaia.rpc',
+      ...agreement,
+      peer: { id: 'ts-peer', runtime: 'node' }
+    })
+  }
+  /** Admit physical frames, then dispatch each original semantic member in order. */
+  async run(): Promise<void> {
+    await this.#handshake()
+    while (true) {
+      if (this.#closing && this.#pending.size === 0) break
+      /** Member-local semantic failure must not reject later envelopes from the same physical frame. */
+      const fromBatch = this.#batchCursor < this.#batchMembers.length
+      const value = fromBatch
+        ? this.#batchMembers[this.#batchCursor++]
+        : this.#closing && this.#drain !== undefined
+          ? await Promise.race([
+              readJson(this.#reader),
+              this.#drain.then(() => undefined),
+              Promise.all([...this.#pending.values()].map((task) => task.done)).then(
+                () => undefined
+              )
+            ])
+          : await readJson(this.#reader)
+      if (value === undefined) break
+      if (!fromBatch && isRecord(value) && value.kind === 'batch') {
+        if (
+          !Array.isArray(value.envelopes) ||
+          value.envelopes.length === 0 ||
+          Object.keys(value).some((key) => key !== 'kind' && key !== 'envelopes')
+        )
+          throw new PeerFault('INVALID_FRAME')
+        this.#batchMembers = [...value.envelopes]
+        this.#batchCursor = 0
+        continue
+      }
       if (
-        !Array.isArray(value.envelopes) ||
-        value.envelopes.length === 0 ||
-        Object.keys(value).some((key) => key !== 'kind' && key !== 'envelopes')
-      )
-        throw new PeerFault('INVALID_FRAME')
-      batchMembers = [...value.envelopes]
-      continue
+        isRecord(value) &&
+        typeof value.kind === 'string' &&
+        !['request', 'response', 'discovery', 'variation', 'stream'].includes(value.kind)
+      ) {
+        stderr.write('PEER_WARN UNKNOWN_KIND\n')
+        continue
+      }
+      if (
+        !isRecord(value) ||
+        typeof value.id !== 'string' ||
+        !isRecord(value.data) ||
+        !isRecord(value.data.route)
+      ) {
+        rejectEnvelope(fromBatch)
+        continue
+      }
+      const inboundRoute = value.data.route
+
+      const sender = typeof inboundRoute.senderId === 'string' ? inboundRoute.senderId : 'caller'
+      if (await this.#control(value as IReferenceInbound, inboundRoute, sender)) continue
+      await this.#request(value as IReferenceInbound, inboundRoute, sender, fromBatch)
     }
-    if (
-      isRecord(value) &&
-      typeof value.kind === 'string' &&
-      !['request', 'response', 'discovery', 'variation', 'stream'].includes(value.kind)
-    ) {
-      stderr.write('PEER_WARN UNKNOWN_KIND\n')
-      continue
+    if (this.#drainTimer !== undefined) clearTimeout(this.#drainTimer)
+    for (const task of this.#pending.values()) {
+      clearTimeout(task.timer)
+      task.finish()
     }
-    if (
-      !isRecord(value) ||
-      typeof value.id !== 'string' ||
-      !isRecord(value.data) ||
-      !isRecord(value.data.route)
-    ) {
-      rejectEnvelope(fromBatch)
-      continue
-    }
-    const inboundRoute = value.data.route
-    const sender = typeof inboundRoute.senderId === 'string' ? inboundRoute.senderId : 'caller'
+  }
+  /** Handle discovery and lifecycle control without entering business dispatch. */
+  async #control(
+    value: IReferenceInbound,
+    inboundRoute: IRecord,
+    sender: string
+  ): Promise<boolean> {
     if (value.kind === 'discovery' && inboundRoute.type === 'discovery-query') {
-      await writeJson(destination, {
+      await writeJson(this.#destination, {
         kind: 'discovery',
         id: value.id,
         version: value.version,
@@ -470,36 +517,36 @@ async function respond(source: Readable, destination: Writable): Promise<void> {
           }
         }
       })
-      continue
+      return true
     }
     if (value.kind === 'variation') {
       if (
         inboundRoute.variation === 'ping' &&
-        (agreement.capabilities as string[]).includes('ping@1')
+        (this.#agreement.capabilities as string[]).includes('ping@1')
       ) {
-        await writeJson(destination, {
+        await writeJson(this.#destination, {
           kind: 'variation',
           id: value.id,
           data: { route: route('variation', 'ts-peer', sender, undefined, 'pong') }
         })
       } else if (inboundRoute.variation === 'abort') {
-        if ((agreement.capabilities as string[]).includes('abort@1')) {
-          if (closing) stderr.write('PEER_EVENT ABORT_DURING_DRAIN\n')
-          const task = pending.get(value.id)
+        if ((this.#agreement.capabilities as string[]).includes('abort@1')) {
+          if (this.#closing) stderr.write('PEER_EVENT ABORT_DURING_DRAIN\n')
+          const task = this.#pending.get(value.id)
           if (task !== undefined) {
             clearTimeout(task.timer)
-            pending.delete(value.id)
+            this.#pending.delete(value.id)
             task.finish()
           } else {
-            cancelledIds.add(value.id)
-            if (cancelledIds.size > MAX_EARLY_ABORT_IDS) {
-              const oldest = cancelledIds.values().next().value
-              if (oldest !== undefined) cancelledIds.delete(oldest)
+            this.#cancelledIds.add(value.id)
+            if (this.#cancelledIds.size > MAX_EARLY_ABORT_IDS) {
+              const oldest = this.#cancelledIds.values().next().value
+              if (oldest !== undefined) this.#cancelledIds.delete(oldest)
             }
           }
         }
       } else if (inboundRoute.variation === 'close') {
-        if (!(agreement.capabilities as string[]).includes('close@1')) continue
+        if (!(this.#agreement.capabilities as string[]).includes('close@1')) return true
         const payload = value.data.payload
         if (
           !isRecord(payload) ||
@@ -508,25 +555,35 @@ async function respond(source: Readable, destination: Writable): Promise<void> {
           Number(payload.drainMs) >= 2 ** 31
         ) {
           stderr.write('PEER_ERROR PROTOCOL_INVALID\n')
-          continue
+          return true
         }
-        if (!closing) {
-          closing = true
-          drain = new Promise<void>((resolve) => {
-            drainTimer = setTimeout(resolve, Number(payload.drainMs))
+        if (!this.#closing) {
+          this.#closing = true
+          this.#drain = new Promise<void>((resolve) => {
+            this.#drainTimer = setTimeout(resolve, Number(payload.drainMs))
           })
         }
       }
-      continue
+      return true
     }
+
+    return false
+  }
+  /** Execute one request through this connection's independent business oracle. */
+  async #request(
+    value: IReferenceInbound,
+    inboundRoute: IRecord,
+    sender: string,
+    fromBatch: boolean
+  ): Promise<void> {
     if (value.kind !== 'request' || typeof value.method !== 'string') {
       rejectEnvelope(fromBatch)
-      continue
+      return
     }
-    cancelledIds.delete(value.id)
-    if (closing) continue
+    this.#cancelledIds.delete(value.id)
+    if (this.#closing) return
     if (inboundRoute.dispatchOnly === true) {
-      if (value.method === ReferenceMethod.echo) oneWayCount += 1
+      if (value.method === ReferenceMethod.echo) this.#oneWayCount += 1
       else {
         /** Notification refusal has no wire response and cannot increment accepted receipts. */
         const code = REFERENCE_DESCRIPTION.methods.some((method) => method.name === value.method)
@@ -534,10 +591,10 @@ async function respond(source: Readable, destination: Writable): Promise<void> {
           : 'PROVIDER_NOT_FOUND'
         stderr.write(`PEER_ERROR ${code}\n`)
       }
-      continue
+      return
     }
     if (value.method === ReferenceMethod.describe) {
-      await writeJson(destination, {
+      await writeJson(this.#destination, {
         kind: 'response',
         id: value.id,
         ok: true,
@@ -546,7 +603,7 @@ async function respond(source: Readable, destination: Writable): Promise<void> {
           payload: REFERENCE_DESCRIPTION
         }
       })
-      continue
+      return
     }
     if (value.method === ReferenceMethod.wait) {
       const id = value.id
@@ -556,8 +613,8 @@ async function respond(source: Readable, destination: Writable): Promise<void> {
         finish = resolve
       })
       const timer = setTimeout(() => {
-        pending.delete(id)
-        void writeJson(destination, {
+        this.#pending.delete(id)
+        void writeJson(this.#destination, {
           kind: 'response',
           id,
           ok: true,
@@ -568,12 +625,12 @@ async function respond(source: Readable, destination: Writable): Promise<void> {
           })
           .finally(finish)
       }, 30_000)
-      pending.set(id, { timer, done, finish })
-      continue
+      this.#pending.set(id, { timer, done, finish })
+      return
     }
     if (value.method === ReferenceMethod.error) {
       const error = wireError('INTERNAL')
-      await writeJson(destination, {
+      await writeJson(this.#destination, {
         kind: 'response',
         id: value.id,
         ok: false,
@@ -582,13 +639,13 @@ async function respond(source: Readable, destination: Writable): Promise<void> {
         error,
         data: { route: route('response', 'ts-peer', sender, value.method) }
       })
-      continue
+      return
     }
     if (value.method === ReferenceMethod.finish) {
-      for (const [id, task] of pending) {
+      for (const [id, task] of this.#pending) {
         clearTimeout(task.timer)
-        pending.delete(id)
-        await writeJson(destination, {
+        this.#pending.delete(id)
+        await writeJson(this.#destination, {
           kind: 'response',
           id,
           ok: true,
@@ -596,17 +653,17 @@ async function respond(source: Readable, destination: Writable): Promise<void> {
         })
         task.finish()
       }
-      await writeJson(destination, {
+      await writeJson(this.#destination, {
         kind: 'response',
         id: value.id,
         ok: true,
         data: { route: route('response', 'ts-peer', sender, value.method), payload: null }
       })
-      continue
+      return
     }
     if (!REFERENCE_DESCRIPTION.methods.some((method) => method.name === value.method)) {
       const error = wireError('PROVIDER_NOT_FOUND')
-      await writeJson(destination, {
+      await writeJson(this.#destination, {
         kind: 'response',
         id: value.id,
         ok: false,
@@ -615,26 +672,26 @@ async function respond(source: Readable, destination: Writable): Promise<void> {
         error,
         data: { route: route('response', 'ts-peer', sender, value.method) }
       })
-      continue
+      return
     }
     const payload =
       value.method === ReferenceMethod.receipts
-        ? oneWayCount
+        ? this.#oneWayCount
         : value.method === ReferenceMethod.trace
           ? (inboundRoute.trace ?? null)
           : (value.data.payload ?? null)
-    await writeJson(destination, {
+    await writeJson(this.#destination, {
       kind: 'response',
       id: value.id,
       ok: true,
       data: { route: route('response', 'ts-peer', sender, value.method), payload }
     })
   }
-  if (drainTimer !== undefined) clearTimeout(drainTimer)
-  for (const task of pending.values()) {
-    clearTimeout(task.timer)
-    task.finish()
-  }
+}
+
+/** Serves one authenticated native connection with independent protocol state. */
+async function respond(source: Readable, destination: Writable): Promise<void> {
+  await new ReferenceResponder(source, destination).run()
 }
 
 /** Verifies the mandatory directory and an actual batch echo through the independent peer. */

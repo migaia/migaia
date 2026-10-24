@@ -3,13 +3,14 @@ import { Buffer } from 'node:buffer'
 import { serializeRpcError } from '@migaia/rpc-contract/errors'
 import {
   decodeRpcDevtoolsRecord,
-  encodeRpcDevtoolsRecord,
-  RpcDevtoolsErrorCode,
+  encodeRpcDevtoolsRecord
+} from '../../src/contract/record-codec.js'
+import { RpcDevtoolsErrorCode, ERROR_SOURCE as RPC_DEVTOOLS_SOURCE } from '../../src/error-code.js'
+import {
   RpcDevtoolsRecordFormat,
-  RPC_DEVTOOLS_SOURCE,
   type IRpcDevtoolsRecord,
   type IRpcDevtoolsRecordEvent
-} from '../../src/contract/index.js'
+} from '../../src/contract/record.js'
 
 /** Uses native coded errors so stack/cause preservation is checked independently of the codec. */
 function codedError(error: Error, code: string): Error {

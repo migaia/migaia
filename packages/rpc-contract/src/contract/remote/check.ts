@@ -1,3 +1,4 @@
+import { orderStringKeys } from '@migaia/utils/string'
 import { normalizePortable, type IRpcPortableValue } from '../portable-index.js'
 import {
   RemoteMethodName,
@@ -212,8 +213,9 @@ function assertName(value: unknown, path: string): asserts value is string {
 function sortedRecord<T>(entries: readonly (readonly [string, T])[]): Readonly<Record<string, T>> {
   /** Null prototype prevents declared keys such as constructor from changing the record shape. */
   const output: Record<string, T> = Object.create(null) as Record<string, T>
-  for (const [key, value] of [...entries].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
-    output[key] = value
+  /** Index the original values once; stable code-unit ordering belongs to utils. */
+  const values = new Map(entries)
+  for (const key of orderStringKeys(Array.from(values.keys()))) output[key] = values.get(key)!
   return Object.freeze(output)
 }
 
@@ -227,6 +229,7 @@ function readRemoteContract(input: unknown): IRemoteContract {
     if (isShapeFailure(cause)) throw cause
     throw invalid('$', cause, undefined, RpcShapeReason.portable)
   }
+  /** The original root is read exactly once into a portable snapshot. */
   const root = asRecord(portable, '$')
   exactKeys(root, ['schemaVersion', 'plugin', 'features'], '$')
   if (root.schemaVersion !== REMOTE_SCHEMA_VERSION)
@@ -240,6 +243,7 @@ function readRemoteContract(input: unknown): IRemoteContract {
   const featureEntries: [string, IRemoteFeatureContract][] = []
   for (const [featureName, featureValue] of Object.entries(features)) {
     assertName(featureName, `$.features.${featureName}`)
+    /** One original feature read preserves getter failure identity. */
     const feature = asRecord(featureValue, `$.features.${featureName}`)
     exactKeys(feature, ['methods'], `$.features.${featureName}`)
     /** Method-table size is checked before reading method values. */
@@ -254,6 +258,7 @@ function readRemoteContract(input: unknown): IRemoteContract {
     /** A method's mode and retry declaration are mandatory, even for one-way and streams. */
     const methodEntries: [string, IRemoteMethodContract][] = []
     for (const [methodName, methodValue] of Object.entries(methods)) {
+      /** Only a validated name or the fixed placeholder reaches diagnostics. */
       const path = `$.features.${featureName}.methods.${methodName}`
       assertName(methodName, path)
       const fullName = `${root.plugin}.${featureName}.${methodName}`
@@ -316,6 +321,7 @@ function readRemoteHostCatalog(input: unknown): IRemoteHostCatalog {
     if (isShapeFailure(cause)) throw cause
     throw invalid('$.catalog', cause, undefined, RpcShapeReason.portable)
   }
+  /** The outer catalog is inspected before its entries are read. */
   const source = asRecord(portable, '$.catalog')
   if (Object.keys(source).length === 0)
     throw invalid('$.catalog', undefined, undefined, RpcShapeReason['empty-table'])

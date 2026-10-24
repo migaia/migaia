@@ -1,5 +1,5 @@
 import { expectTypeOf } from 'vitest'
-import { createRuntimePeer } from '../../dist/remote/index.js'
+import { createRuntimePeer } from '../../dist/remote/runtime-api/peer.js'
 import type { IRuntimePeerOptions, IRuntimeTypedPeer, IRuntimePeer } from '@migaia/rpc-host/plugin'
 
 /** Bridge callers retain their nested remote surface without casting the public factory result. */

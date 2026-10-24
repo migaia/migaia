@@ -1,4 +1,4 @@
-import { openProcessStdioChannel } from '@migaia/rpc-plugin-process/adapters/bun-spawn'
+import { openProcessStdioChannel } from '../../../../rpc-plugin-process/dist/process/adapters/bun-spawn.js'
 import { createProcessTransport } from '../../../../rpc-plugin-process/dist/process/handshake.js'
 import { createNativeProcessOffer } from '../../../../rpc-plugin-process/dist/process/offer.js'
 

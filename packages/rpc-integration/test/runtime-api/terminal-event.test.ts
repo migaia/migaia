@@ -8,7 +8,7 @@ import { threadProtocolDefinition as createThreadPlugin } from './fixtures/threa
 import {
   createNodeThreadLauncher,
   createNodeThreadChannelFactory
-} from '@migaia/rpc-plugin-thread/adapters/node'
+} from '../../../rpc-plugin-thread/dist/threads/adapters/node.js'
 import type { IRuntimeEvent } from '../../../rpc-host/dist/remote/runtime-api/events.js'
 import {
   RuntimeQueryClock,

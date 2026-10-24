@@ -1,18 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import {
-  abort,
-  connect,
-  contract,
-  hooks,
-  ping,
-  protocol,
-  timeout,
-  uuid
-} from '../../../dist/core/middleware/index.js'
-import type { IRpcPluginInstallResult } from '../../../dist/core/typing.js'
-import { installPlugin, pluginScope } from './helpers.js'
+import { abort } from '../../../dist/core/middleware/abort.js'
+import { connect } from '../../../dist/core/middleware/connect.js'
+import { hooks } from '../../../dist/core/middleware/hooks.js'
+import { ping } from '../../../dist/core/middleware/ping.js'
+import { timeout } from '../../../dist/core/middleware/timeout.js'
+import { installPlugin } from './helpers.js'
 import { RpcCoreErrorCode } from '../../../dist/core/errors.js'
-import { RpcPortName } from '../../../dist/core/internal/plugin-shared-keys.js'
 
 describe('middleware capabilities', () => {
   it('installs concrete capability values for every built-in middleware', async () => {
@@ -23,7 +16,6 @@ describe('middleware capabilities', () => {
     }
     const middlewares = [
       connect({ transport }),
-      uuid(),
       timeout({ timeoutMs: 10 }),
       hooks(),
       abort(),
@@ -36,12 +28,6 @@ describe('middleware capabilities', () => {
     expect(values.has('timeoutCapability')).toBe(true)
     expect(values.get('abortCapability')).toEqual({ enabled: true })
     expect(values.get('pingCapability')).toEqual({ enabled: true })
-    const protocolResult = protocol().install(pluginScope()) as IRpcPluginInstallResult
-    const contractResult = contract({ version: '1' }).install(
-      pluginScope()
-    ) as IRpcPluginInstallResult
-    expect(protocolResult.ports[RpcPortName.protocol]).toBeDefined()
-    expect(contractResult.ports[RpcPortName.contract]).toBeDefined()
   })
 
   it('rejects invalid middleware configuration during installation', async () => {
@@ -49,35 +35,16 @@ describe('middleware capabilities', () => {
     for (const middleware of invalid) {
       await expect(Promise.resolve().then(() => installPlugin(middleware))).rejects.toThrow()
     }
-    expect(() => contract({ version: '' }).install(pluginScope())).toThrow()
   })
   it('rejects null built-in middleware descriptors with INVALID_CONFIG', () => {
-    expect(() => protocol(null as never).install(pluginScope())).toThrow(
-      expect.objectContaining({ code: RpcCoreErrorCode.invalidConfig })
-    )
     expect(() => installPlugin(hooks(null as never))).toThrow(
       expect.objectContaining({ code: RpcCoreErrorCode.invalidConfig })
     )
     expect(() => installPlugin(timeout(null as never))).toThrow(
       expect.objectContaining({ code: RpcCoreErrorCode.invalidConfig })
     )
-    expect(() => installPlugin(uuid(null as never))).toThrow(
-      expect.objectContaining({ code: RpcCoreErrorCode.invalidConfig })
-    )
+
     expect(() => installPlugin(connect(null as never))).toThrow(
-      expect.objectContaining({ code: RpcCoreErrorCode.invalidConfig })
-    )
-  })
-  it('rejects unreadable protocol descriptors with INVALID_CONFIG', () => {
-    const unreadable = new Proxy(
-      {},
-      {
-        get() {
-          throw new Error('protocol getter')
-        }
-      }
-    )
-    expect(() => protocol(unreadable as never).install(pluginScope())).toThrow(
       expect.objectContaining({ code: RpcCoreErrorCode.invalidConfig })
     )
   })
@@ -104,19 +71,6 @@ describe('middleware capabilities', () => {
       }
     )
     expect(() => installPlugin(timeout(unreadable as never))).toThrow(
-      expect.objectContaining({ code: RpcCoreErrorCode.invalidConfig })
-    )
-  })
-  it('rejects unreadable uuid descriptors with INVALID_CONFIG', () => {
-    const unreadable = new Proxy(
-      {},
-      {
-        get() {
-          throw new Error('uuid getter')
-        }
-      }
-    )
-    expect(() => installPlugin(uuid(unreadable as never))).toThrow(
       expect.objectContaining({ code: RpcCoreErrorCode.invalidConfig })
     )
   })

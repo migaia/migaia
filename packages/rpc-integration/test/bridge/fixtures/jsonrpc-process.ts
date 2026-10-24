@@ -13,10 +13,10 @@ import { createProcessJsonRpcChannel } from '../../../../rpc-plugin-process/dist
 import type { IProcessJsonRpcChannelOptions } from '../../../../rpc-plugin-process/dist/process/jsonrpc-channel.js'
 import type { IProcessPluginEstablish } from '../../../../rpc-plugin-process/dist/process/plugin/types.js'
 import { nodeByteStream } from '../../../../rpc-plugin-process/dist/process/node-byte-stream.js'
-import { createNodeProcessLauncher } from '@migaia/rpc-plugin-process/adapters/node-child-process'
+import { createNodeProcessLauncher } from '../../../../rpc-plugin-process/dist/process/adapters/node-child-process.js'
 import type { IProcessByteChannel } from '../../../../rpc-plugin-process/dist/process/types.js'
 import type { IIpcLogRecord } from '@migaia/rpc-host/plugin'
-import { BRIDGE_CONTRACT, bridgeFixture } from '../fixture.js'
+import { BRIDGE_CONTRACT, BridgeFixture } from '../fixture.js'
 
 /** A short dedicated-fd peer tests actual Node pipes without changing the native launcher. */
 export const childPath = resolve(import.meta.dirname, 'jsonrpc-child.mjs')
@@ -74,7 +74,7 @@ export function establish(
       byte: raw,
       peerId: 'peer',
       target,
-      offer: bridgeFixture().options.offer,
+      offer: new BridgeFixture().options.offer,
       token: options.token!,
       scheduler: options.scheduler,
       wallClock: { timestamp: () => Date.now() },

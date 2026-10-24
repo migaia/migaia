@@ -96,4 +96,4 @@ rpc.transport.thread 标记线程边界；rpc.endpoint 与 rpc.remote 保留调�
 
 host.close 先沿原 drain 处理已接纳工作，再释放所拥有 Worker。terminate 请求至多一次，exited 只在真正 native exit 后结算；旧代晚到结果不重开已经关闭的连接。取消一个调用、关闭一个流、关闭 host 与杀 Worker 是不同责任。
 
-根入口是 threadPlugin/isThreadChild、选项与错误；/adapters/node、/adapters/electron-main 供确需原生 launcher/channel 的作者使用。短配置覆盖常见应用，浏览器必须使用 browser plugin。
+本包仅提供根入口的 threadPlugin/isThreadChild、选项与错误。短配置覆盖常见应用；自定义原始部署由 host `/plugin` SDK 接纳。浏览器使用 browser plugin。

@@ -22,6 +22,10 @@ export const StoreWorkerErrorText = {
   /** Stable cancellation text for copied inputs; the caller retains its original buffer. */
   aborted: (): string => '[store] serialize worker request aborted',
   cleanupFailed: '[store] serialize worker cleanup failed',
+  /** Preserve the established Host lifecycle wrapper text when endpoint cleanup fails. */
+  endpointCleanup: 'Endpoint disposal completed with cleanup errors',
+  /** Identify the borrowed transport subscription in the existing cleanup error chain. */
+  transportSubscription: 'transport subscription',
   invalidRequestChunk: '[store] invalid serialize worker request chunk',
   invalidPhase: '[store] invalid serialize worker phase'
 } as const

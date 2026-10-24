@@ -1,3 +1,4 @@
+import { orderStringKeys } from '@migaia/utils/string'
 import {
   RpcProbeDirectionName,
   RpcProbeDirection,
@@ -352,8 +353,16 @@ export function readCarrierSequences(rings: readonly EventRing[]): ReadonlyMap<n
       }
     }
   }
-  /** Sorting occurs only on demand, never on the business ingestion stack. */
-  const sequences = Array.from(rows.keys()).sort((left, right) => left - right)
+  /** Collector ordinals are nonnegative doubles; their big-endian IEEE bits preserve numeric order. */
+  const bits = new DataView(new ArrayBuffer(8))
+  /** A fixed-width key keeps the shared linear string owner independent of numeric comparators. */
+  const keyed = new Map<string, number>()
+  for (const sequence of rows.keys()) {
+    bits.setFloat64(0, sequence)
+    keyed.set(bits.getBigUint64(0).toString(16).padStart(16, '0'), sequence)
+  }
+  /** Ordering remains a cold read and costs O(retained rows), with exactly sixteen key digits. */
+  const sequences = orderStringKeys(Array.from(keyed.keys())).map((key) => keyed.get(key)!)
   /** The existing carrier identity owner now exists only for this retained reader snapshot. */
   const carriers = new CarrierTable()
   for (const sequence of sequences) {

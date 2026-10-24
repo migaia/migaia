@@ -1,13 +1,13 @@
-import { RpcAuxiliaryErrorText } from '../../dist/core/internal/auxiliary-error-text.js'
 import { RpcAdapterErrorText } from '../../dist/core/adapters/error-text.js'
 import { RpcMiddlewareErrorText } from '../../dist/core/middleware/error-text.js'
 import { describe, expect, it } from 'vitest'
 import { RpcCoreErrorText } from '../../dist/core/error-text.js'
 import { RpcAbortError, RpcTimeoutError } from '../../dist/core/errors.js'
+import { MemoryTransportText } from '../fixtures/memory-text.ts'
 
 describe('error text inventory', () => {
   it('preserves every core error text from the pre-migration inventory', () => {
-    expect(RpcAdapterErrorText.rpcMemoryTransportIsClosed, 'rpcMemoryTransportIsClosed').toBe(
+    expect(MemoryTransportText.closed, 'rpcMemoryTransportIsClosed').toBe(
       '[rpc] memory transport is closed'
     )
     expect(RpcCoreErrorText.webRPCRequestCancelled, 'webRPCRequestCancelled').toBe(
@@ -152,14 +152,6 @@ describe('error text inventory', () => {
     ).toBe('binding limits must be positive safe integers')
     expect(RpcCoreErrorText.endpointDisposed, 'endpointDisposed').toBe('Endpoint disposed')
     expect(
-      RpcAuxiliaryErrorText.maxLearnedMustBeAPositiveSafeInteger,
-      'maxLearnedMustBeAPositiveSafeInteger'
-    ).toBe('maxLearned must be a positive safe integer')
-    expect(
-      RpcAuxiliaryErrorText.learnedTtlMsMustBeAPositiveSafeInteger,
-      'learnedTtlMsMustBeAPositiveSafeInteger'
-    ).toBe('learnedTtlMs must be a positive safe integer')
-    expect(
       RpcCoreErrorText.providerAdmissionLimitsMustBePositiveSafeIntegers,
       'providerAdmissionLimitsMustBePositiveSafeIntegers'
     ).toBe('provider admission limits must be positive safe integers')
@@ -274,39 +266,6 @@ describe('error text inventory', () => {
       RpcCoreErrorText.transportIdentityDescriptorInvalid,
       'transportIdentityDescriptorInvalid'
     ).toBe('transport identity descriptor is invalid')
-    expect(RpcMiddlewareErrorText.contractDescriptorIsInvalid, 'contractDescriptorIsInvalid').toBe(
-      'contract descriptor is invalid'
-    )
-    expect(
-      RpcMiddlewareErrorText.contractDescriptorIsUnreadable,
-      'contractDescriptorIsUnreadable'
-    ).toBe('contract descriptor is unreadable')
-    expect(RpcMiddlewareErrorText.schemasMustBeAnObject, 'schemasMustBeAnObject').toBe(
-      'schemas must be an object'
-    )
-    expect(RpcMiddlewareErrorText.schemaDescriptorInvalid('x'), 'schemaDescriptorInvalid').toBe(
-      'schema descriptor is invalid: x'
-    )
-    expect(
-      RpcMiddlewareErrorText.contractSchemasMustContainParamsResultSchemasWithParseFunctions,
-      'contractSchemasMustContainParamsResultSchemasWithParseFunctions'
-    ).toBe('contract.schemas must contain params/result schemas with parse functions')
-    expect(
-      RpcMiddlewareErrorText.contractAcceptVersionsMustContainNonEmptyStrings,
-      'contractAcceptVersionsMustContainNonEmptyStrings'
-    ).toBe('contract.acceptVersions must contain non-empty strings')
-    expect(
-      RpcMiddlewareErrorText.contractAcceptVersionsIsUnreadable,
-      'contractAcceptVersionsIsUnreadable'
-    ).toBe('contract.acceptVersions is unreadable')
-    expect(
-      RpcMiddlewareErrorText.contractVersionMustBeANonEmptyString,
-      'contractVersionMustBeANonEmptyString'
-    ).toBe('contract version must be a non-empty string')
-    expect(
-      RpcMiddlewareErrorText.maxIdentifierLengthMustBeAPositiveSafeInteger,
-      'maxIdentifierLengthMustBeAPositiveSafeInteger'
-    ).toBe('maxIdentifierLength must be a positive safe integer')
     expect(RpcMiddlewareErrorText.hooksDescriptorIsInvalid, 'hooksDescriptorIsInvalid').toBe(
       'hooks descriptor is invalid'
     )
@@ -332,15 +291,6 @@ describe('error text inventory', () => {
       RpcMiddlewareErrorText.timeoutMsMustBeFalseOrANonNegativeNumber,
       'timeoutMsMustBeFalseOrANonNegativeNumber'
     ).toBe('timeoutMs must be false or a non-negative number')
-    expect(RpcMiddlewareErrorText.uuidDescriptorIsInvalid, 'uuidDescriptorIsInvalid').toBe(
-      'uuid descriptor is invalid'
-    )
-    expect(RpcMiddlewareErrorText.uuidDescriptorIsUnreadable, 'uuidDescriptorIsUnreadable').toBe(
-      'uuid descriptor is unreadable'
-    )
-    expect(RpcMiddlewareErrorText.uuidGenerateMustBeAFunction, 'uuidGenerateMustBeAFunction').toBe(
-      'uuid generate must be a function'
-    )
 
     expect(RpcAdapterErrorText.workerMessageReadFailed('x'), 'workerMessageReadFailed').toBe(
       '[rpc] worker message could not be read: x'

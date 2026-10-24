@@ -1,3 +1,4 @@
+import { orderStringKeys } from '@migaia/utils/string'
 import { RpcError, createRpcError, isLocalRpcError, localRpcErrorCode } from '../../core/errors.js'
 import { RpcWireLimit } from '@migaia/rpc-contract'
 import {
@@ -9,7 +10,7 @@ import {
 } from '@migaia/rpc-contract/runtime'
 import type { IRpcShapeCheck } from '@migaia/rpc-contract/remote'
 import type { IRuntimeMethodEntry } from './catalog.js'
-import { RpcCoreErrorCode } from '../../core/index.js'
+import { RpcCoreErrorCode } from '../../core/errors.js'
 import {
   RuntimeApiErrorText,
   RuntimeApiMode,
@@ -69,12 +70,12 @@ export function runtimeDirectoryDiff(
   /** The replacement's method index exists only for this cold comparison, never dispatch. */
   const after = new Map(current.methods.map((method) => [method.name, method]))
   /** Reports contain safe method names, not handlers, payloads or native configuration. */
-  const added = [...after.keys()].filter((name) => !before.has(name)).sort()
+  const added = orderStringKeys([...after.keys()].filter((name) => !before.has(name)))
   /** Removed routes remain an observation; the new accepted whitelist rejects their actual use. */
-  const removed = [...before.keys()].filter((name) => !after.has(name)).sort()
+  const removed = orderStringKeys([...before.keys()].filter((name) => !after.has(name)))
   /** Mode order is immaterial: only an actual set difference is an incompatible route change. */
   const modeChanged: IRuntimeDirectoryDiff['modeChanged'][number][] = []
-  for (const name of [...after.keys()].sort()) {
+  for (const name of orderStringKeys([...after.keys()])) {
     /** Missing old entries are additions rather than changed modes. */
     const old = before.get(name)
     /** This name comes from the admitted replacement index. */
@@ -84,6 +85,7 @@ export function runtimeDirectoryDiff(
       (old.supportedModes.length !== next.supportedModes.length ||
         old.supportedModes.some((mode) => !next.supportedModes.includes(mode)))
     )
+      /** Each admitted supportedModes set contains at most the three RuntimeApiMode values. */
       modeChanged.push(
         Object.freeze({
           name,

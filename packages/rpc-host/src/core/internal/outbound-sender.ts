@@ -1,3 +1,4 @@
+import { RemoteMethodName } from '@migaia/rpc-contract/remote'
 import { RpcTransportTopology, type IRpcPlatformValue } from '../transport-constants.js'
 import { carrierSizeBytes } from '../adapters/probe-content.js'
 import {
@@ -35,7 +36,11 @@ import { RpcCoreErrorText } from '../error-text.js'
 import type { IRpcSelectedComponents } from './endpoint-options.js'
 import { RpcEnvelopeKind, type IRpcEnvelope } from '@migaia/rpc-contract'
 import type { IRpcOutboundAdmission, IRpcOutboundGate } from './outbound-gate.js'
-import { registerBatchWriter, type IBatchWriteGuard } from './batch-frame.js'
+import {
+  registerBatchWriter,
+  type IRpcPeerTransportPipeline,
+  type IBatchWriteGuard
+} from './batch-frame.js'
 import { RpcBatchPhysical, RpcCapability } from '@migaia/rpc-contract'
 import { hasRpcBinaryEnvelope } from '@migaia/rpc-contract/binary/inspect'
 import { assertRpcNativeBinaryFrameSize } from '@migaia/rpc-contract/binary/inspect'
@@ -91,6 +96,7 @@ const batchJsonOverhead = measureRpcPhysicalFrame({
 function ownedBatchByteUpperBound(entries: readonly IQueuedEnvelope[]): number | undefined {
   /** Array brackets belong to the fixed wrapper; only separating commas are added here. */
   let bound = batchJsonOverhead + Math.max(0, entries.length - 1)
+  /** A record preserves independent admission, cancellation and completion ownership. */
   for (const entry of entries) {
     /** A custom/opaque member never inherits another envelope's owned snapshot proof. */
     const member = outboundJsonByteUpperBound(entry.message)
@@ -126,10 +132,24 @@ type IQueuedEnvelope = {
   readonly beforeWrite: (() => IRpcEnvelope) | undefined
   readonly onStarted: (() => void) | undefined
   readonly guard: IBatchWriteGuard | undefined
+  /** Cold protocol frames wait in this existing sender until their actual gate admission. */
+  readonly deferredGate?: true
+  /** Original gate settlement releases capacity before the next cold frame reserves it. */
+  gateSettled?: Promise<void>
   /** Only waiting entries retain a queued cancellation listener. */
   cancelQueued?: () => void
   readonly resolve: () => void
   readonly reject: (error: unknown) => void
+}
+
+/** Cold protocol traffic shares the original sender queue without admitting user business early. */
+function isColdProtocol(message: IRpcEnvelope): boolean {
+  return (
+    message.kind === RpcEnvelopeKind.discovery ||
+    ((message.kind === RpcEnvelopeKind.request || message.kind === RpcEnvelopeKind.response) &&
+      (message.kind === RpcEnvelopeKind.request ? message.method : message.data.route.method) ===
+        RemoteMethodName.runtimeDescribe)
+  )
 }
 
 /** One complete encoded/protected physical value retains its exact logical settlements. */
@@ -142,6 +162,13 @@ type IPreparedBatch = Readonly<{
 
 /** The sender becomes idle in the same reaction as its final actual host-write settlement. */
 type IPhysicalDrain = { pending: number; preparing: boolean; finish(): void }
+
+/** A cursor retains an existing prepared suffix without copying it for each physical write. */
+type IPreparedBatchCursor = {
+  readonly frames: readonly IPreparedBatch[]
+  index: number
+  readonly continuation?: IPreparedBatchCursor
+}
 
 /** One actual host write retains its generation and the original admission failure identity. */
 type IPhysicalWriteRecord = {
@@ -165,12 +192,21 @@ type IRuntimeWriteRecord = Readonly<{
   transfer: readonly unknown[] | undefined
   native: boolean
   digest: ReturnType<typeof readAuthenticationBinaryDigest>
+  codec: IRpcPeerTransportPipeline['codec']
   framer: IRpcSelectedComponents['framer']
   generation: number | undefined
   limit: number
   admission: IRpcOutboundAdmission | undefined
   onStarted: (() => void) | Readonly<{ started(): void }> | undefined
   onPrepared: (() => Promise<void>) | undefined
+}>
+
+/** The selected codec's exact encoded result and native backing accounting for one runtime frame. */
+type IRuntimeEncodedFrame = Readonly<{
+  encoded: unknown
+  sidecars: readonly ArrayBuffer[]
+  backingBytes: number
+  encodedByteUpperBound: number | undefined
 }>
 
 /** Minimal canonical send port consumed by the outbound owner. */
@@ -216,6 +252,8 @@ export class RpcOutboundSender {
   readonly #cloneTransfer: boolean
   /** A routed carrier borrows each selected physical agreement instead of a host-wide capability. */
   readonly #capabilitiesForPeer: ((peerId: string) => readonly string[] | undefined) | undefined
+  /** Routed native sends borrow the original codec/framer pair from the admitted physical owner. */
+  readonly #pipelineForPeer: ((peerId: string) => IRpcPeerTransportPipeline | undefined) | undefined
   /** The framing owner supplies limits while binding the actual selected callable pair once. */
   readonly #singleFrameLimits:
     | Readonly<{
@@ -227,15 +265,6 @@ export class RpcOutboundSender {
   #writing = false
   /** Insertion-ordered semantic settlements support direct cancellation without queue scans. */
   #queued = new Set<IQueuedEnvelope>()
-  /** One owner callback releases an idle physical write before its caller continuation. */
-  #idleWriteCompleted = (): void => {
-    this.#finishWriting()
-  }
-  /** Reuse the failure reaction while preserving the exact transport error and release order. */
-  #idleWriteFailed = (error: unknown): never => {
-    this.#finishWriting()
-    throw error
-  }
 
   constructor(
     transport: IRpcOutboundTransport,
@@ -251,7 +280,8 @@ export class RpcOutboundSender {
     receiverId = id,
     cloneTransfer = false,
     probe?: IProbeEmitter,
-    capabilitiesForPeer?: (peerId: string) => readonly string[] | undefined
+    capabilitiesForPeer?: (peerId: string) => readonly string[] | undefined,
+    pipelineForPeer?: (peerId: string) => IRpcPeerTransportPipeline | undefined
   ) {
     this.transport = transport
     this.id = id
@@ -268,6 +298,7 @@ export class RpcOutboundSender {
     this.#physicalLimit = physicalLimit
     this.#cloneTransfer = cloneTransfer
     this.#capabilitiesForPeer = capabilitiesForPeer
+    this.#pipelineForPeer = pipelineForPeer
     this.#singleFrameLimits = this.#objectPort
       ? bindRpcFrameIngress(this.#objectPort.framer.accept, this.#objectPort.framer.frame)
           .singleFrameLimits
@@ -294,6 +325,7 @@ export class RpcOutboundSender {
   sendAuthenticationControl(fields: IAuthenticationChallengeFields): Promise<void> {
     /** A late signature cannot send through a replacement endpoint generation. */
     const generation = this.#lifecycle?.generation
+    /** Receiver freshness is selected by the same original auth context owner for either profile. */
     const context = { ...this.#authenticationContext }
     bindAuthenticationOutboundFrame(context, undefined, this.#receiverId, fields)
     /** Control protection retains the category required by the existing codec/carrier pair. */
@@ -301,6 +333,7 @@ export class RpcOutboundSender {
       this.#transportEncodedType === 'any' || this.#transportEncodedType === undefined
         ? this.components.codec.encodedType
         : this.#transportEncodedType
+    /** The physical preparation retains its actual encoded value for opted-in observation. */
     const value =
       encodedType === 'uint8array' ? new Uint8Array() : encodedType === 'string' ? '' : undefined
     return this.#prepareTransportValue(value, undefined, false, generation, context).then(
@@ -389,9 +422,13 @@ export class RpcOutboundSender {
         RpcCoreErrorText.capabilityUnsupported
       )
     /** The selected private/public frame pair must have actual first-party whole-accept facts. */
-    const framer = this.#objectPort?.framer ?? this.components.framer
+    const pipeline = this.#pipelineForPeer?.(envelope.route.targetId)
+    /** Capture physical encoding before any gate, binary preparation or protection can yield. */
+    const codec = pipeline?.codec ?? this.#objectPort?.codec ?? this.components.codec
+    /** The same actual peer owns both halves of the native whole-frame contract. */
+    const framer = pipeline?.framer ?? this.#objectPort?.framer ?? this.components.framer
     /** No opaque callable is invoked merely to guess whether it fragments. */
-    const facts = this.#singleFrameLimits
+    const facts = pipeline ? pipeline.ingressPrepare.singleFrameLimits : this.#singleFrameLimits
     if (!facts)
       throw createRpcError(
         RpcCoreErrorCode.capabilityUnsupported,
@@ -411,6 +448,7 @@ export class RpcOutboundSender {
       transfer,
       native,
       digest,
+      codec,
       framer,
       generation,
       limit,
@@ -423,6 +461,65 @@ export class RpcOutboundSender {
       : this.#writeRuntime(record)
   }
 
+  /** Per-write binary metadata uses explicit sender/limit state and never captures a send frame. */
+  static #SenderBinaryCodec = class SenderBinaryCodec implements IRpcBinaryDataCodec {
+    /** This actual write's admitted physical limit stays explicit instead of closing over a send. */
+    #limit: number
+    /** The admitted physical destination retains its original codec through binary preparation. */
+    #codec: IRpcPeerTransportPipeline['codec']
+    /** Only this resource's actual first native metadata capture performs prehash admission. */
+    #nativePreflightComplete = false
+    /** The genuine selected Core components determine whether an owned JSON capture exists. */
+    readonly captureJsonData: IRpcBinaryDataCodec['captureJsonData']
+    /** The original platform encoder is read at the same selected-components point. */
+    readonly encodeInline: IRpcBinaryDataCodec['encodeInline']
+
+    /** Keep fast-path qualification private while exposing only actual codec operations. */
+    constructor(
+      sender: RpcOutboundSender,
+      limit: number,
+      codec: IRpcPeerTransportPipeline['codec']
+    ) {
+      this.#limit = limit
+      this.#codec = codec
+      /** Exact component identity, never a caller-provided flag, selects the existing snapshot. */
+      const fast = codec === sender.components.codec && hasFastComponents(sender.components)
+      this.encodeInline = fast ? readFastInlineEncoder(sender.components) : undefined
+      this.captureJsonData = fast
+        ? (manifest, roots, bytes) => this.#capture(manifest, roots, bytes)
+        : undefined
+    }
+
+    /** Actual encoding keeps the original selected codec lookup and invocation point. */
+    encode(manifest: unknown): unknown {
+      return this.#codec.encode(manifest as IRpcEnvelope)
+    }
+
+    /** Capture real metadata and enforce this sender's held physical limit before hashing. */
+    #capture(manifest: object, roots: ReadonlyMap<object, number>, bytes: number): unknown {
+      prepareOwnedBinaryJsonSnapshot(manifest, roots)
+      /** This manifest was constructed by Contract from this operation's actual captured data. */
+      const binaryManifest = manifest as IRpcBinaryManifest
+      if (binaryManifest.storage === RpcBinaryStorage.native && !this.#nativePreflightComplete) {
+        /** The private snapshot bound cannot be supplied or copied by a third-party codec. */
+        const bound = ownedNativeBinaryByteUpperBound(
+          manifest,
+          binaryManifest.backings.length,
+          bytes
+        )
+        if (bound === undefined || bound > this.#limit)
+          assertRpcNativeBinaryFrameSize(
+            this.encode(manifest),
+            binaryManifest.backings.length,
+            bytes,
+            this.#limit
+          )
+        this.#nativePreflightComplete = true
+      }
+      return readOwnedJsonSnapshot(manifest)!.value
+    }
+  }
+
   /** Stable sender preparation yields only for actual binary, crypto, sealing or physical work. */
   async #writeRuntime(record: IRuntimeWriteRecord): Promise<void> {
     const {
@@ -432,7 +529,6 @@ export class RpcOutboundSender {
       transfer,
       native,
       digest,
-      framer,
       generation,
       limit,
       admission,
@@ -452,79 +548,19 @@ export class RpcOutboundSender {
         (p.captureMask & (1 << RpcProbeStage.envelope)) !== 0 ? envelope : undefined,
         envelope.route.senderId
       )
-    /** Codec descriptors encode data; this independent normalized union is never a legacy wrapper. */
-    let encoded: unknown
-    /** Native metadata retains these exact original buffers through protection and physical commit. */
-    let sidecars: readonly ArrayBuffer[] = []
-    /** Unique full backing bytes are charged in addition to metadata and selector/framing overhead. */
-    let backingBytes = 0
-    /** Only the actual canonical string encoding retains a bound for its returned text. */
-    let encodedByteUpperBound: number | undefined
+    /** Only the original binary preparation path yields; ordinary encoding stays synchronous. */
+    let encoding: IRuntimeEncodedFrame
     try {
       /** Only the exact canonical string codec consumes an owned JSON view; custom codecs stay full. */
       const ownedJson =
-        hasFastComponents(this.components) && this.components.codec.encodedType === 'string'
+        record.codec === this.components.codec &&
+        hasFastComponents(this.components) &&
+        record.codec.encodedType === 'string'
       /** Worker keeps the original object; its exact canonical identity function needs no copy. */
       const ownedIdentity =
         hasFastComponents(this.components) &&
         this.#objectPort === undefined &&
-        this.components.codec.encode === identityCodec.encode
-      /** Private codec state is created only by the sender; public options cannot supply it. */
-      class SenderBinaryCodec implements IRpcBinaryDataCodec {
-        /** Hold the actual sender so every later encode reads its original current selection. */
-        #sender: RpcOutboundSender
-        /** Only this resource's actual first native metadata capture performs prehash admission. */
-        #nativePreflightComplete = false
-        /** The genuine selected Core components determine whether an owned JSON capture exists. */
-        readonly captureJsonData: IRpcBinaryDataCodec['captureJsonData']
-        /** The original platform encoder is read at the same selected-components point. */
-        readonly encodeInline: IRpcBinaryDataCodec['encodeInline']
-
-        /** Keep fast-path qualification private while exposing only actual codec operations. */
-        constructor(sender: RpcOutboundSender) {
-          this.#sender = sender
-          /** Exact component identity, never a caller-provided flag, selects the existing snapshot. */
-          const fast = hasFastComponents(sender.components)
-          this.encodeInline = fast ? readFastInlineEncoder(sender.components) : undefined
-          this.captureJsonData = fast
-            ? (manifest, roots, bytes) => this.#capture(manifest, roots, bytes)
-            : undefined
-        }
-
-        /** Actual encoding keeps the original selected codec lookup and invocation point. */
-        encode(manifest: unknown): unknown {
-          return (this.#sender.#objectPort?.codec ?? this.#sender.components.codec).encode(
-            manifest as IRpcEnvelope
-          )
-        }
-
-        /** Capture real metadata and enforce this sender's held physical limit before hashing. */
-        #capture(manifest: object, roots: ReadonlyMap<object, number>, bytes: number): unknown {
-          prepareOwnedBinaryJsonSnapshot(manifest, roots)
-          /** This manifest was constructed by Contract from this operation's actual captured data. */
-          const binaryManifest = manifest as IRpcBinaryManifest
-          if (
-            binaryManifest.storage === RpcBinaryStorage.native &&
-            !this.#nativePreflightComplete
-          ) {
-            /** The private snapshot bound cannot be supplied or copied by a third-party codec. */
-            const bound = ownedNativeBinaryByteUpperBound(
-              manifest,
-              binaryManifest.backings.length,
-              bytes
-            )
-            if (bound === undefined || bound > limit)
-              assertRpcNativeBinaryFrameSize(
-                this.encode(manifest),
-                binaryManifest.backings.length,
-                bytes,
-                limit
-              )
-            this.#nativePreflightComplete = true
-          }
-          return readOwnedJsonSnapshot(manifest)!.value
-        }
-      }
+        record.codec.encode === identityCodec.encode
       const prepared =
         binary || transferRequested
           ? await prepareRpcBinary(
@@ -532,58 +568,24 @@ export class RpcOutboundSender {
               native ? RpcBinaryStorage.native : RpcBinaryStorage.inline,
               limit,
               digest,
-              new SenderBinaryCodec(this)
+              new RpcOutboundSender.#SenderBinaryCodec(this, limit, record.codec)
             )
           : undefined
-      if (prepared) {
-        sidecars = prepared.sidecars
-        backingBytes = prepared.backingBytes
-        if (transfer?.some((backing) => !sidecars.includes(backing as ArrayBuffer)))
-          throw createRpcSerializationError(RpcCoreErrorText.invalidTransferList)
-      }
-      /**
-       * Ordinary large values get one owned JSON walk; binary preparation already retained its
-       * view.
-       */
-      const selected = prepared?.manifest ?? envelope
-      if ((ownedJson || ownedIdentity) && !prepared) prepareOwnedJsonSnapshot(selected)
-      encoded = (this.#objectPort?.codec ?? this.components.codec).encode(
-        selected as unknown as IRpcEnvelope
-      )
-      if (ownedJson || (hasFastComponents(this.components) && encoded === selected))
-        encodedByteUpperBound = readOwnedJsonSnapshot(selected)?.byteUpperBound
-      if (!this.#objectPort) this.assertProtocolEncodedType(encoded)
+      encoding = this.#encodeRuntime(record, prepared, ownedJson, ownedIdentity)
     } catch (cause) {
       throw createRpcSerializationError(RpcCoreErrorText.protocolEncodeFailed, cause)
     }
-    if (p !== undefined && (p.mask & (1 << RpcProbeStage.encoded)) !== 0)
-      p.encoded(
-        RpcProbeDirection.outbound,
-        envelope.id,
-        carrierSizeBytes(encoded),
-        (p.captureMask & (1 << RpcProbeStage.encoded)) !== 0
-          ? this.#probeContent(encoded, transfer)
-          : undefined,
-        envelope.task.method,
-        envelope.route.senderId
-      )
-    /** Known string encodings reuse their preparation bound without a second character scan. */
-    if (!(encodedByteUpperBound !== undefined && encodedByteUpperBound <= limit))
-      assertRpcPhysicalFrameSize(encoded, limit)
-    /** Native framing runs once; multiple fragments are refused before protection or host send. */
-    const frames = framer.frame(encoded, { source: this.id, messageId: envelope.id })
-    if (frames.length !== 1)
-      throw createRpcError(
-        RpcCoreErrorCode.capabilityUnsupported,
-        RpcCoreErrorText.capabilityUnsupported
-      )
+    /** Protection and framing consume the exact original encoded value and backing identities. */
+    const { encoded, sidecars, backingBytes, encodedByteUpperBound } = encoding
+    /** Framing preserves the original single-frame profile and pre-protection sizing boundary. */
+    const frame = this.#frameRuntime(record, encoding)
     /** Receiver freshness is selected by the same original auth context owner for either profile. */
     const context = { ...this.#authenticationContext }
     bindAuthenticationOutboundFrame(context, undefined, this.#receiverId, undefined, envelope.route)
     /** Complete protection and selector construction precede the sole physical write. */
     const protectedValue = this.authentication
       ? await this.#prepareTransportValue(
-          frames[0],
+          frame,
           undefined,
           false,
           generation,
@@ -594,16 +596,16 @@ export class RpcOutboundSender {
           envelope.task.method,
           envelope.route.senderId
         )
-      : this.#unprotectedTransportValue(frames[0], generation)
+      : this.#unprotectedTransportValue(frame, generation)
     if (!this.authentication && p !== undefined && (p.mask & (1 << RpcProbeStage.frame)) !== 0)
       p.frame(
         RpcProbeDirection.outbound,
         envelope.id,
-        carrierSizeBytes(frames[0]),
+        carrierSizeBytes(frame),
         -1,
         -1,
         (p.captureMask & (1 << RpcProbeStage.frame)) !== 0
-          ? this.#probeContent(frames[0], transfer)
+          ? this.#probeContent(frame, transfer)
           : undefined,
         envelope.task.method,
         envelope.route.senderId
@@ -659,6 +661,70 @@ export class RpcOutboundSender {
     })
   }
 
+  /** Observe encoded output and frame one admitted runtime envelope before protection. */
+  #frameRuntime(record: IRuntimeWriteRecord, encoding: IRuntimeEncodedFrame): unknown {
+    const { envelope, transfer, framer, limit } = record
+    const { encoded, encodedByteUpperBound } = encoding
+    /** Encoding and frame observations share the sender's originally selected endpoint emitter. */
+    const p = this.#probe
+    if (p !== undefined && (p.mask & (1 << RpcProbeStage.encoded)) !== 0)
+      p.encoded(
+        RpcProbeDirection.outbound,
+        envelope.id,
+        carrierSizeBytes(encoded),
+        (p.captureMask & (1 << RpcProbeStage.encoded)) !== 0
+          ? this.#probeContent(encoded, transfer)
+          : undefined,
+        envelope.task.method,
+        envelope.route.senderId
+      )
+    /** Known string encodings reuse their preparation bound without a second character scan. */
+    if (!(encodedByteUpperBound !== undefined && encodedByteUpperBound <= limit))
+      assertRpcPhysicalFrameSize(encoded, limit)
+    /** Native framing runs once; multiple fragments are refused before protection or host send. */
+    const frames = framer.frame(encoded, { source: this.id, messageId: envelope.id })
+    if (frames.length !== 1)
+      throw createRpcError(
+        RpcCoreErrorCode.capabilityUnsupported,
+        RpcCoreErrorText.capabilityUnsupported
+      )
+    return frames[0]
+  }
+
+  /** Encode an already prepared binary/ordinary envelope without adding an async boundary. */
+  #encodeRuntime(
+    record: IRuntimeWriteRecord,
+    prepared: Awaited<ReturnType<typeof prepareRpcBinary>> | undefined,
+    ownedJson: boolean,
+    ownedIdentity: boolean
+  ): IRuntimeEncodedFrame {
+    const { envelope, transfer } = record
+    /** The original selected codec produces the same semantic envelope representation. */
+    let encoded: unknown
+    /** Native preparation retains the original backing buffer identities. */
+    let sidecars: readonly ArrayBuffer[] = []
+    /** Unique backing bytes contribute to the existing physical frame budget. */
+    let backingBytes = 0
+    /** Only canonical owned snapshots may bypass a second encoded character scan. */
+    let encodedByteUpperBound: number | undefined
+    if (prepared) {
+      sidecars = prepared.sidecars
+      backingBytes = prepared.backingBytes
+      /** Native transfer admission compares exact backing identities once per manifest. */
+      const sidecarSet = transfer ? new Set(sidecars) : undefined
+      if (transfer?.some((backing) => !sidecarSet!.has(backing as ArrayBuffer)))
+        throw createRpcSerializationError(RpcCoreErrorText.invalidTransferList)
+    }
+    /** Ordinary large values get one owned JSON walk; binary preparation already retained its view. */
+    const selected = prepared?.manifest ?? envelope
+    if ((ownedJson || ownedIdentity) && !prepared) prepareOwnedJsonSnapshot(selected)
+    encoded = record.codec.encode(selected as unknown as IRpcEnvelope)
+    if (ownedJson || (hasFastComponents(this.components) && encoded === selected))
+      encodedByteUpperBound = readOwnedJsonSnapshot(selected)?.byteUpperBound
+    if (!this.#objectPort) this.assertProtocolEncodedType(encoded, record.codec.encodedType)
+    return { encoded, sidecars, backingBytes, encodedByteUpperBound }
+  }
+
   /**
    * Original sourceful/exclusive transforms reuse their stable context; only admitted challenge
    * facts require a receiver-specific snapshot.
@@ -666,6 +732,7 @@ export class RpcOutboundSender {
   #frameContext(frame: IRpcEnvelope): IRpcAuthenticationContext {
     if (!readAuthenticationChallengePort(this.authentication)?.contextNeeded(frame))
       return this.#authenticationContext
+    /** Receiver freshness is selected by the same original auth context owner for either profile. */
     const context = { ...this.#authenticationContext }
     bindAuthenticationOutboundFrame(context, frame, this.#receiverId)
     return context
@@ -679,7 +746,13 @@ export class RpcOutboundSender {
     beforeWrite?: () => IRpcEnvelope,
     onStarted?: () => void
   ): void | Promise<void> {
+    if (this.#gate && isColdProtocol(message))
+      return this.#enqueueProtocol(message, options, admission, beforeWrite, onStarted)
     if (this.#batch) {
+      /** Only the idle writer releases busy ownership after its own original gate fully settles. */
+      let ownsWriter = false
+      /** A queued member borrows this exact gate Promise; no capacity lifetime is recreated. */
+      let queuedEntry: IQueuedEnvelope | undefined
       /** The existing gate owns capacity; its closed check accompanies each queued member. */
       const write = registerBatchWriter((guard?: IBatchWriteGuard) => {
         if (!this.#writing) {
@@ -687,6 +760,7 @@ export class RpcOutboundSender {
           admission?.assertCanSend()
           const envelope = beforeWrite?.() ?? message
           this.#writing = true
+          ownsWriter = true
           /** Idle traffic reuses the original single-frame owner without allocating a queued entry. */
           let sent: void | Promise<void>
           try {
@@ -700,7 +774,7 @@ export class RpcOutboundSender {
           } catch (error) {
             sent = Promise.reject(error)
           }
-          return Promise.resolve(sent).then(this.#idleWriteCompleted, this.#idleWriteFailed)
+          return Promise.resolve(sent)
         }
         return new Promise<void>((resolve, reject) => {
           /** A record preserves independent admission, cancellation and completion ownership. */
@@ -715,41 +789,27 @@ export class RpcOutboundSender {
             resolve,
             reject
           }
-          if (this.#writing) {
-            /** Reuse the existing operation signal only when real writability queues this member. */
-            const signal = admission?.queueSignal
-            if (signal?.aborted) {
-              reject(resolveAbortReason(signal))
-              return
-            }
-            if (signal) {
-              /** Cancellation releases the existing gate's capacity before the held writer drains. */
-              const cancel = () => {
-                if (!this.#queued.delete(entry)) return
-                entry.cancelQueued?.()
-                reject(resolveAbortReason(signal))
-              }
-              signal.addEventListener('abort', cancel, { once: true })
-              entry.cancelQueued = () => signal.removeEventListener('abort', cancel)
-            }
-            this.#queued.add(entry)
-            /** Gate closure releases only this not-yet-started member through the same queue owner. */
-            const releaseGate = guard?.((reason) => {
-              if (!this.#queued.delete(entry)) return
-              entry.cancelQueued?.()
-              reject(reason)
-            })
-            if (releaseGate) {
-              const releaseSignal = entry.cancelQueued
-              entry.cancelQueued = () => {
-                releaseSignal?.()
-                releaseGate()
-              }
-            }
-          }
+          queuedEntry = entry
+          this.#queueEntry(entry)
         })
       })
-      return this.#gate ? this.#gate.run(message, write, admission) : write()
+      const physical = Promise.resolve(
+        this.#gate ? this.#gate.run(message, write, admission) : write()
+      )
+      /** Idle admission has already selected this sender's writer; reuse its original callbacks. */
+      const settled = ownsWriter
+        ? physical.then(this.#settleWriterSuccess, this.#settleWriterFailure)
+        : physical.then(
+            () => {
+              if (ownsWriter) this.#finishWriting()
+            },
+            (error: unknown) => {
+              if (ownsWriter) this.#finishWriting()
+              throw error
+            }
+          )
+      if (queuedEntry) queuedEntry.gateSettled = settled
+      return settled
     }
     if (
       this.#fast &&
@@ -773,15 +833,128 @@ export class RpcOutboundSender {
     return this.#sendEnvelope(message, options, false, admission, onStarted)
   }
 
+  /** Queue one existing logical record with its original cancellation and gate-close receipts. */
+  #queueEntry(entry: IQueuedEnvelope): void {
+    /** Reuse the existing operation signal only when real writability queues this member. */
+    const signal = entry.admission?.queueSignal
+    if (signal?.aborted) {
+      entry.reject(resolveAbortReason(signal))
+      return
+    }
+    if (signal) {
+      /** Cancellation releases the existing gate's capacity before the held writer drains. */
+      const cancel = () => {
+        if (!this.#queued.delete(entry)) return
+        entry.cancelQueued?.()
+        entry.reject(resolveAbortReason(signal))
+      }
+      signal.addEventListener('abort', cancel, { once: true })
+      entry.cancelQueued = () => signal.removeEventListener('abort', cancel)
+    }
+    this.#queued.add(entry)
+    /** Gate closure releases only this not-yet-started member through the same queue owner. */
+    const releaseGate = entry.guard?.((reason) => {
+      if (!this.#queued.delete(entry)) return
+      entry.cancelQueued?.()
+      entry.reject(reason)
+    })
+    if (releaseGate) {
+      const releaseSignal = entry.cancelQueued
+      entry.cancelQueued = () => {
+        releaseSignal?.()
+        releaseGate()
+      }
+    }
+  }
+
+  /** Serialize discovery and directory frames in the existing sender before their gate admission. */
+  #enqueueProtocol(
+    message: IRpcEnvelope,
+    options?: ISendOptions,
+    admission?: IRpcOutboundAdmission,
+    beforeWrite?: () => IRpcEnvelope,
+    onStarted?: () => void
+  ): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      /** A record preserves independent admission, cancellation and completion ownership. */
+      const entry: IQueuedEnvelope = {
+        message,
+        options,
+        admission,
+        beforeWrite,
+        onStarted,
+        transfer: undefined,
+        guard: undefined,
+        resolve,
+        reject,
+        deferredGate: true
+      }
+      if (this.#writing) this.#queueEntry(entry)
+      else {
+        this.#writing = true
+        this.#writeProtocol(entry)
+      }
+    })
+  }
+
+  /** Actual admission precedes every codec, framing and crypto read for this single protocol frame. */
+  #writeProtocol(entry: IQueuedEnvelope): void {
+    entry.cancelQueued?.()
+    const write = () => {
+      this.#lifecycle?.assertActive()
+      entry.admission?.assertCanSend()
+      return this.#sendEnvelope(
+        entry.beforeWrite?.() ?? entry.message,
+        entry.options,
+        true,
+        entry.admission,
+        entry.onStarted,
+        this.#batch
+      )
+    }
+    let sent: void | Promise<void>
+    try {
+      sent = this.#gate ? this.#gate.run(entry.message, write, entry.admission) : write()
+    } catch (error) {
+      sent = Promise.reject(error)
+    }
+    void Promise.resolve(sent).then(
+      () => {
+        this.#finishWriting()
+        entry.resolve()
+      },
+      (error: unknown) => {
+        this.#finishWriting()
+        entry.reject(error)
+      }
+    )
+  }
+
   /** Starts an idle singleton synchronously; only an existing physical write creates a queue. */
-  #flush(entries: Iterable<IQueuedEnvelope>): void {
+  #flush(): void {
     this.#writing = true
+    /** Consume only this ready prefix; a cold protocol boundary retains the rest in the same Set. */
+    const entries: IQueuedEnvelope[] = []
+    /** A record preserves independent admission, cancellation and completion ownership. */
+    for (const entry of this.#queued) {
+      if (entry.deferredGate) {
+        if (entries.length === 0) {
+          this.#queued.delete(entry)
+          this.#writeProtocol(entry)
+          return
+        }
+        break
+      }
+      this.#queued.delete(entry)
+      entries.push(entry)
+    }
     /** Cancellation/close failures remove only their own logical member before preparation. */
     const admitted = this.#admitBatch(entries, true)
     /** Transfer and opaque variation frames are boundaries, preserving their original ownership. */
     const groups: IQueuedEnvelope[][] = []
     /** The current portable run can share one encoded/protected representation. */
     let group: IQueuedEnvelope[] = []
+    /** A record preserves independent admission, cancellation and completion ownership. */
     for (const entry of admitted) {
       if (
         entry.transfer?.length ||
@@ -820,25 +993,38 @@ export class RpcOutboundSender {
       pending: 0,
       preparing: true,
       finish: () => {
-        this.#finishWriting()
+        /** Logical entries settle below; their original gate callbacks then release actual capacity. */
+        void Promise.allSettled(admitted.map((entry) => entry.gateSettled)).then(() =>
+          this.#finishWriting()
+        )
       }
     }
-    this.#writeBatch(prepared, drain)
+    this.#writeBatch({ frames: prepared, index: 0 }, drain)
   }
 
   /** Releases physical ownership before caller continuation and drains exactly one ready snapshot. */
   #finishWriting(): void {
     this.#writing = false
     if (this.#queued.size === 0) return
-    const queued = this.#queued
-    this.#queued = new Set()
-    this.#flush(queued)
+    this.#flush()
+  }
+
+  /** Release one synchronously selected idle writer in its original gate-settlement reaction. */
+  #settleWriterSuccess = (): void => {
+    this.#finishWriting()
+  }
+
+  /** Preserve the physical rejection after releasing that same idle writer for the next request. */
+  #settleWriterFailure = (error: unknown): never => {
+    this.#finishWriting()
+    throw error
   }
 
   /** Every supported cancellation/close is checked through the original operation/gate owners. */
   #admitBatch(entries: Iterable<IQueuedEnvelope>, refresh: boolean): IQueuedEnvelope[] {
     /** Rejected members cannot abort or reorder the survivors. */
     const admitted: IQueuedEnvelope[] = []
+    /** A record preserves independent admission, cancellation and completion ownership. */
     for (const entry of entries) {
       if (refresh) entry.cancelQueued?.()
       try {
@@ -857,7 +1043,10 @@ export class RpcOutboundSender {
     return admitted
   }
 
-  /** Encodes the entire physical value once; only actual oversize results trigger member splitting. */
+  /**
+   * Encodes the entire physical value once; actual oversize results fall back to ordinary singleton
+   * members.
+   */
   #prepareBatch(entries: IQueuedEnvelope[]): IPreparedBatch[] {
     if (!entries.length) return []
     try {
@@ -912,9 +1101,13 @@ export class RpcOutboundSender {
         if (inspection.bytes > this.#physicalLimit) return this.#splitBatch(entries, inspection)
         if (typeof value === 'string') bound = inspection.bytes
       }
-      /** Observe only this bounded physical group; recursive splits emit their own real members. */
+      /**
+       * Observe only this bounded physical group; ordinary singleton fallbacks emit their own real
+       * members.
+       */
       const p = this.#probe
       if (p !== undefined && (p.mask & (1 << RpcProbeStage.envelope)) !== 0)
+        /** A record preserves independent admission, cancellation and completion ownership. */
         for (const entry of entries)
           p.envelope(
             RpcProbeDirection.outbound,
@@ -973,12 +1166,13 @@ export class RpcOutboundSender {
         isLocalRpcError(cause, RpcTransportError)
           ? cause
           : createRpcSerializationError(RpcCoreErrorText.protocolEncodeFailed, cause)
+      /** A record preserves independent admission, cancellation and completion ownership. */
       for (const entry of entries) entry.reject(error)
       return []
     }
   }
 
-  /** Count bisection uses only envelope boundaries, never per-member JSON size estimates. */
+  /** Fall back to ordinary singleton frames after a real oversize measurement. */
   #splitBatch(
     entries: IQueuedEnvelope[],
     inspection: IRpcPhysicalFrameInspection
@@ -990,23 +1184,37 @@ export class RpcOutboundSender {
         throw createRpcTransportError(RpcCoreErrorText.transportSendFailed, cause)
       }
     }
-    /** Oversize frames recurse only until individually bounded semantic members remain. */
-    return inspection.splitBatch(entries).flatMap((members) => this.#prepareBatch(members))
+    return this.#prepareIndividualMembers(entries)
   }
 
-  /** Sequential preparation/invocation supplies FIFO; no physical completion is awaited here. */
-  #writeBatch(frames: readonly IPreparedBatch[], drain: IPhysicalDrain): void {
-    for (let index = 0; index < frames.length; index += 1) {
-      /** Remove only members whose existing operation has actually cancelled or closed. */
-      const frame = frames[index]!
+  /** Encode each surviving member once; auxiliary batch packing never repeats a growing subtree. */
+  #prepareIndividualMembers(entries: readonly IQueuedEnvelope[]): IPreparedBatch[] {
+    return entries.flatMap((entry) => this.#prepareBatch([entry]))
+  }
+
+  /** Sequential preparation/invocation supplies FIFO without copying already prepared suffixes. */
+  #writeBatch(cursor: IPreparedBatchCursor | undefined, drain: IPhysicalDrain): void {
+    while (cursor) {
+      if (cursor.index >= cursor.frames.length) {
+        cursor = cursor.continuation
+        continue
+      }
+      /** The same existing prepared frame is consumed once before its continuation advances. */
+      const frame = cursor.frames[cursor.index++]!
+      /** Cancellation preserves survivor order while falling back to their ordinary frame path. */
       const admitted = this.#admitBatch(frame.entries, false)
       if (!admitted.length) continue
       if (admitted.length !== frame.entries.length) {
-        this.#writeBatch([...this.#prepareBatch(admitted), ...frames.slice(index + 1)], drain)
-        return
+        cursor = {
+          frames: this.#prepareIndividualMembers(admitted),
+          index: 0,
+          continuation: cursor
+        }
+        continue
       }
       if (this.authentication) {
-        /** Protection and any membership rebuild finish before the next frame consumes a counter. */
+        /** This existing suffix stays shared while the current physical protection yields. */
+        const continuation = cursor
         void this.#prepareTransportValue(
           frame.value,
           frame.entries[0]!.transfer,
@@ -1022,12 +1230,19 @@ export class RpcOutboundSender {
           frame.entries[0]!.message.data.route.senderId
         )
           .then((value) => {
+            /** Recheck actual cancellation after the original asynchronous signer completes. */
             const current = this.#admitBatch(frame.entries, false)
             if (current.length !== frame.entries.length) {
-              this.#writeBatch([...this.#prepareBatch(current), ...frames.slice(index + 1)], drain)
+              this.#writeBatch(
+                { frames: this.#prepareIndividualMembers(current), index: 0, continuation },
+                drain
+              )
               return
             }
-            /** Opaque object signers retain exact sizing; strings have no mutable business graph. */
+            /**
+             * Opaque signer objects retain exact physical sizing; strings keep safe existing
+             * bounds.
+             */
             const bound =
               typeof value === 'string'
                 ? value === frame.value
@@ -1035,22 +1250,23 @@ export class RpcOutboundSender {
                   : value.length * 3
                 : undefined
             if (bound === undefined || bound > this.#physicalLimit) {
-              /** Reuse this actual protected frame's sole measurement through recursive splitting. */
+              /** One actual protected-frame measurement decides the unchanged physical quota. */
               const inspection = inspectRpcPhysicalFrame(value, this.#physicalLimit)
               if (inspection.bytes > this.#physicalLimit) {
                 this.#writeBatch(
-                  [...this.#splitBatch(current, inspection), ...frames.slice(index + 1)],
+                  { frames: this.#splitBatch(current, inspection), index: 0, continuation },
                   drain
                 )
                 return
               }
             }
             this.#invokeBatch(frame.entries, value, drain)
-            this.#writeBatch(frames.slice(index + 1), drain)
+            this.#writeBatch(continuation, drain)
           })
           .catch((error: unknown) => {
+            /** A record preserves independent admission, cancellation and completion ownership. */
             for (const entry of frame.entries) entry.reject(error)
-            this.#writeBatch(frames.slice(index + 1), drain)
+            this.#writeBatch(continuation, drain)
           })
         return
       }
@@ -1071,6 +1287,7 @@ export class RpcOutboundSender {
       () => {
         /** The existing per-member start loop also owns exactly one sent event per semantic member. */
         const p = this.#probe
+        /** A record preserves independent admission, cancellation and completion ownership. */
         for (const entry of entries) {
           entry.onStarted?.()
           if (p !== undefined && (p.mask & (1 << RpcProbeStage.message)) !== 0)
@@ -1089,10 +1306,12 @@ export class RpcOutboundSender {
     void sent.then(
       () => {
         complete()
+        /** A record preserves independent admission, cancellation and completion ownership. */
         for (const entry of entries) entry.resolve()
       },
       (error: unknown) => {
         complete()
+        /** A record preserves independent admission, cancellation and completion ownership. */
         for (const entry of entries) entry.reject(error)
       }
     )
@@ -1321,8 +1540,10 @@ export class RpcOutboundSender {
   }
 
   /** Validates codec output before it reaches a typed transport boundary. */
-  private assertProtocolEncodedType(value: unknown): void {
-    const encodedType = this.components.codec.encodedType
+  private assertProtocolEncodedType(
+    value: unknown,
+    encodedType = this.components.codec.encodedType
+  ): void {
     if (
       (encodedType === 'string' && typeof value !== 'string') ||
       (encodedType === 'uint8array' && !isUint8Array(value))
@@ -1332,6 +1553,7 @@ export class RpcOutboundSender {
 
   /** Validates protected output against transport payload requirements. */
   private assertTransportEncodedType(value: unknown): void {
+    /** Control protection retains the category required by the existing codec/carrier pair. */
     const encodedType = this.#transportEncodedType
     if (
       (encodedType === 'string' && typeof value !== 'string') ||
@@ -1474,6 +1696,7 @@ export class RpcOutboundSender {
     message?: IRpcEnvelope
   ): Promise<void> {
     let first = true
+    /** Remove only members whose existing operation has actually cancelled or closed. */
     for (const frame of frames) {
       /** Logical sent belongs only to the first physical write of this existing envelope. */
       const logical = first ? message : undefined

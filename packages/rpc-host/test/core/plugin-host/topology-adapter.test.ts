@@ -1,6 +1,8 @@
+import { createRuntimeEndpointComposition } from '../../../dist/core/runtime-api-endpoint.js'
+import { RpcCapability } from '@migaia/rpc-contract'
 import { describe, expect, it } from 'vitest'
-import { createMemoryTransportPair } from '../../../dist/core/adapters/memory.js'
-import { createFullEndpoint } from '../../../dist/core/full.js'
+import { createMemoryTransportPair } from '../../fixtures/memory-transport.js'
+
 import { defineFeature } from '../../../dist/core/feature.js'
 import { createComposedEndpoint, type IRpcCoreConfig } from '../../../dist/core/composed.js'
 import { RpcCoreErrorCode } from '../../../dist/core/errors.js'
@@ -40,10 +42,13 @@ describe('capability topology adapter', () => {
       { provider }
     )
 
-    const endpoint = await createFullEndpoint({
-      ...createConfig(() => undefined),
-      features: [dependent] as const
-    })
+    const endpoint = await createRuntimeEndpointComposition(
+      {
+        ...createConfig(() => undefined),
+        features: [dependent] as const
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     expect(installs).toEqual(['provider', 'dependent'])
     await endpoint.dispose()
   })

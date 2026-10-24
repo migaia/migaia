@@ -1,8 +1,10 @@
+import { createRuntimeEndpointComposition } from '../../dist/core/runtime-api-endpoint.js'
+import { RpcCapability } from '@migaia/rpc-contract'
 import { describe, expect, it } from 'vitest'
 import { createStringFramer } from '@migaia/rpc-contract/framing'
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
-import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
-import { createEndpoint } from '../../dist/core/index.js'
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
+
 import { authentication } from '../../dist/core/middleware/authentication.js'
 import { codec } from '../../dist/core/middleware/codec.js'
 import { connect } from '../../dist/core/middleware/connect.js'
@@ -58,27 +60,33 @@ describe('contract endpoint pipeline', () => {
         return serverBaseTransport.send(...args)
       }
     }
-    const server = await createEndpoint({
-      id: 'contract-server',
-      transport: serverTransport,
-      provider: { echo: (context) => context.success(context.data) },
-      middlewares: [
-        codec(observedCodec()),
-        framer(createStringFramer({ chunkBytes: 4 })),
-        observedAuthentication('server'),
-        connect({ transport: serverTransport })
-      ]
-    })
-    const client = await createEndpoint({
-      id: 'contract-client',
-      transport: clientTransport,
-      middlewares: [
-        codec(observedCodec()),
-        framer(createStringFramer({ chunkBytes: 4 })),
-        observedAuthentication('client'),
-        connect({ transport: clientTransport })
-      ]
-    })
+    const server = await createRuntimeEndpointComposition(
+      {
+        id: 'contract-server',
+        transport: serverTransport,
+        provider: { echo: (context) => context.success(context.data) },
+        middlewares: [
+          codec(observedCodec()),
+          framer(createStringFramer({ chunkBytes: 4 })),
+          observedAuthentication('server'),
+          connect({ transport: serverTransport })
+        ]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'contract-client',
+        transport: clientTransport,
+        middlewares: [
+          codec(observedCodec()),
+          framer(createStringFramer({ chunkBytes: 4 })),
+          observedAuthentication('client'),
+          connect({ transport: clientTransport })
+        ]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     try {
       await expect(client.send('contract-server', 'echo', 'warm')).resolves.toBe('warm')
       codecCalls.encode = 0

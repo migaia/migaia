@@ -2,7 +2,6 @@
 import type { IRpcFeature } from '../feature.js'
 import type { IRpcEndpoint, IRpcProvider, IRpcMiddleware } from '../typing.js'
 import type { IRpcNativeMiddleware, IRpcMiddlewareComponentContribution } from '../middleware.js'
-import type { IRpcPublicFirstPartyRootNames } from './first-party-roots.js'
 
 /**
  * Reads component slots only from native middleware definitions. The optional unique-symbol marker
@@ -56,8 +55,8 @@ type IRpcFeatureRootSurface<TName extends string, TFeature> =
 export type IRpcRootProjection<TRoots extends Readonly<Record<string, IRpcFeature>>> =
   IUnionToIntersection<
     {
-      [TName in IRpcPublicFirstPartyRootNames<TRoots>]: IRpcFeatureRootSurface<TName, TRoots[TName]>
-    }[IRpcPublicFirstPartyRootNames<TRoots>]
+      [TName in Extract<keyof TRoots, string>]: IRpcFeatureRootSurface<TName, TRoots[TName]>
+    }[Extract<keyof TRoots, string>]
   >
 
 /** Reprojects the completed endpoint so detached `provide()` remains fluent over every surface. */
@@ -77,3 +76,15 @@ type IUnionToIntersection<T> = (T extends unknown ? (value: T) => void : never) 
 
 /** Every factory retains the canonical endpoint disposal capability. */
 export type IRpcKernelSurface = Pick<IRpcEndpoint, 'dispose'>
+
+/** Projects native middleware contributions already installed by the canonical composition. */
+type INativeMiddlewareMemberSurface<TMiddleware> =
+  TMiddleware extends IRpcNativeMiddleware<infer TExtension, infer TPublic>
+    ? string extends keyof TExtension | keyof TPublic
+      ? Record<never, never>
+      : TExtension & TPublic
+    : never
+
+/** Preserve the actual middleware tuple's declared public extension without a preset factory. */
+export type INativeMiddlewareSurface<TMiddlewares extends readonly IRpcMiddleware[]> =
+  IUnionToIntersection<INativeMiddlewareMemberSurface<TMiddlewares[number]>>

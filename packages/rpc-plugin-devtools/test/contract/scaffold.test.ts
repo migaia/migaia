@@ -1,16 +1,15 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import { devtoolsPlugin, RpcDevtoolsErrorCode, RPC_DEVTOOLS_SOURCE } from '../../src/index.js'
-import { createRpcDevtoolsHub, RpcDevtoolsTargetStatus } from '../../src/hub/index.js'
 import {
   decodeRpcDevtoolsRecord,
-  encodeRpcDevtoolsRecord,
-  RpcDevtoolsRecordFormat
-} from '../../src/contract/index.js'
+  encodeRpcDevtoolsRecord
+} from '../../src/contract/record-codec.js'
+import { RpcDevtoolsRecordFormat } from '../../src/contract/record.js'
 import type {
   IRpcDevtoolsCounters,
   IRpcDevtoolsServiceApi,
   IRpcDevtoolsStats
-} from '../../src/contract/index.js'
+} from '../../src/contract/service.js'
 import type { IRuntimeTypedPeer } from '@migaia/rpc-host/plugin'
 
 /** A typed Peer call must preserve the service's concrete stats result across the public API. */
@@ -55,19 +54,14 @@ const service: IRpcDevtoolsServiceApi = {
 }
 
 describe('public scaffold', () => {
-  it('imports the implemented collector and hub entries and preserves their CLOSED identity', async () => {
+  it('imports the collector and record codec and preserves its CLOSED identity', async () => {
     /** The integrated layer replaces both placeholders with live owners and real closure. */
     const collector = devtoolsPlugin().collector
     expect(collector.query().events).toEqual([])
     collector.close()
-    /** An empty live hub is usable before its idempotent close, then rejects cold queries. */
-    const hub = createRpcDevtoolsHub()
-    expect(hub.timeline()).toEqual([])
-    await hub.close()
-    expect(() => hub.timeline()).toThrowError(
+    expect(() => collector.query()).toThrowError(
       expect.objectContaining({ source: RPC_DEVTOOLS_SOURCE, code: RpcDevtoolsErrorCode.closed })
     )
-    expect(RpcDevtoolsTargetStatus.offline).toBe('offline')
     expect(decodeRpcDevtoolsRecord(service.record.stop())).toEqual({
       header: RpcDevtoolsRecordFormat,
       events: []

@@ -1,6 +1,8 @@
+import { createRuntimeEndpointComposition } from '../../dist/core/runtime-api-endpoint.js'
+import { RpcCapability } from '@migaia/rpc-contract'
 import { describe, expect, it, vi } from 'vitest'
-import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
-import { createFullEndpoint } from '../../dist/core/full.js'
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
+
 import { RpcError } from '../../dist/core/errors.js'
 import { connect } from '../../dist/core/middleware/connect.js'
 import { ping } from '../../dist/core/middleware/ping.js'
@@ -21,16 +23,28 @@ async function createManualPair(
   serverId = 'coverage-manual-server'
 ): Promise<IManualPair> {
   const [clientTransport, serverTransport] = createMemoryTransportPair()
-  const client = (await createFullEndpoint({
-    id: clientId,
-    transport: clientTransport,
-    middlewares: [connect({ transport: clientTransport, discoveryMode: 'manual' }), ping()] as const
-  })) as IManualEndpoint
-  const server = (await createFullEndpoint({
-    id: serverId,
-    transport: serverTransport,
-    middlewares: [connect({ transport: serverTransport, discoveryMode: 'manual' }), ping()] as const
-  })) as IManualEndpoint
+  const client = (await createRuntimeEndpointComposition(
+    {
+      id: clientId,
+      transport: clientTransport,
+      middlewares: [
+        connect({ transport: clientTransport, discoveryMode: 'manual' }),
+        ping()
+      ] as const
+    },
+    { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+  ).installing) as IManualEndpoint
+  const server = (await createRuntimeEndpointComposition(
+    {
+      id: serverId,
+      transport: serverTransport,
+      middlewares: [
+        connect({ transport: serverTransport, discoveryMode: 'manual' }),
+        ping()
+      ] as const
+    },
+    { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+  ).installing) as IManualEndpoint
   return { client, server }
 }
 
@@ -174,22 +188,28 @@ describe('discovery attachment semantic coverage', () => {
 
   it('keeps automatic discovery selection and pinned receiver state isolated', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
-    const client = await createFullEndpoint({
-      id: 'coverage-auto-client',
-      transport: clientTransport,
-      middlewares: [
-        connect({
-          transport: clientTransport,
-          receiverSelector: (servers) => servers[0]?.receiverId
-        }),
-        ping()
-      ] as const
-    })
-    const server = await createFullEndpoint({
-      id: 'coverage-auto-server',
-      transport: serverTransport,
-      middlewares: [connect({ transport: serverTransport }), ping()] as const
-    })
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'coverage-auto-client',
+        transport: clientTransport,
+        middlewares: [
+          connect({
+            transport: clientTransport,
+            receiverSelector: (servers) => servers[0]?.receiverId
+          }),
+          ping()
+        ] as const
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
+    const server = await createRuntimeEndpointComposition(
+      {
+        id: 'coverage-auto-server',
+        transport: serverTransport,
+        middlewares: [connect({ transport: serverTransport }), ping()] as const
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     try {
       await expect(
         client.ping!('coverage-auto-server', undefined, { timeoutMs: 100 })

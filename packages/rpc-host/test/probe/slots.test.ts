@@ -1,6 +1,9 @@
+import { createRuntimeEndpointComposition } from '../../dist/core/runtime-api-endpoint.js'
+import { RpcCapability } from '@migaia/rpc-contract'
 import { describe, expect, it, vi } from 'vitest'
-import { createEndpoint, connect } from '../../dist/core/index.js'
-import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
+
+import { connect } from '../../dist/core/middleware/connect.js'
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
 import { defineProbe, type IRpcProbe } from '../../dist/core/probe/index.js'
 import { RpcPortName } from '../../dist/core/internal/plugin-shared-keys.js'
 import type { IRpcTransport } from '../../dist/core/transport.js'
@@ -66,18 +69,24 @@ describe('activated probe slots', () => {
     /** The public transport shape, rather than an internal observation hook, reaches Core. */
     const leftTransport: IRpcTransport = Object.assign(leftWire, { observe })
     /** Each canonical endpoint retains its usual connect middleware and provider owner. */
-    const left = await createEndpoint({
-      id: 'probe-slot-left',
-      transport: leftTransport,
-      middlewares: [connect()]
-    })
+    const left = await createRuntimeEndpointComposition(
+      {
+        id: 'probe-slot-left',
+        transport: leftTransport,
+        middlewares: [connect()]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     /** The receiving endpoint returns the unmodified application payload. */
-    const right = await createEndpoint({
-      id: 'probe-slot-right',
-      transport: rightWire,
-      middlewares: [connect()],
-      provider: { echo: (context) => context.success(context.data) }
-    })
+    const right = await createRuntimeEndpointComposition(
+      {
+        id: 'probe-slot-right',
+        transport: rightWire,
+        middlewares: [connect()],
+        provider: { echo: (context) => context.success(context.data) }
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     try {
       expect(await left.send('probe-slot-right', 'echo', 'unchanged')).toBe('unchanged')
       expect(observe).not.toHaveBeenCalled()

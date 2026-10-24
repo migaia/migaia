@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createServiceWorkerTransport } from '../../../src/browser/adapters/service-worker.js'
 import { createSharedWorkerTransport } from '../../../src/browser/adapters/shared-worker.js'
-import { createWebWorkerTransport } from '@migaia/rpc-plugin-browser/adapters/web-worker'
+import { createWebWorkerTransport } from '@migaia/rpc-host/plugin'
 
 describe('shared-worker adapter lifecycle', () => {
   it('shares one underlying subscription and isolates delivery failures', () => {

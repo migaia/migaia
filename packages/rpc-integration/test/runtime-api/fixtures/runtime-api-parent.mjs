@@ -2,21 +2,21 @@ import assert from 'node:assert/strict'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { createProcessPeer } from '../../../../rpc-plugin-process/test/protocol.ts'
+import { isRpcErrorInstance, RpcCoreErrorCode, RPC_CORE_ERROR_SOURCE } from '@migaia/rpc-host'
 import { createProcessTransport } from '../../../../rpc-plugin-process/dist/process/handshake.js'
 import { createNativeProcessOffer } from '../../../../rpc-plugin-process/dist/process/offer.js'
-import { createThreadPeer } from '../../../../rpc-plugin-thread/test/protocol.ts'
+import { createRuntimePeer } from '../../../../rpc-host/dist/remote/runtime-api/peer.js'
 import {
   createAdapterWebThreadLauncher as createWebThreadLauncher,
   createAdapterWebThreadChannelFactory as createWebThreadChannelFactory
 } from '../../../../rpc-plugin-thread/dist/threads/web-launcher.js'
-import { createNodeProcessLauncher } from '@migaia/rpc-plugin-process/adapters/node-child-process'
-import { createBunProcessLauncher } from '@migaia/rpc-plugin-process/adapters/bun-spawn'
-import { createDenoProcessLauncher } from '@migaia/rpc-plugin-process/adapters/deno-command'
+import { createNodeProcessLauncher } from '../../../../rpc-plugin-process/dist/process/adapters/node-child-process.js'
+import { createBunProcessLauncher } from '../../../../rpc-plugin-process/dist/process/adapters/bun-spawn.js'
+import { createDenoProcessLauncher } from '../../../../rpc-plugin-process/dist/process/adapters/deno-command.js'
 import {
   createNodeThreadLauncher,
   createNodeThreadChannelFactory
-} from '@migaia/rpc-plugin-thread/adapters/node'
+} from '../../../../rpc-plugin-thread/dist/threads/adapters/node.js'
 
 /** Every receipt is emitted by the actual selected runtime, never by a Node stand-in. */
 const runtime = process.argv[2]
@@ -29,7 +29,7 @@ const token = 'native-fixture-token'
 /** Expected business refusal remains classified separately from transport or cleanup failures. */
 const reports = []
 try {
-  peer = await (mode === 'process' ? createProcessPeer : createThreadPeer)({
+  peer = await createRuntimePeer({
     self: { name: 'parent-2', instanceId: 'parent-2' },
     spawn: async (context) => {
       if (mode === 'thread') {
@@ -204,7 +204,13 @@ try {
   const beforeTransfer = await peer.request('binaryCount')
   await assert.rejects(
     async () => peer.request('echo', backing, { transfer: [backing] }),
-    { code: mode === 'process' ? 'INVALID_CONFIG' : 'CAPABILITY_UNSUPPORTED' },
+    (error) => {
+      assert.ok(error instanceof Error)
+      assert.equal(isRpcErrorInstance(error), true)
+      assert.equal(error.source, RPC_CORE_ERROR_SOURCE)
+      assert.equal(error.code, RpcCoreErrorCode.capabilityUnsupported)
+      return true
+    },
     'default native carrier preserves its own transfer rejection'
   )
   assert.equal(backing.byteLength, 4)

@@ -1,15 +1,17 @@
+import { threadPlugin } from '@migaia/rpc-plugin-thread'
+import { RuntimePluginKey } from '@migaia/rpc-host/plugin'
+import { runtimeTestHost } from '../../../rpc-host/test/runtime-api/fixture.js'
+import { readRuntimeOutletConnection } from '../../../rpc-host/dist/remote/runtime-api/outlet.js'
 import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
 import { it, vi } from 'vitest'
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { createThreadPeer } from '../../../rpc-plugin-thread/test/protocol.ts'
 import { type INodeThreadHandle } from '../../../rpc-plugin-thread/dist/threads/node-launcher.js'
 import {
   createNodeThreadLauncher,
   createNodeThreadChannelFactory
-} from '@migaia/rpc-plugin-thread/adapters/node'
-import type { IRuntimeDynamicSurface } from '../../../rpc-host/dist/remote/runtime-api/typing.js'
+} from '../../../rpc-plugin-thread/dist/threads/adapters/node.js'
 import { readRuntimePeerConnection } from '../../../rpc-host/dist/remote/runtime-api/peer.js'
 import { RpcCoreErrorCode } from '../../../rpc-host/dist/core/errors.js'
 
@@ -28,27 +30,39 @@ it('accepted native generations report added/removed/modeChanged without rejecti
   /** Business fixture variants follow the original launch sequence. */
   let sequence = 0
   /** The public facade retains the same original supervisor across all three Workers. */
-  const peer = await createThreadPeer<IRuntimeDynamicSurface>({
-    provide: { parentOnly: () => 9 },
-    spawn: {
-      spec: { entry },
-      budget,
-      scheduler: systemScheduler,
-      launcher: {
-        ...native,
-        launch: async (spec, context) => {
-          /** The canonical launcher creates and owns this exact Worker. */
-          const handle = await native.launch({ ...spec, data: { sequence: ++sequence } }, context)
-          handles.push(handle)
-          return handle
-        }
-      },
-      channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),
-      supervisor: { restart: { initialDelayMs: 1, maxDelayMs: 1, maxRestarts: 2 } },
-      report: (error) => reports.push(error)
-    },
-    report: (error) => reports.push(error)
+  /** The real native Host owns installation and rollback for this managed connection. */
+  const host = runtimeTestHost({
+    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   })
+  /** The committed outlet lends its genuine managed Peer and original iterator/call contracts. */
+  const peer = await host
+    .use(
+      threadPlugin({
+        provide: { parentOnly: () => 9 },
+        spawn: {
+          spec: { entry },
+          budget,
+          scheduler: systemScheduler,
+          launcher: {
+            ...native,
+            launch: async (spec, context) => {
+              /** The canonical launcher creates and owns this exact Worker. */
+              const handle = await native.launch(
+                { ...spec, data: { sequence: ++sequence } },
+                context
+              )
+              handles.push(handle)
+              return handle
+            }
+          },
+          channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),
+          supervisor: { restart: { initialDelayMs: 1, maxDelayMs: 1, maxRestarts: 2 } },
+          report: (error) => reports.push(error)
+        },
+        report: (error) => reports.push(error)
+      })
+    )
+    .then(() => readRuntimeOutletConnection(host.thread, RuntimePluginKey.thread)!.peer)
   try {
     assert.equal(await peer.request('service.data.stable'), 3)
     assert.deepEqual(reports, [], 'initial asymmetric directories are valid, not a TS diff')
@@ -95,7 +109,7 @@ it('accepted native generations report added/removed/modeChanged without rejecti
     assert.equal(await peer.request('service.data.stable'), 3)
     assert.equal(reports.length, 1, 'unchanged accepted routes produce no report')
   } finally {
-    await peer.close()
+    await host.dispose()
     for (const handle of handles) handle.terminate()
     await Promise.all(handles.map((handle) => handle.exited))
   }

@@ -1,22 +1,21 @@
 import { describe, expect, it, vi } from 'vitest'
-import { defineFeature, definePlugin, PluginHost, isDefinedPlugin } from '@migaia/plugin-host'
+import { definePlugin, PluginHost, isDefinedPlugin } from '@migaia/plugin-host'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { CapabilityLevel, createUnitBudget } from '@migaia/supervision'
 import type { IProcessHandle, IProcessSpec } from '@migaia/supervision/process'
 import { RpcPlatform } from '@migaia/rpc-host/plugin'
 import { byteProcessPipeline } from '../fixtures/process-diagnostics.js'
-import { createNativeProcessOffer } from '../../../rpc-plugin-process/dist/process/offer.js'
 import { createSpawnProcessBinding } from '../../../rpc-plugin-process/dist/process/plugin/binding.js'
-import { createProcessPlugin } from '../../../rpc-plugin-process/test/protocol.ts'
+import { processPlugin } from '@migaia/rpc-plugin-process'
+import { nativeHostFixture } from './fixtures/host-native.js'
+import type { IRuntimeOutlet } from '../../../rpc-host/dist/remote/runtime-api/outlet.js'
 import { ProcessPluginChannelKind } from '../../../rpc-plugin-process/dist/process/plugin/constants.js'
-import { ProcessPluginWire } from '../../../rpc-plugin-process/dist/process/plugin/index.js'
+import { ProcessPluginWire } from '../../../rpc-plugin-process/dist/process/plugin/constants.js'
 import { RpcProcessErrorCode } from '@migaia/rpc-plugin-process'
 import type { IProcessByteChannel } from '../../../rpc-plugin-process/dist/process/types.js'
 import type { IRemoteChannel } from '@migaia/rpc-host/plugin'
-import type { IRemotePluginDefinition } from '../../../rpc-host/dist/remote/plugin.js'
 import type { IProcessPluginEstablish } from '../../../rpc-plugin-process/dist/process/plugin/types.js'
-import { type IProcessPluginOptions } from '../../../rpc-plugin-process/test/protocol.ts'
-import { REMOTE_FIXTURE_CONTRACT, remoteHarness } from '../../../rpc-host/test/remote/fixture.js'
+import type { IProcessPluginOptions } from '../../../rpc-plugin-process/dist/process/plugin.js'
 
 /** A valid spec is shared by the supervisor and the optional caller-owned pool. */
 function processSpec(token: string): IProcessSpec {
@@ -38,137 +37,106 @@ function processHandle(): IProcessHandle {
   }
 }
 
-/** The class's protected sync path is exposed only to this acceptance fixture. */
-class SyncProbeHost extends PluginHost<Record<string, never>> {
-  sync(plugin: IRemotePluginDefinition) {
-    return this.useSync([plugin])
-  }
-}
-
 /** Verifies binding handoff without substituting a second RPC implementation. */
 describe('process plugin spawn binding', () => {
   it('completes remote preparation before a dependent first calls its feature', async () => {
-    const fixture = remoteHarness()
-    const host = new SyncProbeHost({
+    /** Real native preparation preserves launch, retry and directory boundaries of the old fixture. */
+    const fixture = nativeHostFixture('result', 1)
+    /** The ordinary Host owns asynchronous native transport installation. */
+    const host = new PluginHost<Record<string, never>>({
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
     })
-    const token = 'private-bootstrap-token'
-    /** The caller's proposal must be the exact one handed to establish. */
-    const offer = createNativeProcessOffer({
-      peer: { id: 'client', runtime: 'node' },
-      auth: token
-    })
-    const scheduler = fixture.binding.scheduler
-    const spec = processSpec(token)
-    const budget = createUnitBudget({ kind: 'process', maxUnits: 1, scheduler })
-    /** Termination settles the mock process exit so Host cleanup cannot hang. */
-    let settleExit!: (value: { code: number | null; signal: string | null }) => void
-    const handle: IProcessHandle = {
-      identity: { fingerprint: 'installed-child' },
-      exited: new Promise((resolve) => {
-        settleExit = resolve
-      }),
-      terminate: () => settleExit({ code: 0, signal: null })
-    }
-    const raw: IProcessByteChannel = {
-      kind: 'byte',
-      write: async () => undefined,
-      onData: () => () => undefined,
-      onClose: () => () => undefined,
-      close: () => undefined
-    }
-    const launch = vi.fn(async () => handle)
+    /** The original offered object must reach the real native establisher by identity. */
+    const offer = fixture.options.spawn.offer
+    /** Count actual OS acquisition rather than a fabricated ready unit. */
+    const launch = vi.fn(fixture.options.spawn.supervision.launcher.launch)
+    /** Public retry and key policy remain attached to this exact native registration. */
     const keyFactory = vi.fn(() => 'process-logical-key')
+    /** The original retry seam dispatches each business operation once. */
     const retryPort = {
       dispatch: vi.fn(
         (input: Parameters<NonNullable<IProcessPluginOptions['retryPort']>['dispatch']>[0]) =>
           input.sendOnce({ expectedGeneration: input.generation, key: input.key })
       )
     }
-    const establish = vi.fn(
-      async (
-        _raw: Parameters<IProcessPluginEstablish>[0],
-        options: Parameters<IProcessPluginEstablish>[1]
-      ) => {
-        expect(options.token).toBe(token)
-        expect(options.offer).toBe(offer)
-        expect(options.session.processId).toBe('installed-child')
-        return {
-          ...fixture.channel,
-          agreement: { ...fixture.channel.agreement, source: 'negotiated' as const }
-        }
-      }
-    )
-    const plugin = createProcessPlugin({
+    /** Retain every exact send input while production owns serialization and physical writes. */
+    const sends: { method: string; options: unknown }[] = []
+    fixture.observeEndpoint((served) => ({
+      ...served,
+      endpoint: Object.create(
+        served.endpoint,
+        Object.getOwnPropertyDescriptors({
+          send<T>(...input: Parameters<typeof served.endpoint.send>) {
+            sends.push({ method: input[1], options: input[3] })
+            return served.endpoint.send<T>(...input)
+          }
+        })
+      )
+    }))
+    /** The genuine channel and session are returned unchanged after checking native handoff. */
+    const establish = vi.fn((...input: Parameters<IProcessPluginEstablish>) => {
+      const [raw, options] = input
+      expect(options.token).toBe(fixture.options.spawn.token)
+      expect(options.offer).toBe(offer)
+      expect(options.session.processId).toBe(fixture.handles[0]!.identity.fingerprint)
+      return fixture.options.spawn.establish(raw, options)
+    })
+    /** Only the transport source grammar changes; the ordinary Host owns installation. */
+    const plugin = processPlugin({
+      ...fixture.options,
       name: 'p',
-      contract: REMOTE_FIXTURE_CONTRACT,
-      registrationOwner: { name: 'p', host },
-      host: host.plugin,
-      endpointFactory: async () => fixture.served,
-      report: () => undefined,
       keyFactory,
       retryPort,
-      deployment: {
-        kind: 'spawn',
-        channelKind: ProcessPluginChannelKind.byte,
-        wire: ProcessPluginWire.native,
-        token,
-        offer,
+      spawn: {
+        ...fixture.options.spawn,
+        establish,
         supervision: {
-          id: 'client',
-          spec,
-          budget,
-          scheduler,
+          ...fixture.options.spawn.supervision,
           launcher: {
-            capabilities: {
-              termination: CapabilityLevel.enforced,
-              'fault-isolation': CapabilityLevel.enforced,
-              'bootstrap-stdin': CapabilityLevel.enforced
-            },
+            ...fixture.options.spawn.supervision.launcher,
             launch
-          },
-          health: { check: async () => undefined },
-          report: () => undefined
-        },
-        rawChannel: async () => raw,
-        establish
+          }
+        }
       }
     })
-    /** Installation observes the Feature only after describe has completed. */
+    /**
+     * The dependent's first operation follows native installation, without the removed Feature
+     * proxy.
+     */
     let result: Promise<unknown> | undefined
+    /** Native transport publication completes before a later ordinary plugin can call its outlet. */
     const dependent = definePlugin({
       name: 'dependent',
-      features: {
-        use: defineFeature(
-          (_core, dependencies) => {
-            result = (
-              dependencies.remote as { request(params: unknown[]): Promise<unknown> }
-            ).request(['value'])
-            return {}
-          },
-          { remote: plugin.getFeature('f') }
-        )
-      },
-      install: () => ({})
+      install: () => {
+        result = (
+          host as PluginHost<Record<string, never>> & { process: IRuntimeOutlet }
+        ).process.request('p', 'p.f.request', ['value'])
+        return {}
+      }
     })
     try {
       expect(isDefinedPlugin(plugin)).toBe(true)
-      expect(() => host.sync(plugin)).toThrowError(
-        expect.objectContaining({ code: 'SETUP_REQUIRES_ASYNC_INSTALL' })
-      )
       expect(launch).not.toHaveBeenCalled()
       await host.use(plugin)
+      await fixture.ready()
       await host.use(dependent)
-      expect(await result).toBe('result')
+      expect(await result).toEqual({
+        pid: fixture.handles[0]!.identity.pid,
+        value: 'result',
+        input: ['value'],
+        calls: 1,
+        disposals: 0
+      })
       expect(launch).toHaveBeenCalledTimes(1)
       expect(establish).toHaveBeenCalledTimes(1)
       expect(keyFactory).toHaveBeenCalledTimes(1)
       expect(retryPort.dispatch).toHaveBeenCalledTimes(1)
-      expect(fixture.sends[1]?.options).toMatchObject({ idempotencyKey: 'process-logical-key' })
-      expect(fixture.sends[0]?.method).toBe('migaia.remote.runtime.describe')
-      expect(fixture.sends[1]?.method).toBe('p.f.request')
+      expect(sends[1]?.options).toMatchObject({ idempotencyKey: 'process-logical-key' })
+      expect(sends[0]?.method).toBe('migaia.remote.runtime.describe')
+      expect(sends[1]?.method).toBe('p.f.request')
     } finally {
       await host.dispose()
+      await fixture.close()
     }
   })
   it('forwards one session, scheduler, and post-subscription stderr to the channel adapter', async () => {

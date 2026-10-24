@@ -1,35 +1,53 @@
 import { describe, expect, it } from 'vitest'
 import { createRtcDataChannelTransport } from '../../../src/browser/adapters/rtc-data-channel.js'
 import { createSharedWorkerTransport } from '../../../src/browser/adapters/shared-worker.js'
-import { createWebTransportDatagramTransport } from '../../../src/browser/adapters/web-transport.js'
-import { createWebWorkerTransport } from '@migaia/rpc-plugin-browser/adapters/web-worker'
+import { createWebWorkerTransport } from '@migaia/rpc-host/plugin'
 
 type IListener = (event: unknown) => void
 
 /** Builds an RTC channel with a cleanup failure to expose aggregate ordering. */
-function rtcChannel() {
+/** Allocate only this case's original observations before installing native-shaped callbacks. */
+function failingRtcChannelFixtureState() {
   const listeners = new Map<string, Set<IListener>>()
   const cleanup = new Error('cleanup failed')
-  const channel = {
-    readyState: 'open',
-    send() {},
-    addEventListener(type: string, listener: IListener) {
-      const current = listeners.get(type) ?? new Set<IListener>()
-      current.add(listener)
-      listeners.set(type, current)
-    },
-    removeEventListener(type: string, listener: IListener) {
-      if (type === 'close') throw cleanup
-      listeners.get(type)?.delete(listener)
+  return { listeners, cleanup }
+}
+
+/** Own one test resource's mutable observations without sharing a factory closure. */
+class FailingRtcChannelFixture {
+  /** Counts, native events and construction inputs belong only to this fixture instance. */
+  #state: ReturnType<typeof failingRtcChannelFixtureState>
+  /** Existing consumers retain the same observable fixture surface and callback identities. */
+  readonly value
+  /** Install the original native-shaped callbacks after their observations exist. */
+  constructor() {
+    this.#state = failingRtcChannelFixtureState()
+    const channel = {
+      readyState: 'open',
+      send: () => {},
+      addEventListener: (type: string, listener: IListener) => {
+        const current = this.#state.listeners.get(type) ?? new Set<IListener>()
+        current.add(listener)
+        this.#state.listeners.set(type, current)
+      },
+      removeEventListener: (type: string, listener: IListener) => {
+        if (type === 'close') throw this.#state.cleanup
+        this.#state.listeners.get(type)?.delete(listener)
+      }
+    }
+    this.value = {
+      channel,
+      cleanup: this.#state.cleanup,
+      emit: (event: unknown) => {
+        for (const listener of this.#state.listeners.get('close') ?? []) listener(event)
+      }
     }
   }
-  return {
-    channel,
-    cleanup,
-    emit(event: unknown) {
-      for (const listener of listeners.get('close') ?? []) listener(event)
-    }
-  }
+}
+
+/** Create one independent owner for the existing native-boundary fixture. */
+function rtcChannel() {
+  return new FailingRtcChannelFixture().value
 }
 
 describe('browser native transport error identity', () => {
@@ -49,30 +67,6 @@ describe('browser native transport error identity', () => {
       message: 'RTCDataChannel closed'
     })
     expect((observed[0] as Error).constructor).toBe(Error)
-  })
-
-  it('tags a WebTransport datagram EOF', async () => {
-    let reader!: ReadableStreamDefaultController<Uint8Array>
-    const transport = createWebTransportDatagramTransport({
-      readable: new ReadableStream<Uint8Array>({
-        start(controller) {
-          reader = controller
-        }
-      }),
-      writable: new WritableStream<Uint8Array>()
-    })
-    const observed: unknown[] = []
-    transport.onTransportError?.((error) => observed.push(error))
-    transport.subscribe(() => undefined)
-    reader.close()
-    await new Promise<void>((resolve) => queueMicrotask(resolve))
-    expect(observed).toHaveLength(1)
-    expect(observed[0]).toMatchObject({
-      source: 'rpc.endpoint',
-      code: 'TRANSPORT',
-      message: 'WebTransport datagram stream ended'
-    })
-    await transport.close?.()
   })
 
   it('converts a non-Error RTC terminal event to a tagged native Error', () => {

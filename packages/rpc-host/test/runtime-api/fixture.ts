@@ -6,7 +6,7 @@ import type {
 import { identityCodec } from '@migaia/serialize/codecs/identity/v1'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { messageFramerV1 } from '@migaia/rpc-contract/framing'
-import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
+import { createMemoryTransportPair } from '../fixtures/memory-transport.ts'
 import { registerBatchAgreement } from '../../dist/core/internal/batch-frame.js'
 import {
   createRuntimePeer,
@@ -17,7 +17,7 @@ import {
 import { createComposedEndpoint } from '../../dist/core/composed.js'
 import { createCanonicalChunkFeature } from '../../dist/core/features/canonical-chunk.js'
 import { createOutboundFeature } from '../../dist/core/features/outbound.js'
-import { createProviderFeature } from '../../dist/core/features/provider.js'
+import { createProviderFeature } from '../../dist/core/internal/provider-feature.js'
 import { connect } from '../../dist/core/middleware/connect.js'
 import { RpcCapability } from '@migaia/rpc-contract'
 
@@ -96,49 +96,66 @@ export function runtimeSources(
   leftCapabilities?: readonly string[],
   rightCapabilities?: readonly string[]
 ) {
-  /** Each endpoint subscribes to one real physical side. */
-  const transports = createMemoryTransportPair()
-  /**
-   * Source preparation waits for both independently supplied offers rather than echoing a local
-   * list.
-   */
-  const offers: (IRuntimePeerSourceContext | undefined)[] = []
-  /** Both construction calls must participate before their source agreement is published. */
-  let accept!: () => void
-  /** This cold fixture barrier is not a production request or lifecycle owner. */
-  const agreed = new Promise<void>((resolve) => {
-    accept = resolve
-  })
-  /** Build only the canonical shared Peer; there is no fixture dispatcher or provider registry. */
-  const source = (index: number) => async (context: IRuntimePeerSourceContext) => {
-    offers[index] = context
-    if (offers[0] && offers[1]) accept()
-    await agreed
-    /** The fixture intentionally lets one side omit a capability to test the genuine AND boundary. */
-    const left = leftCapabilities ?? RUNTIME_API_FIXTURE_BASE_CAPABILITIES
-    /** The remote side's actual offer is independent from the local side. */
-    const right = rightCapabilities ?? RUNTIME_API_FIXTURE_BASE_CAPABILITIES
-    /** Static platform agreement enters the original sender/receiver capability owner as well. */
-    const capabilities = left.filter((value) => right.includes(value))
-    registerBatchAgreement(transports[index]!, capabilities)
+  return new RuntimeSourcePair(leftCapabilities, rightCapabilities).value
+}
+
+/** One cold two-sided offer barrier retains the original memory resources and source identities. */
+class RuntimeSourcePair {
+  /** Each real endpoint subscribes to its same independently owned physical side. */
+  readonly #transports = createMemoryTransportPair()
+  /** Actual source contexts remain separate until both original offers have arrived. */
+  readonly #offers: (IRuntimePeerSourceContext | undefined)[] = []
+  /** The original one-shot agreement receipt resolves only after both sources participate. */
+  readonly #agreed: Promise<void>
+  /** Only the second original offer settles the same native agreement Promise. */
+  #accept!: () => void
+  /** Optional caller-selected left capabilities retain original array identity and duplicate order. */
+  readonly #left: readonly string[] | undefined
+  /** Optional right capabilities remain independent of the local side's proposal. */
+  readonly #right: readonly string[] | undefined
+  /** Original own sources/transports/close key order remains the public fixture surface. */
+  readonly value
+  /** Construct only a cold native pair and its original agreement barrier. */
+  constructor(leftCapabilities?: readonly string[], rightCapabilities?: readonly string[]) {
+    this.#left = leftCapabilities
+    this.#right = rightCapabilities
+    this.#agreed = new Promise<void>((resolve) => {
+      this.#accept = resolve
+    })
+    this.value = {
+      sources: [this.#source(0), this.#source(1)] as const,
+      transports: this.#transports,
+      close: () => this.#transports[0].close()
+    }
+  }
+  /** Each immutable end index delegates its original source callback to this one pair owner. */
+  #source(index: 0 | 1) {
+    return (context: IRuntimePeerSourceContext) => this.#open(index, context)
+  }
+  /** Complete the original two-offer transaction without adding another negotiation or lifetime. */
+  async #open(index: 0 | 1, context: IRuntimePeerSourceContext) {
+    this.#offers[index] = context
+    if (this.#offers[0] && this.#offers[1]) (0, this.#accept)()
+    await this.#agreed
+    /**
+     * Left order and duplicates are retained while each right membership check becomes constant
+     * work.
+     */
+    const left = this.#left ?? RUNTIME_API_FIXTURE_BASE_CAPABILITIES
+    /** A fresh per-source index preserves the original supported mutable input-array read boundary. */
+    const right = new Set(this.#right ?? RUNTIME_API_FIXTURE_BASE_CAPABILITIES)
+    /** Total work is linear in both actual capability arrays and output multiplicity. */
+    const capabilities = left.filter((value) => right.has(value))
+    registerBatchAgreement(this.#transports[index], capabilities)
     return {
-      transport: transports[index]!,
-      peerId: offers[1 - index]!.self.instanceId,
+      transport: this.#transports[index],
+      peerId: this.#offers[1 - index]!.self.instanceId,
       scheduler: systemScheduler,
-      agreement: {
-        source: 'static' as const,
-        codec: identityCodec.id,
-        capabilities
-      },
+      agreement: { source: 'static' as const, codec: identityCodec.id, capabilities },
       pipeline: { codec: identityCodec, framer: messageFramerV1 },
       features: [],
       close: async () => undefined
     }
-  }
-  return {
-    sources: [source(0), source(1)] as const,
-    transports,
-    close: () => transports[0].close()
   }
 }
 

@@ -3,17 +3,17 @@ import { it } from 'vitest'
 import { createComposedEndpoint } from '../../../rpc-host/dist/core/composed.js'
 import { createCanonicalChunkFeature } from '../../../rpc-host/dist/core/stream/index.js'
 import { createOutboundFeature } from '../../../rpc-host/dist/core/features/outbound.js'
-import { createProviderFeature } from '../../../rpc-host/dist/core/features/provider.js'
+import { createProviderFeature } from '../../../rpc-host/dist/core/internal/provider-feature.js'
 import { createOneWayFeature } from '../../../rpc-host/dist/core/features/one-way.js'
-import { codec } from '../../../rpc-host/dist/core/index.js'
-import { framer } from '../../../rpc-host/dist/core/index.js'
-import { abort } from '../../../rpc-host/dist/core/index.js'
-import { connect } from '../../../rpc-host/dist/core/index.js'
+import { codec } from '../../../rpc-host/dist/core/middleware/codec.js'
+import { framer } from '../../../rpc-host/dist/core/middleware/framer.js'
+import { abort } from '../../../rpc-host/dist/core/middleware/abort.js'
+import { connect } from '../../../rpc-host/dist/core/middleware/connect.js'
 import type { IRemoteChannel } from '@migaia/rpc-host/plugin'
-import { type IRpcFactoryConfig } from '../../../rpc-host/dist/core/index.js'
+import type { IRpcFactoryConfig } from '../../../rpc-host/dist/core/typing.js'
 import { RpcCoreErrorCode, RPC_CORE_ERROR_SOURCE } from '@migaia/rpc-host'
 import { fromJsonRpcError } from '@migaia/rpc-contract'
-import { bridgeFixture, flush } from './fixture.js'
+import { BridgeFixture, flush } from './fixture.js'
 
 /** The actual bridge and original provider share one composed kernel, registry and response owner. */
 function responderEndpoint(
@@ -49,7 +49,7 @@ function responderEndpoint(
 }
 
 it('installed Core provider receives foreign invoke and ID-less notify on the same bridge', async () => {
-  const fixture = bridgeFixture()
+  const fixture = new BridgeFixture()
   const channel = await fixture.open()
   const endpoint = await responderEndpoint(channel)
   const calls: unknown[] = []
@@ -84,7 +84,7 @@ it('installed Core provider receives foreign invoke and ID-less notify on the sa
 })
 
 it('full provider error cause retains source/code/name/message/stack on the correlated wire id', async () => {
-  const fixture = bridgeFixture()
+  const fixture = new BridgeFixture()
   const channel = await fixture.open()
   const endpoint = await responderEndpoint(channel)
   const cause = new TypeError('original-cause')
@@ -120,7 +120,7 @@ it.each(['failed', 'not-settled'] as const)(
   '%s and replay retain the same full failure wire graph',
   async (mode) => {
     /** Actual hello negotiates original idempotency metadata before any keyed business call. */
-    const fixture = bridgeFixture()
+    const fixture = new BridgeFixture()
     const channel = await fixture.open({
       offer: { ...fixture.options.offer, capabilities: ['deadline@1', 'trace@1', 'idempotency@1'] }
     })
@@ -171,7 +171,7 @@ it.each(['failed', 'not-settled'] as const)(
 )
 
 it('frozen scope error keeps native name/stack/cause without mutation', async () => {
-  const fixture = bridgeFixture()
+  const fixture = new BridgeFixture()
   const channel = await fixture.open({
     offer: { ...fixture.options.offer, capabilities: ['deadline@1', 'trace@1', 'idempotency@1'] }
   })

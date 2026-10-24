@@ -264,24 +264,23 @@ rejected INVALID_FRAME
 
 业务调用通常使用 `@migaia/rpc-host` 的 `createRpcHost` 加传输 plugin。独立语言对端、适配器作者与错误边界消费者可直接使用 contract 入口。`@migaia/rpc-plugin-process` 复用 Content-Length 分帧及错误转换；serialize 提供底层可移植遍历与错误链实现。contract checker 不反向依赖 Host、plugin 或原生 I/O。
 
-| 公开入口                                                            | 用途                                                                |
-| ------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| `@migaia/rpc-contract`                                              | 常量、V1 信封、握手、portable 与错误工具                            |
-| `./wire`                                                            | 线上常量和类型，也含 measurePortableStreamValue 等纯数据操作        |
-| `./portable`                                                        | wire portable 规范化与深度常量                                      |
-| `./errors`                                                          | 错误树序列化、还原、校验、JSON-RPC 转换与本地分类                   |
-| `./handshake`                                                       | hello/accept/reject 的构造、协商与校验                              |
-| `./v1`、`./framing/v1`                                              | 协议 1.x 信封与消息 framer                                          |
-| `./framing`                                                         | 字符串/二进制消息分片、重组、物理帧检查                             |
-| `./framing/stream`                                                  | 四字节大端长度前缀及 bootstrap/handshake 接收器                     |
-| `./framing/jsonrpc`                                                 | Content-Length 字节分帧及桥错误码                                   |
-| `./remote`                                                          | remote 契约、目录、控制载荷的纯 checker、形状原因与方法 schema 类型 |
-| `./runtime`、`./runtime/metadata`、`./runtime/lazy`                 | runtime 信封、调用头部、generation/steps，及按需加载版本            |
-| `./stream`                                                          | 流负载、序号、进度、额度和控制状态检查                              |
-| `./binary`、`./binary/lazy`、`./binary/capture`、`./binary/inspect` | 二进制捕获、准备、还原、清单、完整性与大小检查                      |
-| `./schema/wire-error`                                               | 随包发布的错误树 JSON Schema                                        |
+| 公开入口                                            | 用途                                                                |
+| --------------------------------------------------- | ------------------------------------------------------------------- |
+| `@migaia/rpc-contract`                              | 常量、V1 信封、握手、portable 与错误工具                            |
+| `./wire`                                            | 线上常量和类型，也含 measurePortableStreamValue 等纯数据操作        |
+| `./portable`                                        | wire portable 规范化与深度常量                                      |
+| `./errors`                                          | 错误树序列化、还原、校验、JSON-RPC 转换与本地分类                   |
+| `./v1`、`./framing/v1`                              | 协议 1.x 信封与消息 framer                                          |
+| `./framing`                                         | 字符串/二进制消息分片、重组、物理帧检查                             |
+| `./framing/stream`                                  | 四字节大端长度前缀及 bootstrap/handshake 接收器                     |
+| `./framing/jsonrpc`                                 | Content-Length 字节分帧及桥错误码                                   |
+| `./remote`                                          | remote 契约、目录、控制载荷的纯 checker、形状原因与方法 schema 类型 |
+| `./runtime`、`./runtime/metadata`、`./runtime/lazy` | runtime 信封、调用头部、generation/steps，及按需加载版本            |
+| `./stream`                                          | 流负载、序号、进度、额度和控制状态检查                              |
+| `./binary/lazy`、`./binary/inspect`                 | 按需二进制准备/还原、清单、完整性与大小检查                         |
+| `./schema/wire-error`                               | 随包发布的错误树 JSON Schema                                        |
 
-以上共根入口及 19 个子入口，最后一项是 JSON 文件。不要导入内部文件。`./v1` 使用具名 rpcProtocol 与 normalizeRpcEnvelope，没有 default 聚合；根入口以 rpcProtocolV1 提供该协议对象。`createReassembler` / `IRpcReassembler` 已移除，直接使用原 framer.accept/close，或 Pick 相应方法类型。完整字符串统一用 remoteProcessStringFramer，bare processStringFramer 不再公开，没有兼容别名。
+以上共根入口及 16 个子入口，最后一项是 JSON 文件。不要导入内部文件。`./v1` 使用具名 rpcProtocol 与 normalizeRpcEnvelope，没有 default 聚合；根入口以 rpcProtocolV1 提供该协议对象。`createReassembler` / `IRpcReassembler` 已移除，直接使用原 framer.accept/close，或 Pick 相应方法类型。完整字符串统一用 remoteProcessStringFramer，bare processStringFramer 不再公开，没有兼容别名。
 
 ### remote 与 runtime 的纯形状检查
 
@@ -376,7 +375,7 @@ stream 入口的 normalizeStreamPayload 校验负载；checkRpcStreamSequence/Pr
 
 ### binary：捕获、清单、还原与预算
 
-prepareRpcBinary(envelope, storage, limit?, digest?, codec?) 生成二进制清单、sidecar 与总量；restoreRpcBinary 校验清单与完整性后还原，Decoded 版有前述信任限制。captureRpcBinaryData 同步捕获，稍后 prepare，适用于捕获时间早于编码；binary/lazy 同名操作在完整 codec 加载前捕获数据，并在需要摘要的 native 分支计算首个摘要。
+prepareRpcBinary(envelope, storage, limit?, digest?, codec?) 生成二进制清单、sidecar 与总量；restoreRpcBinary 校验清单与完整性后还原，Decoded 版有前述信任限制。binary/lazy 在完整 codec 加载前捕获数据，并在需要摘要的 native 分支计算首个摘要。
 
 native 按完整底层 ArrayBuffer 计入 backing 预算；inline 按 offset + visibleLength 计入分配预算，只复制可见字节并保留零前缀语义。limit 不无条件覆盖清单全部元数据。native + encode-only codec 的 prehash 分支另查实际整帧，inline 或其他 codec 的物理帧上限由对应 codec 或调用者负责。
 

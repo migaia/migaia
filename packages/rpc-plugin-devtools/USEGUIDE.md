@@ -111,7 +111,7 @@ try {
 }
 ```
 
-record v1 的头保持 `{ format: 'migaia-rpc-devtools', version: 1 }`，包改名不改变格式。`/contract` 提供 encodeRpcDevtoolsRecord、decodeRpcDevtoolsRecord 和相关类型。字节采用保留的 `$bytes` 语法及规范 base64；原生错误恢复名称、stack 与原因链，不重新生成远端 stack。格式不承诺任意 JS 类实例图往返。
+record v1 的头保持 `{ format: 'migaia-rpc-devtools', version: 1 }`，包改名不改变格式。collector.exportRecord/importRecord 负责记录编解码。字节采用保留的 `$bytes` 语法及规范 base64；原生错误恢复名称、stack 与原因链，不重新生成远端 stack。格式不承诺任意 JS 类实例图往返。
 
 ## 既有 host 上的远程 service
 
@@ -128,48 +128,8 @@ export function exposeDiagnostics(host: IRpcHost, tools: IDevtoolsPlugin) {
 
 capture 与 exposeContent: true 是独立选择；默认远程服务隐藏捕获内容。服务读取会排除其实际服务 host 的观察记录，避免查询观察自身业务。服务保留 query/watch/stats/describe、record.start/stop、clear、pause/resume；跨 RPC 输出沿原 portable/wire 转换。
 
-## Hub 与结构化日志
-
-`/hub` 的 createRpcDevtoolsHub 接收已有 client 的 request/stream 或离线记录，不替应用创建连接。注册名是 Hub 的本地标签，不是 endpoint 身份。
-
-```ts doc-test=check
-import { createRpcDevtoolsHub } from '@migaia/rpc-plugin-devtools/hub'
-
-export async function inspectRecord(text: string) {
-  const hub = createRpcDevtoolsHub({ maxEvents: 5000 })
-  try {
-    hub.importRecord('offline', text)
-    return hub.timeline({ targets: ['offline'], limit: 100 })
-  } finally {
-    await hub.close()
-  }
-}
-```
-
-在线对齐取五次采样中最小 RTT 估计偏移与不确定性，不保证网络对称。Hub 先订阅再补历史，按原序列去重；interaction 只关联已观察到的 trace 或 sender/message 身份，oneSided 不补造缺失一端。关闭 Hub 只 return 自己的 watch、取消自己的定时器，不关闭借入 client。
-
-`/log` 的 createRpcLogProbe 接收实现 debug/info/warn/error 的结构化 logger。需要安装时，把返回 probe 放进作者 SDK 的 feature 定义：
-
-```ts doc-test=check
-import { defineFeaturePlugin } from '@migaia/rpc-host/plugin'
-import { createRpcLogProbe, type IRpcLogSink } from '@migaia/rpc-plugin-devtools/log'
-
-const logger: IRpcLogSink = {
-  debug: (message, fields) => console.debug(message, fields),
-  info: (message, fields) => console.info(message, fields),
-  warn: (message, fields) => console.warn(message, fields),
-  error: (message, fields) => console.error(message, fields)
-}
-export const logging = defineFeaturePlugin({
-  name: 'app-logging',
-  probe: createRpcLogProbe(logger, { slowMs: 100 })
-})
-```
-
-将 logging 与实际传输安装到 host。log probe 只选择 message/peer，不拥有文件、缓冲、批处理或 flush；logger 应避免阻塞，并自行负责 shutdown。logger/格式化失败走 onError，不改变业务结算。
-
 ## 最终清理与错误
 
-先 return 自己的 watch，停止 recording，关闭业务 host，再关闭仍由应用拥有的 collector/Hub/logger。collector.close 幂等且不关闭业务 host；host.close 同样不关闭 collector。
+先 return 自己的 watch，停止 recording，关闭业务 host，再关闭仍由应用拥有的 collector。collector.close 幂等且不关闭业务 host；host.close 同样不关闭 collector。
 
-本包 source 为 rpc.devtools。INVALID_OPTION、CLOSED、RECORD_ACTIVE、RECORD_NOT_ACTIVE、RECORD_FORMAT_INVALID、REDACT_FAILED、TARGET_DUPLICATE、TARGET_UNKNOWN、TARGET_RELEASE_FAILED、SERVICE_RESULT_INVALID 保留原生错误类型与原 cause。诊断与清理错误需要处理或报告，不能用采集失败替换原业务错误。
+本包 source 为 rpc.devtools。INVALID_OPTION、CLOSED、RECORD_ACTIVE、RECORD_NOT_ACTIVE、RECORD_FORMAT_INVALID、REDACT_FAILED、SERVICE_RESULT_INVALID 保留原生错误类型与原 cause。诊断与清理错误需要处理或报告，不能用采集失败替换原业务错误。

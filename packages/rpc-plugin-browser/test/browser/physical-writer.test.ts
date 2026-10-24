@@ -1,7 +1,13 @@
+import { createComposedEndpoint } from '../../../rpc-host/dist/core/composed.js'
+import { createCanonicalChunkFeature } from '../../../rpc-host/dist/core/features/canonical-chunk.js'
+import { createOutboundFeature } from '../../../rpc-host/dist/core/features/outbound.js'
+import { createProviderFeature } from '../../../rpc-host/dist/core/internal/provider-feature.js'
+import { createDiscoveryFeature } from '../../../rpc-host/dist/core/features/discovery.js'
+import { createControlFeature } from '../../../rpc-host/dist/core/features/control.js'
 import assert from 'node:assert/strict'
 import { describe, it } from 'vitest'
-import { createFullOneWayEndpoint, connect } from '../../../rpc-host/dist/core/index.js'
-import { createWebWorkerTransport } from '@migaia/rpc-plugin-browser/adapters/web-worker'
+import { connect } from '../../../rpc-host/dist/core/middleware/connect.js'
+import { createWebWorkerTransport } from '@migaia/rpc-host/plugin'
 import { envelope } from '../../../rpc-host/test/core/fixtures/physical-batch-envelope.js'
 
 describe('optimal physical writer', () => {
@@ -28,11 +34,26 @@ describe('optimal physical writer', () => {
     /** The actual canonical transport grants source/identity behavior on each endpoint. */
     const transport = createWebWorkerTransport(ports[1] as never, { peerId: 'a' })
     /** Provider work is held to distinguish admission order from completion order. */
-    const endpoint = await createFullOneWayEndpoint({
-      id: 'b',
-      transport,
-      middlewares: [connect({ transport })]
-    })
+    /**
+     * This physical endpoint owns one outbound and discovery graph for its original business
+     * assertions.
+     */
+    const endpointOutbound = createOutboundFeature(createCanonicalChunkFeature())
+    /** Discovery shares the same sender and accepted target directory. */
+    const endpointDiscovery = createDiscoveryFeature(endpointOutbound)
+    const endpoint = await createComposedEndpoint(
+      {
+        id: 'b',
+        transport,
+        middlewares: [connect({ transport })]
+      },
+      {
+        'first-party-outbound': endpointOutbound,
+        'first-party-provider': createProviderFeature(endpointOutbound),
+        'first-party-discovery': endpointDiscovery,
+        'first-party-control': createControlFeature(endpointOutbound, endpointDiscovery)
+      }
+    )
     /** Concurrent entries must be observable before either provider completes. */
     const seen: string[] = []
     /** One business hold is released only after both semantic admissions are checked. */

@@ -1,26 +1,24 @@
+import { createRpcHost } from '@migaia/rpc-host'
+import { processPlugin } from '@migaia/rpc-plugin-process'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import assert from 'node:assert/strict'
 import { it, vi } from 'vitest'
 import { RpcCapability } from '@migaia/rpc-contract'
-import { createProcessFixtureListenerPeer as createProcessListenerPeer } from '../fixtures/process-diagnostics.js'
+import {
+  observeProcessListenerSessions,
+  readObservedProcessSessionAdmission
+} from '../fixtures/process-diagnostics.js'
 import { createNativeProcessOffer } from '../../../rpc-plugin-process/dist/process/offer.js'
 import { createProcessTransport } from '../../../rpc-plugin-process/dist/process/handshake.js'
 import {
   dialProcessByteChannel,
   listenProcessByteChannel
-} from '@migaia/rpc-plugin-process/adapters/node-socket'
+} from '../../../rpc-plugin-process/dist/process/adapters/node-socket.js'
 import {
   createRuntimePeer,
   type IRuntimePeer
 } from '../../../rpc-host/dist/remote/runtime-api/peer.js'
-import {
-  readRuntimePeerConnection,
-  readRuntimePeerSessions
-} from '../../../rpc-host/dist/remote/runtime-api/peer.js'
 import { RUNTIME_API_FIXTURE_BASE_CAPABILITIES as RUNTIME_API_CAPABILITIES } from '../../../rpc-host/test/runtime-api/fixture.js'
-import { readEndpointOwner } from '../../../rpc-host/dist/core/internal/endpoint-projection.js'
-import { EndpointOwnerKey } from '../../../rpc-host/dist/core/endpoint-kernel.js'
-import type { ProviderAdmissionRegistry } from '../../../rpc-host/dist/core/internal/provider-admission.js'
 
 it('authenticated native stream retains its shared lease through discard and seals real final outcome', async () => {
   /** Fixture source offers are independent from unadvertised production runtime-api defaults. */
@@ -46,55 +44,62 @@ it('authenticated native stream retains its shared lease through discard and sea
   /** Every original report remains available to reject accidental transport or cleanup failures. */
   const failures: unknown[] = []
   /** Original listener/session/governor/drain wrappers register the actual stream callback. */
-  const server = await createProcessListenerPeer(
-    {
-      self: { name: 'native-stream-provider', instanceId: 'native-stream-provider' },
-      provide: {
-        baseline: () => 42,
-        values: async function* (_payload: unknown, context: { signal: IAbortSignal }) {
-          signal = context.signal
-          effects.push('first')
-          yield 1
-          await held
-          effects.push('discarded')
-          yield 2
-          return 99
-        },
-        after: () => {
-          effects.push('after')
-          return 7
-        },
-        other: () => 9
+  /** Only genuine SDK accepted Peer receipts support the original admission identity oracle. */
+  const acceptedSessions: IRuntimePeer[] = []
+  const server = await createRpcHost({
+    self: { name: 'native-stream-provider', instanceId: 'native-stream-provider' },
+    provide: {
+      baseline: () => 42,
+      values: async function* (_payload: unknown, context: { signal: IAbortSignal }) {
+        signal = context.signal
+        effects.push('first')
+        yield 1
+        await held
+        effects.push('discarded')
+        yield 2
+        return 99
       },
-      report: (error) => failures.push(error)
+      after: () => {
+        effects.push('after')
+        return 7
+      },
+      other: () => 9
     },
-    {
-      kind: 'listener',
-      address: 'tcp://127.0.0.1:0',
-      listen: async (options) => {
-        /** This actual listener owns the assigned address and every accepted byte channel. */
-        const listener = await listenProcessByteChannel(options)
-        address = listener.address
-        return listener
-      },
-      verify: (auth) => {
-        assert.equal(auth, 'native-stream-fixture')
-        return 'stream-principal'
-      },
-      offer: createNativeProcessOffer({
-        peer: { id: 'native-stream-provider', runtime: 'node' },
-        capabilities
-      }),
-      createConnectionContext: () => ({
-        peerId: 'native-stream-caller',
-        ipc: {
-          connectionId: 'native-stream-connection',
-          sessionId: 'native-stream-session',
-          log: () => undefined
-        }
-      })
-    }
-  )
+    report: (error) => failures.push(error),
+    plugins: [
+      observeProcessListenerSessions(
+        processPlugin({
+          listen: {
+            kind: 'listener',
+            address: 'tcp://127.0.0.1:0',
+            listen: async (options) => {
+              /** This actual listener owns the assigned address and every accepted byte channel. */
+              const listener = await listenProcessByteChannel(options)
+              address = listener.address
+              return listener
+            },
+            verify: (auth) => {
+              assert.equal(auth, 'native-stream-fixture')
+              return 'stream-principal'
+            },
+            offer: createNativeProcessOffer({
+              peer: { id: 'native-stream-provider', runtime: 'node' },
+              capabilities
+            }),
+            createConnectionContext: () => ({
+              peerId: 'native-stream-caller',
+              ipc: {
+                connectionId: 'native-stream-connection',
+                sessionId: 'native-stream-session',
+                log: () => undefined
+              }
+            })
+          }
+        }),
+        acceptedSessions
+      )
+    ]
+  })
   /** The connected Peer remains owned by its original native source through cleanup. */
   let client: IRuntimePeer | undefined
   /** The real same-key follower stays observed until the final stream lease is released. */
@@ -141,12 +146,9 @@ it('authenticated native stream retains its shared lease through discard and sea
     )
     assert.deepEqual(effects, ['first'])
     /** Actual native registration carries the same canonical shared admission object. */
-    const session = readRuntimePeerSessions(server)![0]!
+    const session = acceptedSessions[0]!
     /** Waiting and running retain one lease each until true generator terminal and cleanup. */
-    const admission = readEndpointOwner<ProviderAdmissionRegistry>(
-      readRuntimePeerConnection(session).endpoint,
-      EndpointOwnerKey.providerAdmission
-    )!
+    const admission = readObservedProcessSessionAdmission(session)!
     await vi.waitFor(() => assert.equal(admission.size, 2))
     /** Discard reuses the real native iterator and does not release its key at stream-open. */
     const returned = iterator.return!()

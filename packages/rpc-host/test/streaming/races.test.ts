@@ -7,11 +7,8 @@ import type {
   IRpcOutboundOperationsPort
 } from '../../dist/core/internal/plugin-shared-keys.js'
 import { RpcStreamOwner } from '../../dist/core/internal/stream/owner.js'
-import {
-  RpcCoreErrorCode,
-  RPC_CORE_ERROR_SOURCE,
-  deserializeRpcError
-} from '../../dist/core/index.js'
+import { RpcCoreErrorCode, RPC_CORE_ERROR_SOURCE } from '../../dist/core/errors.js'
+import { deserializeRpcError } from '../../dist/core/internal/error-wire-metadata.js'
 import { createRpcError } from '../../dist/core/errors.js'
 import { attachErrorIdentity } from '@migaia/utils/error'
 
@@ -23,71 +20,103 @@ function streamPayload(command: IRpcOutboundCommand) {
 }
 
 /** Drive only the stream-open physical completion boundary without an IPC queue. */
-function heldOpen() {
-  const commands: IRpcOutboundCommand[] = []
-  let onFrame: ((command: IRpcOutboundCommand) => Promise<void>) | undefined
-  let accept!: (message: unknown) => void | Promise<void>
-  let resolveOpen!: () => void
-  let rejectOpen!: (error: unknown) => void
-  const opening = new Promise<void>((resolve, reject) => {
-    resolveOpen = resolve
-    rejectOpen = reject
-  })
-  const outbound: IRpcOutboundOperationsPort = {
-    send: ((command: IRpcOutboundCommand) => {
-      commands.push(command)
-      if (command.kind === 'frame' && onFrame) return onFrame(command)
-      return command.kind === 'stream-open' ? opening : Promise.resolve()
-    }) as IRpcOutboundOperationsPort['send'],
-    noteUnknownField: () => undefined
-  }
-  let route!: IEndpointKernelRoute
-  const closing = new AbortController()
-  let now = 0
-  const kernel = {
-    registerOwner: () => undefined,
-    /** This isolated stream has no optional provider policy owner, as on the real kernel. */
-    readOwner: () => undefined,
-    generation: 0,
-    closingSignal: closing.signal,
-    state: 'active',
-    assertActive: () => undefined,
-    registerRoute: (_kind: string, handler: IEndpointKernelRoute) => {
-      route = handler
-      return () => undefined
-    },
-    time: {
-      now: () => now,
-      timestamp: () => now,
-      setTimeout: (task: () => void, delayMs: number) => {
-        const timer = globalThis.setTimeout(task, delayMs)
-        return { clear: () => globalThis.clearTimeout(timer) }
+class HeldStreamOpen {
+  /** Observe original send order without adding a queue or transport platform. */
+  readonly #commands: IRpcOutboundCommand[] = []
+  /** A case may select one original physical frame continuation after fixture construction. */
+  #onFrame: ((command: IRpcOutboundCommand) => Promise<void>) | undefined
+  /** The actual producer registration supplies its already-admitted request handler. */
+  #accept!: (message: unknown) => void | Promise<void>
+  /** The test resolves the exact original held initial write Promise. */
+  #resolveOpen!: () => void
+  /** The test rejects that same original initial write with its concrete failure identity. */
+  #rejectOpen!: (error: unknown) => void
+  /** All original stream-open writes retain the same held physical completion Promise. */
+  #opening!: Promise<void>
+  /** The real stream owner supplies the sole installed receive handler returned to the test. */
+  #route!: IEndpointKernelRoute
+  /** The case advances only its existing injected monotonic deadline clock. */
+  #now = 0
+  /** Original own fixture shape and callback order remain unchanged. */
+  readonly value
+  /** Construct only the same real stream owner and original per-case ports. */
+  constructor() {
+    this.#opening = new Promise<void>((resolve, reject) => {
+      this.#resolveOpen = resolve
+      this.#rejectOpen = reject
+    })
+    /** The original outbound port records physical effects without adding a queue or provider path. */
+    const outbound: IRpcOutboundOperationsPort = {
+      send: ((command: IRpcOutboundCommand) => {
+        this.#commands.push(command)
+        /** Snapshot the original selected frame callback before its receiver-free invocation. */
+        const onFrame = this.#onFrame
+        if (command.kind === 'frame' && onFrame) return onFrame(command)
+        return command.kind === 'stream-open' ? this.#opening : Promise.resolve()
+      }) as IRpcOutboundOperationsPort['send'],
+      noteUnknownField: () => undefined
+    }
+
+    /** The original injected close signal stays separate from the case-controlled held write. */
+    const closing = new AbortController()
+
+    /**
+     * Only the original stream port owner publishes receive routing and the injected lifetime
+     * clock.
+     */
+    const kernel = {
+      registerOwner: () => undefined,
+      /** This isolated stream has no optional provider policy owner, as on the real kernel. */
+      readOwner: () => undefined,
+      generation: 0,
+      closingSignal: closing.signal,
+      state: 'active',
+      assertActive: () => undefined,
+      registerRoute: (_kind: string, handler: IEndpointKernelRoute) => {
+        this.#route = handler
+        return () => undefined
       },
-      clearTimeout: (timer: { clear: () => void }) => timer.clear()
-    }
-  } as unknown as IEndpointKernelHost
-  const prepared = {
-    id: 'client',
-    options: { uuid: { generate: () => 'fixed' } }
-  } as unknown as IPreparedEndpoint<string>
-  const owner = new RpcStreamOwner(kernel, prepared, outbound, (_method, handler) => {
-    accept = (message) => handler(message, (signal) => ({ signal }) as never)
-    return () => undefined
-  })
-  return {
-    owner,
-    commands,
-    resolveOpen,
-    rejectOpen,
-    route,
-    advance: (elapsedMs: number) => {
-      now += elapsedMs
-    },
-    accept: (message: unknown) => accept(message),
-    onFrame: (handler: (command: IRpcOutboundCommand) => Promise<void>) => {
-      onFrame = handler
+      time: {
+        now: () => this.#now,
+        timestamp: () => this.#now,
+        setTimeout: (task: () => void, delayMs: number) => {
+          /** Keep this native timeout receipt paired with its original clear callback. */
+          const timer = globalThis.setTimeout(task, delayMs)
+          return { clear: () => globalThis.clearTimeout(timer) }
+        },
+        clearTimeout: (timer: { clear: () => void }) => timer.clear()
+      }
+    } as unknown as IEndpointKernelHost
+    /** Retain the original endpoint identity and exact deterministic id generator. */
+    const prepared = {
+      id: 'client',
+      options: { uuid: { generate: () => 'fixed' } }
+    } as unknown as IPreparedEndpoint<string>
+    /** Construct the same actual stream owner against these exact original per-case ports. */
+    const owner = new RpcStreamOwner(kernel, prepared, outbound, (_method, handler) => {
+      this.#accept = (message) => handler(message, (signal) => ({ signal }) as never)
+      return () => undefined
+    })
+    this.value = {
+      owner,
+      commands: this.#commands,
+      resolveOpen: this.#resolveOpen,
+      rejectOpen: this.#rejectOpen,
+      route: this.#route,
+      advance: (elapsedMs: number) => {
+        this.#now += elapsedMs
+      },
+      accept: (message: unknown) => (0, this.#accept)(message),
+      onFrame: (handler: (command: IRpcOutboundCommand) => Promise<void>) => {
+        this.#onFrame = handler
+      }
     }
   }
+}
+
+/** Construct the original fixture surface with its actual state held by one owner. */
+function heldOpen() {
+  return new HeldStreamOpen().value
 }
 
 /** Cancel cannot outrun the initial request's unresolved send Promise. */

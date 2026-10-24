@@ -70,14 +70,12 @@ try {
 
 ## 功能与平台入口
 
-| 入口                                                          | 用途                                                                              |
-| ------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| 根入口                                                        | `processPlugin`、`isProcessChild`、选项类型与错误身份                             |
-| `/features`                                                   | `sendQueueFeature`、`ipcLogFeature` 与原 flow-control 常量/类型，配置原 IPC owner |
-| `/adapters/node-child-process`、`/adapters/node-socket`       | Node 原生进程与 socket                                                            |
-| `/adapters/bun-spawn`、`/adapters/bun-socket`                 | Bun 原生启动与 socket                                                             |
-| `/adapters/deno-command`、`/adapters/deno-socket`             | Deno 原生启动与 socket                                                            |
-| `/adapters/electron-utility-process`、`/adapters/windows-job` | Electron utility process 与 Windows Job 专用接入                                  |
+| 入口        | 用途                                                                              |
+| ----------- | --------------------------------------------------------------------------------- |
+| 根入口      | `processPlugin`、`isProcessChild`、选项类型与错误身份                             |
+| `/features` | `sendQueueFeature`、`ipcLogFeature` 与原 flow-control 常量/类型，配置原 IPC owner |
+
+原生进程和 socket 实现由包内对应 owner 使用。应用选择既有短配置或完整部署配置；载体作者使用 host `/plugin` 部署 SDK。
 
 公用期限、认证、分片、重试和类型生成从 [rpc-host/features](../rpc-host/README.md#选择传输与功能) 安装。传输独有 feature 的配置覆盖对应 IPC 字段，不另建日志或发送队列。
 

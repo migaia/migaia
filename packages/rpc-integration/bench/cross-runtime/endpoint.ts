@@ -1,4 +1,4 @@
-/** Actual TS endpoint loads only RPC public-entry source files in a frozen disposable copy. */
+/** Actual TS endpoint loads genuine native source owners from the frozen disposable copy. */
 import { state, runtime, echo, report, onRejected, classify, snapshot } from './observe.js'
 import { readFileSync, writeFileSync, existsSync, mkdtempSync, rmSync, renameSync } from 'node:fs'
 import { spawn, execFileSync } from 'node:child_process'
@@ -32,9 +32,16 @@ const sourceRoot = process.env.XRT_SOURCE_ROOT
 /** Child and parent retain independent real runtime identity and cold source-loading provenance. */
 const child = process.argv.includes('--child'),
   stem = process.env.XRT_STEM
-/** Exact source imports correspond to public package export subpaths. */
-const api = async () =>
-  import(new URL('./rpc-plugin-process/src/process/index.ts', sourceRoot).href)
+/** Native definition, handshake and proposal imports retain their actual package source owners. */
+const api = async () => {
+  /** Each actual source owner remains independently loaded only on RPC arms. */
+  const [definition, handshake, proposal] = await Promise.all([
+    import(new URL('./rpc-plugin-process/src/process/index.ts', sourceRoot).href),
+    import(new URL('./rpc-plugin-process/src/process/handshake.ts', sourceRoot).href),
+    import(new URL('./rpc-plugin-process/src/process/offer.ts', sourceRoot).href)
+  ])
+  return { ...definition, ...handshake, ...proposal }
+}
 /** Each runtime uses its delivered public process and socket adapter. */
 const processAdapter = () =>
   import(
@@ -105,65 +112,157 @@ if (child) {
 }
 /** Deliver one bare JSON echo using exactly the paired public physical byte adapter. */
 function barePort(raw, serve) {
-  let buffer = Buffer.alloc(0),
-    waiting = [],
-    writing = Promise.resolve(),
-    closed
-  const content = cell.carrier.includes('content-length')
-  const encode = (value) => {
+  return new BareJsonPort(raw, serve)
+}
+
+/** Bare control keeps only physical framing and JSON echo; no RPC module loads on this arm. */
+class BareJsonPort {
+  /** The same physical adapter owns writes and close. */
+  #raw
+  /** Server and reverse arms retain their original echo selection. */
+  #serve
+  /** The fixed cell selects one of the two existing bare framing grammars. */
+  #content = cell.carrier.includes('content-length')
+  /** Header bytes accumulate once, with constant work per incoming byte. */
+  #header = []
+  /** One body allocation is filled incrementally without repeated prefix copying. */
+  #body
+  /** Number of original body bytes received for this frame. */
+  #bodyBytes = 0
+  /** Original exchange FIFO uses constant work for each insertion/removal. */
+  #waiting = new Map()
+  /** Each exchange retains its original request position. */
+  #issued = 0
+  /** Next complete physical frame consumes the corresponding original request. */
+  #received = 0
+  /** Original physical writes stay serialized under one Promise chain. */
+  #writing = Promise.resolve()
+  /** Original physical close reason rejects all outstanding exchanges. */
+  #closed
+  /** Wire callbacks delegate to this one explicit bare owner. */
+  constructor(raw, serve) {
+    this.#raw = raw
+    this.#serve = serve
+    raw.onData((chunk) => this.#receive(chunk))
+    raw.onClose((reason) => {
+      this.#closed = reason ?? new Error(CrossRuntimeErrorText.closed)
+      for (const waiter of this.#waiting.values()) waiter.reject(this.#closed)
+      this.#waiting.clear()
+    })
+  }
+  /** Produce exactly the original length-prefix or Content-Length bytes. */
+  #encode(value) {
+    /** JSON encoding remains the same single business serialization. */
     const body = Buffer.from(JSON.stringify(value))
-    if (content)
+    if (this.#content)
       return Buffer.concat([Buffer.from('Content-Length: ' + body.length + '\r\n\r\n'), body])
+    /** Native prefix remains four bytes and excludes the prefix itself. */
     const result = Buffer.alloc(4 + body.length)
     result.writeUInt32BE(body.length)
     result.set(body, 4)
     return result
   }
-  raw.onData((chunk) => {
-    buffer = Buffer.concat([buffer, chunk])
-    while (true) {
-      let size, start
-      if (content) {
-        const end = buffer.indexOf('\r\n\r\n')
-        if (end < 0) break
-        size = Number(buffer.subarray(0, end).toString().slice(16))
-        start = end + 4
-      } else {
-        if (buffer.length < 4) break
-        size = buffer.readUInt32BE(0)
-        start = 4
+  /** Consume arbitrary physical fragments with total work linear in received bytes. */
+  #receive(chunk) {
+    /** Each byte belongs to one header or one original payload copy. */
+    let cursor = 0
+    while (cursor < chunk.length) {
+      if (!this.#body) {
+        this.#header.push(chunk[cursor++])
+        /** Framing ends at the same fixed prefix or existing CRLF delimiter. */
+        const length = this.#header.length
+        if (
+          this.#content
+            ? length < 4 ||
+              this.#header[length - 4] !== 13 ||
+              this.#header[length - 3] !== 10 ||
+              this.#header[length - 2] !== 13 ||
+              this.#header[length - 1] !== 10
+            : length < 4
+        )
+          continue
+        /** One completed header selects the original supported payload size. */
+        const header = Buffer.from(this.#header)
+        /** Preserve original Content-Length conversion and frame rejection. */
+        const size = this.#content
+          ? Number(
+              header
+                .subarray(0, length - 4)
+                .toString()
+                .slice(16)
+            )
+          : header.readUInt32BE(0)
+        if (!Number.isSafeInteger(size) || size <= 0 || size > 16777216)
+          throw new RangeError(CrossRuntimeErrorText.frame)
+        this.#body = Buffer.alloc(size)
+        this.#bodyBytes = 0
+        this.#header = []
       }
-      if (!Number.isSafeInteger(size) || size <= 0 || size > 16777216)
-        throw new RangeError(CrossRuntimeErrorText.frame)
-      if (buffer.length < start + size) break
-      const value = JSON.parse(buffer.subarray(start, start + size).toString())
-      buffer = buffer.subarray(start + size)
-      if (serve || (cell.direction === 'reverse' && value?.xrtReceipt !== true))
-        writing = writing.then(() => raw.write(encode(value)))
-      else waiting.shift()?.resolve(value)
+      /** Each received payload byte is copied exactly once into its final frame. */
+      const take = Math.min(chunk.length - cursor, this.#body.length - this.#bodyBytes)
+      this.#body.set(chunk.subarray(cursor, cursor + take), this.#bodyBytes)
+      this.#bodyBytes += take
+      cursor += take
+      if (this.#bodyBytes !== this.#body.length) continue
+      /** A complete physical body enters the original JSON echo path once. */
+      const value = JSON.parse(this.#body.toString())
+      this.#body = undefined
+      if (this.#serve || (cell.direction === 'reverse' && value?.xrtReceipt !== true))
+        this.#writing = this.#writing.then(() => this.#raw.write(this.#encode(value)))
+      else {
+        this.#waiting.get(this.#received)?.resolve(value)
+        this.#waiting.delete(this.#received++)
+      }
     }
+  }
+  /** Return the original exchange Promise and preserve write-failure settlement. */
+  exchange = (value) =>
+    new Promise((resolve, reject) => {
+      if (this.#closed) {
+        reject(this.#closed)
+        return
+      }
+      this.#waiting.set(this.#issued++, { resolve, reject })
+      this.#raw.write(this.#encode(value)).catch(reject)
+    })
+  /** Close retains the original physical close result without Promise adoption. */
+  close = () => this.#raw.close()
+}
+
+/** Install one actual cold process definition on an ordinary Host; retain genuine Peer provenance. */
+async function openNativeProcessHost(options) {
+  /** Source-loaded process definition retains this arm's original runtime graph. */
+  const processApi = await api()
+  /** Local PluginHost is the canonical owner of native installation and cleanup. */
+  const { PluginHost } = await import('@migaia/plugin-host')
+  /** The private reader only projects the actual committed outlet, never a substitute facade. */
+  const { readRuntimeOutletConnection } = await import(
+    new URL('./rpc-host/src/remote/runtime-api/outlet.ts', sourceRoot).href
+  )
+  /** Native callback source remains the same already-open physical channel and handshake. */
+  const { connect, ...settings } = options
+  /** One ordinary Host owns this exact native transport definition. */
+  const host = new PluginHost({
+    execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
   })
-  raw.onClose((reason) => {
-    closed = reason ?? new Error(CrossRuntimeErrorText.closed)
-    for (const w of waiting.splice(0)) w.reject(closed)
-  })
-  return {
-    exchange: (value) =>
-      new Promise((resolve, reject) => {
-        if (closed) {
-          reject(closed)
-          return
-        }
-        waiting.push({ resolve, reject })
-        raw.write(encode(value)).catch(reject)
-      }),
-    close: () => raw.close()
+  try {
+    await host.use(
+      processApi.processPlugin({ ...settings, name: 'bench', connect: { target: connect } })
+    )
+    return { host, peer: readRuntimeOutletConnection(host.process, 'bench').peer }
+  } catch (primary) {
+    try {
+      await host.dispose()
+    } catch (cleanup) {
+      report(cleanup)
+    }
+    throw primary
   }
 }
-/** Public source provider owns lifecycle, dispatch and provider admission. */
+/** Actual ordinary native Host owns provider lifetime, dispatch and admission. */
 async function nativeProvider(raw) {
   const a = await api()
-  return a.createProcessPeer({
+  return openNativeProcessHost({
     self: { name: 'provider', instanceId: 'provider' },
     provide: { bench: { echo: capture === 'count' ? echo : (value) => value } },
     providerLimits: limits,
@@ -230,7 +329,7 @@ async function childMain() {
         },
         report,
         onConnection: (pending) =>
-          a.createProcessPeer({
+          openNativeProcessHost({
             self: { name: 'provider', instanceId: 'provider' },
             provide: { bench: { echo: capture === 'count' ? echo : (value) => value } },
             providerLimits: limits,
@@ -252,104 +351,165 @@ async function childMain() {
 }
 /** One source session has a matched physical child and exact actual runtime pair. */
 async function session(physicalSide = side) {
-  const side = physicalSide,
-    stem = process.env.XRT_STEM + '.arm-' + sessionSequence++ + '.' + physicalSide
-  /** Snapshot ordinals are local to this actual freshly launched peer. */
-  let peerSequence = 0
-  /** Actual native exit stops an out-of-band read; it cannot wait forever on a dead writer. */
-  let peerExited = false
-  const foreign = cell.direction !== 'native',
-    peerRuntime = foreign
+  /** One source session retains the original physical arm and its native resources. */
+  const owner = new CrossRuntimeSession(physicalSide)
+  await owner.open()
+  return owner.view()
+}
+
+/** One actual runtime pair owns readiness, physical resources, snapshot positions and native Host. */
+class CrossRuntimeSession {
+  /** The fixed bare/RPC arm selects only its original physical setup. */
+  #side
+  /** Snapshot filenames belong to this distinct physical arm. */
+  #stem
+  /** Snapshot ordinals advance only for this actual launched peer. */
+  #peerSequence = 0
+  /** Native exit receipts stop out-of-band polling without replacing the exit reason. */
+  #peerExited = false
+  /** The frozen direction determines whether the peer uses foreign delivered source. */
+  #foreign
+  /** The exact frozen runtime determines the original executable and adapter. */
+  #peerRuntime
+  /** The actual source-loaded process adapter owns native launch operations. */
+  #adapter
+  /** The actual source-loaded socket adapter owns Unix dialing. */
+  #socket
+  /** Original acquired resources retire in reverse acquisition order. */
+  #cleanup = []
+  /** The genuine physical channel is borrowed by the actual native Host. */
+  #raw
+  /** The original native launcher supplies this independently observed process identity. */
+  #pid
+  /** Physical peer diagnostics accumulate outside the measured business loop. */
+  #stderr = ''
+  /** The existing out-of-band marker resolves only this physical peer startup. */
+  #resolveReady
+  /** Native launch or premature exit rejects the original startup receipt. */
+  #rejectReady
+  /** All original startup paths join this one out-of-band readiness Promise. */
+  #ready
+  /**
+   * Original foreignIdentity belongs to this physical arm and is shared only by its native
+   * operations.
+   */
+  #foreignIdentity
+  /** RPC arms retain the genuine committed Peer; bare arms retain only their physical echo owner. */
+  #peer
+  /** Capture the same finite arm metadata before native source acquisition. */
+  constructor(physicalSide) {
+    this.#side = physicalSide
+    this.#stem = process.env.XRT_STEM + '.arm-' + sessionSequence++ + '.' + physicalSide
+    this.#foreign = cell.direction !== 'native'
+    this.#peerRuntime = this.#foreign
       ? cell.direction === 'reverse'
         ? cell.initiator
         : cell.provider
       : cell.provider
-  const adapter = await processAdapter(),
-    socket = await socketAdapter(),
-    cleanup = []
-  let raw,
-    pid,
-    stderr = '',
-    resolveReady,
-    rejectReady
-  const ready = new Promise((resolve, reject) => {
-    resolveReady = resolve
-    rejectReady = reject
-  })
-  const output = (stream, bytes) => {
+  }
+  /** Source adapters and readiness precede the same original physical launch and handshake. */
+  async open() {
+    this.#adapter = await processAdapter()
+    this.#socket = await socketAdapter()
+    this.#ready = new Promise((resolve, reject) => {
+      this.#resolveReady = resolve
+      this.#rejectReady = reject
+    })
+    /** Only the frozen foreign source manifest may determine a non-native executable. */
+    const spec = this.#spec()
+    /** Child and parent retain the same independent source-loaded runtime environment. */
+    const env = {
+      ...process.env,
+      XRT_CELL: JSON.stringify(cell),
+      XRT_SIDE: this.#side,
+      XRT_STEM: this.#stem + '.peer'
+    }
+    if (cell.carrier.startsWith('stdio')) await this.#openStdio(spec, env)
+    else await this.#openSocket(spec, env)
+    this.#cleanup.push(() => this.#raw.close())
+    if (this.#side === 'bare') this.#peer = barePort(this.#raw, false)
+    else await this.#openRpc()
+  }
+  /** Preserve original raw stderr forwarding and readiness recognition. */
+  #output = (stream, bytes) => {
     if (stream !== 'stderr') return
+    /** The same physical bytes remain visible before any measured echo. */
     const text = Buffer.from(bytes).toString()
-    stderr += text
+    this.#stderr += text
     process.stderr.write(text)
-    if (foreign ? /^READY\s+/m.test(stderr) : stderr.includes('XRT_READY')) resolveReady()
+    if (this.#foreign ? /^READY\s+/m.test(this.#stderr) : this.#stderr.includes('XRT_READY'))
+      this.#resolveReady()
   }
-  let spec
-  /** Native identity binds the optimized executable to this arm's frozen foreign sources. */
-  let foreignIdentity
-  if (foreign) {
-    const path = fileURLToPath(new URL(peerRuntime + '/', fixtureRoot)),
-      executable = JSON.parse(process.env.XRT_FOREIGN_EXECUTABLES ?? '{}')[peerRuntime]
-    /** The source manifest was sealed before this window; no live checkout file supplies a peer. */
-    const source = JSON.parse(readFileSync(process.env.XRT_SOURCE_MANIFEST, 'utf8')).foreign.find(
-      (entry) => entry.runtime === peerRuntime
-    )
-    for (const file of source.files)
-      if (createHash('sha256').update(readFileSync(file.path)).digest('hex') !== file.sha256)
-        throw new Error(CrossRuntimeErrorText.foreignSource)
-    /** Existing optimized launchers resolve their actual executable before warmup begins. */
-    const actualExecutable =
-      peerRuntime === 'python'
-        ? executable
-        : execFileSync('/bin/bash', [envRun, executable, '--executable'], {
-            encoding: 'utf8',
-            stdio: ['ignore', 'pipe', 'inherit']
-          }).trim()
-    foreignIdentity = {
-      runtime: peerRuntime,
-      source,
-      executable: actualExecutable,
-      executableSHA256: createHash('sha256').update(readFileSync(actualExecutable)).digest('hex'),
-      proof:
-        'frozen source/build inputs plus actual launcher executable; no foreign internals claim'
-    }
-    state.foreignIdentities.push(foreignIdentity)
-    spec = {
-      command: actualExecutable,
-      args: peerRuntime === 'python' ? ['-B', path + 'peer.py', '--business'] : ['--business']
-    }
-    spec.args.push('--jsonrpc', ...(side === 'bare' ? ['--bare-jsonrpc'] : []))
-    spec = {
-      command: '/bin/bash',
-      args: [
-        process.env.XRT_ENV_RUN ??
-          fileURLToPath(
-            new URL('../../../../docs/rpc/scratch/core-refactor-impl/env-run.sh', import.meta.url)
-          ),
-        spec.command,
-        ...spec.args
-      ]
-    }
-  } else spec = command(peerRuntime)
-  const env = {
-    ...process.env,
-    XRT_CELL: JSON.stringify(cell),
-    XRT_SIDE: side,
-    XRT_STEM: stem + '.peer'
+  /** Resolve only the original frozen executable and source identity for this physical arm. */
+  #spec() {
+    let spec
+    /** Native identity binds the optimized executable to this arm's frozen foreign sources. */
+    if (this.#foreign) {
+      const path = fileURLToPath(new URL(this.#peerRuntime + '/', fixtureRoot)),
+        executable = JSON.parse(process.env.XRT_FOREIGN_EXECUTABLES ?? '{}')[this.#peerRuntime]
+      /** The source manifest was sealed before this window; no live checkout file supplies a peer. */
+      const source = JSON.parse(readFileSync(process.env.XRT_SOURCE_MANIFEST, 'utf8')).foreign.find(
+        (entry) => entry.runtime === this.#peerRuntime
+      )
+      for (const file of source.files)
+        if (createHash('sha256').update(readFileSync(file.path)).digest('hex') !== file.sha256)
+          throw new Error(CrossRuntimeErrorText.foreignSource)
+      /** Existing optimized launchers resolve their actual executable before warmup begins. */
+      const actualExecutable =
+        this.#peerRuntime === 'python'
+          ? executable
+          : execFileSync('/bin/bash', [envRun, executable, '--executable'], {
+              encoding: 'utf8',
+              stdio: ['ignore', 'pipe', 'inherit']
+            }).trim()
+      this.#foreignIdentity = {
+        runtime: this.#peerRuntime,
+        source,
+        executable: actualExecutable,
+        executableSHA256: createHash('sha256').update(readFileSync(actualExecutable)).digest('hex'),
+        proof:
+          'frozen source/build inputs plus actual launcher executable; no foreign internals claim'
+      }
+      state.foreignIdentities.push(this.#foreignIdentity)
+      spec = {
+        command: actualExecutable,
+        args:
+          this.#peerRuntime === 'python' ? ['-B', path + 'peer.py', '--business'] : ['--business']
+      }
+      spec.args.push('--jsonrpc', ...(this.#side === 'bare' ? ['--bare-jsonrpc'] : []))
+      spec = {
+        command: '/bin/bash',
+        args: [
+          process.env.XRT_ENV_RUN ??
+            fileURLToPath(
+              new URL('../../../../docs/rpc/scratch/core-refactor-impl/env-run.sh', import.meta.url)
+            ),
+          spec.command,
+          ...spec.args
+        ]
+      }
+    } else spec = command(this.#peerRuntime)
+
+    return spec
   }
-  if (cell.carrier.startsWith('stdio')) {
+  /** Open the original process launcher with unchanged bootstrap, stdio and exit receipts. */
+  async #openStdio(spec, env) {
     const factory =
       runtime === 'deno'
-        ? adapter.createDenoProcessLauncher
+        ? this.#adapter.createDenoProcessLauncher
         : runtime === 'bun'
-          ? adapter.createBunProcessLauncher
-          : adapter.createNodeProcessLauncher
+          ? this.#adapter.createBunProcessLauncher
+          : this.#adapter.createNodeProcessLauncher
     const handle = await factory().launch(
       {
         ...spec,
-        args: [...spec.args, ...(foreign ? ['--bootstrap', 'stdin', '--stdio'] : ['--child'])],
+        args: [
+          ...spec.args,
+          ...(this.#foreign ? ['--bootstrap', 'stdin', '--stdio'] : ['--child'])
+        ],
         env: { inherit: ['PATH', 'TMPDIR'], set: env },
         stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' },
-        ...(foreign
+        ...(this.#foreign
           ? {
               bootstrap: {
                 via: 'stdin',
@@ -358,25 +518,27 @@ async function session(physicalSide = side) {
             }
           : {})
       },
-      { signal: new AbortController().signal, output }
+      { signal: new AbortController().signal, output: this.#output }
     )
-    raw = handle.channel
-    pid = handle.identity.pid
-    cleanup.push(async () => {
+    this.#raw = handle.channel
+    this.#pid = handle.identity.pid
+    this.#cleanup.push(async () => {
       handle.terminate('force')
       await handle.exited
     })
     void handle.exited.then((status) => {
-      peerExited = true
-      rejectReady(new Error(CrossRuntimeErrorText.peerExit(status.code)))
+      this.#peerExited = true
+      this.#rejectReady(new Error(CrossRuntimeErrorText.peerExit(status.code)))
     })
-    await ready
-  } else {
+    await this.#ready
+  }
+  /** Open the original Unix listener arm and join the same native readiness before dialing. */
+  async #openSocket(spec, env) {
     const directory = mkdtempSync('/tmp/xrt-'),
       address = directory + '/p.sock'
     env.XRT_ADDRESS = address
-    cleanup.push(async () => rmSync(directory, { recursive: true, force: true }))
-    if (foreign) {
+    this.#cleanup.push(async () => rmSync(directory, { recursive: true, force: true }))
+    if (this.#foreign) {
       const auth = directory + '/auth'
       writeFileSync(auth, CrossRuntimeBench.token, { mode: 0o600 })
       spec = {
@@ -397,17 +559,17 @@ async function session(physicalSide = side) {
     }
     if (runtime === 'deno') {
       const native = new Deno.Command(spec.command, {
-        args: [...spec.args, ...(!foreign ? ['--child'] : [])],
+        args: [...spec.args, ...(!this.#foreign ? ['--child'] : [])],
         env,
         stdin: 'null',
         stdout: 'null',
         stderr: 'piped'
       }).spawn()
-      pid = native.pid
+      this.#pid = native.pid
       void native.status.then(() => {
-        peerExited = true
+        this.#peerExited = true
       })
-      cleanup.push(async () => {
+      this.#cleanup.push(async () => {
         try {
           native.kill('SIGTERM')
         } catch {}
@@ -419,25 +581,25 @@ async function session(physicalSide = side) {
           while (true) {
             const next = await reader.read()
             if (next.done) break
-            output('stderr', next.value)
+            this.#output('stderr', next.value)
           }
         } finally {
           reader.releaseLock()
         }
       })()
     } else {
-      const native = spawn(spec.command, [...spec.args, ...(!foreign ? ['--child'] : [])], {
+      const native = spawn(spec.command, [...spec.args, ...(!this.#foreign ? ['--child'] : [])], {
         env,
         stdio: ['ignore', 'ignore', 'pipe']
       })
-      pid = native.pid
-      native.stderr.on('data', (bytes) => output('stderr', bytes))
-      native.once('error', rejectReady)
+      this.#pid = native.pid
+      native.stderr.on('data', (bytes) => this.#output('stderr', bytes))
+      native.once('error', this.#rejectReady)
       native.once('exit', (code) => {
-        peerExited = true
-        rejectReady(new Error(CrossRuntimeErrorText.peerExit(code)))
+        this.#peerExited = true
+        this.#rejectReady(new Error(CrossRuntimeErrorText.peerExit(code)))
       })
-      cleanup.push(
+      this.#cleanup.push(
         () =>
           new Promise((resolve) => {
             if (native.exitCode !== null) {
@@ -449,106 +611,109 @@ async function session(physicalSide = side) {
           })
       )
     }
-    await ready
-    raw = await socket.dialProcessByteChannel({ address })
+    await this.#ready
+    this.#raw = await this.#socket.dialProcessByteChannel({ address })
   }
-  cleanup.push(() => raw.close())
-  if (side === 'bare') {
-    const port = barePort(raw, false)
-    return {
-      pid,
-      foreignIdentity,
-      exchange: (payload) => port.exchange(payload),
-      snapshot: () => (foreign ? null : peerSnapshot(pid, stem, peerSequence++, () => peerExited)),
-      close: async () => {
-        for (const close of cleanup.reverse()) await close()
-      },
-      stderr
-    }
-  }
-  const a = await api()
-  const connect = foreign
-    ? async (context) => {
-        const { createProcessJsonRpcChannel } = await import(
-          new URL('./rpc-plugin-process/src/process/jsonrpc-channel.ts', sourceRoot).href
-        )
-        return createProcessJsonRpcChannel({
-          byte: raw,
-          peerId: peerRuntime + '-peer',
-          target: {
-            kind: 'plugin',
-            contract: {
-              schemaVersion: 1,
-              plugin: 'p',
-              features: {
-                f: {
-                  methods: {
-                    request: { mode: 'request', idempotent: true },
-                    oneWay: { mode: 'one-way', idempotent: false }
+  /** Actual ordinary PluginHost installation replaces the removed full process Peer factory. */
+  async #openRpc() {
+    const a = await api()
+    const connect = this.#foreign
+      ? async (context) => {
+          const { createProcessJsonRpcChannel } = await import(
+            new URL('./rpc-plugin-process/src/process/jsonrpc-channel.ts', sourceRoot).href
+          )
+          return createProcessJsonRpcChannel({
+            byte: this.#raw,
+            peerId: this.#peerRuntime + '-peer',
+            target: {
+              kind: 'plugin',
+              contract: {
+                schemaVersion: 1,
+                plugin: 'p',
+                features: {
+                  f: {
+                    methods: {
+                      request: { mode: 'request', idempotent: true },
+                      oneWay: { mode: 'one-way', idempotent: false }
+                    }
                   }
                 }
               }
-            }
-          },
-          offer: {
-            versions: [{ major: 1, minor: 1 }],
-            capabilities: context.capabilities.filter((value) =>
-              [
-                'runtime-api@1',
-                'batch@1',
-                'abort@1',
-                'jsonrpc-bridge@1',
-                'wire-error@1',
-                'deadline@1',
-                'trace@1',
-                'idempotency@1'
-              ].includes(value)
-            ),
-            peer: { id: 'initiator', runtime }
-          },
-          token: CrossRuntimeBench.token,
-          scheduler: systemScheduler,
-          wallClock: { timestamp: () => Date.now() },
-          report,
-          ipc
-        })
-      }
-    : (context) =>
-        a.createProcessTransport(raw, {
-          role: 'initiator',
-          peerId: 'provider',
-          offer: { ...offer(a, 'initiator', context.capabilities), auth: CrossRuntimeBench.token },
-          report,
-          ipc
-        })
-  const peer = await a.createProcessPeer({
-    self: { name: 'initiator', instanceId: 'initiator' },
-    provide:
-      cell.direction === 'reverse'
-        ? { bench: { echo: capture === 'count' ? (value) => echo(value[0]) : (value) => value[0] } }
-        : undefined,
-    providerLimits: limits,
-    connect,
-    report
-  })
-  cleanup.push(() => peer.close())
-  return {
-    pid,
-    foreignIdentity,
-    exchange: (payload) =>
-      peer.request(
+            },
+            offer: {
+              versions: [{ major: 1, minor: 1 }],
+              capabilities: context.capabilities.filter((value) =>
+                [
+                  'runtime-api@1',
+                  'batch@1',
+                  'abort@1',
+                  'jsonrpc-bridge@1',
+                  'wire-error@1',
+                  'deadline@1',
+                  'trace@1',
+                  'idempotency@1'
+                ].includes(value)
+              ),
+              peer: { id: 'initiator', runtime }
+            },
+            token: CrossRuntimeBench.token,
+            scheduler: systemScheduler,
+            wallClock: { timestamp: () => Date.now() },
+            report,
+            ipc
+          })
+        }
+      : (context) =>
+          a.createProcessTransport(this.#raw, {
+            role: 'initiator',
+            peerId: 'provider',
+            offer: {
+              ...offer(a, 'initiator', context.capabilities),
+              auth: CrossRuntimeBench.token
+            },
+            report,
+            ipc
+          })
+    const { host, peer } = await openNativeProcessHost({
+      self: { name: 'initiator', instanceId: 'initiator' },
+      provide:
         cell.direction === 'reverse'
-          ? CrossRuntimeBench.reverse
-          : foreign
-            ? CrossRuntimeBench.request
-            : RuntimeBench.echo,
-        cell.direction === 'reverse' ? [payload] : foreign ? [payload] : payload
-      ),
-    snapshot: () => (foreign ? null : peerSnapshot(pid, stem, peerSequence++, () => peerExited)),
-    close: async () => {
-      for (const close of cleanup.reverse()) await close()
-    },
-    stderr
+          ? {
+              bench: { echo: capture === 'count' ? (value) => echo(value[0]) : (value) => value[0] }
+            }
+          : undefined,
+      providerLimits: limits,
+      connect,
+      report
+    })
+    this.#cleanup.push(() => host.dispose())
+    this.#peer = peer
+  }
+  /** Expose original observation receipts without manufacturing a business Peer facade. */
+  view() {
+    return {
+      pid: this.#pid,
+      foreignIdentity: this.#foreignIdentity,
+      exchange: (payload) =>
+        this.#side === 'bare'
+          ? this.#peer.exchange(payload)
+          : this.#peer.request(
+              cell.direction === 'reverse'
+                ? CrossRuntimeBench.reverse
+                : this.#foreign
+                  ? CrossRuntimeBench.request
+                  : RuntimeBench.echo,
+              cell.direction === 'reverse' || this.#foreign ? [payload] : payload
+            ),
+      snapshot: () =>
+        this.#foreign
+          ? null
+          : peerSnapshot(this.#pid, this.#stem, this.#peerSequence++, () => this.#peerExited),
+      close: async () => {
+        for (const close of this.#cleanup.reverse()) await close()
+      },
+      stderr: this.#stderr
+    }
   }
 }
 /** Snapshot polling follows the existing out-of-band fixture control and carries no RPC call. */

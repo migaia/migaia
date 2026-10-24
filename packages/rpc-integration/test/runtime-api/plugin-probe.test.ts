@@ -7,14 +7,14 @@ import { systemScheduler } from '@migaia/utils/scheduler'
 import { deferred } from '@migaia/utils/promise'
 import { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'
 import { defineProbe, RpcProbeDirection, RpcProbeKind } from '@migaia/rpc-host/probe'
-import { createProcessPlugin } from '../../../rpc-plugin-process/test/protocol.ts'
+import { processPlugin } from '@migaia/rpc-plugin-process'
 import { createProcessTransport } from '../../../rpc-plugin-process/dist/process/handshake.js'
-import { createNodeProcessLauncher } from '@migaia/rpc-plugin-process/adapters/node-child-process'
+import { createNodeProcessLauncher } from '../../../rpc-plugin-process/dist/process/adapters/node-child-process.js'
 import { threadProtocolDefinition as createThreadPlugin } from './fixtures/thread-protocol.js'
 import {
   createNodeThreadLauncher,
   createNodeThreadChannelFactory
-} from '@migaia/rpc-plugin-thread/adapters/node'
+} from '../../../rpc-plugin-thread/dist/threads/adapters/node.js'
 import type { ISpawnProcessPluginDeployment } from '../../../rpc-plugin-process/dist/process/plugin/types.js'
 import { coroutineAbort, coroutineTestHost } from './fixtures/coroutine.js'
 
@@ -146,7 +146,7 @@ for (const family of ['process', 'thread', 'coroutine'] as const) {
                 report: () => undefined
               })
           }
-          await host.use(createProcessPlugin({ ...common, spawn }))
+          await host.use(processPlugin({ ...common, spawn }))
         } else {
           await host.use(
             coroutinePlugin({

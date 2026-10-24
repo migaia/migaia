@@ -1,11 +1,12 @@
+import { createRuntimeEndpointComposition } from '../../dist/core/runtime-api-endpoint.js'
+import { RpcCapability } from '@migaia/rpc-contract'
 import { describe, expect, it } from 'vitest'
-import { createClientEndpoint } from '../../dist/core/client.js'
+
 import { createComposedEndpoint } from '../../dist/core/composed.js'
-import { createProviderEndpoint } from '../../dist/core/provider.js'
-import { createFullEndpoint } from '../../dist/core/full.js'
+
 import { defineRpcFeature } from '../../dist/core/internal/define-rpc-feature.js'
 import { RpcCoreErrorCode } from '../../dist/core/errors.js'
-import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
 import type { IRpcCoreConfig } from '../../dist/core/composed.js'
 import type { IRpcPluginInstallScope } from '../../dist/core/typing.js'
 import { connect } from '../../dist/core/middleware/connect.js'
@@ -336,8 +337,14 @@ describe('composition topology and rollback', () => {
   })
 
   it('accepts single-feature client and provider presets despite unselected conflicts', async () => {
-    const client = await createClientEndpoint(createConfig(() => undefined))
-    const provider = await createProviderEndpoint(createConfig(() => undefined))
+    const client = await createRuntimeEndpointComposition(
+      createConfig(() => undefined),
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
+    const provider = await createRuntimeEndpointComposition(
+      createConfig(() => undefined),
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
 
     expect(client.send).toEqual(expect.any(Function))
     expect(provider.provide).toEqual(expect.any(Function))
@@ -348,7 +355,10 @@ describe('composition topology and rollback', () => {
   it('accepts provider dependency closure without a duplicate outbound owner', async () => {
     let subscriptions = 0
 
-    const endpoint = await createProviderEndpoint(createConfig(() => subscriptions++))
+    const endpoint = await createRuntimeEndpointComposition(
+      createConfig(() => subscriptions++),
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     expect(endpoint.send).toEqual(expect.any(Function))
     expect('provide' in endpoint).toBe(true)
     expect(subscriptions).toBe(1)
@@ -357,7 +367,10 @@ describe('composition topology and rollback', () => {
 
   it('composes all five first-party features with one transport subscription', async () => {
     let subscriptions = 0
-    const endpoint = await createFullEndpoint(createConfig(() => subscriptions++))
+    const endpoint = await createRuntimeEndpointComposition(
+      createConfig(() => subscriptions++),
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
 
     expect(endpoint.send).toEqual(expect.any(Function))
     expect(endpoint.provide).toEqual(expect.any(Function))
@@ -422,7 +435,10 @@ describe('composition topology and rollback', () => {
   })
 
   it('keeps coordinator lifecycle ownership when composing provider surface', async () => {
-    const endpoint = await createProviderEndpoint(createConfig(() => undefined))
+    const endpoint = await createRuntimeEndpointComposition(
+      createConfig(() => undefined),
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     const firstDispose = endpoint.dispose()
     expect(endpoint.dispose()).toBe(firstDispose)
     await firstDispose
@@ -434,7 +450,7 @@ describe('composition topology and rollback', () => {
       *[Symbol.iterator](): IterableIterator<never> {
         throw new Error('iterator failure')
       }
-    } as unknown as Readonly<Record<string, import('../../dist/core/index.js').IRpcFeature>>
+    } as unknown as Readonly<Record<string, import('../../dist/core/feature.js').IRpcFeature>>
 
     await expect(
       createComposedEndpoint(
@@ -497,7 +513,7 @@ describe('composition topology and rollback', () => {
       createComposedEndpoint(
         createConfig(() => subscriptions++),
         [root] as unknown as Readonly<
-          Record<string, import('../../dist/core/index.js').IRpcFeature>
+          Record<string, import('../../dist/core/feature.js').IRpcFeature>
         >
       )
     ).rejects.toMatchObject({ code: RpcCoreErrorCode.invalidConfig })

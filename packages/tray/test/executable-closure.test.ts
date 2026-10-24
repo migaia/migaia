@@ -471,101 +471,9 @@ const runtimeCases: readonly IRuntimeCase[] = [
         }
       ).process
       processEvents.on('unhandledRejection', onUnhandled)
-      type IRaceHost = Awaited<ReturnType<typeof createHost<RuntimeHost, readonly never[]>>>
-      type IRaceOperation = Readonly<{
-        readonly label: string
-        readonly run: () => Promise<unknown>
-      }>
-      const runRace = async (
-        operations: (
-          host: IRaceHost,
-          raw: CountingRuntimeHost,
-          tracked: (name: string) => unknown
-        ) => readonly IRaceOperation[],
-        initialNames: readonly string[],
-        expectClosed = false,
-        expectedFacadeState: 'terminal' | 'failed' = 'terminal',
-        expectedPlugins?: readonly string[],
-        expectedRevisionDelta?: readonly [number, number]
-      ): Promise<void> => {
-        const installs = new Map<string, number>()
-        const disposals = new Map<string, number>()
-        const tracked = (name: string) => {
-          return {
-            name,
-            install: (core: IPluginHostCore<string>) => {
-              installs.set(name, (installs.get(name) ?? 0) + 1)
-              core.onDispose(() => {
-                disposals.set(name, (disposals.get(name) ?? 0) + 1)
-              })
-              return { [name]: name }
-            }
-          }
-        }
-        let raw: CountingRuntimeHost | undefined
-        const raceHost = await createHost({
-          ...hostOptions(initialNames.map((name) => tracked(name))),
-          create: () => {
-            raw = new CountingRuntimeHost({
-              execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
-            })
-            return raw
-          }
-        })
-        const rawHost = raw!
-        const initialRevision = rawHost.revision
-        const raceOperations = operations(raceHost, rawHost, tracked)
-        const results = await Promise.allSettled(raceOperations.map(({ run }) => run()))
-        const committedViews: { readonly plugins: readonly string[] }[] = []
-        for (const [index, result] of results.entries()) {
-          const operation = raceOperations[index]
-          expect(operation).toBeDefined()
-          if (result.status === 'rejected') {
-            expect(result.reason, operation?.label).toMatchObject({
-              code: expect.any(String)
-            })
-          } else {
-            expect(result.value, operation?.label).toBeDefined()
-            if (result.value && typeof result.value === 'object' && 'view' in result.value)
-              committedViews.push(
-                (result.value as { readonly view: { readonly plugins: readonly string[] } }).view
-              )
-          }
-        }
-        if (expectClosed) {
-          expect(() => raceHost.plugins).toThrow()
-          for (const view of committedViews) expect(() => view.plugins).toThrow()
-        } else {
-          for (const view of committedViews) expect(view.plugins).toEqual(raceHost.plugins)
-          expect(raceHost.plugins).toEqual(expectedPlugins)
-          expect(rawHost.revision, `initial=${initialRevision}`).toBe(
-            initialRevision + expectedRevisionDelta![0]
-          )
-        }
-        const preDisposeRevision = rawHost.revision
-        const managedDisposal = raceHost.dispose()
-        const managedResult = await managedDisposal
-        expect(managedResult.state).toBe('terminal')
-        if (expectedFacadeState === 'failed')
-          expect(['terminal', 'failed']).toContain(raceHost.state)
-        else expect(raceHost.state).toBe('terminal')
-        expect(raceHost.isActive).toBe(false)
-        expect(rawHost.revision).toBeGreaterThanOrEqual(initialRevision)
-        if (expectedRevisionDelta !== undefined)
-          expect(rawHost.revision).toBeGreaterThanOrEqual(
-            initialRevision + expectedRevisionDelta[0]
-          )
-        expect(preDisposeRevision).toBeGreaterThanOrEqual(initialRevision)
-        expect(rawHost.disposeCalls).toBeGreaterThan(0)
-        expect(() => openComposition(rawHost).getCurrentSnapshot()).toThrow()
-        const terminalRevision = rawHost.revision
-        await raceHost.dispose()
-        expect(rawHost.revision).toBe(terminalRevision)
-        for (const [name, count] of installs) expect(disposals.get(name) ?? 0).toBe(count)
-        for (const view of committedViews) expect(() => view.plugins).toThrow()
-      }
+
       try {
-        await runRace(
+        await runHostMutationRace(
           (raceHost, _raw, tracked) => [
             { label: 'use:left', run: () => raceHost.use(tracked('left') as never) },
             { label: 'use:right', run: () => raceHost.use(tracked('right') as never) },
@@ -577,7 +485,7 @@ const runtimeCases: readonly IRuntimeCase[] = [
           ['seed', 'left', 'right'],
           [2, 2]
         )
-        await runRace(
+        await runHostMutationRace(
           (raceHost, _raw, tracked) => [
             { label: 'use:added', run: () => raceHost.use(tracked('added') as never) },
             { label: 'replace:seed', run: () => raceHost.replace(tracked('seed') as never) }
@@ -588,7 +496,7 @@ const runtimeCases: readonly IRuntimeCase[] = [
           ['seed', 'added'],
           [3, 3]
         )
-        await runRace(
+        await runHostMutationRace(
           (raceHost, _raw) => [
             { label: 'unUse:seed', run: () => raceHost.unUse('seed') },
             { label: 'dispose:managed', run: () => raceHost.dispose() }
@@ -596,7 +504,7 @@ const runtimeCases: readonly IRuntimeCase[] = [
           ['seed'],
           true
         )
-        await runRace(
+        await runHostMutationRace(
           (raceHost, _raw, tracked) => [
             { label: 'replace:seed', run: () => raceHost.replace(tracked('seed') as never) },
             { label: 'dispose:managed', run: () => raceHost.dispose() }
@@ -605,7 +513,7 @@ const runtimeCases: readonly IRuntimeCase[] = [
           true,
           'failed'
         )
-        await runRace(
+        await runHostMutationRace(
           (raceHost, raw, tracked) => [
             { label: 'use:added', run: () => raceHost.use(tracked('added') as never) },
             { label: 'dispose:raw', run: () => raw.dispose() }
@@ -816,3 +724,95 @@ describe('executable Tray Host and Graph acceptance oracles', () => {
     await run()
   })
 })
+
+type IRaceHost = Awaited<ReturnType<typeof createHost<RuntimeHost, readonly never[]>>>
+type IRaceOperation = Readonly<{
+  readonly label: string
+  readonly run: () => Promise<unknown>
+}>
+/** Run one complete native mutation transaction and verify every retained disposal/identity oracle. */
+async function runHostMutationRace(
+  operations: (
+    host: IRaceHost,
+    raw: CountingRuntimeHost,
+    tracked: (name: string) => unknown
+  ) => readonly IRaceOperation[],
+  initialNames: readonly string[],
+  expectClosed = false,
+  expectedFacadeState: 'terminal' | 'failed' = 'terminal',
+  expectedPlugins?: readonly string[],
+  expectedRevisionDelta?: readonly [number, number]
+): Promise<void> {
+  const installs = new Map<string, number>()
+  const disposals = new Map<string, number>()
+  const tracked = (name: string) => {
+    return {
+      name,
+      install: (core: IPluginHostCore<string>) => {
+        installs.set(name, (installs.get(name) ?? 0) + 1)
+        core.onDispose(() => {
+          disposals.set(name, (disposals.get(name) ?? 0) + 1)
+        })
+        return { [name]: name }
+      }
+    }
+  }
+  let raw: CountingRuntimeHost | undefined
+  const raceHost = await createHost({
+    ...hostOptions(initialNames.map((name) => tracked(name))),
+    create: () => {
+      raw = new CountingRuntimeHost({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+      })
+      return raw
+    }
+  })
+  const rawHost = raw!
+  const initialRevision = rawHost.revision
+  const raceOperations = operations(raceHost, rawHost, tracked)
+  const results = await Promise.allSettled(raceOperations.map(({ run }) => run()))
+  const committedViews: { readonly plugins: readonly string[] }[] = []
+  for (const [index, result] of results.entries()) {
+    const operation = raceOperations[index]
+    expect(operation).toBeDefined()
+    if (result.status === 'rejected') {
+      expect(result.reason, operation?.label).toMatchObject({
+        code: expect.any(String)
+      })
+    } else {
+      expect(result.value, operation?.label).toBeDefined()
+      if (result.value && typeof result.value === 'object' && 'view' in result.value)
+        committedViews.push(
+          (result.value as { readonly view: { readonly plugins: readonly string[] } }).view
+        )
+    }
+  }
+  if (expectClosed) {
+    expect(() => raceHost.plugins).toThrow()
+    for (const view of committedViews) expect(() => view.plugins).toThrow()
+  } else {
+    for (const view of committedViews) expect(view.plugins).toEqual(raceHost.plugins)
+    expect(raceHost.plugins).toEqual(expectedPlugins)
+    expect(rawHost.revision, `initial=${initialRevision}`).toBe(
+      initialRevision + expectedRevisionDelta![0]
+    )
+  }
+  const preDisposeRevision = rawHost.revision
+  const managedDisposal = raceHost.dispose()
+  const managedResult = await managedDisposal
+  expect(managedResult.state).toBe('terminal')
+  if (expectedFacadeState === 'failed') expect(['terminal', 'failed']).toContain(raceHost.state)
+  else expect(raceHost.state).toBe('terminal')
+  expect(raceHost.isActive).toBe(false)
+  expect(rawHost.revision).toBeGreaterThanOrEqual(initialRevision)
+  if (expectedRevisionDelta !== undefined)
+    expect(rawHost.revision).toBeGreaterThanOrEqual(initialRevision + expectedRevisionDelta[0])
+  expect(preDisposeRevision).toBeGreaterThanOrEqual(initialRevision)
+  expect(rawHost.disposeCalls).toBeGreaterThan(0)
+  expect(() => openComposition(rawHost).getCurrentSnapshot()).toThrow()
+  const terminalRevision = rawHost.revision
+  await raceHost.dispose()
+  expect(rawHost.revision).toBe(terminalRevision)
+  for (const [name, count] of installs) expect(disposals.get(name) ?? 0).toBe(count)
+  for (const view of committedViews) expect(() => view.plugins).toThrow()
+}

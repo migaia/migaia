@@ -12,64 +12,98 @@ import { RpcCoreErrorCode } from '../../dist/core/errors.js'
 import { RpcStreamErrorText } from '../../dist/core/internal/stream/error-text.js'
 
 /** Uses the stream ports directly because IPC queue admission belongs to its later leaf. */
-function streamPorts(rejectFrame?: (command: IRpcOutboundCommand) => unknown) {
-  const commands: IRpcOutboundCommand[] = []
-  let route!: IEndpointKernelRoute
-  let accept!: (message: unknown) => void | Promise<void>
-  let closed = false
-  const kernel = {
-    registerOwner: () => undefined,
-    /** This isolated stream has no optional provider policy owner, as on the real kernel. */
-    readOwner: () => undefined,
-    generation: 0,
-    closingSignal: new AbortController().signal,
-    state: 'active',
-    assertActive: () => {
-      if (closed) throw new Error('connection closed')
-    },
-    registerRoute: (_kind: string, handler: IEndpointKernelRoute) => {
-      route = handler
-      return () => undefined
-    },
-    time: {
-      now: () => 0,
-      timestamp: () => 0,
-      setTimeout: (task: () => void, delayMs: number) => {
-        const handle = globalThis.setTimeout(task, delayMs)
-        return { clear: () => globalThis.clearTimeout(handle) }
+class StreamAdmissionPorts {
+  /** Original outbound effects stay ordered for the actual admission assertions. */
+  readonly #commands: IRpcOutboundCommand[] = []
+  /** The real stream owner publishes its sole admitted receive handler. */
+  #route!: IEndpointKernelRoute
+  /** The original registered provider callback receives only already admitted requests. */
+  #accept!: (message: unknown) => void | Promise<void>
+  /** Only this fixture close operation changes its existing kernel admission. */
+  #closed = false
+  /** Generate the original per-fixture monotonic stream identity without shared factory captures. */
+  #issued = 0
+  /** The selected per-case physical refusal callback retains its original receiver-free invocation. */
+  readonly #rejectFrame: ((command: IRpcOutboundCommand) => unknown) | undefined
+  /** Original own fixture shape and callback order remain unchanged. */
+  readonly value
+  /** Construct only the same real stream owner and original per-case ports. */
+  constructor(rejectFrame?: (command: IRpcOutboundCommand) => unknown) {
+    this.#rejectFrame = rejectFrame
+
+    /**
+     * Only the original stream port owner publishes receive routing and the injected lifetime
+     * clock.
+     */
+    const kernel = {
+      registerOwner: () => undefined,
+      /** This isolated stream has no optional provider policy owner, as on the real kernel. */
+      readOwner: () => undefined,
+      generation: 0,
+      closingSignal: new AbortController().signal,
+      state: 'active',
+      assertActive: () => {
+        if (this.#closed) throw new Error('connection closed')
       },
-      clearTimeout: (timer: { clear: () => void }) => timer.clear()
+      registerRoute: (_kind: string, handler: IEndpointKernelRoute) => {
+        this.#route = handler
+        return () => undefined
+      },
+      time: {
+        now: () => 0,
+        timestamp: () => 0,
+        setTimeout: (task: () => void, delayMs: number) => {
+          /** Keep this native timeout receipt paired with its original clear callback. */
+          const handle = globalThis.setTimeout(task, delayMs)
+          return { clear: () => globalThis.clearTimeout(handle) }
+        },
+        clearTimeout: (timer: { clear: () => void }) => timer.clear()
+      }
+    } as unknown as IEndpointKernelHost
+
+    /** Retain the original endpoint identity and exact deterministic id generator. */
+    const prepared = {
+      id: 'server',
+      options: { uuid: { generate: () => `local-${this.#issued++}` } }
+    } as unknown as IPreparedEndpoint<string>
+    /** The original outbound port records physical effects without adding a queue or provider path. */
+    const outbound = {
+      send: ((command: IRpcOutboundCommand) => {
+        this.#commands.push(command)
+        /**
+         * Snapshot only the externally supplied refusal callback to preserve receiver-free
+         * invocation.
+         */
+        const rejectFrame = this.#rejectFrame
+        /** Retain the exact selected refusal value before completing the original physical send. */
+        const rejected = rejectFrame?.(command)
+        if (rejected !== undefined) return Promise.reject(rejected)
+        return command.kind === 'frame' || command.kind === 'stream-open'
+          ? Promise.resolve()
+          : undefined
+      }) as IRpcOutboundOperationsPort['send'],
+      noteUnknownField: () => undefined
     }
-  } as unknown as IEndpointKernelHost
-  let issued = 0
-  const prepared = {
-    id: 'server',
-    options: { uuid: { generate: () => `local-${issued++}` } }
-  } as unknown as IPreparedEndpoint<string>
-  const outbound = {
-    send: ((command: IRpcOutboundCommand) => {
-      commands.push(command)
-      const rejected = rejectFrame?.(command)
-      if (rejected !== undefined) return Promise.reject(rejected)
-      return command.kind === 'frame' || command.kind === 'stream-open'
-        ? Promise.resolve()
-        : undefined
-    }) as IRpcOutboundOperationsPort['send'],
-    noteUnknownField: () => undefined
-  }
-  const owner = new RpcStreamOwner(kernel, prepared, outbound, (_method, handler) => {
-    accept = (message) => handler(message, (signal) => ({ signal }) as never)
-    return () => undefined
-  })
-  return {
-    owner,
-    commands,
-    route: (message: unknown) => route(message),
-    accept: (message: unknown) => accept(message),
-    close: () => {
-      closed = true
+    /** Construct the same actual stream owner against these exact original per-case ports. */
+    const owner = new RpcStreamOwner(kernel, prepared, outbound, (_method, handler) => {
+      this.#accept = (message) => handler(message, (signal) => ({ signal }) as never)
+      return () => undefined
+    })
+    this.value = {
+      owner,
+      commands: this.#commands,
+      route: (message: unknown) => (0, this.#route)(message),
+      accept: (message: unknown) => (0, this.#accept)(message),
+      close: () => {
+        this.#closed = true
+      }
     }
   }
+}
+
+/** Construct the original fixture surface with its actual state held by one owner. */
+function streamPorts(rejectFrame?: (command: IRpcOutboundCommand) => unknown) {
+  return new StreamAdmissionPorts(rejectFrame).value
 }
 
 /** Read only the already-normalized frame event in an outbound test command. */

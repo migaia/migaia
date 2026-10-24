@@ -43,7 +43,8 @@ describe('architecture and export boundary', () => {
       '@migaia/serialize',
       '@migaia/utils/bytes',
       '@migaia/utils/error',
-      '@migaia/utils/function'
+      '@migaia/utils/function',
+      '@migaia/utils/string'
     ])
     const bareSpecifiers = new Set<string>()
     for (const path of sourceFiles(join(packageRoot, 'src', 'contract'))) {

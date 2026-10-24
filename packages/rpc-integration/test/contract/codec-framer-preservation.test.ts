@@ -2,7 +2,8 @@ import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { it, vi } from 'vitest'
 import vectors from '../../schema/vectors/runtime-api.json'
-import { prepareRpcBinary, restoreRpcBinary } from '@migaia/rpc-contract/binary'
+import { prepareWithBinaryDataCodec } from '../../../rpc-contract/test/runtime-api/binary-operation.js'
+import { restoreRpcBinary } from '../../../rpc-contract/dist/contract/runtime-api/binary.js'
 import { RpcBinaryStorage } from '@migaia/rpc-contract/wire'
 import { normalizeRuntimeEnvelope } from '@migaia/rpc-contract/runtime'
 import { assertRpcPhysicalFrameSize } from '@migaia/rpc-contract/framing'
@@ -41,7 +42,7 @@ for (const storage of [RpcBinaryStorage.inline, RpcBinaryStorage.native]) {
         const decode = vi.spyOn(bytes, 'base64ToBytes')
         try {
           /** Admission completes at the original owner before the actual codec awaits. */
-          const prepared = await prepareRpcBinary(envelope, storage, 1024 * 1024, digest)
+          const prepared = await prepareWithBinaryDataCodec(envelope, storage, 1024 * 1024, digest)
           /** Both signed representations must roundtrip their whole wrapper before restoration. */
           for (const auth of [false, true]) {
             const serialized = JSON.stringify(prepared.manifest)

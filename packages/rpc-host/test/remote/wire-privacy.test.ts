@@ -1,12 +1,12 @@
+import { createRuntimeEndpointComposition } from '../../dist/core/runtime-api-endpoint.js'
 import { randomUUID } from 'node:crypto'
 import { describe, expect, it, vi } from 'vitest'
-import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
-import { createProviderEndpoint } from '../../dist/core/provider.js'
-import { createFirstPartyRoots } from '../../dist/core/internal/first-party-roots.js'
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
+
 import { createComposedEndpoint } from '../../dist/core/composed.js'
 import { connect } from '../../dist/core/middleware/connect.js'
 import { hooks } from '../../dist/core/middleware/hooks.js'
-import { serializeRpcError } from '../../dist/core/index.js'
+import { serializeRpcError } from '../../dist/core/internal/error-wire-metadata.js'
 import { normalizeRpcEnvelope, RpcContractErrorCode } from '@migaia/rpc-contract'
 import { normalizeRemoteHostCatalog } from '../../dist/remote/contract.js'
 import { streamRoots } from '../streaming/fixture.js'
@@ -63,38 +63,41 @@ describe('local contract error privacy', () => {
       /** Report retains the exact local failure for diagnosis rather than copying its text. */
       const reports: unknown[] = []
       /** The production provider/stream owner emits the controlled failure. */
-      const server = await createProviderEndpoint({
-        id: 'privacy-server',
-        transport: serverTransport,
-        middlewares: [
-          connect({ transport: serverTransport }),
-          hooks({
-            listeners: (event) => {
-              if (event.name === 'failure') reports.push(event)
+      const server = await createRuntimeEndpointComposition(
+        {
+          id: 'privacy-server',
+          transport: serverTransport,
+          middlewares: [
+            connect({ transport: serverTransport }),
+            hooks({
+              listeners: (event) => {
+                if (event.name === 'failure') reports.push(event)
+              }
+            })
+          ],
+          provider: {
+            describe: () => {
+              throw local!
             }
-          })
-        ],
-        provider: {
-          describe: () => {
-            throw local!
           }
-        }
-      })
+        },
+        { agreement: { capabilities: [] }, peerId: '' }
+      ).installing
       /** Responses are observed after real codec/route processing, independent of client exceptions. */
       /** Only received production frames are inspected for the original marker. */
       const frames: unknown[] = []
       /** Observe real inbound wire frames until resource cleanup. */
       const unsubscribe = clientTransport.subscribe(({ data }) => frames.push(data))
       /** The production requester decodes the response through the public owner. */
-      const client = await createComposedEndpoint(
+      const client = await createRuntimeEndpointComposition(
         {
           id: 'privacy-client',
           transport: clientTransport,
           targetIds: ['privacy-server'],
           middlewares: [connect({ transport: clientTransport })]
         },
-        createFirstPartyRoots(new Set(['first-party-outbound'] as const))
-      )
+        { agreement: { capabilities: [] }, peerId: '' }
+      ).installing
       try {
         /** Each locally controlled factory owns its distinct semantic rejection code. */
         const code =

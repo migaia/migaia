@@ -1,6 +1,7 @@
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { createThreadPeer } from '../../protocol.js'
+import { createRpcHost } from '@migaia/rpc-host'
+import { threadPlugin } from '@migaia/rpc-plugin-thread'
 import {
   createAdapterWebThreadChannelFactory as createWebThreadChannelFactory,
   createAdapterWebThreadLauncher as createWebThreadLauncher
@@ -49,24 +50,28 @@ globalThis.runOwnedThreadExitBoundary = async (): Promise<IExitBoundaryReceipt> 
   /** A long recovery window makes prompt abandonment distinct from an elapsed recovery timeout. */
   const reapTimeoutMs = 2_000
   /** Full spawn selects actual owned supervision rather than borrowing a manually created Worker. */
-  const peer = await createThreadPeer<{ twice(value: number): number }>({
-    spawn: {
-      spec: { entry: new URL('./worker.ts', import.meta.url).href },
-      launcher,
-      budget,
-      scheduler: systemScheduler,
-      channelFactory: createWebThreadChannelFactory({ scheduler: systemScheduler }),
-      report,
-      supervisor: {
-        isolation: 'best-effort',
-        stop: { drainTimeoutMs: 25, exitTimeoutMs: 25, reapTimeoutMs }
-      }
-    },
+  const peer = await createRpcHost<{ twice(value: number): number }>({
+    plugins: [
+      threadPlugin({
+        spawn: {
+          spec: { entry: new URL('./worker.ts', import.meta.url).href },
+          launcher,
+          budget,
+          scheduler: systemScheduler,
+          channelFactory: createWebThreadChannelFactory({ scheduler: systemScheduler }),
+          report,
+          supervisor: {
+            isolation: 'best-effort',
+            stop: { drainTimeoutMs: 25, exitTimeoutMs: 25, reapTimeoutMs }
+          }
+        }
+      })
+    ],
     report
   })
   try {
     /** Business success must precede disposal; startup-only evidence cannot prove owned execution. */
-    const value = await peer.request('twice', 21)
+    const value = await Object.values(peer.peers)[0]!.twice(21)
     /** Keep the pre-existing best-effort admission warning separate from teardown reporting. */
     const admission = diagnostics.slice()
     /** Closing owns one original Promise and one force/reap operation across repeated calls. */

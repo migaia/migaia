@@ -7,8 +7,8 @@ import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { describe, expect, it, vi } from 'vitest'
 import { createNodeThreadChannel, createWebThreadChannel } from '../../src/threads/channel.js'
-import { assembleThreadFixture } from './fixture.js'
-import { createThreadPeer } from '../protocol.js'
+import { threadPlugin } from '@migaia/rpc-plugin-thread'
+import { createRpcHost } from '@migaia/rpc-host'
 import { runtimeTestHost } from '../../../rpc-host/test/runtime-api/public-host.js'
 import {
   createAdapterWebThreadLauncher as createWebThreadLauncher,
@@ -16,7 +16,7 @@ import {
 } from '../../dist/threads/web-launcher.js'
 import { receiveThreadData } from '../../src/threads/bootstrap.js'
 import type { IThreadWebPort } from '../../src/threads/types.js'
-import { nativeFixture, endpointFactory } from './fixture.js'
+import { nativeFixture } from './fixture.js'
 
 /** EventTarget peer keeps private bootstrap separate from transport subscriptions. */
 function webPair() {
@@ -225,7 +225,7 @@ describe('thread channel ownership and portable boundary', () => {
         budget: createUnitBudget({ kind: 'thread', maxUnits: 1 }),
         scheduler: systemScheduler,
         channelFactory: { open: vi.fn() },
-        endpointFactory,
+
         report: vi.fn()
       }
       const host = runtimeTestHost({
@@ -235,14 +235,14 @@ describe('thread channel ownership and portable boundary', () => {
         for (const build of [
           () =>
             host.use(
-              assembleThreadFixture({
+              threadPlugin({
                 name: 'p',
                 spawn: common,
-                endpointFactory,
+
                 report: vi.fn()
               })
             ),
-          () => createThreadPeer({ spawn: common, endpointFactory, report: vi.fn() })
+          () => createRpcHost({ plugins: [threadPlugin({ spawn: common })], report: vi.fn() })
         ]) {
           const failure = await build().catch((error: unknown) => error)
           const native =

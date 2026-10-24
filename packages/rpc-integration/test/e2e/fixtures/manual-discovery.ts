@@ -1,4 +1,4 @@
-import { createBrowserMessagePortTransport } from '@migaia/rpc-plugin-browser/adapters/message-port'
+import { createBrowserMessagePortTransport } from '@migaia/rpc-host/plugin'
 import { readEndpointDebugSnapshot } from '../../../../rpc-host/dist/core/internal/test-observer.js'
 import { createRpc, echoProvider, installErrorGuards } from './rpc.js'
 

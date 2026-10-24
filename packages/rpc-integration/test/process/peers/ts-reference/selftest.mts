@@ -145,7 +145,8 @@ function validatePortable(value: unknown, depth = 1): void {
   if (isRecord(value)) {
     if (Object.hasOwn(value, '$rpc')) {
       if (
-        Object.keys(value).sort().join(',') === '$rpc,base64url' &&
+        Object.keys(value).length === 2 &&
+        Object.hasOwn(value, 'base64url') &&
         value.$rpc === 'bytes' &&
         typeof value.base64url === 'string' &&
         /^[A-Za-z0-9_-]*$/.test(value.base64url)
@@ -177,7 +178,13 @@ function validateWire(
   ignoreUnknown = false,
   reports: Array<{ pointer: string; field: string }> = []
 ): IRecord {
-  const fields = new Set([
+  return new WireValidator(ignoreUnknown, reports).visit(value, '', 1)
+}
+
+/** Independent graph validator owns exactly one wire traversal and its original budget counters. */
+class WireValidator {
+  /** Supported fields are the fixed independent wire-error grammar. */
+  readonly #fields = new Set([
     'source',
     'code',
     'name',
@@ -188,20 +195,37 @@ function validateWire(
     'data',
     'truncated'
   ])
-  let totalBytes = 0
-  let nodes = 0
-  const visit = (input: unknown, path: string, depth: number): IRecord => {
+
+  /** Aggregate string byte budget spans this entire graph, preserving original DFS order. */
+  #totalBytes = 0
+  /** Node budget counts every original visit, including repeated graph references. */
+  #nodes = 0
+  /** Existing oracle policy selects rejection or ordered unknown-field reports. */
+  readonly #ignoreUnknown: boolean
+  /** Caller-owned reports retain their original pointer and field order. */
+  readonly #reports: Array<{ pointer: string; field: string }>
+  /** Borrow the oracle policy and report sink for one traversal only. */
+  constructor(ignoreUnknown: boolean, reports: Array<{ pointer: string; field: string }>) {
+    this.#ignoreUnknown = ignoreUnknown
+    this.#reports = reports
+  }
+  /** Validate one DFS node without changing the independent grammar or error ordering. */
+  visit(input: unknown, path: string, depth: number): IRecord {
     if (depth > 48) throw new WireViolation('depth', path)
-    nodes += 1
-    if (nodes > 1024) throw new WireViolation('nodes', path)
+    this.#nodes += 1
+    if (this.#nodes > 1024) throw new WireViolation('nodes', path)
     if (!isRecord(input)) throw new WireViolation('type', path)
+    /**
+     * Test-oracle exception: n is this wire-error node's input key count; exact lexical reports
+     * match independent cross-language vectors.
+     */
     const unknown = Object.keys(input)
-      .filter((key) => !fields.has(key))
+      .filter((key) => !this.#fields.has(key))
       .sort()
-    if (unknown.length > 0 && !ignoreUnknown) throw new WireViolation('unknownField', path)
-    for (const field of unknown) reports.push({ pointer: path, field })
+    if (unknown.length > 0 && !this.#ignoreUnknown) throw new WireViolation('unknownField', path)
+    for (const field of unknown) this.#reports.push({ pointer: path, field })
     const clean: IRecord = Object.fromEntries(
-      Object.entries(input).filter(([key]) => fields.has(key))
+      Object.entries(input).filter(([key]) => this.#fields.has(key))
     )
     for (const field of ['source', 'code', 'name', 'message', 'stack']) {
       const item = clean[field]
@@ -211,23 +235,22 @@ function validateWire(
       if (/[\uD800-\uDFFF]/.test(item)) throw new WireViolation('surrogate', `${path}/${field}`)
       const amount = Buffer.byteLength(item, 'utf8')
       if (amount > 65_536) throw new WireViolation('stringBytes', `${path}/${field}`)
-      totalBytes += amount
-      if (totalBytes > 1_048_576) throw new WireViolation('totalBytes', `${path}/${field}`)
+      this.#totalBytes += amount
+      if (this.#totalBytes > 1_048_576) throw new WireViolation('totalBytes', `${path}/${field}`)
     }
     if (clean.truncated !== undefined && clean.truncated !== true)
       throw new WireViolation('truncatedValue', `${path}/truncated`)
     if (clean.data !== undefined) validatePortable(clean.data)
-    if (clean.cause !== undefined) clean.cause = visit(clean.cause, `${path}/cause`, depth + 1)
+    if (clean.cause !== undefined) clean.cause = this.visit(clean.cause, `${path}/cause`, depth + 1)
     if (clean.errors !== undefined) {
       if (!Array.isArray(clean.errors)) throw new WireViolation('type', `${path}/errors`)
       if (clean.errors.length === 0) throw new WireViolation('emptyErrors', `${path}/errors`)
       clean.errors = clean.errors.map((child, index) =>
-        visit(child, `${path}/errors/${index}`, depth + 2)
+        this.visit(child, `${path}/errors/${index}`, depth + 2)
       )
     }
     return clean
   }
-  return visit(value, '', 1)
 }
 
 /** Converts a logical throw value into the bounded wire shape used by small vectors. */
@@ -271,111 +294,110 @@ function check(verdict: IVerdict, name: string, assertion: () => void): void {
 }
 
 /** Runs current wire rows and the mandatory baseline offer without loading an RPC implementation. */
-function run(directory: string): IVerdict {
-  const verdict: IVerdict = { passed: 0, failed: 0, pending: [], failures: [] }
-  check(verdict, 'required-baseline-offer', () => {
-    /** The real executable offer must expose both mandatory baseline capabilities. */
-    const offer = localOffer('ts-peer')
-    assert.equal((offer.capabilities as string[]).includes('runtime-api@1'), true)
-    assert.equal((offer.capabilities as string[]).includes('batch@1'), true)
-  })
-  for (const base of ['']) {
-    const prefix = base === '' ? '' : `${base}/`
-    const handshake = vector(directory, `${prefix}handshake.json`)
-    for (const item of handshake.agreement as Array<Record<string, unknown>>) {
-      check(verdict, `${prefix}handshake/agreement/${item.id}`, () => {
-        assert.deepEqual(
+/** Check the exact existing handshake rows through the independent protocol oracle. */
+function checkHandshake(directory: string, verdict: IVerdict, prefix: string): void {
+  const handshake = vector(directory, `${prefix}handshake.json`)
+  for (const item of handshake.agreement as Array<Record<string, unknown>>) {
+    check(verdict, `${prefix}handshake/agreement/${item.id}`, () => {
+      assert.deepEqual(
+        negotiate(
+          item.initiator as Record<string, unknown>,
+          item.responder as Record<string, unknown>
+        ),
+        item.expected
+      )
+    })
+  }
+  for (const item of handshake.invalid as Array<Record<string, unknown>>) {
+    check(verdict, `${prefix}handshake/invalid/${item.id}`, () => {
+      if (item.value !== undefined) assert.equal(validateHello(item.value), item.violation)
+      else
+        assert.equal(
           negotiate(
             item.initiator as Record<string, unknown>,
             item.responder as Record<string, unknown>
           ),
-          item.expected
+          undefined
         )
-      })
-    }
-    for (const item of handshake.invalid as Array<Record<string, unknown>>) {
-      check(verdict, `${prefix}handshake/invalid/${item.id}`, () => {
-        if (item.value !== undefined) assert.equal(validateHello(item.value), item.violation)
-        else
-          assert.equal(
-            negotiate(
-              item.initiator as Record<string, unknown>,
-              item.responder as Record<string, unknown>
-            ),
-            undefined
-          )
-      })
-    }
-    for (const item of handshake.mismatch as Array<Record<string, unknown>>) {
-      check(verdict, `${prefix}handshake/mismatch/${item.id}`, () => {
-        const offer = (handshake.agreement as Array<Record<string, unknown>>)[0]
-          .initiator as Record<string, unknown>
-        assert.equal(validateAccept(offer, item.accept), false)
-      })
-    }
-    const envelopes = vector(directory, `${prefix}envelope.json`)
-    for (const item of envelopes.valid as Array<Record<string, unknown>>) {
-      check(verdict, `${prefix}envelope/valid/${item.id}`, () =>
-        assert.equal(envelope(item.value, base === ''), undefined)
-      )
-    }
-    for (const item of envelopes.invalid as Array<Record<string, unknown>>) {
-      check(verdict, `${prefix}envelope/invalid/${item.id}`, () => {
-        assert.deepEqual(envelope(item.value, false), [item.violation, item.pointer])
-      })
-    }
-    const unknown = envelopes.unknownFields as Array<Record<string, unknown>>
-    for (const item of unknown) {
-      check(verdict, `${prefix}envelope/unknownFields/${item.id}`, () => {
-        const value = item.value as Record<string, unknown>
-        const route = (value.data as Record<string, unknown>).route as Record<string, unknown>
-        const actual = [
-          ...Object.keys(value)
-            .filter((key) => !['kind', 'id', 'method', 'data'].includes(key))
-            .sort()
-            .map((key) => ['', key]),
-          ...Object.keys(route)
-            .filter(
-              (key) =>
-                ![
-                  'profile',
-                  'type',
-                  'applicationVersion',
-                  'senderId',
-                  'targetId',
-                  'sentAt'
-                ].includes(key)
-            )
-            .sort()
-            .map((key) => ['/data/route', key])
-        ]
-        assert.deepEqual(actual, item.expected)
-      })
-    }
-    for (const item of envelopes.order as Array<Record<string, unknown>>) {
-      check(verdict, `${prefix}envelope/order/${item.id}`, () =>
-        assert.deepEqual(envelope(item.value, base === ''), [item.violation, item.pointer])
-      )
-    }
-    const control = vector(directory, `${prefix}control.json`)
-    for (const item of control.cases as Array<Record<string, unknown>>) {
-      check(verdict, `${prefix}control/${item.id}`, () => {
-        const action =
-          item.variation === 'close' &&
-          (!isRecord(item.payload) ||
-            !Number.isSafeInteger(item.payload.drainMs) ||
-            Number(item.payload.drainMs) < 0)
-            ? 'report'
-            : ((
-                { abort: 'abort', ping: 'ping', pong: 'pong', close: 'close' } as Record<
-                  string,
-                  string
-                >
-              )[String(item.variation)] ?? 'warn')
-        assert.equal(action, item.action)
-      })
-    }
+    })
   }
+  for (const item of handshake.mismatch as Array<Record<string, unknown>>) {
+    check(verdict, `${prefix}handshake/mismatch/${item.id}`, () => {
+      const offer = (handshake.agreement as Array<Record<string, unknown>>)[0].initiator as Record<
+        string,
+        unknown
+      >
+      assert.equal(validateAccept(offer, item.accept), false)
+    })
+  }
+}
+/** Check envelope fields, unknown reports and first-error precedence in original row order. */
+function checkEnvelopes(directory: string, verdict: IVerdict, prefix: string, base: string): void {
+  const envelopes = vector(directory, `${prefix}envelope.json`)
+  for (const item of envelopes.valid as Array<Record<string, unknown>>) {
+    check(verdict, `${prefix}envelope/valid/${item.id}`, () =>
+      assert.equal(envelope(item.value, base === ''), undefined)
+    )
+  }
+  for (const item of envelopes.invalid as Array<Record<string, unknown>>) {
+    check(verdict, `${prefix}envelope/invalid/${item.id}`, () => {
+      assert.deepEqual(envelope(item.value, false), [item.violation, item.pointer])
+    })
+  }
+  const unknown = envelopes.unknownFields as Array<Record<string, unknown>>
+  for (const item of unknown) {
+    check(verdict, `${prefix}envelope/unknownFields/${item.id}`, () => {
+      const value = item.value as Record<string, unknown>
+      const route = (value.data as Record<string, unknown>).route as Record<string, unknown>
+      const actual = [
+        // Test-oracle exception: n is this envelope's key count; preserve the vector's exact lexical report order.
+        ...Object.keys(value)
+          .filter((key) => !['kind', 'id', 'method', 'data'].includes(key))
+          .sort()
+          .map((key) => ['', key]),
+        // Test-oracle exception: n is this route's key count; preserve the vector's exact lexical report order.
+        ...Object.keys(route)
+          .filter(
+            (key) =>
+              !['profile', 'type', 'applicationVersion', 'senderId', 'targetId', 'sentAt'].includes(
+                key
+              )
+          )
+          .sort()
+          .map((key) => ['/data/route', key])
+      ]
+      assert.deepEqual(actual, item.expected)
+    })
+  }
+  for (const item of envelopes.order as Array<Record<string, unknown>>) {
+    check(verdict, `${prefix}envelope/order/${item.id}`, () =>
+      assert.deepEqual(envelope(item.value, base === ''), [item.violation, item.pointer])
+    )
+  }
+}
+/** Check lifecycle control actions without changing their independent expected values. */
+function checkControls(directory: string, verdict: IVerdict, prefix: string): void {
+  const control = vector(directory, `${prefix}control.json`)
+  for (const item of control.cases as Array<Record<string, unknown>>) {
+    check(verdict, `${prefix}control/${item.id}`, () => {
+      const action =
+        item.variation === 'close' &&
+        (!isRecord(item.payload) ||
+          !Number.isSafeInteger(item.payload.drainMs) ||
+          Number(item.payload.drainMs) < 0)
+          ? 'report'
+          : ((
+              { abort: 'abort', ping: 'ping', pong: 'pong', close: 'close' } as Record<
+                string,
+                string
+              >
+            )[String(item.variation)] ?? 'warn')
+      assert.equal(action, item.action)
+    })
+  }
+}
+/** Check every stream payload, sequence and byte-budget row. */
+function checkStreams(directory: string, verdict: IVerdict): void {
   const streams = vector(directory, 'stream.json')
   for (const item of streams.payload as Array<Record<string, unknown>>) {
     check(verdict, `stream/payload/${item.id}`, () => {
@@ -422,13 +444,9 @@ function run(directory: string): IVerdict {
   check(verdict, 'stream/envelope/valid', () =>
     assert.equal(envelope((streams.envelope as Record<string, unknown>).valid, true), undefined)
   )
-  check(verdict, 'framing/zero-and-limit', () => {
-    assert.throws(() => encodeFrame(Buffer.alloc(0)), { code: 'INVALID_FRAME' })
-    assert.throws(() => encodeFrame(Buffer.alloc(MAX_FRAME + 1)), { code: 'FRAME_LIMIT_EXCEEDED' })
-    const decoder = new FrameDecoder()
-    assert.throws(() => decoder.push(Buffer.from([1, 0, 0, 1])), { code: 'FRAME_LIMIT_EXCEEDED' })
-    assert.throws(() => new FrameDecoder().push(Buffer.alloc(4)), { code: 'INVALID_FRAME' })
-  })
+}
+/** Check bounded wire graphs, truncation and foreign-error projection in original order. */
+function checkWireErrors(directory: string, verdict: IVerdict): void {
   const wires = vector(directory, 'error-chain.json')
   for (const item of wires.valid as IRecord[]) {
     check(verdict, `wire/valid/${item.id}`, () => {
@@ -520,6 +538,9 @@ function run(directory: string): IVerdict {
       }
     })
   }
+}
+/** Check framing entry boundaries and every physical chunk vector through the real byte codec. */
+function checkFraming(directory: string, verdict: IVerdict): void {
   /** Execute every current framing row through this executable peer's actual byte codec. */
   const framing = vector(directory, 'stream-framing.json') as unknown as IRecord[]
   for (const item of framing) {
@@ -550,6 +571,32 @@ function run(directory: string): IVerdict {
       }
     })
   }
+}
+/** Runs all existing vector families with one independent verdict ledger. */
+function run(directory: string): IVerdict {
+  const verdict: IVerdict = { passed: 0, failed: 0, pending: [], failures: [] }
+  check(verdict, 'required-baseline-offer', () => {
+    /** The real executable offer must expose both mandatory baseline capabilities. */
+    const offer = localOffer('ts-peer')
+    assert.equal((offer.capabilities as string[]).includes('runtime-api@1'), true)
+    assert.equal((offer.capabilities as string[]).includes('batch@1'), true)
+  })
+  for (const base of ['']) {
+    const prefix = base === '' ? '' : `${base}/`
+    checkHandshake(directory, verdict, prefix)
+    checkEnvelopes(directory, verdict, prefix, base)
+    checkControls(directory, verdict, prefix)
+  }
+  checkStreams(directory, verdict)
+  check(verdict, 'framing/zero-and-limit', () => {
+    assert.throws(() => encodeFrame(Buffer.alloc(0)), { code: 'INVALID_FRAME' })
+    assert.throws(() => encodeFrame(Buffer.alloc(MAX_FRAME + 1)), { code: 'FRAME_LIMIT_EXCEEDED' })
+    const decoder = new FrameDecoder()
+    assert.throws(() => decoder.push(Buffer.from([1, 0, 0, 1])), { code: 'FRAME_LIMIT_EXCEEDED' })
+    assert.throws(() => new FrameDecoder().push(Buffer.alloc(4)), { code: 'INVALID_FRAME' })
+  })
+  checkWireErrors(directory, verdict)
+  checkFraming(directory, verdict)
   return verdict
 }
 

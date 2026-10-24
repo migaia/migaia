@@ -1,7 +1,7 @@
+import { createRuntimeEndpointComposition } from '../../dist/core/runtime-api-endpoint.js'
 import { describe, expect, it } from 'vitest'
-import { createClientEndpoint } from '../../dist/core/client.js'
-import { createProviderEndpoint } from '../../dist/core/provider.js'
-import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
+
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
 import { connect } from '../../dist/core/middleware/connect.js'
 import { RpcRouteProfile, type IRpcRequestEnvelope } from '@migaia/rpc-contract'
 
@@ -10,27 +10,33 @@ describe('composed receiver identity admission', () => {
   it('rejects absent, foreign, and forged receiver identities before provider execution', async () => {
     const [clientTransport, providerTransport] = createMemoryTransportPair()
     let executions = 0
-    const provider = await createProviderEndpoint({
-      id: 'receiver-provider',
-      transport: providerTransport,
-      middlewares: [
-        connect({
-          transport: providerTransport,
-          useBaseIdVerifyOnly: false,
-          identifier: async ({ senderId }) => senderId === 'receiver-client'
-        })
-      ]
-    })
+    const provider = await createRuntimeEndpointComposition(
+      {
+        id: 'receiver-provider',
+        transport: providerTransport,
+        middlewares: [
+          connect({
+            transport: providerTransport,
+            useBaseIdVerifyOnly: false,
+            identifier: async ({ senderId }) => senderId === 'receiver-client'
+          })
+        ]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     provider.provide('count', (context) => {
       executions += 1
       return context.success(null)
     })
-    const client = await createClientEndpoint({
-      id: 'receiver-client',
-      targetIds: ['receiver-provider'],
-      transport: clientTransport,
-      middlewares: [connect({ transport: clientTransport })]
-    })
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'receiver-client',
+        targetIds: ['receiver-provider'],
+        transport: clientTransport,
+        middlewares: [connect({ transport: clientTransport })]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     try {
       await client.send('receiver-provider', 'count', null)
       expect(executions).toBe(1)

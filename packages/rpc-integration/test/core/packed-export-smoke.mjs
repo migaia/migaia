@@ -17,6 +17,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { chromium } from '@playwright/test'
 import { parseSync } from 'oxc-parser'
+import { orderStringKeys } from '@migaia/utils/string'
 
 const integrationDirectory = resolve(fileURLToPath(new URL('../..', import.meta.url)))
 const repositoryRoot = resolve(integrationDirectory, '../..')
@@ -110,11 +111,6 @@ async function main() {
       join(packedPackages['rpc-contract'], 'dist/contract/v1/normalize.js')
     )
     console.log('CHECK contract-normalize PASS')
-    const canonicalProtocolPath = join(packedPackage, 'dist/core/middleware/canonical-protocol.js')
-    assertPackedLegacyCodecRejection(consumerDirectory, canonicalProtocolPath)
-    console.log('CHECK legacy-codec-rejection PASS')
-    assertPackedLegacyCodecPerturbation(consumerDirectory, canonicalProtocolPath)
-    console.log('CHECK canonical-protocol PASS')
     assertPackedLegacyRootAliasPerturbation(packedPackage, consumerDirectory)
     console.log('CHECK root-entry PASS')
     assertPackedCanonicalFeatureRoutePerturbation(packedPackage, consumerDirectory)
@@ -243,62 +239,6 @@ function assertPackedLegacyEnvelopePerturbation(consumerDirectory, normalizerPat
   assertPackedLegacyEnvelopeRejection(consumerDirectory)
 }
 
-/** Rejects the retired codec callback descriptor before either callback can be reached. */
-function assertPackedLegacyCodecRejection(consumerDirectory, canonicalProtocolPath) {
-  const probe = join(consumerDirectory, 'legacy-codec-probe.mjs')
-  writeFileSync(
-    probe,
-    [
-      `import { canonicalProtocol } from ${JSON.stringify(pathToFileURL(canonicalProtocolPath).href)}`,
-      'let callbacks = 0',
-      'const legacy = {',
-      '  encode() { callbacks += 1; return undefined },',
-      '  decode() { callbacks += 1; return undefined }',
-      '}',
-      'try {',
-      '  canonicalProtocol(legacy)',
-      "  throw new Error('Legacy codec configuration was accepted')",
-      '} catch (error) {',
-      "  if (error?.message === 'Legacy codec configuration was accepted') throw error",
-      "  if (error?.code !== 'INVALID_CONFIG') throw error",
-      "  if (callbacks !== 0) throw new Error('Legacy codec callbacks executed before rejection')",
-      '}'
-    ].join('\n'),
-    'utf8'
-  )
-  execFileSync(process.execPath, [probe], { cwd: consumerDirectory, stdio: 'pipe' })
-}
-
-/**
- * Allows only the packed codec owner to admit the retired descriptor, then restores its exact
- * bytes.
- */
-function assertPackedLegacyCodecPerturbation(consumerDirectory, canonicalProtocolPath) {
-  const original = readFileSync(canonicalProtocolPath, 'utf8')
-  const target =
-    "    if (!descriptor ||\n        typeof descriptor !== 'object' ||\n        typeof readProtocolNormalize(descriptor) !== 'function')"
-  const replacement = "    if (!descriptor || typeof descriptor !== 'object')"
-  if (!original.includes(target))
-    throw new Error('Packed canonical protocol mutation anchor is unavailable')
-  let observed = false
-  try {
-    writeFileSync(canonicalProtocolPath, original.replace(target, replacement), 'utf8')
-    try {
-      assertPackedLegacyCodecRejection(consumerDirectory, canonicalProtocolPath)
-    } catch (error) {
-      if (String(error.stderr ?? '').includes('Legacy codec configuration was accepted')) {
-        observed = true
-      } else {
-        throw error
-      }
-    }
-  } finally {
-    writeFileSync(canonicalProtocolPath, original, 'utf8')
-  }
-  if (!observed) throw new Error('Legacy codec oracle accepted the mutated packed protocol owner')
-  assertPackedLegacyCodecRejection(consumerDirectory, canonicalProtocolPath)
-}
-
 /**
  * Restores the retired root export only inside the extracted packed package and proves its
  * behavior.
@@ -318,6 +258,7 @@ function assertPackedLegacyRootAliasPerturbation(packedPackage, consumerDirector
    * exports, so the perturbation still loads against the current packed dist.
    */
   const legacyChunkSource = fixture.source
+    .replace("'../internal/utf8.js'", "'@migaia/utils/bytes'")
     .replace(
       'import { WebRpcError, WebRpcErrorCode }',
       'import { RpcError as WebRpcError, RpcCoreErrorCode as WebRpcErrorCode }'
@@ -330,7 +271,7 @@ function assertPackedLegacyRootAliasPerturbation(packedPackage, consumerDirector
   if (legacyChunkSource.includes('import { WebRpc'))
     throw new Error('Packed legacy chunk fixture imports an unmapped pre-layering name')
   /** Packed files whose exact bytes establish the root-export sensitivity baseline. */
-  const rootPath = join(packedPackage, 'dist/core/index.js')
+  const rootPath = join(packedPackage, 'dist/index.js')
   const canonicalChunkPath = join(packedPackage, 'dist/core/middleware/canonical-chunk.js')
   const sharedKeysPath = join(packedPackage, 'dist/core/internal/plugin-shared-keys.js')
   const roleSchemaPath = join(packedPackage, 'dist/core/internal/plugin-contract.js')
@@ -390,7 +331,7 @@ function assertPackedLegacyRootAliasPerturbation(packedPackage, consumerDirector
     writeFileSync(canonicalChunkPath, legacyChunkSource, 'utf8')
     writeFileSync(
       rootPath,
-      `${root.toString('utf8')}\nexport { canonicalChunk as chunk } from './middleware/canonical-chunk.js'\n`,
+      `${root.toString('utf8')}\nexport { canonicalChunk as chunk } from './core/middleware/canonical-chunk.js'\n`,
       'utf8'
     )
     assertRootChunkAbsent(true)
@@ -430,14 +371,14 @@ function assertPackedCanonicalFeatureRoutePerturbation(packedPackage, consumerDi
   /** Original bytes retained for byte-exact restoration after the adversarial installation. */
   const original = readFileSync(canonicalFeaturePath)
   const source = original.toString('utf8')
-  /** Exact compiled install statement that causally bounds the injected legacy route. */
-  const anchor = 'const prepared = core.featureExpose.getPrepared();'
+  /** Exact compiled constructor statement still inside native Feature installation claim capture. */
+  const anchor = 'this.#core = core;'
   if (!source.includes(anchor))
     throw new Error('Packed canonical feature route mutation anchor is unavailable')
   /** One-line perturbation that makes the real canonical feature claim the retired route. */
   const mutated = source.replace(
     anchor,
-    `${anchor}\n        core.featureExpose.getKernel().registerRoute('chunk', () => undefined);`
+    `${anchor}\n        this.#core.featureExpose.getKernel().registerRoute('chunk', () => undefined);`
   )
   /** Fresh child-process probe that preserves the packed outbound-to-canonical dependency path. */
   const probe = join(consumerDirectory, 'canonical-feature-route-probe.mjs')
@@ -449,15 +390,22 @@ function assertPackedCanonicalFeatureRoutePerturbation(packedPackage, consumerDi
     writeFileSync(
       probe,
       [
-        "import { createClientEndpoint } from './node_modules/@migaia/rpc-host/dist/core/client.js'",
-        "import { connect, protocol, codec } from './node_modules/@migaia/rpc-host/dist/core/index.js'",
-        "import { createMemoryTransportPair } from './node_modules/@migaia/rpc-host/dist/core/adapters/memory.js'",
+        "import { createComposedEndpoint } from './node_modules/@migaia/rpc-host/dist/core/composed.js'",
+        "import { createCanonicalChunkFeature } from './node_modules/@migaia/rpc-host/dist/core/features/canonical-chunk.js'",
+        "import { createOutboundFeature } from './node_modules/@migaia/rpc-host/dist/core/features/outbound.js'",
+        "import { connect } from './node_modules/@migaia/rpc-host/dist/core/middleware/connect.js'",
+        "import { codec } from './node_modules/@migaia/rpc-host/dist/core/middleware/codec.js'",
+        "import { MessageChannel } from 'node:worker_threads'",
+        "import { createNodeMessagePortTransport } from './node_modules/@migaia/rpc-host/dist/core/adapters/message-port.js'",
         "import { createStringFramer } from '@migaia/rpc-contract/framing'",
         "import { defineJsonCodec } from '@migaia/serialize/codecs/json'",
-        'const [transport] = createMemoryTransportPair()',
+        'const { port1, port2 } = new MessageChannel()',
+        'const transport = createNodeMessagePortTransport(port1)',
+        'port1.unref(); port2.unref()',
         'try {',
-        '  const endpoint = await createClientEndpoint(',
-        "    { id: 'packed-canonical-feature-route', transport, framer: createStringFramer(), middlewares: [protocol(), codec(defineJsonCodec({ version: 1 })), connect({ transport })] },",
+        '  const endpoint = await createComposedEndpoint(',
+        "    { id: 'packed-canonical-feature-route', transport, framer: createStringFramer(), middlewares: [codec(defineJsonCodec({ version: 1 })), connect({ transport })] },",
+        '    { outbound: createOutboundFeature(createCanonicalChunkFeature()) }',
         '  )',
         "  if ('chunk' in endpoint) throw new Error('Canonical feature leaked a root chunk surface')",
         '  await endpoint.dispose()',
@@ -468,7 +416,7 @@ function assertPackedCanonicalFeatureRoutePerturbation(packedPackage, consumerDi
         '    process.exit(1)',
         '  }',
         '  throw error',
-        '}'
+        '} finally { port1.close(); port2.close() }'
       ].join('\n'),
       'utf8'
     )
@@ -488,7 +436,7 @@ function assertPackedCanonicalFeatureRoutePerturbation(packedPackage, consumerDi
     writeFileSync(canonicalFeaturePath, mutated, 'utf8')
     if (
       !readFileSync(canonicalFeaturePath, 'utf8').includes(
-        "core.featureExpose.getKernel().registerRoute('chunk', () => undefined);"
+        "this.#core.featureExpose.getKernel().registerRoute('chunk', () => undefined);"
       )
     )
       throw new Error('Packed canonical feature route mutation was not written')
@@ -578,12 +526,12 @@ function resolveEsbuildBinary() {
   return binary
 }
 
-/** Verifies the complete root-reachable public feature documentation graph with TypeScript symbols. */
+/** Verifies the retained Feature owner documentation graph with TypeScript symbols. */
 function assertDefineFeatureDocumentation(packedPackage) {
   const roots = [
-    resolve(packageDirectory, 'src/core/index.ts'),
-    resolve(packageDirectory, 'dist/core/index.d.ts'),
-    join(packedPackage, 'dist/core/index.d.ts')
+    resolve(packageDirectory, 'src/core/feature.ts'),
+    resolve(packageDirectory, 'dist/core/feature.d.ts'),
+    join(packedPackage, 'dist/core/feature.d.ts')
   ]
   const manifests = roots.map((path) => readFeatureDocumentationManifest(path))
   if (JSON.stringify(manifests[0]) !== JSON.stringify(manifests[1]))
@@ -594,7 +542,7 @@ function assertDefineFeatureDocumentation(packedPackage) {
   const negativeDirectory = mkdtempSync(join(smokeDirectory, 'feature-doc-negative-'))
   try {
     const fixtureDist = join(negativeDirectory, 'dist')
-    const fixtureRoot = join(fixtureDist, 'core/index.d.ts')
+    const fixtureRoot = join(fixtureDist, 'core/feature.d.ts')
     const fixtureFeature = join(fixtureDist, 'core/feature.d.ts')
     cpSync(join(packedPackage, 'dist'), fixtureDist, { recursive: true })
     const originalFeature = readFileSync(fixtureFeature, 'utf8')
@@ -782,6 +730,25 @@ function readJSDoc(file, node) {
 }
 
 /**
+ * Order tag names by the shared UTF-16 contract while retaining every same-name tag in source
+ * order.
+ *
+ * @param {readonly { name: string; text: string }[]} tags Original tags, including repeated names.
+ * @returns {[string, string][]} All original entries grouped in stable canonical name order.
+ */
+function orderedDocumentationTags(tags) {
+  /** Each name keeps its original ordered cohort; no tag is deduplicated or overwritten. */
+  const groups = new Map()
+  for (const tag of tags) {
+    /** The cohort belongs to this exact stable tag name. */
+    let entries = groups.get(tag.name)
+    if (!entries) groups.set(tag.name, (entries = []))
+    entries.push([tag.name, tag.text])
+  }
+  return orderStringKeys([...groups.keys()]).flatMap((name) => groups.get(name))
+}
+
+/**
  * Extracts a stable public-symbol and overload documentation manifest through the root export
  * graph.
  */
@@ -796,12 +763,7 @@ function readFeatureDocumentationManifest(rootPath) {
     const docs = exported.declarations.map(({ statement }) => readJSDoc(exported.file, statement))
     const documentation = [...new Set(docs.map((doc) => doc.description).filter(Boolean))].join(' ')
     if (!documentation) throw new Error(`Feature documentation missing for public symbol: ${name}`)
-    const tags = Object.fromEntries(
-      docs
-        .flatMap((doc) => doc.tags)
-        .map((tag) => [tag.name, tag.text])
-        .sort(([left], [right]) => left.localeCompare(right))
-    )
+    const tags = orderedDocumentationTags(docs.flatMap((doc) => doc.tags))
     if (name === 'defineFeature') {
       const overloads = exported.declarations.filter(
         ({ node }) => node.type === 'TSDeclareFunction'
@@ -810,11 +772,7 @@ function readFeatureDocumentationManifest(rootPath) {
         throw new Error(`defineFeature overload count drifted in ${rootPath}`)
       const overloadManifest = overloads.map(({ statement, node }) => {
         const doc = readJSDoc(exported.file, statement)
-        const overloadTags = Object.fromEntries(
-          doc.tags
-            .map((tag) => [tag.name, tag.text])
-            .sort(([left], [right]) => left.localeCompare(right))
-        )
+        const overloadTags = orderedDocumentationTags(doc.tags)
         /** `@param name - text` and `@typeParam name - text` both split on the first word. */
         const named = (tagName) =>
           doc.tags
@@ -840,7 +798,9 @@ function readFeatureDocumentationManifest(rootPath) {
               node.typeParameters?.params.map((parameter) => parameter.name.name) ?? []
             ) ||
           typeParameters.some((parameter) => !parameter.documentation) ||
-          !['remarks', 'returns', 'throws'].every((tag) => overloadTags[tag])
+          !['remarks', 'returns', 'throws'].every((tag) =>
+            overloadTags.some(([name, text]) => name === tag && text)
+          )
         )
           throw new Error(`defineFeature overload documentation is incomplete in ${rootPath}`)
         return {
@@ -855,7 +815,10 @@ function readFeatureDocumentationManifest(rootPath) {
       manifest[name] = { documentation, tags }
     }
   }
-  const config = findExportedDeclarations(rootPath, 'IRpcFactoryConfig')
+  const config = findExportedDeclarations(
+    resolve(dirname(rootPath), rootPath.endsWith('.d.ts') ? 'typing.d.ts' : 'typing.ts'),
+    'IRpcFactoryConfig'
+  )
   if (!config) throw new Error('Feature documentation root export missing: IRpcFactoryConfig')
   const declaration = config.declarations.find(({ node }) => node.type === 'TSTypeAliasDeclaration')
   const property = declaration?.node.typeAnnotation.members?.find(
@@ -973,38 +936,6 @@ try {
 }
 
 const assert = (await import('node:assert/strict')).default;
-const { createPeerPair } = await import('./node_modules/@migaia/rpc-host/dist/testing/index.js');
-const pairReports = [];
-let pairEffects = 0;
-const pair = await createPeerPair({
-  a: { provide: { double: (value) => value * 2 } },
-  b: { provide: { echo: (value) => value, count: () => ++pairEffects } },
-  report: (error) => pairReports.push(error)
-});
-try {
-  assert.equal(await pair.b.request('double', 2), 4);
-  const backing = new Uint8Array([9, 1, 2, 8]).buffer;
-  const copied = await pair.a.request('echo', { backing, view: new Uint8Array(backing, 1, 2) });
-  assert.ok(copied.backing instanceof ArrayBuffer);
-  assert.ok(copied.view instanceof Uint8Array);
-  assert.notEqual(copied.backing, backing);
-  assert.equal(copied.view.byteOffset, 1);
-  assert.deepEqual([...copied.view], [1, 2]);
-  assert.equal(backing.byteLength, 4);
-  await assert.rejects(pair.a.request('echo', backing, { transfer: [backing] }), { code: 'CAPABILITY_UNSUPPORTED' });
-  assert.equal(backing.byteLength, 4);
-  const steps = [{ method: 'count' }, { method: 'count' }];
-  const grouped = await pair.a.group(steps, { idempotencyKey: 'packed-pair-group' });
-  assert.deepEqual(grouped.map((step) => step.state), ['success', 'success']);
-  assert.equal((await pair.a.outcome('packed-pair-group')).state, 'done');
-  await pair.a.group(steps, { idempotencyKey: 'packed-pair-group' });
-  assert.equal(pairEffects, 2);
-  assert.equal((await pair.a.describe()).connections[0].carrier, 'Memory');
-  assert.deepEqual(pairReports, []);
-} finally {
-  await Promise.all([pair.a.close(), pair.b.close()]);
-}
-process.stdout.write('CHECK runtime-peer-pair PASS\\n');
 try {
   await expectNotExported('@migaia/rpc-host/not-a-legacy-subpath');
   throw new Error('Unrelated import failure was accepted as a legacy subpath');
@@ -1062,57 +993,26 @@ await childReady;
 try { assert.equal(await packedHost.request('echo', 42), 42); }
 finally { await packedHost.close(); }
 process.stdout.write('CHECK host-entry PASS\\n');
-const root = await import('./node_modules/@migaia/rpc-host/dist/core/index.js');
-const clientPreset = await import('./node_modules/@migaia/rpc-host/dist/core/client.js');
-const providerPreset = await import('./node_modules/@migaia/rpc-host/dist/core/provider.js');
-const memory = await import('./node_modules/@migaia/rpc-host/dist/core/adapters/memory.js');
-const [clientTransport] = memory.createMemoryTransportPair();
-const [providerTransport] = memory.createMemoryTransportPair();
-const [fullTransport] = memory.createMemoryTransportPair();
-const middleware = root.connect();
-const packedFeature = root.defineFeature(() => ({ packedCustom: () => 'packed-custom' }));
+const { connect } = await import('./node_modules/@migaia/rpc-host/dist/core/middleware/connect.js');
+const { defineFeature } = await import('./node_modules/@migaia/rpc-host/dist/core/feature.js');
+const composed = await import('./node_modules/@migaia/rpc-host/dist/core/composed.js');
+const { MessageChannel } = await import('node:worker_threads');
+const { createNodeMessagePortTransport } = await import('./node_modules/@migaia/rpc-host/dist/core/adapters/message-port.js');
+const { port1, port2 } = new MessageChannel();
+const transport = createNodeMessagePortTransport(port1);
+port1.unref(); port2.unref();
+const middleware = connect();
+const packedFeature = defineFeature(() => ({ packedCustom: () => 'packed-custom' }));
 try {
-  await root.createEndpoint({
-    id: 'packed-legacy-shape',
-    transport: clientTransport,
-    middlewares: [{ name: 'legacy', install() {} }]
-  });
+  await composed.createComposedEndpoint({ id: 'packed-legacy-shape', transport, middlewares: [{ name: 'legacy', install() {} }] }, {});
   throw new Error('Packed legacy middleware shape was accepted');
 } catch (error) {
   if (error?.code !== 'INVALID_CONFIG') throw error;
 }
-const client = await clientPreset.createClientEndpoint({
-  id: 'packed-client',
-  transport: clientTransport,
-  middlewares: [middleware]
-});
-const provider = await providerPreset.createProviderEndpoint({
-  id: 'packed-provider',
-  transport: providerTransport,
-  middlewares: [middleware]
-});
-const full = await root.createEndpoint({
-  id: 'packed-full',
-  transport: fullTransport,
-  middlewares: [middleware],
-  features: [packedFeature]
-});
-if (typeof client.send !== 'function' || typeof provider.provide !== 'function')
-  throw new Error('Packed selected preset surface missing runtime capability');
-if (
-  typeof full.send !== 'function' ||
-  typeof full.provide !== 'function' ||
-  typeof full.connect !== 'object' ||
-  typeof full.discovery !== 'object'
-)
-  throw new Error('Packed full surface does not match its declared capabilities');
-if (full.packedCustom() !== 'packed-custom')
-  throw new Error('Packed root custom feature runtime projection failed');
-if ('connect' in provider || 'discovery' in provider)
-  throw new Error('Packed provider surface leaked unselected capabilities');
-await client.dispose();
-await provider.dispose();
-await full.dispose();
+const custom = await composed.createComposedEndpoint({ id: 'packed-composed', transport, middlewares: [middleware], features: [packedFeature] }, {});
+if (custom.packedCustom() !== 'packed-custom') throw new Error('Packed custom feature runtime projection failed');
+await custom.dispose();
+port1.close(); port2.close();
 `
 }
 
@@ -1153,9 +1053,9 @@ function assertPackedOwnerManifests(packedPackages) {
       manifest.private !== true
     )
       throw new Error(`Unexpected packed owner identity: ${owner}`)
-    const rpcPeers = Object.keys(manifest.peerDependencies ?? {})
-      .filter((peer) => peer.startsWith('@migaia/rpc-'))
-      .sort()
+    const rpcPeers = orderStringKeys(
+      Object.keys(manifest.peerDependencies ?? {}).filter((peer) => peer.startsWith('@migaia/rpc-'))
+    )
     if (JSON.stringify(rpcPeers) !== JSON.stringify(expectedPeers[owner]))
       throw new Error(`Packed dependency direction or required peers drifted: ${owner}`)
     for (const [peer, version] of Object.entries(manifest.peerDependencies ?? {}))

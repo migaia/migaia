@@ -1,3 +1,13 @@
+import { prepareRuntimeProviderAssembly } from '../../../../../rpc-host/dist/remote/runtime-api/peer.js'
+import {
+  compileRuntimeMethods,
+  type IRuntimeMethodEntry
+} from '../../../../../rpc-host/dist/remote/runtime-api/catalog.js'
+import { describeRemoteMethods } from '../../../../../rpc-host/dist/remote/serve-methods.js'
+import { createRemoteLayerError } from '../../../../../rpc-host/dist/remote/error.js'
+import { RpcRemoteLayerErrorCode } from '../../../../../rpc-host/dist/remote/error-code.js'
+import { RemoteMethodName } from '../../../../../rpc-host/dist/remote/constants.js'
+import { RuntimeApiMode } from '../../../../../rpc-host/dist/remote/runtime-api/constants.js'
 import { PeerMethod, PeerText } from './text.js'
 import { randomUUID } from 'node:crypto'
 import { spawn } from 'node:child_process'
@@ -5,16 +15,13 @@ import { once } from 'node:events'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { parseArgs } from 'node:util'
-import { PluginHost, defineFeature, definePlugin } from '@migaia/plugin-host'
 import { createProcessTransport } from '../../../../../rpc-plugin-process/dist/process/handshake.js'
 import { createNativeProcessOffer } from '../../../../../rpc-plugin-process/dist/process/offer.js'
-import { openProcessStdioChannel } from '@migaia/rpc-plugin-process/adapters/node-child-process'
+import { openProcessStdioChannel } from '../../../../../rpc-plugin-process/dist/process/adapters/node-child-process.js'
 import {
   dialProcessByteChannel,
   listenProcessByteChannel
-} from '@migaia/rpc-plugin-process/adapters/node-socket'
-import { serveRemotePlugin } from '../../../../../rpc-host/dist/remote/serve-plugin.js'
-import { serveRemoteHost } from '../../../../../rpc-host/dist/remote/serve-host.js'
+} from '../../../../../rpc-plugin-process/dist/process/adapters/node-socket.js'
 import { type IRemoteChannel, type IRemoteContract } from '@migaia/rpc-host/plugin'
 import {
   RpcCoreErrorCode,
@@ -85,31 +92,113 @@ const contract: IRemoteContract = values['non-idempotent-request']
 const received: unknown[] = []
 /** Provider-observed cancellation reasons are independently queried after the caller settles. */
 const aborts: unknown[] = []
-/** The real PluginHost owns business Feature installation and disposal. */
-const host = new PluginHost<Record<string, never>>({
-  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
-})
-/** One local definition is resolved by name; no executable definition crosses the channel. */
-const definition = definePlugin({
-  name: contract.plugin,
-  features: {
-    f: defineFeature(() => ({
-      request: (input: unknown) => input,
-      oneWay: (input: unknown) => {
-        received.push(input)
-      },
-      generator: function* (input: unknown) {
-        yield* Array.isArray(input) ? input : [input, input, input]
-      },
-      asyncGenerator: async function* (input: unknown) {
-        for (const item of Array.isArray(input) ? input : [input, input, input]) yield item
+/** Fixed foreign conformance business state, matching the other independent language peers. */
+class PeerBusinessState {
+  /** Foreign Host vectors install exactly their one declared fixture target, never a resolver. */
+  #installed: boolean
+  /** Revisions describe real fixture installation changes without a generic Host mutation layer. */
+  #revision = 0
+  /** Actual application methods are compiled and registered by the canonical runtime owner. */
+  readonly provide = {
+    p: {
+      f: {
+        request: (payload: unknown) => {
+          this.#active()
+          return (payload as unknown[])[0]
+        },
+        oneWay: (payload: unknown) => {
+          this.#active()
+          received.push((payload as unknown[])[0])
+        },
+        generator: (payload: unknown) => this.#generator(payload),
+        asyncGenerator: (payload: unknown) => this.#asyncGenerator(payload)
       }
-    }))
-  },
-  install: () => ({})
-})
+    }
+  }
+
+  /** Plugin vectors start installed; Host vectors require an explicit real wire use request. */
+  constructor(hostProfile: boolean) {
+    this.#installed = !hostProfile
+  }
+
+  /** Retain the original closed-provider boundary after explicit foreign target removal. */
+  #active(): void {
+    if (!this.#installed) throw createRemoteLayerError(RpcRemoteLayerErrorCode.closed)
+  }
+
+  /** Return only the one fixed target described by the published foreign conformance vector. */
+  #entry() {
+    return {
+      name: contract.plugin,
+      state: 'enabled',
+      revision: this.#revision,
+      features: Object.keys(contract.features)
+    }
+  }
+
+  /** A foreign use request changes this fixture target only; no definition/catalog is accepted. */
+  #use = (payload: unknown) => {
+    if (!Array.isArray(payload) || payload[0] !== contract.plugin)
+      throw createRemoteLayerError(RpcRemoteLayerErrorCode.contractInvalid)
+    if (!this.#installed) {
+      this.#installed = true
+      this.#revision += 1
+    }
+    return this.#entry()
+  }
+
+  /** Explicit target removal preserves the foreign wire result and disables subsequent business. */
+  #unUse = (payload: unknown) => {
+    if (!Array.isArray(payload) || payload[0] !== contract.plugin)
+      throw createRemoteLayerError(RpcRemoteLayerErrorCode.contractInvalid)
+    if (this.#installed) {
+      this.#installed = false
+      this.#revision += 1
+    }
+    return { ok: true }
+  }
+
+  /** The safe foreign snapshot reports only this static fixture target's actual installation. */
+  #inspect = () => ({ revision: this.#revision, plugins: this.#installed ? [this.#entry()] : [] });
+
+  /** Stream values come from the same actual application state as scalar and notify methods. */
+  *#generator(payload: unknown): Generator<unknown> {
+    this.#active()
+    const input = (payload as unknown[])[0]
+    yield* Array.isArray(input) ? input : [input, input, input]
+  }
+
+  /** Async streams retain their original independent iterator and fixed fallback cardinality. */
+  async *#asyncGenerator(payload: unknown): AsyncGenerator<unknown> {
+    this.#active()
+    const input = (payload as unknown[])[0]
+    for (const item of Array.isArray(input) ? input : [input, input, input]) yield item
+  }
+
+  /** Add only the three published foreign control vectors to the actual compiled provider list. */
+  methods(): readonly IRuntimeMethodEntry[] {
+    const methods = [...compileRuntimeMethods(this.provide, contract)]
+    if (values.host)
+      for (const [name, method] of [
+        [RemoteMethodName.hostUse, this.#use],
+        [RemoteMethodName.hostUnUse, this.#unUse],
+        [RemoteMethodName.hostInspect, this.#inspect]
+      ] as const)
+        methods.push({
+          name,
+          method,
+          receiver: this,
+          supportedModes: [RuntimeApiMode.request],
+          declaration: { mode: 'request', idempotent: false }
+        })
+    return methods
+  }
+}
+
+/** The foreign executable owns its one published application state across accepted connections. */
+const business = new PeerBusinessState(values.host ?? false)
 /** Each connection borrows this Host and owns its endpoint service. */
-const services = new Set<{ close(): Promise<void> }>()
+const services = new Set<ForeignPeerSession>()
 /** Actual public service-port calls and settlements remain observable after EOF ends the wire. */
 const cleanups: Array<{ calls: number; settled: number; providerAborts: number }> = []
 /** Close intentions fence new peer-originated requests while admitted providers drain. */
@@ -171,54 +260,69 @@ async function serve(channel: IRemoteChannel): Promise<void> {
     if (event.error !== undefined) report(event.error)
     if (event.name === 'control.close') closing = true
   })
-  /** Host profile exposes catalog control; Plugin profile describes the already installed target. */
-  const publicService = values.host
-    ? await serveRemoteHost({
-        host,
-        catalog: { [contract.plugin]: contract },
-        resolvePlugin: () => definition,
-        endpoint: runtime,
-        report
-      })
-    : await serveRemotePlugin({ host, contract, endpoint: runtime, report })
-  /** Publish all providers before releasing the canonical native receive queue. */
+  /** The same canonical provider/directory/stream owner serves the fixed foreign vector. */
+  const assembly = prepareRuntimeProviderAssembly({
+    methods: business.methods(),
+    streams: channel.agreement.capabilities.includes('stream@1'),
+    generations: false,
+    supports: (_peerId, capability) => channel.agreement.capabilities.includes(capability),
+    remoteNode: () => undefined,
+    bindRemoteNode: () => undefined,
+    describe: () =>
+      describeRemoteMethods(
+        [contract],
+        { name: 'ts-peer', instanceId: 'ts-peer' },
+        values.host ?? false
+      )
+  })
+  assembly.install(runtime.endpoint as unknown as Parameters<typeof assembly.install>[0])
+  /** Publish all actual providers before releasing the original native receive queue. */
   ;(channel as IRemoteChannel & { activateReceive?: () => void }).activateReceive?.()
-  /** Observation delegates the exact public close promise; it does not replace its ownership. */
-  const cleanup = { calls: 0, settled: 0, providerAborts: 0 }
-  cleanups.push(cleanup)
-  const service = {
-    close: async () => {
-      cleanup.calls++
-      await publicService.close()
-      cleanup.settled++
-      cleanup.providerAborts = aborts.length
-    }
+  new ForeignPeerSession(channel, runtime)
+}
+
+/** One accepted physical session owns its original endpoint/channel cleanup receipt. */
+class ForeignPeerSession {
+  /** The admitted native channel is closed only after its actual endpoint releases. */
+  #channel: IRemoteChannel
+  /** The same canonical endpoint owns request, stream and pending-provider cancellation. */
+  #runtime: Awaited<ReturnType<typeof endpointFor>>
+  /** Passive original cleanup counts remain observable after native EOF. */
+  #cleanup = { calls: 0, settled: 0, providerAborts: 0 }
+  /** EOF and explicit shutdown share the original first cleanup Promise. */
+  #closed: Promise<void> | undefined
+  /** Native failure observation is removed before physical resource release. */
+  #releaseFailure: () => void = () => undefined
+
+  /** Observe only this already-admitted session without creating another provider owner. */
+  constructor(channel: IRemoteChannel, runtime: Awaited<ReturnType<typeof endpointFor>>) {
+    this.#channel = channel
+    this.#runtime = runtime
+    cleanups.push(this.#cleanup)
+    services.add(this)
+    this.#releaseFailure =
+      channel.transport.onTransportError?.(() => {
+        void this.close().catch(report)
+      }) ?? this.#releaseFailure
   }
-  /** One close promise fences EOF and explicit shutdown against repeated disposal. */
-  let closed: Promise<void> | undefined
-  /** Subscription belongs to this connection and is released before closing its channel. */
-  let releaseFailure = (): void => undefined
-  /** Session ownership ends after the remote service and its channel have both released. */
-  const owned = {
-    close: (): Promise<void> => {
-      if (closed) return closed
-      releaseFailure()
-      closed = (async () => {
-        try {
-          await service.close()
-          await channel.close()
-        } finally {
-          services.delete(owned)
-        }
-      })()
-      return closed
-    }
+
+  /** Preserve original endpoint-before-channel order and leave cleanup counts exact on failures. */
+  close = (): Promise<void> => {
+    if (this.#closed) return this.#closed
+    ;(0, this.#releaseFailure)()
+    this.#closed = (async () => {
+      try {
+        this.#cleanup.calls += 1
+        await this.#runtime.endpoint.dispose()
+        this.#cleanup.settled += 1
+        this.#cleanup.providerAborts = aborts.length
+        await this.#channel.close()
+      } finally {
+        services.delete(this)
+      }
+    })()
+    return this.#closed
   }
-  services.add(owned)
-  releaseFailure =
-    channel.transport.onTransportError?.(() => {
-      void owned.close().catch(report)
-    }) ?? releaseFailure
 }
 
 /** Run one actual public-API client exchange for ordered native interop pairs. */
@@ -251,7 +355,6 @@ async function main(): Promise<void> {
     process.exitCode = 2
     return
   }
-  if (!values.host) await host.use(definition)
   /** One native proposal advertises exactly production-installed control and stream support. */
   const offer = createNativeProcessOffer({
     peer: { id: 'ts-peer', runtime: 'node' },
@@ -360,7 +463,6 @@ async function main(): Promise<void> {
       await exited
     }
   }
-  await host.dispose()
   process.stderr.write(PeerText.cleanupPrefix + JSON.stringify(cleanups) + '\n')
 }
 

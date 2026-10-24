@@ -1,3 +1,5 @@
+import { RpcCapability } from '@migaia/rpc-contract'
+import { RemoteMethodName } from '@migaia/rpc-host/plugin'
 import type { IProcessByteChannel } from '../../../rpc-plugin-process/dist/process/types.js'
 import { mkdtemp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -7,31 +9,109 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   dialProcessByteChannel,
   listenProcessByteChannel
-} from '@migaia/rpc-plugin-process/adapters/node-socket'
+} from '../../../rpc-plugin-process/dist/process/adapters/node-socket.js'
 import { createProcessTransport } from '../../../rpc-plugin-process/dist/process/handshake.js'
 import { createNativeProcessOffer } from '../../../rpc-plugin-process/dist/process/offer.js'
 import {
-  createProcessSessionService,
-  type IProcessSessionServiceOptions
-} from '../../../rpc-plugin-process/test/protocol.ts'
-import { serveProcessSessions } from '../../../rpc-plugin-process/dist/process/plugin/serve.js'
+  createRuntimePeer,
+  type IRuntimePeer
+} from '../../../rpc-host/dist/remote/runtime-api/peer.js'
+import type { IRpcProvider } from '../../../rpc-host/dist/core/typing.js'
+import type { IAbortSignal } from '@migaia/utils/promise'
+import { createLifecycleScope } from '@migaia/lifecycle'
+import {
+  serveProcessSessions,
+  type IProcessReadySession
+} from '../../../rpc-plugin-process/dist/process/plugin/serve.js'
 import { createProcessResilience } from '../../../rpc-plugin-process/dist/process/resilience/index.js'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import type {
   IProcessServeChildIngress,
   IProcessServeListenerIngress
-} from '../../../rpc-plugin-process/dist/process/plugin/index.js'
+} from '../../../rpc-plugin-process/dist/process/plugin/types.js'
 import type { IProcessServeEndpointFactory } from '../../../rpc-plugin-process/dist/process/plugin/types.js'
 import type { IProcessSessionIdentity } from '../../../rpc-plugin-process/dist/process/resilience/types.js'
 import type { IRemoteServeEndpoint } from '@migaia/rpc-host/plugin'
 import { nativeBytePair, nativeEndpoint } from './fixtures/native-runtime.js'
 
 /** Fixture composition uses only retained target/session ports, without deprecated facade types. */
-type IServiceFixtureOptions = IProcessSessionServiceOptions &
-  Readonly<{
-    ingress: IProcessServeChildIngress | IProcessServeListenerIngress
-    endpointFactory: IProcessServeEndpointFactory
-  }>
+type IServiceFixtureOptions = Readonly<{
+  contract: import('@migaia/rpc-host/plugin').IRemoteContract
+  report(error: unknown): void
+  ingress: IProcessServeChildIngress | IProcessServeListenerIngress
+  endpointFactory: IProcessServeEndpointFactory
+}>
+
+/** The local application keeps its original argument-vector and accepted-session invocation shape. */
+type ILocalSessionMethods = Readonly<{
+  request(
+    value: unknown,
+    invocation: Readonly<{ session: IProcessSessionIdentity; signal: IAbortSignal }>
+  ): unknown
+  notify?(
+    value: unknown,
+    invocation: Readonly<{ session: IProcessSessionIdentity; signal: IAbortSignal }>
+  ): unknown
+  generator?(
+    value: unknown,
+    invocation: Readonly<{ session: IProcessSessionIdentity; signal: IAbortSignal }>
+  ): Iterable<unknown> | AsyncIterable<unknown>
+}>
+
+/** Build only actual Runtime Peer providers over these original local application methods. */
+function sessionProvide(methods: ILocalSessionMethods, identity: IProcessSessionIdentity) {
+  /** One immutable invocation selection retains native identity and original local method receivers. */
+  const local = { methods, identity }
+  return {
+    p: {
+      f: {
+        request: (payload: unknown, context: Parameters<IRpcProvider>[0]) =>
+          local.methods.request(
+            (payload as unknown[])[0],
+            Object.freeze({ session: local.identity, signal: context.signal })
+          ),
+        ...(methods.notify
+          ? {
+              notify: (payload: unknown, context: Parameters<IRpcProvider>[0]) =>
+                local.methods.notify!(
+                  (payload as unknown[])[0],
+                  Object.freeze({ session: local.identity, signal: context.signal })
+                )
+            }
+          : {}),
+        ...(methods.generator
+          ? {
+              generator: (payload: unknown, context: Parameters<IRpcProvider>[0]) =>
+                local.methods.generator!(
+                  (payload as unknown[])[0],
+                  Object.freeze({ session: local.identity, signal: context.signal })
+                )
+            }
+          : {})
+      }
+    }
+  }
+}
+
+/**
+ * Canonical Peer construction owns its directory, providers and startup rollback on the same
+ * endpoint.
+ */
+async function sessionPeer(
+  session: IProcessReadySession,
+  methods: ILocalSessionMethods,
+  options: IServiceFixtureOptions
+) {
+  return createRuntimePeer(
+    {
+      self: { name: 'server', instanceId: 'server' },
+      provide: sessionProvide(methods, session.identity),
+      contract: options.contract,
+      report: options.report
+    },
+    { channel: session.channel, signal: session.signal, endpoint: session.endpoint }
+  )
+}
 
 describe('default process resilience wiring', () => {
   it('serves child request, one-way and generator context and removes its parent-loss guard on explicit close', async () => {
@@ -60,7 +140,7 @@ describe('default process resilience wiring', () => {
       },
       install: () => ({})
     })
-    await host.use(target)
+    const [sharedTarget] = await host.use(target)
     const contract = {
       schemaVersion: 1 as const,
       plugin: 'p',
@@ -79,7 +159,6 @@ describe('default process resilience wiring', () => {
     const serving = (() => {
       /** The canonical session and target-selection owners retain the original default policy. */
       const options: IServiceFixtureOptions = {
-        host,
         contract,
         report: (error) => reports.push(error),
         endpointFactory: (channel, _signal, session) => nativeEndpoint(channel, 'server', session),
@@ -102,7 +181,7 @@ describe('default process resilience wiring', () => {
               offer: createNativeProcessOffer({
                 peer: { id: 'server', runtime: 'node' },
                 stream: true,
-                capabilities: ['runtime-api@1']
+                capabilities: [RpcCapability.runtimeApi]
               }),
               auth: { mode: 'required', verify: context.verify! },
               ipc: { ...context.session, log: () => undefined },
@@ -117,7 +196,13 @@ describe('default process resilience wiring', () => {
       return serveProcessSessions(
         options.ingress,
         options.endpointFactory,
-        createProcessSessionService(options),
+        async (session) => {
+          /** This is the original local application output, not a remote Plugin proxy. */
+          const methods = sharedTarget.getFeature('f') as ILocalSessionMethods
+          /** The actual Peer is accepted only after native control/directory preparation. */
+          const peer = await sessionPeer(session, methods, options)
+          return { close: peer.close }
+        },
         resilience,
         options.report,
         undefined,
@@ -132,14 +217,17 @@ describe('default process resilience wiring', () => {
         peer: { id: 'parent', runtime: 'node' },
         auth: 'child-secret',
         stream: true,
-        capabilities: ['runtime-api@1']
+        capabilities: [RpcCapability.runtimeApi]
       }),
       ipc: { connectionId: 'parent', sessionId: 'parent', log: () => undefined },
       report: (error) => reports.push(error)
     })
     const client = await nativeEndpoint(parentChannel, 'parent')
-    /** This caller has no deferred provider installation before receiving replies. */
-    ;(parentChannel as typeof parentChannel & { activateReceive?: () => void }).activateReceive?.()
+    /** Actual caller control replies run through Core before it activates this same byte receiver. */
+    const clientPeer = await createRuntimePeer(
+      { self: { name: 'parent', instanceId: 'parent' }, report: (error) => reports.push(error) },
+      { channel: parentChannel, endpoint: client }
+    )
     const service = await serving
     try {
       expect(await client.endpoint.send('server', 'p.f.request', ['value'])).toBe('value')
@@ -159,6 +247,7 @@ describe('default process resilience wiring', () => {
       expect(JSON.stringify(reports)).not.toContain('child-secret')
     } finally {
       await service.close()
+      await clientPeer.close()
       await client.endpoint.dispose()
       await parentChannel.close()
       await host.dispose()
@@ -188,7 +277,7 @@ describe('default process resilience wiring', () => {
         features: { f: defineFeature(() => ({ request: execute })) },
         install: () => ({})
       })
-      await host.use(target)
+      const [sharedTarget] = await host.use(target)
       const contract = {
         schemaVersion: 1 as const,
         plugin: 'p',
@@ -196,8 +285,16 @@ describe('default process resilience wiring', () => {
       }
       /** Real endpoint ownership is tracked separately from connection identities. */
       const clients: IRemoteServeEndpoint[] = []
+      /** Actual caller Peers answer canonical directory controls on the same physical channels. */
+      const clientPeers: IRuntimePeer[] = []
+      /** Count actual startup provider calls before opening the original business-only bucket. */
+      const startupDescriptions: number[] = []
       const channels: Awaited<ReturnType<typeof createProcessTransport>>[] = []
       const reports: unknown[] = []
+      /** Genuine directory startup completes before the original 600-business-call rate window. */
+      let offset = 0
+      /** Native timers stay real while the existing quota owner can enter a fresh minute bucket. */
+      const scheduler = { ...systemScheduler, now: () => systemScheduler.now() + offset }
       /** The per-connection factory owns one distinct target Host for each physical session. */
       const ownedTargets: PluginHost<Record<string, never>>[] = []
       const disposals: ReturnType<typeof vi.spyOn>[] = []
@@ -205,30 +302,21 @@ describe('default process resilience wiring', () => {
       const serving = await (() => {
         /** The canonical session and target-selection owners retain the original default policy. */
         const options: IServiceFixtureOptions = {
-          host,
           contract,
-          instanceMode,
-          createSessionHost: async () => {
-            const owned = new PluginHost<Record<string, never>>({
-              execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
-            })
-            await owned.use(target)
-            ownedTargets.push(owned)
-            disposals.push(vi.spyOn(owned, 'dispose'))
-            return owned
-          },
           report: (error) => reports.push(error),
           endpointFactory: (channel, _signal, session) =>
             nativeEndpoint(channel, 'server', session),
           ingress: {
             kind: 'listener',
             address,
+            scheduler,
             listen: listenProcessByteChannel,
             verify: (auth) =>
               auth === 'alice-secret' ? 'alice' : auth === 'bob-secret' ? 'bob' : '',
             offer: createNativeProcessOffer({
               peer: { id: 'server', runtime: 'node' },
-              stream: true
+              stream: true,
+              capabilities: [RpcCapability.runtimeApi]
             }),
             createConnectionContext: () => {
               const id = `client-${++sequence}`
@@ -240,17 +328,71 @@ describe('default process resilience wiring', () => {
           }
         }
         const resilience = createProcessResilience({
-          scheduler: systemScheduler,
+          scheduler,
           report: options.report
         })
         return serveProcessSessions(
           options.ingress,
           options.endpointFactory,
-          createProcessSessionService(options),
+          async (session) => {
+            /**
+             * Existing lifecycle owns per-connection local application resources in native close
+             * order.
+             */
+            const lifetime = createLifecycleScope({
+              scheduler,
+              report: options.report
+            })
+            try {
+              /**
+               * Shared mode borrows the original installed application; owned mode registers
+               * locally.
+               */
+              let installed = sharedTarget
+              if (instanceMode === 'per-connection') {
+                /** One actual local application Host belongs only to this accepted physical session. */
+                const owned = new PluginHost<Record<string, never>>({
+                  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+                })
+                lifetime.own(owned, {
+                  force: async () => {
+                    await owned.dispose()
+                  }
+                })
+                const [created] = await owned.use(target)
+                installed = created
+                ownedTargets.push(owned)
+                disposals.push(vi.spyOn(owned, 'dispose'))
+              }
+              /**
+               * Direct local output supplies the same original business method and invocation
+               * count.
+               */
+              const methods = installed.getFeature('f') as ILocalSessionMethods
+              /**
+               * The canonical runtime provider assembly uses this real accepted endpoint and
+               * identity.
+               */
+              const peer = await sessionPeer(session, methods, options)
+              lifetime.own(peer, { force: () => peer.close() })
+              return {
+                close: async () => {
+                  await lifetime.dispose()
+                }
+              }
+            } catch (primary) {
+              try {
+                await lifetime.dispose()
+              } catch (cleanup) {
+                options.report(cleanup)
+              }
+              throw primary
+            }
+          },
           resilience,
           options.report,
           undefined,
-          systemScheduler,
+          scheduler,
           { release: () => resilience.close() }
         )
       })()
@@ -261,13 +403,48 @@ describe('default process resilience wiring', () => {
           const channel = await createProcessTransport(raw, {
             role: 'initiator',
             peerId: 'server',
-            offer: createNativeProcessOffer({ peer: { id, runtime: 'node' }, auth, stream: true }),
+            scheduler,
+            offer: createNativeProcessOffer({
+              peer: { id, runtime: 'node' },
+              auth,
+              stream: true,
+              capabilities: [RpcCapability.runtimeApi]
+            }),
             ipc: { connectionId: id, sessionId: id, log: () => undefined },
             report: (error) => reports.push(error)
           })
           channels.push(channel)
-          clients.push(await nativeEndpoint(channel, id))
+          /** Raw business oracle and Core control Peer share the same actual prepared kernel. */
+          const endpoint = await nativeEndpoint(channel, id)
+          clients.push(endpoint)
+          /** This index belongs to the same physical connection and its one directory exchange. */
+          const index = clientPeers.length
+          startupDescriptions.push(0)
+          clientPeers.push(
+            await createRuntimePeer(
+              { self: { name: id, instanceId: id }, report: (error) => reports.push(error) },
+              {
+                channel,
+                endpoint: {
+                  ...endpoint,
+                  endpoint: Object.create(endpoint.endpoint, {
+                    send: {
+                      /** Count only startup sends and retain every original native send Promise. */
+                      value: <T>(...args: Parameters<typeof endpoint.endpoint.send>) => {
+                        if (args[1] === RemoteMethodName.runtimeDescribe)
+                          startupDescriptions[index]! += 1
+                        return endpoint.endpoint.send<T>(...args)
+                      }
+                    }
+                  })
+                }
+              }
+            )
+          )
         }
+        expect(startupDescriptions).toEqual([1, 1, 1, 1])
+        /** Keep the tested default quota exact; setup controls belong to the preceding bucket. */
+        offset = 60_000
         for (const client of clients)
           expect(
             await client.endpoint.send('server', 'p.f.request', ['value'], {
@@ -337,6 +514,7 @@ describe('default process resilience wiring', () => {
         expect(JSON.stringify(reports)).not.toContain('secret')
       } finally {
         finishHeld()
+        await Promise.allSettled(clientPeers.map((peer) => peer.close()))
         await Promise.allSettled(clients.map((client) => client.endpoint.dispose()))
         await Promise.allSettled(channels.map((channel) => channel.close()))
         await serving.close()

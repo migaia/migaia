@@ -6,7 +6,7 @@ import { type IProcessByteChannel } from '../../dist/process/types.js'
 import {
   createNodeProcessLauncher,
   type INodeProcessHandle
-} from '@migaia/rpc-plugin-process/adapters/node-child-process'
+} from '../../dist/process/adapters/node-child-process.js'
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { runtimeTestHost } from '../../../rpc-host/test/runtime-api/public-host.js'

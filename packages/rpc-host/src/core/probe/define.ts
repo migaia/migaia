@@ -27,6 +27,8 @@ function compileStages(stages: readonly IRpcProbeStageName[], allowEmpty: boolea
   let mask = 0
   for (let i = 0; i < stages.length; i++) {
     /** Exact table lookup rejects inherited property names and unknown stage names. */
+    // The lookup domain is the seven fixed stage names declared in RpcProbeStageName, never peers/events.
+    /** Exact table lookup rejects inherited property names and unknown stage names. */
     const stage = RpcProbeStageName.indexOf(stages[i]!)
     if (stage < 0) invalid(RpcCoreErrorText.probeStagesInvalid)
     mask |= 1 << stage
@@ -34,24 +36,17 @@ function compileStages(stages: readonly IRpcProbeStageName[], allowEmpty: boolea
   return mask
 }
 
-/** Compiles one standalone frozen probe without emitting or installing observations. */
-export function defineProbe(definition: IRpcProbeDefinition): IRpcProbe
-/** Attaches compiled fields to the same host reference, freezes it and retains all existing members. */
-export function defineProbe<THost extends object>(
+/** Validate and snapshot cold probe inputs before the first host mutation. */
+function prepareProbeDefinition(
   definition: IRpcProbeDefinition,
-  host: THost
-): THost & IRpcProbe
-/**
- * Validates definition and host before attachment. The probe stores references in private state;
- * emitters install them once into their own fixed-shape records and never read the host on hot
- * paths.
- */
-export function defineProbe(definition: IRpcProbeDefinition, host?: object): IRpcProbe {
+  host: object | undefined,
+  hasHost: boolean
+) {
   if (typeof definition !== 'object' || definition === null)
     invalid(RpcCoreErrorText.probeDefinitionInvalid)
-  /** Initial subscriptions must be nonempty; only later stage updates may pause the probe. */
+  /** Initial subscriptions are compiled before any host field can be attached. */
   const stageMask = compileStages(definition.stages, false)
-  /** Capture remains immutable even while setStages selects a different current subscription set. */
+  /** Capture stays fixed while later stage changes may pause active subscription. */
   const captureMask = definition.capture === undefined ? 0 : compileStages(definition.capture, true)
   if ((captureMask & stageMask) !== captureMask) invalid(RpcCoreErrorText.probeCaptureInvalid)
   if (typeof definition.emit !== 'function') invalid(RpcCoreErrorText.probeEmitInvalid)
@@ -72,15 +67,13 @@ export function defineProbe(definition: IRpcProbeDefinition, host?: object): IRp
       definition.methods.some((method) => typeof method !== 'string'))
   )
     invalid(RpcCoreErrorText.probeMethodsInvalid)
-  /** Compiles the required membership Set representation; this is not a defensive payload copy. */
+  /** A membership Set is the existing emitter filter representation. */
   const methods = definition.methods === undefined ? undefined : new Set(definition.methods)
-  /** The full-sampling sentinel preserves the frozen v1 compiled-field contract. */
+  /** Full sampling preserves the existing unsigned 32-bit sentinel. */
   const sampleThreshold =
     definition.sample === undefined || definition.sample === 1
       ? 0xffffffff
       : Math.floor(definition.sample * 0x100000000)
-  /** An explicitly supplied undefined host is invalid rather than the single-argument form. */
-  const hasHost = arguments.length > 1
   if (hasHost) {
     if (
       typeof host !== 'object' ||
@@ -91,11 +84,15 @@ export function defineProbe(definition: IRpcProbeDefinition, host?: object): IRp
     )
       invalid(RpcCoreErrorText.probeHostInvalid)
     /** Validate every reserved own field before the first property is attached. */
+    // ProbeHostField is a fixed five-field own-property attachment contract.
     for (const field of Object.values(ProbeHostField)) {
       if (Object.hasOwn(host, field)) invalid(RpcCoreErrorText.probeHostInvalid)
     }
   }
-  /** Definition callbacks are captured once so caller mutations cannot retarget future emitters. */
+  /**
+   * Callback references are captured after validation so later definition mutation cannot retarget
+   * emitters.
+   */
   const state: IRpcProbeState = {
     stageMask,
     captureMask,
@@ -107,16 +104,76 @@ export function defineProbe(definition: IRpcProbeDefinition, host?: object): IRp
     onError: definition.onError,
     listeners: new Set()
   }
-  /** Stage updates change private active state; a host's non-writable data mask stays initial. */
-  const setStages = (stages: readonly IRpcProbeStageName[]): void => {
+  return { stageMask, captureMask, methods, sampleThreshold, state }
+}
+
+/** Own one probe's mutable subscription mask and its installed emitter listeners. */
+class CompiledProbe {
+  /** The original private record remains the canonical emitter state and callback snapshot. */
+  #state: IRpcProbeState
+  /** Original host identity or standalone frozen facade stays the only published probe value. */
+  readonly value: IRpcProbe
+  /** Complete validation before attaching any of the existing reserved fields. */
+  constructor(definition: IRpcProbeDefinition, host: object | undefined, hasHost: boolean) {
+    const { stageMask, captureMask, methods, sampleThreshold, state } = prepareProbeDefinition(
+      definition,
+      host,
+      hasHost
+    )
+    this.#state = state
+    if (hasHost) {
+      /** All validation completes before the first property is attached to the original host. */
+      const target = host as object & IRpcProbe
+      Object.defineProperty(target, ProbeHostField.stageMask, {
+        value: stageMask,
+        enumerable: true
+      })
+      Object.defineProperty(target, ProbeHostField.captureMask, {
+        value: captureMask,
+        enumerable: true
+      })
+      Object.defineProperty(target, ProbeHostField.methods, { value: methods, enumerable: true })
+      Object.defineProperty(target, ProbeHostField.sampleThreshold, {
+        value: sampleThreshold,
+        enumerable: true
+      })
+      Object.defineProperty(target, ProbeHostField.setStages, {
+        value: this.#setStages,
+        enumerable: true
+      })
+      registerProbeState(target, state)
+      Object.freeze(target)
+      this.value = target
+      return
+    }
+    /**
+     * The frozen handle reads only the one private state record and exposes no subscriber
+     * collection.
+     */
+    const probe: IRpcProbe = Object.freeze({
+      /** Reads the current compiled subscription mask while the public handle remains frozen. */
+      get stageMask(): number {
+        return state.stageMask
+      },
+      captureMask,
+      methods,
+      sampleThreshold,
+      emit: state.emit,
+      setStages: this.#setStages
+    })
+    registerProbeState(probe, state)
+    this.value = probe
+  }
+  /** Commit a validated mask before notifying each original installed emitter. */
+  #setStages = (stages: readonly IRpcProbeStageName[]): void => {
     /** Compile first so invalid input preserves the original mask and sends no notifications. */
     const nextMask = compileStages(stages, true)
-    if (nextMask === state.stageMask) return
-    state.stageMask = nextMask
+    if (nextMask === this.#state.stageMask) return
+    this.#state.stageMask = nextMask
     /** Each installed emitter rebuilds its existing dispatch table only on a changed mask. */
     /** Listener failures cannot prevent installed emitters from adopting the committed mask. */
     const failures: Error[] = []
-    for (const listener of state.listeners) {
+    for (const listener of this.#state.listeners) {
       try {
         listener()
       } catch (error) {
@@ -136,36 +193,20 @@ export function defineProbe(definition: IRpcProbeDefinition, host?: object): IRp
         RpcCoreErrorCode.callbackFailed
       )
   }
-  if (hasHost) {
-    /** All validation completes before the first property is attached to the original host. */
-    const target = host as object & IRpcProbe
-    Object.defineProperty(target, ProbeHostField.stageMask, { value: stageMask, enumerable: true })
-    Object.defineProperty(target, ProbeHostField.captureMask, {
-      value: captureMask,
-      enumerable: true
-    })
-    Object.defineProperty(target, ProbeHostField.methods, { value: methods, enumerable: true })
-    Object.defineProperty(target, ProbeHostField.sampleThreshold, {
-      value: sampleThreshold,
-      enumerable: true
-    })
-    Object.defineProperty(target, ProbeHostField.setStages, { value: setStages, enumerable: true })
-    registerProbeState(target, state)
-    Object.freeze(target)
-    return target
-  }
-  /** The frozen handle projects the one private mutable stage mask without exposing subscribers. */
-  const probe: IRpcProbe = Object.freeze({
-    /** Reads the current compiled subscription mask while the public handle remains frozen. */
-    get stageMask(): number {
-      return state.stageMask
-    },
-    captureMask,
-    methods,
-    sampleThreshold,
-    emit: state.emit,
-    setStages
-  })
-  registerProbeState(probe, state)
-  return probe
+}
+
+/** Compiles one standalone frozen probe without emitting or installing observations. */
+export function defineProbe(definition: IRpcProbeDefinition): IRpcProbe
+/** Attaches compiled fields to the same host reference, freezes it and retains all existing members. */
+export function defineProbe<THost extends object>(
+  definition: IRpcProbeDefinition,
+  host: THost
+): THost & IRpcProbe
+/**
+ * Validates definition and host before attachment. The probe stores references in private state;
+ * emitters install them once into their own fixed-shape records and never read the host on hot
+ * paths.
+ */
+export function defineProbe(definition: IRpcProbeDefinition, host?: object): IRpcProbe {
+  return new CompiledProbe(definition, host, arguments.length > 1).value
 }

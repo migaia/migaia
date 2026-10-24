@@ -18,7 +18,6 @@ type IProgramResult = {
     frameEvents: number
     protectedEvents: number
     localFrameDiffersFromProtected: boolean
-    orderedTimeline: boolean
     recordingEvents: number
     recordingSequencePreserved: boolean
     metadataContentHidden: boolean
@@ -33,7 +32,6 @@ type IProgramResult = {
       inboundCarriers: number
       frameContentDiffers: boolean
     }[]
-    orderedTimeline: boolean
     recordingEvents: number
     recordingSequencePreserved: boolean
     selfFiltered: boolean
@@ -83,7 +81,6 @@ it('actual traffic crosses signed/encrypted parent-child-worker hops with live s
   expect(observed.core?.frameEvents).toBeGreaterThan(0)
   expect(observed.core?.protectedEvents).toBeGreaterThan(0)
   expect(observed.core?.localFrameDiffersFromProtected).toBe(true)
-  expect(observed.core?.orderedTimeline).toBe(true)
   expect(observed.core?.recordingEvents).toBeGreaterThan(0)
   expect(observed.core?.recordingSequencePreserved).toBe(true)
   expect(observed.core?.metadataContentHidden).toBe(true)
@@ -101,7 +98,6 @@ it('actual traffic crosses signed/encrypted parent-child-worker hops with live s
     expect(hop.inboundCarriers).toBeGreaterThan(0)
     expect(hop.frameContentDiffers).toBe(true)
   }
-  expect(observed.trace?.orderedTimeline).toBe(true)
   expect(observed.trace?.recordingEvents).toBeGreaterThan(0)
   expect(observed.trace?.recordingSequencePreserved).toBe(true)
   expect(observed.trace?.selfFiltered).toBe(true)

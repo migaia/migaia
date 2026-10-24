@@ -1,7 +1,7 @@
 import { assert, describe, expect, it, vi } from 'vitest'
 import { normalizeRpcEnvelope, RpcRouteProfile, type IRpcPortableValue } from '@migaia/rpc-contract'
 import type { IPluginRuntimeSharedSlot } from '@migaia/plugin-host'
-import type { IRpcContext, IRpcProviderResult } from '../../dist/core/index.js'
+import type { IRpcContext, IRpcProviderResult } from '../../dist/core/typing.js'
 import { RpcCoreErrorCode } from '../../dist/core/errors.js'
 import {
   ProviderExecutor,

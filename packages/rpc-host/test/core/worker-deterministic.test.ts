@@ -1,6 +1,8 @@
+import { readEndpointOwner } from '../../dist/core/internal/endpoint-projection.js'
+import { EndpointOwnerKey } from '../../dist/core/endpoint-kernel.js'
+import { createRuntimeEndpointComposition } from '../../dist/core/runtime-api-endpoint.js'
 import { describe, expect, it, vi } from 'vitest'
-import { createClientEndpoint } from '../../dist/core/client.js'
-import { createProviderEndpoint } from '../../dist/core/provider.js'
+
 import type { IRpcTransport } from '../../dist/core/transport.js'
 import { readEndpointDebugSnapshot } from '../../dist/core/internal/test-observer.js'
 import { PendingRegistry } from '../../dist/core/internal/pending.js'
@@ -26,26 +28,32 @@ type ICanonicalWorkerFrame = {
   }
 }
 
-/** Creates a source-less Worker-like transport whose delivery order is test-controlled. */
-function createControlledTransport(): IControlledTransport {
-  let listener: ((message: IQueuedFrame) => void) | undefined
-  const queued: IQueuedFrame[] = []
-  return {
-    platform: 'Worker',
-    topology: 'exclusive',
-    send(message) {
-      queued.push({ data: message })
-    },
-    subscribe(next) {
-      listener = next
-      return () => {
-        listener = undefined
-      }
-    },
-    deliver(message) {
-      listener?.({ data: message, source: undefined })
-    },
-    queued
+/** One source-less Worker-like transport owns its actual listener and chronological frames. */
+class ControlledTransport implements IControlledTransport {
+  /** This original physical profile deliberately carries no sender-side source reference. */
+  readonly platform = 'Worker'
+  /** One exclusive peer owns the same original physical frame boundary. */
+  readonly topology = 'exclusive' as const
+  /** The current native subscription is replaced and revoked by the original callbacks. */
+  #listener: ((message: IQueuedFrame) => void) | undefined
+  /** Tests deliver each original chronological frame exactly when their phase permits it. */
+  readonly queued: IQueuedFrame[] = []
+  /** Retain the actual message object instead of simulating a response protocol. */
+  send = (message: unknown): void => {
+    this.queued.push({ data: message })
+  }
+  /** Install one actual listener and return its original unconditional revocation operation. */
+  subscribe = (next: (message: IQueuedFrame) => void): (() => void) => {
+    this.#listener = next
+    return () => {
+      this.#listener = undefined
+    }
+  }
+  /** Native dispatch keeps a plain receiver and the original undefined source reference. */
+  deliver = (message: unknown): void => {
+    /** The original listener is not called with this transport as its receiver. */
+    const listener = this.#listener
+    listener?.({ data: message, source: undefined })
   }
 }
 
@@ -61,19 +69,22 @@ async function drainMicrotasks(): Promise<void> {
 
 describe('deterministic source-less Worker settlement', () => {
   it('settles concurrent out-of-order responses exactly once', async () => {
-    const clientTransport = createControlledTransport()
-    const providerTransport = createControlledTransport()
+    const clientTransport = new ControlledTransport()
+    const providerTransport = new ControlledTransport()
     let executions = 0
     const releaseProviderCalls = new Map<string, () => void>()
     const taskIdByData = new Map<string, string>()
     const providerAcquireSpy = vi.spyOn(ProviderAdmissionRegistry.prototype, 'acquire')
     const providerReleaseSpy = vi.spyOn(ProviderAdmissionRegistry.prototype, 'release')
     const clientReleaseSpy = vi.spyOn(PendingRegistry.prototype, 'delete')
-    const provider = await createProviderEndpoint({
-      id: 'worker-provider',
-      transport: providerTransport,
-      middlewares: [connect({ transport: providerTransport })]
-    })
+    const provider = await createRuntimeEndpointComposition(
+      {
+        id: 'worker-provider',
+        transport: providerTransport,
+        middlewares: [connect({ transport: providerTransport })]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     provider.provide('echo', async (context) => {
       executions += 1
       const taskId = taskIdByData.get(String(context.data)) ?? String(context.data)
@@ -84,12 +95,15 @@ describe('deterministic source-less Worker settlement', () => {
       })
       return context.success(context.data)
     })
-    const client = await createClientEndpoint({
-      id: 'worker-client',
-      targetIds: ['worker-provider'],
-      transport: clientTransport,
-      middlewares: [connect({ transport: clientTransport })]
-    })
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'worker-client',
+        targetIds: ['worker-provider'],
+        transport: clientTransport,
+        middlewares: [connect({ transport: clientTransport })]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
 
     try {
       const first = client.send('worker-provider', 'echo', 'first')
@@ -134,7 +148,9 @@ describe('deterministic source-less Worker settlement', () => {
       await drainMicrotasks()
       expect(executions).toBe(2)
       expect(readEndpointDebugSnapshot(provider)).toMatchObject({ activeControllers: 2 })
-      expect(readEndpointDebugSnapshot(client)).toMatchObject({ pending: 2 })
+      expect(
+        readEndpointOwner<PendingRegistry<unknown>>(client, EndpointOwnerKey.pendingRegistry)!.size
+      ).toBe(2)
       const providerAdmissionKeys = providerAcquireSpy.mock.calls.map(([key]) => key)
       expect(providerAdmissionKeys).toHaveLength(2)
       expect(new Set(providerAdmissionKeys)).toHaveLength(2)
@@ -145,8 +161,8 @@ describe('deterministic source-less Worker settlement', () => {
       const responses = takeFrames(providerTransport)
       expect(responses).toHaveLength(2)
       await vi.waitFor(() =>
-        expect(providerReleaseSpy.mock.calls.map(([key]) => key).sort()).toEqual(
-          providerAdmissionKeys.slice().sort()
+        expect(new Set(providerReleaseSpy.mock.calls.map(([key]) => key))).toEqual(
+          new Set(providerAdmissionKeys)
         )
       )
       expect(
@@ -172,16 +188,22 @@ describe('deterministic source-less Worker settlement', () => {
         id: 'unknown-task'
       })
       await drainMicrotasks()
-      expect(readEndpointDebugSnapshot(client)).toMatchObject({ pending: 2 })
+      expect(
+        readEndpointOwner<PendingRegistry<unknown>>(client, EndpointOwnerKey.pendingRegistry)!.size
+      ).toBe(2)
       expect(clientReleaseSpy).not.toHaveBeenCalled()
 
       const reversedResponses = responses.slice().reverse()
       clientTransport.deliver(reversedResponses[0])
       await drainMicrotasks()
-      expect(readEndpointDebugSnapshot(client)).toMatchObject({ pending: 1 })
+      expect(
+        readEndpointOwner<PendingRegistry<unknown>>(client, EndpointOwnerKey.pendingRegistry)!.size
+      ).toBe(1)
       clientTransport.deliver(reversedResponses[1])
       await drainMicrotasks()
-      expect(readEndpointDebugSnapshot(client)).toMatchObject({ pending: 0 })
+      expect(
+        readEndpointOwner<PendingRegistry<unknown>>(client, EndpointOwnerKey.pendingRegistry)!.size
+      ).toBe(0)
       await expect(first).resolves.toBe('first')
       await expect(second).resolves.toBe('second')
       for (const taskId of taskIds) {
@@ -191,7 +213,9 @@ describe('deterministic source-less Worker settlement', () => {
       expect(readEndpointDebugSnapshot(provider)).toMatchObject({ activeControllers: 0 })
       clientTransport.deliver(reversedResponses[1])
       await drainMicrotasks()
-      expect(readEndpointDebugSnapshot(client)).toMatchObject({ pending: 0 })
+      expect(
+        readEndpointOwner<PendingRegistry<unknown>>(client, EndpointOwnerKey.pendingRegistry)!.size
+      ).toBe(0)
     } finally {
       providerAcquireSpy.mockRestore()
       providerReleaseSpy.mockRestore()

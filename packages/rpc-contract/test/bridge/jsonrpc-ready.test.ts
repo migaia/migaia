@@ -7,13 +7,13 @@ import {
   BRIDGE_CONTRACT,
   BRIDGE_METHODS,
   BRIDGE_PEER_OFFER,
-  bridgeFixture,
+  BridgeFixture,
   flush
 } from '../../../rpc-integration/test/bridge/fixture.js'
 
 describe('JSON-RPC bridge readiness', () => {
   it('completes control negotiation with diagnostic peer identity and no native capabilities', async () => {
-    const fixture = bridgeFixture()
+    const fixture = new BridgeFixture()
     const channel = await fixture.open()
     expect(channel.agreement).toEqual({
       source: 'negotiated',
@@ -38,7 +38,7 @@ describe('JSON-RPC bridge readiness', () => {
   it.each(['ping@1', 'close@1', 'stream@1'])(
     'refuses unsupported capability %s before bytes',
     async (capability) => {
-      const fixture = bridgeFixture()
+      const fixture = new BridgeFixture()
       await expect(
         fixture.open({ offer: { ...fixture.options.offer, capabilities: [capability] } })
       ).rejects.toMatchObject({ code: 'JSONRPC_PROFILE_INVALID' })
@@ -46,14 +46,14 @@ describe('JSON-RPC bridge readiness', () => {
     }
   )
   it.each(['', undefined])('refuses missing/empty token before bytes', async (token) => {
-    const fixture = bridgeFixture()
+    const fixture = new BridgeFixture()
     await expect(fixture.open({ token: token as string })).rejects.toMatchObject({
       code: 'JSONRPC_PROFILE_INVALID'
     })
     expect(fixture.writes).toEqual([])
   })
   it('refuses local streams and ambiguous target before bytes', async () => {
-    const fixture = bridgeFixture()
+    const fixture = new BridgeFixture()
     const streaming = {
       ...BRIDGE_CONTRACT,
       features: { f: { methods: { generator: { mode: 'generator' as const, idempotent: false } } } }
@@ -77,7 +77,7 @@ describe('JSON-RPC bridge readiness', () => {
     expect(fixture.writes).toEqual([])
   })
   it.each(BRIDGE_METHODS)('rejects missing method %s and closes once', async (missing) => {
-    const fixture = bridgeFixture({
+    const fixture = new BridgeFixture({
       responder(message) {
         const answer = acceptRpcHandshake(
           BRIDGE_PEER_OFFER,
@@ -100,7 +100,7 @@ describe('JSON-RPC bridge readiness', () => {
   it.each(['jsonrpc-bridge@1', 'abort@1', 'wire-error@1'])(
     'rejects absent capability %s after otherwise valid control accept',
     async (missing) => {
-      const fixture = bridgeFixture({
+      const fixture = new BridgeFixture({
         responder(message) {
           const answer = acceptRpcHandshake(
             {
@@ -126,7 +126,7 @@ describe('JSON-RPC bridge readiness', () => {
     [-32601, 'JSONRPC_EXTENSION_MISSING'],
     [-32602, 'JSONRPC_PROFILE_INVALID']
   ])('classifies hello integer error %s without losing foreign cause', async (code, expected) => {
-    const fixture = bridgeFixture({
+    const fixture = new BridgeFixture({
       responder: (message) => ({
         jsonrpc: '2.0',
         id: message.id,
@@ -140,7 +140,7 @@ describe('JSON-RPC bridge readiness', () => {
     expect(fixture.closes).toBe(1)
   })
   it('times out at 10000ms, rejects abort by identity, and releases timers', async () => {
-    const silent = bridgeFixture({ autoHello: false })
+    const silent = new BridgeFixture({ autoHello: false })
     const timed = silent.open()
     silent.scheduler.advance(9999)
     expect(silent.closes).toBe(0)
@@ -148,7 +148,7 @@ describe('JSON-RPC bridge readiness', () => {
     await expect(timed).rejects.toMatchObject({ code: 'JSONRPC_HANDSHAKE_TIMEOUT' })
     expect(silent.closes).toBe(1)
     expect(silent.scheduler.pendingCount).toBe(0)
-    const fixture = bridgeFixture({ autoHello: false })
+    const fixture = new BridgeFixture({ autoHello: false })
     const controller = new AbortController()
     const reason = new Error('caller cancellation')
     const aborted = fixture.open({ signal: controller.signal })
@@ -161,7 +161,7 @@ describe('JSON-RPC bridge readiness', () => {
   it.each(['kind', 'step', 'protocol', 'codec', 'unknown-field', 'peer'])(
     'preserves original control failure and redacts hostile reply %s',
     async (field) => {
-      const fixture = bridgeFixture({ autoHello: false })
+      const fixture = new BridgeFixture({ autoHello: false })
       const pending = fixture.open()
       await flush()
       const hello = (fixture.messages[0]!.params as { hello: string }).hello
@@ -216,7 +216,7 @@ describe('JSON-RPC bridge readiness', () => {
     'reclaims resources when timer cancellation throws (hello=%s)',
     async (hello) => {
       /** Both completed hello and an existing abort primary exercise the same cleanup owner. */
-      const fixture = bridgeFixture({ autoHello: hello })
+      const fixture = new BridgeFixture({ autoHello: hello })
       /** The native cleanup failure must stay reachable without replacing an earlier abort. */
       const cleanup = new Error('timer cancellation fixture')
       /** Cancellation already owns the opening failure before the timer cleanup fails. */
@@ -269,7 +269,7 @@ describe('JSON-RPC bridge readiness', () => {
   )
   it('redacts malformed JSON, truncated bodies and nonstring replies', async () => {
     for (const kind of ['json', 'truncated', 'shape']) {
-      const fixture = bridgeFixture({ autoHello: false })
+      const fixture = new BridgeFixture({ autoHello: false })
       const pending = fixture.open()
       await flush()
       if (kind === 'shape')

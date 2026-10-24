@@ -1,142 +1,16 @@
 import { execFileSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { readFileSync } from 'node:fs'
 import { inspect } from 'node:util'
-import { describe, expect, it } from 'vitest'
-import { createProcessPlugin } from '../../../rpc-plugin-process/test/protocol.ts'
-import { runtimeTestHost } from '../../../rpc-host/test/runtime-api/public-host.js'
-import { parseProcessPluginDescriptor } from '../../../rpc-plugin-process/dist/process/plugin/index.js'
-import { serializeRpcError } from '../../../rpc-host/dist/core/index.js'
-import { createNodeProcessLauncher } from '@migaia/rpc-plugin-process/adapters/node-child-process'
+import { expect, it } from 'vitest'
+import { createNodeProcessLauncher } from '../../../rpc-plugin-process/dist/process/adapters/node-child-process.js'
 import { createProcessTransport } from '../../../rpc-plugin-process/dist/process/handshake.js'
 import { createNativeProcessOffer } from '../../../rpc-plugin-process/dist/process/offer.js'
-import { hostFixture } from './fixtures/host-control.js'
 
 /** Demand that all six-character fragments are absent from a safe serialized projection. */
 function privateProjection(value: string, marker: string): void {
   for (let offset = 0; offset <= marker.length - 6; offset++)
     expect(value.includes(marker.slice(offset, offset + 6))).toBe(false)
 }
-
-/**
- * Historical constructor/getter and descriptor/proxy payloads now follow the repaired privacy
- * contract.
- */
-describe('historical Host and descriptor sentinel replay', () => {
-  it.each(['getter', 'proxy'] as const)(
-    'Host %s keeps original cause local and never serializes it',
-    async (kind) => {
-      /** A synthetic random marker prevents an incidental stable text match. */
-      const marker = randomUUID()
-      /** The precise original instance remains reachable only for local diagnosis. */
-      const original = new Error(marker)
-      /** No deployment starts after hostile catalog admission fails. */
-      const fixture = hostFixture()
-      /** Actual PluginHost installation owns the cold catalog admission before source effects. */
-      const host = runtimeTestHost({
-        host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
-      })
-      /** Retain both historical failure shapes without exercising unrelated lifecycle probes. */
-      const catalog =
-        kind === 'getter'
-          ? Object.defineProperty({}, 'p', {
-              enumerable: true,
-              get: () => {
-                throw original
-              }
-            })
-          : new Proxy(
-              {},
-              {
-                ownKeys: () => {
-                  throw original
-                }
-              }
-            )
-      /** Capture current native error instead of using the old expected-leak assertion. */
-      let caught: unknown
-      try {
-        await host.use(
-          createProcessPlugin({
-            name: 'private-admission',
-            host,
-            expose: ['host'],
-            catalog,
-            resolvePlugin: () => undefined as never,
-            spawn: fixture.options.deployment as never,
-            report: fixture.report
-          })
-        )
-      } catch (error) {
-        expect(error).toMatchObject({ code: 'PLUGIN_INSTALL_FAILED' })
-        caught = (error as Error).cause
-      } finally {
-        await host.dispose()
-      }
-      expect(caught).toBeInstanceOf(TypeError)
-      expect(caught).toMatchObject({
-        source: 'rpc.remote',
-        code: 'REMOTE_CONTRACT_INVALID'
-      })
-      /** The controlled wrapper intentionally preserves local error identity. */
-      const chain: unknown[] = []
-      for (let error = caught; error instanceof Error; error = error.cause) chain.push(error)
-      expect(chain).toContain(original)
-      /** The public wire serializer may not copy that identity-sensitive local cause. */
-      const reports: unknown[] = []
-      privateProjection(
-        JSON.stringify(serializeRpcError(caught, { report: (value) => reports.push(value) })),
-        marker
-      )
-      expect(fixture.launch).not.toHaveBeenCalled()
-    }
-  )
-
-  it.each(['getter', 'proxy'] as const)(
-    'descriptor %s rejects with no hostile cause or diagnostic secret',
-    (kind) => {
-      /** The historic literal is a synthetic fixture, never a user's credential. */
-      const marker = randomUUID()
-      /** Reuse the shipped descriptor golden rather than invent a parallel valid shape. */
-      const vectors = JSON.parse(
-        readFileSync(
-          new URL('../../schema/vectors/process-plugin-descriptor.json', import.meta.url),
-          'utf8'
-        )
-      ) as { cases: { id: string; value: Record<string, unknown> }[] }
-      /** The production schema vector owns the positive admission baseline. */
-      const base = vectors.cases.find((entry) => entry.id === 'spawn-native-stdin')!.value
-      /** Snapshot admission encounters the exact getter/ownKeys failures in the original audit. */
-      const input =
-        kind === 'getter'
-          ? Object.defineProperty({ ...base }, 'runtime', {
-              enumerable: true,
-              get: () => {
-                throw new Error(marker)
-              }
-            })
-          : new Proxy(base, {
-              ownKeys: () => {
-                throw new Error(marker)
-              }
-            })
-      /** No original hostile input is attached to parser errors. */
-      let caught: unknown
-      try {
-        parseProcessPluginDescriptor(input)
-      } catch (error) {
-        caught = error
-      }
-      expect(caught).toMatchObject({ code: 'PROCESS_PLUGIN_INVALID_OPTION' })
-      expect((caught as Error).cause).toBeUndefined()
-      privateProjection(inspect(caught, { depth: null, showHidden: true }), marker)
-      privateProjection(
-        JSON.stringify(serializeRpcError(caught, { report: () => undefined })),
-        marker
-      )
-    }
-  )
-})
 
 /**
  * Native bootstrap preserves the historical argv/environment oracle without repeating 50

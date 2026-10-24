@@ -1,5 +1,5 @@
 import type { IFeatureOutput, IFeatureRecord, IPluginConstraint } from '@migaia/plugin-host'
-import type { ISendOptions } from '../../core/index.js'
+import type { ISendOptions } from '../../core/typing.js'
 import type { IRpcRuntimeEnvelope } from '@migaia/rpc-contract'
 import type { IRpcRuntimeStepOutcome } from '@migaia/rpc-contract/v1'
 import type { IRuntimePeer as IRuntimePeerHandle } from './peer.js'

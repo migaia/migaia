@@ -1,6 +1,8 @@
+import { createRuntimeEndpointComposition } from '../../dist/core/runtime-api-endpoint.js'
+import { RpcCapability } from '@migaia/rpc-contract'
 import { describe, expect, it } from 'vitest'
-import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
-import { createEndpoint } from '../../dist/core/index.js'
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
+
 import { authentication } from '../../dist/core/middleware/authentication.js'
 import { connect } from '../../dist/core/middleware/connect.js'
 import type { IRpcTransport } from '../../dist/core/transport.js'
@@ -19,17 +21,23 @@ const signed = () =>
 describe('authentication integration', () => {
   it('protects request and response frames without changing contract data', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
-    const server = await createEndpoint({
-      id: 'server',
-      transport: serverTransport,
-      provider: { echo: (context) => context.success(context.data) },
-      middlewares: [connect({ transport: serverTransport }), signed()]
-    })
-    const client = await createEndpoint({
-      id: 'client',
-      transport: clientTransport,
-      middlewares: [connect({ transport: clientTransport }), signed()]
-    })
+    const server = await createRuntimeEndpointComposition(
+      {
+        id: 'server',
+        transport: serverTransport,
+        provider: { echo: (context) => context.success(context.data) },
+        middlewares: [connect({ transport: serverTransport }), signed()]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'client',
+        transport: clientTransport,
+        middlewares: [connect({ transport: clientTransport }), signed()]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     await expect(client.send('server', 'echo', { clean: true })).resolves.toEqual({ clean: true })
     await client.dispose()
     await server.dispose()
@@ -43,22 +51,28 @@ describe('authentication integration', () => {
       send: (value, options) =>
         clientBase.send({ ...(value as object), signature: 'forged' }, options)
     }
-    const server = await createEndpoint({
-      id: 'server',
-      transport: serverTransport,
-      provider: {
-        echo: (context) => {
-          providerCalls += 1
-          return context.success(context.data)
-        }
+    const server = await createRuntimeEndpointComposition(
+      {
+        id: 'server',
+        transport: serverTransport,
+        provider: {
+          echo: (context) => {
+            providerCalls += 1
+            return context.success(context.data)
+          }
+        },
+        middlewares: [connect({ transport: serverTransport }), signed()]
       },
-      middlewares: [connect({ transport: serverTransport }), signed()]
-    })
-    const client = await createEndpoint({
-      id: 'client',
-      transport: forgedTransport,
-      middlewares: [connect({ transport: forgedTransport }), signed()]
-    })
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'client',
+        transport: forgedTransport,
+        middlewares: [connect({ transport: forgedTransport }), signed()]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     await expect(client.send('server', 'echo', 'forged', { timeoutMs: 5 })).rejects.toMatchObject({
       code: 'DEADLINE_EXCEEDED'
     })
@@ -69,17 +83,23 @@ describe('authentication integration', () => {
 
   it('rejects unauthenticated transfer lists', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
-    const server = await createEndpoint({
-      id: 'server',
-      transport: serverTransport,
-      provider: { echo: (context) => context.success(context.data) },
-      middlewares: [connect({ transport: serverTransport }), signed()]
-    })
-    const client = await createEndpoint({
-      id: 'client',
-      transport: clientTransport,
-      middlewares: [connect({ transport: clientTransport }), signed()]
-    })
+    const server = await createRuntimeEndpointComposition(
+      {
+        id: 'server',
+        transport: serverTransport,
+        provider: { echo: (context) => context.success(context.data) },
+        middlewares: [connect({ transport: serverTransport }), signed()]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'client',
+        transport: clientTransport,
+        middlewares: [connect({ transport: clientTransport }), signed()]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     await expect(
       client.send('server', 'echo', 'data', { transfer: [{}], timeoutMs: 100 })
     ).rejects.toMatchObject({ code: 'AUTHENTICATION_FAILED' })

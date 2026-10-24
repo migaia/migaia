@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { createPeerPair } from '@migaia/rpc-host/testing'
+import type { IRpcHost } from '@migaia/rpc-host'
+import { connectedHosts } from '../../../rpc-host/test/host/fixture.js'
 import { RpcProbeStage } from '@migaia/rpc-host/probe'
 import { devtoolsPlugin, RpcDevtoolsErrorCode, RPC_DEVTOOLS_SOURCE } from '../../src/index.js'
-import type { IRpcDevtoolsQuery, IRpcDevtoolsServiceApi } from '../../src/contract/index.js'
+import type { IRpcDevtoolsQuery, IRpcDevtoolsServiceApi } from '../../src/contract/service.js'
 import { CollectorFixture, collectorView } from './fixture.js'
 
 describe('collector query, watch and service', () => {
-  it('serves query, stats, watch, lifecycle and recording through actual memory Peers', async () => {
+  it('serves query, stats, watch, lifecycle and recording through actual connected Hosts', async () => {
     /** Capture is local opt-in; the service remains metadata-only without exposeContent. */
     const devtools = devtoolsPlugin({
       stages: ['message', 'encoded'],
@@ -37,11 +38,16 @@ describe('collector query, watch and service', () => {
     }
     /** The service is exercised on its real serving Peer without depending on observation points. */
     const servingSide = { provide: { devtools: service }, probe: devtools }
-    /** The canonical testing helper owns both real memory transports and genuine Peers. */
-    const pair = await createPeerPair({ a: { provide: {} }, b: servingSide })
+    /** The existing test fixture owns both real memory bindings and public Hosts. */
+    const pair = await connectedHosts<
+      unknown,
+      Record<string, { devtools: IRpcDevtoolsServiceApi }>
+    >({ a: { provide: {} }, b: servingSide })
+    /** The direct capability projection addresses the one actual serving Host. */
+    const remote = pair.a.peers[pair.b.self.instanceId]!.devtools
     try {
       /** The first remote call activates the service; Core contract alone supplies no observations. */
-      const remoteDescription = await pair.a.request('devtools.describe')
+      const remoteDescription = await remote.describe()
       expect(remoteDescription.version).toBe(devtools.describe().version)
       expect(remoteDescription.limits).toEqual(devtools.describe().limits)
       expect(remoteDescription.now).toBeGreaterThan(0)
@@ -65,16 +71,16 @@ describe('collector query, watch and service', () => {
         methods: [CollectorFixture.method],
         trace: CollectorFixture.trace
       }
-      expect((await pair.a.request('devtools.query', query)).events).toEqual(
-        devtools.query(query).events
-      )
+      expect((await remote.query(query)).events).toEqual(devtools.query(query).events)
       expect(devtools.query(query).events.map((event) => event.seq)).toEqual([firstSequence])
-      expect(await pair.a.request('devtools.stats')).toEqual(devtools.stats())
-      for (const event of (await pair.a.request('devtools.query')).events)
-        expect(event).not.toHaveProperty('content')
+      expect(await remote.stats()).toEqual(devtools.stats())
+      for (const event of (await remote.query()).events) expect(event).not.toHaveProperty('content')
 
-      /** The fixture barrier observes the original provider iterator's actual first next. */
-      const watch = pair.a.stream('devtools.watch', { methods: [CollectorFixture.method] })
+      /** Automatic providers support all modes; select the public stream operation explicitly. */
+      const watch = (pair.a.stream as IRpcHost['stream'])('devtools.watch', {
+        methods: [CollectorFixture.method]
+      })
+      if (!('next' in watch)) expect.fail('The single connected service must return one iterator')
       /** This pending request waits for the next qualifying collector batch. */
       const next = watch.next()
       await started
@@ -85,20 +91,18 @@ describe('collector query, watch and service', () => {
       })
       await watch.return!(undefined)
 
-      await pair.a.request('devtools.pause')
+      await remote.pause()
       expect(devtools.describe().paused).toBe(true)
       devtools.emit(collectorView(firstSequence + 5))
       expect(devtools.query().counters.ignoredWhilePaused).toBe(1)
-      await pair.a.request('devtools.resume')
+      await remote.resume()
       expect(devtools.describe().paused).toBe(false)
-      await pair.a.request('devtools.record.start', { maxEvents: 3 })
+      await remote.record.start({ maxEvents: 3 })
       devtools.emit(collectorView(firstSequence + 6))
       expect(
-        devtools
-          .importRecord(await pair.a.request('devtools.record.stop'))
-          .events.map((event) => event.seq)
+        devtools.importRecord(await remote.record.stop()).events.map((event) => event.seq)
       ).toEqual([firstSequence + 6])
-      await pair.a.request('devtools.clear')
+      await remote.clear()
       expect(devtools.query().events).toEqual([])
       expect(devtools.stats().methods).toEqual([])
     } finally {
@@ -115,9 +119,14 @@ describe('collector query, watch and service', () => {
     /** Real Peer identity supplies the observed endpoint; the method name is no identity substitute. */
     const servingSide = { provide: { devtools: service }, probe: devtools }
     /** Memory Peers establish an actual provider call before its endpoint events are hand-filled. */
-    const pair = await createPeerPair({ a: { provide: {} }, b: servingSide })
+    const pair = await connectedHosts<
+      unknown,
+      Record<string, { devtools: IRpcDevtoolsServiceApi }>
+    >({ a: { provide: {} }, b: servingSide })
+    /** Address the exact service Host rather than the broadcast scalar/fanout union. */
+    const remote = pair.a.peers[pair.b.self.instanceId]!.devtools
     try {
-      await pair.a.request('devtools.describe')
+      await remote.describe()
       /** Hand-filled views avoid a dependency on the separate probe-core observation leaf. */
       const ownTraffic = collectorView()
       ownTraffic.endpointId = pair.b.self.instanceId

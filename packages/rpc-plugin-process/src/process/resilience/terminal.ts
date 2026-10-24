@@ -34,6 +34,231 @@ export function scheduleProcessDiagnostic(
 }
 
 /** Create one terminal report clock without adding a second supervisor state machine. */
+/** Allocate one registration terminal diagnostic clock before installing behavior callbacks. */
+function processTerminalRegistrationState(
+  options: Readonly<{
+    name: string
+    binding: IProcessRegistrationBinding
+    scheduler: IScheduler
+    reportAtMs: readonly number[]
+    unhandledLimit: number
+    report(error: unknown): void
+    notify(snapshot: IProcessResilienceSnapshot): Promise<boolean>
+    liquidate(): Promise<void>
+    onClose(): void
+  }>
+) {
+  /** This owner stores only diagnostics not present in the supervisor snapshot. */
+  let unhandled = 0
+  /**
+   * Committed liquidation prevents another owner-removal attempt for the same terminal
+   * registration.
+   */
+  let liquidated = false
+  /** Terminal admission state prevents this owner from accepting work after its resource is closed. */
+  let closed = false
+  /** The next configured recovery offset advances once per terminal diagnostic attempt. */
+  let entry = 0
+  /** The original terminal reason remains reachable through later liquidation and notification. */
+  const reason = undefined as unknown
+  /** At most one scheduled diagnostic or recovery step belongs to this owner at a time. */
+  const timer = undefined as IScheduledTask | undefined
+  /** The first owner-removal Promise is shared by concurrent terminal observations. */
+  const liquidation = undefined as Promise<void> | undefined
+  /** The first close operation owns cleanup; later callers observe the same settlement. */
+  const closePromise = undefined as Promise<void> | undefined
+
+  return {
+    unhandled,
+    liquidated,
+    closed,
+    entry,
+    reason,
+    timer,
+    liquidation,
+    closePromise,
+    options,
+    unsubscribe: undefined as unknown as () => void
+  }
+}
+
+/** Own one registration terminal diagnostic clock; callbacks access only this explicit instance. */
+class ProcessTerminalRegistration {
+  /** All mutable storage and original construction inputs belong to this operation. */
+  #state: ReturnType<typeof processTerminalRegistrationState>
+  /** Preserve the original stable resource surface and callback identities. */
+  readonly value: IProcessTerminalRegistration
+  /** Initialize owned storage before publishing the resource's callbacks. */
+  constructor(
+    options: Readonly<{
+      name: string
+      binding: IProcessRegistrationBinding
+      scheduler: IScheduler
+      reportAtMs: readonly number[]
+      unhandledLimit: number
+      report(error: unknown): void
+      notify(snapshot: IProcessResilienceSnapshot): Promise<boolean>
+      liquidate(): Promise<void>
+      onClose(): void
+    }>
+  ) {
+    this.#state = processTerminalRegistrationState(options)
+    this.#state.unsubscribe = this.#state.options.binding.supervisor.onTerminal((event) => {
+      this.#state.timer?.cancel()
+      this.#state.entry = event.entry
+      this.#state.reason = event.error
+      const beganAt = this.#state.options.scheduler.now()
+      void this.#deliver(this.#state.entry, 0, beganAt)
+    })
+    const guard: IRemoteCallGuard = Object.freeze({
+      beforeDispatch: (): void => {
+        if (this.#state.closed) return
+        if (this.#state.liquidated)
+          throw ((
+            originalCause: unknown,
+            originalDetail: Readonly<Record<string, unknown>> | undefined
+          ) =>
+            attachErrorIdentity(
+              new Error(
+                RpcProcessErrorText.liquidated,
+                originalCause === undefined ? undefined : { cause: originalCause }
+              ),
+              {
+                source: RPC_PROCESS_ERROR_SOURCE,
+                code: RpcProcessErrorCode.liquidated,
+                ...(originalDetail ? { detail: originalDetail } : {})
+              }
+            ))(this.#state.reason, {
+            registrationId: this.#state.options.name
+          })
+        if (this.#state.options.binding.supervisor.inspect().state === 'terminal')
+          throw ((
+            originalCause: unknown,
+            originalDetail: Readonly<Record<string, unknown>> | undefined
+          ) =>
+            attachErrorIdentity(
+              new Error(
+                RpcProcessErrorText.terminalCall,
+                originalCause === undefined ? undefined : { cause: originalCause }
+              ),
+              {
+                source: RPC_PROCESS_ERROR_SOURCE,
+                code: RpcProcessErrorCode.terminalCall,
+                ...(originalDetail ? { detail: originalDetail } : {})
+              }
+            ))(this.#state.reason, {
+            registrationId: this.#state.options.name
+          })
+      }
+    })
+    const registration: IProcessRegistration = Object.freeze({
+      restart: async () => {
+        if (this.#state.liquidated)
+          throw ((originalCause: unknown) =>
+            attachErrorIdentity(
+              new Error(
+                RpcProcessErrorText.liquidated,
+                originalCause === undefined ? undefined : { cause: originalCause }
+              ),
+              { source: RPC_PROCESS_ERROR_SOURCE, code: RpcProcessErrorCode.liquidated }
+            ))(this.#state.reason)
+        if (this.#state.liquidation) await this.#state.liquidation.catch(() => undefined)
+        if (this.#state.liquidated)
+          throw ((originalCause: unknown) =>
+            attachErrorIdentity(
+              new Error(
+                RpcProcessErrorText.liquidated,
+                originalCause === undefined ? undefined : { cause: originalCause }
+              ),
+              { source: RPC_PROCESS_ERROR_SOURCE, code: RpcProcessErrorCode.liquidated }
+            ))(this.#state.reason)
+        if (!this.#state.closed) {
+          this.#state.timer?.cancel()
+          this.#state.unhandled = 0
+        }
+        return this.#state.options.binding.supervisor.restart()
+      },
+      inspect: this.#snapshot,
+      close: (): Promise<void> => {
+        return (this.#state.closePromise ??= (async () => {
+          this.#state.closed = true
+          this.#state.timer?.cancel()
+          ;(0, this.#state.unsubscribe)()
+          this.#state.unhandled = 0
+          await this.#state.liquidation?.catch(() => undefined)
+          this.#state.options.onClose()
+        })())
+      }
+    })
+    this.value = Object.freeze({ registration, guard, snapshot: this.#snapshot })
+  }
+
+  #snapshot = (): IProcessResilienceSnapshot | undefined => {
+    if (this.#state.closed) return undefined
+    const supervisor = this.#state.options.binding.supervisor.inspect()
+    return Object.freeze({
+      id: this.#state.options.name,
+      state: supervisor.state,
+      health: this.#state.options.binding.health,
+      unhandled: this.#state.unhandled,
+      liquidated: this.#state.liquidated,
+      ...(supervisor.state === 'terminal'
+        ? { reason: this.#state.reason ?? supervisor.terminalError }
+        : {})
+    })
+  }
+
+  #scheduleNext = (currentEntry: number, index: number, beganAt: number): void => {
+    if (this.#state.closed || this.#state.liquidated || this.#state.entry !== currentEntry) return
+    this.#state.timer = scheduleProcessDiagnostic(
+      this.#state.options.scheduler,
+      this.#state.options.reportAtMs,
+      beganAt,
+      index,
+      () => {
+        void this.#deliver(currentEntry, index, beganAt)
+      }
+    )
+  }
+
+  /** Supervision already reported index zero; this owner reports only later ticks. */
+  #deliver = async (currentEntry: number, index: number, beganAt: number): Promise<void> => {
+    this.#state.timer = undefined
+    if (this.#state.closed || this.#state.liquidated || this.#state.entry !== currentEntry) return
+    if (this.#state.options.binding.supervisor.inspect().state !== 'terminal') return
+    if (index > 0) this.#state.options.report(this.#state.reason)
+    const current = this.#snapshot()
+    if (!current) return
+    let handled = false
+    try {
+      handled = await this.#state.options.notify(current)
+    } catch (error) {
+      this.#state.options.report(error)
+    }
+    if (this.#state.closed || this.#state.liquidated || this.#state.entry !== currentEntry) return
+    if (handled) {
+      this.#state.unhandled = 0
+      return
+    }
+    this.#state.unhandled += 1
+    if (this.#state.unhandled > this.#state.options.unhandledLimit) {
+      this.#state.liquidation = Promise.resolve().then(() => this.#state.options.liquidate())
+      try {
+        await this.#state.liquidation
+        this.#state.liquidated = true
+        ;(0, this.#state.unsubscribe)()
+        this.#state.options.onClose()
+      } catch (error) {
+        this.#state.liquidation = undefined
+        this.#state.options.report(error)
+      }
+      return
+    }
+    this.#scheduleNext(currentEntry, index + 1, beganAt)
+  }
+}
+
+/** Construct the single owner for one registration terminal diagnostic clock. */
 export function createProcessTerminalRegistration(
   options: Readonly<{
     name: string
@@ -47,163 +272,5 @@ export function createProcessTerminalRegistration(
     onClose(): void
   }>
 ): IProcessTerminalRegistration {
-  /** This owner stores only diagnostics not present in the supervisor snapshot. */
-  let unhandled = 0
-  let liquidated = false
-  let closed = false
-  let entry = 0
-  let reason: unknown
-  let timer: IScheduledTask | undefined
-  let liquidation: Promise<void> | undefined
-  let closePromise: Promise<void> | undefined
-
-  const snapshot = (): IProcessResilienceSnapshot | undefined => {
-    if (closed) return undefined
-    const supervisor = options.binding.supervisor.inspect()
-    return Object.freeze({
-      id: options.name,
-      state: supervisor.state,
-      health: options.binding.health,
-      unhandled,
-      liquidated,
-      ...(supervisor.state === 'terminal' ? { reason: reason ?? supervisor.terminalError } : {})
-    })
-  }
-
-  const scheduleNext = (currentEntry: number, index: number, beganAt: number): void => {
-    if (closed || liquidated || entry !== currentEntry) return
-    timer = scheduleProcessDiagnostic(options.scheduler, options.reportAtMs, beganAt, index, () => {
-      void deliver(currentEntry, index, beganAt)
-    })
-  }
-
-  /** Supervision already reported index zero; this owner reports only later ticks. */
-  const deliver = async (currentEntry: number, index: number, beganAt: number): Promise<void> => {
-    timer = undefined
-    if (closed || liquidated || entry !== currentEntry) return
-    if (options.binding.supervisor.inspect().state !== 'terminal') return
-    if (index > 0) options.report(reason)
-    const current = snapshot()
-    if (!current) return
-    let handled = false
-    try {
-      handled = await options.notify(current)
-    } catch (error) {
-      options.report(error)
-    }
-    if (closed || liquidated || entry !== currentEntry) return
-    if (handled) {
-      unhandled = 0
-      return
-    }
-    unhandled += 1
-    if (unhandled > options.unhandledLimit) {
-      liquidation = Promise.resolve().then(() => options.liquidate())
-      try {
-        await liquidation
-        liquidated = true
-        // This delivery has consumed its timer; retain only the owner's bounded tombstone.
-        unsubscribe()
-        options.onClose()
-      } catch (error) {
-        liquidation = undefined
-        options.report(error)
-      }
-      return
-    }
-    scheduleNext(currentEntry, index + 1, beganAt)
-  }
-
-  /** The terminal event is emitted after supervision's own index-zero report. */
-  const unsubscribe = options.binding.supervisor.onTerminal((event) => {
-    timer?.cancel()
-    entry = event.entry
-    reason = event.error
-    const beganAt = options.scheduler.now()
-    void deliver(entry, 0, beganAt)
-  })
-
-  const guard: IRemoteCallGuard = Object.freeze({
-    beforeDispatch(): void {
-      if (closed) return
-      if (liquidated)
-        throw ((
-          originalCause: unknown,
-          originalDetail: Readonly<Record<string, unknown>> | undefined
-        ) =>
-          attachErrorIdentity(
-            new Error(
-              RpcProcessErrorText.liquidated,
-              originalCause === undefined ? undefined : { cause: originalCause }
-            ),
-            {
-              source: RPC_PROCESS_ERROR_SOURCE,
-              code: RpcProcessErrorCode.liquidated,
-              ...(originalDetail ? { detail: originalDetail } : {})
-            }
-          ))(reason, {
-          registrationId: options.name
-        })
-      if (options.binding.supervisor.inspect().state === 'terminal')
-        throw ((
-          originalCause: unknown,
-          originalDetail: Readonly<Record<string, unknown>> | undefined
-        ) =>
-          attachErrorIdentity(
-            new Error(
-              RpcProcessErrorText.terminalCall,
-              originalCause === undefined ? undefined : { cause: originalCause }
-            ),
-            {
-              source: RPC_PROCESS_ERROR_SOURCE,
-              code: RpcProcessErrorCode.terminalCall,
-              ...(originalDetail ? { detail: originalDetail } : {})
-            }
-          ))(reason, {
-          registrationId: options.name
-        })
-    }
-  })
-
-  const registration: IProcessRegistration = Object.freeze({
-    async restart() {
-      if (liquidated)
-        throw ((originalCause: unknown) =>
-          attachErrorIdentity(
-            new Error(
-              RpcProcessErrorText.liquidated,
-              originalCause === undefined ? undefined : { cause: originalCause }
-            ),
-            { source: RPC_PROCESS_ERROR_SOURCE, code: RpcProcessErrorCode.liquidated }
-          ))(reason)
-      if (liquidation) await liquidation.catch(() => undefined)
-      if (liquidated)
-        throw ((originalCause: unknown) =>
-          attachErrorIdentity(
-            new Error(
-              RpcProcessErrorText.liquidated,
-              originalCause === undefined ? undefined : { cause: originalCause }
-            ),
-            { source: RPC_PROCESS_ERROR_SOURCE, code: RpcProcessErrorCode.liquidated }
-          ))(reason)
-      if (!closed) {
-        timer?.cancel()
-        unhandled = 0
-      }
-      return options.binding.supervisor.restart()
-    },
-    inspect: snapshot,
-    close(): Promise<void> {
-      return (closePromise ??= (async () => {
-        closed = true
-        timer?.cancel()
-        unsubscribe()
-        unhandled = 0
-        await liquidation?.catch(() => undefined)
-        options.onClose()
-      })())
-    }
-  })
-
-  return Object.freeze({ registration, guard, snapshot })
+  return new ProcessTerminalRegistration(options).value
 }

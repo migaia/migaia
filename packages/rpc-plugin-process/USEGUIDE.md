@@ -122,4 +122,4 @@ export async function installAndRelease(entry: URL) {
 
 同名客户端在旧会话仍响应时以 HOST_PEER_NAME_DUPLICATE 拒绝；旧会话已死或一次原 ping 失败/到期时正常退场再接纳。不会附加后台 heartbeat。业务缺少目标是 TARGET_UNKNOWN，未知结果先对账再重试。
 
-原生错误 source 为 rpc.transport.process，host/调用和托管错误仍可能来自 rpc.endpoint/rpc.remote。按 source/code 判断，不按文本匹配；保留原生 TypeError/AbortError 等类型和完整原因链。Node/Bun/Deno、Electron utility process、Windows Job 的能力取决于实际适配器；权限或资源参数不创造原生不存在的隔离。
+原生错误 source 为 rpc.transport.process，host/调用和托管错误仍可能来自 rpc.endpoint/rpc.remote。按 source/code 判断，不按文本匹配；保留原生 TypeError/AbortError 等类型和完整原因链。Node/Bun/Deno 的能力取决于实际适配器；Electron 沿用 Node I/O 路径。权限或资源参数不创造原生不存在的隔离。

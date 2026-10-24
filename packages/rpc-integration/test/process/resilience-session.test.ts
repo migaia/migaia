@@ -1,6 +1,3 @@
-import { PluginHost } from '@migaia/plugin-host'
-import { createUnitBudget } from '@migaia/supervision'
-import type { IProcessHandle, IProcessSpec } from '@migaia/supervision/process'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { describe, expect, it, vi } from 'vitest'
 import { serveProcessSessions } from '../../../rpc-plugin-process/dist/process/plugin/serve.js'
@@ -8,106 +5,75 @@ import { createProcessResilience } from '../../../rpc-plugin-process/dist/proces
 import type {
   IProcessServeChildIngress,
   IProcessServeListenerIngress
-} from '../../../rpc-plugin-process/dist/process/plugin/index.js'
+} from '../../../rpc-plugin-process/dist/process/plugin/types.js'
 import { createNativeProcessOffer } from '../../../rpc-plugin-process/dist/process/offer.js'
-import { createProcessPlugin } from '../../../rpc-plugin-process/test/protocol.ts'
+import { processPlugin } from '@migaia/rpc-plugin-process'
+import { runtimeHostFixture } from './fixtures/host-control.js'
+import { nativeEndpoint } from './fixtures/native-runtime.js'
 import { createProcessSessionManager } from '../../../rpc-plugin-process/dist/process/resilience/session.js'
 import type { IProcessMessageChannel } from '../../../rpc-plugin-process/dist/process/types.js'
-import { REMOTE_FIXTURE_CONTRACT, remoteHarness } from '../../../rpc-host/test/remote/fixture.js'
 import { createProcessFixtureChannel } from '../fixtures/process-diagnostics.js'
+import { readEndpointOwner } from '../../../rpc-host/dist/core/internal/endpoint-projection.js'
+import { EndpointOwnerKey } from '../../../rpc-host/dist/core/endpoint-kernel.js'
+import type { ResourceScope } from '../../../rpc-host/dist/core/internal/resource-scope.js'
 
 describe('process resilience session ownership', () => {
-  it('drains a real PluginHost unUse before disposing the process endpoint', async () => {
-    const fixture = remoteHarness()
-    const scheduler = fixture.binding.scheduler
-    const host = new PluginHost<Record<string, never>>({
-      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
-    })
-    /** The real Host hook must observe the pending request before release disposes it. */
+  it('drains a real native PluginHost unUse before disposing the process endpoint', async () => {
+    /** The actual native Host and binding retain their original deterministic supervisor clock. */
+    const fixture = runtimeHostFixture()
+    /** Business is deliberately held before physical send, under the actual native drain wrapper. */
     let settleRequest!: (value: string) => void
+    /** Preserve the caller's original pending request and exact successful result. */
     const pending = new Promise<string>((resolve) => {
       settleRequest = resolve
     })
-    const send = fixture.served.endpoint.send
-    fixture.served.endpoint.send = ((peer, method, params, options) =>
-      method === 'p.f.request' ? pending : send(peer, method, params, options)) as typeof send
+    /** Native announce-close must precede endpoint retirement after the pending operation drains. */
     const order: string[] = []
-    fixture.served.endpoint.announceClose = vi.fn(async () => {
+    /** This observer retains the actual kernel/projection ancestry and original cleanup operation. */
+    const announceClose = vi.fn(async () => {
       order.push('close-frame')
     })
-    fixture.served.endpoint.dispose = vi.fn(async () => {
-      order.push('dispose')
-    })
-    /** This unit exits only when the Host releases its installed Plugin. */
-    let exit!: (value: { code: number | null; signal: string | null }) => void
-    const handle: IProcessHandle = {
-      identity: { fingerprint: 'drain-child' },
-      exited: new Promise((resolve) => {
-        exit = resolve
-      }),
-      terminate: () => exit({ code: 0, signal: null })
-    }
-    const spec: IProcessSpec = {
-      command: 'fixture',
-      args: [],
-      env: { inherit: [], set: {} },
-      stdio: { stdin: 'ignore', stdout: 'ignore', stderr: 'ignore' }
-    }
-    const raw: IProcessMessageChannel = {
-      kind: 'message',
-      send: () => undefined,
-      onMessage: () => () => undefined,
-      onClose: () => () => undefined,
-      close: () => undefined
-    }
-    const definition = createProcessPlugin({
-      name: 'p',
-      contract: REMOTE_FIXTURE_CONTRACT,
-      registrationOwner: { name: 'p', host },
-      host: {
-        disable: (name, options) => host.plugin.disable(name, options),
-        enable: (name) => host.plugin.enable(name)
-      },
-      endpointFactory: async () => fixture.served,
-      report: () => undefined,
-      deployment: {
-        kind: 'spawn',
-        channelKind: 'message',
-        supervision: {
-          id: 'drain-child',
-          spec,
-          launcher: {
-            capabilities: { termination: 'enforced', 'fault-isolation': 'enforced' },
-            launch: async () => handle
-          },
-          budget: createUnitBudget({ kind: 'process', maxUnits: 1, scheduler }),
-          scheduler,
-          health: { check: async () => undefined },
-          report: () => undefined
-        },
-        rawChannel: async () => raw,
-        establish: async () => ({
-          ...fixture.channel,
-          agreement: { ...fixture.channel.agreement, capabilities: ['close@1', 'stream@1'] }
-        })
+    fixture.observeEndpoint((served) => {
+      /** The shared canonical kernel owns disposal; the borrowed session view cannot replace it. */
+      readEndpointOwner<ResourceScope>(served.endpoint, EndpointOwnerKey.resourceScope)!.addSync(
+        'fixture endpoint disposal',
+        () => order.push('dispose')
+      )
+      return {
+        ...served,
+        endpoint: Object.create(
+          served.endpoint,
+          Object.getOwnPropertyDescriptors({
+            send: <T>(...args: Parameters<typeof served.endpoint.send>) =>
+              args[1] === 'p.f.m' ? (pending as Promise<T>) : served.endpoint.send<T>(...args),
+            announceClose
+          })
+        )
       }
     })
     try {
-      const [installed] = await host.use(definition)
-      const feature = installed.getFeature('f') as { request(params: unknown[]): Promise<unknown> }
-      const request = feature.request(['pending'])
+      await fixture.host.use(processPlugin({ ...fixture.options, name: 'p' }))
+      /**
+       * Native outlet calls retain the current managed Peer and the actual binding's request
+       * tracking.
+       */
+      const request = fixture.host.process!.request('p', 'p.f.m', ['pending'])
       for (let turn = 0; turn < 10; turn += 1) await Promise.resolve()
-      const removing = host.unUse('p', { policy: 'suspend' })
-      for (let turn = 0; turn < 10; turn += 1) await Promise.resolve()
-      expect(fixture.served.endpoint.announceClose).toHaveBeenCalledTimes(1)
+      /** Host.unUse owns the actual native release rather than the retired Plugin proxy facade. */
+      const removing = fixture.host.unUse('p', { policy: 'suspend' })
+      /** Observe the actual asynchronous native close receipt before asserting drain order. */
+      await vi.waitFor(() => expect(announceClose).toHaveBeenCalledTimes(1))
       expect(order).toEqual(['close-frame'])
       settleRequest('done')
       await expect(request).resolves.toBe('done')
       await removing
       expect(order).toEqual(['close-frame', 'dispose'])
-      expect(scheduler.pendingCount).toBe(0)
+      /** The fixture also owns its independently created child Peer on the same manual clock. */
+      await fixture.close()
+      expect(fixture.scheduler.pendingCount).toBe(0)
     } finally {
-      await host.dispose()
+      settleRequest('done')
+      await fixture.close()
     }
   })
 
@@ -190,15 +156,44 @@ describe('unpublished process service rollback', () => {
   it.each(['child', 'listener'] as const)(
     'closes a returned %s service when recovery rejects before publication',
     async (kind) => {
-      /** The neutral endpoint recorder isolates the service-to-session ownership transfer. */
-      const fixture = remoteHarness()
-      const scheduler = fixture.channel.scheduler
+      /** The actual canonical endpoint isolates the same service-to-session transfer boundary. */
+      const scheduler = createManualScheduler()
+      /** Real native connection close is observed at its held physical I/O resource. */
+      const channelClose = vi.fn(async () => undefined)
+      /** Core constructs this exact fixed-profile channel from actual held message operations. */
+      const channel = await createProcessFixtureChannel(
+        {
+          kind: 'message',
+          send: () => undefined,
+          onMessage: () => () => undefined,
+          onClose: () => () => undefined,
+          close: channelClose
+        },
+        { peerId: 'peer', scheduler }
+      )
+      /** The production feature roots build the original endpoint and resource scope. */
+      const original = await nativeEndpoint(channel, 'rollback-fixture')
+      /**
+       * Rollback invokes the actual original endpoint disposal while retaining its projection
+       * ancestry.
+       */
+      const dispose = vi.fn(() => original.endpoint.dispose())
+      /** The same actual composed endpoint is borrowed by the service callback and native session. */
+      const endpoint = {
+        ...original,
+        endpoint: Object.create(original.endpoint, Object.getOwnPropertyDescriptors({ dispose }))
+      }
+      /** Existing native governor controls admission and original physical lease release. */
       const resilience = createProcessResilience({ scheduler, report: () => undefined })
       /** Recovery fails only after the service callback has returned its owned endpoint. */
       const primary = new Error('recovery fixture failed')
+      /** Cleanup failure remains an independent reported leaf and cannot replace primary. */
       const cleanup = new Error('service fixture cleanup failed')
+      /** The second original fallback readiness call rejects after service construction. */
       const ready = vi.fn().mockResolvedValueOnce(undefined).mockRejectedValueOnce(primary)
+      /** No unpublished session may install a fallback membership. */
       const add = vi.fn(() => () => undefined)
+      /** Existing fallback interface retains the exact original recovery interleaving. */
       const fallback = {
         version: 0,
         ready,
@@ -206,24 +201,17 @@ describe('unpublished process service rollback', () => {
         close: async () => undefined,
         inspect: () => ({ recoverable: true, fused: false })
       }
+      /** Every secondary cleanup failure remains visible through the existing reporter. */
       const reports: unknown[] = []
-      const dispose = vi.spyOn(fixture.served.endpoint, 'dispose')
+      /** The callback owns its actual endpoint before the native session can publish it. */
       const serviceClose = vi.fn(async () => {
-        await fixture.served.endpoint.dispose()
+        await endpoint.endpoint.dispose()
         throw cleanup
       })
-      const channelClose = vi.spyOn(fixture.channel, 'close')
-      /** Core owns the exact channel; its held physical close calls the original observed resource. */
-      const channel = await createProcessFixtureChannel(
-        {
-          kind: 'message',
-          send: () => undefined,
-          onMessage: () => () => undefined,
-          onClose: () => () => undefined,
-          close: () => fixture.channel.close!()
-        },
-        { peerId: fixture.channel.peerId, scheduler }
-      )
+      /**
+       * Raw child source is unused after its existing establish callback returns the genuine
+       * channel.
+       */
       const raw: IProcessMessageChannel = {
         kind: 'message',
         send: () => undefined,
@@ -258,7 +246,7 @@ describe('unpublished process service rollback', () => {
             }
       const starting = serveProcessSessions(
         ingress,
-        async () => fixture.served,
+        async () => endpoint,
         async () => ({ close: serviceClose }),
         resilience,
         (error) => reports.push(error),

@@ -42,7 +42,6 @@ export type {
   IRemoteGenerationEvents,
   IRemoteRetryDispatch,
   IRemoteRetryPort,
-  IRemotePluginHostPort,
   IRemoteProxyOptions
 } from '../remote/types.js'
 export type {
@@ -90,17 +89,98 @@ export type {
   IRuntimePeerSourceContext,
   IRuntimePeerSourceResult
 } from '../remote/runtime-api/peer.js'
-export type { IRuntimePluginOptions } from '../remote/runtime-api/plugin.js'
 export type { IRpcRemoteLayerErrorCode } from '../remote/error-code.js'
-export * from '../adapter.js'
-export * from '../adapter/internal-advanced.js'
-export * from '../core/transport-kit.js'
+/** Task-level adapter authors provide actual raw I/O; Core retains protocol and resource owners. */
+export { defineMessageAdapter, defineByteAdapter } from '../runtime-adapter/definition.js'
+export type {
+  IMessageAdapterOptions,
+  IMessageAdapterPort,
+  IMessageAdapterLaunch,
+  IByteAdapterOptions,
+  IAdapterDefinition,
+  IAdapterDeploymentOptions
+} from '../runtime-adapter/definition-types.js'
+/** Native adapters retain only the existing lower-level operations their real source owners use. */
+export { resolveAdapterEntry, retainAdapterRuntimeFlags } from '../runtime-adapter/entry.js'
+export { createJsonRpcBridgeError } from '../runtime-adapter/jsonrpc/error.js'
+export {
+  JsonRpcProfile,
+  JsonRpcErrorNumber,
+  JSONRPC_REQUIRED_CAPABILITIES,
+  JSONRPC_ALLOWED_CAPABILITIES,
+  JSONRPC_REQUIRED_METHODS
+} from '../runtime-adapter/jsonrpc/constants.js'
+export type { IAdapterJsonRpcChannelOptions } from '../runtime-adapter/jsonrpc/handshake.js'
+export {
+  createAdapterSourceConfigurationError,
+  IpcReporterContext,
+  createAdapterId,
+  readAdapterAbortReason,
+  createAdapterConfigurationError,
+  createAdapterConfigurationTypeError,
+  createAdapterTransportError
+} from '../runtime-adapter/data.js'
+export { holdAdapterLaunch } from '../runtime-adapter/peer.js'
+export type { IAdapterPeerPreparation } from '../runtime-adapter/peer.js'
+export { createAdapterBindingDrain } from '../runtime-adapter/binding.js'
+export type {
+  IAdapterListenerPreparation,
+  IAdapterListenerSession,
+  IAdapterListenerService
+} from '../runtime-adapter/listener.js'
+export type { IRuntimeObjectConnection } from '../runtime-adapter/object/types.js'
+export { createRuntimeByteConnection } from '../runtime-adapter/byte/handshake.js'
+export { readRuntimeByteBootstrap } from '../runtime-adapter/byte/bootstrap.js'
+export type {
+  IRuntimeByteDiagnostics,
+  IRuntimeConnectionOptions,
+  IRuntimeByteOptions,
+  IRuntimeByteConnection
+} from '../runtime-adapter/byte/types.js'
+export { createRuntimeProviderGovernor } from '../runtime-adapter/provider/governor.js'
+export type { IRuntimeProviderGovernor } from '../runtime-adapter/provider/governor.js'
+export { createRuntimeProviderScope } from '../runtime-adapter/provider/scope.js'
+export type { IRuntimeProviderScope } from '../runtime-adapter/provider/scope.js'
+export {
+  createEventEmitterMessageResource,
+  createEventTargetMessageResource
+} from '../runtime-adapter/message/resource.js'
+export type {
+  IAdapterMessageResource,
+  IAdapterEventEmitterMessagePort
+} from '../runtime-adapter/message/types.js'
+export { createRuntimeEventByteIO } from '../runtime-adapter/byte/event-byte-io.js'
+export { createRuntimeMessageConnection } from '../runtime-adapter/message/connection.js'
+
+/** Shared physical metadata sizing avoids payload scans or duplicate carrier implementations. */
+export { carrierSizeBytes } from '../core/adapters/probe-content.js'
+/** Public adapter-facing transport types. */
+export type { IRpcTransport, IRpcSendOptions } from '../core/transport.js'
+/** Stable platform and resource ownership values for adapters. */
+export { RpcPlatform, RpcTransportOwnership } from '../core/transport-constants.js'
+/** Classify native adapter I/O failures without duplicating Core's semantic error policy. */
+export { identifyRpcBoundaryFailure } from '../core/errors.js'
+/** Listener lifecycle and failure primitives shared by platform adapters. */
+export {
+  collectListenerCleanupFailures,
+  collectListenerFailure,
+  createListenerFailure,
+  createListenerFailureState,
+  drainListenerFailures,
+  drainTerminalListenerFailures,
+  observeListener,
+  registerListeners,
+  releaseListenerRegistration,
+  reportListenerFailure
+} from '../core/internal/listener-safety.js'
+/** Shared listener fan-out primitive for adapter subscriptions. */
+export { createMessageListenerHub } from '../core/internal/message-listener-hub.js'
+/** Safe access and diagnostics for hostile platform event objects. */
+export { safeRead, safeString } from '../core/internal/safe-value.js'
 export * from '../core/transport-constants.js'
 /** Genuine object channels mint their own agreement; callers cannot inject private trust writers. */
-export {
-  holdAdapterObjectChannel,
-  materializeAdapterJson
-} from '../runtime-adapter/object/index.js'
+export { holdAdapterObjectChannel } from '../runtime-adapter/object/connection.js'
+export { materializeAdapterJson } from '../runtime-adapter/object/pipeline.js'
 export type { IRuntimeObjectIO, IRuntimeObjectChannel } from '../runtime-adapter/object/types.js'
 /** Native authors capture cold binding recipes; this grants no channel or private proof identity. */
 export { createAdapterDeployment } from '../runtime-adapter/deployment.js'

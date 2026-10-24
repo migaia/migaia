@@ -4,6 +4,7 @@ import * as built from '@migaia/rpc-plugin-process'
 
 describe('process Host public root', () => {
   it('exposes only processPlugin and retained adapter contracts through the public root', () => {
+    /** Compiler-owned root has exactly the four names below; this comparison has a fixed domain. */
     expect(Object.keys(built).toSorted()).toEqual([
       'RPC_PROCESS_ERROR_SOURCE',
       'RpcProcessErrorCode',
@@ -43,26 +44,19 @@ describe('process Host public root', () => {
     type IPluginOptions = Parameters<typeof built.processPlugin>[0]
     const service: (options: IPluginOptions) => object = built.processPlugin
     expect(service).toBe(built.processPlugin)
-    /** Exact subpaths preserve all eight original native adapters and the new process features. */
+    /** Exact subpaths expose the native transport and its supported cold features. */
     const manifest = JSON.parse(
       readFileSync(new URL('../../package.json', import.meta.url), 'utf8')
     )
-    expect(Object.keys(manifest.exports).toSorted()).toEqual(
-      [
+    /** JSON object keys are unique, so exact Set equality retains every missing/extra subpath. */
+    expect(new Set(Object.keys(manifest.exports))).toEqual(
+      new Set([
         '.',
-        './adapters/node-child-process',
-        './adapters/node-socket',
-        './adapters/bun-spawn',
-        './adapters/bun-socket',
-        './adapters/deno-command',
-        './adapters/deno-socket',
-        './adapters/electron-utility-process',
-        './adapters/windows-job',
         './features',
         './features/send-queue',
         './features/log',
         './features/flow-control'
-      ].toSorted()
+      ])
     )
     for (const key of ['./host', './host/*', './process', './process/host', './process/host/*'])
       expect(manifest.exports[key]).toBeUndefined()

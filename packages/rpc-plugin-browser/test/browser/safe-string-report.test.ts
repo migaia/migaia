@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createWebWorkerTransport } from '@migaia/rpc-plugin-browser/adapters/web-worker'
+import { createWebWorkerTransport } from '@migaia/rpc-host/plugin'
 
 describe('safeString failure reporting', () => {
   it('reports Worker conversion and message getter failures before primary errors', () => {

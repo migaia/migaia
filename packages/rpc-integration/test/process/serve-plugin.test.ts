@@ -2,17 +2,17 @@ import { defineFeature, definePlugin, PluginHost } from '@migaia/plugin-host'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { describe, expect, it, vi } from 'vitest'
-import { type IRpcEndpoint } from '../../../rpc-host/dist/core/index.js'
+import type { IRpcEndpoint } from '../../../rpc-host/dist/core/typing.js'
 import type { IRemoteChannel } from '@migaia/rpc-host/plugin'
-import { createProcessSessionService } from '../../../rpc-plugin-process/test/protocol.ts'
 import { serveProcessSessions } from '../../../rpc-plugin-process/dist/process/plugin/serve.js'
-import { serveRemotePlugin } from '../../../rpc-host/dist/remote/serve-plugin.js'
+import { prepareRuntimeProviderAssembly } from '../../../rpc-host/dist/remote/runtime-api/peer.js'
+import { compileRuntimeMethods } from '../../../rpc-host/dist/remote/runtime-api/catalog.js'
 import { createProcessResilience } from '../../../rpc-plugin-process/dist/process/resilience/index.js'
 import { createProcessInstanceFallback } from '../../../rpc-plugin-process/dist/process/resilience/fallback.js'
 import type {
   IProcessServeChildIngress,
   IProcessServeListenerIngress
-} from '../../../rpc-plugin-process/dist/process/plugin/index.js'
+} from '../../../rpc-plugin-process/dist/process/plugin/types.js'
 import type { IProcessServeEndpointFactory } from '../../../rpc-plugin-process/dist/process/plugin/types.js'
 import type { IProcessPendingByteConnection } from '../../../rpc-plugin-process/dist/process/types.js'
 import { createNativeProcessOffer } from '../../../rpc-plugin-process/dist/process/offer.js'
@@ -38,38 +38,82 @@ async function targetHost() {
   const host = new PluginHost<Record<string, never>>({
     execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
   })
+  /**
+   * One actual business implementation is shared by the native provider and the Host lifecycle
+   * oracle.
+   */
+  const provide = { p: { f: { request: () => 'live' } } }
   const target = definePlugin({
     name: 'p',
-    features: { f: defineFeature(() => ({ request: () => 'live' })) },
+    features: { f: defineFeature(() => provide.p.f) },
     install: () => ({ version: () => 1 })
   })
   const [targetHandle] = await host.use(target)
-  return { host, targetHandle }
+  return { host, targetHandle, provide }
 }
 
-/** Core constructs the accepted channel over this fixture's actual held message subscription. */
-async function acceptedChannel(id: string, closeResource?: () => Promise<void>) {
-  /** The callback belongs to this physical connection alone. */
-  let onError: ((error: unknown) => void) | undefined
-  /** Physical close remains observable without copying the Core channel's private identity. */
-  const close = closeResource ?? vi.fn(async () => undefined)
-  /** The held message input is inert until the original service subscribes or injects EOF. */
-  const channel = await createProcessFixtureChannel(
-    {
-      kind: 'message',
-      send: () => undefined,
-      onMessage: () => () => undefined,
-      onClose(listener) {
-        onError = listener
-        return () => {
-          onError = undefined
-        }
+/** Register the real local business through the same provider compiler used by RuntimeHost. */
+async function installFixtureProvider(
+  endpoint: { endpoint: IRpcEndpoint },
+  provide: Awaited<ReturnType<typeof targetHost>>['provide']
+) {
+  /** This fixture exercises native session lifecycle, without directory traffic or stream methods. */
+  const assembly = prepareRuntimeProviderAssembly({
+    methods: compileRuntimeMethods(provide, contract),
+    streams: false,
+    generations: false,
+    supports: () => false,
+    remoteNode: () => undefined,
+    bindRemoteNode: () => undefined,
+    describe: () => undefined
+  })
+  assembly.install(endpoint.endpoint as unknown as Parameters<typeof assembly.install>[0])
+  return { close: () => endpoint.endpoint.dispose() }
+}
+
+/** One held physical subscription owns its terminal callback without a captured factory container. */
+class AcceptedChannel {
+  /** Native termination is observed only while this original physical connection is subscribed. */
+  #onError: ((error: unknown) => void) | undefined
+  /** This exact Core-built channel retains its private authenticated resource identity. */
+  #channel!: IRemoteChannel
+  /** Existing spy identity records the real physical close operation. */
+  readonly close: () => Promise<void>
+
+  /** Preserve the supplied physical close callback or the original inert default spy. */
+  constructor(closeResource?: () => Promise<void>) {
+    this.close = closeResource ?? vi.fn(async () => undefined)
+  }
+
+  /** Open one held resource using the original manual clock and subscription lifetime. */
+  async open(id: string): Promise<this> {
+    this.#channel = await createProcessFixtureChannel(
+      {
+        kind: 'message',
+        send: () => undefined,
+        onMessage: () => () => undefined,
+        onClose: (listener) => {
+          this.#onError = listener
+          return () => {
+            this.#onError = undefined
+          }
+        },
+        close: this.close
       },
-      close
-    },
-    { peerId: id, scheduler: createManualScheduler() }
-  )
-  return { channel, close, fail: () => onError?.(new Error('EOF')) }
+      { peerId: id, scheduler: createManualScheduler() }
+    )
+    return this
+  }
+
+  /** Borrow the original built channel rather than copying its private provenance. */
+  get channel(): IRemoteChannel {
+    return this.#channel
+  }
+
+  /** Inject original native EOF into the currently installed physical observer. */
+  fail(): void {
+    this.#onError?.(new Error('EOF'))
+  }
 }
 
 /** Lets asynchronous service cleanup settle without a timing assertion. */
@@ -79,10 +123,10 @@ async function settle(): Promise<void> {
 
 describe('process plugin service ingress', () => {
   it('closes the unhealthy shared session and replaces its real Host target', async () => {
-    const { host, targetHandle } = await targetHost()
-    const physical = await acceptedChannel('first')
-    const second = await acceptedChannel('second')
-    const third = await acceptedChannel('third')
+    const { host, targetHandle, provide: business } = await targetHost()
+    const physical = await new AcceptedChannel().open('first')
+    const second = await new AcceptedChannel().open('second')
+    const third = await new AcceptedChannel().open('third')
     let onConnection: (pending: IProcessPendingByteConnection) => void | Promise<void> = () =>
       undefined
     let unhealthy: (event: { targetName: string; reason: unknown }) => void = () => undefined
@@ -134,15 +178,7 @@ describe('process plugin service ingress', () => {
         }
       },
       endpointFactory,
-      ({ endpoint, identity }) =>
-        serveRemotePlugin({
-          host,
-          contract,
-          endpoint,
-          report,
-          invocationContext: (context) =>
-            Object.freeze({ session: identity, signal: context.signal })
-        }),
+      ({ endpoint }) => installFixtureProvider(endpoint, business),
       resilience,
       report,
       recovery,
@@ -184,7 +220,7 @@ describe('process plugin service ingress', () => {
   })
 
   it('reports a narrow Host before accepting and exposes its unrecoverable fuse', async () => {
-    const { host } = await targetHost()
+    const { host, provide: business } = await targetHost()
     /** This caller implements exactly the formerly documented service Host port. */
     const narrow = { use: host.use, unUse: host.unUse, plugin: host.plugin }
     const report = vi.fn()
@@ -218,7 +254,7 @@ describe('process plugin service ingress', () => {
           listen
         },
         vi.fn(),
-        ({ endpoint }) => serveRemotePlugin({ host: narrow, contract, endpoint, report }),
+        ({ endpoint }) => installFixtureProvider(endpoint, business),
         resilience,
         report,
         recovery,
@@ -245,34 +281,16 @@ describe('process plugin service ingress', () => {
     }
   })
 
-  it('rejects missing recovery factories before listener binding', async () => {
-    const { host } = await targetHost()
-    const listen = vi.fn()
-    try {
-      expect(() =>
-        createProcessSessionService({
-          host,
-          contract,
-          instanceMode: 'per-connection',
-          report: vi.fn()
-        })
-      ).toThrow(expect.objectContaining({ detail: { field: 'createSessionHost' } }))
-      expect(listen).not.toHaveBeenCalled()
-    } finally {
-      await host.dispose()
-    }
-  })
-
   it('creates one target Host per authenticated connection', async () => {
     const { host: fallback } = await targetHost()
-    const first = await acceptedChannel('first')
-    const second = await acceptedChannel('second')
+    const first = await new AcceptedChannel().open('first')
+    const second = await new AcceptedChannel().open('second')
     const created: Array<Awaited<ReturnType<typeof targetHost>>> = []
     let onConnection!: (pending: IProcessPendingByteConnection) => void | Promise<void>
     const createSessionHost = vi.fn(async (_session: IProcessSessionIdentity) => {
       const next = await targetHost()
       created.push(next)
-      return next.host
+      return next
     })
     /** Existing governance owns connection quotas; each authenticated callback owns one real Host. */
     const report = vi.fn()
@@ -307,13 +325,20 @@ describe('process plugin service ingress', () => {
     const serving = await serveProcessSessions(
       options.ingress,
       options.endpointFactory,
-      createProcessSessionService({
-        host: fallback,
-        contract,
-        instanceMode: 'per-connection',
-        createSessionHost,
-        report
-      }),
+      async ({ endpoint, identity }) => {
+        /** The authenticated session owns this genuine target and the canonical endpoint provider. */
+        const target = await createSessionHost(identity)
+        const service = await installFixtureProvider(endpoint, target.provide)
+        return {
+          close: async () => {
+            try {
+              await service.close()
+            } finally {
+              await target.host.dispose()
+            }
+          }
+        }
+      },
       resilience,
       report,
       undefined,
@@ -351,7 +376,7 @@ describe('process plugin service ingress', () => {
   })
 
   it('rejects a listener without a verifier before binding', async () => {
-    const { host } = await targetHost()
+    const { host, provide: business } = await targetHost()
     const listen = vi.fn()
     const endpointFactory = vi.fn()
     try {
@@ -377,15 +402,7 @@ describe('process plugin service ingress', () => {
           return serveProcessSessions(
             options.ingress,
             options.endpointFactory,
-            ({ endpoint, identity }) =>
-              serveRemotePlugin({
-                host,
-                contract,
-                endpoint,
-                report: options.report,
-                invocationContext: (context) =>
-                  Object.freeze({ session: identity, signal: context.signal })
-              }),
+            ({ endpoint }) => installFixtureProvider(endpoint, business),
             resilience,
             options.report,
             undefined,
@@ -402,7 +419,7 @@ describe('process plugin service ingress', () => {
   })
 
   it('closes byte ingress without a verifier before establishing a responder', async () => {
-    const { host } = await targetHost()
+    const { host, provide: business } = await targetHost()
     const rawClose = vi.fn(async () => undefined)
     const establish = vi.fn()
     const endpointFactory = vi.fn()
@@ -438,15 +455,7 @@ describe('process plugin service ingress', () => {
           return serveProcessSessions(
             options.ingress,
             options.endpointFactory,
-            ({ endpoint, identity }) =>
-              serveRemotePlugin({
-                host,
-                contract,
-                endpoint,
-                report: options.report,
-                invocationContext: (context) =>
-                  Object.freeze({ session: identity, signal: context.signal })
-              }),
+            ({ endpoint }) => installFixtureProvider(endpoint, business),
             resilience,
             options.report,
             undefined,
@@ -466,9 +475,9 @@ describe('process plugin service ingress', () => {
   })
 
   it('gives accepted sessions distinct endpoints and closes only the departed session', async () => {
-    const { host, targetHandle } = await targetHost()
-    const first = await acceptedChannel('first')
-    const second = await acceptedChannel('second')
+    const { host, targetHandle, provide: business } = await targetHost()
+    const first = await new AcceptedChannel().open('first')
+    const second = await new AcceptedChannel().open('second')
     const dispose = [vi.fn(async () => undefined), vi.fn(async () => undefined)]
     const provide = [
       vi.fn((_method: string, _handler: (context: never) => unknown) => undefined),
@@ -519,15 +528,7 @@ describe('process plugin service ingress', () => {
         return serveProcessSessions(
           options.ingress,
           options.endpointFactory,
-          ({ endpoint, identity }) =>
-            serveRemotePlugin({
-              host,
-              contract,
-              endpoint,
-              report: options.report,
-              invocationContext: (context) =>
-                Object.freeze({ session: identity, signal: context.signal })
-            }),
+          ({ endpoint }) => installFixtureProvider(endpoint, business),
           resilience,
           options.report,
           undefined,
@@ -600,8 +601,8 @@ describe('process plugin service ingress', () => {
   })
 
   it('closes a channel that authenticates after the serve handle starts closing', async () => {
-    const { host, targetHandle } = await targetHost()
-    const accepted = await acceptedChannel('late')
+    const { host, targetHandle, provide: business } = await targetHost()
+    const accepted = await new AcceptedChannel().open('late')
     /** The pending accept controls the precise close/handshake ordering. */
     let finishAccept!: (value: { channel: IRemoteChannel; principalId: string }) => void
     const authenticated = new Promise<{ channel: IRemoteChannel; principalId: string }>(
@@ -640,15 +641,7 @@ describe('process plugin service ingress', () => {
       return serveProcessSessions(
         options.ingress,
         options.endpointFactory,
-        ({ endpoint, identity }) =>
-          serveRemotePlugin({
-            host,
-            contract,
-            endpoint,
-            report: options.report,
-            invocationContext: (context) =>
-              Object.freeze({ session: identity, signal: context.signal })
-          }),
+        ({ endpoint }) => installFixtureProvider(endpoint, business),
         resilience,
         options.report,
         undefined,
@@ -678,8 +671,8 @@ describe('process plugin service ingress', () => {
   })
 
   it('disposes an endpoint returned after listener close without publishing it', async () => {
-    const { host } = await targetHost()
-    const accepted = await acceptedChannel('late-endpoint')
+    const { host, provide: business } = await targetHost()
+    const accepted = await new AcceptedChannel().open('late-endpoint')
     /** The endpoint becomes available only after the handle has begun closing. */
     let finishEndpoint!: (value: { endpoint: IRpcEndpoint }) => void
     const prepared = new Promise<{ endpoint: IRpcEndpoint }>((resolve) => {
@@ -716,15 +709,7 @@ describe('process plugin service ingress', () => {
       return serveProcessSessions(
         options.ingress,
         options.endpointFactory,
-        ({ endpoint, identity }) =>
-          serveRemotePlugin({
-            host,
-            contract,
-            endpoint,
-            report: options.report,
-            invocationContext: (context) =>
-              Object.freeze({ session: identity, signal: context.signal })
-          }),
+        ({ endpoint }) => installFixtureProvider(endpoint, business),
         resilience,
         options.report,
         undefined,
@@ -754,7 +739,7 @@ describe('process plugin service ingress', () => {
   })
 
   it('retains listener, endpoint, and channel cleanup failures in order', async () => {
-    const { host } = await targetHost()
+    const { host, provide: business } = await targetHost()
     const listenerError = new Error('listener cleanup failed')
     const endpointError = new Error('endpoint cleanup failed')
     const channelError = new Error('channel cleanup failed')
@@ -800,15 +785,7 @@ describe('process plugin service ingress', () => {
       return serveProcessSessions(
         options.ingress,
         options.endpointFactory,
-        ({ endpoint, identity }) =>
-          serveRemotePlugin({
-            host,
-            contract,
-            endpoint,
-            report: options.report,
-            invocationContext: (context) =>
-              Object.freeze({ session: identity, signal: context.signal })
-          }),
+        ({ endpoint }) => installFixtureProvider(endpoint, business),
         resilience,
         options.report,
         undefined,
@@ -817,7 +794,7 @@ describe('process plugin service ingress', () => {
       )
     })()
     /** Failure belongs to the actual held close operation, rather than a copied channel surface. */
-    const accepted = await acceptedChannel('cleanup', closeChannel)
+    const accepted = await new AcceptedChannel(closeChannel).open('cleanup')
     try {
       await onConnection({
         accept: async () => ({

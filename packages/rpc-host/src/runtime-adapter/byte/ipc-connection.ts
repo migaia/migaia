@@ -3,7 +3,7 @@ import { deferred, hostRethrowReporter } from '@migaia/utils/promise'
 import { createDisposeTransaction, DisposeTransactionKind } from '@migaia/lifecycle'
 import { drainListenerFailures } from '../../core/internal/listener-safety.js'
 import { RpcCoreErrorCode } from '../../core/error-code.js'
-import type { IRpcFeature } from '../../core/index.js'
+import type { IRpcFeature } from '../../core/feature.js'
 import { IpcReporterContext } from '../../core/plugins/reporter-context.js'
 import { createIpcLogFeature } from '../../core/plugins/log.js'
 import {

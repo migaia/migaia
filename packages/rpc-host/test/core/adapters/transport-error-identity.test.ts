@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createMemoryTransportPair } from '../../../dist/core/adapters/memory.js'
+import { createMemoryTransportPair } from '../../fixtures/memory-transport.js'
 
 describe('memory transport terminal identity', () => {
   it('sends a tagged native Error with stable text to each side', () => {

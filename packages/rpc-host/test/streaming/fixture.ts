@@ -1,6 +1,6 @@
 import { createCanonicalChunkFeature } from '../../dist/core/features/canonical-chunk.js'
 import { createOutboundFeature } from '../../dist/core/features/outbound.js'
-import { createProviderFeature } from '../../dist/core/features/provider.js'
+import { createProviderFeature } from '../../dist/core/internal/provider-feature.js'
 import {
   createStreamFeature,
   type IRpcStreamCapabilityPort

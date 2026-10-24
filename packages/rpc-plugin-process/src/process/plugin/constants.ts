@@ -28,28 +28,3 @@ export const ProcessConnectionProfile = {
 
 export type ProcessConnectionProfile =
   (typeof ProcessConnectionProfile)[keyof typeof ProcessConnectionProfile]
-
-/** Descriptors name the persisted plugin or host target without carrying executable ports. */
-export const ProcessDescriptorTarget = { plugin: 'plugin', host: 'host' } as const
-export type ProcessDescriptorTarget =
-  (typeof ProcessDescriptorTarget)[keyof typeof ProcessDescriptorTarget]
-
-/** Shared is the only instance mode accepted before the resilience extension. */
-export const ProcessPluginInstanceMode = {
-  shared: 'shared',
-  perConnection: 'per-connection'
-} as const
-export type ProcessPluginInstanceMode =
-  (typeof ProcessPluginInstanceMode)[keyof typeof ProcessPluginInstanceMode]
-
-/** The first persisted description format has no runtime ports or bootstrap payload. */
-export const PROCESS_PLUGIN_DESCRIPTOR_VERSION = 1
-
-/** Persisted argument names that can carry a secret in a following value or after '='. */
-export const PROCESS_DESCRIPTOR_SECRET_ARGUMENTS = [
-  '--token',
-  '--secret',
-  '--password',
-  '--api-key',
-  '--access-key'
-] as const

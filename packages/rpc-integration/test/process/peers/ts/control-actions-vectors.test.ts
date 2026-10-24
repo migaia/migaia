@@ -1,16 +1,16 @@
+import { createRuntimeEndpointComposition } from '../../../../../rpc-host/dist/core/runtime-api-endpoint.js'
+import { RpcCapability } from '@migaia/rpc-contract'
 import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
 import { normalizeRpcEnvelope, RpcRouteProfile } from '@migaia/rpc-contract'
-import {
-  abort,
-  connect,
-  hooks,
-  ping,
-  type IRpcHookEvent,
-  type IRpcTransport
-} from '../../../../../rpc-host/dist/core/index.js'
-import { createFullEndpoint as createEndpoint } from '../../../../../rpc-host/dist/core/full.js'
-import { createMemoryTransportPair } from '../../../../../rpc-host/dist/core/adapters/memory.js'
+import { abort } from '../../../../../rpc-host/dist/core/middleware/abort.js'
+import { connect } from '../../../../../rpc-host/dist/core/middleware/connect.js'
+import { hooks } from '../../../../../rpc-host/dist/core/middleware/hooks.js'
+import { ping } from '../../../../../rpc-host/dist/core/middleware/ping.js'
+import type { IRpcHookEvent } from '../../../../../rpc-host/dist/core/typing.js'
+import type { IRpcTransport } from '../../../../../rpc-host/dist/core/transport.js'
+
+import { createMemoryTransportPair } from '../../../../../rpc-host/test/fixtures/memory-transport.js'
 
 /** Published controls drive production variation dispatch, never a local action-name switch oracle. */
 type IControlVector = { id: string; variation: string; payload: unknown; action: string }
@@ -64,21 +64,27 @@ describe('public control action vectors', () => {
         return serverWire.send(output, options)
       }
     }
-    const server = await createEndpoint({
-      id: 'server',
-      transport: serverCapture,
-      middlewares: [
-        connect({ transport: serverCapture }),
-        abort(),
-        ping(),
-        hooks({ listeners: (event) => void events.push(event) })
-      ]
-    })
-    const client = await createEndpoint({
-      id: 'client',
-      transport: clientCapture,
-      middlewares: [connect({ transport: clientCapture }), abort(), ping()]
-    })
+    const server = await createRuntimeEndpointComposition(
+      {
+        id: 'server',
+        transport: serverCapture,
+        middlewares: [
+          connect({ transport: serverCapture }),
+          abort(),
+          ping(),
+          hooks({ listeners: (event) => void events.push(event) })
+        ]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'client',
+        transport: clientCapture,
+        middlewares: [connect({ transport: clientCapture }), abort(), ping()]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     try {
       if (vector.action === 'abort') {
         server.provide('slow', async (context) => {

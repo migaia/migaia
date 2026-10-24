@@ -4,44 +4,48 @@ import { bindProcessByteWire } from '../fixtures/process-diagnostics.js'
 import { receiveAdapterBootstrap as openBootstrapFrameChannel } from '../../../rpc-plugin-process/dist/process/bootstrap.js'
 import type { IProcessByteChannel } from '../../../rpc-plugin-process/dist/process/types.js'
 
-/** A synchronous byte source exposes the exact bootstrap and handshake reader boundary. */
-function source() {
-  /** Physical data arrives in arbitrary chunks. */
-  const data = new Set<(chunk: Uint8Array) => void>()
-  /** EOF is observed independently of the last byte chunk. */
-  const close = new Set<(reason?: unknown) => void>()
-  /** Teardown count distinguishes one owner from repeated close attempts. */
-  let closes = 0
-  const channel: IProcessByteChannel = {
+/** A controlled synchronous byte source owns the original bootstrap reader boundary. */
+class SynchronousBootstrapSource {
+  /** Physical data subscriptions receive the exact arbitrary chunks supplied by each test. */
+  #data = new Set<(chunk: Uint8Array) => void>()
+  /** EOF subscriptions remain independent from delivery of the final byte chunk. */
+  #close = new Set<(reason?: unknown) => void>()
+  /** Physical close count distinguishes the single original owner from repeated teardown. */
+  #closes = 0
+  /** The canonical decoder receives this exact physical source, with no wrapper transport. */
+  readonly channel: IProcessByteChannel = {
     kind: 'byte',
     write: async () => undefined,
-    onData(listener) {
-      data.add(listener)
+    onData: (listener) => {
+      this.#data.add(listener)
       return () => {
-        data.delete(listener)
+        this.#data.delete(listener)
       }
     },
-    onClose(listener) {
-      close.add(listener)
+    onClose: (listener) => {
+      this.#close.add(listener)
       return () => {
-        close.delete(listener)
+        this.#close.delete(listener)
       }
     },
-    async close() {
-      closes++
+    close: async () => {
+      this.#closes += 1
     }
   }
-  return {
-    channel,
-    push(chunk: Uint8Array) {
-      for (const listener of data) listener(chunk)
-    },
-    eof() {
-      for (const listener of close) listener()
-    },
-    get closes() {
-      return closes
-    }
+
+  /** Deliver one original chunk to current physical readers without normalizing it. */
+  push(chunk: Uint8Array): void {
+    for (const listener of this.#data) listener(chunk)
+  }
+
+  /** Publish the original terminal event without replacing the source identity. */
+  eof(): void {
+    for (const listener of this.#close) listener()
+  }
+
+  /** Return physical teardown observations. */
+  get closes(): number {
+    return this.#closes
   }
 }
 
@@ -59,7 +63,7 @@ function frames(...payloads: string[]): Uint8Array {
 
 describe('process bootstrap decoder ownership', () => {
   it('transfers a coalesced hello to the same decoder', async () => {
-    const port = source()
+    const port = new SynchronousBootstrapSource()
     const opening = openBootstrapFrameChannel(port.channel, 'stdin')
     port.push(frames('secret-bootstrap', 'hello-control'))
     const opened = await opening
@@ -72,25 +76,25 @@ describe('process bootstrap decoder ownership', () => {
   })
 
   it('leaves an unbootstrapped channel unchanged when no bootstrap is required', async () => {
-    const port = source()
+    const port = new SynchronousBootstrapSource()
     expect(await openBootstrapFrameChannel(port.channel, 'none')).toEqual({ channel: port.channel })
     expect(port.closes).toBe(0)
   })
 
   it('rejects EOF and an invalid first frame before exposing a channel', async () => {
-    const eofPort = source()
+    const eofPort = new SynchronousBootstrapSource()
     const eof = openBootstrapFrameChannel(eofPort.channel, 'stdin')
     eofPort.eof()
     await expect(eof).rejects.toMatchObject({ code: 'PROCESS_CHANNEL_CLOSED' })
     expect(eofPort.closes).toBe(1)
 
-    const invalidPort = source()
+    const invalidPort = new SynchronousBootstrapSource()
     const invalid = openBootstrapFrameChannel(invalidPort.channel, 'stdin')
     invalidPort.push(new Uint8Array([0, 0, 0, 0]))
     await expect(invalid).rejects.toMatchObject({ code: 'INVALID_FRAME' })
     expect(invalidPort.closes).toBe(1)
 
-    const oversizedPort = source()
+    const oversizedPort = new SynchronousBootstrapSource()
     const oversized = openBootstrapFrameChannel(oversizedPort.channel, 'stdin')
     oversizedPort.push(new Uint8Array([1, 0, 0, 0]))
     await expect(oversized).rejects.toMatchObject({ code: 'FRAME_LIMIT_EXCEEDED' })
@@ -98,7 +102,7 @@ describe('process bootstrap decoder ownership', () => {
   })
 
   it('rejects two pre-ready control frames after one bootstrap', async () => {
-    const port = source()
+    const port = new SynchronousBootstrapSource()
     const opened = openBootstrapFrameChannel(port.channel, 'stdin')
     port.push(frames('bootstrap', 'hello-one', 'hello-two'))
     await opened
@@ -106,7 +110,7 @@ describe('process bootstrap decoder ownership', () => {
   })
 
   it('caps the transferred decoder after bootstrap and before handshake', async () => {
-    const port = source()
+    const port = new SynchronousBootstrapSource()
     const opening = openBootstrapFrameChannel(port.channel, 'stdin')
     port.push(frames('bootstrap'))
     await opening

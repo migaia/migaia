@@ -2,8 +2,6 @@ import { RpcError, RpcTransportError, tagRpcError } from '../core/errors.js'
 import { RpcCoreErrorCode } from '../core/error-code.js'
 import { defaultRpcId } from '../core/internal/id.js'
 import { resolveAbortReason } from '../core/internal/async-control.js'
-import { readRuntimeDefaultTimeout } from '../remote/runtime-api/timeout.js'
-import { compileRuntimeMethods } from '../remote/runtime-api/catalog.js'
 import { normalizeRuntimeDescription } from '../remote/runtime-api/description.js'
 import { contractRequiresStream } from '../remote/serve-methods.js'
 import { RuntimeApiErrorText } from '../remote/runtime-api/constants.js'
@@ -25,18 +23,6 @@ export function createAdapterId(): string {
 /** Preserve the signal's original abort reason at the held resource operation boundary. */
 export function readAdapterAbortReason(signal: Parameters<typeof resolveAbortReason>[0]) {
   return resolveAbortReason(signal)
-}
-
-/** Validate a Peer default before an adapter discovers or launches any native resource. */
-export function validateAdapterPeerTimeout(
-  options: Parameters<typeof readRuntimeDefaultTimeout>[0]
-) {
-  return readRuntimeDefaultTimeout(options)
-}
-
-/** Compile actual local provider declarations before an adapter installs bootstrap listeners. */
-export function validateAdapterPeerMethods(...args: Parameters<typeof compileRuntimeMethods>) {
-  return compileRuntimeMethods(...args)
 }
 
 /** Normalize a received directory as data; this operation cannot grant channel capability facts. */

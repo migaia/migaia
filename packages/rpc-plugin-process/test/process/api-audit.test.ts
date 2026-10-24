@@ -5,22 +5,41 @@ import { createNodeProcessLauncher } from '../../src/process/adapters/node-child
 import { listenProcessByteChannel } from '../../src/process/adapters/node-socket.js'
 
 /** Native stream hooks expose physical cleanup independently of channel bookkeeping. */
-function streamPair() {
-  /** Each hook must run exactly once despite listener reentry or rejection. */
+/** Allocate only this case's original observations before installing native-shaped callbacks. */
+function streamPairFixtureState() {
   const counts = { cancels: 0, aborts: 0 }
-  return {
-    counts,
-    readable: new ReadableStream<Uint8Array>({
-      cancel() {
-        counts.cancels++
-      }
-    }),
-    writable: new WritableStream<Uint8Array>({
-      abort() {
-        counts.aborts++
-      }
-    })
+  return { counts }
+}
+
+/** Own one test resource's mutable observations without sharing a factory closure. */
+class StreamPairFixture {
+  /** Counts, native events and construction inputs belong only to this fixture instance. */
+  #state: ReturnType<typeof streamPairFixtureState>
+  /** Existing consumers retain the same observable fixture surface and callback identities. */
+  readonly value
+  /** Install the original native-shaped callbacks after their observations exist. */
+  constructor() {
+    this.#state = streamPairFixtureState()
+
+    this.value = {
+      counts: this.#state.counts,
+      readable: new ReadableStream<Uint8Array>({
+        cancel: () => {
+          this.#state.counts.cancels++
+        }
+      }),
+      writable: new WritableStream<Uint8Array>({
+        abort: () => {
+          this.#state.counts.aborts++
+        }
+      })
+    }
   }
+}
+
+/** Create one independent owner for the existing native-boundary fixture. */
+function streamPair() {
+  return new StreamPairFixture().value
 }
 
 it('publishes one close settlement before invoking a reentrant listener', async () => {

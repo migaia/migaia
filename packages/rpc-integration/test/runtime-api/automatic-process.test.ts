@@ -1,12 +1,12 @@
+import { processPlugin } from '@migaia/rpc-plugin-process'
+import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
 import type { IRuntimeDynamicSurface } from '../../../rpc-host/dist/remote/runtime-api/typing.js'
 import assert from 'node:assert/strict'
 import { it } from 'vitest'
 import { fileURLToPath } from 'node:url'
-import { createNodeProcessLauncher } from '@migaia/rpc-plugin-process/adapters/node-child-process'
+import { createNodeProcessLauncher } from '../../../rpc-plugin-process/dist/process/adapters/node-child-process.js'
 import { createProcessTransport } from '../../../rpc-plugin-process/dist/process/handshake.js'
 import { createNativeProcessOffer } from '../../../rpc-plugin-process/dist/process/offer.js'
-import type { IRuntimePeer } from '../../../rpc-host/dist/remote/runtime-api/peer.js'
-import { createProcessPeer } from '../../../rpc-plugin-process/test/protocol.ts'
 
 /** A genuine child loads built public owners independently from the source parent. */
 const entry = fileURLToPath(new URL('./fixtures/automatic-process.mjs', import.meta.url))
@@ -25,9 +25,9 @@ it('framed bootstrap supplies child identity and parent route before automatic b
   /** The launcher exposes the exact safe identity placed in its authenticated bootstrap. */
   let childInstanceId: string | undefined
   /** The existing parent source executes before the missing automatic-source assertion. */
-  let parent: IRuntimePeer | undefined
+  let parent: IRpcHost | undefined
   try {
-    parent = await createProcessPeer<IRuntimeDynamicSurface>({
+    parent = await createRpcHost<IRuntimeDynamicSurface>({
       self: { name: 'parent', instanceId: 'automatic-process-parent' },
       provide: {
         parentEcho: () => {
@@ -35,46 +35,51 @@ it('framed bootstrap supplies child identity and parent route before automatic b
           return parent!.self.instanceId
         }
       },
-      spawn: async (context) => {
-        /** Current JS ignores this opt-in; an absent new type/export cannot be the RED. */
-        const create = createNodeProcessLauncher as unknown as (
-          options: unknown
-        ) => ReturnType<typeof createNodeProcessLauncher>
-        const launcher = create({
-          runtimeApiBootstrap: {
-            name: 'named-process-child',
-            parentInstanceId: context.self.instanceId
+      plugins: [
+        processPlugin({
+          spawn: async (context) => {
+            /** Current JS ignores this opt-in; an absent new type/export cannot be the RED. */
+            const create = createNodeProcessLauncher as unknown as (
+              options: unknown
+            ) => ReturnType<typeof createNodeProcessLauncher>
+            const launcher = create({
+              runtimeApiBootstrap: {
+                name: 'named-process-child',
+                parentInstanceId: context.self.instanceId
+              }
+            })
+            handle = await launcher.launch(
+              {
+                command: process.execPath,
+                args: [entry],
+                env: { inherit: ['PATH'], set: {} },
+                stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' },
+                bootstrap: { via: 'stdin', payload: new TextEncoder().encode(token) }
+              },
+              { signal: new AbortController().signal, output: () => undefined }
+            )
+            /** New bootstrap identity is a projection of the launcher owner, never the child's PID. */
+            const identity = (
+              handle as typeof handle & { runtimeApiIdentity?: { instanceId: string } }
+            ).runtimeApiIdentity
+            childInstanceId = identity?.instanceId
+            /** The actual peer independently negotiates its offer over the genuine byte stream. */
+            const offer = createNativeProcessOffer({
+              peer: { id: context.self.instanceId, runtime: 'node' },
+              auth: token
+            })
+            return createProcessTransport(handle.channel!, {
+              role: 'initiator',
+              peerId: identity?.instanceId ?? 'legacy-process-child',
+              offer: { ...offer, capabilities: context.capabilities },
+              ipc: { connectionId: 'c3-process', sessionId: 'c3-process', log: () => undefined },
+              report: (error) => {
+                failures.push(error)
+              }
+            })
           }
         })
-        handle = await launcher.launch(
-          {
-            command: process.execPath,
-            args: [entry],
-            env: { inherit: ['PATH'], set: {} },
-            stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' },
-            bootstrap: { via: 'stdin', payload: new TextEncoder().encode(token) }
-          },
-          { signal: new AbortController().signal, output: () => undefined }
-        )
-        /** New bootstrap identity is a projection of the launcher owner, never the child's PID. */
-        const identity = (handle as typeof handle & { runtimeApiIdentity?: { instanceId: string } })
-          .runtimeApiIdentity
-        childInstanceId = identity?.instanceId
-        /** The actual peer independently negotiates its offer over the genuine byte stream. */
-        const offer = createNativeProcessOffer({
-          peer: { id: context.self.instanceId, runtime: 'node' },
-          auth: token
-        })
-        return createProcessTransport(handle.channel!, {
-          role: 'initiator',
-          peerId: identity?.instanceId ?? 'legacy-process-child',
-          offer: { ...offer, capabilities: context.capabilities },
-          ipc: { connectionId: 'c3-process', sessionId: 'c3-process', log: () => undefined },
-          report: (error) => {
-            failures.push(error)
-          }
-        })
-      },
+      ],
       report: (error) => {
         failures.push(error)
       }

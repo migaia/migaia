@@ -1,10 +1,10 @@
+import { createRuntimeEndpointComposition } from '../../dist/core/runtime-api-endpoint.js'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { describe, expect, it, vi } from 'vitest'
 import { normalizeRpcEnvelope } from '@migaia/rpc-contract'
-import { createClientEndpoint } from '../../dist/core/client.js'
-import { createProviderEndpoint } from '../../dist/core/provider.js'
-import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
+
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
 import { createEndpointKernel } from '../../dist/core/endpoint-kernel.js'
 import { prepareEndpoint } from '../../dist/core/internal/endpoint-bootstrap.js'
 import { RpcOutboundAttachment } from '../../dist/core/internal/outbound-attachment.js'
@@ -71,24 +71,30 @@ describe('provider relative deadline', () => {
       }
     }
     let providerSignal: IAbortSignal | undefined
-    const provider = await createProviderEndpoint({
-      id: 'provider',
-      transport: providerWire,
-      scheduler: providerScheduler,
-      middlewares: [connect({ transport: providerWire })],
-      provider: {
-        check: (context) => {
-          providerSignal = context.signal
-          return context.success(context.signal.aborted)
+    const provider = await createRuntimeEndpointComposition(
+      {
+        id: 'provider',
+        transport: providerWire,
+        scheduler: providerScheduler,
+        middlewares: [connect({ transport: providerWire })],
+        provider: {
+          check: (context) => {
+            providerSignal = context.signal
+            return context.success(context.signal.aborted)
+          }
         }
-      }
-    })
-    const client = await createClientEndpoint({
-      id: 'client',
-      transport: capture,
-      scheduler: clientScheduler,
-      middlewares: [connect({ transport: capture }), timeout()]
-    })
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'client',
+        transport: capture,
+        scheduler: clientScheduler,
+        middlewares: [connect({ transport: capture }), timeout()]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     try {
       expect(await client.send('provider', 'check', null, { timeoutMs: false })).toBe(false)
       const disabled = sent
@@ -124,23 +130,29 @@ describe('provider relative deadline', () => {
       observed = resolve
     })
     let calls = 0
-    const provider = await createProviderEndpoint({
-      id: 'provider',
-      transport: providerWire,
-      middlewares: [connect({ transport: providerWire })],
-      provider: {
-        check: (context) => {
-          calls += 1
-          if (calls === 2) observed(context.signal.aborted)
-          return context.success(null)
+    const provider = await createRuntimeEndpointComposition(
+      {
+        id: 'provider',
+        transport: providerWire,
+        middlewares: [connect({ transport: providerWire })],
+        provider: {
+          check: (context) => {
+            calls += 1
+            if (calls === 2) observed(context.signal.aborted)
+            return context.success(null)
+          }
         }
-      }
-    })
-    const client = await createClientEndpoint({
-      id: 'client',
-      transport: capture,
-      middlewares: [connect({ transport: capture })]
-    })
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'client',
+        transport: capture,
+        middlewares: [connect({ transport: capture })]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     try {
       await client.send('provider', 'check', null)
       const request = sent
@@ -182,27 +194,33 @@ describe('provider relative deadline', () => {
       started = resolve
     })
     let providerSignal: IAbortSignal | undefined
-    const provider = await createProviderEndpoint({
-      id: 'provider',
-      transport: providerWire,
-      scheduler,
-      wallClock,
-      middlewares: [connect({ transport: providerWire })],
-      provider: {
-        hang: (context) => {
-          providerSignal = context.signal
-          started()
-          return new Promise<never>(() => undefined)
+    const provider = await createRuntimeEndpointComposition(
+      {
+        id: 'provider',
+        transport: providerWire,
+        scheduler,
+        wallClock,
+        middlewares: [connect({ transport: providerWire })],
+        provider: {
+          hang: (context) => {
+            providerSignal = context.signal
+            started()
+            return new Promise<never>(() => undefined)
+          }
         }
-      }
-    })
-    const client = await createClientEndpoint({
-      id: 'client',
-      transport: capture,
-      scheduler,
-      wallClock,
-      middlewares: [connect({ transport: capture }), timeout()]
-    })
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'client',
+        transport: capture,
+        scheduler,
+        wallClock,
+        middlewares: [connect({ transport: capture }), timeout()]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     try {
       const result = client.send('provider', 'hang', null, { timeoutMs: 100 })
       result.catch(() => undefined)

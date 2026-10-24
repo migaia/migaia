@@ -53,6 +53,176 @@ export type IRpcPluginHost = IHostHandle<IRpcPluginCore, IRpcPipelineValue, read
     ): Promise<readonly IPluginHandle<IRpcPluginConstraint>[]>
   }>
 
+/** Own the single native WebRPC mutation shell and its registration-local port catalog. */
+class WebRpcPluginHost {
+  /** Native endpoint identity remains unchanged for every registered domain core. */
+  #id: string
+  /** The exact admitted transport belongs to the endpoint, never to individual catalog entries. */
+  #transport: IRpcTransport
+  /** Original construction cancellation and native disposal share this control. */
+  #construction: IRpcConstructionControl
+  /** The original hooks callback remains an unbound observer, not a wrapper instance method. */
+  #hooks: (event: IRpcHookEvent) => void
+  /** Cleanup translation reads the original endpoint error collection at its original boundary. */
+  #readCleanupErrors: () => readonly IRpcCleanupError[]
+  /** Registration-local middleware keys are independent of shared port publication. */
+  #nativeMiddlewareKeys = new Map<string, readonly string[]>()
+  /** Each port entry retains its actual native registration owner and provisional output. */
+  #portFeatures = new Map<
+    string,
+    Readonly<{ readonly owner: string; readonly output: IRpcPortFeature }>
+  >()
+  /** Committed handles replace provisional outputs without a second installation registry. */
+  #handles = new Map<string, IPluginHandle<IRpcPluginConstraint>>()
+  /** Terminal disposal rejects later catalog reads and is never reversed. */
+  #terminal = false
+  /** The original defineHost owner remains authoritative for transactions and Promise memoization. */
+  #host: ReturnType<typeof defineHost<IRpcPluginCore, IRpcPipelineValue>>
+  /** The frozen original facade preserves own fields, callbacks and detached operations. */
+  readonly value: IRpcPluginHost
+  /** Capture endpoint inputs before creating the one native mutation owner. */
+  constructor(
+    id: string,
+    transport: IRpcTransport,
+    construction: IRpcConstructionControl,
+    hooks: (event: IRpcHookEvent) => void,
+    options: IPluginHostOptions,
+    readCleanupErrors: () => readonly IRpcCleanupError[] = () => []
+  ) {
+    this.#id = id
+    this.#transport = transport
+    this.#construction = construction
+    this.#hooks = hooks
+    this.#readCleanupErrors = readCleanupErrors
+    this.#host = defineHost<IRpcPluginCore, IRpcPipelineValue>({
+      host: options,
+      domainCore: ({ pluginName }) => this.#createDomainCore(pluginName),
+      translateDisposalError: (error) =>
+        translateEndpointDisposalError(
+          error,
+          Reflect.apply(this.#readCleanupErrors, undefined, [])
+        ),
+      // 构造竞态在宿主排入终结性 mutation 之前关闭；`next()` 由 handle 保证恰好执行一次。
+      dispose: async (next) => {
+        this.#construction.close()
+        try {
+          /** The original native disposal outcome determines whether cleanup translation is needed. */
+          const result = await next()
+          if (result.cleanupErrors.length === 0) return result
+          /** Preserve the first native cleanup failure and original aggregate member identities. */
+          const cleanup =
+            result.cleanupErrors.length === 1
+              ? result.cleanupErrors[0]
+              : new AggregateError(result.cleanupErrors)
+          throw translateEndpointDisposalError(
+            cleanup,
+            Reflect.apply(this.#readCleanupErrors, undefined, [])
+          )
+        } finally {
+          this.#terminal = true
+          this.#portFeatures.clear()
+          this.#handles.clear()
+        }
+      }
+    })
+    this.value = Object.freeze({
+      ...this.#host,
+      /** Registration-local middleware keys captured before the activation Plugin runs. */
+      readNativeMiddlewareKeys: (): readonly string[] =>
+        Object.freeze([...this.#nativeMiddlewareKeys.values()].flat()),
+      /** Reads the current value behind a published registration-local port Feature. */
+      getPort: this.#getPort,
+      /** Reads extension publication through PluginHost's composition-only inspection surface. */
+      getCurrentExtensions: (): Readonly<Record<PropertyKey, unknown>> =>
+        openComposition(this.#host).getCurrentSnapshot().extensions,
+      /** Installs the complete construction batch through PluginHost's single transaction. */
+      installBatch: async (plugins: readonly IRpcPluginConstraint[]) => {
+        /** Reject the existing native role conflict before acquiring any plugin resources. */
+        const admissionFailure = createNativeAdmissionFailure(plugins)
+        if (admissionFailure) throw admissionFailure
+        try {
+          /** Actual committed handles become the authoritative live port readers. */
+          const installed = (await this.#host.use(
+            ...(plugins as never)
+          )) as unknown as readonly IPluginHandle<IRpcPluginConstraint>[]
+          for (const handle of installed) this.#handles.set(handle.name, handle)
+          return installed
+        } catch (error) {
+          this.#portFeatures.clear()
+          this.#handles.clear()
+          throw error
+        }
+      },
+      unUse: async (name: string, mutationOptions?: IPluginDependencyMutationOptions) => {
+        /** Prune ports only after the original native removal completes outside a dry run. */
+        const result = await this.#host.unUse(name, mutationOptions as never)
+        if (mutationOptions?.dryRun !== true) this.#prunePorts()
+        return result
+      }
+    }) as IRpcPluginHost
+  }
+  /** Read the original heterogeneous native Feature handle without another projection. */
+  #readHandleFeature = (handle: IPluginHandle<IRpcPluginConstraint>, name: string): unknown =>
+    (handle as unknown as { getFeature(key: string): unknown }).getFeature(name)
+  /** Read a live native handle output or its original provisional port. */
+  #getPort = (key: PropertyKey): unknown => {
+    if (this.#terminal) throw createRpcLifecycleError(RpcCoreErrorText.endpointDisposed)
+    if (typeof key !== 'string') return undefined
+    /** The catalog maps each port to its original registration and provisional output. */
+    const entry = this.#portFeatures.get(key)
+    if (!entry) return undefined
+    /** A committed native handle supersedes the provisional registration output. */
+    const handle = this.#handles.get(entry.owner)
+    return readWebRpcPortFeature(handle ? this.#readHandleFeature(handle, key) : entry.output)
+  }
+  /** Withdraw only catalog entries whose original native owner is no longer live. */
+  #prunePorts = (): void => {
+    for (const [name, entry] of this.#portFeatures) {
+      /** A committed native handle supersedes the provisional registration output. */
+      const handle = this.#handles.get(entry.owner)
+      if (!handle) {
+        this.#portFeatures.delete(name)
+        continue
+      }
+      try {
+        this.#readHandleFeature(handle, name)
+      } catch {
+        this.#portFeatures.delete(name)
+        this.#handles.delete(entry.owner)
+      }
+    }
+  }
+  /** Build one registration-local domain core that publishes ports under its actual native owner. */
+  #createDomainCore = (pluginName: string): IRpcPluginCore =>
+    Object.freeze({
+      id: this.#id,
+      transport: this.#transport,
+      signal: this.#construction.signal,
+      hooks: this.#hooks,
+      construction: this.#construction,
+      getPort: this.#getPort,
+      publishPortFeatures: (outputs: Readonly<Record<string, IRpcPortFeature>>) => {
+        for (const [name, output] of Object.entries(outputs)) {
+          if (this.#portFeatures.has(name))
+            throw createRpcError(
+              RpcCoreErrorCode.capabilityConflict,
+              RpcCoreErrorText.endpointModuleDuplicated
+            )
+          this.#portFeatures.set(name, Object.freeze({ owner: pluginName, output }))
+        }
+      },
+      registerNativeMiddlewareKeys: (name: string, keys: readonly string[]) => {
+        /**
+         * Registration-local keys preserve original publication order when another batch
+         * contributes.
+         */
+        const previous = this.#nativeMiddlewareKeys.get(name) ?? []
+        this.#nativeMiddlewareKeys.set(name, Object.freeze([...previous, ...keys]))
+      }
+    })
+}
+
+/** Create one endpoint-local native mutation owner with the existing frozen shell boundary. */
 export function createWebRpcPluginHost(
   id: string,
   transport: IRpcTransport,
@@ -61,123 +231,7 @@ export function createWebRpcPluginHost(
   options: IPluginHostOptions,
   readCleanupErrors: () => readonly IRpcCleanupError[] = () => []
 ): IRpcPluginHost {
-  /** Dynamic native middleware keys, for this Host transaction only. */
-  const nativeMiddlewareKeys = new Map<string, readonly string[]>()
-  /** Construction catalog entries retain their owning registration for live handle resolution. */
-  const portFeatures = new Map<
-    string,
-    Readonly<{ readonly owner: string; readonly output: IRpcPortFeature }>
-  >()
-  /** Installed handles replace provisional outputs as soon as the atomic batch commits. */
-  const handles = new Map<string, IPluginHandle<IRpcPluginConstraint>>()
-  /** Terminal marker keeps internal port reads fail-closed after disposal. */
-  let terminal = false
-  /** Reads a dynamically named port Feature from the heterogeneous middleware handle set. */
-  const readHandleFeature = (handle: IPluginHandle<IRpcPluginConstraint>, name: string): unknown =>
-    (handle as unknown as { getFeature(key: string): unknown }).getFeature(name)
-  /** Reads provisional outputs during construction and live handle outputs after publication. */
-  const getPort = (key: PropertyKey): unknown => {
-    if (terminal) throw createRpcLifecycleError(RpcCoreErrorText.endpointDisposed)
-    if (typeof key !== 'string') return undefined
-    const entry = portFeatures.get(key)
-    if (!entry) return undefined
-    const handle = handles.get(entry.owner)
-    return readWebRpcPortFeature(handle ? readHandleFeature(handle, key) : entry.output)
-  }
-  /** Removes catalog entries whose exact owner registration is no longer live. */
-  const prunePorts = (): void => {
-    for (const [name, entry] of portFeatures) {
-      const handle = handles.get(entry.owner)
-      if (!handle) {
-        portFeatures.delete(name)
-        continue
-      }
-      try {
-        readHandleFeature(handle, name)
-      } catch {
-        portFeatures.delete(name)
-        handles.delete(entry.owner)
-      }
-    }
-  }
-  /** Builds the registration-local domain core so publication records the exact owner name. */
-  const createDomainCore = (pluginName: string): IRpcPluginCore =>
-    Object.freeze({
-      id,
-      transport,
-      signal: construction.signal,
-      hooks,
-      construction,
-      getPort,
-      publishPortFeatures: (outputs: Readonly<Record<string, IRpcPortFeature>>) => {
-        for (const [name, output] of Object.entries(outputs)) {
-          if (portFeatures.has(name))
-            throw createRpcError(
-              RpcCoreErrorCode.capabilityConflict,
-              RpcCoreErrorText.endpointModuleDuplicated
-            )
-          portFeatures.set(name, Object.freeze({ owner: pluginName, output }))
-        }
-      },
-      registerNativeMiddlewareKeys: (name: string, keys: readonly string[]) => {
-        const previous = nativeMiddlewareKeys.get(name) ?? []
-        nativeMiddlewareKeys.set(name, Object.freeze([...previous, ...keys]))
-      }
-    })
-  const host = defineHost<IRpcPluginCore, IRpcPipelineValue>({
-    host: options,
-    domainCore: ({ pluginName }) => createDomainCore(pluginName),
-    translateDisposalError: (error) => translateEndpointDisposalError(error, readCleanupErrors()),
-    // 构造竞态在宿主排入终结性 mutation 之前关闭；`next()` 由 handle 保证恰好执行一次。
-    dispose: async (next) => {
-      construction.close()
-      try {
-        const result = await next()
-        if (result.cleanupErrors.length === 0) return result
-        const cleanup =
-          result.cleanupErrors.length === 1
-            ? result.cleanupErrors[0]
-            : new AggregateError(result.cleanupErrors)
-        throw translateEndpointDisposalError(cleanup, readCleanupErrors())
-      } finally {
-        terminal = true
-        portFeatures.clear()
-        handles.clear()
-      }
-    }
-  })
-  return Object.freeze({
-    ...host,
-    /** Registration-local middleware keys captured before the activation Plugin runs. */
-    readNativeMiddlewareKeys: (): readonly string[] =>
-      Object.freeze([...nativeMiddlewareKeys.values()].flat()),
-    /** Reads the current value behind a published registration-local port Feature. */
-    getPort,
-    /** Reads extension publication through PluginHost's composition-only inspection surface. */
-    getCurrentExtensions: (): Readonly<Record<PropertyKey, unknown>> =>
-      openComposition(host).getCurrentSnapshot().extensions,
-    /** Installs the complete construction batch through PluginHost's single transaction. */
-    installBatch: async (plugins: readonly IRpcPluginConstraint[]) => {
-      const admissionFailure = createNativeAdmissionFailure(plugins)
-      if (admissionFailure) throw admissionFailure
-      try {
-        const installed = (await host.use(
-          ...(plugins as never)
-        )) as unknown as readonly IPluginHandle<IRpcPluginConstraint>[]
-        for (const handle of installed) handles.set(handle.name, handle)
-        return installed
-      } catch (error) {
-        portFeatures.clear()
-        handles.clear()
-        throw error
-      }
-    },
-    unUse: async (name: string, mutationOptions?: IPluginDependencyMutationOptions) => {
-      const result = await host.unUse(name, mutationOptions as never)
-      if (mutationOptions?.dryRun !== true) prunePorts()
-      return result
-    }
-  }) as IRpcPluginHost
+  return new WebRpcPluginHost(id, transport, construction, hooks, options, readCleanupErrors).value
 }
 
 /** Creates the PluginHost boundary error for the one asynchronous install entry point. */

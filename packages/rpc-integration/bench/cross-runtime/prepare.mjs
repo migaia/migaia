@@ -164,8 +164,7 @@ function instrument(path, source) {
       text: 'globalThis.__XRT_COUNT(' + JSON.stringify(key) + ');'
     })
   })
-  for (const e of edits.sort((a, b) => b.pos - a.pos))
-    source = source.slice(0, e.pos) + e.text + source.slice(e.pos)
+  source = insertSourceObservations(source, edits)
   if (path === 'core/internal/provider-admission.ts') {
     source = source.replace(
       'this.#leases.set(taskKey, peerKey)',
@@ -181,6 +180,42 @@ function instrument(path, source) {
     )
   }
   return source
+}
+/**
+ * Insert each observation in one source pass, preserving the old equal-position insertion order.
+ * AST offsets bound the scan to source length L; E inserts cost O(L + E + inserted bytes),
+ * replacing comparison sorting and E copies of the full source. The former descending stable edit
+ * loop put later edits before earlier edits at the same offset, so each bucket is emitted in
+ * reverse.
+ *
+ * @param {string} source Original source with AST-relative UTF-16 offsets.
+ * @param {{ pos: number; text: string }[]} edits Observation insertions in their original visit
+ *   order.
+ * @returns {string} Exactly the same diagnostic source overlay.
+ */
+function insertSourceObservations(source, edits) {
+  /** Equal AST offsets share an insertion-ordered bucket without deduplicating observations. */
+  const buckets = new Map()
+  for (const edit of edits) {
+    /** Only insertion text belongs to this source offset. */
+    const bucket = buckets.get(edit.pos)
+    if (bucket) bucket.push(edit.text)
+    else buckets.set(edit.pos, [edit.text])
+  }
+  /** Each original source span enters the output once before the final join. */
+  const parts = []
+  /** This cursor marks the first original character not yet copied into the output. */
+  let cursor = 0
+  for (let position = 0; position <= source.length; position++) {
+    /** Missing offsets need no source copy or temporary output. */
+    const bucket = buckets.get(position)
+    if (!bucket) continue
+    parts.push(source.slice(cursor, position))
+    for (let index = bucket.length - 1; index >= 0; index--) parts.push(bucket[index])
+    cursor = position
+  }
+  parts.push(source.slice(cursor))
+  return parts.join('')
 }
 /** Plain timing and diagnostic trees have the same pinned RPC source and existing dependency graph. */
 const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: wt, encoding: 'utf8' }).trim()

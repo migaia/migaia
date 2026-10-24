@@ -16,63 +16,93 @@ const { default: conformanceConfig } = await import(
 /** The measurement module is a test-only, unpackaged JavaScript harness. */
 const measurement = await import(new URL('../../bench/ipc.mjs', import.meta.url).href)
 
-/** Deterministic PID snapshots prove metric attribution without executing a performance run. */
-function fixture(pids = [11, 22]) {
-  /** Exchange count separates readiness/warmup from the settled measurement window. */
-  let calls = 0
-  /** The clock advances by one nanosecond per observed boundary. */
-  let ticks = 0
-  /** Snapshot count selects pre-window and post-window CPU totals. */
-  let reads = 0
-  /** RSS observer errors are deliberately injected for a failed-reading assertion. */
-  let missing = false
-  /** Observer joins synchronously in this fixture; production observer must join outstanding reads. */
-  let stopped = false
-  return {
-    options: {
+/** Deterministic observations keep measurement readiness, clocks and PID readings explicit. */
+class MeasurementFixture {
+  /** Exchange count separates original warmup from the settled measurement window. */
+  #calls = 0
+  /** The clock advances by one nanosecond at each observed boundary. */
+  #ticks = 0
+  /** Snapshot count distinguishes the original pre-window and post-window totals. */
+  #reads = 0
+  /** Tests deliberately invalidate only RSS evidence through this flag. */
+  #missing = false
+  /** The returned observer remover records its actual join. */
+  #stopped = false
+  /** Original PID inputs preserve duplicate handling and caller reference semantics. */
+  #pids: number[]
+  /** The existing measurement owner receives these observation callbacks unchanged. */
+  readonly options: {
+    ready(): Promise<void>
+    exchange(): Promise<void>
+    warmup: number
+    samples: number
+    nowNs(): number
+    observer: {
+      pids: number[]
+      method: string
+      intervalMs: number
+      read(): Promise<{ pid: number; cpuNs: number; rssBytes: number }[]>
+      start(
+        receive: (rows: { pid: number; cpuNs: number; rssBytes: number }[]) => void
+      ): () => Promise<void>
+    }
+  }
+
+  /** Build one set of original PID/clock observations without running a measured window. */
+  constructor(pids = [11, 22]) {
+    this.#pids = pids
+    this.options = {
       ready: async () => {
-        expect(calls).toBe(0)
+        expect(this.#calls).toBe(0)
       },
       exchange: async () => {
-        calls++
+        this.#calls += 1
       },
       warmup: 7,
       samples: 1000,
-      nowNs: () => ticks++,
+      nowNs: () => this.#ticks++,
       observer: {
-        pids,
+        pids: this.#pids,
         method: 'focused-deterministic-pid-snapshot',
         intervalMs: 10,
+        /** The last original PID reading advances the same before/after snapshot boundary. */
         read: async () => {
-          expect(calls).toBe(reads === 0 ? 7 : 1007)
-          return [...new Set(pids)]
+          expect(this.#calls).toBe(this.#reads === 0 ? 7 : 1007)
+          return [...new Set(this.#pids)]
             .map((pid) => ({
               pid,
-              cpuNs: reads === 0 ? 10000 : 20000,
-              rssBytes: reads === 0 ? 500 : 700
+              cpuNs: this.#reads === 0 ? 10000 : 20000,
+              rssBytes: this.#reads === 0 ? 500 : 700
             }))
             .map((row) => {
-              if (missing) row.rssBytes = 0
+              if (this.#missing) row.rssBytes = 0
               return row
             })
             .map((row, index, rows) => {
-              if (index === rows.length - 1) reads++
+              if (index === rows.length - 1) this.#reads += 1
               return row
             })
         },
-        start: (receive: (rows: { pid: number; cpuNs: number; rssBytes: number }[]) => void) => {
-          expect(calls).toBe(7)
-          receive([...new Set(pids)].map((pid) => ({ pid, cpuNs: 15000, rssBytes: 900 })))
+        /** A single synchronous observation precedes the original async join callback. */
+        start: (receive) => {
+          expect(this.#calls).toBe(7)
+          receive([...new Set(this.#pids)].map((pid) => ({ pid, cpuNs: 15000, rssBytes: 900 })))
           return async () => {
-            stopped = true
+            this.#stopped = true
           }
         }
       }
-    },
-    failRead: () => {
-      missing = true
-    },
-    isStopped: () => stopped
+    }
+  }
+
+  /** Invalidate the same subsequent RSS samples without changing exchange behavior. */
+  failRead(): void {
+    this.#missing = true
+  }
+
+  /** Expose whether the original observer remover completed. */
+  isStopped(): boolean {
+    return this.#stopped
   }
 }
 
@@ -104,7 +134,7 @@ describe('preparation only; no aggregate performance PASS', () => {
   })
   it('excludes warmup and sums absolute per-end RSS peaks and PID CPU deltas', async () => {
     /** Each endpoint has a 10000ns window CPU delta and a 900-byte absolute RSS peak. */
-    const run = fixture()
+    const run = new MeasurementFixture()
     /** The result describes synthetic observations, never a product performance receipt. */
     const result = await measurement.measureBare(run.options)
     expect(result.samples).toBe(1000)
@@ -117,13 +147,13 @@ describe('preparation only; no aggregate performance PASS', () => {
   })
   it('counts a shared thread PID once', async () => {
     /** Worker-style endpoints share their process and must not double-charge it. */
-    const result = await measurement.measureBare(fixture([11, 11]).options)
+    const result = await measurement.measureBare(new MeasurementFixture([11, 11]).options)
     expect(result.cpuNsPerRequest).toBe(10)
     expect(result.rssAbsolutePeakSumBytes).toBe(900)
   })
   it('fails a missing absolute RSS reading instead of manufacturing a denominator', async () => {
     /** A failed observer cannot yield a valid reference side. */
-    const run = fixture()
+    const run = new MeasurementFixture()
     run.failRead()
     await expect(measurement.measureBare(run.options)).rejects.toThrow(
       'Missing CPU or absolute RSS observation'

@@ -83,305 +83,373 @@ export function classification(value, depth = 0) {
  * @throws {Error} Fixture init failure, including a secondary cleanup failure when requested.
  */
 export function nodePlugins(info, trayPlugin) {
-  reportMarker = info.config?.reportMarker
-  probeMarker = info.config?.probeMarker
-  if (info.config?.failInit || (info.config?.failAfterFirst && info.generation > 1)) {
-    throw fixtureError(FixtureText.initCode, FixtureText.initMessage)
-  }
-  /** Cancellation counts belong to the target generation, not the caller. */
-  let aborted = 0
-  /** Notify delivery remains observable without response semantics. */
-  let noted = 0
-  /** A saved child remote must retain its original parent-issued admission receipt. */
-  let captured
-  /** Feature creation proves init executes once for each generation. */
-  let initCount = 0
-  /** Business topic observations belong to this native generation's real child hub. */
-  const topicMessages = []
-  /** Each fixture subscription retains its actual asynchronous off receipt. */
-  const topicOffs = new Map()
-  /** Init cannot finish until its configured business subscription is accepted by the parent. */
-  let topicInit
-  /** First plugin registers cleanup before a requested second admission fails. */
-  const plugin = definePlugin({
-    name: 'node',
-    features: {
-      svc: defineFeature(
-        (_core, deps) => {
-          initCount += 1
-          /**
-           * Registers a real Tray listener and stores the parent's authenticated metadata.
-           *
-           * @param {any} input Topic, receipt key and optional user failure mode.
-           * @returns {Promise<void>} Resolves after relay membership admission.
-           */
-          const subscribeTopic = async (input) => {
-            /** The key identifies this local listener, never the remote generation membership. */
-            const key = input.key ?? input.topic
-            /** User callback failures pass through the same Tray wrapper as application listeners. */
-            const off = await deps.tray.subscribe(input.topic, (payload, meta) => {
-              topicMessages.push({ payload, meta, frozen: Object.isFrozen(meta) })
-              if (input.throwSync)
-                throw fixtureError(FixtureText.businessCode, FixtureText.businessMessage)
-              if (input.rejectAsync)
-                return Promise.reject(fixtureError(FixtureText.causeCode, FixtureText.causeMessage))
-            })
-            topicOffs.set(key, off)
-          }
-          if (info.config?.topic) topicInit = subscribeTopic({ topic: info.config.topic })
-          return {
-            /**
-             * @param {any} input Business topic and portable payload. @returns {Promise<void>}
-             *   Parent publish result.
-             */
-            topicPublish: (input) => deps.tray.publish(input.topic, input.payload),
-            /**
-             * @param {any} input Topic and local receipt identity. @returns {Promise<void>}
-             *   Subscription result.
-             */
-            topicSubscribe: subscribeTopic,
-            /**
-             * @param {string} key Local receipt identity. @returns {Promise<void>} Idempotent local
-             *   off result.
-             */
-            topicOff: async (key) => {
-              await topicOffs.get(key)?.()
-              topicOffs.delete(key)
-            },
-            /** @returns {readonly object[]} Current generation's genuine business deliveries. */
-            topicMessages: () => [...topicMessages],
-            /** @returns {object} Current generation, validated config and real native identity. */
-            hello: () => ({
-              ...info,
-              initCount,
-              pid: process.pid,
-              threadId,
-              resourceLimits,
-              env: process.env.TRAY_SANDBOX ?? null,
-              hasEmit: 'emit' in deps.tray
-            }),
-            /**
-             * @param {unknown} value Query payload. @returns {unknown} Unchanged query paired with
-             *   target identity.
-             */
-            search: (value) => ({ id: info.id, value }),
-            /** @param {unknown} value Portable input. @returns {unknown} Unchanged input. */
-            echo: (value) => value,
-            /**
-             * @param {string} [value] Optional payload. @returns {string|null} Exact payload or
-             *   null.
-             */
-            optional: (value) => value ?? null,
-            /**
-             * @param {number} total Number of items. @returns {AsyncGenerator<number>} Ordered
-             *   items.
-             */
-            count: async function* (total) {
-              for (let index = 1; index <= total; index += 1) yield index
-            },
-            /**
-             * @param {number} milliseconds Hold time. @param {any} context Canonical RPC
-             *   cancellation context. @returns {Promise<object>} Generation that owns the receipt.
-             */
-            sleep: (milliseconds, context) =>
-              new Promise((resolve) => {
-                /** Timer belongs to this request and is released on cancellation. */
-                const timer = setTimeout(() => {
-                  context?.signal?.removeEventListener('abort', cancel)
-                  resolve({ generation: info.generation })
-                }, milliseconds)
-                /** Cooperative target cancellation records receipt propagation. */
-                const cancel = () => {
-                  clearTimeout(timer)
-                  aborted += 1
-                  resolve({ generation: info.generation, aborted: true })
-                }
-                if (context?.signal?.aborted) cancel()
-                else context?.signal?.addEventListener('abort', cancel, { once: true })
-              }),
-            /**
-             * @param {number} milliseconds Delay between items. @returns {AsyncGenerator<object>}
-             *   Generation-bound stream.
-             */
-            held: async function* (milliseconds) {
-              yield { generation: info.generation, item: 1 }
-              await new Promise((resolve) => setTimeout(resolve, milliseconds))
-              yield { generation: info.generation, item: 2 }
-            },
-            /** @returns {number} Target-side cancellation count. */
-            aborted: () => aborted,
-            /** @returns {number} Successful one-way deliveries. */
-            notedCount: () => noted,
-            /** @returns {void} Records one-way delivery. */
-            noted: () => {
-              noted += 1
-            },
-            /** @returns {never} Throws a business error with a distinct original cause. */
-            fail: () => {
-              throw fixtureError(
-                FixtureText.businessCode,
-                FixtureText.businessMessage,
-                fixtureError(FixtureText.causeCode, FixtureText.causeMessage)
-              )
-            },
-            /** @returns {never} One-way failure must reach the target report channel. */
-            notifyFail: () => {
-              throw fixtureError(FixtureText.businessCode, FixtureText.businessMessage)
-            },
-            /**
-             * @param {any} input Host name, id and query. @returns {Promise<unknown>} Target result
-             *   through parent relay.
-             */
-            ask: async (input) =>
-              (await deps.tray.to(hostByName(input.host), input.id)).request(
-                'node.svc.search',
-                input.value
-              ),
-            /**
-             * @param {any} input Host name, id and item count. @returns {Promise<number[]>} Ordered
-             *   relay stream.
-             */
-            collect: async (input) => {
-              /** Items come from the remote stream, never a local fixture loop. */
-              const values = []
-              for await (const item of (
-                await deps.tray.to(hostByName(input.host), input.id)
-              ).stream('node.svc.count', input.total))
-                values.push(item)
-              return values
-            },
-            /**
-             * @param {any} input Target host/id and hold duration. @param {any} context Parent
-             *   request cancellation. @returns {Promise<unknown>} Relayed cancellable target
-             *   request.
-             */
-            wait: async (input, context) =>
-              (await deps.tray.to(hostByName(input.host), input.id)).request(
-                'node.svc.sleep',
-                input.milliseconds,
-                { signal: context?.signal, timeoutMs: context?.timeoutMs }
-              ),
-            /**
-             * @param {any} input Target host/id. @returns {Promise<never>} Target error passed
-             *   through relay.
-             */
-            relayFail: async (input) =>
-              (await deps.tray.to(hostByName(input.host), input.id)).request('node.svc.fail'),
-            /**
-             * @param {any} input Target host/id. @returns {Promise<void>} Real one-way relay
-             *   delivery.
-             */
-            relayNotify: async (input) =>
-              (await deps.tray.to(hostByName(input.host), input.id)).notify(
-                input.fail ? 'node.svc.notifyFail' : 'node.svc.noted'
-              ),
-            /**
-             * @param {any} input Target host/id. @returns {Promise<boolean>} Stores a parent-issued
-             *   remote receipt.
-             */
-            capture: async (input) => {
-              captured = await deps.tray.to(hostByName(input.host), input.id)
-              return true
-            },
-            /** @returns {Promise<unknown>} Calls the original captured receipt without rebinding. */
-            captured: () => captured.request('node.svc.hello'),
-            /** @returns {object} Child namespace shape and local pick count. */
-            routingInfo: () => ({
-              picks: routingPicks,
-              balanced: 'balanced' in deps.tray,
-              names: Object.keys(deps.tray.routing)
-            }),
-            /**
-             * @param {any} input Portable route. @param {any} context Provider deadline. @returns
-             *   {Promise<unknown>} Routed target response.
-             */
-            route: (input, context) => {
-              const remote = input.member
-                ? deps.tray.routing[input.policy](hostByName(input.host))
-                : deps.tray.routing(input.policy, hostByName(input.host))
-              return remote.request(input.path ?? 'node.svc.hello', input.payload, {
-                signal: context.signal,
-                timeoutMs: context.timeoutMs
-              })
-            },
-            /** @param {any} input Portable route. @returns {Promise<void>} One-way target send. */
-            routeNotify: (input) =>
-              deps.tray.routing(input.policy, hostByName(input.host)).notify('node.svc.noted'),
-            /**
-             * @param {any} input Portable route. @param {any} context Provider deadline. @returns
-             *   {AsyncIterableIterator<number>} Routed target stream.
-             */
-            routeStream: (input, context) =>
-              deps.tray.routing(input.policy, hostByName(input.host)).stream('node.svc.count', 3, {
-                signal: context.signal,
-                timeoutMs: context.timeoutMs
-              }),
-            /** @returns {void} Ends this generation as a crash using Tray's public child Feature. */
-            exitCrash: () => {
-              deps.tray.exit(fixtureError(FixtureText.crashCode, FixtureText.crashMessage))
-              deps.tray.exit()
-            },
-            /** @returns {void} First clean exit wins over the immediately following crash request. */
-            exitClean: () => {
-              deps.tray.exit()
-              deps.tray.exit(fixtureError(FixtureText.crashCode, FixtureText.crashMessage))
-            },
-            /**
-             * @param {string} path Writable probe path. @returns {string} Native filesystem
-             *   outcome.
-             */
-            tryWrite: (path) => {
-              try {
-                writeFileSync(path, 'fixture')
-                return 'written'
-              } catch (error) {
-                return /** @type {any} */ (error).code
-              }
-            }
-          }
-        },
-        { tray: trayPlugin.getFeature('tray') }
-      ),
-      hidden: defineFeature(() => ({ secret: () => 'hidden' }))
-    },
-    /**
-     * @param {any} core Owning PluginHost lifecycle. @returns {Promise<object>} Waits only when
-     *   init delay is configured.
-     */
-    install: async (core) => {
-      await topicInit
-      core.onDispose(() => {
-        if (info.config?.cleanupMarker)
-          appendFileSync(info.config.cleanupMarker, `cleanup:${info.id}:${info.generation}\n`)
-        if (info.config?.cleanupFail)
-          throw fixtureError(FixtureText.cleanupCode, FixtureText.cleanupMessage)
-        if (info.config?.cleanupHang) return new Promise(() => {})
-      })
-      if (info.config?.initMarker)
-        appendFileSync(
-          info.config.initMarker,
-          `init:${info.id}:${info.generation}:${info.config.label ?? ''}\n`
-        )
-      if (info.config?.launchFailureMarker)
-        writeFileSync(info.config.launchFailureMarker, 'fail-next-launch')
-      if (info.config?.initDelayMs)
-        await new Promise((resolve) => setTimeout(resolve, info.config.initDelayMs))
-      return {}
+  return new NodePluginFixture(info, trayPlugin).plugins
+}
+/** Owns one generation's business fixture state, using the genuine per-init Tray dependency. */
+class NodePluginFixture {
+  /** Accepted immutable instance metadata distinguishes this native generation. */
+  #info
+  /** Feature reference keeps the genuine per-init client plugin dependency. */
+  #trayPlugin
+  /** Resolved Tray Feature is retained only after canonical dependency derivation. */
+  #tray
+  /** Actual target cancellation receipts are counted independently of caller completion. */
+  #aborted = 0
+  /** Successful one-way dispatch increments only this generation's receipt count. */
+  #noted = 0
+  /** Held remote retains its original parent-issued admission receipt. */
+  #captured
+  /** Actual Feature creation count proves one init per native generation. */
+  #initCount = 0
+  /** Authenticated topic observations remain local to the genuine child hub. */
+  #topicMessages = []
+  /** Actual off receipts are indexed by local listener identity. */
+  #topicOffs = new Map()
+  /** Installation waits for the configured original topic registration. */
+  #topicInit
+  /** Genuine business definition is retained for rollback dependency and lifecycle assertions. */
+  #plugin
+  /** Existing definition list remains the public fixture return value. */
+  plugins
+  /**
+   * @param {any} info Accepted instance metadata. @param {any} trayPlugin Genuine per-init Tray
+   *   Feature plugin.
+   */
+  constructor(info, trayPlugin) {
+    this.#info = info
+    this.#trayPlugin = trayPlugin
+    reportMarker = this.#info.config?.reportMarker
+    probeMarker = this.#info.config?.probeMarker
+    if (
+      this.#info.config?.failInit ||
+      (this.#info.config?.failAfterFirst && this.#info.generation > 1)
+    ) {
+      throw fixtureError(FixtureText.initCode, FixtureText.initMessage)
     }
-  })
-  if (!info.config?.rollbackFail) return [plugin]
-  return [
-    plugin,
-    definePlugin({
-      name: 'broken',
+    this.#plugin = definePlugin({
+      name: 'node',
       features: {
-        guard: defineFeature(() => ({}), { svc: plugin.getFeature('svc') })
+        svc: defineFeature((_core, deps) => this.#service(deps), {
+          tray: this.#trayPlugin.getFeature('tray')
+        }),
+        hidden: defineFeature(() => ({ secret: () => 'hidden' }))
       },
-      install: () => {
-        throw fixtureError(FixtureText.initCode, FixtureText.initMessage)
+      /**
+       * @param {any} core Owning PluginHost lifecycle. @returns {Promise<object>} Waits only when
+       *   init delay is configured.
+       */
+      install: async (core) => {
+        await this.#topicInit
+        core.onDispose(() => {
+          if (this.#info.config?.cleanupMarker)
+            appendFileSync(
+              this.#info.config.cleanupMarker,
+              `cleanup:${this.#info.id}:${this.#info.generation}\n`
+            )
+          if (this.#info.config?.cleanupFail)
+            throw fixtureError(FixtureText.cleanupCode, FixtureText.cleanupMessage)
+          if (this.#info.config?.cleanupHang) return new Promise(() => {})
+        })
+        if (this.#info.config?.initMarker)
+          appendFileSync(
+            this.#info.config.initMarker,
+            `init:${this.#info.id}:${this.#info.generation}:${this.#info.config.label ?? ''}\n`
+          )
+        if (this.#info.config?.launchFailureMarker)
+          writeFileSync(this.#info.config.launchFailureMarker, 'fail-next-launch')
+        if (this.#info.config?.initDelayMs)
+          await new Promise((resolve) => setTimeout(resolve, this.#info.config.initDelayMs))
+        return {}
       }
     })
-  ]
+    if (!this.#info.config?.rollbackFail) {
+      this.plugins = [this.#plugin]
+      return
+    }
+    this.plugins = [
+      this.#plugin,
+      definePlugin({
+        name: 'broken',
+        features: {
+          guard: defineFeature(() => ({}), { svc: this.#plugin.getFeature('svc') })
+        },
+        install: () => {
+          throw fixtureError(FixtureText.initCode, FixtureText.initMessage)
+        }
+      })
+    ]
+  }
+  /**
+   * @param {any} deps Actual Feature dependency resolution. @returns {object} Original business
+   *   method table.
+   */
+  #service(deps) {
+    this.#initCount += 1
+    this.#tray = deps.tray
+    if (this.#info.config?.topic)
+      this.#topicInit = this.#subscribeTopic({ topic: this.#info.config.topic })
+    return {
+      topicPublish: this.#topicPublishAction,
+      topicSubscribe: this.#subscribeTopic,
+      topicOff: this.#topicOffAction,
+      topicMessages: this.#topicMessagesAction,
+      hello: this.#helloAction,
+      search: this.#searchAction,
+      echo: this.#echoAction,
+      optional: this.#optionalAction,
+
+      /** @param {number} total Number of items. @returns {AsyncGenerator<number>} Ordered items. */
+      count: async function* (total) {
+        for (let index = 1; index <= total; index += 1) yield index
+      },
+      sleep: this.#sleepAction,
+      held: (milliseconds) => this.#heldAction(milliseconds),
+      aborted: this.#abortedAction,
+      notedCount: this.#notedCountAction,
+      noted: this.#notedAction,
+      fail: this.#failAction,
+      notifyFail: this.#notifyFailAction,
+      ask: this.#askAction,
+      collect: this.#collectAction,
+      wait: this.#waitAction,
+      relayFail: this.#relayFailAction,
+      relayNotify: this.#relayNotifyAction,
+      capture: this.#captureAction,
+      captured: this.#capturedAction,
+      routingInfo: this.#routingInfoAction,
+      route: this.#routeAction,
+      routeNotify: this.#routeNotifyAction,
+      routeStream: this.#routeStreamAction,
+      exitCrash: this.#exitCrashAction,
+      exitClean: this.#exitCleanAction,
+      tryWrite: this.#tryWriteAction
+    }
+  }
+  /**
+   * @param {any} input Topic and local receipt identity. @returns {Promise<void>} Original parent
+   *   membership completion.
+   */
+  #subscribeTopic = async (input) => {
+    /** The key identifies this local listener, never the remote generation membership. */
+    const key = input.key ?? input.topic
+    /** User callback failures pass through the same Tray wrapper as application listeners. */
+    const off = await this.#tray.subscribe(input.topic, (payload, meta) => {
+      this.#topicMessages.push({ payload, meta, frozen: Object.isFrozen(meta) })
+      if (input.throwSync) throw fixtureError(FixtureText.businessCode, FixtureText.businessMessage)
+      if (input.rejectAsync)
+        return Promise.reject(fixtureError(FixtureText.causeCode, FixtureText.causeMessage))
+    })
+    this.#topicOffs.set(key, off)
+  }
+
+  /**
+   * @param {any} input Business topic and portable payload. @returns {Promise<void>} Parent publish
+   *   result.
+   */
+  #topicPublishAction = (input) => this.#tray.publish(input.topic, input.payload)
+
+  /**
+   * @param {string} key Local receipt identity. @returns {Promise<void>} Idempotent local off
+   *   result.
+   */
+  #topicOffAction = async (key) => {
+    await this.#topicOffs.get(key)?.()
+    this.#topicOffs.delete(key)
+  }
+
+  /** @returns {readonly object[]} Current generation's genuine business deliveries. */
+  #topicMessagesAction = () => [...this.#topicMessages]
+
+  /** @returns {object} Current generation, validated config and real native identity. */
+  #helloAction = () => ({
+    ...this.#info,
+    initCount: this.#initCount,
+    pid: process.pid,
+    threadId,
+    resourceLimits,
+    env: process.env.TRAY_SANDBOX ?? null,
+    hasEmit: 'emit' in this.#tray
+  })
+
+  /**
+   * @param {unknown} value Query payload. @returns {unknown} Unchanged query paired with target
+   *   identity.
+   */
+  #searchAction = (value) => ({ id: this.#info.id, value })
+
+  /** @param {unknown} value Portable input. @returns {unknown} Unchanged input. */
+  #echoAction = (value) => value
+
+  /** @param {string} [value] Optional payload. @returns {string|null} Exact payload or null. */
+  #optionalAction = (value) => value ?? null
+
+  /**
+   * @param {number} milliseconds Hold time. @param {any} context Canonical RPC cancellation
+   *   context. @returns {Promise<object>} Generation that owns the receipt.
+   */
+  #sleepAction = (milliseconds, context) =>
+    new Promise((resolve) => {
+      /** Timer belongs to this request and is released on cancellation. */
+      const timer = setTimeout(() => {
+        context?.signal?.removeEventListener('abort', cancel)
+        resolve({ generation: this.#info.generation })
+      }, milliseconds)
+      /** Cooperative target cancellation records receipt propagation. */
+      const cancel = () => {
+        clearTimeout(timer)
+        this.#aborted += 1
+        resolve({ generation: this.#info.generation, aborted: true })
+      }
+      if (context?.signal?.aborted) cancel()
+      else context?.signal?.addEventListener('abort', cancel, { once: true })
+    })
+
+  /**
+   * @param {number} milliseconds Delay between items. @returns {AsyncGenerator<object>}
+   *   Generation-bound stream.
+   */
+  async *#heldAction(milliseconds) {
+    yield { generation: this.#info.generation, item: 1 }
+    await new Promise((resolve) => setTimeout(resolve, milliseconds))
+    yield { generation: this.#info.generation, item: 2 }
+  }
+
+  /** @returns {number} Target-side cancellation count. */
+  #abortedAction = () => this.#aborted
+
+  /** @returns {number} Successful one-way deliveries. */
+  #notedCountAction = () => this.#noted
+
+  /** @returns {void} Records one-way delivery. */
+  #notedAction = () => {
+    this.#noted += 1
+  }
+
+  /** @returns {never} Throws a business error with a distinct original cause. */
+  #failAction = () => {
+    throw fixtureError(
+      FixtureText.businessCode,
+      FixtureText.businessMessage,
+      fixtureError(FixtureText.causeCode, FixtureText.causeMessage)
+    )
+  }
+
+  /** @returns {never} One-way failure must reach the target report channel. */
+  #notifyFailAction = () => {
+    throw fixtureError(FixtureText.businessCode, FixtureText.businessMessage)
+  }
+
+  /**
+   * @param {any} input Host name, id and query. @returns {Promise<unknown>} Target result through
+   *   parent relay.
+   */
+  #askAction = async (input) =>
+    (await this.#tray.to(hostByName(input.host), input.id)).request('node.svc.search', input.value)
+
+  /**
+   * @param {any} input Host name, id and item count. @returns {Promise<number[]>} Ordered relay
+   *   stream.
+   */
+  #collectAction = async (input) => {
+    /** Items come from the remote stream, never a local fixture loop. */
+    const values = []
+    for await (const item of (await this.#tray.to(hostByName(input.host), input.id)).stream(
+      'node.svc.count',
+      input.total
+    ))
+      values.push(item)
+    return values
+  }
+
+  /**
+   * @param {any} input Target host/id and hold duration. @param {any} context Parent request
+   *   cancellation. @returns {Promise<unknown>} Relayed cancellable target request.
+   */
+  #waitAction = async (input, context) =>
+    (await this.#tray.to(hostByName(input.host), input.id)).request(
+      'node.svc.sleep',
+      input.milliseconds,
+      { signal: context?.signal, timeoutMs: context?.timeoutMs }
+    )
+
+  /** @param {any} input Target host/id. @returns {Promise<never>} Target error passed through relay. */
+  #relayFailAction = async (input) =>
+    (await this.#tray.to(hostByName(input.host), input.id)).request('node.svc.fail')
+
+  /** @param {any} input Target host/id. @returns {Promise<void>} Real one-way relay delivery. */
+  #relayNotifyAction = async (input) =>
+    (await this.#tray.to(hostByName(input.host), input.id)).notify(
+      input.fail ? 'node.svc.notifyFail' : 'node.svc.noted'
+    )
+
+  /**
+   * @param {any} input Target host/id. @returns {Promise<boolean>} Stores a parent-issued remote
+   *   receipt.
+   */
+  #captureAction = async (input) => {
+    this.#captured = await this.#tray.to(hostByName(input.host), input.id)
+    return true
+  }
+
+  /** @returns {Promise<unknown>} Calls the original captured receipt without rebinding. */
+  #capturedAction = () => this.#captured.request('node.svc.hello')
+
+  /** @returns {object} Child namespace shape and local pick count. */
+  #routingInfoAction = () => ({
+    picks: routingPicks,
+    balanced: 'balanced' in this.#tray,
+    names: Object.keys(this.#tray.routing)
+  })
+
+  /**
+   * @param {any} input Portable route. @param {any} context Provider deadline. @returns
+   *   {Promise<unknown>} Routed target response.
+   */
+  #routeAction = (input, context) => {
+    const remote = input.member
+      ? this.#tray.routing[input.policy](hostByName(input.host))
+      : this.#tray.routing(input.policy, hostByName(input.host))
+    return remote.request(input.path ?? 'node.svc.hello', input.payload, {
+      signal: context.signal,
+      timeoutMs: context.timeoutMs
+    })
+  }
+
+  /** @param {any} input Portable route. @returns {Promise<void>} One-way target send. */
+  #routeNotifyAction = (input) =>
+    this.#tray.routing(input.policy, hostByName(input.host)).notify('node.svc.noted')
+
+  /**
+   * @param {any} input Portable route. @param {any} context Provider deadline. @returns
+   *   {AsyncIterableIterator<number>} Routed target stream.
+   */
+  #routeStreamAction = (input, context) =>
+    this.#tray.routing(input.policy, hostByName(input.host)).stream('node.svc.count', 3, {
+      signal: context.signal,
+      timeoutMs: context.timeoutMs
+    })
+
+  /** @returns {void} Ends this generation as a crash using Tray's public child Feature. */
+  #exitCrashAction = () => {
+    this.#tray.exit(fixtureError(FixtureText.crashCode, FixtureText.crashMessage))
+    this.#tray.exit()
+  }
+
+  /** @returns {void} First clean exit wins over the immediately following crash request. */
+  #exitCleanAction = () => {
+    this.#tray.exit()
+    this.#tray.exit(fixtureError(FixtureText.crashCode, FixtureText.crashMessage))
+  }
+
+  /** @param {string} path Writable probe path. @returns {string} Native filesystem outcome. */
+  #tryWriteAction = (path) => {
+    try {
+      writeFileSync(path, 'fixture')
+      return 'written'
+    } catch (error) {
+      return /** @type {any} */ (error).code
+    }
+  }
 }
 
 /**

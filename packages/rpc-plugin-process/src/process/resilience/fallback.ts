@@ -39,7 +39,8 @@ function canReplace(value: unknown): value is Readonly<{
 }
 
 /** Recover only after affected sessions have stopped serving the unhealthy target. */
-export function createProcessInstanceFallback(
+/** Allocate one target instance recovery lifetime before installing behavior callbacks. */
+function processInstanceFallbackState(
   options: Readonly<{
     mode: 'shared' | 'per-connection'
     targetName: string
@@ -50,7 +51,7 @@ export function createProcessInstanceFallback(
     onInstanceUnhealthy?(listener: (event: IProcessInstanceFault) => void): () => void
     report(error: unknown): void
   }>
-): IProcessInstanceFallback {
+) {
   /** Session removal prevents a late fault from closing an unrelated successor. */
   const sessions = new Set<IProcessFallbackSession>()
   /** A single queue orders successive explicit health events for this target. */
@@ -59,6 +60,7 @@ export function createProcessInstanceFallback(
   let version = 0
   /** All recovery factories receive the same owner cancellation signal. */
   const controller = new AbortController()
+  /** Terminal admission state prevents this owner from accepting work after its resource is closed. */
   let closed = false
   /** Shared recovery requires the caller's Host to expose its trusted replacement method. */
   const recoverable = options.mode === 'per-connection' || canReplace(options.host)
@@ -77,20 +79,104 @@ export function createProcessInstanceFallback(
       })
   if (unavailable) options.report(unavailable)
 
-  const recover = async (event: IProcessInstanceFault): Promise<void> => {
-    if (closed) return
-    fused = true
-    const affected = [...sessions].filter(
-      (session) => options.mode === 'shared' || session.connectionId === event.connectionId
+  return {
+    sessions,
+    pending,
+    version,
+    controller,
+    closed,
+    recoverable,
+    fused,
+    unavailable,
+    options
+  }
+}
+
+/** Own one target instance recovery lifetime; callbacks access only this explicit instance. */
+class ProcessInstanceFallback {
+  /** All mutable storage and original construction inputs belong to this operation. */
+  #state: ReturnType<typeof processInstanceFallbackState>
+  /** Preserve the original stable resource surface and callback identities. */
+  readonly value: IProcessInstanceFallback
+  /** Initialize owned storage before publishing the resource's callbacks. */
+  constructor(
+    options: Readonly<{
+      mode: 'shared' | 'per-connection'
+      targetName: string
+      host: unknown
+      createSharedTarget?(
+        input: Readonly<{ reason: unknown; signal: AbortSignal }>
+      ): Promise<unknown> | unknown
+      onInstanceUnhealthy?(listener: (event: IProcessInstanceFault) => void): () => void
+      report(error: unknown): void
+    }>
+  ) {
+    this.#state = processInstanceFallbackState(options)
+    const unsubscribe =
+      this.#state.options.onInstanceUnhealthy?.((event) => {
+        if (this.#state.closed || event.targetName !== this.#state.options.targetName) return
+        this.#state.version += 1
+        this.#state.pending = this.#state.pending
+          .catch(() => undefined)
+          .then(() => this.#recover(event))
+        void this.#state.pending.catch((error: unknown) => {
+          if (error !== this.#state.unavailable) this.#state.options.report(error)
+        })
+      }) ?? (() => undefined)
+    this.value = Object.freeze(
+      Object.defineProperties(
+        {
+          version: 0,
+          inspect: (): Readonly<{ recoverable: boolean; fused: boolean }> => {
+            return Object.freeze({ recoverable: this.#state.recoverable, fused: this.#state.fused })
+          },
+          add: (session: IProcessFallbackSession): (() => void) => {
+            if (this.#state.closed)
+              throw attachErrorIdentity(new Error(RpcProcessErrorText.channelClosed), {
+                source: RPC_PROCESS_ERROR_SOURCE,
+                code: RpcProcessErrorCode.channelClosed
+              })
+            this.#state.sessions.add(session)
+            return () => this.#state.sessions.delete(session)
+          },
+          ready: (): Promise<void> => {
+            return this.#state.pending
+          },
+          close: (): Promise<void> => {
+            if (this.#state.closed) return this.#state.pending.catch(() => undefined)
+            this.#state.closed = true
+            this.#state.controller.abort()
+            unsubscribe()
+            this.#state.sessions.clear()
+            return this.#state.pending.catch(() => undefined)
+          }
+        },
+        {
+          version: {
+            get: () => {
+              return this.#state.version
+            }
+          }
+        }
+      )
+    )
+  }
+
+  #recover = async (event: IProcessInstanceFault): Promise<void> => {
+    if (this.#state.closed) return
+    this.#state.fused = true
+    const affected = [...this.#state.sessions].filter(
+      (session) =>
+        this.#state.options.mode === 'shared' || session.connectionId === event.connectionId
     )
     await Promise.all(affected.map((session) => session.close()))
-    if (closed) return
-    if (options.mode === 'per-connection') {
-      fused = false
+    if (this.#state.closed) return
+    if (this.#state.options.mode === 'per-connection') {
+      this.#state.fused = false
       return
     }
-    if (unavailable) throw unavailable
-    if (!canReplace(options.host) || !options.createSharedTarget)
+    if (this.#state.unavailable) throw this.#state.unavailable
+    if (!canReplace(this.#state.options.host) || !this.#state.options.createSharedTarget)
       throw ((originalCause: unknown) =>
         attachErrorIdentity(
           new Error(
@@ -99,11 +185,11 @@ export function createProcessInstanceFallback(
           ),
           { source: RPC_PROCESS_ERROR_SOURCE, code: RpcProcessErrorCode.instanceUnhealthy }
         ))(event.reason)
-    const candidate = await options.createSharedTarget({
+    const candidate = await this.#state.options.createSharedTarget({
       reason: event.reason,
-      signal: controller.signal
+      signal: this.#state.controller.signal
     })
-    if (closed) return
+    if (this.#state.closed) return
     if (!isDefinedPlugin(candidate))
       throw ((originalCause: unknown) =>
         attachErrorIdentity(
@@ -113,45 +199,23 @@ export function createProcessInstanceFallback(
           ),
           { source: RPC_PROCESS_ERROR_SOURCE, code: RpcProcessErrorCode.instanceUnhealthy }
         ))(event.reason)
-    await options.host.replace(options.targetName, candidate)
-    fused = false
+    await this.#state.options.host.replace(this.#state.options.targetName, candidate)
+    this.#state.fused = false
   }
+}
 
-  const unsubscribe =
-    options.onInstanceUnhealthy?.((event) => {
-      if (closed || event.targetName !== options.targetName) return
-      version += 1
-      pending = pending.catch(() => undefined).then(() => recover(event))
-      void pending.catch((error: unknown) => {
-        if (error !== unavailable) options.report(error)
-      })
-    }) ?? (() => undefined)
-  return Object.freeze({
-    get version() {
-      return version
-    },
-    inspect(): Readonly<{ recoverable: boolean; fused: boolean }> {
-      return Object.freeze({ recoverable, fused })
-    },
-    add(session: IProcessFallbackSession): () => void {
-      if (closed)
-        throw attachErrorIdentity(new Error(RpcProcessErrorText.channelClosed), {
-          source: RPC_PROCESS_ERROR_SOURCE,
-          code: RpcProcessErrorCode.channelClosed
-        })
-      sessions.add(session)
-      return () => sessions.delete(session)
-    },
-    ready(): Promise<void> {
-      return pending
-    },
-    close(): Promise<void> {
-      if (closed) return pending.catch(() => undefined)
-      closed = true
-      controller.abort()
-      unsubscribe()
-      sessions.clear()
-      return pending.catch(() => undefined)
-    }
-  })
+/** Construct the single owner for one target instance recovery lifetime. */
+export function createProcessInstanceFallback(
+  options: Readonly<{
+    mode: 'shared' | 'per-connection'
+    targetName: string
+    host: unknown
+    createSharedTarget?(
+      input: Readonly<{ reason: unknown; signal: AbortSignal }>
+    ): Promise<unknown> | unknown
+    onInstanceUnhealthy?(listener: (event: IProcessInstanceFault) => void): () => void
+    report(error: unknown): void
+  }>
+): IProcessInstanceFallback {
+  return new ProcessInstanceFallback(options).value
 }

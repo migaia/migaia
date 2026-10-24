@@ -1,20 +1,16 @@
+import { RpcCapability } from '@migaia/rpc-contract'
+import { createRuntimeEndpointComposition } from '../../dist/core/runtime-api-endpoint.js'
 import { describe, expect, it } from 'vitest'
-import { createClientEndpoint } from '../../dist/core/client.js'
-import { createProviderEndpoint } from '../../dist/core/provider.js'
-import { createComposedEndpoint } from '../../dist/core/composed.js'
-import {
-  createFirstPartyRoots,
-  type IRpcFirstPartyRootName
-} from '../../dist/core/internal/first-party-roots.js'
-import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
+
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
 import { connect } from '../../dist/core/middleware/connect.js'
 import { ping } from '../../dist/core/middleware/ping.js'
 import {
   RpcCoreErrorCode,
   RpcLifecycleError,
-  RPC_CORE_ERROR_SOURCE,
-  deserializeRpcError
-} from '../../dist/core/index.js'
+  RPC_CORE_ERROR_SOURCE
+} from '../../dist/core/errors.js'
+import { deserializeRpcError } from '../../dist/core/internal/error-wire-metadata.js'
 import { attachErrorIdentity } from '@migaia/utils/error'
 
 /**
@@ -28,19 +24,25 @@ import { attachErrorIdentity } from '@migaia/utils/error'
 describe('composed sendAll/pingAll fanout contract', () => {
   it('sendAll keys results by the tagged fanoutDeliveryKey shape and tolerates a __proto__ target', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
-    const server = await createProviderEndpoint({
-      id: '__proto__',
-      transport: serverTransport,
-      targetIds: ['client'],
-      middlewares: [connect({ transport: serverTransport })],
-      provider: { echo: (context) => context.success(context.data) }
-    })
-    const client = await createClientEndpoint({
-      id: 'client',
-      transport: clientTransport,
-      targetIds: ['__proto__'],
-      middlewares: [connect({ transport: clientTransport })]
-    })
+    const server = await createRuntimeEndpointComposition(
+      {
+        id: '__proto__',
+        transport: serverTransport,
+        targetIds: ['client'],
+        middlewares: [connect({ transport: serverTransport })],
+        provider: { echo: (context) => context.success(context.data) }
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'client',
+        transport: clientTransport,
+        targetIds: ['__proto__'],
+        middlewares: [connect({ transport: clientTransport })]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     try {
       const { fulfilled, rejected } = await client.sendAll('echo', 'value')
       expect(Object.getPrototypeOf(fulfilled)).toBeNull()
@@ -58,23 +60,23 @@ describe('composed sendAll/pingAll fanout contract', () => {
 
   it('pingAll keys results by the tagged fanoutDeliveryKey shape and tolerates a __proto__ target', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
-    const server = await createComposedEndpoint(
+    const server = await createRuntimeEndpointComposition(
       {
         id: '__proto__',
         transport: serverTransport,
         middlewares: [connect({ transport: serverTransport }), ping()]
       },
-      createFirstPartyRoots(new Set<IRpcFirstPartyRootName>(['first-party-control']))
-    )
-    const client = await createComposedEndpoint(
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
+    const client = await createRuntimeEndpointComposition(
       {
         id: 'client-ping-fanout',
         transport: clientTransport,
         targetIds: ['__proto__'],
         middlewares: [connect({ transport: clientTransport }), ping()]
       },
-      createFirstPartyRoots(new Set<IRpcFirstPartyRootName>(['first-party-control']))
-    )
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     try {
       const { fulfilled, rejected } = await client.pingAll!()
       expect(Object.getPrototypeOf(fulfilled)).toBeNull()
@@ -90,27 +92,30 @@ describe('composed sendAll/pingAll fanout contract', () => {
 
   it('pingAll rethrows a RpcLifecycleError instead of folding it into the per-target result', async () => {
     const [clientTransport] = createMemoryTransportPair()
-    const client = await createComposedEndpoint(
+    const client = await createRuntimeEndpointComposition(
       {
         id: 'client-disposed-fanout',
         transport: clientTransport,
         targetIds: ['unreachable'],
         middlewares: [connect({ transport: clientTransport }), ping()]
       },
-      createFirstPartyRoots(new Set<IRpcFirstPartyRootName>(['first-party-control']))
-    )
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     await client.dispose()
     await expect(client.pingAll!()).rejects.toBeInstanceOf(RpcLifecycleError)
   })
 
   it('sendAll rethrows a RpcLifecycleError instead of resolving with per-target rejections', async () => {
     const [clientTransport] = createMemoryTransportPair()
-    const client = await createClientEndpoint({
-      id: 'client-disposed-send-fanout',
-      transport: clientTransport,
-      targetIds: ['unreachable'],
-      middlewares: [connect({ transport: clientTransport })]
-    })
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'client-disposed-send-fanout',
+        transport: clientTransport,
+        targetIds: ['unreachable'],
+        middlewares: [connect({ transport: clientTransport })]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     await client.dispose()
     await expect(client.sendAll('echo', 'value')).rejects.toBeInstanceOf(RpcLifecycleError)
   })
@@ -152,12 +157,15 @@ describe('composed sendAll/pingAll fanout contract', () => {
         sends++
         throw forged
       }
-      const client = await createClientEndpoint({
-        id: 'forged-lifecycle-client',
-        transport,
-        targetIds: ['provider'],
-        middlewares: [connect({ transport })]
-      })
+      const client = await createRuntimeEndpointComposition(
+        {
+          id: 'forged-lifecycle-client',
+          transport,
+          targetIds: ['provider'],
+          middlewares: [connect({ transport })]
+        },
+        { agreement: { capabilities: [] }, peerId: '' }
+      ).installing
       try {
         /** A caller-owned lifecycle diagnostic cannot become a Core close decision. */
         const result = await client.sendAll('value', null)

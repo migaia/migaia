@@ -349,6 +349,88 @@ async function dialWhenReady(
 }
 
 /** Expand short forms into the same full deployments after original Core preparation is captured. */
+/**
+ * Open the selected native/JSON-RPC channel using the held preparation, without acquiring another
+ * endpoint.
+ */
+function establishShortSpawn(
+  raw: Parameters<IProcessPluginEstablish>[0],
+  prepared: Parameters<IProcessPluginEstablish>[1],
+  context: Readonly<{
+    wire: ProcessPluginWire
+    contract: IRemoteContract | undefined
+    report: (error: unknown) => void
+  }>
+): ReturnType<IProcessPluginEstablish> {
+  const { wire, contract, report } = context
+
+  /** Native stderr is presentation metadata around this one held Core connection. */
+  const ipc = {
+    ...prepared.session,
+    stderr: prepared.stderr,
+    log: () => undefined,
+    ...prepared.ipc
+  }
+  return wire === ProcessPluginWire.jsonrpc
+    ? createProcessJsonRpcChannel({
+        byte: raw as IProcessByteChannel,
+        peerId: contract!.plugin,
+        target: { kind: 'plugin', contract: contract! },
+        offer: {
+          ...prepared.offer!,
+          capabilities: prepared.offer!.capabilities.filter((capability) =>
+            JSONRPC_ALLOWED_CAPABILITIES.includes(capability)
+          )
+        },
+        token: prepared.token!,
+        scheduler: prepared.scheduler,
+        wallClock: systemWallClock,
+        signal: prepared.signal,
+        handshakeTimeoutMs: prepared.handshakeTimeoutMs,
+        ipc,
+        report
+      })
+    : createProcessTransport(raw as IProcessByteChannel, {
+        role: 'initiator',
+        offer: prepared.offer!,
+        peerId: prepared.session.processId!,
+        scheduler: prepared.scheduler,
+        signal: prepared.signal,
+        handshakeTimeoutMs: prepared.handshakeTimeoutMs,
+        ipc,
+        report
+      })
+}
+
+/** Apply named-local socket permissions to the original listener and roll it back on chmod failure. */
+async function listenLocalProcessSocket(
+  input: Parameters<IListenProcessByteChannel>[0],
+  socket: Readonly<{ listenProcessByteChannel: IListenProcessByteChannel }>,
+  selected: Awaited<ReturnType<typeof endpoint>>,
+  report: (error: unknown) => void
+): ReturnType<IListenProcessByteChannel> {
+  /** The original socket listener owns both pending accepts and its stable Unix inode record. */
+  const listener = await socket.listenProcessByteChannel({
+    ...input,
+    serviceId: selected.serviceId
+  })
+  try {
+    const { chmod } = await import('node:fs/promises')
+    await chmod(selected.address, PROCESS_LOCAL_SOCKET_MODE)
+    return listener
+  } catch (cause) {
+    try {
+      await listener.close()
+    } catch (cleanup) {
+      report(cleanup)
+    }
+    throw attachErrorIdentity(new Error(RpcProcessErrorText.listenFailed, { cause }), {
+      source: ERROR_SOURCE,
+      code: RpcProcessErrorCode.listenFailed
+    })
+  }
+}
+
 export async function normalizeProcessSources(
   options: IRuntimeProcessPeerOptions,
   runtime: string,
@@ -449,6 +531,7 @@ export async function normalizeProcessSources(
     const selectedLauncher = short.supervision?.launcher ?? launcher
     /** Each full source receives a fresh secret transported only in its existing stdin bootstrap. */
     const { randomBytes } = await import('node:crypto')
+    /** An omitted credential receives fresh entropy before this native process is launched. */
     const token = short.token ?? randomBytes(32).toString('base64url')
     /**
      * The public source object names protocol policy; actual agreement remains with the handshake
@@ -526,44 +609,7 @@ export async function normalizeProcessSources(
       rawChannel: async (handle) => (handle as INodeProcessHandle).channel!,
       establish:
         short.establish ??
-        ((raw, prepared) => {
-          /** Native stderr is presentation metadata around this one held Core connection. */
-          const ipc = {
-            ...prepared.session,
-            stderr: prepared.stderr,
-            log: () => undefined,
-            ...prepared.ipc
-          }
-          return wire === ProcessPluginWire.jsonrpc
-            ? createProcessJsonRpcChannel({
-                byte: raw as IProcessByteChannel,
-                peerId: contract!.plugin,
-                target: { kind: 'plugin', contract: contract! },
-                offer: {
-                  ...prepared.offer!,
-                  capabilities: prepared.offer!.capabilities.filter((capability) =>
-                    JSONRPC_ALLOWED_CAPABILITIES.includes(capability)
-                  )
-                },
-                token: prepared.token!,
-                scheduler: prepared.scheduler,
-                wallClock: systemWallClock,
-                signal: prepared.signal,
-                handshakeTimeoutMs: prepared.handshakeTimeoutMs,
-                ipc,
-                report
-              })
-            : createProcessTransport(raw as IProcessByteChannel, {
-                role: 'initiator',
-                offer: prepared.offer!,
-                peerId: prepared.session.processId!,
-                scheduler: prepared.scheduler,
-                signal: prepared.signal,
-                handshakeTimeoutMs: prepared.handshakeTimeoutMs,
-                ipc,
-                report
-              })
-        })
+        ((raw, prepared) => establishShortSpawn(raw, prepared, { wire, contract, report }))
     } as ISpawnProcessPluginDeployment
   }
   if (typeof options.connect === 'string' || typeof options.listen === 'string') {
@@ -623,31 +669,7 @@ export async function normalizeProcessSources(
     } else {
       /** Socket mode is narrowed inside the already private directory before exposing the listener. */
       const listen: IListenProcessByteChannel = selected.local
-        ? async (input) => {
-            /**
-             * The original socket listener owns both pending accepts and its stable Unix inode
-             * record.
-             */
-            const listener = await socket.listenProcessByteChannel({
-              ...input,
-              serviceId: selected.serviceId
-            })
-            try {
-              const { chmod } = await import('node:fs/promises')
-              await chmod(selected.address, PROCESS_LOCAL_SOCKET_MODE)
-              return listener
-            } catch (cause) {
-              try {
-                await listener.close()
-              } catch (cleanup) {
-                report(cleanup)
-              }
-              throw attachErrorIdentity(new Error(RpcProcessErrorText.listenFailed, { cause }), {
-                source: ERROR_SOURCE,
-                code: RpcProcessErrorCode.listenFailed
-              })
-            }
-          }
+        ? (input) => listenLocalProcessSocket(input, socket, selected, report)
         : socket.listenProcessByteChannel
       resolved.listen = {
         kind: 'listener',

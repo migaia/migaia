@@ -5,27 +5,12 @@ import { systemScheduler } from '@migaia/utils/scheduler'
 import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'
 import { RpcCodecId, RpcProtocol } from '@migaia/rpc-contract'
 import {
-  createRuntimePeer,
-  prepareRuntimePeerEndpoint,
   type IRuntimePeerOptions,
-  type IRuntimePeer,
   type IRuntimePeerSourceContext,
   type IRuntimePeerSourceResult
 } from '../remote/runtime-api/peer.js'
-import { createRuntimePlugin, type IRuntimePluginOptions } from '../remote/runtime-api/plugin.js'
-import type {
-  IRuntimeFlatten,
-  IRuntimeTypedPeer,
-  IRuntimePluginTyping
-} from '../remote/runtime-api/typing.js'
-import type { IRuntimePeerProvide } from '../remote/runtime-api/catalog.js'
 import { RuntimePluginKey } from '../remote/runtime-api/constants.js'
-import {
-  readRuntimePreparationContext,
-  withRuntimePreparationContext
-} from '../remote/runtime-api/launch-context.js'
-import { assertRuntimeTransferDisabled } from '../core/internal/runtime-call-options.js'
-import { prepareAdapterPeer } from './peer.js'
+import { readRuntimePreparationContext } from '../remote/runtime-api/launch-context.js'
 import {
   createAdapterSourceConfigurationError,
   createAdapterConfigurationTypeError,
@@ -53,19 +38,14 @@ import type {
   IByteAdapterOptions,
   IAdapterDefinition,
   IAdapterDefinitionPeerOptions,
-  IAdapterDefinitionPluginOptions,
-  IAdapterTask,
-  IAdapterTaskOptions,
   IMessageAdapterPort,
   IMessageAdapterLaunch
 } from './definition-types.js'
 import type { IRuntimeByteDiagnostics } from './byte/types.js'
 import type { IRpcIdempotencyStore } from '../core/idempotency-store.js'
-import type { IAdapterInitialMessageResource } from './message/types.js'
 import type { IRemoteChannel } from '../remote/types.js'
 import { hostRethrowReporter, type IAbortSignal } from '@migaia/utils/promise'
 import { IpcReporterContext } from './data.js'
-import { defaultRpcReporter } from '../core/default-reporter.js'
 import {
   createAdapterDeployment,
   type IAdapterDeployment,
@@ -127,16 +107,6 @@ function readRecipe(definition: object): IRecipe {
   return recipe
 }
 
-/** Synchronous native opening keeps its original assembly Promise; async physical opening is joined. */
-function useOpened<T>(
-  value: T | Promise<T>,
-  prepare: (opened: T) => Promise<IRuntimePeer>
-): Promise<IRuntimePeer> {
-  return typeof (value as Promise<T>).then === 'function'
-    ? Promise.resolve(value).then(prepare)
-    : prepare(value as T)
-}
-
 /** Secondary physical cleanup is reported without replacing the construction's exact primary error. */
 async function closeAfterFailure(
   resource: Readonly<{ close(): void | Promise<void> }>,
@@ -155,81 +125,28 @@ async function closeAfterFailure(
   throw primary
 }
 
-/** Cold Host rollback and endpoint disposal join one close operation on the same held resource. */
-function coldSourceClose(
-  resource: Readonly<{ close(): void | Promise<void> }>
-): () => Promise<void> {
-  /** Only cold deployment receipts cache cleanup; private Peer resources retain their own API. */
-  let closing: Promise<void> | undefined
-  return () => {
-    if (closing) return closing
-    try {
-      closing = Promise.resolve(resource.close())
-    } catch (error) {
-      closing = Promise.reject(error)
-    }
-    return closing
+/** One cold deployment receipt owns its original physical cleanup Promise cache. */
+class ColdSourceClose {
+  /** The held physical resource retains its original receiver and native cleanup semantics. */
+  #resource: Readonly<{ close(): void | Promise<void> }>
+  /** Host rollback and endpoint disposal share this exact original cleanup result. */
+  #closing: Promise<void> | undefined
+
+  /** Retain the already-open physical resource without closing or copying its native state. */
+  constructor(resource: Readonly<{ close(): void | Promise<void> }>) {
+    this.#resource = resource
   }
-}
 
-/**
- * Capture original options once before native loading. Native source owners may keep their existing
- * real managed/listener recipes; automatic tasks open actual raw I/O and complete Core assembly.
- */
-export function captureAdapterTask<TInput>(
-  definition: IAdapterDefinition<TInput>,
-  options: IAdapterTaskOptions,
-  defaultName: string,
-  selectedSelf?: import('../remote/runtime-api/peer.js').IRuntimePeerIdentity
-): IAdapterTask<TInput> {
-  /** A definition only selects its raw recipe; the original options select genuine Host provenance. */
-  const recipe = readRecipe(definition)
-  /** Byte recipes retain the same transfer prohibition across all native source shapes. */
-  const prepared = prepareAdapterPeer(options, defaultName, selectedSelf)
-  const preparation = recipe.kind === 'byte' ? prepared.withoutTransfer() : prepared
-  return Object.freeze({
-    preparation,
-    managed: <TUnit, TSpec>(...args: Parameters<typeof preparation.managed<TUnit, TSpec>>) =>
-      preparation.managed<TUnit, TSpec>(...args),
-    listener: (offer: readonly string[]) => preparation.listener(offer),
-    resourcePeer: (peerOptions: IRuntimePeerOptions, resource: IAdapterMessageResource) =>
-      preparation.peer(peerOptions, resource),
-    messagePeer(
-      peerOptions: IRuntimePeerOptions,
-      input: TInput,
-      initial?: IAdapterInitialMessageResource
-    ) {
-      if (recipe.kind !== 'message') throw createAdapterSourceConfigurationError()
-      /** A real raw opening feeds the same constructor used by native Thread channels. */
-      return useOpened(recipe.options.open(input), (port) => {
-        const resource = holdMessagePort(port)
-        if (initial) resource.receiveInitial(initial)
-        return preparation.peer(peerOptions, resource)
-      })
-    },
-    bytePeer(
-      peerOptions: IRuntimePeerOptions,
-      input: TInput,
-      local: import('./byte/peer.js').IAdapterBytePeerOptions
-    ) {
-      if (recipe.kind !== 'byte') throw createAdapterSourceConfigurationError()
-      /** Core's existing private first-frame snapshot must belong to this exact returned byte I/O. */
-      return useOpened(recipe.options.open(input), (byte) =>
-        preparation.bytePeer(peerOptions, byte, local)
-      )
+  /** Cache synchronous throws as rejected Promises exactly at the original first close call. */
+  close = (): Promise<void> => {
+    if (this.#closing) return this.#closing
+    try {
+      this.#closing = Promise.resolve(this.#resource.close())
+    } catch (error) {
+      this.#closing = Promise.reject(error)
     }
-  })
-}
-
-/** Native Plugins keep their original slot family and public source grammar through one assembler. */
-export function assembleAdapterPlugin<TInput, TSpawn, TConnect, TListen>(
-  definition: IAdapterDefinition<TInput>,
-  options: IRuntimePluginOptions<TSpawn, TConnect, TListen>,
-  slot: Parameters<typeof createRuntimePlugin>[1],
-  createPeer: NonNullable<Parameters<typeof createRuntimePlugin>[2]>
-) {
-  readRecipe(definition)
-  return createRuntimePlugin(options, slot, createPeer)
+    return this.#closing
+  }
 }
 
 /**
@@ -271,7 +188,7 @@ async function openDefinitionSource<TInput>(
     const resource = holdMessagePort(launched?.port ?? (await recipe.options.open(input)), launched)
     if (launched) ownAdapterMessageClose(resource)
     /** Local rollback and native Host disposal observe the exact same cold-source close result. */
-    const rollback = controls.ownClose ? { close: coldSourceClose(resource) } : resource
+    const rollback = controls.ownClose ? { close: new ColdSourceClose(resource).close } : resource
     try {
       controls.ownClose?.(rollback.close)
       /** One original preparation budget covers both identity capture and ACK negotiation. */
@@ -361,7 +278,7 @@ async function openDefinitionSource<TInput>(
     recipe.options.diagnostics ?? byteDiagnostics
   )
   /** Native byte cleanup uses the same cold receipt instead of another resource lifecycle. */
-  const rollback = controls.ownClose ? { close: coldSourceClose(connection) } : connection
+  const rollback = controls.ownClose ? { close: new ColdSourceClose(connection).close } : connection
   try {
     controls.ownClose?.(rollback.close)
     if (options.governor) {
@@ -381,71 +298,107 @@ async function openDefinitionSource<TInput>(
   }
 }
 
-/** Capture a cold source recipe; each installation still opens a separate canonical raw resource. */
-function captureDefinitionDeployment<TInput>(
-  definition: IAdapterDefinition<TInput>,
-  options: IAdapterDefinitionPeerOptions<TInput>,
-  family: object
-): IAdapterDeployment {
-  /** Only this exact raw definition can select the private physical operations. */
-  const recipe = readRecipe(definition)
-  /** Configuration is captured before the returned token may be installed into another Host. */
-  const captured = Object.freeze({ ...options })
-  /** Existing raw-source exclusivity is checked before physical acquisition. */
-  const sources = [captured.spawn, captured.connect, captured.listen].filter(
-    (source) => source !== undefined
-  )
-  if (sources.length > 1) throw createAdapterSourceConfigurationError()
-  /** Shared scope identity remains canonical and borrowed; the deployment never closes it. */
-  const scope = captured.scope && readRuntimeProviderScope(captured.scope)
-  if (captured.scope && !scope)
-    throw createAdapterConfigurationTypeError(RuntimeAdapterErrorText.connectionRequired)
-  /** Actual native Host provenance is retained only when the original options already carry it. */
-  const provenance = readRuntimePreparationContext(options)
-  /** Weak receipts associate existing governors with actual returned channels without owning them. */
-  const governors = new WeakMap<IRemoteChannel, IRuntimeProviderGovernor>()
-  return createAdapterDeployment({
-    runtimeKey: recipe.kind === 'message' ? RuntimePluginKey.thread : RuntimePluginKey.process,
-    runtimeFamily: family,
-    runtimeOptions: {
-      self: captured.self,
-      provide: captured.provide,
-      probe: captured.probe,
-      providerLimits: captured.providerLimits,
-      authentication: captured.authentication,
-      defaultTimeoutMs: captured.defaultTimeoutMs,
-      contract: captured.contract,
-      keyFactory: captured.keyFactory,
-      retryPort: captured.retryPort,
-      report: captured.report
-    },
-    open: (context) =>
-      openDefinitionSource(recipe, captured, captured as IRuntimePeerOptions, context, {
-        signal: context.signal ?? captured.signal,
-        messageSignal: context.signal ?? captured.signal,
-        connectTimeoutMs: context.connectTimeoutMs ?? provenance?.connectTimeoutMs,
+/** One cold source recipe owns physical governor receipts and borrowed provider policy. */
+class DefinitionDeployment<TInput> {
+  /** The exact raw definition selects its private physical operations. */
+  #recipe: IRecipe
+  /** The original captured options remain immutable across later installations. */
+  #captured: IAdapterDefinitionPeerOptions<TInput>
+  /** Every installation retains the one original physical family token. */
+  #family: object
+  /** The borrowed shared scope remains owned by its original caller. */
+  #scope: ReturnType<typeof readRuntimeProviderScope>
+  /** Actual native Host provenance remains associated with the original options identity. */
+  #provenance: ReturnType<typeof readRuntimePreparationContext>
+  /** Weak receipts associate existing governors with exact channels without owning their lifetime. */
+  #governors = new WeakMap<IRemoteChannel, IRuntimeProviderGovernor>()
+
+  /** Validate and capture physical configuration before any native resource is acquired. */
+  constructor(
+    definition: IAdapterDefinition<TInput>,
+    options: IAdapterDefinitionPeerOptions<TInput>,
+    family: object
+  ) {
+    this.#recipe = readRecipe(definition)
+    this.#captured = Object.freeze({ ...options })
+    this.#family = family
+    /** Existing raw source exclusivity is checked before physical acquisition. */
+    const sources = [this.#captured.spawn, this.#captured.connect, this.#captured.listen].filter(
+      (source) => source !== undefined
+    )
+    if (sources.length > 1) throw createAdapterSourceConfigurationError()
+    this.#scope = this.#captured.scope && readRuntimeProviderScope(this.#captured.scope)
+    if (this.#captured.scope && !this.#scope)
+      throw createAdapterConfigurationTypeError(RuntimeAdapterErrorText.connectionRequired)
+    this.#provenance = readRuntimePreparationContext(options)
+  }
+
+  /** Mint the actual existing cold deployment; no endpoint or callable Peer is constructed here. */
+  deployment(): IAdapterDeployment {
+    return createAdapterDeployment({
+      runtimeKey:
+        this.#recipe.kind === 'message' ? RuntimePluginKey.thread : RuntimePluginKey.process,
+      runtimeFamily: this.#family,
+      runtimeOptions: {
+        self: this.#captured.self,
+        provide: this.#captured.provide,
+        probe: this.#captured.probe,
+        providerLimits: this.#captured.providerLimits,
+        authentication: this.#captured.authentication,
+        defaultTimeoutMs: this.#captured.defaultTimeoutMs,
+        contract: this.#captured.contract,
+        keyFactory: this.#captured.keyFactory,
+        retryPort: this.#captured.retryPort,
+        report: this.#captured.report
+      },
+      open: this.#open,
+      prepareEndpoint: this.#prepareEndpoint
+    })
+  }
+
+  /** Open only the selected raw source through the same canonical protocol and resource owners. */
+  #open = (context: IAdapterDeploymentContext): Promise<IRuntimePeerSourceResult> =>
+    openDefinitionSource(
+      this.#recipe,
+      this.#captured,
+      this.#captured as IRuntimePeerOptions,
+      context,
+      {
+        signal: context.signal ?? this.#captured.signal,
+        messageSignal: context.signal ?? this.#captured.signal,
+        connectTimeoutMs: context.connectTimeoutMs ?? this.#provenance?.connectTimeoutMs,
         report: context.report,
         ownClose: context.ownClose,
         onGovernor: (channel, governor) => {
-          governors.set(channel, governor)
+          this.#governors.set(channel, governor)
         }
-      }),
-    prepareEndpoint: (channel, providerLimits) => {
+      }
+    )
+
+  /** Derive provider policy only from this exact channel's original governor and borrowed scope. */
+  #prepareEndpoint: NonNullable<Parameters<typeof createAdapterDeployment>[0]['prepareEndpoint']> =
+    (channel, providerLimits) => {
       /** The host's explicit provider selection wins over the cold source's inherited selection. */
-      const configured = providerLimits ?? captured.providerLimits
+      const configured = providerLimits ?? this.#captured.providerLimits
       /** Governor policy remains enforced by its original existing provider wrapper. */
-      const governor = governors.get(channel)
+      const governor = this.#governors.get(channel)
       /** Quota observers attach once at the same preparation point as the legacy Peer path. */
       const limits = governor
-        ? governor.limits(configured ?? {}, captured.providerLimits)
+        ? governor.limits(configured ?? {}, this.#captured.providerLimits)
         : configured
-      /** The authenticated scope derives its original store/key once for this physical channel. */
-      const idempotency = scope?.session(channel, limits ?? {}).idempotency
-      /** Host reservation stages the same policy; candidate failure cannot tighten a live scope. */
-      const registration = provenance?.providerAdmissionRegistration
+      /**
+       * The authenticated this.#scope derives its original store/key once for this physical
+       * channel.
+       */
+      const idempotency = this.#scope?.session(channel, limits ?? {}).idempotency
+      /**
+       * Host reservation stages the same policy; candidate failure cannot tighten a live
+       * this.#scope.
+       */
+      const registration = this.#provenance?.providerAdmissionRegistration
       registration?.stagePolicy(limits?.maxGlobal, limits?.maxPerPeer)
       /** Borrow only an explicitly held original quota resource; ordinary sessions allocate none. */
-      const providerAdmission = provenance?.providerAdmission ?? scope?.admission
+      const providerAdmission = this.#provenance?.providerAdmission ?? this.#scope?.admission
       return {
         policy: {
           ...(limits === undefined ? {} : { providerLimits: limits }),
@@ -459,156 +412,19 @@ function captureDefinitionDeployment<TInput>(
           ...(governor ? { provider: governor.provider, enterStream: governor.enterStream } : {})
         },
         providerAdmission,
-        providerAdmissionRegistration: provenance?.providerAdmissionRegistration,
+        providerAdmissionRegistration: this.#provenance?.providerAdmissionRegistration,
         ...(governor ? { wrapEndpoint: (endpoint) => governor.endpoint(endpoint) } : {})
       }
     }
-  })
 }
 
-/** Construct a regular Peer from raw I/O while the original Core factory retains validation order. */
-export async function constructDefinitionPeer<
-  TRemote = never,
-  TInput = unknown,
-  TKey extends 'process' | 'thread' = 'process' | 'thread'
->(
-  definition: IAdapterDefinition<TInput, TKey>,
+/** Capture one real raw source context without introducing another assembly or provider owner. */
+function captureDefinitionDeployment<TInput>(
+  definition: IAdapterDefinition<TInput>,
   options: IAdapterDefinitionPeerOptions<TInput>,
-  original: IRuntimePeerOptions = options as IRuntimePeerOptions
-): Promise<
-  [TRemote] extends [never]
-    ? IRuntimePeer
-    : IRuntimeTypedPeer<TRemote, IRuntimeFlatten<TRemote>, TKey>
-> {
-  /**
-   * Capture before constructing replacement source callbacks, especially during actual Host
-   * install.
-   */
-  const recipe = readRecipe(definition)
-  const key = recipe.kind === 'message' ? RuntimePluginKey.thread : RuntimePluginKey.process
-  const task = captureAdapterTask(definition, original, key)
-  const provenance = readRuntimePreparationContext(original)
-  /** The existing preparation signal has the same precedence for every physical source kind. */
-  const signal = task.preparation.initialSignal ?? options.signal
-  const report = options.report ?? defaultRpcReporter
-  /** Mutually exclusive raw source values map to the existing single-source Core grammar. */
-  const sources = [original.spawn, original.connect, original.listen].filter(
-    (source) => source !== undefined
-  )
-  if (sources.length > 1) throw createAdapterSourceConfigurationError()
-  const scope = options.scope && readRuntimeProviderScope(options.scope)
-  if (options.scope && !scope)
-    throw createAdapterConfigurationTypeError(RuntimeAdapterErrorText.connectionRequired)
-  /** The actual connection determines governor eligibility, quotas and all accepted capabilities. */
-  let governor: ReturnType<typeof createRuntimeProviderGovernor> | undefined
-  /** The original governor composes its rejection observer into the canonical provider limits. */
-  let limits = original.providerLimits
-  /** Scope keys derive from this exact constructed channel, not the endpoint's borrowed view. */
-  let sourceChannel!: IRemoteChannel
-  /** Endpoint wrapping reuses the original provider root; it never changes the local offer compiler. */
-  const resources: NonNullable<Parameters<typeof createRuntimePeer>[1]> = {
-    host: provenance?.host,
-    providerAdmissionRegistration: provenance?.providerAdmissionRegistration,
-    get providerAdmission() {
-      return provenance?.providerAdmission ?? scope?.admission
-    },
-    signal,
-    ...(options.governor ? { wrapEndpoint: (endpoint) => governor!.endpoint(endpoint) } : {})
-  }
-  /** Caller-owned source values and presentation do not enter the accepted private agreement. */
-  const peerOptions: IRuntimePeerOptions = {
-    ...original,
-    self: task.preparation.context.self,
-    spawn: undefined,
-    listen: undefined,
-    report,
-    get providerLimits() {
-      return limits
-    },
-    ...(scope
-      ? {
-          endpointFactory: (channel, signal) =>
-            prepareRuntimePeerEndpoint(
-              { ...original, self: task.preparation.context.self, report },
-              channel,
-              signal,
-              {
-                idempotency: scope.session(sourceChannel, limits ?? {}).idempotency,
-                providerLimits: limits
-              },
-              provenance?.providerAdmission ?? scope.admission,
-              provenance?.providerAdmissionRegistration
-            )
-        }
-      : {}),
-    connect: async (context) => {
-      /**
-       * Scoped providers retain the original compiled local offer rather than a borrowed endpoint
-       * view.
-       */
-      const sourceContext = scope && !original.endpointFactory ? task.preparation.context : context
-      /** The same helper serves legacy Peer construction and cold host deployments. */
-      const channel = await openDefinitionSource(recipe, options, original, sourceContext, {
-        signal,
-        messageSignal: provenance?.initialSignal ?? options.signal,
-        connectTimeoutMs: provenance?.connectTimeoutMs,
-        report,
-        onGovernor: (_channel, held) => {
-          governor = held
-          limits = held.limits(limits ?? {}, original.providerLimits)
-        }
-      })
-      sourceChannel = channel
-      return channel
-    }
-  }
-  /** This only transfers the genuine captured context to the factory's own ordinary source copy. */
-  return withRuntimePreparationContext(
-    peerOptions,
-    {
-      ...provenance,
-      ...(recipe.kind === 'byte' ? { restrictTransfer: assertRuntimeTransferDisabled } : {})
-    },
-    () => createRuntimePeer(peerOptions, resources)
-  ) as Promise<
-    [TRemote] extends [never]
-      ? IRuntimePeer
-      : IRuntimeTypedPeer<TRemote, IRuntimeFlatten<TRemote>, TKey>
-  >
-}
-
-/** Private kernel baselines reuse the original complete assembler without publishing it. */
-export function constructDefinitionPlugin<
-  TRemote = Record<never, never>,
-  const TProvide extends IRuntimePeerProvide = Record<never, never>,
-  const TName extends string = string,
-  const TExpose extends readonly string[] = readonly [],
-  TInput = unknown,
-  TKey extends 'process' | 'thread' = 'process' | 'thread'
->(
-  definition: IAdapterDefinition<TInput, TKey>,
-  options: Omit<IAdapterDefinitionPluginOptions<TInput>, 'provide' | 'name' | 'expose'> &
-    Readonly<{ provide?: TProvide; name: TName; expose?: TExpose }>
-): ReturnType<typeof createRuntimePlugin> &
-  IRuntimePluginTyping<TRemote, TProvide, TName, TExpose, TKey> {
-  /** The actual raw definition retains its original private native slot family. */
-  const recipe = readRecipe(definition)
-  const key = recipe.kind === 'message' ? RuntimePluginKey.thread : RuntimePluginKey.process
-  return assembleAdapterPlugin(
-    definition,
-    options,
-    {
-      key,
-      acquire: (integration, create) => integration.acquireSharedSlot(key, recipe.family!, create)
-    },
-    (peerOptions) =>
-      constructDefinitionPeer(
-        definition,
-        { ...options, ...peerOptions } as IAdapterDefinitionPeerOptions<TInput>,
-        peerOptions
-      )
-  ) as ReturnType<typeof createRuntimePlugin> &
-    IRuntimePluginTyping<TRemote, TProvide, TName, TExpose, TKey>
+  family: object
+): IAdapterDeployment {
+  return new DefinitionDeployment(definition, options, family).deployment()
 }
 
 /** The definition holds only a cold source recipe and its existing shared admission scope. */

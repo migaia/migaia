@@ -1,58 +1,19 @@
 import type { IAbortSignal } from '@migaia/utils/promise'
-import { createRpcError } from '../../core/errors.js'
-import { runtimeReadyEvent, runtimeSupervisorEvent } from './events.js'
+import { deferred } from '@migaia/utils/promise'
+import { createRpcError, RpcCoreErrorCode } from '../../core/errors.js'
 import {
-  definePlugin,
-  type IDefinedPluginConstraint,
   PluginHostError,
   PluginHostErrorCode,
-  getPluginRuntimeIntegration,
   type IPluginRuntimeFeatureSnapshot
 } from '@migaia/plugin-host'
-import { defaultRpcId } from '../../core/internal/id.js'
-import { deferred, hostRethrowReporter } from '@migaia/utils/promise'
-import { IpcReporterContext } from '../../core/plugins/reporter-context.js'
-import { RpcCoreErrorCode } from '../../core/index.js'
-import {
-  createRuntimeOutlet,
-  readRuntimeOutletConnection,
-  readRuntimeOutletEvents,
-  type IRuntimeOutlet,
-  type IRuntimePluginConnection
-} from './outlet.js'
-import { RuntimeApiErrorText, RuntimePluginKey, RuntimePluginExpose } from './constants.js'
-import {
-  createRuntimePeer,
-  readRuntimePeerConnection,
-  readRuntimePeerSessions,
-  type IRuntimePeerOptions,
-  type IRuntimePeer,
-  type IRuntimePeerMethod,
-  type IRuntimePeerProvide,
-  type IRuntimePeerSource
-} from './peer.js'
-import { createRemoteHostControl, type IRemoteHostControlOptions } from '../serve-host.js'
-import { createRemoteLayerError } from '../error.js'
-import { RpcRemoteLayerErrorCode } from '../error-code.js'
-import { RemoteMethodName } from '../constants.js'
-import {
-  compileRuntimeMethods,
-  runtimeModeForDeclaration,
-  registerRuntimePluginMethods,
-  attachCommitGate,
-  type ICommitGate,
-  type IRuntimeForwardMethodEntry,
-  type IRuntimeMethodEntry
-} from './catalog.js'
-import { RuntimeApiMode } from './constants.js'
-import { withRuntimePreparationContext } from './launch-context.js'
-import { readManagedRuntimeHolder } from './managed-peer.js'
-import { readRuntimeDefaultTimeout } from './timeout.js'
-import { createProviderAdmissionScope } from '../../core/features/provider.js'
+import { readRuntimeOutletConnection, type IRuntimePluginConnection } from './outlet.js'
+import { RuntimeApiErrorText, RuntimePluginKey } from './constants.js'
+import type { IRuntimePeerMethod, IRuntimePeerProvide } from './peer.js'
+import { attachCommitGate, type ICommitGate, type IRuntimeForwardMethodEntry } from './catalog.js'
+import { createProviderAdmissionScope } from '../../core/internal/provider-admission.js'
 import { attachProviderPreflight } from '../../core/internal/provider.js'
 import { registerLocalErrorWireSummary } from '../../core/internal/error-wire-metadata.js'
 import { resolveAbortReason } from '../../core/internal/async-control.js'
-import { defaultRpcReporter } from '../../core/default-reporter.js'
 
 /** A private extension uses the original atomic shared-slot owner across both adapter families. */
 const providerAdmissionSlot = Symbol('runtime-provider-admission')
@@ -60,70 +21,25 @@ const providerAdmissionSlot = Symbol('runtime-provider-admission')
 /** One Host logical provider keeps the same shared family identity across physical adapters. */
 const providerAdmissionFamily = Object.freeze({})
 
-/** An actual owner operation reserves only its captured Host slot; key is descriptive data only. */
-type IRuntimePluginSlotResource = Readonly<{
-  key: keyof typeof RuntimePluginKey
-  acquire(
-    integration: import('@migaia/plugin-host').IPluginRuntimeIntegration,
-    create: (
-      slot: import('@migaia/plugin-host').IPluginRuntimeSharedSlot<IRuntimeOutlet>
-    ) => IRuntimeOutlet
-  ): import('@migaia/plugin-host').IPluginRuntimeSharedSlot<IRuntimeOutlet>
-}>
-
-/** Platform factories share this application contract while retaining their original source owner. */
-export type IRuntimePluginOptions<
-  TSpawn = IRuntimePeerSource,
-  TConnect = IRuntimePeerSource,
-  TListen = IRuntimePeerSource
-> = Omit<IRuntimePeerOptions, 'spawn' | 'connect' | 'listen' | 'report'> &
-  Readonly<{
-    /** Missing reporters use console.error for every lifecycle and cleanup diagnostic. */
-    report?: IRuntimePeerOptions['report']
-    /**
-     * Physical spawn source for an owned managed connection; mutually exclusive with
-     * connect/listen.
-     */
-    spawn?: TSpawn
-    /** Physical connect source, mutually exclusive with spawn/listen. */
-    connect?: TConnect
-    /** Physical listener source, mutually exclusive with spawn/connect. */
-    listen?: TListen
-    /** Unique Host connection registration name. */
-    name: string
-    /** Explicit local/forward method whitelist; defaults to no exposed Host methods. */
-    expose?: readonly string[]
-    /** Existing Host-control configuration is used only when host is explicitly exposed. */
-    host?: IRemoteHostControlOptions['host']
-    /** Optional Host-control catalog used only when host is explicitly exposed. */
-    catalog?: IRemoteHostControlOptions['catalog']
-    /** Local synchronous resolver for explicitly exposed Host installation controls. */
-    resolvePlugin?: IRemoteHostControlOptions['resolvePlugin']
-  }>
-
 /** An absent ordinary exposed method keeps the existing runtime whitelist error. */
 function unavailableExposedMethod(): never {
   throw createRpcError(RpcCoreErrorCode.providerNotFound, RuntimeApiErrorText.methodUnavailable)
 }
 
-/** Original catalog serving rejects unavailable or unadopted outputs with the same remote code. */
-function closedCatalogMethod(): never {
-  throw createRemoteLayerError(RpcRemoteLayerErrorCode.closed)
-}
-
-/** The existing Host commit and lifecycle signal settle one shared local Feature admission gate. */
-export function createCommitGate(lifecycle: IAbortSignal): ICommitGate & { open(): void } {
-  /** Fulfilled failure data avoids an unobserved rejection when an install has no held calls. */
-  const completion = deferred<ReturnType<typeof createRpcError> | undefined>()
+/** One original Host commit and lifecycle signal own the admission state shared by held calls. */
+class RuntimeCommitGate implements ICommitGate {
+  /** Fulfilled failure data avoids unobserved rejection when an install has no held calls. */
+  readonly #completion = deferred<ReturnType<typeof createRpcError> | undefined>()
   /** Only the original slot commit opens admission; later generations reuse the open gate. */
-  let open = false
-  /** Rollback retains the actual lifecycle reason rather than the separately thrown install error. */
-  const onAbort = (): void => {
-    /** The canonical wire owner preserves this infrastructure code and its lifecycle cause chain. */
+  #open = false
+  /** The native lifecycle, rather than an install failure wrapper, supplies rollback cause identity. */
+  readonly #lifecycle: IAbortSignal
+  /** Rollback records its original native reason before releasing the same shared completion. */
+  readonly #onAbort = (): void => {
     const failure = createRpcError(
       RpcCoreErrorCode.targetUnknown,
       RuntimeApiErrorText.targetUnknown,
-      resolveAbortReason(lifecycle)
+      resolveAbortReason(this.#lifecycle)
     )
     registerLocalErrorWireSummary(
       failure,
@@ -131,38 +47,46 @@ export function createCommitGate(lifecycle: IAbortSignal): ICommitGate & { open(
       RuntimeApiErrorText.targetUnknown,
       { preserveSerializedError: true }
     )
-    completion.resolve(failure)
+    this.#completion.resolve(failure)
   }
-  if (lifecycle.aborted) onAbort()
-  else lifecycle.addEventListener('abort', onAbort, { once: true })
-  return {
-    isOpen: () => open,
-    /** Commit releases waiters before the original ready event is published. */
-    open(): void {
-      if (lifecycle.aborted) return
-      open = true
-      lifecycle.removeEventListener('abort', onAbort)
-      completion.resolve(undefined)
-    },
-    /** Each waiter owns only its invocation signal listener and preserves its exact abort reason. */
-    wait(signal): Promise<void> {
-      if (signal.aborted) return Promise.reject(resolveAbortReason(signal))
-      return new Promise<void>((resolve, reject) => {
-        /** Cancellation settles this call without affecting other held invocations. */
-        const cancel = (): void => {
-          signal.removeEventListener('abort', cancel)
-          reject(resolveAbortReason(signal))
-        }
-        signal.addEventListener('abort', cancel, { once: true })
-        completion.promise.then((failure) => {
-          signal.removeEventListener('abort', cancel)
-          if (signal.aborted) reject(resolveAbortReason(signal))
-          else if (failure) reject(failure)
-          else resolve()
-        })
+  /** Subscribe once to the actual Host lifetime, retaining its initial already-aborted behavior. */
+  constructor(lifecycle: IAbortSignal) {
+    this.#lifecycle = lifecycle
+    if (lifecycle.aborted) this.#onAbort()
+    else lifecycle.addEventListener('abort', this.#onAbort, { once: true })
+  }
+  /** Availability can be read without materializing any invocation resource. */
+  readonly isOpen = (): boolean => this.#open
+  /** Commit releases the original waiters before publication of the ready event. */
+  readonly open = (): void => {
+    if (this.#lifecycle.aborted) return
+    this.#open = true
+    this.#lifecycle.removeEventListener('abort', this.#onAbort)
+    this.#completion.resolve(undefined)
+  }
+  /** Each natural Promise/abort callback retains only this original invocation's settlement. */
+  readonly wait = (signal: IAbortSignal): Promise<void> => {
+    if (signal.aborted) return Promise.reject(resolveAbortReason(signal))
+    return new Promise<void>((resolve, reject) => {
+      /** Cancellation releases exactly this call's native listener, not other held invocations. */
+      const cancel = (): void => {
+        signal.removeEventListener('abort', cancel)
+        reject(resolveAbortReason(signal))
+      }
+      signal.addEventListener('abort', cancel, { once: true })
+      this.#completion.promise.then((failure) => {
+        signal.removeEventListener('abort', cancel)
+        if (signal.aborted) reject(resolveAbortReason(signal))
+        else if (failure) reject(failure)
+        else resolve()
       })
-    }
+    })
   }
+}
+
+/** Construct the commit boundary consumed by native transport installation and actual methods. */
+export function createCommitGate(lifecycle: IAbortSignal): ICommitGate & { open(): void } {
+  return new RuntimeCommitGate(lifecycle)
 }
 
 /** A cold method whitelist resolves current Feature availability through its original Host owner. */
@@ -317,96 +241,53 @@ export function exposedProvide(
   return Object.freeze(provide)
 }
 
-/**
- * Compile only explicitly exposed catalog methods; the existing control owner retains installation,
- * exact adoption, current output identity and disabled-target authority for every invocation.
- */
-function exposedCatalogMethods(
-  control: ReturnType<typeof createRemoteHostControl>,
-  expose: readonly string[],
-  assertCurrent: () => void
-): readonly IRuntimeMethodEntry[] {
-  /** Whole-plugin and individual-method permissions form one cold union, matching local exposure. */
-  const methods = new Map<string, IRuntimeMethodEntry>()
-  /** Different Features cannot silently share a folded public method. */
-  const owners = new Map<string, string>()
-  for (const path of expose) {
-    /** Catalog exposure uses the same plugin.method spelling as real local Feature exposure. */
-    const separator = path.indexOf('.')
-    /** The normalized catalog owns this Plugin name independently of installation state. */
-    const name = separator < 0 ? path : path.slice(0, separator)
-    /** An explicit selector must match a declared method; whole Plugin exposure is a union. */
-    const selected = separator < 0 ? undefined : path.slice(separator + 1)
-    /** The original control constructor already normalized this exact declaration. */
-    const contract = control.catalog[name]!
-    /** Missing explicit methods fail cold rather than silently shrinking authority. */
-    let found = selected === undefined
-    for (const [feature, definition] of Object.entries(contract.features)) {
-      for (const [key, declaration] of Object.entries(definition.methods)) {
-        if (selected !== undefined && selected !== key) continue
-        /** Folds the Feature segment while retaining the declared method's owner. */
-        const fullName = `${name}.${key}`
-        if (owners.has(fullName) && owners.get(fullName) !== feature)
-          throw createRpcError(
-            RpcCoreErrorCode.capabilityConflict,
-            RuntimeApiErrorText.featureConflict
-          )
-        found = true
-        if (!methods.has(fullName))
-          methods.set(
-            fullName,
-            Object.freeze({
-              name: fullName,
-              receiver: control,
-              declaration,
-              supportedModes: Object.freeze([runtimeModeForDeclaration(declaration.mode)]),
-              method: exposedMethod(
-                () => {
-                  assertCurrent()
-                  return control.liveFeature(name, feature)
-                },
-                key,
-                closedCatalogMethod
-              )
-            })
-          )
-        owners.set(fullName, feature)
-      }
+/** One Host reservation owns staged provider policy until its original slot is committed. */
+class RuntimeProviderAdmissionReservation {
+  /** The original shared slot remains sole provider scope and commit-index owner. */
+  #admission: import('@migaia/plugin-host').IPluginRuntimeSharedSlot<
+    ReturnType<typeof createProviderAdmissionScope>
+  >
+  /** Policy identity is registered before mutation; failed candidates never publish these limits. */
+  #policy: { maxGlobal?: number; maxPerPeer?: number } = {}
+  /** The returned data borrows actual scope/registration ports without copying lifecycle state. */
+  readonly value
+
+  /** Reserve one original shared provider resource and register its cold policy identity. */
+  constructor(integration: import('@migaia/plugin-host').IPluginRuntimeIntegration) {
+    this.#admission = integration.acquireSharedSlot(
+      providerAdmissionSlot,
+      providerAdmissionFamily,
+      () => createProviderAdmissionScope()
+    )
+    this.#admission.register(this.#policy, () =>
+      this.#admission.facade.constrain(this.#policy.maxGlobal, this.#policy.maxPerPeer)
+    )
+    this.value = {
+      providerAdmission: this.#admission.facade,
+      providerAdmissionRegistration: Object.freeze({
+        stagePolicy: this.#stagePolicy,
+        isCommitted: this.#isCommitted
+      })
     }
-    if (!found)
-      throw createRpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.featureInvalid)
   }
-  return Object.freeze([...methods.values()])
+
+  /** Stage only this reservation's original minima before Core reads the actual committed index. */
+  #stagePolicy = (maxGlobal?: number, maxPerPeer?: number): void => {
+    if (maxGlobal !== undefined)
+      this.#policy.maxGlobal = Math.min(this.#policy.maxGlobal ?? maxGlobal, maxGlobal)
+    if (maxPerPeer !== undefined)
+      this.#policy.maxPerPeer = Math.min(this.#policy.maxPerPeer ?? maxPerPeer, maxPerPeer)
+  }
+
+  /** Commit authority comes from exact policy membership in the original shared slot index. */
+  #isCommitted = (): boolean => this.#admission.registered().includes(this.#policy)
 }
 
-/** Borrow the original Host reservation and shared provider owner for every transport installation. */
+/** Borrow the original Host reservation and shared provider owner for each transport installation. */
 export function acquireRuntimeProviderAdmission(
   integration: import('@migaia/plugin-host').IPluginRuntimeIntegration
 ) {
-  const admission = integration.acquireSharedSlot(
-    providerAdmissionSlot,
-    providerAdmissionFamily,
-    () => createProviderAdmissionScope()
-  )
-  /** Policy metadata belongs to this original reservation, so failed candidates never publish it. */
-  const admissionPolicy: { maxGlobal?: number; maxPerPeer?: number } = {}
-  admission.register(admissionPolicy, () =>
-    admission.facade.constrain(admissionPolicy.maxGlobal, admissionPolicy.maxPerPeer)
-  )
-  /** Cold source preparation reads the actual original commit index rather than a readiness flag. */
-  /** Core resolves only this exact quota handle after selecting its real framer. */
-  const providerAdmission = admission.facade
-  /** Stage the original reservation policy before Core asks its real committed index. */
-  const providerAdmissionRegistration = Object.freeze({
-    stagePolicy(maxGlobal?: number, maxPerPeer?: number): void {
-      if (maxGlobal !== undefined)
-        admissionPolicy.maxGlobal = Math.min(admissionPolicy.maxGlobal ?? maxGlobal, maxGlobal)
-      if (maxPerPeer !== undefined)
-        admissionPolicy.maxPerPeer = Math.min(admissionPolicy.maxPerPeer ?? maxPerPeer, maxPerPeer)
-    },
-    isCommitted: () => admission.registered().includes(admissionPolicy)
-  })
-  return { providerAdmission, providerAdmissionRegistration }
+  return new RuntimeProviderAdmissionReservation(integration).value
 }
 
 /** Resolve current connections through the original shared outlets and ambiguity policy. */
@@ -422,283 +303,4 @@ export function resolveRuntimePluginConnection(
     if (current) return current
   }
   return undefined
-}
-
-/**
- * Install one true managed connection through the original install batch and resource scope. Its
- * shared slot remains unpublished until the same commit that publishes this registration.
- */
-export function createRuntimePlugin<TSpawn, TConnect, TListen>(
-  options: IRuntimePluginOptions<TSpawn, TConnect, TListen>,
-  slotResource: IRuntimePluginSlotResource,
-  createPeer: (options: IRuntimePeerOptions) => Promise<IRuntimePeer> = createRuntimePeer
-): IDefinedPluginConstraint<Record<string, never>, never, Record<string, never>> {
-  /** Preserve the original options identity while defaulting all captured diagnostic paths. */
-  const report = options.report ?? defaultRpcReporter
-  /** Invalid defaults fail during cold Plugin construction, before any installation side effects. */
-  const defaultTimeoutMs = readRuntimeDefaultTimeout(options)
-  /** Registration name is copied before installation; caller mutation cannot change publication. */
-  const name = options.name
-  if (typeof name !== 'string' || !name || !Object.hasOwn(RuntimePluginKey, slotResource.key))
-    throw createRpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.pluginNameInvalid)
-  /** The whitelist is snapshotted before physical source effects, and defaults to empty. */
-  const input = options.expose ?? []
-  if (
-    !Array.isArray(input) ||
-    input.some((value) => typeof value !== 'string' || !value) ||
-    new Set(input).size !== input.length
-  )
-    throw createRpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.exposeInvalid)
-  /** The immutable whitelist owns only names, never caller-owned objects or Host fields. */
-  const expose = Object.freeze([...input])
-  /** Own methods share the Peer descriptor builder and compile before source effects. */
-  const ownMethods = compileRuntimeMethods(options.provide)
-  /** Platform source selection and safe identity continue through the same public Peer factory. */
-  const peerOptions: IRuntimePeerOptions = Object.freeze({
-    self: options.self,
-    probe: options.probe,
-    // Only the selected platform factory interprets its original deployment grammar.
-    spawn: options.spawn as IRuntimePeerSource | undefined,
-    connect: options.connect as IRuntimePeerSource | undefined,
-    listen: options.listen as IRuntimePeerSource | undefined,
-    providerLimits: options.providerLimits,
-    authentication: options.authentication,
-    defaultTimeoutMs,
-    contract: options.contract,
-    keyFactory: options.keyFactory,
-    retryPort: options.retryPort,
-    endpointFactory: options.endpointFactory,
-    report
-  })
-  return definePlugin({
-    name,
-    install: async (core) => {
-      /** The actual core is the only provenance accepted by the original integration owner. */
-      const integration = getPluginRuntimeIntegration(core)
-      /**
-       * Original committed slot indexes select a connection across the two physical adapter
-       * families.
-       */
-      const resolve = (target: string): IRuntimePluginConnection | undefined =>
-        resolveRuntimePluginConnection(integration, target)
-      /** This cold union compiles into the existing method table and owns no live connection state. */
-      const forwards = new Map<string, IRuntimeForwardMethodEntry>()
-      /** The original catalog/adopter owner exists before validating explicitly exposed paths. */
-      let control: ReturnType<typeof createRemoteHostControl> | undefined
-      /** Reserved Host operations are additional canonical entries, not an authority bypass. */
-      let controls: readonly IRuntimeMethodEntry[] = []
-      if (expose.includes(RuntimePluginExpose.host)) {
-        if (!options.host || !options.catalog || typeof options.resolvePlugin !== 'function')
-          throw createRpcError(
-            RpcCoreErrorCode.invalidConfig,
-            RuntimeApiErrorText.hostControlInvalid
-          )
-        if (!integration.matchesHost(options.host))
-          throw createRemoteLayerError(RpcRemoteLayerErrorCode.hostNotAdopted)
-        /**
-         * Resolver, install coalescing and adopter records remain in the original Host-control
-         * owner.
-         */
-        control = createRemoteHostControl({
-          host: options.host,
-          catalog: options.catalog,
-          resolvePlugin: options.resolvePlugin,
-          report
-        })
-        /** Reserved callbacks capture this exact immutable adopter owner, never a later binding. */
-        const authority = control
-        /**
-         * Reserved scalar routes preserve original request/one-way registration, without stream
-         * aliases.
-         */
-        controls = [
-          [RemoteMethodName.hostUse, authority.use],
-          [RemoteMethodName.hostUnUse, authority.unUse],
-          [RemoteMethodName.hostInspect, authority.inspect]
-        ].map(([name, operation]) =>
-          Object.freeze({
-            name: name as string,
-            receiver: authority,
-            reserved: true,
-            supportedModes: Object.freeze([RuntimeApiMode.request, RuntimeApiMode.notify]),
-            method: (payload: unknown) => {
-              integration.assertCurrent()
-              return (operation as (data: unknown) => unknown)(payload)
-            }
-          })
-        )
-      }
-      /** Explicit catalog exposure is distinct from ordinary live Feature or connection exposure. */
-      const catalogPaths = control
-        ? expose.filter(
-            (path) =>
-              path !== RuntimePluginExpose.host &&
-              Object.hasOwn(control!.catalog, path.split('.')[0]!)
-          )
-        : []
-      /** One install gate is shared only by compiled local Feature methods, never catalog routes. */
-      const commitGate = createCommitGate(core.lifecycle.signal)
-      /** Ordinary exposure keeps the same true Feature snapshots and forwarding authority. */
-      const provide = exposedProvide(
-        expose.filter(
-          (target) => target !== RuntimePluginExpose.host && !catalogPaths.includes(target)
-        ),
-        (target) => integration.readFeatureOutputs(target),
-        resolve,
-        forwards,
-        integration.nodeId,
-        commitGate
-      )
-      /** The same compiled table holds dynamic catalog methods; no second provider is registered. */
-      const catalogMethods = control
-        ? exposedCatalogMethods(control, catalogPaths, () => integration.assertCurrent())
-        : []
-      registerRuntimePluginMethods(provide, [
-        ...ownMethods,
-        ...controls,
-        ...catalogMethods,
-        ...forwards.values()
-      ])
-      /** Later same-family installs reuse this facade while retaining separate endpoint owners. */
-      /** Each install gets its own reservation; the resource fixes acquisition independently of key. */
-      const slot = slotResource.acquire(integration, (shared) =>
-        createRuntimeOutlet(
-          shared,
-          Object.freeze({ name: integration.identity.name, instanceId: integration.identity.id }),
-          slotResource.key
-        )
-      )
-      /** The same original provider reservation is reused by new host and legacy installations. */
-      const { providerAdmission, providerAdmissionRegistration } =
-        acquireRuntimeProviderAdmission(integration)
-      /**
-       * Automatic bootstrap retains its trusted identity; explicit sources use the original id
-       * owner.
-       */
-      const preparationOptions = {
-        ...peerOptions,
-        self:
-          peerOptions.self ??
-          (peerOptions.spawn || peerOptions.connect || peerOptions.listen
-            ? Object.freeze({ name, instanceId: defaultRpcId() })
-            : undefined),
-        provide
-      }
-      /** Each genuine prepared session contributes one exact receipt through this original slot. */
-      /** Actual listener commits can publish ready after this registration becomes visible. */
-      let publishReady: ((prepared: IRuntimePeer, generation?: number) => void) | undefined
-      const publishPeer = (
-        prepared: IRuntimePeer,
-        routedPeer: IRuntimePeer = prepared,
-        generation?: number
-      ): (() => void) => {
-        const accepted = readRuntimePeerConnection(prepared)
-        const connection: IRuntimePluginConnection = Object.freeze({
-          name,
-          instanceId: accepted.peerId,
-          identity: accepted.description?.self,
-          description: accepted.description,
-          peer: routedPeer,
-          report: accepted.report
-        })
-        const withdraw = slot.contribute(connection, connection.instanceId)
-        publishReady?.(prepared, generation)
-        return withdraw
-      }
-      /** Original scope owns native cleanup before any launcher or cold channel preparation. */
-      const peer = await withRuntimePreparationContext(
-        preparationOptions,
-        {
-          selfDefaulted: peerOptions.self === undefined,
-          host: integration,
-          providerAdmission,
-          providerAdmissionRegistration,
-          initialSignal: core.operation.signal,
-          lifecycleSignal: core.lifecycle.signal,
-          own: (dispose) => core.onDispose(dispose),
-          // Native preparation owns the frozen whitelist; business availability is checked on calls.
-          readProvide: () => provide,
-          publishPeer
-        },
-        () => createPeer(preparationOptions)
-      )
-      /** Managed native resources were already registered before startup; callbacks transfer here. */
-      const holder = readManagedRuntimeHolder(peer)
-      /** The holder owns one canonical registration and coalesces observer/command preparation. */
-      const registration = holder?.registration
-      /** Listener provenance denotes original early scope ownership, even with no ready sessions. */
-      const listenerSource = readRuntimePeerSessions(peer) !== undefined
-      try {
-        if (!registration && !listenerSource) core.onDispose(() => peer.close())
-      } catch (error) {
-        // A late prepared Peer belongs to this attempt even after the original Host scope closed.
-        try {
-          await peer.close()
-        } catch (cleanup) {
-          try {
-            report(cleanup)
-          } catch (reporterError) {
-            hostRethrowReporter(reporterError, IpcReporterContext)
-          }
-        }
-        throw error
-      }
-      /** Metadata and event lifetime remain scoped to this original committed reservation. */
-      const record = Object.freeze({
-        name,
-        peer,
-        execution: registration?.execution,
-        whenReady: holder ? () => holder.prepareRebind(core.lifecycle.signal) : undefined,
-        instanceIds: (): readonly string[] =>
-          registration
-            ? registration.runtimeInstanceIds()
-            : (readRuntimePeerSessions(peer) ?? [peer]).map(
-                (current) => readRuntimePeerConnection(current).peerId
-              )
-      })
-      /** The same actual shared facade owns every passive listener and watch. */
-      const events = readRuntimeOutletEvents(slot.facade)
-      /** Initial accepted readiness is published only after its original Host reservation commits. */
-      const ready = (prepared: IRuntimePeer, generation?: number): void => {
-        if (!slot.registered().includes(record)) return
-        events.publish(
-          runtimeReadyEvent(name, prepared, generation),
-          readRuntimePeerConnection(prepared).report
-        )
-      }
-      publishReady = ready
-      slot.register(record, () => {
-        commitGate.open()
-        if (listenerSource) {
-          for (const session of readRuntimePeerSessions(peer)!) ready(session)
-        } else if (!registration || registration.events.current().active)
-          ready(peer, registration?.events.current().generation)
-      })
-      /** Logical owner close settles idle watch reads even if no native exit can be observed. */
-      const closeEvents = (): void => {
-        if (slot.registered().length === 0) events.close()
-      }
-      core.lifecycle.signal.addEventListener('abort', closeEvents, { once: true })
-      core.onDispose(() => core.lifecycle.signal.removeEventListener('abort', closeEvents))
-      if (registration)
-        core.onDispose(
-          registration.supervisor.subscribe((event) => {
-            if (!slot.registered().includes(record)) return
-            /** The same projector serves standalone Peers without duplicating native event policy. */
-            const observation = runtimeSupervisorEvent(name, registration, event, report)
-            if (observation) events.publish(observation, report)
-          })
-        )
-      /** Accepted remote metadata is read from the genuine Peer, without reflecting local describe. */
-      /** Each actual prepared generation publishes an exact receipt through the canonical slot. */
-      const publish = (prepared: IRuntimePeer, generation?: number): void => {
-        const withdraw = publishPeer(prepared, peer, generation)
-        if (registration && generation !== undefined)
-          registration.events.onLeave(generation, withdraw)
-      }
-      if (!listenerSource) publish(peer, registration?.events.current().generation)
-      if (registration) core.onDispose(registration.onReady(publish))
-      return {}
-    }
-  })
 }

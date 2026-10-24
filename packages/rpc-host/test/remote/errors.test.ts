@@ -67,10 +67,12 @@ describe('remote errors and rollback boundary', () => {
       const before = fixture.sends.length
       closed = true
       notify(reason)
-      await expect(fixture.registration.invokeRequest('p.f.request', [])).rejects.toMatchObject({
-        code: 'REMOTE_CLOSED',
-        cause: reason
-      })
+      expect(() => fixture.registration.invokeRequest('p.f.request', [])).toThrowError(
+        expect.objectContaining({
+          code: 'REMOTE_CLOSED',
+          cause: reason
+        })
+      )
       expect(fixture.sends).toHaveLength(before)
     } finally {
       for (const dispose of fixture.owned.toReversed()) await dispose()
@@ -99,7 +101,7 @@ describe('remote errors and rollback boundary', () => {
   it('preserves a core endpoint-construction error and registers the channel for rollback', async () => {
     const original = new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.schedulerInvalid)
     const fixture = remoteHarness({
-      async endpointFactory() {
+      async prepareRuntime() {
         throw original
       }
     })
@@ -111,13 +113,17 @@ describe('remote errors and rollback boundary', () => {
     expect(fixture.calls.filter((entry) => entry === 'channel.close')).toHaveLength(1)
   })
 
-  it('keeps remote contract failures native and coded', async () => {
+  it('keeps the actual runtime directory rejection coded without dispatching', async () => {
     const fixture = remoteHarness()
     await fixture.registration.prepareGeneration(new AbortController().signal, fixture.own)
-    await expect(fixture.registration.invokeRequest('p.f.absent', [])).rejects.toMatchObject({
-      code: 'REMOTE_CONTRACT_INVALID',
-      name: 'TypeError'
-    })
+    /** The removed contract facade no longer changes the canonical runtime method error. */
+    expect(() => fixture.registration.invokeRequest('p.f.absent', [])).toThrowError(
+      expect.objectContaining({
+        source: 'rpc.endpoint',
+        code: RpcCoreErrorCode.providerNotFound,
+        name: 'RpcError'
+      })
+    )
     expect(fixture.sends).toHaveLength(1)
   })
 })

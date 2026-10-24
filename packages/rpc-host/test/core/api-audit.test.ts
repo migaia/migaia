@@ -1,18 +1,17 @@
+import { createRuntimeEndpointComposition } from '../../dist/core/runtime-api-endpoint.js'
 import { expect, it, vi } from 'vitest'
 import { identityCodec } from '@migaia/serialize/codecs/identity/v1'
 import { messageFramerV1 } from '@migaia/rpc-contract/framing'
 import { RpcCapability } from '@migaia/rpc-contract'
 import { systemScheduler } from '@migaia/utils'
-import {
-  connect,
-  createEndpoint,
-  defineMiddleware,
-  RpcLifecycleError,
-  uuid
-} from '../../dist/core/index.js'
-import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
-import { createRuntimePeer } from '../../dist/remote/index.js'
-import * as root from '../../dist/core/index.js'
+import { connect } from '../../dist/core/middleware/connect.js'
+
+import { defineMiddleware } from '../../dist/core/middleware.js'
+import { RpcLifecycleError } from '../../dist/core/errors.js'
+import { uuid } from '../fixtures/core-role/uuid.js'
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
+import { createRuntimePeer } from '../../dist/remote/runtime-api/peer.js'
+import * as root from '../../dist/index.js'
 
 it('keeps the authentication nonce helper outside the public root', () => {
   expect(root).not.toHaveProperty('createAuthenticationNonce')
@@ -24,20 +23,23 @@ it('releases the operation parent listener when the UUID callback throws synchro
   /** The supported UUID middleware can fail while allocating a task identifier. */
   const original = new Error('audit UUID failed')
   /** A static target prevents unrelated discovery from running before the callback. */
-  const endpoint = await createEndpoint({
-    id: 'uuid-listener',
-    transport: left,
-    targetIds: ['remote'],
-    middlewares: [
-      connect({ transport: left }),
-      uuid({
-        generate(context) {
-          if (context.variation === 'task') throw original
-          return 'initial'
-        }
-      })
-    ]
-  })
+  const endpoint = await createRuntimeEndpointComposition(
+    {
+      id: 'uuid-listener',
+      transport: left,
+      targetIds: ['remote'],
+      middlewares: [
+        connect({ transport: left }),
+        uuid({
+          generate(context) {
+            if (context.variation === 'task') throw original
+            return 'initial'
+          }
+        })
+      ]
+    },
+    { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+  ).installing
   /** Track actual native subscriptions by receiver and listener identity. */
   const active = new Map<EventTarget, Set<unknown>>()
   /** Native delegates retain receiver semantics without mutable call/apply helpers. */
@@ -102,11 +104,14 @@ it('retains independent cleanup failures beside a public lifecycle diagnostic', 
   const [left, right] = createMemoryTransportPair()
   try {
     /** This endpoint owns the middleware cleanup transaction. */
-    const endpoint = await createEndpoint({
-      id: 'audit-cleanup',
-      transport: left,
-      middlewares: [connect({ transport: left }), middleware]
-    })
+    const endpoint = await createRuntimeEndpointComposition(
+      {
+        id: 'audit-cleanup',
+        transport: left,
+        middlewares: [connect({ transport: left }), middleware]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     /** The boundary diagnostic must expose both original leaves in release order. */
     const failure = await endpoint.dispose().catch((error: unknown) => error)
     expect(released).toEqual(['second', 'first'])

@@ -1,15 +1,20 @@
+import { createComposedEndpoint } from '../../dist/core/composed.js'
+import {
+  createRuntimeEndpointComposition,
+  createRuntimeFeatureRoots
+} from '../../dist/core/runtime-api-endpoint.js'
+import { RpcCapability } from '@migaia/rpc-contract'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { createEndpointTimePort } from '../../dist/core/internal/time-port.js'
 import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
-import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
 import { RpcRouteProfile, rpcProtocolV1 } from '@migaia/rpc-contract'
 import { createStringFramer } from '@migaia/rpc-contract/framing'
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
-import { createComposedEndpoint, type IRpcCoreConfig } from '../../dist/core/composed.js'
-import { createClientEndpoint } from '../../dist/core/client.js'
-import { createEndpoint } from '../../dist/core/index.js'
+import { type IRpcCoreConfig } from '../../dist/core/composed.js'
+
 import { defineMiddleware } from '../../dist/core/middleware.js'
 import { abort } from '../../dist/core/middleware/abort.js'
 import { authentication } from '../../dist/core/middleware/authentication.js'
@@ -17,19 +22,13 @@ import { bindAuthenticationReplayContext } from '../../dist/core/internal/authen
 import { RpcAuthenticationEnvelope } from '../../dist/core/middleware/authentication-envelope.js'
 import { codec } from '../../dist/core/middleware/codec.js'
 import { connect } from '../../dist/core/middleware/connect.js'
-import { contract } from '../../dist/core/middleware/contract.js'
+import { contract } from '../fixtures/core-role/contract.js'
 import { hooks } from '../../dist/core/middleware/hooks.js'
 import { ping } from '../../dist/core/middleware/ping.js'
-import { canonicalProtocol as protocol } from '../../dist/core/middleware/canonical-protocol.js'
+import { canonicalProtocol as protocol } from '../fixtures/core-role/canonical-protocol.js'
 import { timeout } from '../../dist/core/middleware/timeout.js'
-import { uuid } from '../../dist/core/middleware/uuid.js'
-import { createProviderEndpoint } from '../../dist/core/provider.js'
-import { createClientFirstPartyRoots } from '../../dist/core/internal/client-first-party-roots.js'
-import { createProviderFirstPartyRoots } from '../../dist/core/internal/provider-first-party-roots.js'
-import {
-  createFirstPartyRoots,
-  type IRpcFirstPartyRootName
-} from '../../dist/core/internal/first-party-roots.js'
+import { uuid } from '../fixtures/core-role/uuid.js'
+
 import type {
   IRpcPluginConstraint,
   IRpcPluginCore
@@ -291,9 +290,102 @@ function productionMiddleware(
   ].filter((middleware): middleware is IRpcPlugin => middleware != null)
 }
 
-async function createProductionBatch(
+/** The exact canonical batch callback carries its admitted claims into fault injection. */
+type IInjectedNativeDefinition = Parameters<
+  NonNullable<Parameters<typeof buildNativePluginBatch>[0]['transformDefinition']>
+>[1]
+
+/** Own the native core temporarily lent to one actual definition fault injection. */
+class InjectedProductionDefinition {
+  /** Original fixture choices decide only the existing injected failure path. */
+  #options: IProductionBatchOptions
+  /** The canonical definition stays the only source of real install behavior. */
+  #definition: IInjectedNativeDefinition
+  /** The native role retains the original injection dispatch key. */
+  #role: IRpcPluginRole
+  /** Each injected invocation lends the original active native core to its legacy observation. */
+  #activeCore: Parameters<IRpcPluginConstraint['install']>[0] | undefined
+  /** The selected injected installer is retained without calling it during definition preparation. */
+  #install: IRpcPluginDescriptor['install'] | undefined
+  /** A pass-through keeps the exact original opaque native definition identity. */
+  readonly value: IInjectedNativeDefinition
+  /** Evaluate the original injection once at native batch construction time. */
+  constructor(
+    options: IProductionBatchOptions,
+    role: IRpcPluginRole,
+    definition: IInjectedNativeDefinition
+  ) {
+    this.#options = options
+    this.#role = role
+    this.#definition = definition
+    if (role.kind === 'middleware') {
+      this.value = definition
+      return
+    }
+    this.#install = options.injectInstall?.(role, this.#originalInstall)
+    this.value =
+      this.#install === undefined || this.#install === this.#originalInstall
+        ? definition
+        : Object.freeze({ ...definition, install: this.#installDefinition })
+  }
+  /** Execute the original native install on the currently lent real core. */
+  #originalInstall: IRpcPluginDescriptor['install'] = async () => {
+    if (!this.#activeCore) throw new Error('native injection core unavailable')
+    return this.#definition.install(this.#activeCore)
+  }
+  /** Run the original injected scope and construction gate, then transfer its exact cleanup. */
+  #installDefinition = async (
+    core: Parameters<IRpcPluginConstraint['install']>[0]
+  ): Promise<Record<string, unknown>> => {
+    this.#activeCore = core
+    const scope: IRpcPluginInstallScope = {
+      id: core.id,
+      transport: core.transport,
+      signal: core.signal,
+      hooks: core.hooks,
+      getPort: core.getPort,
+      own: (resource, release) => {
+        core.onDispose(release)
+        return resource
+      }
+    }
+    /** Preserve the original injected callback's plain receiver. */
+    const install = this.#install!
+    const result = this.#options.injectConstructionGate?.(this.#role)
+      ? await runConstructionInstall(
+          {
+            id: core.id,
+            transport: core.transport,
+            control: core.construction,
+            hooks: core.hooks,
+            getPort: core.getPort,
+            registerScope: (_scope, close, awaitClose) => {
+              core.onDispose(async () => {
+                close()
+                await awaitClose()
+              })
+            }
+          },
+          () => install(scope)
+        )
+      : await install(scope)
+    if (result === null || typeof result !== 'object')
+      throw new RpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.endpointModuleInvalid)
+    const disposer =
+      result !== null && typeof result === 'object'
+        ? Object.getOwnPropertyDescriptor(result, 'dispose')?.value
+        : undefined
+    if (typeof disposer === 'function') core.onDispose(() => disposer())
+    const output: Record<string, unknown> = { ...result }
+    delete output.dispose
+    return output
+  }
+}
+
+/** Allocate the explicit state used by every production batch fixture phase. */
+function productionBatchContext(
   optionsOrInject?: IProductionBatchOptions | IProductionBatchOptions['injectInstall']
-): Promise<IProductionBatch> {
+) {
   const options: IProductionBatchOptions =
     typeof optionsOrInject === 'function'
       ? { injectInstall: optionsOrInject }
@@ -301,27 +393,39 @@ async function createProductionBatch(
   const [baseTransport] = createMemoryTransportPair()
   const stats = { activeSubscriptions: 0, subscribeCalls: 0, dispatches: 0, closeCalls: 0 }
   const trace = options.lifecycleTrace
+  /** Native activation facts stay mutable behind one explicitly passed transaction context. */
+  const state = {
+    prepared: undefined as IPreparedEndpoint<string> | undefined,
+    activated: false,
+    runtimeState: undefined as IRpcComposedRuntimeState | undefined,
+    activationPreflight: undefined as IProductionBatchOptions['onActivationPreflight']
+  }
+  return { options, baseTransport, stats, trace, state }
+}
+
+/** Create the original physical carrier and middleware configuration without opening a second owner. */
+function configureProductionBatch(context: ReturnType<typeof productionBatchContext>) {
   const close = (): void => {
-    stats.closeCalls += 1
-    trace?.push({ kind: 'transport.close', instance: close })
-    if (options.transportCloseError) throw options.transportCloseError
-    baseTransport.close?.()
+    context.stats.closeCalls += 1
+    context.trace?.push({ kind: 'transport.close', instance: close })
+    if (context.options.transportCloseError) throw context.options.transportCloseError
+    context.baseTransport.close?.()
   }
   const transport = {
-    ...baseTransport,
-    ownership: options.transportOwnership,
+    ...context.baseTransport,
+    ownership: context.options.transportOwnership,
     send: (message: unknown) => {
-      stats.dispatches += 1
-      baseTransport.send(message)
+      context.stats.dispatches += 1
+      context.baseTransport.send(message)
     },
     close,
-    subscribe: (listener: Parameters<typeof baseTransport.subscribe>[0]) => {
-      stats.subscribeCalls += 1
-      stats.activeSubscriptions += 1
-      const unsubscribe = baseTransport.subscribe(listener)
+    subscribe: (listener: Parameters<typeof context.baseTransport.subscribe>[0]) => {
+      context.stats.subscribeCalls += 1
+      context.stats.activeSubscriptions += 1
+      const unsubscribe = context.baseTransport.subscribe(listener)
       const tracedUnsubscribe = () => {
-        trace?.push({ kind: 'unsubscribe', instance: tracedUnsubscribe })
-        stats.activeSubscriptions -= 1
+        context.trace?.push({ kind: 'unsubscribe', instance: tracedUnsubscribe })
+        context.stats.activeSubscriptions -= 1
         unsubscribe()
       }
       return tracedUnsubscribe
@@ -330,45 +434,43 @@ async function createProductionBatch(
   const config: IRpcCoreConfig = {
     id: `production-${productionBatchId++}`,
     transport,
-    provider: options.providers,
-    construction: options.construction,
-    framer: options.framer ?? (createStringFramer() as unknown as IRpcCoreConfig['framer']),
+    provider: context.options.providers,
+    construction: context.options.construction,
+    framer: context.options.framer ?? (createStringFramer() as unknown as IRpcCoreConfig['framer']),
     middlewares: productionMiddleware(
       transport,
-      options.omitProtocol ? null : options.protocolMiddleware,
-      options.codecMiddleware ?? codec(defineJsonCodec({ version: 1 })),
-      options.omitContract ? null : options.contractMiddleware,
-      options.omitAuthentication ? null : options.authenticationMiddleware,
-      options.omitConnect ? null : options.connectMiddleware,
-      options.omitAbort ? null : (options.abortMiddleware ?? abort()),
-      options.omitTimeout ? null : (options.timeoutMiddleware ?? timeout()),
-      options.hooksMiddleware ?? hooks(),
-      options.omitPing ? null : (options.pingMiddleware ?? ping()),
-      options.uuidMiddleware ?? uuid()
+      context.options.omitProtocol ? null : context.options.protocolMiddleware,
+      context.options.codecMiddleware ?? codec(defineJsonCodec({ version: 1 })),
+      context.options.omitContract ? null : context.options.contractMiddleware,
+      context.options.omitAuthentication ? null : context.options.authenticationMiddleware,
+      context.options.omitConnect ? null : context.options.connectMiddleware,
+      context.options.omitAbort ? null : (context.options.abortMiddleware ?? abort()),
+      context.options.omitTimeout ? null : (context.options.timeoutMiddleware ?? timeout()),
+      context.options.hooksMiddleware ?? hooks(),
+      context.options.omitPing ? null : (context.options.pingMiddleware ?? ping()),
+      context.options.uuidMiddleware ?? uuid()
     )
   }
-  /** The fixture exercises the same native root record and capability Feature as production. */
-  const roots = createFirstPartyRoots(
-    new Set([
-      'first-party-outbound',
-      'first-party-provider',
-      'first-party-discovery',
-      'first-party-control',
-      'first-party-chunk'
-    ] satisfies readonly IRpcFirstPartyRootName[])
-  )
-  const deferred = (await prepareEndpoint(config, {
+  const { roots } = createRuntimeFeatureRoots(config, {
+    agreement: { capabilities: [RpcCapability.ping] },
+    peerId: ''
+  })
+  return { ...context, close, transport, config, roots }
+}
+
+/** Prepare the actual endpoint bootstrap, kernel and native construction lifetime. */
+async function prepareProductionBatch(context: ReturnType<typeof configureProductionBatch>) {
+  const deferred = (await prepareEndpoint(context.config, {
     deferMiddlewareInstall: true
   })) as IDeferredPreparedEndpoint<string>
-  /** Match core: retain bootstrap's validated transport-method snapshot for the native kernel. */
   const rawKernel = createEndpointKernel(deferred.transport, deferred.transportSnapshot)
   let kernel = rawKernel
-  if (trace) {
+  if (context.trace) {
     const observedKernel = new Proxy(rawKernel, {
       get: (target, key) => {
         if (key === 'completeDispose')
           return () => {
-            trace.push({ kind: 'kernel.completeDispose', instance: observedKernel })
+            context.trace!.push({ kind: 'kernel.completeDispose', instance: observedKernel })
             target.completeDispose()
           }
         const member = Reflect.get(target, key, target)
@@ -383,8 +485,8 @@ async function createProductionBatch(
   }
   const construction = createConstructionControl({
     time: createEndpointTimePort(systemScheduler),
-    signal: (options.construction?.signal ?? new AbortController().signal) as IAbortSignal,
-    timeoutMs: options.construction?.timeoutMs
+    signal: (context.options.construction?.signal ?? new AbortController().signal) as IAbortSignal,
+    timeoutMs: context.options.construction?.timeoutMs
   })
   const hookEvents: IRpcHookEvent[] = []
   const host = createWebRpcPluginHost(
@@ -394,34 +496,34 @@ async function createProductionBatch(
     (event: IRpcHookEvent) => hookEvents.push(event),
     { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   )
-  let prepared: IPreparedEndpoint<string> | undefined
-  let activated = false
-  let runtimeState: IRpcComposedRuntimeState | undefined
-  let activationPreflight:
-    | ((state: IRpcComposedRuntimeState, getPort: (key: PropertyKey) => unknown) => void)
-    | undefined
+  return { ...context, deferred, rawKernel, kernel, construction, hookEvents, host }
+}
+
+/** Build one canonical native capability batch with the original fault-injection observations. */
+function buildProductionBatch(context: Awaited<ReturnType<typeof prepareProductionBatch>>) {
   const capabilityBatch = createEndpointCapabilitiesBatchFeature(
-    roots,
+    context.roots,
     Object.freeze({
-      getKernel: () => kernel,
+      getKernel: () => context.kernel,
       getPrepared: () => {
-        if (!prepared) throw new Error('production batch prepared endpoint missing')
-        return prepared
+        if (!context.state.prepared) throw new Error('production batch prepared endpoint missing')
+        return context.state.prepared
       },
-      transformOutput: options.injectRuntimeOutput
+      transformOutput: context.options.injectRuntimeOutput
         ? (phase, output) =>
-            options.injectRuntimeOutput!(
+            context.options.injectRuntimeOutput!(
               { kind: 'feature', index: 0, key: 'endpoint-capabilities' },
               phase,
               output as IRpcPluginRuntimeOutput
             )
         : undefined,
       transformFeaturePrepare: (name, prepare) =>
-        options.injectInstall?.({ kind: 'feature', index: 0, key: name }, prepare) ?? prepare
+        context.options.injectInstall?.({ kind: 'feature', index: 0, key: name }, prepare) ??
+        prepare
     }),
-    Object.keys(roots).filter((name) => name.startsWith('first-party-')),
-    'first-party-outbound' in roots ? ['first-party-outbound'] : [],
-    Object.keys(roots).filter((name) =>
+    Object.keys(context.roots).filter((name) => name.startsWith('first-party-')),
+    'first-party-outbound' in context.roots ? ['first-party-outbound'] : [],
+    Object.keys(context.roots).filter((name) =>
       [
         'first-party-outbound',
         'first-party-discovery',
@@ -429,12 +531,8 @@ async function createProductionBatch(
         'first-party-provider'
       ].includes(name)
     ),
-    new Set(Object.keys(roots))
+    new Set(Object.keys(context.roots))
   )
-  /**
-   * Native feature definitions stay one typed Host batch; fault injection never creates a side
-   * registry.
-   */
   const featureDefinitions: readonly IRpcNativeFeatureDefinition[] = capabilityBatch.admission
     ? [
         {
@@ -442,101 +540,50 @@ async function createProductionBatch(
           definition: capabilityBatch.plugin.definition,
           admission: capabilityBatch.admission
         },
-        ...(options.additionalNativeFeatures ?? [])
+        ...(context.options.additionalNativeFeatures ?? [])
       ]
     : []
   const nativeBatch = buildNativePluginBatch({
-    kernel,
-    deferred,
-    middlewareSnapshots: deferred.middlewareSnapshots,
-    hookEvents,
+    kernel: context.kernel,
+    deferred: context.deferred,
+    middlewareSnapshots: context.deferred.middlewareSnapshots,
+    hookEvents: context.hookEvents,
     onPrepared: (value) => {
-      prepared = value
+      context.state.prepared = value
     },
     onActivationCommitted: () => {
-      activated = true
+      context.state.activated = true
     },
     onActivationRolledBack: () => {
-      activated = false
+      context.state.activated = false
     },
     onNativeFeatureActivate: () => capabilityBatch.plugin.activate(),
     onActivationPreflight: async (state, getPort) => {
-      const observed = options.injectRuntimeState
-        ? await options.injectRuntimeState({ kind: 'activation' }, state)
+      const observed = context.options.injectRuntimeState
+        ? await context.options.injectRuntimeState({ kind: 'activation' }, state)
         : state
-      runtimeState = observed
-      return activationPreflight?.(observed, getPort)
+      context.state.runtimeState = observed
+      return context.state.activationPreflight?.(observed, getPort)
     },
     transformMiddlewareInstall: (role, install) =>
-      options.injectInstall?.(role, install) ?? install,
+      context.options.injectInstall?.(role, install) ?? install,
     /**
      * Fault injection replaces the real native definition install directly; it never rebuilds a
      * descriptor.
      */
-    transformDefinition: (role, definition) => {
-      if (role.kind === 'middleware') return definition
-      let activeCore: Parameters<typeof definition.install>[0] | undefined
-      const originalInstall: IRpcPluginDescriptor['install'] = async () => {
-        if (!activeCore) throw new Error('native injection core unavailable')
-        return definition.install(activeCore)
-      }
-      const install = options.injectInstall?.(role, originalInstall)
-      /** A pass-through keeps definePlugin's opaque identity and descriptor factory intact. */
-      return install === undefined || install === originalInstall
-        ? definition
-        : Object.freeze({
-            ...definition,
-            install: async (core): Promise<Record<string, unknown>> => {
-              activeCore = core
-              const scope: IRpcPluginInstallScope = {
-                id: core.id,
-                transport: core.transport,
-                signal: core.signal,
-                hooks: core.hooks,
-                getPort: core.getPort,
-                own: (resource, release) => {
-                  core.onDispose(release)
-                  return resource
-                }
-              }
-              const result = options.injectConstructionGate?.(role)
-                ? await runConstructionInstall(
-                    {
-                      id: core.id,
-                      transport: core.transport,
-                      control: core.construction,
-                      hooks: core.hooks,
-                      getPort: core.getPort,
-                      registerScope: (_scope, close, awaitClose) => {
-                        core.onDispose(async () => {
-                          close()
-                          await awaitClose()
-                        })
-                      }
-                    },
-                    () => install(scope)
-                  )
-                : await install(scope)
-              if (result === null || typeof result !== 'object')
-                throw new RpcError(
-                  RpcCoreErrorCode.invalidConfig,
-                  RpcCoreErrorText.endpointModuleInvalid
-                )
-              const disposer =
-                result !== null && typeof result === 'object'
-                  ? Object.getOwnPropertyDescriptor(result, 'dispose')?.value
-                  : undefined
-              if (typeof disposer === 'function') core.onDispose(() => disposer())
-              const output: Record<string, unknown> = { ...result }
-              delete output.dispose
-              return output
-            }
-          })
-    },
+    transformDefinition: (role, definition) =>
+      new InjectedProductionDefinition(context.options, role, definition).value,
     featureDefinitions
   })
-  /** Compatibility-shaped observations point at the native definition; no legacy translation runs. */
-  const inventory = nativeBatch.map(({ role, definition, admission }) => ({
+  return { ...context, capabilityBatch, featureDefinitions, nativeBatch }
+}
+
+/** All projection helpers receive the exact completed native transaction context explicitly. */
+type IProductionBatchContext = ReturnType<typeof buildProductionBatch>
+
+/** Project existing native definitions and activation facts for the unchanged test assertions. */
+function projectProductionBatch(context: IProductionBatchContext): IProductionBatch {
+  const inventory = context.nativeBatch.map(({ role, definition, admission }) => ({
     role,
     descriptor: {
       ...definition,
@@ -552,7 +599,7 @@ async function createProductionBatch(
         : { sharedOptionalConsumes: admission.sharedOptionalConsumes })
     }
   })) as unknown as readonly IProductionNativeEntry[]
-  const descriptors = nativeBatch.map(({ definition, admission }) =>
+  const descriptors = context.nativeBatch.map(({ definition, admission }) =>
     Object.freeze({
       ...definition,
       claims: admission.claims,
@@ -567,35 +614,48 @@ async function createProductionBatch(
         : { sharedOptionalConsumes: admission.sharedOptionalConsumes })
     })
   ) as unknown as IRpcPluginDescriptor[]
-  const claims = nativeBatch.map(({ admission }) => admission.claims)
-  const translated = nativeBatch.map(({ definition }) => ({
+  const claims = context.nativeBatch.map(({ admission }) => admission.claims)
+  const translated = context.nativeBatch.map(({ definition }) => ({
     definition
   })) as IRpcTranslatedPlugin[]
-  if (!options.skipPreflight) {
+  if (!context.options.skipPreflight) {
     try {
-      preflightFeatureClaims(nativeBatch.map(({ admission }) => admission))
+      preflightFeatureClaims(context.nativeBatch.map(({ admission }) => admission))
     } catch (error) {
-      if (!options.omitConnect) throw error
+      if (!context.options.omitConnect) throw error
     }
   }
-  activationPreflight = options.onActivationPreflight
+  context.state.activationPreflight = context.options.onActivationPreflight
   return {
-    host,
-    kernel,
-    transport,
-    construction,
-    hookEvents,
+    host: context.host,
+    kernel: context.kernel,
+    transport: context.transport,
+    construction: context.construction,
+    hookEvents: context.hookEvents,
     inventory,
     descriptors,
-    admissions: nativeBatch.map(({ admission }) => admission),
+    admissions: context.nativeBatch.map(({ admission }) => admission),
     claims,
     translated,
-    getPrepared: () => prepared,
-    getRuntimeState: () => runtimeState,
-    propagateDiscoveryCleanupFaults: capabilityBatch.plugin.propagateDiscoveryCleanupFaults,
-    stats,
-    isActivated: () => activated
+    getPrepared: () => context.state.prepared,
+    getRuntimeState: () => context.state.runtimeState,
+    propagateDiscoveryCleanupFaults: context.capabilityBatch.plugin.propagateDiscoveryCleanupFaults,
+    stats: context.stats,
+    isActivated: () => context.state.activated
   }
+}
+
+/** Run the fixture's actual construction phases with one explicit state owner. */
+async function createProductionBatch(
+  optionsOrInject?: IProductionBatchOptions | IProductionBatchOptions['injectInstall']
+): Promise<IProductionBatch> {
+  return projectProductionBatch(
+    buildProductionBatch(
+      await prepareProductionBatch(
+        configureProductionBatch(productionBatchContext(optionsOrInject))
+      )
+    )
+  )
 }
 
 /** Captures only public Host/lifecycle dimensions used by no-mutation failure rows. */
@@ -871,11 +931,14 @@ describe('atomic middleware and claim contracts', () => {
         expose: () => ({ nativeMiddleware: () => 'ready' })
       }
     })
-    const endpoint = await createEndpoint({
-      id: 'native-2',
-      transport,
-      middlewares: [connect({ transport }), middleware] as const
-    })
+    const endpoint = await createRuntimeEndpointComposition(
+      {
+        id: 'native-2',
+        transport,
+        middlewares: [connect({ transport }), middleware] as const
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     expect(descriptors).toBe(1)
     expect((endpoint as { nativeMiddleware: () => string }).nativeMiddleware()).toBe('ready')
     await endpoint.dispose()
@@ -893,11 +956,14 @@ describe('atomic middleware and claim contracts', () => {
       },
       expose: () => ({ ownedMiddleware: () => 'ready' })
     }))
-    const endpoint = await createEndpoint({
-      id: 'fixture-owned-resource',
-      transport,
-      middlewares: [connect({ transport }), middleware] as const
-    })
+    const endpoint = await createRuntimeEndpointComposition(
+      {
+        id: 'fixture-owned-resource',
+        transport,
+        middlewares: [connect({ transport }), middleware] as const
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     expect((endpoint as { ownedMiddleware: () => string }).ownedMiddleware()).toBe('ready')
     await endpoint.dispose()
     await endpoint.dispose()
@@ -922,11 +988,14 @@ describe('atomic middleware and claim contracts', () => {
         return { extension: { objectNativeMiddleware: () => 'ready' }, ports: {} }
       }
     })
-    const endpoint = await createEndpoint({
-      id: 'object-native',
-      transport,
-      middlewares: [connect({ transport }), middleware] as const
-    })
+    const endpoint = await createRuntimeEndpointComposition(
+      {
+        id: 'object-native',
+        transport,
+        middlewares: [connect({ transport }), middleware] as const
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     expect(installs).toBe(1)
     expect(
       (endpoint as unknown as { objectNativeMiddleware: () => string }).objectNativeMiddleware()
@@ -942,10 +1011,13 @@ describe('atomic middleware and claim contracts', () => {
       name: 'object-transport',
       transport
     })
-    const endpoint = await createEndpoint({
-      id: 'object-transport',
-      middlewares: [middleware] as const
-    })
+    const endpoint = await createRuntimeEndpointComposition(
+      {
+        id: 'object-transport',
+        middlewares: [middleware] as const
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     expect(endpoint).toBeDefined()
     await endpoint.dispose()
   })
@@ -970,11 +1042,14 @@ describe('atomic middleware and claim contracts', () => {
     definition.metadata = {
       claims: { ...emptyClaims, publicKeys: ['mutated'], exposedKeys: ['mutated'] }
     }
-    const endpoint = await createEndpoint({
-      id: 'object-capture',
-      transport,
-      middlewares: [connect({ transport }), middleware] as const
-    })
+    const endpoint = await createRuntimeEndpointComposition(
+      {
+        id: 'object-capture',
+        transport,
+        middlewares: [connect({ transport }), middleware] as const
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     expect(capturedInstalls).toBe(1)
     expect(mutatedInstalls).toBe(0)
     await endpoint.dispose()
@@ -1002,11 +1077,14 @@ describe('atomic middleware and claim contracts', () => {
       }
     })
     await expect(
-      createEndpoint({
-        id: 'object-empty-public',
-        transport,
-        middlewares: [connect({ transport }), middleware] as const
-      })
+      createRuntimeEndpointComposition(
+        {
+          id: 'object-empty-public',
+          transport,
+          middlewares: [connect({ transport }), middleware] as const
+        },
+        { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+      ).installing
     ).rejects.toMatchObject({ code: RpcCoreErrorCode.invalidConfig })
     expect(stats.subscribeCalls).toBe(0)
     expect(releases).toBe(1)
@@ -1034,11 +1112,14 @@ describe('atomic middleware and claim contracts', () => {
       }
     })
     await expect(
-      createEndpoint({
-        id: 'object-empty-shared',
-        transport,
-        middlewares: [connect({ transport }), middleware] as const
-      })
+      createRuntimeEndpointComposition(
+        {
+          id: 'object-empty-shared',
+          transport,
+          middlewares: [connect({ transport }), middleware] as const
+        },
+        { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+      ).installing
     ).rejects.toMatchObject({ code: RpcCoreErrorCode.invalidConfig })
     expect(stats.subscribeCalls).toBe(0)
     expect(releases).toBe(1)
@@ -1057,16 +1138,22 @@ describe('atomic middleware and claim contracts', () => {
           : { secondNativeMiddleware: () => 'second' }
     }))
     const [first, second] = await Promise.all([
-      createEndpoint({
-        id: 'first-4',
-        transport: firstTransport,
-        middlewares: [connect({ transport: firstTransport }), middleware] as const
-      }),
-      createEndpoint({
-        id: 'second-3',
-        transport: secondTransport,
-        middlewares: [connect({ transport: secondTransport }), middleware] as const
-      })
+      createRuntimeEndpointComposition(
+        {
+          id: 'first-4',
+          transport: firstTransport,
+          middlewares: [connect({ transport: firstTransport }), middleware] as const
+        },
+        { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+      ).installing,
+      createRuntimeEndpointComposition(
+        {
+          id: 'second-3',
+          transport: secondTransport,
+          middlewares: [connect({ transport: secondTransport }), middleware] as const
+        },
+        { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+      ).installing
     ])
     expect((first as { firstNativeMiddleware: () => string }).firstNativeMiddleware()).toBe('first')
     expect((second as { secondNativeMiddleware: () => string }).secondNativeMiddleware()).toBe(
@@ -1103,10 +1190,10 @@ describe('atomic middleware and claim contracts', () => {
         }
       }
     })
-    const endpoint = await createComposedEndpoint(
+    const endpoint = await createRuntimeEndpointComposition(
       composedConfig(transport, [connect({ transport }), middleware]),
-      createClientFirstPartyRoots()
-    )
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     expect(reads).toBe(1)
     expect(receiverWasUndefined).toBe(true)
     await endpoint.dispose()
@@ -1128,10 +1215,10 @@ describe('atomic middleware and claim contracts', () => {
         return { extension: {}, ports: {} }
       }
     } as IRpcPlugin
-    const creation = createComposedEndpoint(
+    const creation = createRuntimeEndpointComposition(
       composedConfig(transport, [connect({ transport }), middleware]),
-      createClientFirstPartyRoots()
-    )
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     Object.defineProperty(middleware, 'install', {
       configurable: true,
       value: () => {
@@ -1876,100 +1963,41 @@ describe('atomic middleware and claim contracts', () => {
     }
   )
 
-  it.each(['protocol', 'contract'] as const)(
-    'preserves native %s hostile configuration cause identity and zero residue',
-    async (failedRole) => {
-      const hostile = new Error(`${failedRole} hostile getter`)
-      let primary: unknown
-      const config = new Proxy(
-        {},
-        {
-          get(_target, key) {
-            if (key === (failedRole === 'protocol' ? 'normalize' : 'version')) throw hostile
-            return undefined
-          }
+  it('preserves a selected protocol normalizer failure before any transport subscription', async () => {
+    /** The actual descriptor snapshot owner must retain the original getter failure as its cause. */
+    const hostile = new Error('protocol hostile getter')
+    /** No removed factory pre-reads the descriptor before Core snapshots it. */
+    const descriptor = new Proxy(
+      { id: 'hostile-selected-protocol', version: 1 },
+      {
+        get(target, key, receiver) {
+          if (key === 'normalize') throw hostile
+          return Reflect.get(target, key, receiver)
         }
-      )
-      if (failedRole === 'protocol') {
-        let failure: unknown
-        try {
-          protocol(config as never)
-        } catch (error) {
-          failure = error
-        }
-        expect(failure).toBeInstanceOf(RpcError)
-        expect((failure as { readonly cause?: unknown }).cause).toBe(hostile)
-        let normalizeReads = 0
-        const selectedDescriptor = new Proxy(
-          { id: 'hostile-selected-protocol', version: 1 },
-          {
-            get(target, key, receiver) {
-              if (key === 'normalize') {
-                normalizeReads += 1
-                if (normalizeReads > 1) throw hostile
-                return rpcProtocolV1.normalize
-              }
-              return Reflect.get(target, key, receiver)
-            }
-          }
-        )
-        const selectedProtocol = protocol(selectedDescriptor as never)
-        const [baseTransport] = createMemoryTransportPair()
-        let subscribeCalls = 0
-        const transport = {
-          ...baseTransport,
-          subscribe: (listener: Parameters<typeof baseTransport.subscribe>[0]) => {
-            subscribeCalls += 1
-            return baseTransport.subscribe(listener)
-          }
-        }
-        const constructionFailure = await createComposedEndpoint(
-          {
-            id: 'protocol-hostile-selected-normalize',
-            transport,
-            middlewares: [connect({ transport }), selectedProtocol]
-          },
-          createClientFirstPartyRoots()
-        ).catch((error: unknown) => error)
-        expect(errorChainContains(constructionFailure, hostile)).toBe(true)
-        expect(subscribeCalls).toBe(0)
-        return
       }
-      const batch = await createProductionBatch({
-        protocolMiddleware: undefined,
-        contractMiddleware: failedRole === 'contract' ? contract(config as never) : undefined,
-        injectInstall: (role, install) => {
-          if (role.kind !== 'middleware' || role.name !== failedRole) return install
-          return async (scope) => {
-            try {
-              return await install(scope)
-            } catch (error) {
-              primary = error
-              throw error
-            }
-          }
-        }
-      })
-      let failure: unknown
-      try {
-        await batch.host.installBatch(batch.translated.map(({ definition }) => definition))
-      } catch (error) {
-        failure = error
+    )
+    /** The real memory transport observes that descriptor failure precedes ingress acquisition. */
+    const [baseTransport] = createMemoryTransportPair()
+    let subscribeCalls = 0
+    const transport = {
+      ...baseTransport,
+      subscribe: (listener: Parameters<typeof baseTransport.subscribe>[0]) => {
+        subscribeCalls += 1
+        return baseTransport.subscribe(listener)
       }
-      expect(failure).toMatchObject({
-        code: 'PLUGIN_INSTALL_FAILED',
-        cause: primary,
-        detail: { failedName: failedRole }
-      })
-      expect(primary).toBeInstanceOf(RpcError)
-      expect((primary as { readonly cause?: unknown }).cause).toBe(hostile)
-      expect(errorChainContains(failure, hostile)).toBe(true)
-      expect(batch.stats.subscribeCalls).toBe(0)
-      expect(batch.stats.activeSubscriptions).toBe(0)
-      expect(batch.kernel.state).toBe('disposed')
-      await batch.host.dispose()
     }
-  )
+    const constructionFailure = await createRuntimeEndpointComposition(
+      {
+        id: 'protocol-hostile-selected-normalize',
+        transport,
+        protocol: descriptor as never,
+        middlewares: [connect({ transport })]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing.catch((error: unknown) => error)
+    expect(errorChainContains(constructionFailure, hostile)).toBe(true)
+    expect(subscribeCalls).toBe(0)
+  })
 
   it('releases native protocol resources exactly once on success and failure, and preserves factory disposal identity', async () => {
     let successfulReleases = 0
@@ -2021,11 +2049,14 @@ describe('atomic middleware and claim contracts', () => {
     expect(failed.stats.activeSubscriptions).toBe(0)
 
     const [transport] = createMemoryTransportPair()
-    const endpoint = await createEndpoint({
-      id: 'native-factory-equivalence',
-      transport,
-      middlewares: [protocol(), contract(), connect({ transport })]
-    })
+    const endpoint = await createRuntimeEndpointComposition(
+      {
+        id: 'native-factory-equivalence',
+        transport,
+        middlewares: [protocol(), contract(), connect({ transport })]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     const endpointDispose = endpoint.dispose()
     expect(endpoint.dispose()).toBe(endpointDispose)
     await endpointDispose
@@ -2193,11 +2224,14 @@ describe('atomic middleware and claim contracts', () => {
         endpointTransport.close?.()
       }
     }
-    const endpoint = await createEndpoint({
-      id: 'b12b02-native-equivalence',
-      transport: ownedTransport,
-      middlewares: [authenticationMiddleware, connect({ transport: ownedTransport })]
-    })
+    const endpoint = await createRuntimeEndpointComposition(
+      {
+        id: 'b12b02-native-equivalence',
+        transport: ownedTransport,
+        middlewares: [authenticationMiddleware, connect({ transport: ownedTransport })]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     const firstDispose = endpoint.dispose()
     expect(endpoint.dispose()).toBe(firstDispose)
     await firstDispose
@@ -2585,19 +2619,22 @@ describe('atomic middleware and claim contracts', () => {
         baseTransport.close?.()
       }
     }
-    const endpoint = await createEndpoint({
-      id: 'b12b02-endpoint',
-      transport,
-      middlewares: [
-        authentication({
-          encrypt: (value) => value,
-          decrypt: (value) => value,
-          sign: (value) => value,
-          verify: (value) => value
-        }),
-        connect({ transport })
-      ]
-    })
+    const endpoint = await createRuntimeEndpointComposition(
+      {
+        id: 'b12b02-endpoint',
+        transport,
+        middlewares: [
+          authentication({
+            encrypt: (value) => value,
+            decrypt: (value) => value,
+            sign: (value) => value,
+            verify: (value) => value
+          }),
+          connect({ transport })
+        ]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     const firstDispose = endpoint.dispose()
     expect(endpoint.dispose()).toBe(firstDispose)
     await firstDispose
@@ -3167,10 +3204,12 @@ describe('atomic middleware and claim contracts', () => {
     const kernelSource = source('../../src/core/endpoint-kernel.ts')
     expect((kernelSource.match(/#resources\.add\('transport close'/g) ?? []).length).toBe(1)
     expect(coreSource).toMatch(
-      /if \(host\)[\s\S]*?await host\.dispose\(\)[\s\S]*?\} else if \(kernel\)[\s\S]*?\} else \{[\s\S]*?deferred\.transport\.close/
+      /if \(this\.#host\)[\s\S]*?await this\.#host!\.dispose\(\)[\s\S]*?\} else if \(this\.#kernel\)[\s\S]*?\} else \{[\s\S]*?this\.#deferred\.transport\.close/
     )
     expect(bootstrapSource).not.toContain('transport.close')
-    const hostCleanupBranch = coreSource.match(/if \(host\) \{[\s\S]*?\} else if \(kernel\)/)?.[0]
+    const hostCleanupBranch = coreSource.match(
+      /if \(this\.#host\) \{[\s\S]*?\} else if \(this\.#kernel\)/
+    )?.[0]
     expect(hostCleanupBranch).toBeDefined()
     expect(hostCleanupBranch).not.toMatch(/transport\.close/)
   })
@@ -3299,11 +3338,14 @@ describe('atomic middleware and claim contracts', () => {
     }
     const middleware = timeout(config)
     expect(reads).toBe(0)
-    const endpoint = await createEndpoint({
-      id: 'b12b03-timeout-getter',
-      transport,
-      middlewares: [connect({ transport }), middleware]
-    })
+    const endpoint = await createRuntimeEndpointComposition(
+      {
+        id: 'b12b03-timeout-getter',
+        transport,
+        middlewares: [connect({ transport }), middleware]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     expect(reads).toBe(1)
     await endpoint.dispose()
   })
@@ -3346,11 +3388,14 @@ describe('atomic middleware and claim contracts', () => {
     }
     const middleware = timeout(config)
     expect(reads).toEqual([])
-    const endpoint = await createEndpoint({
-      id: 'b12b03-timeout-fields',
-      transport,
-      middlewares: [connect({ transport }), middleware]
-    })
+    const endpoint = await createRuntimeEndpointComposition(
+      {
+        id: 'b12b03-timeout-fields',
+        transport,
+        middlewares: [connect({ transport }), middleware]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     expect(timeoutReceiver).toBe(true)
     expect(reads).toEqual(['timeoutMs'])
     await endpoint.dispose()
@@ -3450,11 +3495,14 @@ describe('atomic middleware and claim contracts', () => {
     }
     const middleware = timeout(config)
     expect(reads).toBe(0)
-    const endpointPromise = createEndpoint({
-      id: 'b12b03-hostile-timeout',
-      transport,
-      middlewares: [connect({ transport }), middleware]
-    })
+    const endpointPromise = createRuntimeEndpointComposition(
+      {
+        id: 'b12b03-hostile-timeout',
+        transport,
+        middlewares: [connect({ transport }), middleware]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     expect(reads).toBe(0)
     await expect(endpointPromise).rejects.toMatchObject({ code: 'INVALID_CONFIG', cause: hostile })
     expect(reads).toBe(1)
@@ -3565,7 +3613,7 @@ describe('atomic middleware and claim contracts', () => {
 
   it('composed operation abort preserves exact caller reason and terminal residue', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
-    const server = await createComposedEndpoint(
+    const server = await createRuntimeEndpointComposition(
       {
         id: 'b12b03-server',
         transport: serverTransport,
@@ -3574,17 +3622,17 @@ describe('atomic middleware and claim contracts', () => {
         },
         middlewares: [connect({ transport: serverTransport }), protocol(), abort(), timeout()]
       },
-      createProviderFirstPartyRoots()
-    )
-    const client = await createComposedEndpoint(
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
+    const client = await createRuntimeEndpointComposition(
       {
         id: 'b12b03-client',
         targetIds: ['b12b03-server'],
         transport: clientTransport,
         middlewares: [connect({ transport: clientTransport }), protocol(), abort(), timeout()]
       },
-      createClientFirstPartyRoots()
-    )
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     const controller = new AbortController()
     const reason = new DOMException('operation abort', 'AbortError')
     const pending = readProjectedSend(client)('b12b03-server', 'hang', null, {
@@ -4172,7 +4220,7 @@ describe('atomic middleware and claim contracts', () => {
     const providerStarted = new Promise<void>((resolve) => {
       providerStartedResolve = resolve
     })
-    const server = await createComposedEndpoint(
+    const server = await createRuntimeEndpointComposition(
       {
         id: 'b12b03-server',
         transport: serverTransport,
@@ -4185,17 +4233,17 @@ describe('atomic middleware and claim contracts', () => {
         },
         middlewares: [connect({ transport: serverTransport }), protocol(), abort(), timeout()]
       },
-      createProviderFirstPartyRoots()
-    )
-    const client = await createComposedEndpoint(
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
+    const client = await createRuntimeEndpointComposition(
       {
         id: 'b12b03-client',
         targetIds: ['b12b03-server'],
         transport: clientTransport,
         middlewares: [connect({ transport: clientTransport }), protocol(), abort(), timeout()]
       },
-      createClientFirstPartyRoots()
-    )
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     const controller = new AbortController()
     const reason = new DOMException('timeout race caller abort', 'AbortError')
     const pending = readProjectedSend(client)('b12b03-server', 'hang', null, {
@@ -4227,7 +4275,7 @@ describe('atomic middleware and claim contracts', () => {
     const providerStarted = new Promise<void>((resolve) => {
       providerStartedResolve = resolve
     })
-    const server = await createComposedEndpoint(
+    const server = await createRuntimeEndpointComposition(
       {
         id: 'b12b03-timeout-server',
         transport: serverTransport,
@@ -4240,17 +4288,17 @@ describe('atomic middleware and claim contracts', () => {
         },
         middlewares: [connect({ transport: serverTransport }), protocol(), abort(), timeout()]
       },
-      createProviderFirstPartyRoots()
-    )
-    const client = await createComposedEndpoint(
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
+    const client = await createRuntimeEndpointComposition(
       {
         id: 'b12b03-timeout-client',
         targetIds: ['b12b03-timeout-server'],
         transport: clientTransport,
         middlewares: [connect({ transport: clientTransport }), protocol(), abort(), timeout()]
       },
-      createClientFirstPartyRoots()
-    )
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     const controller = new AbortController()
     const reason = new DOMException('late caller abort', 'AbortError')
     const pending = readProjectedSend(client)('b12b03-timeout-server', 'hang', null, {
@@ -4286,7 +4334,7 @@ describe('atomic middleware and claim contracts', () => {
       providerStartedResolve = resolve
     })
     let releaseReject!: () => void
-    const server = await createComposedEndpoint(
+    const server = await createRuntimeEndpointComposition(
       {
         id: 'b12b03-late-reject-server',
         transport: serverTransport,
@@ -4307,17 +4355,17 @@ describe('atomic middleware and claim contracts', () => {
           hooks({ onHookError: (error) => reports.push(error) })
         ]
       },
-      createProviderFirstPartyRoots()
-    )
-    const client = await createComposedEndpoint(
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
+    const client = await createRuntimeEndpointComposition(
       {
         id: 'b12b03-late-reject-client',
         targetIds: ['b12b03-late-reject-server'],
         transport: clientTransport,
         middlewares: [connect({ transport: clientTransport }), protocol(), abort(), timeout()]
       },
-      createClientFirstPartyRoots()
-    )
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     /** Captures the active server's idle root and operation-observer baseline before send. */
     const idleServer = readEndpointDebugSnapshot(server)
     expect(idleServer).toBeDefined()
@@ -4472,7 +4520,7 @@ describe('atomic middleware and claim contracts', () => {
     ])
   })
 
-  it.each(['hooks', 'ping', 'uuid'] as const)(
+  it.each(['hooks', 'ping'] as const)(
     'owning %s file has no legacy registry write and is a native plugin',
     (role) => {
       const source = readFileSync(
@@ -5170,18 +5218,10 @@ describe('atomic middleware and claim contracts', () => {
         abort(),
         timeout()
       ]
-      const endpoint = await createComposedEndpoint(
+      const endpoint = await createRuntimeEndpointComposition(
         { id: `t89-${role}`, transport, middlewares: middleware },
-        createFirstPartyRoots(
-          new Set<IRpcFirstPartyRootName>([
-            'first-party-chunk',
-            'first-party-outbound',
-            'first-party-provider',
-            'first-party-discovery',
-            'first-party-control'
-          ])
-        )
-      )
+        { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+      ).installing
       expect(nativeInstallCalls).toBe(1)
       expect(consumerInstallCalls).toBe(1)
       expect(nativeInstallation).toBeDefined()
@@ -5478,21 +5518,27 @@ describe('outbound feature production-seam matrix', () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
     const sourceTargetIds = ['snapshot-server']
     let targetReads = 0
-    const server = await createProviderEndpoint({
-      id: 'snapshot-server',
-      transport: serverTransport,
-      middlewares: [connect({ transport: serverTransport })],
-      provider: { echo: (context) => context.success(context.data) }
-    })
-    const client = await createClientEndpoint({
-      id: 'snapshot-client',
-      transport: clientTransport,
-      middlewares: [connect({ transport: clientTransport })],
-      get targetIds(): readonly string[] {
-        targetReads += 1
-        return sourceTargetIds
-      }
-    } as never)
+    const server = await createRuntimeEndpointComposition(
+      {
+        id: 'snapshot-server',
+        transport: serverTransport,
+        middlewares: [connect({ transport: serverTransport })],
+        provider: { echo: (context) => context.success(context.data) }
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'snapshot-client',
+        transport: clientTransport,
+        middlewares: [connect({ transport: clientTransport })],
+        get targetIds(): readonly string[] {
+          targetReads += 1
+          return sourceTargetIds
+        }
+      } as never,
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     try {
       sourceTargetIds[0] = 'mutated-after-endpoint-snapshot'
       expect(targetReads).toBe(1)
@@ -5516,9 +5562,14 @@ describe('outbound feature production-seam matrix', () => {
         throw hostile
       }
     }
-    const failure = await createClientEndpoint(configuration as never).catch(
-      (error: unknown) => error
+    /** Native root construction stays independent of the hostile configuration getter. */
+    const { roots } = createRuntimeFeatureRoots(
+      { id: 'getter-outbound-roots', middlewares: [] },
+      { agreement: { capabilities: [] }, peerId: '' }
     )
+    const failure = await createComposedEndpoint(configuration as never, {
+      'first-party-outbound': roots['first-party-outbound']
+    }).catch((error: unknown) => error)
     expect(failure).toMatchObject({
       source: RPC_CORE_ERROR_SOURCE,
       code: RpcCoreErrorCode.invalidConfig,
@@ -5540,32 +5591,38 @@ describe('outbound feature production-seam matrix', () => {
     }
     const nativeFramer = createStringFramer({ chunkBytes: 2 })
     const codec = defineJsonCodec({ version: 1 })
-    const rejected = await createClientEndpoint({
-      id: 'wp2-native-rejected',
-      transport,
-      framer: nativeFramer,
-      codec,
-      middlewares: [connect({ transport })]
-    } as never).catch((error: unknown) => error)
+    const rejected = await createRuntimeEndpointComposition(
+      {
+        id: 'wp2-native-rejected',
+        transport,
+        framer: nativeFramer,
+        codec,
+        middlewares: [connect({ transport })]
+      } as never,
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing.catch((error: unknown) => error)
     expect(rejected).toMatchObject({ code: RpcCoreErrorCode.invalidConfig })
     expect(subscribeCalls).toBe(0)
 
-    const client = await createClientEndpoint({
-      id: 'wp2-native-authenticated',
-      transport,
-      framer: nativeFramer,
-      codec,
-      middlewares: [
-        connect({ transport }),
-        authentication({
-          encrypt: (value) => String(value),
-          decrypt: (value) => value,
-          sign: (value) => value,
-          verify: (value) => value,
-          encodedType: 'string'
-        })
-      ]
-    } as never)
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'wp2-native-authenticated',
+        transport,
+        framer: nativeFramer,
+        codec,
+        middlewares: [
+          connect({ transport }),
+          authentication({
+            encrypt: (value) => String(value),
+            decrypt: (value) => value,
+            sign: (value) => value,
+            verify: (value) => value,
+            encodedType: 'string'
+          })
+        ]
+      } as never,
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     try {
       expect(subscribeCalls).toBe(1)
     } finally {
@@ -5622,11 +5679,14 @@ describe('outbound feature production-seam matrix', () => {
         ]
       }
     ]) {
-      const failure = await createClientEndpoint({
-        id: `wp2-unknown-${subscriptions}`,
-        transport,
-        ...config
-      } as never).catch((error: unknown) => error)
+      const failure = await createRuntimeEndpointComposition(
+        {
+          id: `wp2-unknown-${subscriptions}`,
+          transport,
+          ...config
+        } as never,
+        { agreement: { capabilities: [] }, peerId: '' }
+      ).installing.catch((error: unknown) => error)
       expect(failure).toMatchObject({ code: RpcCoreErrorCode.invalidConfig })
       expect(subscriptions).toBe(0)
     }
@@ -5654,21 +5714,24 @@ describe('outbound feature production-seam matrix', () => {
       }
     }
     const events: IRpcHookEvent[] = []
-    const client = await createClientEndpoint({
-      id: 'wp2-transport-shadow',
-      transport: winner,
-      middlewares: [
-        connect({ transport: shadowed }),
-        hooks({
-          listeners: [
-            (event) => {
-              events.push(event)
-              order.push(event.name)
-            }
-          ]
-        })
-      ]
-    } as never)
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'wp2-transport-shadow',
+        transport: winner,
+        middlewares: [
+          connect({ transport: shadowed }),
+          hooks({
+            listeners: [
+              (event) => {
+                events.push(event)
+                order.push(event.name)
+              }
+            ]
+          })
+        ]
+      } as never,
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     try {
       const shadows = events.filter((value) => value.name === 'component-shadowed')
       const event = shadows[0]
@@ -5735,23 +5798,26 @@ describe('outbound feature production-seam matrix', () => {
       codec: defineJsonCodec({ version: 2 }),
       framer
     }
-    const endpoint = await createClientEndpoint({
-      id: 'wp2-getters',
-      transport,
-      protocol: countedProtocol,
-      codec: countedCodec,
-      framer: countedFramer,
-      middlewares: [
-        componentPlugin,
-        hooks({
-          listeners: [
-            (event) => {
-              events.push(event)
-            }
-          ]
-        })
-      ]
-    } as never)
+    const endpoint = await createRuntimeEndpointComposition(
+      {
+        id: 'wp2-getters',
+        transport,
+        protocol: countedProtocol,
+        codec: countedCodec,
+        framer: countedFramer,
+        middlewares: [
+          componentPlugin,
+          hooks({
+            listeners: [
+              (event) => {
+                events.push(event)
+              }
+            ]
+          })
+        ]
+      } as never,
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     try {
       expect(frameCalls).toBe(0)
       expect(acceptCalls).toBe(0)
@@ -5880,14 +5946,17 @@ describe('outbound feature production-seam matrix', () => {
           return baseTransport.subscribe(listener)
         }
       }
-      const failure = await createClientEndpoint({
-        id: 'wp2-invalid-descriptor',
-        transport,
-        protocol: component === 'protocol' ? descriptor : rpcProtocolV1,
-        codec: component === 'codec' ? descriptor : defineJsonCodec({ version: 1 }),
-        framer: component === 'framer' ? descriptor : createStringFramer(),
-        middlewares: [connect({ transport })]
-      } as never).catch((error: unknown) => error)
+      const failure = await createRuntimeEndpointComposition(
+        {
+          id: 'wp2-invalid-descriptor',
+          transport,
+          protocol: component === 'protocol' ? descriptor : rpcProtocolV1,
+          codec: component === 'codec' ? descriptor : defineJsonCodec({ version: 1 }),
+          framer: component === 'framer' ? descriptor : createStringFramer(),
+          middlewares: [connect({ transport })]
+        } as never,
+        { agreement: { capabilities: [] }, peerId: '' }
+      ).installing.catch((error: unknown) => error)
       expect(failure).toMatchObject({ code: RpcCoreErrorCode.invalidConfig })
       expect(subscriptions).toBe(0)
       if (cause !== undefined) expect(errorChainContains(failure, cause)).toBe(true)
@@ -5912,11 +5981,14 @@ describe('outbound feature production-seam matrix', () => {
         }
       }
     ) as typeof baseTransport
-    const endpoint = await createClientEndpoint({
-      id: 'wp2-transport-getters',
-      transport,
-      middlewares: [connect({ transport: baseTransport })]
-    } as never)
+    const endpoint = await createRuntimeEndpointComposition(
+      {
+        id: 'wp2-transport-getters',
+        transport,
+        middlewares: [connect({ transport: baseTransport })]
+      } as never,
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     try {
       expect(subscriptions).toBe(1)
       for (const field of ['platform', 'encodedType', 'ownership']) expect(reads.get(field)).toBe(1)
@@ -5946,11 +6018,14 @@ describe('outbound feature production-seam matrix', () => {
     }
     const [pluginTransport] = createMemoryTransportPair()
     const transport = new PrivateReceiverTransport()
-    const endpoint = await createClientEndpoint({
-      id: 'wp2-transport-private-receiver',
-      transport,
-      middlewares: [connect({ transport: pluginTransport })]
-    } as never)
+    const endpoint = await createRuntimeEndpointComposition(
+      {
+        id: 'wp2-transport-private-receiver',
+        transport,
+        middlewares: [connect({ transport: pluginTransport })]
+      } as never,
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     try {
       expect(transport.subscriptions).toBe(1)
     } finally {
@@ -5977,40 +6052,52 @@ describe('outbound feature production-seam matrix', () => {
         return secondBase.subscribe(listener)
       }
     }
-    const failure = await createClientEndpoint({
-      id: 'wp2-duplicate-transport',
-      middlewares: [
-        { ...connect({ transport: first }), name: 'wp2-connect-first' },
-        { ...connect({ transport: second }), name: 'wp2-connect-second' }
-      ]
-    } as never).catch((error: unknown) => error)
+    const failure = await createRuntimeEndpointComposition(
+      {
+        id: 'wp2-duplicate-transport',
+        middlewares: [
+          { ...connect({ transport: first }), name: 'wp2-connect-first' },
+          { ...connect({ transport: second }), name: 'wp2-connect-second' }
+        ]
+      } as never,
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing.catch((error: unknown) => error)
     expect(failure).toMatchObject({ code: RpcCoreErrorCode.capabilityConflict })
     expect(firstSubscriptions).toBe(0)
     expect(secondSubscriptions).toBe(0)
   })
 
   it('rejects a missing transport before Host construction', async () => {
-    const failure = await createClientEndpoint({
-      id: 'wp2-missing-transport',
-      middlewares: [connect()]
-    } as never).catch((error: unknown) => error)
+    const failure = await createRuntimeEndpointComposition(
+      {
+        id: 'wp2-missing-transport',
+        middlewares: [connect()]
+      } as never,
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing.catch((error: unknown) => error)
     expect(failure).toMatchObject({ code: RpcCoreErrorCode.invalidConfig })
   })
 
   it('real outbound send and RPC fanout preserve canonical results', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
-    const server = await createProviderEndpoint({
-      id: 'rpc-server',
-      transport: serverTransport,
-      middlewares: [connect({ transport: serverTransport })],
-      provider: { echo: (context) => context.success(context.data) }
-    })
-    const client = await createClientEndpoint({
-      id: 'rpc-client',
-      transport: clientTransport,
-      targetIds: ['rpc-server'],
-      middlewares: [connect({ transport: clientTransport })]
-    })
+    const server = await createRuntimeEndpointComposition(
+      {
+        id: 'rpc-server',
+        transport: serverTransport,
+        middlewares: [connect({ transport: serverTransport })],
+        provider: { echo: (context) => context.success(context.data) }
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'rpc-client',
+        transport: clientTransport,
+        targetIds: ['rpc-server'],
+        middlewares: [connect({ transport: clientTransport })]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     try {
       await expect(client.send('rpc-server', 'echo', 'value')).resolves.toBe('value')
       const fanout = await client.sendAll('echo', 'fanout')
@@ -6023,11 +6110,14 @@ describe('outbound feature production-seam matrix', () => {
 
   it('outbound dispose is host-owned, idempotent, and rejects later sends canonically', async () => {
     const [transport] = createMemoryTransportPair()
-    const client = await createClientEndpoint({
-      id: 'dispose-client',
-      transport,
-      middlewares: [connect({ transport })]
-    })
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'dispose-client',
+        transport,
+        middlewares: [connect({ transport })]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     const first = client.dispose()
     expect(client.dispose()).toBe(first)
     await first
@@ -6196,11 +6286,14 @@ describe('outbound feature production-seam matrix', () => {
         .mockImplementation(() => {
           return Promise.reject(endpointOutboundFailure)
         })
-      const endpoint = await createClientEndpoint({
-        id: 'outbound-disposal-endpoint',
-        transport: endpointTransport,
-        middlewares: [connect({ transport: endpointTransport })]
-      })
+      const endpoint = await createRuntimeEndpointComposition(
+        {
+          id: 'outbound-disposal-endpoint',
+          transport: endpointTransport,
+          middlewares: [connect({ transport: endpointTransport })]
+        },
+        { agreement: { capabilities: [] }, peerId: '' }
+      ).installing
       const endpointDispose = endpoint.dispose()
       endpointDisposePromiseWasStable = endpoint.dispose() === endpointDispose
       try {
@@ -6262,18 +6355,24 @@ describe('outbound feature production-seam matrix', () => {
 
   it('supporting endpoint seam: send/RPC retains endpoint and disposal Promise identity', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
-    const server = await createProviderEndpoint({
-      id: 'store-worker-rpc-server',
-      transport: serverTransport,
-      middlewares: [connect({ transport: serverTransport })],
-      provider: { echo: (context) => context.success(context.data) }
-    })
-    const client = await createClientEndpoint({
-      id: 'store-worker-rpc-client',
-      transport: clientTransport,
-      targetIds: ['store-worker-rpc-server'],
-      middlewares: [connect({ transport: clientTransport })]
-    })
+    const server = await createRuntimeEndpointComposition(
+      {
+        id: 'store-worker-rpc-server',
+        transport: serverTransport,
+        middlewares: [connect({ transport: serverTransport })],
+        provider: { echo: (context) => context.success(context.data) }
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'store-worker-rpc-client',
+        transport: clientTransport,
+        targetIds: ['store-worker-rpc-server'],
+        middlewares: [connect({ transport: clientTransport })]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     try {
       await expect(client.send('store-worker-rpc-server', 'echo', 'consumer')).resolves.toBe(
         'consumer'
@@ -6288,11 +6387,14 @@ describe('outbound feature production-seam matrix', () => {
 
   it('caller cancellation preserves native cause and clears outbound pending state', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
-    const server = await createProviderEndpoint({
-      id: 'cancel-rpc-server',
-      transport: serverTransport,
-      middlewares: [connect({ transport: serverTransport }), abort()]
-    })
+    const server = await createRuntimeEndpointComposition(
+      {
+        id: 'cancel-rpc-server',
+        transport: serverTransport,
+        middlewares: [connect({ transport: serverTransport }), abort()]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     server.provide(
       'hang',
       (context) =>
@@ -6306,11 +6408,14 @@ describe('outbound feature production-seam matrix', () => {
           )
         })
     )
-    const client = await createClientEndpoint({
-      id: 'cancel-rpc-client',
-      transport: clientTransport,
-      middlewares: [connect({ transport: clientTransport }), abort()]
-    })
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'cancel-rpc-client',
+        transport: clientTransport,
+        middlewares: [connect({ transport: clientTransport }), abort()]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     const controller = new AbortController()
     const reason = new DOMException('outbound cancellation', 'AbortError')
     try {
@@ -6337,33 +6442,36 @@ describe('outbound feature production-seam matrix', () => {
         return baseTransport.send(message, options)
       }
     }
-    const client = await createClientEndpoint({
-      id: 'order-client',
-      transport,
-      middlewares: [
-        codec({
-          ...defineJsonCodec({ version: 1 }),
-          encode: (value) => {
-            events.push('encode')
-            return JSON.stringify(value)
-          }
-        }),
-        protocol(),
-        authentication({
-          encrypt: (value) => {
-            events.push('encrypt')
-            return value
-          },
-          decrypt: (value) => value,
-          sign: (value) => {
-            events.push('sign')
-            return value
-          },
-          verify: (value) => value
-        }),
-        connect({ transport })
-      ]
-    })
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'order-client',
+        transport,
+        middlewares: [
+          codec({
+            ...defineJsonCodec({ version: 1 }),
+            encode: (value) => {
+              events.push('encode')
+              return JSON.stringify(value)
+            }
+          }),
+          protocol(),
+          authentication({
+            encrypt: (value) => {
+              events.push('encrypt')
+              return value
+            },
+            decrypt: (value) => value,
+            sign: (value) => {
+              events.push('sign')
+              return value
+            },
+            verify: (value) => value
+          }),
+          connect({ transport })
+        ]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     try {
       client.dispatch('order-target', 'order-method', 'order-data')
       await vi.waitFor(() => expect(events).toEqual(['encode', 'encrypt', 'sign', 'transport']))
@@ -6375,21 +6483,24 @@ describe('outbound feature production-seam matrix', () => {
   it('hostile outbound authentication preserves native source/code/cause identity', async () => {
     const [transport] = createMemoryTransportPair()
     const hostile = new Error('outbound encrypt failed')
-    const client = await createClientEndpoint({
-      id: 'hostile-auth-client',
-      transport,
-      middlewares: [
-        authentication({
-          encrypt: () => {
-            throw hostile
-          },
-          decrypt: (value) => value,
-          sign: (value) => value,
-          verify: (value) => value
-        }),
-        connect({ transport })
-      ]
-    })
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'hostile-auth-client',
+        transport,
+        middlewares: [
+          authentication({
+            encrypt: () => {
+              throw hostile
+            },
+            decrypt: (value) => value,
+            sign: (value) => value,
+            verify: (value) => value
+          }),
+          connect({ transport })
+        ]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     try {
       await expect(
         client.send('target', 'method', 'data', { timeoutMs: false })
@@ -6406,11 +6517,15 @@ describe('outbound feature production-seam matrix', () => {
   /** Frozen title retained; the approved group/outcome operations expand the asserted current keys. */
   it('descriptor four-key claims remain distinct from seven-key final projection', async () => {
     const [transport] = createMemoryTransportPair()
-    const client = await createClientEndpoint({
-      id: 'projection-client',
-      transport,
-      middlewares: [connect({ transport })]
-    })
+    /** The outbound-only projection uses the actual native Feature and canonical composition. */
+    const { roots } = createRuntimeFeatureRoots(
+      { id: 'projection-roots', middlewares: [] },
+      { agreement: { capabilities: [] }, peerId: '' }
+    )
+    const client = await createComposedEndpoint(
+      { id: 'projection-client', transport, middlewares: [connect({ transport })] },
+      { 'first-party-outbound': roots['first-party-outbound'] }
+    )
     const descriptorBatch = await createProductionBatch()
     try {
       const descriptorEntry = findCapabilitiesEntry(descriptorBatch)
@@ -6782,16 +6897,14 @@ describe('discovery Host transactions', () => {
       }
     }
     const [transport] = createMemoryTransportPair()
-    const endpoint = await createComposedEndpoint(
+    const endpoint = await createRuntimeEndpointComposition(
       {
         id: 'cycle-l-discovery-cleanup',
         transport,
         middlewares: [connect({ transport }), middleware]
       },
-      createFirstPartyRoots(
-        new Set<IRpcFirstPartyRootName>(['first-party-outbound', 'first-party-discovery'])
-      )
-    )
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     const firstDispose = endpoint.dispose()
     expect(endpoint.dispose()).toBe(firstDispose)
     await expect(firstDispose).rejects.toMatchObject({
@@ -6841,16 +6954,14 @@ describe('discovery Host transactions', () => {
     const replayError = new Error('discovery replay cleanup failed')
     const registryError = new Error('discovery registry cleanup failed')
     const [transport] = createMemoryTransportPair()
-    const endpoint = await createComposedEndpoint(
+    const endpoint = await createRuntimeEndpointComposition(
       {
         id: 'cycle-l-discovery-leaves',
         transport,
         middlewares: [connect({ transport })]
       },
-      createFirstPartyRoots(
-        new Set<IRpcFirstPartyRootName>(['first-party-outbound', 'first-party-discovery'])
-      )
-    )
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     const unregister = registerDiscoveryCleanupFaults(endpoint, {
       route: [routeFirst, routeSecond],
       replay: [replayError],

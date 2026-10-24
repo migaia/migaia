@@ -23,21 +23,127 @@ export function createChildDispatcher(
   exit: (error?: unknown) => void,
   report: (error: unknown) => void
 ): IPluginConstraint<any, any, any> {
-  /** Handles are name-addressed PluginHost views, never another connection registry. */
-  const handles = new Map<string, IPluginHandle<IPluginConstraint<any, any>>>()
-  /**
-   * The admitted name inventory identifies business plugins; it does not duplicate install
-   * ordering.
-   */
-  const installed: string[] = []
-  /** One local business topic hub belongs to this dispatcher generation. */
-  const topics = createChildTopics(outlet, report)
-  /** Init admission stays closed after failure or shutdown; a new native generation gets a new Host. */
-  let initialized = false
-  /** Repeated cleanup callers share the same PluginHost removal sequence. */
-  let shutdown: Promise<void> | undefined
-  /** Resolve only declared Feature paths and preserve the Feature receiver on invocation. */
-  const invoke = (input: ITrayInvocation, context?: IRpcContext): unknown => {
+  return new ChildDispatcher(definition, host, outlet, exit, report).plugin
+}
+/** Owns one accepted child generation while PluginHost retains business installation and cleanup. */
+class ChildDispatcher {
+  /** Original branded DSL definition owns exposed business paths. */
+  readonly #definition: IAnyTrayHost
+  /** Plain native Host remains the canonical plugin transaction owner. */
+  readonly #host: ITrayRuntimeHost
+  /** Current accepted outlet is borrowed for child-to-parent operations. */
+  readonly #outlet: () => ITrayRuntimeOutlet
+  /** Original task exit port is passed to the child client unchanged. */
+  readonly #exit: (error?: unknown) => void
+  /** Cleanup failures remain contained by the original reporter. */
+  readonly #report: (error: unknown) => void
+  /** Handles retain exact PluginHost registration identity. */
+  readonly #handles = new Map<string, IPluginHandle<IPluginConstraint<any, any>>>()
+  /** Membership deletion is O(1); iteration keeps original admission order. */
+  readonly #installed = new Set<string>()
+  /** Local topic fan-out belongs only to this child generation. */
+  readonly #topics: ReturnType<typeof createChildTopics>
+  /** Failed init never reopens admission within the same generation. */
+  #initialized = false
+  /** Repeated shutdown callers share the original removal promise. */
+  #shutdown: Promise<void> | undefined
+  /** Genuine plugin definition installs the same control Feature on the plain child Host. */
+  readonly plugin: IPluginConstraint<any, any, any>
+  /** Capture native ownership and construct the original generation control definition. */
+  constructor(
+    definition: IAnyTrayHost,
+    host: ITrayRuntimeHost,
+    outlet: () => ITrayRuntimeOutlet,
+    exit: (error?: unknown) => void,
+    report: (error: unknown) => void
+  ) {
+    this.#definition = definition
+    this.#host = host
+    this.#outlet = outlet
+    this.#exit = exit
+    this.#report = report
+    this.#topics = createChildTopics(outlet, report)
+    this.plugin = definePlugin({
+      name: TrayInternal.childPlugin,
+      features: {
+        control: defineFeature(() => ({
+          /** Validate before user plugins are created; one dispatcher belongs to one generation. */
+          init: async (input: ITrayInstanceInfo<string, unknown>) => {
+            if (this.#initialized || input.host !== this.#definition.name)
+              throw createTrayError(TrayErrorCode.childStateInvalid)
+            this.#initialized = true
+            /** Validator output is local application data, not another wire transfer. */
+            const info = Object.freeze({
+              ...input,
+              config: this.#definition.config ? this.#definition.config(input.config) : input.config
+            })
+            /** Feature dependencies refer to this exact per-init plugin definition. */
+            const client = createTrayPlugin(
+              this.#outlet,
+              info,
+              this.#exit,
+              this.#topics,
+              this.#definition
+            )
+            /** Parent never invokes this DSL factory; execution belongs entirely to the child. */
+            const plugins = this.#definition.plugins(info, client)
+            /** Internal plugin names cannot be shadowed by business plugins. */
+            if (
+              plugins.some((plugin: IPluginConstraint<any>) =>
+                [
+                  TrayInternal.childPlugin,
+                  TrayInternal.clientPlugin,
+                  TrayInternal.relayPlugin
+                ].some((name) => name === plugin.name)
+              )
+            )
+              throw createTrayError(TrayErrorCode.reservedName)
+            /** PluginHost performs one transaction and owns rollback of a failed batch. */
+            const batch = [client, ...plugins]
+            const views = await this.#host.use(...batch)
+            batch.forEach((plugin, index) => {
+              this.#handles.set(
+                plugin.name,
+                views[index] as IPluginHandle<IPluginConstraint<any, any>>
+              )
+              this.#installed.add(plugin.name)
+            })
+            return undefined
+          },
+          invoke: this.#invoke,
+          stream: (input: ITrayInvocation, context?: IRpcContext) => this.#invoke(input, context),
+          /** Business events stay separate from the parent's read-only lifecycle channel. */
+          deliver: this.#topics.deliver,
+          /** Bounded logical wait lets the caller terminate a hung realm; cleanup keeps its owner. */
+          shutdown: async ({ graceMs }: { graceMs: number }) => {
+            this.#shutdown ??= (async () => {
+              this.#topics.close()
+              for (const name of [...this.#installed].reverse()) {
+                if (!this.#handles.has(name)) continue
+                const result = await this.#host.unUse(name, { policy: DependencyPolicy.cascade })
+                for (const step of result.affected.steps) {
+                  if (step.action !== DependencyAction.release) continue
+                  this.#handles.delete(step.name)
+                  this.#installed.delete(step.name)
+                }
+                if (!result.ok) for (const error of result.errors) this.#report(error)
+              }
+              this.#installed.clear()
+            })()
+            try {
+              await withTimeout(() => this.#shutdown!, { timeoutMs: graceMs, report: this.#report })
+            } catch (error) {
+              this.#report(error)
+              throw error
+            }
+          }
+        }))
+      },
+      install: () => ({})
+    })
+  }
+  /** Resolve only declared live Feature paths, preserving the receiver of each method. */
+  #invoke = (input: ITrayInvocation, context?: IRpcContext): unknown => {
     /** Path components are the DSL's plugin, Feature and method namespaces. */
     const [plugin, feature, method, extra] = input.path.split('.')
     if (
@@ -45,83 +151,17 @@ export function createChildDispatcher(
       !plugin ||
       !feature ||
       !method ||
-      !definition.exposes.includes(`${plugin}.${feature}`)
+      !this.#definition.exposes.includes(`${plugin}.${feature}`)
     )
       throw createTrayError(TrayErrorCode.pathNotExposed)
     /** PluginHost owns live Feature availability and registration identity. */
-    const target = handles.get(plugin)?.getFeature(feature) as Record<string, unknown> | undefined
+    const target = this.#handles.get(plugin)?.getFeature(feature) as
+      | Record<string, unknown>
+      | undefined
     if (!target || typeof target[method] !== 'function')
       throw createTrayError(TrayErrorCode.pathNotExposed)
     return (target as Record<string, (payload: unknown, context?: IRpcContext) => unknown>)[
       method
     ]!(input.payload, context)
   }
-  return definePlugin({
-    name: TrayInternal.childPlugin,
-    features: {
-      control: defineFeature(() => ({
-        /** Validate before user plugins are created; one dispatcher belongs to one generation. */
-        init: async (input: ITrayInstanceInfo<string, unknown>) => {
-          if (initialized || input.host !== definition.name)
-            throw createTrayError(TrayErrorCode.childStateInvalid)
-          initialized = true
-          /** Validator output is local application data, not another wire transfer. */
-          const info = Object.freeze({
-            ...input,
-            config: definition.config ? definition.config(input.config) : input.config
-          })
-          /** Feature dependencies refer to this exact per-init plugin definition. */
-          const client = createTrayPlugin(outlet, info, exit, topics, definition)
-          /** Parent never invokes this DSL factory; execution belongs entirely to the child. */
-          const plugins = definition.plugins(info, client)
-          /** Internal plugin names cannot be shadowed by business plugins. */
-          if (
-            plugins.some((plugin: IPluginConstraint<any>) =>
-              [TrayInternal.childPlugin, TrayInternal.clientPlugin, TrayInternal.relayPlugin].some(
-                (name) => name === plugin.name
-              )
-            )
-          )
-            throw createTrayError(TrayErrorCode.reservedName)
-          /** PluginHost performs one transaction and owns rollback of a failed batch. */
-          const batch = [client, ...plugins]
-          const views = await host.use(...batch)
-          batch.forEach((plugin, index) => {
-            handles.set(plugin.name, views[index] as IPluginHandle<IPluginConstraint<any, any>>)
-            installed.push(plugin.name)
-          })
-          return undefined
-        },
-        invoke,
-        stream: (input: ITrayInvocation, context?: IRpcContext) => invoke(input, context),
-        /** Business events stay separate from the parent's read-only lifecycle channel. */
-        deliver: topics.deliver,
-        /** Bounded logical wait lets the caller terminate a hung realm; cleanup keeps its owner. */
-        shutdown: async ({ graceMs }: { graceMs: number }) => {
-          shutdown ??= (async () => {
-            topics.close()
-            for (const name of [...installed].reverse()) {
-              if (!handles.has(name)) continue
-              const result = await host.unUse(name, { policy: DependencyPolicy.cascade })
-              for (const step of result.affected.steps) {
-                if (step.action !== DependencyAction.release) continue
-                handles.delete(step.name)
-                const index = installed.indexOf(step.name)
-                if (index >= 0) installed.splice(index, 1)
-              }
-              if (!result.ok) for (const error of result.errors) report(error)
-            }
-            installed.length = 0
-          })()
-          try {
-            await withTimeout(() => shutdown!, { timeoutMs: graceMs, report })
-          } catch (error) {
-            report(error)
-            throw error
-          }
-        }
-      }))
-    },
-    install: () => ({})
-  })
 }

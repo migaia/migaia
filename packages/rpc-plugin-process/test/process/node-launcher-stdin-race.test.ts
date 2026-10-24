@@ -52,7 +52,7 @@ describe('Node bootstrap stdin race', () => {
     async (phase) => {
       spawnMock.mockImplementationOnce(() => childWithStdinFailure(phase))
       const { createNodeProcessLauncher } =
-        await import('@migaia/rpc-plugin-process/adapters/node-child-process')
+        await import('../../dist/process/adapters/node-child-process.js')
       await expect(
         createNodeProcessLauncher().launch(
           {
@@ -81,7 +81,7 @@ describe('Node bootstrap stdin race', () => {
       try {
         spawnMock.mockImplementationOnce(() => childWithStdinFailure('during-write', code))
         const { createNodeProcessLauncher } =
-          await import('@migaia/rpc-plugin-process/adapters/node-child-process')
+          await import('../../dist/process/adapters/node-child-process.js')
         await expect(
           createNodeProcessLauncher().launch(
             {

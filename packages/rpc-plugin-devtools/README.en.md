@@ -1,6 +1,6 @@
 # `@migaia/rpc-plugin-devtools`
 
-Observe real host calls through bounded events, cumulative statistics, incremental watches, independent recording, and offline timelines.
+Observe real host calls through bounded events, cumulative statistics, incremental watches, independent recording, and record import/export.
 
 [中文](./README.md) · [Usage guide](./USEGUIDE.en.md)
 
@@ -9,7 +9,7 @@ Observe real host calls through bounded events, cumulative statistics, increment
 - Event eviction does not subtract cumulative calls, and clear does not stop independent recording.
 - A `devtoolsPlugin` installs the original collector on the host without another business connection or forwarding emitter.
 - Logical/physical stages, content capture, redaction, and remote content exposure remain explicit choices.
-- The existing NDJSON codec retains bytes and error chains. Hub borrows existing clients or offline records without creating connections.
+- Collector NDJSON import/export retains bytes and error chains for local record inspection.
 
 ## Start here
 
@@ -61,17 +61,14 @@ Watch and recording retain separate bounded windows; loss counters are not zero-
 
 ## Retained entries
 
-| Entry       | Purpose                                                                                              |
-| ----------- | ---------------------------------------------------------------------------------------------------- |
-| Root        | `devtoolsPlugin`, collector/options types, and error identity                                        |
-| `/contract` | Wire/service/record types, NDJSON format, and encode/decode                                          |
-| `/hub`      | `createRpcDevtoolsHub`: existing clients, clock alignment, timeline/interactions, and offline import |
-| `/log`      | `createRpcLogProbe`: synchronous qualifying fields for an application-owned structured logger        |
+| Entry | Purpose                                                       |
+| ----- | ------------------------------------------------------------- |
+| Root  | `devtoolsPlugin`, collector/options types, and error identity |
 
-Record v1 retains format `migaia-rpc-devtools`; package renaming does not change the recording grammar. Hub does not close borrowed clients, invent missing events, or replay business calls. Log probe owns no files, batching, or flush; the logger owns actual I/O and final shutdown.
+Record v1 retains format `migaia-rpc-devtools`; package renaming does not change the recording grammar. Use the same collector's exportRecord/importRecord operations.
 
 ## Remote access and errors
 
 The application can publish `collector.service` through an existing host's nested provide. The application owns authorization. `capture` and `exposeContent: true` are independent choices. Service reads exclude observations from their actual serving host; the application chooses the existing host that publishes them. The remote boundary uses existing portable/wire conversion, not arbitrary lossless JavaScript graph transport.
 
-The source is `rpc.devtools`. INVALID_OPTION, CLOSED, RECORD_ACTIVE/RECORD_NOT_ACTIVE, RECORD_FORMAT_INVALID, REDACT_FAILED, TARGET_DUPLICATE/TARGET_UNKNOWN, TARGET_RELEASE_FAILED, and SERVICE_RESULT_INVALID preserve native types and original causes. Diagnostic callback failures are reported without changing completed business results. See the [usage guide](./USEGUIDE.en.md).
+The source is `rpc.devtools`. INVALID_OPTION, CLOSED, RECORD_ACTIVE/RECORD_NOT_ACTIVE, RECORD_FORMAT_INVALID, REDACT_FAILED, and SERVICE_RESULT_INVALID preserve native types and original causes. Diagnostic callback failures are reported without changing completed business results. See the [usage guide](./USEGUIDE.en.md).

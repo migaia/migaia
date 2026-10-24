@@ -1,8 +1,12 @@
 import { createComposedEndpoint } from '../../dist/core/composed.js'
-import { abort, codec, connect, framer, type IRpcEndpoint } from '../../dist/core/index.js'
+import { abort } from '../../dist/core/middleware/abort.js'
+import { codec } from '../../dist/core/middleware/codec.js'
+import { connect } from '../../dist/core/middleware/connect.js'
+import { framer } from '../../dist/core/middleware/framer.js'
+import { type IRpcEndpoint } from '../../dist/core/typing.js'
 import { createCanonicalChunkFeature, createStreamFeature } from '../../dist/core/stream/index.js'
 import { createOutboundFeature } from '../../dist/core/features/outbound.js'
-import { createProviderFeature } from '../../dist/core/features/provider.js'
+import { createProviderFeature } from '../../dist/core/internal/provider-feature.js'
 import { createDiscoveryFeature } from '../../dist/core/features/discovery.js'
 import { createControlFeature } from '../../dist/core/features/control.js'
 import { createOneWayFeature } from '../../dist/core/features/one-way.js'
@@ -31,7 +35,7 @@ export function streamRoots(capability?: IRpcStreamCapabilityPort) {
 export async function endpointFor(
   channel: IRemoteChannel,
   id: string,
-  providerLimits?: import('../../dist/core/index.js').IRpcProviderLimits
+  providerLimits?: import('../../dist/core/typing.js').IRpcProviderLimits
 ): Promise<IRemoteServeEndpoint> {
   /** Core stream and request paths share the same token graph. */
   const roots = streamRoots({ supports: () => channel.agreement.capabilities.includes('stream@1') })

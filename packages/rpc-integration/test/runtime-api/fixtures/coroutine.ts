@@ -46,30 +46,50 @@ export async function coroutineAbort(signal: IAbortSignal): Promise<void> {
 
 /** One family fixture owns actual child hosts and accepts explicit raw task completion. */
 export function coroutineService(label: string, report: (error: unknown) => void, late = false) {
-  /** Each generation records independent task entry and cleanup, never guessed supervisor state. */
-  const contexts: ICoroutineTaskContext[] = []
-  /** Signals permit deterministic raw crash and late-settlement acceptance without extra hooks. */
-  const finishes: ReturnType<typeof deferred<void>>[] = []
-  /** Actual child Hosts make reverse calls through their genuine committed outlet. */
-  const hosts: ReturnType<typeof coroutineTestHost>[] = []
-  /** Provider notify has a separate sink from its one-way caller completion. */
-  const notices: unknown[] = []
-  /** Actual provider entry and abort independently prove cancellation reaches coroutine business. */
-  const cancellation = { waiting: 0, cancelled: 0 }
-  /** Each launch publishes its own counter and address after the child Host commits. */
-  const installed = deferred<void>()
-  /** The wrapper consumes this ordinary task using the supervisor's existing task contract. */
-  const task: ICoroutineUserTask = async (context) => {
+  return new CoroutineServiceFixture(label, report, late)
+}
+/** Owns observations for one genuine coroutine service without duplicating its supervisor. */
+class CoroutineServiceFixture {
+  /** Portable service label distinguishes replacement providers. */
+  readonly #label: string
+  /** Original report observer remains the child native diagnostic owner. */
+  readonly #report: (error: unknown) => void
+  /** Explicit late mode waits for raw task completion after canonical signal abort. */
+  readonly #late: boolean
+  /** Per-generation task contexts preserve the original supervisor signal identities. */
+  readonly contexts: ICoroutineTaskContext[] = []
+  /** Exact deferred task receipts permit deterministic crash and late completion. */
+  readonly finishes: ReturnType<typeof deferred<void>>[] = []
+  /** Every reverse call uses an actual committed child Host. */
+  readonly hosts: ReturnType<typeof coroutineTestHost>[] = []
+  /** Notify provider entry is observed independently of caller send completion. */
+  readonly notices: unknown[] = []
+  /** Provider context cancellation remains separate from task cancellation. */
+  readonly cancellation = { waiting: 0, cancelled: 0 }
+  /** One install completion is published only after the child Host commits. */
+  readonly #installed = deferred<void>()
+  /** Capture immutable service policy for every genuine generation task. */
+  constructor(label: string, report: (error: unknown) => void, late: boolean) {
+    this.#label = label
+    this.#report = report
+    this.#late = late
+  }
+  /** Public acceptance promise retains the original deferred identity. */
+  get installed() {
+    return this.#installed.promise
+  }
+  /** Actual coroutine task preserves native provider setup and child cleanup ordering. */
+  readonly task: ICoroutineUserTask = async (context) => {
     /** A per-generation barrier lets acceptance settle this exact old task independently. */
     const finish = deferred<void>()
     void finish.promise.catch(() => undefined)
-    contexts.push(context)
-    finishes.push(finish)
+    this.contexts.push(context)
+    this.finishes.push(finish)
     /** Provider installation precedes connection installation, matching the child-mode contract. */
     const child = coroutineTestHost({
       host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
     })
-    hosts.push(child)
+    this.hosts.push(child)
     try {
       await child.use(
         definePlugin({
@@ -77,10 +97,10 @@ export function coroutineService(label: string, report: (error: unknown) => void
           features: {
             methods: defineFeature(() => ({
               /** Payload identity is portable and distinguishes replacement providers. */
-              read: (payload: unknown) => [label, payload],
+              read: (payload: unknown) => [this.#label, payload],
               /** Notify completion belongs to the actual provider invocation. */
               notice: (payload: unknown) => {
-                notices.push(payload)
+                this.notices.push(payload)
               },
               /** Streaming yields the exact provider order without a fixture dispatcher. */
               *values() {
@@ -91,10 +111,10 @@ export function coroutineService(label: string, report: (error: unknown) => void
               /** Provider cancellation observes the canonical call context, not the task signal. */
               wait: (_payload: unknown, context: IRpcContext) =>
                 new Promise<void>((_resolve, reject) => {
-                  cancellation.waiting += 1
+                  this.cancellation.waiting += 1
                   /** Preserve the canonical provider reason while recording its actual abort. */
                   const cancel = () => {
-                    cancellation.cancelled += 1
+                    this.cancellation.cancelled += 1
                     reject(context.signal.reason)
                   }
                   if (context.signal.aborted) cancel()
@@ -122,17 +142,16 @@ export function coroutineService(label: string, report: (error: unknown) => void
           name: 'parent',
           connectToParent: context.connect,
           expose: ['service'],
-          report
+          report: this.#report
         })
       )
-      installed.resolve()
-      if (late) await finish.promise
+      this.#installed.resolve()
+      if (this.#late) await finish.promise
       else await Promise.race([finish.promise, coroutineAbort(context.signal)])
     } finally {
       await child.dispose()
     }
   }
-  return { task, contexts, finishes, hosts, notices, cancellation, installed: installed.promise }
 }
 
 /** Captured same-realm failures retain complete semantic evidence, including every original cause. */

@@ -1,3 +1,6 @@
+import { createProbeEmitter, bindInstalledProbe } from '../../dist/core/internal/probe-emitter.js'
+import { systemScheduler } from '@migaia/utils/scheduler'
+import { createRuntimeEndpointComposition } from '../../dist/core/runtime-api-endpoint.js'
 import { describe, expect, it, vi } from 'vitest'
 import { MessageChannel } from 'node:worker_threads'
 import { createHmac } from 'node:crypto'
@@ -8,18 +11,18 @@ import {
   messageFramerV1,
   readRpcBatchMembers
 } from '@migaia/rpc-contract/framing'
-import { systemScheduler } from '@migaia/utils/scheduler'
-import { createEndpoint, connect, abort, ping } from '../../dist/core/index.js'
+
+import { connect } from '../../dist/core/middleware/connect.js'
+import { abort } from '../../dist/core/middleware/abort.js'
+import { ping } from '../../dist/core/middleware/ping.js'
 import { codec } from '../../dist/core/middleware/codec.js'
 import { framer } from '../../dist/core/middleware/framer.js'
 import { authentication } from '../../dist/core/middleware/authentication.js'
-import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
 import { createNodeMessagePortTransport } from '../../dist/core/adapters/message-port.js'
 import { createRuntimePeer } from '../../dist/remote/runtime-api/peer.js'
 import {
   defineProbe,
-  probePlugin,
-  snapshotProbeEvent,
   RpcProbeDirection,
   RpcProbeStage,
   RpcProbeOutcome,
@@ -211,7 +214,9 @@ describe('probe non-interference', () => {
       const events: IRpcProbeEventView[] = [],
         reports: unknown[] = []
       /** A reentrant request completes before the quota refusal scenario begins. */
-      let currentClient: Awaited<ReturnType<typeof createEndpoint>> | undefined,
+      let currentClient:
+          | Awaited<ReturnType<typeof createRuntimeEndpointComposition>['installing']>
+          | undefined,
         nested: Promise<unknown> | undefined
       /** Two genuine running providers occupy the complete supported admission budget. */
       let release!: () => void
@@ -235,7 +240,7 @@ describe('probe non-interference', () => {
               capture: ['frame', 'protected'],
               onError: (error) => reports.push(error),
               emit: (event) => {
-                events.push(snapshotProbeEvent(event))
+                events.push(Object.freeze({ ...event }))
                 if (mode === 'throw') throw sinkFailure
                 if (mode === 'reject') return Promise.reject(sinkFailure)
                 if (
@@ -277,59 +282,74 @@ describe('probe non-interference', () => {
             return JSON.parse(String(value).slice('encrypted:'.length))
           } // Restore the wire representation.
         })
+      /** Both real emitters share only the compiled observer, as separate Host installations do. */
+      if (probe) {
+        bindInstalledProbe(
+          rightWire,
+          createProbeEmitter([probe], systemScheduler.now, 'encrypted-server')
+        )
+        bindInstalledProbe(
+          leftWire,
+          createProbeEmitter([probe], systemScheduler.now, 'encrypted-client')
+        )
+      }
       /** Provider execution remains owned by the original public Core endpoint. */
-      const server = await createEndpoint({
-        id: 'encrypted-server',
-        transport: rightWire,
-        middlewares: [
-          codec(json),
-          framer(serverChunks),
-          protectedMiddleware('right'),
-          connect(),
-          abort(),
-          ping(),
-          ...(probe ? [probePlugin(probe)] : [])
-        ],
-        providerLimits: {
-          maxGlobal: 2,
-          maxPerPeer: 2,
-          onRejected: (rejection) => {
-            rejections.push(rejection.reason)
+      const server = await createRuntimeEndpointComposition(
+        {
+          id: 'encrypted-server',
+          transport: rightWire,
+          middlewares: [
+            codec(json),
+            framer(serverChunks),
+            protectedMiddleware('right'),
+            connect(),
+            abort(),
+            ping()
+          ],
+          providerLimits: {
+            maxGlobal: 2,
+            maxPerPeer: 2,
+            onRejected: (rejection) => {
+              rejections.push(rejection.reason)
+            }
+          },
+          provider: {
+            reenter: (context) => {
+              calls.push('reenter')
+              return context.success('ready')
+            },
+            echo: (context) => {
+              if (context.data !== 'nested') calls.push('echo')
+              return context.success(context.data)
+            },
+            fail: () => {
+              calls.push('fail')
+              throw original
+            },
+            hold: async (context) => {
+              calls.push(String(context.data))
+              await held
+              return context.success(context.data)
+            }
           }
         },
-        provider: {
-          reenter: (context) => {
-            calls.push('reenter')
-            return context.success('ready')
-          },
-          echo: (context) => {
-            if (context.data !== 'nested') calls.push('echo')
-            return context.success(context.data)
-          },
-          fail: () => {
-            calls.push('fail')
-            throw original
-          },
-          hold: async (context) => {
-            calls.push(String(context.data))
-            await held
-            return context.success(context.data)
-          }
-        }
-      })
-      const client = await createEndpoint({
-        id: 'encrypted-client',
-        transport: leftWire,
-        middlewares: [
-          codec(json),
-          framer(chunks),
-          protectedMiddleware('left'),
-          connect(),
-          abort(),
-          ping(),
-          ...(probe ? [probePlugin(probe)] : [])
-        ]
-      })
+        { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+      ).installing
+      const client = await createRuntimeEndpointComposition(
+        {
+          id: 'encrypted-client',
+          transport: leftWire,
+          middlewares: [
+            codec(json),
+            framer(chunks),
+            protectedMiddleware('left'),
+            connect(),
+            abort(),
+            ping()
+          ]
+        },
+        { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+      ).installing
       currentClient = client
       /** The existing admission registry supplies cleanup facts without a substitute quota owner. */
       const admission = readEndpointOwner<ProviderAdmissionRegistry>(server, 'provider-admission')!

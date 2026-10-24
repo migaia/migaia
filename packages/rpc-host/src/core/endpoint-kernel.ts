@@ -1,3 +1,4 @@
+import { orderStringKeys } from '@migaia/utils/string'
 import type { IRpcPlatformValue, IRpcTransportTopologyValue } from './transport-constants.js'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import {
@@ -295,12 +296,12 @@ class EndpointKernel implements IEndpointKernelHost {
 
   /** Returns the exact sorted runtime-owner topology retained by this kernel. */
   get ownerKeys(): readonly string[] {
-    return Object.freeze([...this.#owners.keys()].sort())
+    return Object.freeze(orderStringKeys([...this.#owners.keys()]))
   }
 
   /** Returns decoded route kinds registered by selected feature attachments. */
   get routeKeys(): readonly string[] {
-    return Object.freeze([...this.#routes.keys()].sort())
+    return Object.freeze(orderStringKeys([...this.#routes.keys()]))
   }
 
   /**

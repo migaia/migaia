@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
 import { createManualScheduler } from '@migaia/utils/testing'
-import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
 import { createComposedEndpoint } from '../../dist/core/composed.js'
 import { connect } from '../../dist/core/middleware/connect.js'
 import { streamRoots } from './fixture.js'

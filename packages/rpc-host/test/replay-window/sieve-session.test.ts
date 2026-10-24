@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { it, vi } from 'vitest'
-import { authentication } from '../../dist/core/index.js'
+import { authentication } from '../../dist/core/middleware/authentication.js'
 import { installPlugin } from '../core/middleware/helpers.js'
 import {
   bindAuthenticationReplayContext,
@@ -10,7 +10,7 @@ import { wrapAuthenticationEnvelope } from '../../dist/core/middleware/authentic
 import type {
   IRpcAuthenticationCapability,
   IRpcAuthenticationContext
-} from '../../dist/core/index.js'
+} from '../../dist/core/typing.js'
 
 /** Exercise the original authentication table without unrelated endpoint registries or codecs. */
 function table() {

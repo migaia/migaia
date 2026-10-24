@@ -10,8 +10,13 @@ import { type INodeThreadHandle } from '../../../rpc-plugin-thread/dist/threads/
 import {
   createNodeThreadLauncher,
   createNodeThreadChannelFactory
-} from '@migaia/rpc-plugin-thread/adapters/node'
-import * as runtimeEndpoint from '../../../rpc-host/dist/core/index.js'
+} from '../../../rpc-plugin-thread/dist/threads/adapters/node.js'
+import { readRuntimePeerEndpoint } from '../../../rpc-host/dist/remote/runtime-api/peer.js'
+import { readRuntimeOutletConnection } from '../../../rpc-host/dist/remote/runtime-api/outlet.js'
+import { readEndpointOwner } from '../../../rpc-host/dist/core/internal/endpoint-projection.js'
+import type { IEndpointKernelHost } from '../../../rpc-host/dist/core/endpoint-kernel.js'
+import { RuntimeEventName } from '../../../rpc-host/dist/remote/runtime-api/constants.js'
+import { deferred } from '@migaia/utils/promise'
 
 /** Every case restarts the same genuine Worker used by the original generation acceptance. */
 const entry = fileURLToPath(new URL('./fixtures/managed-worker.mjs', import.meta.url))
@@ -33,24 +38,10 @@ for (const unavailable of [
     const reports: unknown[] = []
     /** Count genuine parent business, independently from the child probe's provider. */
     let calls = 0
-    /** Completion of the selected original endpoint proves readProvide has already completed. */
-    let constructed = 0
-    /** Observe the canonical assembly, including its genuine borrowed Host admission owner. */
-    const assemble = runtimeEndpoint.createRuntimeApiEndpoint
-    /** This observer preserves every original argument and returned endpoint. */
-    const construction = vi
-      .spyOn(runtimeEndpoint, 'createRuntimeApiEndpoint')
-      .mockImplementation((...args: Parameters<typeof assemble>) => {
-        const endpoint = assemble(...args)
-        /** The same actual readiness boundary advances this observer before native publication. */
-        const observed = Object.create(endpoint) as typeof endpoint
-        Object.defineProperty(observed, 'ready', {
-          value: endpoint.ready.then(() => {
-            constructed += 1
-          })
-        })
-        return Object.freeze(observed)
-      })
+    /** The actual successor publication proves its preparation finished before business admission. */
+    const rebound = deferred<void>()
+    /** This exact native outlet event receipt is released with the case's Host resources. */
+    let stopReady: (() => void) | undefined
     const gate = definePlugin({
       name: 'gate',
       features: { data: defineFeature(() => ({ read: () => 42 })) },
@@ -108,10 +99,19 @@ for (const unavailable of [
             })
           : plugin
       )
+      stopReady = host.thread!.on(RuntimeEventName.ready, (event) => {
+        if (event.name === 'bridge' && event.generation === 2) rebound.resolve()
+      })
       const first = (await host.thread!.request('bridge', 'probe', 'ordinary')) as {
         parent: number
       }
       assert.equal(first.parent, 42)
+      /** Read the first genuine Host kernel through its accepted managed Peer projection. */
+      const kernel = readEndpointOwner<IEndpointKernelHost>(
+        readRuntimePeerEndpoint(readRuntimeOutletConnection(host.thread, 'bridge')!.peer).endpoint,
+        'kernel'
+      )!
+      assert.ok(kernel)
       /** Unload and enablement use only the original Host mutation API. */
       const disabled =
         unavailable === 'exposed-unloaded'
@@ -128,11 +128,23 @@ for (const unavailable of [
       handles[0]!.terminate()
       await handles[0]!.exited
       await vi.waitFor(() => assert.equal(handles.length, 2), { timeout: 3000 })
-      /**
-       * Baseline reports preparation failure; fixed code constructs a new endpoint despite
-       * unavailable business.
-       */
-      await vi.waitFor(() => assert.ok(constructed === 2 || reports.length > 0), { timeout: 3000 })
+      await rebound.promise
+      if (unavailable.startsWith('connection-'))
+        assert.equal(
+          readRuntimeOutletConnection(host.thread, 'bridge'),
+          undefined,
+          'disabled connection cannot expose its otherwise prepared native receipt'
+        )
+      else
+        assert.equal(
+          readEndpointOwner(
+            readRuntimePeerEndpoint(readRuntimeOutletConnection(host.thread, 'bridge')!.peer)
+              .endpoint,
+            'kernel'
+          ),
+          kernel,
+          'the committed successor borrows the original Host endpoint'
+        )
       calls = 0
       /** Local outlet denial and inbound Feature denial must retain their exact registered owner. */
       const expected = unavailable.startsWith('connection-')
@@ -204,9 +216,17 @@ for (const unavailable of [
         },
         { timeout: 3000 }
       )
-      assert.equal(constructed, 2, 'recovery never opens a third endpoint')
+      assert.equal(
+        readEndpointOwner(
+          readRuntimePeerEndpoint(readRuntimeOutletConnection(host.thread, 'bridge')!.peer)
+            .endpoint,
+          'kernel'
+        ),
+        kernel,
+        'availability recovery retains the exact original Host endpoint'
+      )
     } finally {
-      construction.mockRestore()
+      stopReady?.()
       await host.dispose()
       for (const handle of handles) handle.terminate()
       await Promise.all(handles.map((handle) => handle.exited))

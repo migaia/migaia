@@ -1,4 +1,5 @@
-import { createThreadPeer } from '../../../../rpc-plugin-thread/test/protocol.ts'
+import { createRpcHost } from '@migaia/rpc-host'
+import { threadPlugin } from '@migaia/rpc-plugin-thread'
 import { readThreadBootstrap } from '../../../../rpc-plugin-thread/dist/threads/bootstrap.js'
 import { workerData } from 'node:worker_threads'
 
@@ -28,7 +29,8 @@ const declarations =
         changed: { mode: 'async-generator', idempotent: false },
         stable: { mode: 'request', idempotent: false }
       }
-await createThreadPeer({
+await createRpcHost({
+  plugins: [threadPlugin({ connectToParent: true })],
   provide: { service: { data: methods } },
   contract: { schemaVersion: 1, plugin: 'service', features: { data: { methods: declarations } } },
   report: (error) => process.stderr.write(`${error?.code ?? 'fixture-error'}\n`)

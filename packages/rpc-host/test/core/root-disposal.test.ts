@@ -1,3 +1,5 @@
+import { createRuntimeEndpointComposition } from '../../dist/core/runtime-api-endpoint.js'
+import { RpcCapability } from '@migaia/rpc-contract'
 import { describe, expect, it } from 'vitest'
 import {
   PluginHostDisposalNodeKind,
@@ -5,7 +7,9 @@ import {
   readPluginHostDisposalProvenance
 } from '@migaia/plugin-host'
 import type { IPluginHostCore } from '@migaia/plugin-host'
-import { createEndpoint, RpcLifecycleError, type IRpcTransport } from '../../dist/core/index.js'
+
+import { RpcLifecycleError } from '../../dist/core/errors.js'
+import { type IRpcTransport } from '../../dist/core/transport.js'
 import { translateEndpointDisposalError } from '../../dist/core/internal/disposal-translation.js'
 import { connect } from '../../dist/core/middleware/connect.js'
 
@@ -158,11 +162,14 @@ describe('composed endpoint root disposal boundary', () => {
         }
       }
     }
-    const endpoint = await createEndpoint({
-      id: 'root-disposal',
-      transport,
-      middlewares: [connect({ transport })]
-    })
+    const endpoint = await createRuntimeEndpointComposition(
+      {
+        id: 'root-disposal',
+        transport,
+        middlewares: [connect({ transport })]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
 
     const first = endpoint.dispose()
     const second = endpoint.dispose()
@@ -212,11 +219,14 @@ describe('composed endpoint root disposal boundary', () => {
         return () => undefined
       }
     }
-    const endpoint = await createEndpoint({
-      id: 'root-disposal-order',
-      transport,
-      middlewares: [connect({ transport })]
-    })
+    const endpoint = await createRuntimeEndpointComposition(
+      {
+        id: 'root-disposal-order',
+        transport,
+        middlewares: [connect({ transport })]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
 
     const first = endpoint.dispose()
     const second = endpoint.dispose()
@@ -260,11 +270,14 @@ describe('composed endpoint root disposal boundary', () => {
         }
       }
     }
-    const endpoint = await createEndpoint({
-      id: 'root-disposal-nested',
-      transport,
-      middlewares: [connect({ transport })]
-    })
+    const endpoint = await createRuntimeEndpointComposition(
+      {
+        id: 'root-disposal-nested',
+        transport,
+        middlewares: [connect({ transport })]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
 
     const first = endpoint.dispose()
     const second = endpoint.dispose()

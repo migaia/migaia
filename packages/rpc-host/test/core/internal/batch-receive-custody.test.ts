@@ -1,8 +1,9 @@
+import { createRuntimeEndpointComposition } from '../../../dist/core/runtime-api-endpoint.js'
 import { expect, it, vi } from 'vitest'
 import { normalizeRpcEnvelope, RpcRouteProfile } from '@migaia/rpc-contract'
 import { RpcCapability } from '@migaia/rpc-contract'
-import { createMemoryTransportPair } from '../../../dist/core/adapters/memory.js'
-import { createFullOneWayEndpoint } from '../../../dist/core/index.js'
+import { createMemoryTransportPair } from '../../fixtures/memory-transport.js'
+
 import { connect } from '../../../dist/core/middleware/connect.js'
 import { registerBatchAgreement } from '../../../dist/core/internal/batch-frame.js'
 
@@ -26,18 +27,21 @@ it('reports each rejected batch member independently when replay refusal cannot 
   /** One accepted request fills the unchanged per-peer replay ledger. */
   let calls = 0
   /** Owns the real receiver with one per-peer replay slot. */
-  const endpoint = await createFullOneWayEndpoint({
-    id: 'b',
-    transport,
-    providerLimits: { maxReplayEntriesPerPeer: 1 },
-    provider: {
-      echo: (context) => {
-        calls += 1
-        return context.success(context.data)
-      }
+  const endpoint = await createRuntimeEndpointComposition(
+    {
+      id: 'b',
+      transport,
+      providerLimits: { maxReplayEntriesPerPeer: 1 },
+      provider: {
+        echo: (context) => {
+          calls += 1
+          return context.success(context.data)
+        }
+      },
+      middlewares: [connect({ transport })]
     },
-    middlewares: [connect({ transport })]
-  })
+    { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+  ).installing
   /** Original failures remain observable through the actual receiver hook channel. */
   const failures: unknown[] = []
   /** Releases only this test's diagnostic subscription. */

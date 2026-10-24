@@ -21,7 +21,6 @@ const coreFiles = [
   './src/core/error-text.ts',
   './src/core/transport.ts',
   './src/core/typing.ts',
-  './src/core/adapters/memory.ts',
   './src/core/adapters/message-port.ts'
 ]
 
@@ -52,6 +51,7 @@ describe('platform-neutral type boundaries', () => {
       expect(parsed.compilerOptions.lib).not.toContain('dom')
       if (layer === 'core') {
         for (const file of coreFiles) expect(parsed.files).toContain(file)
+        expect(parsed.files).not.toContain('./src/core/adapters/memory.ts')
       } else {
         expect(
           parsed.files.every(

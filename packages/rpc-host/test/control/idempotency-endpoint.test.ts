@@ -1,8 +1,8 @@
+import { createRuntimeEndpointComposition } from '../../dist/core/runtime-api-endpoint.js'
 import { describe, expect, it, vi } from 'vitest'
-import { createClientEndpoint } from '../../dist/core/client.js'
-import { createProviderEndpoint } from '../../dist/core/provider.js'
-import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
-import { createRpcIdempotencyStore } from '../../dist/core/index.js'
+
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
+import { createRpcIdempotencyStore } from '../../dist/core/idempotency-store.js'
 import { connect } from '../../dist/core/middleware/connect.js'
 import { abort } from '../../dist/core/middleware/abort.js'
 import { readEndpointDebugSnapshot } from '../../dist/core/internal/test-observer.js'
@@ -12,22 +12,28 @@ describe('keyed provider execution', () => {
     const [clientWire, serverWire] = createMemoryTransportPair()
     const buffer = new Uint8Array([1, 2, 3])
     let calls = 0
-    const server = await createProviderEndpoint({
-      id: 'server',
-      transport: serverWire,
-      middlewares: [connect({ transport: serverWire })],
-      provider: {
-        bytes: (context) => {
-          calls += 1
-          return context.success(buffer, { transfer: [buffer.buffer] })
+    const server = await createRuntimeEndpointComposition(
+      {
+        id: 'server',
+        transport: serverWire,
+        middlewares: [connect({ transport: serverWire })],
+        provider: {
+          bytes: (context) => {
+            calls += 1
+            return context.success(buffer, { transfer: [buffer.buffer] })
+          }
         }
-      }
-    })
-    const client = await createClientEndpoint({
-      id: 'client',
-      transport: clientWire,
-      middlewares: [connect({ transport: clientWire })]
-    })
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'client',
+        transport: clientWire,
+        middlewares: [connect({ transport: clientWire })]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     try {
       const first = await client.send('server', 'bytes', null, { idempotencyKey: 'bytes' })
       const second = await client.send('server', 'bytes', null, { idempotencyKey: 'bytes' })
@@ -50,39 +56,51 @@ describe('keyed provider execution', () => {
       started = resolve
     })
     let calls = 0
-    const serverA = await createProviderEndpoint({
-      id: 'server',
-      transport: serverWireA,
-      idempotency,
-      middlewares: [connect({ transport: serverWireA })],
-      provider: {
-        count: async (context) => {
-          calls += 1
-          started()
-          await new Promise<void>((resolve) =>
-            context.signal.addEventListener('abort', () => resolve(), { once: true })
-          )
-          return context.success(calls)
+    const serverA = await createRuntimeEndpointComposition(
+      {
+        id: 'server',
+        transport: serverWireA,
+        idempotency,
+        middlewares: [connect({ transport: serverWireA })],
+        provider: {
+          count: async (context) => {
+            calls += 1
+            started()
+            await new Promise<void>((resolve) =>
+              context.signal.addEventListener('abort', () => resolve(), { once: true })
+            )
+            return context.success(calls)
+          }
         }
-      }
-    })
-    const serverB = await createProviderEndpoint({
-      id: 'server',
-      transport: serverWireB,
-      idempotency,
-      middlewares: [connect({ transport: serverWireB })],
-      provider: { count: (context) => context.success(++calls) }
-    })
-    const clientA = await createClientEndpoint({
-      id: 'client-a',
-      transport: clientWireA,
-      middlewares: [connect({ transport: clientWireA })]
-    })
-    const clientB = await createClientEndpoint({
-      id: 'client-b',
-      transport: clientWireB,
-      middlewares: [connect({ transport: clientWireB })]
-    })
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
+    const serverB = await createRuntimeEndpointComposition(
+      {
+        id: 'server',
+        transport: serverWireB,
+        idempotency,
+        middlewares: [connect({ transport: serverWireB })],
+        provider: { count: (context) => context.success(++calls) }
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
+    const clientA = await createRuntimeEndpointComposition(
+      {
+        id: 'client-a',
+        transport: clientWireA,
+        middlewares: [connect({ transport: clientWireA })]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
+    const clientB = await createRuntimeEndpointComposition(
+      {
+        id: 'client-b',
+        transport: clientWireB,
+        middlewares: [connect({ transport: clientWireB })]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     try {
       const first = clientA.send<number>('server', 'count', null, { idempotencyKey: 'k' })
       first.catch(() => undefined)
@@ -103,19 +121,25 @@ describe('keyed provider execution', () => {
 
   it('rejects a new key while the bounded store owns an executing request', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
-    const server = await createProviderEndpoint({
-      id: 'server',
-      transport: serverTransport,
-      targetIds: ['client'],
-      idempotency: { store: createRpcIdempotencyStore({ maxEntries: 1 }) },
-      middlewares: [connect({ transport: serverTransport })]
-    })
-    const client = await createClientEndpoint({
-      id: 'client',
-      transport: clientTransport,
-      targetIds: ['server'],
-      middlewares: [connect({ transport: clientTransport })]
-    })
+    const server = await createRuntimeEndpointComposition(
+      {
+        id: 'server',
+        transport: serverTransport,
+        targetIds: ['client'],
+        idempotency: { store: createRpcIdempotencyStore({ maxEntries: 1 }) },
+        middlewares: [connect({ transport: serverTransport })]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'client',
+        transport: clientTransport,
+        targetIds: ['server'],
+        middlewares: [connect({ transport: clientTransport })]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     let count = 0
     let started!: () => void
     let finish!: (value: number) => void
@@ -148,30 +172,39 @@ describe('keyed provider execution', () => {
   it('rejects a malformed injected store before constructing a provider endpoint', async () => {
     const [, serverTransport] = createMemoryTransportPair()
     await expect(
-      createProviderEndpoint({
-        id: 'server',
-        transport: serverTransport,
-        idempotency: { store: 1 as never },
-        middlewares: [connect({ transport: serverTransport })]
-      })
+      createRuntimeEndpointComposition(
+        {
+          id: 'server',
+          transport: serverTransport,
+          idempotency: { store: 1 as never },
+          middlewares: [connect({ transport: serverTransport })]
+        },
+        { agreement: { capabilities: [] }, peerId: '' }
+      ).installing
     ).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
   })
 
   it('keeps method tuples distinct and reports retained-result tombstones', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
-    const server = await createProviderEndpoint({
-      id: 'server',
-      transport: serverTransport,
-      targetIds: ['client'],
-      idempotency: { store: createRpcIdempotencyStore({ maxOutcomeBytes: 10 }) },
-      middlewares: [connect({ transport: serverTransport })]
-    })
-    const client = await createClientEndpoint({
-      id: 'client',
-      transport: clientTransport,
-      targetIds: ['server'],
-      middlewares: [connect({ transport: clientTransport })]
-    })
+    const server = await createRuntimeEndpointComposition(
+      {
+        id: 'server',
+        transport: serverTransport,
+        targetIds: ['client'],
+        idempotency: { store: createRpcIdempotencyStore({ maxOutcomeBytes: 10 }) },
+        middlewares: [connect({ transport: serverTransport })]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'client',
+        transport: clientTransport,
+        targetIds: ['server'],
+        middlewares: [connect({ transport: clientTransport })]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     let count = 0
     let count2 = 0
     server.provide('count', (context) => {
@@ -197,18 +230,24 @@ describe('keyed provider execution', () => {
 
   it('executes one method/key pair once and replays the result', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
-    const server = await createProviderEndpoint({
-      id: 'server',
-      transport: serverTransport,
-      targetIds: ['client'],
-      middlewares: [connect({ transport: serverTransport })]
-    })
-    const client = await createClientEndpoint({
-      id: 'client',
-      transport: clientTransport,
-      targetIds: ['server'],
-      middlewares: [connect({ transport: clientTransport })]
-    })
+    const server = await createRuntimeEndpointComposition(
+      {
+        id: 'server',
+        transport: serverTransport,
+        targetIds: ['client'],
+        middlewares: [connect({ transport: serverTransport })]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'client',
+        transport: clientTransport,
+        targetIds: ['server'],
+        middlewares: [connect({ transport: clientTransport })]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     let count = 0
     server.provide('count', (context) => context.success(++count))
     try {
@@ -230,18 +269,24 @@ describe('keyed provider execution', () => {
 
   it('makes an overlapping duplicate wait for the owner result', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
-    const server = await createProviderEndpoint({
-      id: 'server',
-      transport: serverTransport,
-      targetIds: ['client'],
-      middlewares: [connect({ transport: serverTransport })]
-    })
-    const client = await createClientEndpoint({
-      id: 'client',
-      transport: clientTransport,
-      targetIds: ['server'],
-      middlewares: [connect({ transport: clientTransport })]
-    })
+    const server = await createRuntimeEndpointComposition(
+      {
+        id: 'server',
+        transport: serverTransport,
+        targetIds: ['client'],
+        middlewares: [connect({ transport: serverTransport })]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'client',
+        transport: clientTransport,
+        targetIds: ['server'],
+        middlewares: [connect({ transport: clientTransport })]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     let count = 0
     let finish: ((value: number) => void) | undefined
     const gate = new Promise<number>((resolve) => {
@@ -269,18 +314,24 @@ describe('keyed provider execution', () => {
 
   it('releases an aborted owner so a duplicate can execute once', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
-    const server = await createProviderEndpoint({
-      id: 'server',
-      transport: serverTransport,
-      targetIds: ['client'],
-      middlewares: [connect({ transport: serverTransport }), abort()]
-    })
-    const client = await createClientEndpoint({
-      id: 'client',
-      transport: clientTransport,
-      targetIds: ['server'],
-      middlewares: [connect({ transport: clientTransport }), abort()]
-    })
+    const server = await createRuntimeEndpointComposition(
+      {
+        id: 'server',
+        transport: serverTransport,
+        targetIds: ['client'],
+        middlewares: [connect({ transport: serverTransport }), abort()]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'client',
+        transport: clientTransport,
+        targetIds: ['server'],
+        middlewares: [connect({ transport: clientTransport }), abort()]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     let count = 0
     let started: (() => void) | undefined
     const firstStarted = new Promise<void>((resolve) => {

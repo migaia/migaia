@@ -33,43 +33,22 @@ import {
 import { attachErrorIdentity } from '@migaia/utils/error'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { IpcReporterContext } from '../core/plugins/reporter-context.js'
-import { normalizePortable } from '@migaia/rpc-contract'
-import {} from '../core/internal/outbound-envelope.js'
-import {
-  isForwardedPayload,
-  isForwardedOperation,
-  retainForwardOptions
-} from '../core/internal/outbound-envelope.js'
+import { isForwardedOperation } from '../core/internal/outbound-envelope.js'
 import type { IRpcPortableValue } from '@migaia/rpc-contract'
-import type { IRuntimePeer, IRuntimePeerSourceResult } from './runtime-api/peer.js'
+import type { IRuntimePeer } from './runtime-api/peer.js'
 import { readRuntimePeerConnection } from './runtime-api/peer.js'
 import { RuntimeApiErrorText, RuntimeApiMode } from './runtime-api/constants.js'
 import { RpcCoreErrorText } from '../core/error-text.js'
 import { createProviderGenerationRetired } from '../core/internal/provider.js'
-import { RpcCoreErrorCode } from '../core/index.js'
+import { RpcCoreErrorCode } from '../core/errors.js'
 
 import { nativeReplayReceipt } from '../core/internal/native-replay.js'
 import { resolveAbortReason } from '../core/internal/async-control.js'
-import { assertRpcIdempotencyKey, defaultRpcId } from '../core/internal/id.js'
-import { RemoteMethodName } from './constants.js'
-import {
-  normalizeRemoteContract,
-  normalizeRemoteControlShape,
-  normalizeRemoteHostCatalog,
-  RemoteMethodMode,
-  type IRemoteContract,
-  type IRemoteControlDefinition,
-  type IRemoteHostCatalog,
-  type IRemoteMethodContract
-} from './contract.js'
-import { normalizeRuntimeDescription, runtimeDirectoryDiff } from './runtime-api/description.js'
-import { describeRemoteMethods } from './serve-methods.js'
+import { runtimeDirectoryDiff } from './runtime-api/description.js'
 import { ERROR_SOURCE, RpcRemoteLayerErrorCode } from './error-code.js'
 import { createRemoteLayerError } from './error.js'
-import { RpcRemoteLayerErrorText } from './error-text.js'
 import { createRemoteRetryPort, dispatchRemoteRetry } from './retry.js'
 import type {
-  IRemoteCallOptions,
   IRemoteChannel,
   IRemoteGenerationEvents,
   IRemoteProxyOptions,
@@ -82,89 +61,57 @@ type IRemoteGeneration = Readonly<{
   number: number
   channel: IRemoteChannel
   served: IRemoteServeEndpoint
-  runtime?: IRuntimePeer
+  runtime: IRuntimePeer
   /** Only the original current receipt retains its exact native unit for local cold sampling. */
   unit: unknown
   close(): Promise<void>
 }>
 
-/** Internal owner used by Plugin, Host, and Coroutine without a second proxy implementation. */
-export type IRemoteRegistration = Readonly<{
-  readonly contract: IRemoteContract | IRemoteHostCatalog
+/** The same generation owner accepts a negotiated runtime directory without a synthetic v1 contract. */
+export type IRemoteRuntimeRegistration = Readonly<{
   readonly events: IRemoteGenerationEvents
   prepareGeneration(
     signal: IAbortSignal,
     own: (dispose: () => Promise<void>) => void
   ): Promise<number>
-  invokeRequest(
-    method: string,
-    params: unknown,
-    options?: IRemoteCallOptions
-  ): Promise<IRpcPortableValue>
-  invokeOneWay(method: string, params: unknown): Promise<void>
-  invokeStream(
-    method: string,
-    params: unknown,
-    options?: IRemoteCallOptions
-  ): AsyncIterableIterator<IRpcPortableValue>
-  invokeControl(
-    method: string,
-    params: unknown,
-    parameterShape: IRemoteControlDefinition,
-    resultShape: IRemoteControlDefinition
-  ): Promise<IRpcPortableValue>
-  featureProxies(
-    pluginName?: string
-  ): Readonly<Record<string, Readonly<Record<string, (...args: unknown[]) => unknown>>>>
   revoke(reason: unknown): void
   whenClosed(generation: number): Promise<void>
   departedReasonCount(): number
   release(): Promise<void>
+  /** Exact native execution authority is present only for the original spawn/create factory path. */
+  /** Identity reads keep late exit facts bound to their exact original native generation. */
+  /** Cold target selection reads only the retained safe directory, without native sampling. */
+  runtimeInstanceIds(): readonly string[]
+  runtimeInstanceId(generation: number): string | IRuntimeUnavailable
+  readonly execution: ISupervisor<unknown, unknown> | undefined
+  /** Passive lifecycle observers read the same original supervisor, including local connections. */
+  readonly supervisor: ISupervisor<unknown, unknown>
+  currentPeer(): IRuntimePeer
+  /** True while the next generation is starting and no current Peer exists. */
+  readonly restarting: boolean
+  /** Whole forwarded groups retain the original accepted generation and leave reason. */
+  invokeGroup(...args: Parameters<IRuntimePeer['group']>): ReturnType<IRuntimePeer['group']>
+  /** Read original native state and bounded safe lifecycle history without preparing a generation. */
+  inspectRuntime(): Promise<IRuntimeDetail>
+  /** Logical runtime calls reuse the original retry/key/deadline dispatch below. */
+  invokeRequest(
+    method: string,
+    payload: unknown,
+    options?: IRuntimeCallOptions,
+    mode?: RuntimeApiMode
+  ): Promise<IRpcPortableValue>
+  /** Forward streams retain the original generation and iterator lifecycle without replay. */
+  invokeStream(
+    method: string,
+    payload: unknown,
+    options?: IRuntimeCallOptions
+  ): AsyncIterableIterator<IRpcPortableValue>
+  /** Observe only a genuinely prepared canonical generation, after current pointer publication. */
+  onReady(listener: (peer: IRuntimePeer, generation: number) => void): () => void
 }>
 
-/** The same generation owner accepts a negotiated runtime directory without a synthetic v1 contract. */
-export type IRemoteRuntimeRegistration = Pick<
-  IRemoteRegistration,
-  'events' | 'prepareGeneration' | 'whenClosed' | 'release' | 'revoke' | 'departedReasonCount'
-> &
-  Readonly<{
-    /** Exact native execution authority is present only for the original spawn/create factory path. */
-    /** Identity reads keep late exit facts bound to their exact original native generation. */
-    /** Cold target selection reads only the retained safe directory, without native sampling. */
-    runtimeInstanceIds(): readonly string[]
-    runtimeInstanceId(generation: number): string | IRuntimeUnavailable
-    readonly execution: ISupervisor<unknown, unknown> | undefined
-    /** Passive lifecycle observers read the same original supervisor, including local connections. */
-    readonly supervisor: ISupervisor<unknown, unknown>
-    currentPeer(): IRuntimePeer
-    /** True while the next generation is starting and no current Peer exists. */
-    readonly restarting: boolean
-    /** Whole forwarded groups retain the original accepted generation and leave reason. */
-    invokeGroup(...args: Parameters<IRuntimePeer['group']>): ReturnType<IRuntimePeer['group']>
-    /** Read original native state and bounded safe lifecycle history without preparing a generation. */
-    inspectRuntime(): Promise<IRuntimeDetail>
-    /** Logical runtime calls reuse the original retry/key/deadline dispatch below. */
-    invokeRequest(
-      method: string,
-      payload: unknown,
-      options?: IRuntimeCallOptions,
-      mode?: RuntimeApiMode
-    ): Promise<IRpcPortableValue>
-    /** Forward streams retain the original generation and iterator lifecycle without replay. */
-    invokeStream(
-      method: string,
-      payload: unknown,
-      options?: IRuntimeCallOptions
-    ): AsyncIterableIterator<IRpcPortableValue>
-    /** Observe only a genuinely prepared canonical generation, after current pointer publication. */
-    onReady(listener: (peer: IRuntimePeer, generation: number) => void): () => void
-  }>
-
 /** Runtime preparation stays inside the original binding/channel/generation rollback boundary. */
-export type IRemoteRuntimeRegistrationOptions<TUnit, TSpec> = Omit<
-  IRemoteProxyOptions<TUnit, TSpec>,
-  'contract' | 'endpointFactory'
-> &
+export type IRemoteRuntimeRegistrationOptions<TUnit, TSpec> = IRemoteProxyOptions<TUnit, TSpec> &
   Readonly<{
     /** Private native factory provenance; local connection ownership cannot set execution authority. */
     execution?: ISupervisor<unknown, unknown>
@@ -178,23 +125,9 @@ export type IRemoteRuntimeRegistrationOptions<TUnit, TSpec> = Omit<
     beforeRelease?(): Promise<void>
   }>
 
-/** Only the package factories construct this union; v1 contract validation remains mandatory there. */
-type IRemoteRegistrationOptions<TUnit, TSpec> = Omit<
-  IRemoteProxyOptions<TUnit, TSpec>,
-  'contract' | 'endpointFactory'
-> &
-  Readonly<{
-    execution?: ISupervisor<unknown, unknown>
-    contract?: IRemoteContract | IRemoteHostCatalog
-    endpointFactory?: IRemoteProxyOptions<TUnit, TSpec>['endpointFactory']
-    prepareRuntime?: IRemoteRuntimeRegistrationOptions<TUnit, TSpec>['prepareRuntime']
-    readRuntimeEndpoint?: IRemoteRuntimeRegistrationOptions<TUnit, TSpec>['readRuntimeEndpoint']
-    beforeRelease?: IRemoteRuntimeRegistrationOptions<TUnit, TSpec>['beforeRelease']
-  }>
-
 /** One setup-scoped resource owner also accepts replacement generation resources. */
 export type IRemoteGenerationHolder<
-  TRegistration extends IRemoteRegistration | IRemoteRuntimeRegistration = IRemoteRegistration
+  TRegistration extends IRemoteRuntimeRegistration = IRemoteRuntimeRegistration
 > = Readonly<{
   readonly registration: TRegistration
   prepareInitial(signal: IAbortSignal, rollbackOnFailure?: boolean): Promise<number>
@@ -231,20 +164,74 @@ function restoreTaggedProviderFailure(error: unknown): never {
   throw error
 }
 
+/** One acquired candidate retains endpoint/channel cleanup identities until commit or rollback. */
+class RemoteGenerationResources {
+  /** The original acquired physical channel must close after its logical endpoint. */
+  readonly channel: IRemoteChannel
+  /** A prepared runtime owns endpoint disposal when the native route is selected. */
+  #runtime: IRuntimePeer | undefined
+  /** Binding validation may throw after runtime ownership has already been retained. */
+  #served: IRemoteServeEndpoint | undefined
+  /** Channel cleanup is idempotent and preserves the original Promise identity. */
+  #channelClose: Promise<void> | undefined
+  /** Endpoint cleanup is idempotent independently of channel cleanup. */
+  #endpointClose: Promise<void> | undefined
+
+  /** Retain an acquired channel before subsequent admission or binding can fail. */
+  constructor(channel: IRemoteChannel) {
+    this.channel = channel
+  }
+
+  /** Retain runtime disposal before observing its endpoint, whose binding validation can throw. */
+  retainRuntime(runtime: IRuntimePeer | undefined): void {
+    this.#runtime = runtime
+  }
+
+  /** Retain the exact endpoint selected by the existing binding owner. */
+  retainEndpoint(served: IRemoteServeEndpoint): void {
+    this.#served = served
+  }
+
+  /** Close exactly the acquired channel, retaining its first cleanup Promise. */
+  closeChannel = (): Promise<void> => (this.#channelClose ??= this.channel.close())
+
+  /** Close the prepared runtime or its exact endpoint before releasing the physical channel. */
+  closeEndpoint = (): Promise<void> =>
+    (this.#endpointClose ??= this.#runtime
+      ? this.#runtime.close()
+      : this.#served!.endpoint.dispose())
+
+  /** Run the existing endpoint-before-channel transaction and preserve native failure identities. */
+  close = async (): Promise<void> => {
+    /** Lifecycle continues the original plan even when endpoint cleanup fails. */
+    const failures = await createDisposeTransaction(
+      { kind: DisposeTransactionKind.plan },
+      { errorPolicy: 'collect', scheduler: this.channel.scheduler }
+    ).run(
+      [this.closeEndpoint, this.closeChannel].map((force, index) => ({
+        source: String(index),
+        descriptor: { force }
+      }))
+    )
+    if (failures.length === 1) throw failures[0]!.error
+    if (failures.length > 1)
+      throw codedAggregate(
+        failures.map(({ error }) => error),
+        RpcRemoteLayerErrorCode.closed
+      )
+  }
+}
+
 /** One generation holder owns leave ordering and the retry port's neutral events. */
 class RemoteRegistration<TUnit, TSpec> {
-  /** Validated method description, independent of a live connection. */
-  readonly contract: IRemoteContract | IRemoteHostCatalog | undefined
-  /** Host mode validates one catalog over one shared generation. */
-  readonly #catalog: IRemoteHostCatalog | undefined
   /** Generation observations consumed by retry and Host readiness. */
   readonly events: IRemoteGenerationEvents
   /** The current binding and its single scheduler. */
-  readonly #options: IRemoteRegistrationOptions<TUnit, TSpec>
+  readonly #options: IRemoteRuntimeRegistrationOptions<TUnit, TSpec>
   /** An explicit port replaces the shared default for this registration. */
   readonly #retryPort: IRemoteRetryPort
   /** Core owns runtime raw capture, retry and conditional lazy consumer preparation. */
-  readonly #coreCalls: ReturnType<typeof createRuntimeBindingCalls> | undefined
+  readonly #coreCalls: ReturnType<typeof createRuntimeBindingCalls>
   /** Most recent described and active generation. */
   #current: IRemoteGeneration | undefined
   /** Accepted runtime sessions start at zero; failed channel/describe candidates never advance it. */
@@ -274,15 +261,8 @@ class RemoteRegistration<TUnit, TSpec> {
   #releaseReason: unknown
 
   /** Validates local options before any launcher side effect. */
-  constructor(options: IRemoteRegistrationOptions<TUnit, TSpec>, kind: 'plugin' | 'host') {
+  constructor(options: IRemoteRuntimeRegistrationOptions<TUnit, TSpec>) {
     this.#options = options
-    this.#catalog =
-      !options.prepareRuntime && kind === 'host'
-        ? normalizeRemoteHostCatalog(options.contract)
-        : undefined
-    this.contract = options.prepareRuntime
-      ? undefined
-      : (this.#catalog ?? normalizeRemoteContract(options.contract))
     if (
       options.callDeadlineCapMs !== undefined &&
       (!Number.isSafeInteger(options.callDeadlineCapMs) || options.callDeadlineCapMs <= 0)
@@ -326,58 +306,41 @@ class RemoteRegistration<TUnit, TSpec> {
         scheduler: options.binding.scheduler,
         report: options.report
       })
-    this.#coreCalls = options.prepareRuntime
-      ? createRuntimeBindingCalls({
-          scheduler: options.binding.scheduler,
-          events: this.events,
-          dispatch: (input, forwarded) =>
-            forwarded
-              ? dispatchRemoteRetry(
-                  {
-                    events: this.events,
-                    scheduler: options.binding.scheduler,
-                    report: options.report
-                  },
-                  input
-                )
-              : this.#retryPort.dispatch(input),
-          current: () => {
-            const active = this.#active()
-            return {
-              number: active.number,
-              channel: active.channel,
-              endpoint: active.served.endpoint
-            }
-          },
-          observedGeneration: () => this.#current?.number ?? options.binding.supervisor.generation,
-          declaration: (method, mode) => this.#runtimeMethod(method, mode),
-          validateOptions: (input) => this.#callOptions(input as IRuntimeCallOptions, true),
-          ...(options.callGuard
-            ? {
-                guard: (method, mode, generation) =>
-                  options.callGuard!.beforeDispatch({
-                    method,
-                    mode:
-                      mode === 'stream'
-                        ? RemoteMethodMode.asyncGenerator
-                        : mode === 'notify'
-                          ? RemoteMethodMode.oneWay
-                          : RemoteMethodMode.request,
-                    generation
-                  })
-              }
-            : {}),
-          keyFactory: options.keyFactory,
-          timeout: (requested) => this.#timeout(requested),
-          closed: (generation, cause) =>
-            createRemoteLayerError(RpcRemoteLayerErrorCode.closed, cause, { generation }),
-          departureCause: (generation) => this.#departed.get(generation),
-          restoreFailure: restoreTaggedProviderFailure,
-          ...(options.binding.trackRequest
-            ? { trackRequest: (invoke) => options.binding.trackRequest!(invoke) }
-            : {})
-        })
-      : undefined
+    this.#coreCalls = createRuntimeBindingCalls({
+      scheduler: options.binding.scheduler,
+      events: this.events,
+      dispatch: (input, forwarded) =>
+        forwarded
+          ? dispatchRemoteRetry(
+              {
+                events: this.events,
+                scheduler: options.binding.scheduler,
+                report: options.report
+              },
+              input
+            )
+          : this.#retryPort.dispatch(input),
+      current: () => {
+        const active = this.#active()
+        return {
+          number: active.number,
+          channel: active.channel,
+          endpoint: active.served.endpoint
+        }
+      },
+      observedGeneration: () => this.#current?.number ?? options.binding.supervisor.generation,
+      declaration: (method, mode) => this.#runtimeMethod(method, mode),
+      validateOptions: (input) => this.#callOptions(input),
+      keyFactory: options.keyFactory,
+      timeout: (requested) => this.#timeout(requested),
+      closed: (generation, cause) =>
+        createRemoteLayerError(RpcRemoteLayerErrorCode.closed, cause, { generation }),
+      departureCause: (generation) => this.#departed.get(generation),
+      restoreFailure: restoreTaggedProviderFailure,
+      ...(options.binding.trackRequest
+        ? { trackRequest: (invoke) => options.binding.trackRequest!(invoke) }
+        : {})
+    })
     this.#unsubscribe = options.binding.supervisor.subscribe((event) => {
       if (event.type === 'exit') this.#leave(event.generation, event.error)
       if (
@@ -444,26 +407,25 @@ class RemoteRegistration<TUnit, TSpec> {
     if (this.#departed.has(generation)) return
     this.#departed.set(generation, reason)
     const current = this.#current?.number === generation ? this.#current : undefined
-    if (this.#options.prepareRuntime) {
-      /**
-       * Capture safe identity before disposing the exact current endpoint; never label a candidate
-       * with an old identity.
-       */
-      const identity = current?.runtime
-        ? readRuntimePeerConnection(current.runtime).description?.self
-        : undefined
-      this.#runtimeRecent.push(
-        Object.freeze({
-          generation,
-          timestamp: this.#options.binding.scheduler.now(),
-          clock: RuntimeQueryClock.scheduler,
-          kind: RuntimeRecentKind.departed,
-          ...(identity ? { identity } : {}),
-          ...runtimeErrorIdentity(reason, this.#options.report)
-        })
-      )
-      if (this.#runtimeRecent.length > RuntimeQueryLimit.recent) this.#runtimeRecent.shift()
-    }
+    /**
+     * Capture safe identity before disposing the exact current endpoint; never label a candidate
+     * with an old identity.
+     */
+    const identity = current?.runtime
+      ? readRuntimePeerConnection(current.runtime).description?.self
+      : undefined
+    this.#runtimeRecent.push(
+      Object.freeze({
+        generation,
+        timestamp: this.#options.binding.scheduler.now(),
+        clock: RuntimeQueryClock.scheduler,
+        kind: RuntimeRecentKind.departed,
+        ...(identity ? { identity } : {}),
+        ...runtimeErrorIdentity(reason, this.#options.report)
+      })
+    )
+    /** This shift is bounded by the compile-time RuntimeQueryLimit.recent=100 history cap. */
+    if (this.#runtimeRecent.length > RuntimeQueryLimit.recent) this.#runtimeRecent.shift()
     if (current) this.#current = undefined
     for (const listener of this.#leaveListeners.get(generation) ?? []) {
       try {
@@ -577,9 +539,10 @@ class RemoteRegistration<TUnit, TSpec> {
     } catch (cause) {
       throw createRemoteLayerError(RpcRemoteLayerErrorCode.startFailed, cause)
     }
+    /** Cleanup identities belong to the candidate rather than a captured mutable local cache. */
+    const resources = new RemoteGenerationResources(channel)
     /** The channel is owned before any later validation or endpoint construction can fail. */
-    let channelClose: Promise<void> | undefined
-    const closeChannel = (): Promise<void> => (channelClose ??= channel.close())
+    const closeChannel = resources.closeChannel
     try {
       this.#assertPreparing(signal, outcome.generation)
     } catch (error) {
@@ -589,25 +552,6 @@ class RemoteRegistration<TUnit, TSpec> {
     own(closeChannel)
     if (channel.scheduler !== this.#options.binding.scheduler)
       throw createRpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.schedulerInvalid)
-    const contracts = this.#options.prepareRuntime
-      ? []
-      : this.#catalog
-        ? Object.values(this.#catalog)
-        : [this.contract as IRemoteContract]
-    const hasStream = contracts.some((contract) =>
-      Object.values(contract.features).some((feature) =>
-        Object.values(feature.methods).some(
-          (method) =>
-            method.mode === RemoteMethodMode.generator ||
-            method.mode === RemoteMethodMode.asyncGenerator
-        )
-      )
-    )
-    if (hasStream && !channel.agreement.capabilities.includes('stream@1'))
-      throw createRpcError(
-        RpcCoreErrorCode.capabilityConflict,
-        RpcRemoteLayerErrorText.streamUnavailable
-      )
     /**
      * Local physical closure must revoke the generation before endpoint sends reject. A peer error
      * code alone is not departure evidence; only this transport's closed state is.
@@ -616,28 +560,23 @@ class RemoteRegistration<TUnit, TSpec> {
       if (channel.transport.closed === true) this.#leave(outcome.generation, reason)
     })
     if (removeTransportError) own(async () => removeTransportError())
-    if (this.#options.prepareRuntime) {
-      /** Native L can retire during a core checkpoint before the adapter's exit event arrives. */
-      const removeRetirement = nativeReplayReceipt(channel.transport)?.onRetire(() =>
-        this.#leave(outcome.generation, createRpcAbortError())
-      )
-      if (removeRetirement) own(async () => removeRetirement())
-    }
+    /** Native L can retire during a core checkpoint before the adapter's exit event arrives. */
+    const removeRetirement = nativeReplayReceipt(channel.transport)?.onRetire(() =>
+      this.#leave(outcome.generation, createRpcAbortError())
+    )
+    if (removeRetirement) own(async () => removeRetirement())
     /** Both runtime and advanced v2 directories share the same exact departure/resource owner. */
     /** Only the eventual original pointer publication commits this reserved session ordinal. */
     const sessionGeneration = this.#runtimeSession + 1
-    const runtime = this.#options.prepareRuntime
-      ? await this.#options.prepareRuntime(channel, signal, sessionGeneration)
-      : undefined
+    const runtime = await this.#options.prepareRuntime(channel, signal, sessionGeneration)
     /** Endpoint is registered before the first describe frame. */
-    let endpointClose: Promise<void> | undefined
-    const closeEndpoint = (): Promise<void> =>
-      (endpointClose ??= runtime ? runtime.close() : served.endpoint.dispose())
-    if (runtime) own(closeEndpoint)
+    resources.retainRuntime(runtime)
+    /** The candidate owns the same cleanup function throughout binding validation. */
+    const closeEndpoint = resources.closeEndpoint
+    own(closeEndpoint)
     /** Binding validation can itself fail, so acquired runtime cleanup is already retained above. */
-    const served = runtime
-      ? this.#options.readRuntimeEndpoint!(runtime)
-      : await this.#options.endpointFactory!(channel, signal)
+    const served = this.#options.readRuntimeEndpoint(runtime)
+    resources.retainEndpoint(served)
     try {
       this.#assertPreparing(signal, outcome.generation)
     } catch (error) {
@@ -645,79 +584,14 @@ class RemoteRegistration<TUnit, TSpec> {
       throw error
     }
     own(closeEndpoint)
-    if (hasStream && !served.stream)
-      throw createRpcError(
-        RpcCoreErrorCode.capabilityConflict,
-        RpcRemoteLayerErrorText.streamUnavailable
-      )
-    if (!runtime) {
-      /** Legacy facade assembly now publishes v2 routes before releasing the same native reader. */
-      ;(channel as IRuntimePeerSourceResult).activateReceive?.()
-      const description = await served.endpoint.send(
-        channel.peerId,
-        RemoteMethodName.runtimeDescribe,
-        [],
-        {
-          signal
-        }
-      )
-      /**
-       * Local advanced declarations select facade methods; the remote v2 whitelist is
-       * authoritative.
-       */
-      const remote = normalizeRuntimeDescription(description)
-      const expected = describeRemoteMethods(contracts, remote.self, this.#catalog !== undefined)
-      const names = new Set(contracts.map((contract) => contract.plugin))
-      const selected = remote.methods.filter(
-        (method) =>
-          names.has(method.name.split('.')[0]!) ||
-          (this.#catalog !== undefined &&
-            [
-              RemoteMethodName.hostUse,
-              RemoteMethodName.hostUnUse,
-              RemoteMethodName.hostInspect
-            ].includes(method.name as never))
-      )
-      if (
-        remote.self.instanceId !== channel.peerId ||
-        selected.length !== expected.methods.length ||
-        expected.methods.some((method) => {
-          const actual = selected.find((candidate) => candidate.name === method.name)
-          return (
-            !actual ||
-            actual.supportedModes.length !== method.supportedModes.length ||
-            actual.supportedModes.some((mode) => !method.supportedModes.includes(mode)) ||
-            (actual.idempotent ?? false) !== (method.idempotent ?? false)
-          )
-        })
-      )
-        throw createRemoteLayerError(RpcRemoteLayerErrorCode.contractInvalid)
-    }
     /** Close endpoint before channel regardless of who owns the registration. */
     const generation: IRemoteGeneration = Object.freeze({
       number: outcome.generation,
       unit: outcome.unit,
       channel,
       served,
-      ...(runtime ? { runtime } : {}),
-      close: async () => {
-        /** Lifecycle continues the original endpoint-before-channel plan after either failure. */
-        const failures = await createDisposeTransaction(
-          { kind: DisposeTransactionKind.plan },
-          { errorPolicy: 'collect', scheduler: channel.scheduler }
-        ).run(
-          [closeEndpoint, closeChannel].map((force, index) => ({
-            source: String(index),
-            descriptor: { force }
-          }))
-        )
-        if (failures.length === 1) throw failures[0]!.error
-        if (failures.length > 1)
-          throw codedAggregate(
-            failures.map(({ error }) => error),
-            RpcRemoteLayerErrorCode.closed
-          )
-      }
+      runtime,
+      close: resources.close
     })
     try {
       this.#assertPreparing(signal, generation.number)
@@ -725,9 +599,18 @@ class RemoteRegistration<TUnit, TSpec> {
       await this.#closeFailedCandidate([closeEndpoint, closeChannel])
       throw error
     }
-    if (runtime) this.#runtimeSession = sessionGeneration
+    return this.#commitGeneration(generation, runtime, sessionGeneration)
+  }
+
+  /** Publish one accepted generation, then notify its original directory and readiness observers. */
+  #commitGeneration(
+    generation: IRemoteGeneration,
+    runtime: IRuntimePeer,
+    sessionGeneration: number
+  ): number {
+    this.#runtimeSession = sessionGeneration
     /** Only the accepted replacement is compared with the original last-admitted directory. */
-    const directory = runtime ? readRuntimePeerConnection(runtime).directory : undefined
+    const directory = readRuntimePeerConnection(runtime).directory
     /** First acceptance and identical route sets produce no artificial diff. */
     const diff =
       this.#runtimeDirectory?.description && directory?.description
@@ -746,14 +629,13 @@ class RemoteRegistration<TUnit, TSpec> {
         hostRethrowReporter(failure, IpcReporterContext)
       }
     }
-    if (runtime)
-      for (const listener of this.#runtimeReadyListeners) {
-        try {
-          listener(runtime, generation.number)
-        } catch (error) {
-          this.#options.report(error)
-        }
+    for (const listener of this.#runtimeReadyListeners) {
+      try {
+        listener(runtime, generation.number)
+      } catch (error) {
+        this.#options.report(error)
       }
+    }
     for (const waiter of this.#readyWaiters)
       if (generation.number > waiter.after) this.#settleWaiter(waiter, generation.number, true)
     return generation.number
@@ -932,36 +814,18 @@ class RemoteRegistration<TUnit, TSpec> {
     }
   }
 
-  /** Portable method arguments are checked before guard, retry, or frame emission. */
-  #params(value: unknown): readonly IRpcPortableValue[] {
-    /** Contract-level normalization errors are remapped to the application contract owner. */
-    let portable: IRpcPortableValue
-    try {
-      portable = normalizePortable(value)
-    } catch (cause) {
-      throw createRemoteLayerError(RpcRemoteLayerErrorCode.contractInvalid, cause)
-    }
-    if (!Array.isArray(portable))
-      throw createRemoteLayerError(RpcRemoteLayerErrorCode.contractInvalid)
-    return portable as readonly IRpcPortableValue[]
-  }
-
   /** Rejects control data that is not part of a declared request or stream call. */
-  #callOptions(
-    options: unknown,
-    allowKey: boolean
-  ): asserts options is IRemoteCallOptions | IRuntimeCallOptions {
+  #callOptions(options: unknown): asserts options is IRuntimeCallOptions {
     if (options === null || typeof options !== 'object' || Array.isArray(options))
       throw createRemoteLayerError(RpcRemoteLayerErrorCode.contractInvalid)
     for (const key of Object.keys(options))
       if (
         key !== 'signal' &&
         key !== 'timeoutMs' &&
-        !(allowKey && key === 'idempotencyKey') &&
-        !(
-          this.#options.prepareRuntime &&
-          (key === 'orderKey' || key === 'cancel' || key === 'transfer')
-        )
+        key !== 'idempotencyKey' &&
+        key !== 'orderKey' &&
+        key !== 'cancel' &&
+        key !== 'transfer'
       )
         throw createRemoteLayerError(RpcRemoteLayerErrorCode.contractInvalid, undefined, {
           path: `$.options.${key}`
@@ -969,7 +833,7 @@ class RemoteRegistration<TUnit, TSpec> {
     const call = options as IRuntimeCallOptions
     if (
       call.timeoutMs !== undefined &&
-      !(this.#options.prepareRuntime && call.timeoutMs === false) &&
+      call.timeoutMs !== false &&
       (typeof call.timeoutMs !== 'number' || !Number.isFinite(call.timeoutMs) || call.timeoutMs < 0)
     )
       throw createRpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.timeoutInvalid)
@@ -979,102 +843,10 @@ class RemoteRegistration<TUnit, TSpec> {
   invokeRequest(
     method: string,
     params: unknown,
-    options: IRemoteCallOptions | IRuntimeCallOptions = {},
+    options: IRuntimeCallOptions = {},
     mode: RuntimeApiMode = RuntimeApiMode.request
   ): Promise<IRpcPortableValue> {
-    if (this.#coreCalls)
-      return this.#coreCalls.request(method, params, options, mode as 'request' | 'notify')
-    const forwarded = isForwardedPayload(options, params)
-    try {
-      const data = this.#params(params)
-      /** Runtime routes share the accepted cold index, while frozen v1 retains its original lookup. */
-      const declaration = this.#method(method)
-      if (declaration && 'mode' in declaration && declaration.mode !== RemoteMethodMode.request)
-        throw createRemoteLayerError(RpcRemoteLayerErrorCode.contractInvalid)
-      this.#callOptions(options, true)
-      const observedGeneration =
-        this.#current?.number ?? this.#options.binding.supervisor.generation
-      this.#options.callGuard?.beforeDispatch({
-        method,
-        mode: mode === RuntimeApiMode.notify ? RemoteMethodMode.oneWay : RemoteMethodMode.request,
-        generation: observedGeneration
-      })
-      const active = this.#active()
-      /** Explicit caller key takes precedence and suppresses factory invocation. */
-      const key =
-        options.idempotencyKey ??
-        (declaration?.idempotent ? (this.#options.keyFactory?.() ?? defaultRpcId()) : undefined)
-      if (key !== undefined) assertRpcIdempotencyKey(key)
-      const timeoutMs = this.#timeout(options.timeoutMs)
-      const deadlineAt =
-        timeoutMs === undefined ? undefined : this.#options.binding.scheduler.now() + timeoutMs
-      /** Retry ports see the same event source and a sendOnce bound to the logical key. */
-      const dispatch = {
-        method,
-        mode: 'request' as const,
-        idempotent: declaration?.idempotent ?? false,
-        key,
-        generation: active.number,
-        signal: options.signal,
-        timeoutMs,
-        deadlineAt,
-        events: this.events,
-        sendOnce: async (
-          input: Readonly<{ expectedGeneration: number; remainingMs?: number; key?: string }>
-        ) => {
-          if (input.key !== key)
-            throw createRpcError(
-              RpcCoreErrorCode.invalidConfig,
-              RpcCoreErrorText.idempotencyKeyInvalid
-            )
-          if (
-            input.remainingMs !== undefined &&
-            (!Number.isFinite(input.remainingMs) || input.remainingMs <= 0)
-          )
-            throw createRpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.timeoutInvalid)
-          const live = this.#active()
-          if (live.number !== input.expectedGeneration)
-            throw createRemoteLayerError(
-              RpcRemoteLayerErrorCode.closed,
-              this.#departed.get(input.expectedGeneration),
-              { generation: input.expectedGeneration }
-            )
-          const sendOptions = retainForwardOptions(options, {
-            ...(options.signal ? { signal: options.signal } : {}),
-            ...(input.remainingMs === undefined
-              ? timeoutMs === undefined
-                ? {}
-                : { timeoutMs }
-              : { timeoutMs: input.remainingMs }),
-            ...(key === undefined ? {} : { idempotencyKey: key })
-          })
-          /** Native results can be returned without native input; this retains the same retry owner. */
-          const result = live.served.endpoint.send<IRpcPortableValue>(
-            live.channel.peerId,
-            method,
-            data,
-            sendOptions
-          )
-          return result.catch(restoreTaggedProviderFailure)
-        }
-      }
-      /**
-       * Forwarded work belongs to this admitted execution; a retired generation is never
-       * re-entered.
-       */
-      return forwarded
-        ? dispatchRemoteRetry(
-            {
-              events: this.events,
-              scheduler: this.#options.binding.scheduler,
-              report: this.#options.report
-            },
-            retainForwardOptions(options, dispatch)
-          )
-        : this.#retryPort.dispatch(dispatch)
-    } catch (error) {
-      return Promise.reject(error)
-    }
+    return this.#coreCalls.request(method, params, options, mode as 'request' | 'notify')
   }
 
   /** Admit the logical business mode from the same precompiled index used by direct Peer calls. */
@@ -1097,138 +869,13 @@ class RemoteRegistration<TUnit, TSpec> {
     return declaration
   }
 
-  /** One-way only settles local sending and has no invocation control options. */
-  invokeOneWay(method: string, params: unknown): Promise<void> {
-    try {
-      const data = this.#params(params)
-      const declaration = this.#method(method)
-      if (declaration.mode !== RemoteMethodMode.oneWay)
-        throw createRemoteLayerError(RpcRemoteLayerErrorCode.contractInvalid)
-      const observedGeneration =
-        this.#current?.number ?? this.#options.binding.supervisor.generation
-      this.#options.callGuard?.beforeDispatch({
-        method,
-        mode: declaration.mode,
-        generation: observedGeneration
-      })
-      const active = this.#active()
-      if (!active.served.oneWay)
-        throw createRpcError(
-          RpcCoreErrorCode.capabilityConflict,
-          RpcRemoteLayerErrorText.oneWayUnavailable
-        )
-      return active.served.oneWay.sendOneWay(active.channel.peerId, method, data)
-    } catch (error) {
-      return Promise.reject(error)
-    }
-  }
-
-  /** Sends one validated Host control request through the same generation and guard gate. */
-  invokeControl(
-    method: string,
-    params: unknown,
-    parameterShape: IRemoteControlDefinition,
-    resultShape: IRemoteControlDefinition
-  ): Promise<IRpcPortableValue> {
-    try {
-      if (!this.#catalog) throw createRemoteLayerError(RpcRemoteLayerErrorCode.contractInvalid)
-      const data = normalizeRemoteControlShape(parameterShape, params)
-      if (!Array.isArray(data))
-        throw createRemoteLayerError(RpcRemoteLayerErrorCode.contractInvalid)
-      if (method !== RemoteMethodName.hostInspect && !this.#catalog[data[0] as string])
-        throw createRemoteLayerError(RpcRemoteLayerErrorCode.contractInvalid)
-      this.#options.callGuard?.beforeDispatch({
-        method,
-        mode: 'host-control',
-        generation: this.#current?.number ?? this.#options.binding.supervisor.generation
-      })
-      const active = this.#active()
-      return active.served.endpoint
-        .send<IRpcPortableValue>(active.channel.peerId, method, data)
-        .catch(restoreTaggedProviderFailure)
-        .then((result) => normalizeRemoteControlShape(resultShape, result))
-    } catch (error) {
-      return Promise.reject(error)
-    }
-  }
-
   /** Stream opening remains lazy so guard errors reach the first next call. */
   invokeStream(
     method: string,
     params: unknown,
-    options: IRemoteCallOptions | IRuntimeCallOptions = {}
+    options: IRuntimeCallOptions = {}
   ): AsyncIterableIterator<IRpcPortableValue> {
-    if (this.#coreCalls) return this.#coreCalls.stream(method, params, options)
-    return this.#legacyStream(method, params, options)
-  }
-
-  /** Frozen advanced streams retain their original lazy generator and option contract. */
-  async *#legacyStream(
-    method: string,
-    params: unknown,
-    options: IRemoteCallOptions | IRuntimeCallOptions
-  ): AsyncIterableIterator<IRpcPortableValue> {
-    /** Advanced forwarding keeps its existing generation owner without another iterator registry. */
-    const forwarded = isForwardedPayload(options, params)
-    const data = this.#params(params)
-    const declaration = this.#method(method)
-    if (
-      declaration.mode !== RemoteMethodMode.generator &&
-      declaration.mode !== RemoteMethodMode.asyncGenerator
-    )
-      throw createRemoteLayerError(RpcRemoteLayerErrorCode.contractInvalid)
-    this.#callOptions(options, false)
-    const observedGeneration = this.#current?.number ?? this.#options.binding.supervisor.generation
-    this.#options.callGuard?.beforeDispatch({
-      method,
-      mode: declaration.mode,
-      generation: observedGeneration
-    })
-    const active = this.#active()
-    if (!active.served.stream)
-      throw createRpcError(
-        RpcCoreErrorCode.capabilityConflict,
-        RpcRemoteLayerErrorText.streamUnavailable
-      )
-    /** Departure is published by the original owner before its endpoint terminates this iterator. */
-    let retired: Error | undefined
-    /** Only forwarding observes retirement; ordinary streams retain their original error policy. */
-    const unsubscribe = forwarded
-      ? this.events.onLeave(active.number, (reason) => {
-          retired = createProviderGenerationRetired(reason)
-        })
-      : undefined
-    try {
-      /** Internal options keep the exact admitted payload and signed route through this owner. */
-      const callOptions = retainForwardOptions(options, {
-        ...(options.signal ? { signal: options.signal } : {}),
-        ...(this.#timeout(options.timeoutMs) === undefined
-          ? {}
-          : { timeoutMs: this.#timeout(options.timeoutMs) })
-      })
-      yield* active.served.stream.open(
-        active.channel.peerId,
-        `${RemoteMethodName.runtimeStreamPrefix}${method}`,
-        data,
-        callOptions
-      )
-    } catch (error) {
-      throw retired ?? error
-    } finally {
-      unsubscribe?.()
-    }
-  }
-
-  /** Finds only methods present in the validated description. */
-  #method(fullName: string): IRemoteMethodContract {
-    const [plugin, feature, method, extra] = fullName.split('.')
-    const contract = this.#catalog?.[plugin!] ?? (this.contract as IRemoteContract)
-    const declaration =
-      extra === undefined && plugin === contract.plugin
-        ? contract.features[feature!]?.methods[method!]
-        : undefined
-    if (!declaration) throw createRemoteLayerError(RpcRemoteLayerErrorCode.contractInvalid)
-    return declaration
+    return this.#coreCalls.stream(method, params, options)
   }
 
   /** Applies one registration cap at the logical-call entry. */
@@ -1238,46 +885,6 @@ class RemoteRegistration<TUnit, TSpec> {
       throw createRpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.timeoutInvalid)
     const cap = this.#options.callDeadlineCapMs
     return cap === undefined ? requested : requested === undefined ? cap : Math.min(cap, requested)
-  }
-
-  /** Feature methods are projected from the contract, never enumerated from a peer object. */
-  featureProxies(
-    pluginName?: string
-  ): Readonly<Record<string, Readonly<Record<string, (...args: unknown[]) => unknown>>>> {
-    /** Stable proxy surface persists across generation switches. */
-    const features: Record<
-      string,
-      Readonly<Record<string, (...args: unknown[]) => unknown>>
-    > = Object.create(null) as Record<
-      string,
-      Readonly<Record<string, (...args: unknown[]) => unknown>>
-    >
-    const contract = this.#catalog
-      ? this.#catalog[pluginName ?? '']
-      : (this.contract as IRemoteContract)
-    if (!contract) throw createRemoteLayerError(RpcRemoteLayerErrorCode.contractInvalid)
-    for (const [featureName, feature] of Object.entries(contract.features)) {
-      const methods: Record<string, (...args: unknown[]) => unknown> = Object.create(
-        null
-      ) as Record<string, (...args: unknown[]) => unknown>
-      for (const [methodName, declaration] of Object.entries(feature.methods)) {
-        const fullName = `${contract.plugin}.${featureName}.${methodName}`
-        methods[methodName] = (...args: unknown[]) => {
-          const params = args[0]
-          const options = args[1] as IRemoteCallOptions | undefined
-          if (declaration.mode === RemoteMethodMode.request)
-            return this.invokeRequest(fullName, params, options)
-          if (declaration.mode === RemoteMethodMode.oneWay) {
-            if (args.length > 1)
-              return Promise.reject(createRemoteLayerError(RpcRemoteLayerErrorCode.contractInvalid))
-            return this.invokeOneWay(fullName, params)
-          }
-          return this.invokeStream(fullName, params, options)
-        }
-      }
-      features[featureName] = Object.freeze(methods)
-    }
-    return Object.freeze(features)
   }
 
   /** Revokes a prepared generation when its external PluginHost enable step fails. */
@@ -1361,39 +968,43 @@ class RemoteRegistration<TUnit, TSpec> {
   }
 }
 
-/** Creates the single proxy owner shared by all runtime launchers. */
-export function createRemoteRegistration<TUnit, TSpec>(
-  options: IRemoteProxyOptions<TUnit, TSpec>,
-  kind: 'plugin' | 'host' = 'plugin'
-): IRemoteRegistration {
-  // The v1 constructor branch always validates and retains its required contract.
-  return new RemoteRegistration(options, kind) as IRemoteRegistration
-}
-
 /** Runtime facades reuse the original supervisor, leave ordering, waiters and resource holder. */
 export function createRemoteRuntimeRegistration<TUnit, TSpec>(
   options: IRemoteRuntimeRegistrationOptions<TUnit, TSpec>
 ): IRemoteRuntimeRegistration {
-  return new RemoteRegistration(options, 'plugin')
+  return new RemoteRegistration(options)
 }
 
 /** Owns generation resources once across setup, replacement, and final removal. */
-export function createRemoteGenerationHolder<
-  TRegistration extends IRemoteRegistration | IRemoteRuntimeRegistration
->(
-  registration: TRegistration,
-  report: (error: unknown) => void,
-  /** Runtime native drain owns committed channels; preparation cancellation must detach at commit. */
-  detachPreparationOnCommit = false
-): IRemoteGenerationHolder<TRegistration> {
-  /** A departed generation drops its resource group instead of growing a lifetime stack. */
-  const retained = new Set<Set<() => Promise<void>>>()
-  /** Final removal shares one settlement with repeated PluginHost cleanup. */
-  let releasePromise: Promise<void> | undefined
-  /** Observer and public command join one preparation of the same native generation. */
-  let pendingRebind: Promise<number> | undefined
-  /** Closes one group's disposers in reverse acquisition order. */
-  const closeGroup = async (group: Set<() => Promise<void>>): Promise<unknown[]> => {
+/** Own retained resources once across actual initial setup, native replacement and final removal. */
+class RemoteGenerationHolder<
+  TRegistration extends IRemoteRuntimeRegistration
+> implements IRemoteGenerationHolder<TRegistration> {
+  /** Original registration remains the sole native generation and supervision authority. */
+  readonly registration: TRegistration
+  /** Cleanup diagnostics retain the caller's original bare reporter. */
+  #report: (error: unknown) => void
+  /** Native drain ownership may detach preparation cancellation only at genuine commit. */
+  #detachPreparationOnCommit: boolean
+  /** Departed generations release their resource groups rather than growing a lifetime stack. */
+  #retained = new Set<Set<() => Promise<void>>>()
+  /** Final removal shares its first settlement with every repeated PluginHost cleanup. */
+  #releasePromise: Promise<void> | undefined
+  /** Observers and public commands join one original preparation of the same native generation. */
+  #pendingRebind: Promise<number> | undefined
+
+  /** Capture the existing owner ports without opening or preparing a native generation. */
+  constructor(
+    registration: TRegistration,
+    report: (error: unknown) => void,
+    detachPreparationOnCommit: boolean
+  ) {
+    this.registration = registration
+    this.#report = report
+    this.#detachPreparationOnCommit = detachPreparationOnCommit
+  }
+  /** Close original group resources in reverse acquisition order, retaining exact errors. */
+  #closeGroup = async (group: Set<() => Promise<void>>): Promise<unknown[]> => {
     const failures: unknown[] = []
     for (const dispose of [...group].reverse()) {
       try {
@@ -1403,32 +1014,34 @@ export function createRemoteGenerationHolder<
       }
     }
     group.clear()
-    retained.delete(group)
+    this.#retained.delete(group)
     return failures
   }
-  /** Rolls back a failed candidate without replacing its primary error. */
-  const rollback = async (group: Set<() => Promise<void>>, primary: unknown): Promise<boolean> => {
-    const failures = await closeGroup(group)
+
+  /** Report cleanup beside its original preparation primary without replacing that primary. */
+  #rollback = async (group: Set<() => Promise<void>>, primary: unknown): Promise<boolean> => {
+    const failures = await this.#closeGroup(group)
     if (failures.length > 0)
-      report(codedAggregate([primary, ...failures], RpcRemoteLayerErrorCode.startFailed))
+      (0, this.#report)(codedAggregate([primary, ...failures], RpcRemoteLayerErrorCode.startFailed))
     return failures.length > 0
   }
-  /** One preparation owns a new group and releases it when its generation leaves. */
-  const prepare = async (
+
+  /** Prepare one genuine generation and transfer only its actual acquired disposer group. */
+  #prepare = async (
     signal: IAbortSignal,
     cleanupOnFailure: boolean,
     reportFailure: boolean
   ): Promise<number> => {
     const group = new Set<() => Promise<void>>()
-    retained.add(group)
+    this.#retained.add(group)
     /** The existing lifecycle controller separates one preparation from its committed channel. */
-    const attempt = detachPreparationOnCommit
+    const attempt = this.#detachPreparationOnCommit
       ? createGenerationController({ parentSignal: signal })
       : undefined
     /** Initial setup and later rebinds use the same canonical cancellation transfer. */
     const request = attempt?.begin()
     try {
-      const generation = await registration.prepareGeneration(
+      const generation = await this.registration.prepareGeneration(
         request?.signal ?? signal,
         (dispose) => {
           group.add(dispose)
@@ -1438,59 +1051,73 @@ export function createRemoteGenerationHolder<
         if (request.signal.aborted) throw resolveAbortReason(request.signal)
         attempt!.complete(request.token)
       }
-      registration.events.onLeave(generation, () => {
-        void registration.whenClosed(generation).then(() => {
+      this.registration.events.onLeave(generation, () => {
+        void this.registration.whenClosed(generation).then(() => {
           group.clear()
-          retained.delete(group)
+          this.#retained.delete(group)
         })
       })
       return generation
     } catch (error) {
-      if (cleanupOnFailure || releasePromise) {
-        const hadCleanupFailure = await rollback(group, error)
-        if (reportFailure && !hadCleanupFailure) report(error)
+      if (cleanupOnFailure || this.#releasePromise) {
+        const hadCleanupFailure = await this.#rollback(group, error)
+        if (reportFailure && !hadCleanupFailure) (0, this.#report)(error)
       }
       throw error
     } finally {
       attempt?.dispose()
     }
   }
-  return {
-    registration,
-    prepareInitial: (signal, rollbackOnFailure = false) =>
-      prepare(signal, rollbackOnFailure, false),
-    prepareRebind: (signal) => {
-      if (signal.aborted) return Promise.reject(resolveAbortReason(signal))
-      if (releasePromise)
-        return Promise.reject(createRemoteLayerError(RpcRemoteLayerErrorCode.closed))
-      if (pendingRebind) return pendingRebind
-      /** An accepted generation already published its original pointer and outlet receipt. */
-      const current = registration.events.current()
-      if (
-        current.active &&
-        (!('supervisor' in registration) ||
-          current.generation === registration.supervisor.generation)
-      )
-        return Promise.resolve(current.generation)
-      pendingRebind = prepare(signal, true, true).finally(() => {
-        pendingRebind = undefined
-      })
-      return pendingRebind
-    },
-    retainedResourceCount: () => [...retained].reduce((count, group) => count + group.size, 0),
-    release: () => {
-      if (releasePromise) return releasePromise
-      releasePromise = (async () => {
-        const failures: unknown[] = []
-        try {
-          await registration.release()
-        } catch (error) {
-          failures.push(error)
-        }
-        for (const group of retained) failures.push(...(await closeGroup(group)))
-        if (failures.length > 0) throw codedAggregate(failures, RpcRemoteLayerErrorCode.closed)
-      })()
-      return releasePromise
-    }
+
+  /** Use original initial setup and explicit rollback policy before publication. */
+  prepareInitial = (signal: IAbortSignal, rollbackOnFailure = false) =>
+    this.#prepare(signal, rollbackOnFailure, false)
+
+  /** Join one preparation of the same original native generation without retargeting. */
+  prepareRebind = (signal: IAbortSignal) => {
+    if (signal.aborted) return Promise.reject(resolveAbortReason(signal))
+    if (this.#releasePromise)
+      return Promise.reject(createRemoteLayerError(RpcRemoteLayerErrorCode.closed))
+    if (this.#pendingRebind) return this.#pendingRebind
+    /** An accepted generation already published its original pointer and outlet receipt. */
+    const current = this.registration.events.current()
+    if (
+      current.active &&
+      (!('supervisor' in this.registration) ||
+        current.generation === this.registration.supervisor.generation)
+    )
+      return Promise.resolve(current.generation)
+    this.#pendingRebind = this.#prepare(signal, true, true).finally(() => {
+      this.#pendingRebind = undefined
+    })
+    return this.#pendingRebind
   }
+
+  /** Count only currently retained actual generation resources. */
+  retainedResourceCount = () => [...this.#retained].reduce((count, group) => count + group.size, 0)
+
+  /** Join the exact original final cleanup Promise across repeated host removal. */
+  release = () => {
+    if (this.#releasePromise) return this.#releasePromise
+    this.#releasePromise = (async () => {
+      const failures: unknown[] = []
+      try {
+        await this.registration.release()
+      } catch (error) {
+        failures.push(error)
+      }
+      for (const group of this.#retained) failures.push(...(await this.#closeGroup(group)))
+      if (failures.length > 0) throw codedAggregate(failures, RpcRemoteLayerErrorCode.closed)
+    })()
+    return this.#releasePromise
+  }
+}
+
+/** Reuse the original native registration for one retained generation resource owner. */
+export function createRemoteGenerationHolder<TRegistration extends IRemoteRuntimeRegistration>(
+  registration: TRegistration,
+  report: (error: unknown) => void,
+  detachPreparationOnCommit = false
+): IRemoteGenerationHolder<TRegistration> {
+  return new RemoteGenerationHolder(registration, report, detachPreparationOnCommit)
 }

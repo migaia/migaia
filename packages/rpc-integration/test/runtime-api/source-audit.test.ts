@@ -1,13 +1,13 @@
+import { processPlugin } from '@migaia/rpc-plugin-process'
+import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
 import type { IRuntimeDynamicSurface } from '../../../rpc-host/dist/remote/runtime-api/typing.js'
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { it } from 'vitest'
-import { createNodeProcessLauncher } from '@migaia/rpc-plugin-process/adapters/node-child-process'
-import { createProcessPeer } from '../../../rpc-plugin-process/test/protocol.ts'
+import { createNodeProcessLauncher } from '../../../rpc-plugin-process/dist/process/adapters/node-child-process.js'
 import { createProcessTransport } from '../../../rpc-plugin-process/dist/process/handshake.js'
 import { createNativeProcessOffer } from '../../../rpc-plugin-process/dist/process/offer.js'
-import type { IRuntimePeer } from '../../../rpc-host/dist/remote/runtime-api/peer.js'
 
 it('Deno explicit source does not require or prompt for discovery env permission', () => {
   /** Actual Deno executes without allow-env; imported modules and local Feature business run first. */
@@ -29,40 +29,51 @@ it('consumed process discovery cannot redirect a genuine grandchild stdin', asyn
     | Awaited<ReturnType<ReturnType<typeof createNodeProcessLauncher>['launch']>>
     | undefined
   /** The genuine accepted Peer is closed independently from the owned execution unit. */
-  let peer: IRuntimePeer | undefined
+  let peer: IRpcHost | undefined
   /** The one-off authentication token remains inside bootstrap and the actual native handshake. */
   const token = 'source-audit-native-token'
   try {
-    peer = await createProcessPeer<IRuntimeDynamicSurface>({
+    peer = await createRpcHost<IRuntimeDynamicSurface>({
       self: { name: 'audit-parent', instanceId: 'automatic-process-parent' },
       provide: { parentEcho: () => 'automatic-process-parent' },
-      spawn: async (context) => {
-        handle = await createNodeProcessLauncher({
-          runtimeApiBootstrap: { name: 'audit-child', parentInstanceId: context.self.instanceId }
-        }).launch(
-          {
-            command: process.execPath,
-            args: [entry],
-            env: { inherit: ['PATH'], set: {} },
-            stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' },
-            bootstrap: { via: 'stdin', payload: new TextEncoder().encode(token) }
-          },
-          { signal: new AbortController().signal, output: () => undefined }
-        )
-        /** The exact original launch fingerprint remains the remote route authority. */
-        const offer = createNativeProcessOffer({
-          peer: { id: context.self.instanceId, runtime: 'node' },
-          auth: token,
-          capabilities: context.capabilities
+      plugins: [
+        processPlugin({
+          spawn: async (context) => {
+            handle = await createNodeProcessLauncher({
+              runtimeApiBootstrap: {
+                name: 'audit-child',
+                parentInstanceId: context.self.instanceId
+              }
+            }).launch(
+              {
+                command: process.execPath,
+                args: [entry],
+                env: { inherit: ['PATH'], set: {} },
+                stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' },
+                bootstrap: { via: 'stdin', payload: new TextEncoder().encode(token) }
+              },
+              { signal: new AbortController().signal, output: () => undefined }
+            )
+            /** The exact original launch fingerprint remains the remote route authority. */
+            const offer = createNativeProcessOffer({
+              peer: { id: context.self.instanceId, runtime: 'node' },
+              auth: token,
+              capabilities: context.capabilities
+            })
+            return createProcessTransport(handle.channel!, {
+              role: 'initiator',
+              peerId: handle.runtimeApiIdentity!.instanceId,
+              offer,
+              ipc: {
+                connectionId: 'audit-parent',
+                sessionId: 'audit-parent',
+                log: () => undefined
+              },
+              report: () => undefined
+            })
+          }
         })
-        return createProcessTransport(handle.channel!, {
-          role: 'initiator',
-          peerId: handle.runtimeApiIdentity!.instanceId,
-          offer,
-          ipc: { connectionId: 'audit-parent', sessionId: 'audit-parent', log: () => undefined },
-          report: () => undefined
-        })
-      },
+      ],
       report: () => undefined
     })
     assert.equal(((await peer.request('probe', 'ordinary')) as { value: string }).value, 'ordinary')

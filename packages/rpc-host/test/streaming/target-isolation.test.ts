@@ -9,55 +9,76 @@ import type {
 import { RpcStreamOwner } from '../../dist/core/internal/stream/owner.js'
 
 /** Exercise the real stream owner with an admitted route and captured outbound commands. */
-function streamOwner(id: string) {
-  const commands: IRpcOutboundCommand[] = []
-  let route!: IEndpointKernelRoute
-  let accept!: (message: unknown) => void | Promise<void>
-  const kernel = {
-    registerOwner: () => undefined,
-    /** This isolated stream has no optional provider policy owner, as on the real kernel. */
-    readOwner: () => undefined,
-    generation: 0,
-    closingSignal: new AbortController().signal,
-    state: 'active',
-    assertActive: () => undefined,
-    registerRoute: (_kind: string, handler: IEndpointKernelRoute) => {
-      route = handler
-      return () => undefined
-    },
-    time: {
-      now: () => 0,
-      timestamp: () => 0,
-      setTimeout: (task: () => void, delayMs: number) => {
-        const timer = setTimeout(task, delayMs)
-        return { clear: () => clearTimeout(timer) }
+class IsolatedStreamOwner {
+  /** Keep each actual owner outbound effect separate for target and sender isolation assertions. */
+  readonly #commands: IRpcOutboundCommand[] = []
+  /** The real owner publishes only its own admitted receive route. */
+  #route!: IEndpointKernelRoute
+  /** The original local provider registration admits requests only for this owner. */
+  #accept!: (message: unknown) => void | Promise<void>
+  /** Original own fixture shape and callback order remain unchanged. */
+  readonly value
+  /** Construct only the same real stream owner and original per-case ports. */
+  constructor(id: string) {
+    /**
+     * Only the original stream port owner publishes receive routing and the injected lifetime
+     * clock.
+     */
+    const kernel = {
+      registerOwner: () => undefined,
+      /** This isolated stream has no optional provider policy owner, as on the real kernel. */
+      readOwner: () => undefined,
+      generation: 0,
+      closingSignal: new AbortController().signal,
+      state: 'active',
+      assertActive: () => undefined,
+      registerRoute: (_kind: string, handler: IEndpointKernelRoute) => {
+        this.#route = handler
+        return () => undefined
       },
-      clearTimeout: (timer: { clear: () => void }) => timer.clear()
+      time: {
+        now: () => 0,
+        timestamp: () => 0,
+        setTimeout: (task: () => void, delayMs: number) => {
+          /** Keep this native timeout receipt paired with its original clear callback. */
+          const timer = setTimeout(task, delayMs)
+          return { clear: () => clearTimeout(timer) }
+        },
+        clearTimeout: (timer: { clear: () => void }) => timer.clear()
+      }
+    } as unknown as IEndpointKernelHost
+    /** Retain the original endpoint identity and exact deterministic id generator. */
+    const prepared = {
+      id,
+      options: { uuid: { generate: () => 'same-id' } }
+    } as unknown as IPreparedEndpoint<string>
+    /** The original outbound port records physical effects without adding a queue or provider path. */
+    const outbound = {
+      send: ((command: IRpcOutboundCommand) => {
+        this.#commands.push(command)
+        return command.kind === 'frame' || command.kind === 'stream-open'
+          ? Promise.resolve()
+          : undefined
+      }) as IRpcOutboundOperationsPort['send'],
+      noteUnknownField: () => undefined
     }
-  } as unknown as IEndpointKernelHost
-  const prepared = {
-    id,
-    options: { uuid: { generate: () => 'same-id' } }
-  } as unknown as IPreparedEndpoint<string>
-  const outbound = {
-    send: ((command: IRpcOutboundCommand) => {
-      commands.push(command)
-      return command.kind === 'frame' || command.kind === 'stream-open'
-        ? Promise.resolve()
-        : undefined
-    }) as IRpcOutboundOperationsPort['send'],
-    noteUnknownField: () => undefined
+    /** Construct the same actual stream owner against these exact original per-case ports. */
+    const owner = new RpcStreamOwner(kernel, prepared, outbound, (_method, handler) => {
+      this.#accept = (message) => handler(message, (signal) => ({ signal }) as never)
+      return () => undefined
+    })
+    this.value = {
+      owner,
+      commands: this.#commands,
+      route: (message: unknown) => (0, this.#route)(message),
+      accept: (message: unknown) => (0, this.#accept)(message)
+    }
   }
-  const owner = new RpcStreamOwner(kernel, prepared, outbound, (_method, handler) => {
-    accept = (message) => handler(message, (signal) => ({ signal }) as never)
-    return () => undefined
-  })
-  return {
-    owner,
-    commands,
-    route: (message: unknown) => route(message),
-    accept: (message: unknown) => accept(message)
-  }
+}
+
+/** Construct the original fixture surface with its actual state held by one owner. */
+function streamOwner(id: string) {
+  return new IsolatedStreamOwner(id).value
 }
 
 /** Build an already-admitted frame for a specified sender and receiver. */

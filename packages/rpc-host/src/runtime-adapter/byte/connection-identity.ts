@@ -1,4 +1,4 @@
-import type { IRemoteChannel } from '../../remote/index.js'
+import type { IRemoteChannel } from '../../remote/types.js'
 import { defaultRpcId } from '../../core/internal/id.js'
 
 /** Only constructed Core connections carry this internal identity; copied public data cannot. */

@@ -1,6 +1,6 @@
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { attachSecondaryErrors } from '@migaia/utils/error'
-import { RpcCoreErrorCode } from '../../core/index.js'
+import { RpcCoreErrorCode } from '../../core/errors.js'
 import { tagRpcError } from '../../core/errors.js'
 import { IpcReporterContext } from '../../core/plugins/reporter-context.js'
 import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'
@@ -19,6 +19,142 @@ export type IMessageReceiveHandoff<T> = Readonly<{
 }>
 
 /** Retain at most one application frame, then install the original native receiver directly. */
+class MessageReceiveHandoff<T> {
+  /** Original native resource retained by this single adapter owner. */
+  #native: Readonly<{
+    add(listener: (message: T) => void): void
+    remove(listener: (message: T) => void): void
+    observeFailure(listener: (cause?: unknown) => void): () => void
+  }>
+
+  /** Original options resource retained by this single adapter owner. */
+  #options: Readonly<{
+    consume?: (message: T) => boolean
+    onFailure?: (error: unknown) => void
+  }>
+
+  /** Occupancy distinguishes an actual undefined native message from an empty cold slot. */
+  #occupied
+
+  /** A single early frame is released on delivery, failure or rollback. */
+  #queued: T | undefined
+
+  /** Canonical message transport has one physical receiver, installed after endpoint commit. */
+  #receiver: ((message: T) => void) | undefined
+
+  /** Activation permanently removes the cold capture path. */
+  #activated
+
+  /** Close removes only this bootstrap owner's hooks and retained frame. */
+  #closed
+
+  /** An incomplete source retains its original failure through the eventual activation attempt. */
+  #failure: Error | undefined
+
+  /** Native failure registration may invoke synchronously, before returning its remover. */
+  #removeFailure: () => void = () => undefined
+
+  /** Startup failure uses the existing registered bootstrap error and keeps native causes reachable. */
+  #fail = (cause?: unknown): void => {
+    if (this.#closed || this.#activated || this.#failure) return
+    this.#failure = tagRpcError(
+      new TypeError(rpcMessageCapabilityControl.failureText, { cause }),
+      RpcCoreErrorCode.invalidConfig
+    )
+    /** Native release failures must remain reachable without stranding the original startup. */
+    const cleanupErrors = collectListenerCleanupFailures([
+      this.#removeFailure,
+      () => this.#native.remove(this.#capture)
+    ])
+    this.#failure = attachSecondaryErrors(this.#failure, cleanupErrors) as Error
+    this.#occupied = false
+    this.#queued = undefined
+    try {
+      this.#options.onFailure?.(this.#failure)
+    } catch (reporterFailure) {
+      hostRethrowReporter(reporterFailure, IpcReporterContext)
+    }
+  }
+
+  /** Private bootstrap/ACK is consumed; ordinary traffic occupies the sole cold application slot. */
+  #capture = (message: T): void => {
+    if (this.#failure || this.#closed) return
+    try {
+      if (this.#options.consume?.(message)) return
+      if (this.#occupied) return this.#fail()
+      this.#occupied = true
+      this.#queued = message
+    } catch (cause) {
+      this.#fail(cause)
+    }
+  }
+
+  /** Frozen operation surface keeps the original transport/resource identity. */
+  readonly value: IMessageReceiveHandoff<T>
+  /** Acquire resources and install native observers in the original construction order. */
+  constructor(
+    native: Readonly<{
+      add(listener: (message: T) => void): void
+      remove(listener: (message: T) => void): void
+      observeFailure(listener: (cause?: unknown) => void): () => void
+    }>,
+    options: Readonly<{
+      consume?: (message: T) => boolean
+      onFailure?: (error: unknown) => void
+    }> = {}
+  ) {
+    this.#native = native
+    this.#options = options
+    this.#occupied = false
+    this.#activated = false
+    this.#closed = false
+
+    this.#native.add(this.#capture)
+
+    this.#removeFailure = this.#native.observeFailure(this.#fail)
+
+    if (this.#failure) this.#removeFailure()
+
+    this.value = Object.freeze({
+      subscribe: (listener) => {
+        if (this.#activated) this.#native.add(listener)
+        else this.#receiver = listener
+      },
+      unsubscribe: (listener) => {
+        if (this.#activated) this.#native.remove(listener)
+        else if (this.#receiver === listener) this.#receiver = undefined
+      },
+      fail: this.#fail,
+      activateReceive: () => {
+        if (this.#failure) throw this.#failure
+        if (this.#activated || this.#closed) return
+        this.#activated = true
+        this.#native.remove(this.#capture)
+        this.#removeFailure()
+        if (this.#receiver) this.#native.add(this.#receiver)
+        /** Clear before invoking the receiver so reentrant activation cannot deliver twice. */
+        const buffered = this.#queued
+        /** Occupancy is retained only across this synchronous transfer. */
+        const deliver = this.#occupied
+        this.#occupied = false
+        this.#queued = undefined
+        if (deliver && this.#receiver) this.#receiver(buffered as T)
+      },
+      close: () => {
+        if (this.#closed) return
+        if (!this.#activated) this.#fail()
+        this.#closed = true
+        this.#native.remove(this.#capture)
+        this.#removeFailure()
+        this.#occupied = false
+        this.#queued = undefined
+        this.#receiver = undefined
+      }
+    })
+  }
+}
+
+/** Retain one cold application frame and then install the original physical callback directly. */
 export function createMessageReceiveHandoff<T>(
   native: Readonly<{
     add(listener: (message: T) => void): void
@@ -30,92 +166,7 @@ export function createMessageReceiveHandoff<T>(
     onFailure?: (error: unknown) => void
   }> = {}
 ): IMessageReceiveHandoff<T> {
-  /** Occupancy distinguishes an actual undefined native message from an empty cold slot. */
-  let occupied = false
-  /** A single early frame is released on delivery, failure or rollback. */
-  let queued: T | undefined
-  /** Canonical message transport has one physical receiver, installed after endpoint commit. */
-  let receiver: ((message: T) => void) | undefined
-  /** Activation permanently removes the cold capture path. */
-  let activated = false
-  /** Close removes only this bootstrap owner's hooks and retained frame. */
-  let closed = false
-  /** An incomplete source retains its original failure through the eventual activation attempt. */
-  let failure: Error | undefined
-  /** Native failure registration may invoke synchronously, before returning its remover. */
-  let removeFailure: () => void = () => undefined
-  /** Startup failure uses the existing registered bootstrap error and keeps native causes reachable. */
-  const fail = (cause?: unknown): void => {
-    if (closed || activated || failure) return
-    failure = tagRpcError(
-      new TypeError(rpcMessageCapabilityControl.failureText, { cause }),
-      RpcCoreErrorCode.invalidConfig
-    )
-    /** Native release failures must remain reachable without stranding the original startup. */
-    const cleanupErrors = collectListenerCleanupFailures([
-      removeFailure,
-      () => native.remove(capture)
-    ])
-    failure = attachSecondaryErrors(failure, cleanupErrors) as Error
-    occupied = false
-    queued = undefined
-    try {
-      options.onFailure?.(failure)
-    } catch (reporterFailure) {
-      hostRethrowReporter(reporterFailure, IpcReporterContext)
-    }
-  }
-  /** Private bootstrap/ACK is consumed; ordinary traffic occupies the sole cold application slot. */
-  const capture = (message: T): void => {
-    if (failure || closed) return
-    try {
-      if (options.consume?.(message)) return
-      if (occupied) return fail()
-      occupied = true
-      queued = message
-    } catch (cause) {
-      fail(cause)
-    }
-  }
-  native.add(capture)
-  removeFailure = native.observeFailure(fail)
-  if (failure) removeFailure()
-  return Object.freeze({
-    subscribe(listener) {
-      if (activated) native.add(listener)
-      else receiver = listener
-    },
-    unsubscribe(listener) {
-      if (activated) native.remove(listener)
-      else if (receiver === listener) receiver = undefined
-    },
-    fail,
-    activateReceive() {
-      if (failure) throw failure
-      if (activated || closed) return
-      activated = true
-      native.remove(capture)
-      removeFailure()
-      if (receiver) native.add(receiver)
-      /** Clear before invoking the receiver so reentrant activation cannot deliver twice. */
-      const buffered = queued
-      /** Occupancy is retained only across this synchronous transfer. */
-      const deliver = occupied
-      occupied = false
-      queued = undefined
-      if (deliver && receiver) receiver(buffered as T)
-    },
-    close() {
-      if (closed) return
-      if (!activated) fail()
-      closed = true
-      native.remove(capture)
-      removeFailure()
-      occupied = false
-      queued = undefined
-      receiver = undefined
-    }
-  })
+  return new MessageReceiveHandoff<T>(native, options).value
 }
 
 /** EventEmitter's original message callback is transferred directly after cold bootstrap. */
@@ -135,7 +186,7 @@ export function createEventEmitterMessageHandoff(
       remove: (listener) => {
         native.off(MessageResourceEvent.message, listener)
       },
-      observeFailure(listener) {
+      observeFailure: (listener) => {
         native.on(MessageResourceEvent.messageerror, listener)
         native.on(MessageResourceEvent.close, listener)
         return () => {
@@ -174,7 +225,7 @@ export function createEventTargetMessageHandoff(
     {
       add: (listener) => native.addEventListener(MessageResourceEvent.message, listener),
       remove: (listener) => native.removeEventListener(MessageResourceEvent.message, listener),
-      observeFailure(listener) {
+      observeFailure: (listener) => {
         /**
          * Generic raw failure events expose the original native cause separately from their
          * wrapper.

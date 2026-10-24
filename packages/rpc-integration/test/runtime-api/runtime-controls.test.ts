@@ -12,7 +12,7 @@ import { type INodeThreadHandle } from '../../../rpc-plugin-thread/dist/threads/
 import {
   createNodeThreadLauncher,
   createNodeThreadChannelFactory
-} from '@migaia/rpc-plugin-thread/adapters/node'
+} from '../../../rpc-plugin-thread/dist/threads/adapters/node.js'
 import { runtimeSources, runtimeTestHost } from '../../../rpc-host/test/runtime-api/fixture.js'
 
 it('borrowed connections reject every native control and retain ordinary business', async () => {

@@ -9,8 +9,7 @@ import {
   type IRpcHostMember
 } from '@migaia/rpc-host/plugin'
 import * as thread from '@migaia/rpc-plugin-thread'
-import * as node from '@migaia/rpc-plugin-thread/adapters/node'
-import * as electron from '@migaia/rpc-plugin-thread/adapters/electron-main'
+import * as node from '../../dist/threads/adapters/node.js'
 
 /** Runtime lookup makes the first preimplementation failure exercise the actual built root. */
 const threadPlugin = Reflect.get(thread, 'threadPlugin') as (options: any) => IRpcTransportPlugin
@@ -117,26 +116,18 @@ describe('native thread transport plugin', () => {
     }
   }, 15_000)
 
-  it('exports only the cold transport root and invokes both retained native adapter subpaths', async () => {
+  it('keeps the canonical native adapter behind the cold public root', async () => {
     expect(Object.keys(thread).toSorted()).toEqual(
       ['RPC_THREAD_ERROR_SOURCE', 'RpcThreadErrorCode', 'isThreadChild', 'threadPlugin'].toSorted()
     )
     expect(Object.keys(node).toSorted()).toEqual(
       ['createNodeThreadLauncher', 'createNodeThreadChannelFactory'].toSorted()
     )
-    expect(Object.keys(electron).toSorted()).toEqual(
-      ['createElectronMainThreadLauncher', 'createElectronMainThreadChannelFactory'].toSorted()
-    )
     for (const [launcher, factory, strength] of [
       [
         node.createNodeThreadLauncher(),
         node.createNodeThreadChannelFactory({ scheduler: systemScheduler }),
         'enforced'
-      ],
-      [
-        electron.createElectronMainThreadLauncher(),
-        electron.createElectronMainThreadChannelFactory({ scheduler: systemScheduler }),
-        'unsupported'
       ]
     ] as const) {
       expect(launcher.capabilities).toEqual({

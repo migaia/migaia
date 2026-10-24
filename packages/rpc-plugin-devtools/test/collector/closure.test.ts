@@ -1,23 +1,13 @@
 import { expect, it, vi } from 'vitest'
 import {
-  defineProbe,
   readProbeStages,
-  snapshotProbeEvent,
   RpcProbeDirection,
   RpcProbeOutcome,
   RpcProbeKind,
-  RpcProbeStage,
-  type IRpcProbeEventView
+  RpcProbeStage
 } from '@migaia/rpc-host/probe'
 import { devtoolsPlugin } from '../../src/index.js'
-import type { IRpcDevtoolsWatchBatch, IRpcDevtoolsServiceApi } from '../../src/contract/index.js'
-import { createPeerPair } from '@migaia/rpc-host/testing'
-import type { IRpcContext } from '../../../rpc-host/dist/core/index.js'
-import { RpcEnvelopeKind, RpcRouteProfile, RpcRouteType } from '@migaia/rpc-contract'
-import { readRuntimePeerEndpoint } from '../../../rpc-host/dist/remote/runtime-api/peer.js'
-import { readEndpointOwner } from '../../../rpc-host/dist/core/internal/endpoint-projection.js'
-import { EndpointOwnerKey } from '../../../rpc-host/dist/core/endpoint-kernel.js'
-import type { RpcOutboundAttachment } from '../../../rpc-host/dist/core/internal/outbound-attachment.js'
+import type { IRpcDevtoolsWatchBatch, IRpcDevtoolsServiceApi } from '../../src/contract/service.js'
 import { NameTable, CarrierTable } from '../../src/collector/intern.js'
 import { CollectorStats } from '../../src/collector/stats.js'
 import { collectorView } from './fixture.js'
@@ -329,170 +319,6 @@ it('preserves all variation strings through a method-filtered record boundary', 
     expect(events.some((event) => event.method === 'other')).toBe(false)
     expect(devtools.importRecord(devtools.exportRecord(recording.stop())).events).toEqual(events)
   } finally {
-    devtools.close()
-  }
-})
-
-it('keeps all genuine variations through Core and collector echo filters', async () => {
-  /** One collector observes both genuine memory-Peer endpoints through its default logical stages. */
-  const devtools = devtoolsPlugin({ methods: ['echo'] }).collector
-  /** A separate Core consumer checks its own method filter on original normalized envelopes. */
-  const coreEvents: IRpcProbeEventView[] = []
-  /** Both method filters receive the same real emissions, without a synthetic forwarding callback. */
-  const coreProbe = defineProbe({
-    stages: ['message', 'envelope'],
-    methods: ['echo'],
-    emit: (view) => coreEvents.push(snapshotProbeEvent(view))
-  })
-  /** Recording starts before construction so its complete sequence matches the retained query. */
-  const recording = devtools.record({ maxEvents: 256 })
-  /** Local fixture vocabulary distinguishes the custom subtype from the actively cancelled call. */
-  const fixture = { user: 'user-observation', held: 'held-variation' } as const
-  /** Actual provider execution starts before each native caller abort signal is raised. */
-  const started = [false, false]
-  /** The provider signal proves each abort arrived through the real receive path. */
-  const aborted = [false, false]
-  /** Each actual Peer registers its cancellation-capable echo once during original construction. */
-  const providers = [0, 1].map((index) => ({
-    /** This real provider waits for its original signal only for the explicitly held payload. */
-    echo: async (input: string, context: IRpcContext) => {
-      if (input === fixture.held) {
-        started[index] = true
-        await new Promise<void>((resolve) => {
-          context.signal.addEventListener(
-            'abort',
-            () => {
-              aborted[index] = true
-              resolve()
-            },
-            { once: true }
-          )
-        })
-      }
-      return input
-    },
-    /** Unselected business executes normally, while both method filters exclude its observations. */
-    other: (input: string) => input
-  }))
-  /** Existing side spreading forwards the original collector object without a test dispatcher. */
-  const configurations = {
-    a: { provide: providers[0]!, probe: [coreProbe, devtools] },
-    b: { provide: providers[1]!, probe: [coreProbe, devtools] }
-  }
-  /** Real peer construction and endpoint control ownership match the existing Core variation oracle. */
-  const pair = await createPeerPair(configurations)
-  /**
-   * Existing private readers retain the original endpoint controls and variation registration
-   * owner.
-   */
-  const peers = [pair.a, pair.b] as const
-  /** Public endpoint controls share the physical Peer connections used by the typed calls below. */
-  const endpoints = peers.map((peer) => readRuntimePeerEndpoint(peer).endpoint)
-  /** Custom subtype sends use the original canonical pipeline, not a hand-filled probe event. */
-  const outbound = endpoints.map((endpoint) =>
-    readEndpointOwner<RpcOutboundAttachment>(endpoint, EndpointOwnerKey.outboundAttachment)!
-  )
-  /** Receiver completion proves the custom subtype reached its registered production owner. */
-  const received = [0, 0]
-  /** Registration release remains owned by the original variation coordinator. */
-  const releases = outbound.map((owner, index) =>
-    owner.variations.register(fixture.user, () => {
-      received[index]++
-    })
-  )
-  try {
-    expect(await pair.a.request('echo', 'selected')).toBe('selected')
-    expect(await pair.a.request('other', 'excluded')).toBe('excluded')
-    for (let index = 0; index < peers.length; index++) {
-      /** Each orientation produces genuine outbound and inbound observations on the two hosts. */
-      const sender = endpoints[index]!
-      /** Routing uses the target's actual runtime Peer identity and receiver selection. */
-      const target = peers[1 - index]!.self.instanceId
-      // Public ping emits ping and its actual pong response.
-      expect(await sender.ping(target)).toBe(true)
-      // Public close announcement emits the close variation without disposing the connection.
-      await sender.announceClose(target, { drainMs: 0 })
-      /** The public signal aborts only after this echo has started on the remote endpoint. */
-      const controller = new AbortController()
-      /** Rejection observation is attached before the original caller cancellation settles. */
-      const cancellation = expect(
-        sender.send(target, 'echo', fixture.held, {
-          signal: controller.signal,
-          timeoutMs: false
-        })
-      ).rejects.toMatchObject({ code: 'CANCELLED' })
-      await vi.waitFor(() => expect(started[1 - index]).toBe(true))
-      controller.abort()
-      await cancellation
-      await vi.waitFor(() => expect(aborted[1 - index]).toBe(true))
-      /** The user subtype is sent by the same owner that emits built-in normalized variations. */
-      const receiver = await outbound[index]!.resolveReceiver(target)
-      await outbound[index]!.sendFrame({
-        kind: RpcEnvelopeKind.variation,
-        id: `${fixture.user}-${index}`,
-        data: {
-          route: {
-            profile: RpcRouteProfile,
-            type: RpcRouteType.variation,
-            applicationVersion: '1',
-            senderId: peers[index]!.self.instanceId,
-            targetId: target,
-            receiverId: receiver.receiverId,
-            sentAt: Date.now(),
-            variation: fixture.user
-          }
-        }
-      })
-      await vi.waitFor(() => expect(received[1 - index]).toBe(1))
-    }
-    /** Actual wire rows prove both control directions survive the collector's own filter. */
-    const events = devtools.query({ stages: ['message'] }).events
-    expect(events.some((event) => event.method === 'echo')).toBe(true)
-    expect(events.some((event) => event.method === 'other')).toBe(false)
-    for (const variation of ['ping', 'pong', 'close', 'abort', fixture.user])
-      for (const direction of ['outbound', 'inbound']) {
-        /** Both filters preserve the subtype and its existing cancel/control kind. */
-        const event = events.find(
-          (entry) => entry.variation === variation && entry.direction === direction
-        )
-        expect(event).toBeDefined()
-        expect(event!.kind).toBe(variation === 'abort' ? 'cancel' : 'control')
-        for (const stage of [RpcProbeStage.message, RpcProbeStage.envelope]) {
-          /** Core observes the same real subtype even though its whitelist selects only echo. */
-          const observed = coreEvents.find(
-            (entry) =>
-              entry.stage === stage &&
-              entry.variation === variation &&
-              entry.direction ===
-                (direction === 'outbound' ? RpcProbeDirection.outbound : RpcProbeDirection.inbound)
-          )
-          expect(observed).toBeDefined()
-          if (stage === RpcProbeStage.message)
-            expect(observed!.kind).toBe(
-              variation === 'abort' ? RpcProbeKind.cancel : RpcProbeKind.control
-            )
-        }
-      }
-    expect(coreEvents.some((event) => event.method === 'echo')).toBe(true)
-    expect(coreEvents.some((event) => event.method === 'other')).toBe(false)
-    for (const event of events)
-      if (event.kind === 'request' || event.kind === 'response')
-        expect(event.variation).toBeUndefined()
-    for (const event of coreEvents)
-      if (event.kind === RpcProbeKind.request || event.kind === RpcProbeKind.response)
-        expect(event.variation).toBeUndefined()
-    /** The existing record codec preserves exact sequence, direction, kind and variation identity. */
-    const decoded = devtools.importRecord(devtools.exportRecord(recording.stop()))
-    expect(
-      decoded.events
-        .filter((event) => event.stage === 'message')
-        .map((event) => [event.seq, event.direction, event.kind, event.method, event.variation])
-    ).toEqual(
-      events.map((event) => [event.seq, event.direction, event.kind, event.method, event.variation])
-    )
-  } finally {
-    for (const release of releases) release()
-    await Promise.all(peers.map((peer) => peer.close()))
     devtools.close()
   }
 })

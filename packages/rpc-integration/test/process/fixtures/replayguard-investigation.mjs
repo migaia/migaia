@@ -3,14 +3,18 @@ import assert from 'node:assert/strict'
 import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
-import {
-  createFullEndpoint,
-  createFullOneWayEndpoint
-} from '../../../../rpc-host/dist/core/full.js'
-import { createMemoryTransportPair } from '../../../../rpc-host/dist/core/adapters/memory.js'
-import { codec } from '../../../../rpc-host/dist/core/index.js'
-import { framer } from '../../../../rpc-host/dist/core/index.js'
-import { connect } from '../../../../rpc-host/dist/core/index.js'
+import { orderStatistic } from '../../../bench/cross-runtime/statistics.mjs'
+import { createComposedEndpoint } from '../../../../rpc-host/dist/core/composed.js'
+import { createCanonicalChunkFeature } from '../../../../rpc-host/dist/core/stream/index.js'
+import { createOutboundFeature } from '../../../../rpc-host/dist/core/features/outbound.js'
+import { createProviderFeature } from '../../../../rpc-host/dist/core/internal/provider-feature.js'
+import { createDiscoveryFeature } from '../../../../rpc-host/dist/core/features/discovery.js'
+import { createControlFeature } from '../../../../rpc-host/dist/core/features/control.js'
+import { createOneWayFeature } from '../../../../rpc-host/dist/core/features/one-way.js'
+import { createMemoryTransportPair } from '../../../../rpc-host/test/fixtures/memory-transport.ts'
+import { codec } from '../../../../rpc-host/dist/core/middleware/codec.js'
+import { framer } from '../../../../rpc-host/dist/core/middleware/framer.js'
+import { connect } from '../../../../rpc-host/dist/core/middleware/connect.js'
 import { createStringFramer } from '@migaia/rpc-contract/framing'
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
 import { RpcOutboundAttachment } from '../../../../rpc-host/dist/core/internal/outbound-attachment.js'
@@ -21,7 +25,7 @@ import { createNativeProcessOffer } from '../../../../rpc-plugin-process/dist/pr
 import {
   createNodeProcessLauncher,
   openProcessStdioChannel
-} from '@migaia/rpc-plugin-process/adapters/node-child-process'
+} from '../../../../rpc-plugin-process/dist/process/adapters/node-child-process.js'
 
 /** Inspector roots belong only to this fixture; production objects are never changed. */
 globalThis.replayInvestigationPrototypes = [
@@ -42,13 +46,12 @@ const oneWay = process.argv.includes('--one-way')
  * @returns {object} Count and nearest-rank tail metrics.
  */
 function delaySummary(values) {
-  /** Sorting a copy leaves the caller's streaming accumulation unchanged. */
-  const sorted = [...values].sort((left, right) => left - right)
+  /** Exact ranks preserve every observation, equal-value order and the original empty sentinel. */
   return {
-    count: sorted.length,
-    p50Ms: sorted[Math.ceil(sorted.length * 0.5) - 1] ?? null,
-    p99Ms: sorted[Math.ceil(sorted.length * 0.99) - 1] ?? null,
-    maxMs: sorted.at(-1) ?? null
+    count: values.length,
+    p50Ms: orderStatistic(values, Math.ceil(values.length * 0.5) - 1) ?? null,
+    p99Ms: orderStatistic(values, Math.ceil(values.length * 0.99) - 1) ?? null,
+    maxMs: orderStatistic(values, values.length - 1) ?? null
   }
 }
 
@@ -151,15 +154,30 @@ async function createObserver() {
  * @param {object | undefined} pipeline Negotiated pipeline or memory default.
  * @param {number | undefined} providerCapacity Optional public isolation configuration.
  * @param {object[]} features Authenticated channel's canonical IPC features.
- * @returns {Promise<object>} Production full endpoint.
+ * @returns {Promise<object>} Canonical composed endpoint with the original raw v1 ledger profile.
  */
 async function endpointFor(id, transport, pipeline, providerCapacity, features = []) {
-  /** Public one-way preset is used only for the explicitly labelled release discriminator. */
-  const create = oneWay ? createFullOneWayEndpoint : createFullEndpoint
-  return create({
+  /** This raw v1 ledger oracle selects only the original provider/discovery/control facilities. */
+  const chunk = createCanonicalChunkFeature()
+  /** All original request/refusal namespaces share this same actual outbound ledger. */
+  const outbound = createOutboundFeature(chunk)
+  /** The original provider owns admission/replay counters inspected by this fixture. */
+  const provider = createProviderFeature(outbound)
+  /** Discovery and control remain canonical owners over this exact outbound instance. */
+  const discovery = createDiscoveryFeature(outbound)
+  const control = createControlFeature(outbound, discovery)
+  return createComposedEndpoint({
     id,
     transport,
-    features,
+    features: [
+      chunk,
+      outbound,
+      provider,
+      discovery,
+      control,
+      ...(oneWay ? [createOneWayFeature(outbound)] : []),
+      ...features
+    ],
     ...(providerCapacity === undefined
       ? {}
       : { providerLimits: { maxReplayEntriesPerPeer: providerCapacity } }),
@@ -230,70 +248,82 @@ async function serveChild(providerCapacity) {
 }
 
 /**
- * Measure one rate for real elapsed time, without changing clocks or capacity defaults.
- *
- * @param {string} mode Memory or Node child.
- * @param {number} rate Requested attempts per second.
- * @param {number} durationMs Real measurement duration.
- * @param {string} directory Receipt directory.
- * @param {number | undefined} providerCapacity Optional outbound isolation override.
- * @returns {Promise<void>} Full immutable raw and summary receipts written.
+ * Own one measurement cell's observations; production endpoints retain all protocol/lifecycle
+ * state.
  */
-async function measure(mode, rate, durationMs, directory, providerCapacity) {
-  mkdirSync(directory, { recursive: true })
-  /** Each cell owns fresh endpoints and fresh default replay windows. */
-  const basename = `${mode}-${rate}-${providerCapacity ?? 'default'}`
-  /** Streaming receipts survive interruption and contain only counters, codes and fixture text. */
-  const rawPath = `${directory}/${basename}.jsonl`
-  /** Parent counters identify local outbound refusal separately from remote rejection. */
-  const counters = {
-    attempted: 0,
-    succeeded: 0,
-    remoteRejected: 0,
-    localRejected: 0,
-    otherRejected: 0
-  }
-  /** Every observed semantic error code receives its own count. */
-  const codes = {}
-  /** Delay distribution stores one small scalar per settled fixture request. */
-  const latencies = []
-  /** Separate five-second success/refusal tails reveal latency changes before capacity refusal. */
-  const windowLatencies = {
-    succeeded: [],
-    remoteRejected: [],
-    localRejected: [],
-    otherRejected: []
-  }
-  /** Exact first occurrences locate each independently bounded namespace's exhaustion. */
-  const first = {}
-  /** Pending requests detect silent blocking instead of treating it as success. */
-  const pending = new Set()
-  /** Raw production provider snapshots arrive on a separate stderr channel. */
-  let childSample = null
-  /** Readiness and observer diagnostics are parsed independently of production frames. */
-  let stderr = ''
-  /** A real child only needs endpoint readiness before its first attempt. */
-  let readyResolve
-  /** Child readiness has an explicit preparation deadline, outside the measured duration. */
-  const ready = new Promise((resolve) => {
-    readyResolve = resolve
+class ReplayguardMeasurement {
+  /** Existing native/memory profile for this one original measurement cell. */
+  #mode
+  /** Original requested attempts per second. */
+  #rate
+  /** Original real elapsed measurement duration. */
+  #durationMs
+  /** Original receipt directory owned by this cell. */
+  #directory
+  /** Optional original provider capacity override. */
+  #providerCapacity
+  /** Stable original output basename is computed once before acquisition. */
+  #basename
+  /** Original streaming receipt remains durable across interrupted measurement. */
+  #rawPath
+  /** Actual settled counters remain separate from pending requests. */
+  #counters = { attempted: 0, succeeded: 0, remoteRejected: 0, localRejected: 0, otherRejected: 0 }
+  /** Original complete code/text counters are preserved by this structural repair. */
+  #codes = {}
+  /** Offline quantile samples retain their original settlement order. */
+  #latencies = []
+  /** Each original five-second interval owns independent latency samples. */
+  #windowLatencies = { succeeded: [], remoteRejected: [], localRejected: [], otherRejected: [] }
+  /** First original rejection in each namespace retains its exact elapsed observation. */
+  #first = {}
+  /** Original production request Promises remain tracked through settlement. */
+  #pending = new Set()
+  /** Passive child snapshots remain separate from protocol frames. */
+  #childSample = null
+  /** Incomplete native diagnostic lines carry only until their next complete delimiter. */
+  #stderr = ''
+  /** The native child supplies the same one-time readiness receipt. */
+  #readyResolve
+  /** This original barrier completes outside the timed measurement interval. */
+  #ready = new Promise((resolve) => {
+    this.#readyResolve = resolve
   })
-  /** Canonical transports and endpoint disposal are owned by this cell. */
-  const cleanup = []
-  /** Client endpoint is always production createFullEndpoint, never a mock. */
-  let client
-  /** Observer is disconnected even when preparation or measurement fails. */
-  let observer
-  try {
-    if (mode === 'memory') {
+  /** Original cleanup callbacks retain reverse acquisition order. */
+  #cleanup = []
+  /** The original production endpoint performs every attempted operation. */
+  #client
+  /** Inspector remains a passive observer of actual production owners. */
+  #observer
+  /** Original real monotonic start timestamp defines rate catch-up and elapsed evidence. */
+  #started
+  /** Exactly the first settled request triggers the original first-settlement snapshot. */
+  #firstSettlement = null
+  /** Only one original inspector sample may be active at a time. */
+  #sampling = false
+  /** Original preparation evidence is retained for the immutable terminal receipt. */
+  #preparation
+
+  /** Capture original cell inputs before acquiring endpoints or native resources. */
+  constructor(mode, rate, durationMs, directory, providerCapacity) {
+    this.#mode = mode
+    this.#rate = rate
+    this.#durationMs = durationMs
+    this.#directory = directory
+    this.#providerCapacity = providerCapacity
+    this.#basename = `${mode}-${rate}-${providerCapacity ?? 'default'}`
+    this.#rawPath = `${directory}/${this.#basename}.jsonl`
+  }
+  /** Acquire the same native/memory resources before entering the original timed interval. */
+  async #prepare() {
+    if (this.#mode === 'memory') {
       /** Asynchronous production memory pair is independent from native child framing. */
       const pair = createMemoryTransportPair()
       /** Provider uses unmodified production per-peer/global/TTL defaults. */
-      const provider = await endpointFor('peer', pair[1], undefined, providerCapacity)
-      client = await endpointFor('parent', pair[0])
-      cleanup.push(
+      const provider = await endpointFor('peer', pair[1], undefined, this.#providerCapacity)
+      this.#client = await endpointFor('parent', pair[0])
+      this.#cleanup.push(
         () => provider.dispose(),
-        () => client.dispose()
+        () => this.#client.dispose()
       )
     } else {
       /** Real owned child runs this fixture's provider branch with production dist modules. */
@@ -303,7 +333,7 @@ async function measure(mode, rate, durationMs, directory, providerCapacity) {
           args: [
             entry,
             '--child',
-            String(providerCapacity ?? ''),
+            String(this.#providerCapacity ?? ''),
             ...(oneWay ? ['--one-way'] : [])
           ],
           env: { inherit: ['PATH'], set: {} },
@@ -312,27 +342,27 @@ async function measure(mode, rate, durationMs, directory, providerCapacity) {
         {
           signal: new AbortController().signal,
           output: (_stream, bytes) => {
-            stderr += Buffer.from(bytes).toString()
+            this.#stderr += Buffer.from(bytes).toString()
             /** Only complete fixture diagnostic lines can update passive provider counts. */
             let end
-            while ((end = stderr.indexOf('\n')) >= 0) {
+            while ((end = this.#stderr.indexOf('\n')) >= 0) {
               /** Child business frames never enter stderr. */
-              const line = stderr.slice(0, end)
-              stderr = stderr.slice(end + 1)
+              const line = this.#stderr.slice(0, end)
+              this.#stderr = this.#stderr.slice(end + 1)
               if (!line.startsWith(marker)) {
-                appendFileSync(rawPath, `${JSON.stringify({ stderr: line })}\n`)
+                appendFileSync(this.#rawPath, `${JSON.stringify({ stderr: line })}\n`)
                 continue
               }
               /** Fixture-owned diagnostic objects cannot contain request payloads. */
               const record = JSON.parse(line.slice(marker.length))
-              if (record.ready) readyResolve()
-              if (record.child) childSample = record.child
-              else appendFileSync(rawPath, `${JSON.stringify(record)}\n`)
+              if (record.ready) this.#readyResolve()
+              if (record.child) this.#childSample = record.child
+              else appendFileSync(this.#rawPath, `${JSON.stringify(record)}\n`)
             }
           }
         }
       )
-      cleanup.push(async () => {
+      this.#cleanup.push(async () => {
         await handle.terminate('force')
         await handle.exited
       })
@@ -345,20 +375,20 @@ async function measure(mode, rate, durationMs, directory, providerCapacity) {
           auth: 'replay-fixture'
         },
         report: (error) =>
-          appendFileSync(rawPath, `${JSON.stringify({ report: String(error) })}\n`),
+          appendFileSync(this.#rawPath, `${JSON.stringify({ report: String(error) })}\n`),
         ipc: { connectionId: 'replay', sessionId: 'replay', log: () => undefined }
       })
-      cleanup.push(() => channel.close())
-      client = await endpointFor(
+      this.#cleanup.push(() => channel.close())
+      this.#client = await endpointFor(
         'parent',
         channel.transport,
         channel.pipeline,
         undefined,
         channel.features
       )
-      cleanup.push(() => client.dispose())
+      this.#cleanup.push(() => this.#client.dispose())
       await Promise.race([
-        ready,
+        this.#ready,
         new Promise((_resolve, reject) =>
           setTimeout(() => {
             try {
@@ -370,157 +400,178 @@ async function measure(mode, rate, durationMs, directory, providerCapacity) {
         )
       ])
     }
+  }
+  /** Preserve each original production request Promise, settlement and refusal classification. */
+  /** Catch handlers preserve every refusal and never create an unhandled rejection. */
+  #attempt() {
+    /** Attempt sequence is unique fixture data and never part of identity instrumentation. */
+    const value = this.#counters.attempted++
+    /** Latency starts before the production outbound capacity check. */
+    const sentAt = performance.now()
+    /** Production Promise is tracked unchanged until settlement. */
+    const request = oneWay
+      ? this.#client.sendOneWay('peer', 'echo', value)
+      : this.#client.send('peer', 'echo', value, { timeoutMs: 10_000 })
+    this.#pending.add(request)
+    request
+      .then(
+        async (result) => {
+          if (!oneWay) assert.equal(result, value, 'fixture echo mismatch')
+          this.#counters.succeeded++
+          this.#windowLatencies.succeeded.push(performance.now() - sentAt)
+          if (this.#firstSettlement === null) {
+            this.#firstSettlement = { pending: true }
+            this.#firstSettlement = {
+              elapsedMs: performance.now() - this.#started,
+              counters: { ...this.#counters },
+              snapshot: await this.#observer.sample()
+            }
+            appendFileSync(
+              this.#rawPath,
+              `${JSON.stringify({ firstSettlement: this.#firstSettlement })}\n`
+            )
+          }
+        },
+        (error) => {
+          /** Canonical text identifies provenance even when both endpoints use OVERLOADED. */
+          const kind =
+            error.message === RpcCoreErrorText.outboundReplayFull
+              ? 'localRejected'
+              : error.code === 'OVERLOADED'
+                ? 'remoteRejected'
+                : 'otherRejected'
+          this.#counters[kind]++
+          this.#windowLatencies[kind].push(performance.now() - sentAt)
+          this.#codes[`${kind}:${error.source ?? ''}:${error.code ?? ''}:${error.message}`] =
+            (this.#codes[`${kind}:${error.source ?? ''}:${error.code ?? ''}:${error.message}`] ??
+              0) + 1
+          this.#first[kind] ??= {
+            elapsedMs: performance.now() - this.#started,
+            attempted: this.#counters.attempted,
+            code: error.code,
+            source: error.source,
+            message: error.message
+          }
+        }
+      )
+      .then(
+        () => {
+          this.#pending.delete(request)
+          this.#latencies.push(performance.now() - sentAt)
+        },
+        (error) => {
+          this.#pending.delete(request)
+          appendFileSync(this.#rawPath, `${JSON.stringify({ fixtureFailure: String(error) })}\n`)
+        }
+      )
+  }
+
+  /** Read original five-second distributions without changing production collections. */
+  async #sample() {
+    if (this.#sampling) return
+    this.#sampling = true
+    try {
+      /** Keep each five-second distribution separate, then start the next actual-time window. */
+      const delays = Object.fromEntries(
+        Object.entries(this.#windowLatencies).map(([kind, values]) => {
+          /** Transfer only fixture-owned samples; no production collections are changed. */
+          const result = delaySummary(values)
+          values.length = 0
+          return [kind, result]
+        })
+      )
+      appendFileSync(
+        this.#rawPath,
+        `${JSON.stringify({ elapsedMs: performance.now() - this.#started, counters: { ...this.#counters }, pending: this.#pending.size, delays, parent: await this.#observer.sample(), child: this.#childSample })}\n`
+      )
+    } catch (error) {
+      appendFileSync(this.#rawPath, `${JSON.stringify({ observerError: String(error) })}\n`)
+    } finally {
+      this.#sampling = false
+    }
+  }
+  /** Drive the original real-time sender and sampler, then drain their existing requests. */
+  async #window() {
     /** Cached inspector IDs are discovered before the measured wall-clock window. */
-    observer = await createObserver()
+    this.#observer = await createObserver()
     /** Complete control-plane identity, executable and load evidence for reproducibility. */
-    const preparation = {
-      mode,
+    this.#preparation = {
+      mode: this.#mode,
       oneWay,
-      rate,
-      durationMs,
-      providerCapacity: providerCapacity ?? 1024,
+      rate: this.#rate,
+      durationMs: this.#durationMs,
+      providerCapacity: this.#providerCapacity ?? 1024,
       outboundCapacity: 4096,
       ttlMs: 310000,
       pid: process.pid,
       node: process.version,
       uptime: execFileSync('uptime', { encoding: 'utf8' }).trim(),
       date: new Date().toISOString(),
-      initial: await observer.sample()
+      initial: await this.#observer.sample()
     }
-    appendFileSync(rawPath, `${JSON.stringify({ preparation })}\n`)
+    appendFileSync(this.#rawPath, `${JSON.stringify({ preparation: this.#preparation })}\n`)
     /** Real monotonic elapsed time defines attempts, TTL observations and the duration stop. */
-    const started = performance.now()
+    this.#started = performance.now()
     /**
      * Immediately sample the first settled request to distinguish active release from capacity
      * release.
      */
-    let firstSettlement = null
-    /** Catch handlers preserve every refusal and never create an unhandled rejection. */
-    function attempt() {
-      /** Attempt sequence is unique fixture data and never part of identity instrumentation. */
-      const value = counters.attempted++
-      /** Latency starts before the production outbound capacity check. */
-      const sentAt = performance.now()
-      /** Production Promise is tracked unchanged until settlement. */
-      const request = oneWay
-        ? client.sendOneWay('peer', 'echo', value)
-        : client.send('peer', 'echo', value, { timeoutMs: 10_000 })
-      pending.add(request)
-      request
-        .then(
-          async (result) => {
-            if (!oneWay) assert.equal(result, value, 'fixture echo mismatch')
-            counters.succeeded++
-            windowLatencies.succeeded.push(performance.now() - sentAt)
-            if (firstSettlement === null) {
-              firstSettlement = { pending: true }
-              firstSettlement = {
-                elapsedMs: performance.now() - started,
-                counters: { ...counters },
-                snapshot: await observer.sample()
-              }
-              appendFileSync(rawPath, `${JSON.stringify({ firstSettlement })}\n`)
-            }
-          },
-          (error) => {
-            /** Canonical text identifies provenance even when both endpoints use OVERLOADED. */
-            const kind =
-              error.message === RpcCoreErrorText.outboundReplayFull
-                ? 'localRejected'
-                : error.code === 'OVERLOADED'
-                  ? 'remoteRejected'
-                  : 'otherRejected'
-            counters[kind]++
-            windowLatencies[kind].push(performance.now() - sentAt)
-            codes[`${kind}:${error.source ?? ''}:${error.code ?? ''}:${error.message}`] =
-              (codes[`${kind}:${error.source ?? ''}:${error.code ?? ''}:${error.message}`] ?? 0) + 1
-            first[kind] ??= {
-              elapsedMs: performance.now() - started,
-              attempted: counters.attempted,
-              code: error.code,
-              source: error.source,
-              message: error.message
-            }
-          }
-        )
-        .then(
-          () => {
-            pending.delete(request)
-            latencies.push(performance.now() - sentAt)
-          },
-          (error) => {
-            pending.delete(request)
-            appendFileSync(rawPath, `${JSON.stringify({ fixtureFailure: String(error) })}\n`)
-          }
-        )
-    }
+    this.#firstSettlement = null
+
     /** Interval only schedules real attempts; catch-up never changes the logical clock. */
     const sender = setInterval(
       () => {
         /** Catch up scheduled attempts while retaining their actual timestamps and latency. */
-        const due = Math.floor((Math.min(durationMs, performance.now() - started) * rate) / 1000)
-        while (counters.attempted < due) attempt()
+        const due = Math.floor(
+          (Math.min(this.#durationMs, performance.now() - this.#started) * this.#rate) / 1000
+        )
+        while (this.#counters.attempted < due) this.#attempt()
       },
-      Math.min(10, 1000 / rate)
+      Math.min(10, 1000 / this.#rate)
     )
-    /** Sampling and request scheduling never share mutable production state. */
-    let sampling = false
-    /** Five-second raw series crosses the real 310-second retention boundary. */
-    const sampler = setInterval(async () => {
-      if (sampling) return
-      sampling = true
-      try {
-        /** Keep each five-second distribution separate, then start the next actual-time window. */
-        const delays = Object.fromEntries(
-          Object.entries(windowLatencies).map(([kind, values]) => {
-            /** Transfer only fixture-owned samples; no production collections are changed. */
-            const result = delaySummary(values)
-            values.length = 0
-            return [kind, result]
-          })
-        )
-        appendFileSync(
-          rawPath,
-          `${JSON.stringify({ elapsedMs: performance.now() - started, counters: { ...counters }, pending: pending.size, delays, parent: await observer.sample(), child: childSample })}\n`
-        )
-      } catch (error) {
-        appendFileSync(rawPath, `${JSON.stringify({ observerError: String(error) })}\n`)
-      } finally {
-        sampling = false
-      }
-    }, 5_000)
-    await new Promise((resolve) => setTimeout(resolve, durationMs))
+
+    const sampler = setInterval(() => this.#sample(), 5_000)
+    await new Promise((resolve) => setTimeout(resolve, this.#durationMs))
     clearInterval(sender)
     clearInterval(sampler)
     /** Last scheduled requests settle under the unchanged production request deadline. */
-    await Promise.allSettled(pending)
+    await Promise.allSettled(this.#pending)
+
+    await this.#summarize()
+  }
+  /** Summarize all original observations with a fixed number of exact linear rank selections. */
+  async #summarize() {
     /** Final passive snapshot occurs before owner disposal clears all state. */
-    const final = await observer.sample()
-    /** Tail quantiles include refusals, with success/refusal counts kept separate. */
-    const sorted = [...latencies].sort((left, right) => left - right)
+    const final = await this.#observer.sample()
+    /** Tail selections include refusals, with success/refusal counts kept separate. */
     /** Immutable terminal receipt links all sampled states to the real measurement window. */
     const summary = {
-      ...preparation,
-      elapsedMs: performance.now() - started,
-      counters,
-      codes,
-      first,
-      firstSettlement,
+      ...this.#preparation,
+      elapsedMs: performance.now() - this.#started,
+      counters: this.#counters,
+      codes: this.#codes,
+      first: this.#first,
+      firstSettlement: this.#firstSettlement,
       final,
-      child: childSample,
-      pending: pending.size,
-      p50Ms: sorted[Math.ceil(sorted.length * 0.5) - 1],
-      p99Ms: sorted[Math.ceil(sorted.length * 0.99) - 1],
-      maxMs: sorted.at(-1),
+      child: this.#childSample,
+      pending: this.#pending.size,
+      p50Ms: orderStatistic(this.#latencies, Math.ceil(this.#latencies.length * 0.5) - 1),
+      p99Ms: orderStatistic(this.#latencies, Math.ceil(this.#latencies.length * 0.99) - 1),
+      maxMs: orderStatistic(this.#latencies, this.#latencies.length - 1),
       endUptime: execFileSync('uptime', { encoding: 'utf8' }).trim()
     }
-    writeFileSync(`${directory}/${basename}.json`, `${JSON.stringify(summary, null, 2)}\n`)
+    writeFileSync(
+      `${this.#directory}/${this.#basename}.json`,
+      `${JSON.stringify(summary, null, 2)}\n`
+    )
     process.stdout.write(`${JSON.stringify(summary)}\n`)
-  } finally {
-    observer?.close()
+  }
+  /** Disconnect passive inspection and preserve every original reverse-order cleanup diagnostic. */
+  async #close() {
+    this.#observer?.close()
     /** Preserve cleanup failures as diagnostics while always releasing the real child. */
     const cleanupFailures = []
-    for (const close of cleanup.reverse()) {
+    for (const close of this.#cleanup.reverse()) {
       try {
         await close()
       } catch (error) {
@@ -529,6 +580,30 @@ async function measure(mode, rate, durationMs, directory, providerCapacity) {
     }
     if (cleanupFailures.length) process.stderr.write(`${JSON.stringify({ cleanupFailures })}\n`)
   }
+  /** Execute the same bounded cell while always releasing its original acquisitions. */
+  async run() {
+    mkdirSync(this.#directory, { recursive: true })
+    try {
+      await this.#prepare()
+      await this.#window()
+    } finally {
+      await this.#close()
+    }
+  }
+}
+
+/**
+ * Measure one rate for real elapsed time, without changing clocks or capacity defaults.
+ *
+ * @param {string} mode Memory or Node child.
+ * @param {number} rate Requested attempts per second.
+ * @param {number} durationMs Real measurement duration.
+ * @param {string} directory Receipt directory.
+ * @param {number | undefined} providerCapacity Optional outbound isolation override.
+ * @returns {Promise<void>} Full immutable raw and summary receipts written.
+ */
+async function measure(mode, rate, durationMs, directory, providerCapacity) {
+  await new ReplayguardMeasurement(mode, rate, durationMs, directory, providerCapacity).run()
 }
 
 if (process.argv[2] === '--child') await serveChild(Number(process.argv[3]) || undefined)

@@ -1,3 +1,10 @@
+import {
+  defineTransportPlugin,
+  createAdapterDeployment,
+  RuntimePluginKey,
+  RpcTransportMode
+} from '@migaia/rpc-host/plugin'
+import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
 import type { IRuntimeDynamicSurface } from '../../../rpc-host/dist/remote/runtime-api/typing.js'
 import assert from 'node:assert/strict'
 import { it } from 'vitest'
@@ -6,9 +13,7 @@ import { systemScheduler } from '@migaia/utils/scheduler'
 import {
   createNodeThreadLauncher,
   createNodeThreadChannelFactory
-} from '@migaia/rpc-plugin-thread/adapters/node'
-import type { IRuntimePeer } from '../../../rpc-host/dist/remote/runtime-api/peer.js'
-import { createThreadPeer } from '../../../rpc-plugin-thread/test/protocol.ts'
+} from '../../../rpc-plugin-thread/dist/threads/adapters/node.js'
 
 /** A native Worker runs independently from Vitest and loads the built package. */
 const entry = fileURLToPath(new URL('./fixtures/automatic-worker.mjs', import.meta.url))
@@ -21,9 +26,9 @@ it('the genuine launcher supplies trusted child name and parent route without a 
   /** Genuine reverse dispatch is measured independently of child-returned bootstrap metadata. */
   let reverseCalls = 0
   /** A real ordinary call proves worker startup, imports and provider dispatch before the RED. */
-  let parent: IRuntimePeer | undefined
+  let parent: IRpcHost | undefined
   try {
-    parent = await createThreadPeer<IRuntimeDynamicSurface>({
+    parent = await createRpcHost<IRuntimeDynamicSurface>({
       self: { name: 'parent', instanceId: 'automatic-parent' },
       provide: {
         parentEcho: () => {
@@ -31,18 +36,30 @@ it('the genuine launcher supplies trusted child name and parent route without a 
           return parent!.self.instanceId
         }
       },
-      spawn: async (context) => {
-        /** The JS-compatible option is ignored by the current launcher; no missing import is RED. */
-        const create = createNodeThreadLauncher as unknown as (
-          options: unknown
-        ) => ReturnType<typeof createNodeThreadLauncher>
-        const launcher = create({ runtimeApi: context })
-        handle = await launcher.launch(
-          { entry, name: 'named-child' },
-          { signal: new AbortController().signal }
-        )
-        return channels.open(handle, new AbortController().signal)
-      },
+      plugins: [
+        defineTransportPlugin({
+          name: RuntimePluginKey.thread,
+          mode: RpcTransportMode.spawn,
+          deployment: createAdapterDeployment({
+            runtimeKey: RuntimePluginKey.thread,
+            open: async (context) => {
+              /**
+               * The JS-compatible option is ignored by the current launcher; no missing import is
+               * RED.
+               */
+              const create = createNodeThreadLauncher as unknown as (
+                options: unknown
+              ) => ReturnType<typeof createNodeThreadLauncher>
+              const launcher = create({ runtimeApi: context })
+              handle = await launcher.launch(
+                { entry, name: 'named-child' },
+                { signal: new AbortController().signal }
+              )
+              return channels.open(handle, new AbortController().signal)
+            }
+          })
+        })
+      ],
       report: () => undefined
     })
     /** The baseline probe executes inside the actual native child, not a mocked facade. */

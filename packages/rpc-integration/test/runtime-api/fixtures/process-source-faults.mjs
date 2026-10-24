@@ -1,4 +1,5 @@
-import { createProcessPeer } from '../../../../rpc-plugin-process/test/protocol.ts'
+import { createRpcHost } from '@migaia/rpc-host'
+import { processPlugin } from '@migaia/rpc-plugin-process'
 
 /** A genuine process observes publication and callback counts independently from returned labels. */
 let publications = 0
@@ -13,21 +14,28 @@ const mode = process.argv[2]
 /** Only safe classification fields are returned to the fixture's independent stderr reader. */
 let code
 try {
-  const peer = await createProcessPeer({
+  const peer = await createRpcHost({
     provide: {
       probe: () => {
         handlerCalls += 1
         return 'unexpected-business'
       }
     },
-    ...(mode === 'explicit'
-      ? {
-          connect: async () => {
-            sourceCalls += 1
-            return undefined
-          }
-        }
-      : {}),
+    plugins: [
+      processPlugin({
+        connectToParent: true,
+        ...(mode === 'explicit'
+          ? {
+              connect: {
+                target: async () => {
+                  sourceCalls += 1
+                  return undefined
+                }
+              }
+            }
+          : {})
+      })
+    ],
     report: () => undefined
   })
   publications += 1

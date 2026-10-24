@@ -168,78 +168,16 @@ export function buildNativePluginBatch(
       })
       return
     }
+    /** The role owner retains the original installation result until native port publication. */
     const middleware = snapshot.plugin
-    const install =
-      options.transformMiddlewareInstall?.(role, middleware.install) ?? middleware.install
-    let result: import('../typing.js').IRpcPluginInstallResult | undefined
-    add(
-      role,
-      nativeDefinition(
-        middleware.name,
-        middleware.metadata.claims,
-        middleware.metadata.sharedProvides ?? [],
-        middleware.metadata.sharedConsumes ?? [],
-        async (core) => {
-          const hooksPort = core.getPort(RpcPortName.hooks) as IRpcHooksPort | undefined
-          const constructionReporter = hooksPort?.reportConstructionDiagnostic
-          const installed = await runConstructionInstall(
-            {
-              id: core.id,
-              transport: core.transport,
-              control: core.construction,
-              hooks: core.hooks,
-              getPort: (key) => core.getPort(key),
-              report: constructionReporter
-                ? (error) =>
-                    constructionReporter({
-                      name: 'failure',
-                      at: core.construction.time.timestamp(),
-                      localId: core.id,
-                      code: RpcCoreErrorCode.internal,
-                      error
-                    })
-                : (error) =>
-                    core.hooks({
-                      name: 'failure',
-                      at: core.construction.time.timestamp(),
-                      localId: core.id,
-                      code: RpcCoreErrorCode.internal,
-                      error
-                    }),
-              registerScope: (_scope, close, awaitClose) => {
-                core.onDispose(async () => {
-                  close()
-                  await awaitClose()
-                })
-              }
-            },
-            async (scope) => {
-              const installation = await install(scope)
-              const disposer =
-                installation !== null && typeof installation === 'object'
-                  ? Object.getOwnPropertyDescriptor(installation, 'dispose')?.value
-                  : undefined
-              if (typeof disposer === 'function')
-                scope.own({}, async () => {
-                  await disposer()
-                })
-              return installation
-            }
-          )
-          assertPluginInstallResult(installed)
-          result = installed
-          return copyExtensionOutput(installed.extension, middleware.metadata.claims.publicKeys)
-        },
-        () => result?.ports ?? {}
-      ),
-      {
-        name: middleware.name,
-        claims: middleware.metadata.claims,
-        sharedProvides: middleware.metadata.sharedProvides,
-        sharedConsumes: middleware.metadata.sharedConsumes,
-        sharedOptionalConsumes: middleware.metadata.sharedOptionalConsumes
-      }
-    )
+    const owner = new NativeLegacyMiddlewareRole(options, middleware, role)
+    add(role, owner.definition, {
+      name: middleware.name,
+      claims: middleware.metadata.claims,
+      sharedProvides: middleware.metadata.sharedProvides,
+      sharedConsumes: middleware.metadata.sharedConsumes,
+      sharedOptionalConsumes: middleware.metadata.sharedOptionalConsumes
+    })
   })
   add(
     { kind: 'middleware-finalize' },
@@ -311,7 +249,154 @@ export function buildNativePluginBatch(
   return Object.freeze(entries)
 }
 
+/** One legacy middleware role owns the exact install output later published as native ports. */
+class NativeLegacyMiddlewareRole {
+  /** Immutable admitted legacy descriptor supplies the original output-key contract. */
+  #middleware: Extract<IEndpointMiddlewareSnapshot, { kind: 'legacy' }>['plugin']
+  /** The bounded install transformation is captured once before native definition construction. */
+  #operation: IRpcPluginDescriptor['install']
+  /** Only the successful original installation may publish this role's shared ports. */
+  #result: import('../typing.js').IRpcPluginInstallResult | undefined
+  /** The exact genuine native definition participates in the one endpoint batch. */
+  readonly definition: IRpcPluginConstraint & { readonly claims: IRpcPluginClaims }
+  /** Capture the role-local operation before creating its native PluginHost definition. */
+  constructor(
+    options: IRpcNativePluginBatchOptions,
+    middleware: Extract<IEndpointMiddlewareSnapshot, { kind: 'legacy' }>['plugin'],
+    role: IRpcPluginRole
+  ) {
+    this.#middleware = middleware
+    this.#operation =
+      options.transformMiddlewareInstall?.(role, middleware.install) ?? middleware.install
+    this.definition = nativeDefinition(
+      middleware.name,
+      middleware.metadata.claims,
+      middleware.metadata.sharedProvides ?? [],
+      middleware.metadata.sharedConsumes ?? [],
+      this.#install,
+      this.#ports
+    )
+  }
+  /** Run the original rollback transaction, retain its output, then project declared public keys. */
+  #install = async (core: IRpcPluginCore & IRpcPluginHostCore) => {
+    const hooksPort = core.getPort(RpcPortName.hooks) as IRpcHooksPort | undefined
+    const constructionReporter = hooksPort?.reportConstructionDiagnostic
+    const installed = await runConstructionInstall(
+      {
+        id: core.id,
+        transport: core.transport,
+        control: core.construction,
+        hooks: core.hooks,
+        getPort: (key) => core.getPort(key),
+        report: constructionReporter
+          ? (error) =>
+              constructionReporter({
+                name: 'failure',
+                at: core.construction.time.timestamp(),
+                localId: core.id,
+                code: RpcCoreErrorCode.internal,
+                error
+              })
+          : (error) =>
+              core.hooks({
+                name: 'failure',
+                at: core.construction.time.timestamp(),
+                localId: core.id,
+                code: RpcCoreErrorCode.internal,
+                error
+              }),
+        registerScope: (_scope, close, awaitClose) => {
+          core.onDispose(async () => {
+            close()
+            await awaitClose()
+          })
+        }
+      },
+      async (scope) => {
+        const installation = await (0, this.#operation)(scope)
+        const disposer =
+          installation !== null && typeof installation === 'object'
+            ? Object.getOwnPropertyDescriptor(installation, 'dispose')?.value
+            : undefined
+        if (typeof disposer === 'function')
+          scope.own({}, async () => {
+            await disposer()
+          })
+        return installation
+      }
+    )
+    assertPluginInstallResult(installed)
+    this.#result = installed
+    return copyExtensionOutput(installed.extension, this.#middleware.metadata.claims.publicKeys)
+  }
+  /** Shared port publication reads the exact successful output of this original registration. */
+  #ports = () => this.#result?.ports ?? {}
+}
+
 /** Creates a direct domain definition; PluginHost still owns the feature graph and instances. */
+/** One definition owns a separate deferred port runtime for each genuine native core. */
+class NativePluginDefinition {
+  /** Immutable declared port Feature definitions are shared; their cells remain registration-local. */
+  #portFeatures: ReturnType<typeof createWebRpcPortFeatureSet>
+  /** Exact native core identities index their original deferred port cells. */
+  #runtimes = new WeakMap<
+    object,
+    ReturnType<ReturnType<typeof createWebRpcPortFeatureSet>['createRuntime']>
+  >()
+  /** Original installation remains receiverless and retains its exact result. */
+  #operation: (core: IRpcPluginCore & IRpcPluginHostCore) => unknown | Promise<unknown>
+  /** The caller lends the original successful shared-port projection. */
+  #ports: (() => Record<PropertyKey, unknown>) | undefined
+  /** Genuine PluginHost definition is the sole topology and lifecycle authority. */
+  readonly value: IRpcPluginConstraint & { readonly claims: IRpcPluginClaims }
+  /** Capture declared ports once, then publish callbacks tied to this explicit definition owner. */
+  constructor(
+    name: string,
+    claims: IRpcPluginClaims,
+    sharedProvides: readonly PropertyKey[],
+    sharedConsumes: readonly PropertyKey[],
+    install: (core: IRpcPluginCore & IRpcPluginHostCore) => unknown | Promise<unknown>,
+    ports?: () => Record<PropertyKey, unknown>
+  ) {
+    this.#portFeatures = createWebRpcPortFeatureSet(sharedProvides)
+    this.#operation = install
+    this.#ports = ports
+    this.value = definePlugin({
+      name,
+      claims,
+      sharedProvides,
+      sharedConsumes,
+      features: this.#portFeatures.features,
+      featureExpose: (core: IRpcPluginCore & IRpcPluginHostCore) => this.#runtimeFor(core).expose,
+      install: this.#install
+    }) as IRpcPluginConstraint & { readonly claims: IRpcPluginClaims }
+  }
+  /** Allocate each native core's deferred cells only on its first original access. */
+  #runtimeFor = (
+    core: object
+  ): ReturnType<ReturnType<typeof createWebRpcPortFeatureSet>['createRuntime']> => {
+    /** Existing cells are reused without another registration or source. */ const current =
+      this.#runtimes.get(core)
+    if (current) return current
+    /** Only a genuinely new core receives a fresh publication runtime. */ const created =
+      this.#portFeatures.createRuntime()
+    this.#runtimes.set(core, created)
+    return created
+  }
+  /** Original installation settles before its exact port outputs are published to native Features. */
+  #install = async (core: IRpcPluginCore & IRpcPluginHostCore) => {
+    /** Keep the caller operation receiverless. */ const operation = this.#operation
+    const output = await operation(core)
+    /** Publish through this core's original deferred cells. */ const runtime =
+      this.#runtimeFor(core)
+    /** Keep the caller projection receiverless. */ const ports = this.#ports
+    runtime.publish(ports?.() ?? {})
+    core.publishPortFeatures(runtime.outputs)
+    return output as Record<string, unknown>
+  }
+}
+
+/** Create the direct native domain definition with explicit registration-local port ownership. */
 function nativeDefinition(
   name: string,
   claims: IRpcPluginClaims,
@@ -320,31 +405,8 @@ function nativeDefinition(
   install: (core: IRpcPluginCore & IRpcPluginHostCore) => unknown | Promise<unknown>,
   ports?: () => Record<PropertyKey, unknown>
 ): IRpcPluginConstraint & { readonly claims: IRpcPluginClaims } {
-  /** Feature declarations are immutable; their cells are allocated per registration below. */
-  const portFeatures = createWebRpcPortFeatureSet(sharedProvides)
-  const runtimes = new WeakMap<object, ReturnType<typeof portFeatures.createRuntime>>()
-  const runtimeFor = (core: object): ReturnType<typeof portFeatures.createRuntime> => {
-    const current = runtimes.get(core)
-    if (current) return current
-    const created = portFeatures.createRuntime()
-    runtimes.set(core, created)
-    return created
-  }
-  return definePlugin({
-    name,
-    claims,
-    sharedProvides,
-    sharedConsumes,
-    features: portFeatures.features,
-    featureExpose: (core: IRpcPluginCore & IRpcPluginHostCore) => runtimeFor(core).expose,
-    install: async (core: IRpcPluginCore & IRpcPluginHostCore) => {
-      const output = await install(core)
-      const runtime = runtimeFor(core)
-      runtime.publish(ports?.() ?? {})
-      core.publishPortFeatures(runtime.outputs)
-      return output as Record<string, unknown>
-    }
-  }) as IRpcPluginConstraint & { readonly claims: IRpcPluginClaims }
+  return new NativePluginDefinition(name, claims, sharedProvides, sharedConsumes, install, ports)
+    .value
 }
 
 /** Re-materializes legacy middleware output as Host-compatible configurable data properties. */
@@ -369,9 +431,52 @@ function copyExtensionOutput(
 
 /** Preserves raw cleanup identities while flattening lifecycle/resource diagnostic containers. */
 function flattenReleaseErrors(error: unknown): readonly unknown[] {
-  if (error instanceof AggregateError)
-    return error.errors.flatMap((child) => flattenReleaseErrors(child))
-  if (error && typeof error === 'object' && 'error' in error)
-    return flattenReleaseErrors((error as { readonly error: unknown }).error)
-  return [error]
+  /** Each frame snapshots the original array length once and visits indexed children left to right. */
+  const frames: { errors: readonly unknown[]; index: number; length: number; owner?: object }[] = [
+    { errors: [error], index: 0, length: 1 }
+  ]
+  /**
+   * Only active ancestors suppress cycles; completed DAG branches retain their original
+   * multiplicity.
+   */
+  const ancestors = new WeakSet<object>()
+  /** Leaves retain original multiplicity and identity without repeatedly copying descendant arrays. */
+  const output: unknown[] = []
+  while (frames.length) {
+    /** Depth-first frames preserve the original native flatMap getter and sparse-array order. */
+    const frame = frames[frames.length - 1]!
+    if (frame.index >= frame.length) {
+      if (frame.owner) ancestors.delete(frame.owner)
+      frames.pop()
+      continue
+    }
+    /** Native flatMap skips absent indices while still observing inherited indexed properties. */
+    const index = frame.index++
+    if (!(index in frame.errors)) continue
+    /** Each child is read once, before any later sibling is observed. */
+    const current = frame.errors[index]
+    if (current && typeof current === 'object' && ancestors.has(current)) {
+      output.push(current)
+      continue
+    }
+    if (current instanceof AggregateError) {
+      ancestors.add(current)
+      /** Retain the original array identity and its one length snapshot throughout this traversal. */
+      const children = current.errors
+      frames.push({ errors: children, index: 0, length: children.length, owner: current })
+      continue
+    }
+    if (current && typeof current === 'object' && 'error' in current) {
+      ancestors.add(current)
+      frames.push({
+        errors: [(current as { error: unknown }).error],
+        index: 0,
+        length: 1,
+        owner: current
+      })
+      continue
+    }
+    output.push(current)
+  }
+  return output
 }

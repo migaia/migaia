@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { safeRead } from '../../dist/core/transport-kit.js'
+import { safeRead } from '../../dist/core/internal/safe-value.js'
 
 describe('safeRead guarded property policy', () => {
   it('skips primitives and returns a successful read unchanged', () => {

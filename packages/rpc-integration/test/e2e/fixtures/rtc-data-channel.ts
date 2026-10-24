@@ -1,15 +1,16 @@
-import { createRtcDataChannelTransport } from '@migaia/rpc-plugin-browser/adapters/rtc-data-channel'
+import { RpcCapability } from '@migaia/rpc-contract'
+import { createRuntimeEndpointComposition } from '../../../../rpc-host/dist/core/runtime-api-endpoint.js'
+import { createRtcDataChannelTransport } from '../../../../rpc-plugin-browser/dist/browser/adapters/rtc-data-channel.js'
 import { readEndpointDebugSnapshot } from '../../../../rpc-host/dist/core/internal/test-observer.js'
-import { createEndpoint } from '../../../../rpc-host/dist/core/index.js'
 import { createStringFramer } from '@migaia/rpc-contract/framing'
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
 import type { ICodecValue } from '@migaia/serialize'
-import { authentication } from '../../../../rpc-host/dist/core/index.js'
-import { connect } from '../../../../rpc-host/dist/core/index.js'
-import { timeout } from '../../../../rpc-host/dist/core/index.js'
-import { abort } from '../../../../rpc-host/dist/core/index.js'
-import { contract } from '../../../../rpc-host/dist/core/index.js'
-import { ping } from '../../../../rpc-host/dist/core/index.js'
+import { authentication } from '../../../../rpc-host/dist/core/middleware/authentication.js'
+import { connect } from '../../../../rpc-host/dist/core/middleware/connect.js'
+import { timeout } from '../../../../rpc-host/dist/core/middleware/timeout.js'
+import { abort } from '../../../../rpc-host/dist/core/middleware/abort.js'
+import { contract } from '../../../../rpc-host/test/fixtures/core-role/contract.js'
+import { ping } from '../../../../rpc-host/dist/core/middleware/ping.js'
 import { installErrorGuards } from './rpc.js'
 
 const errors = installErrorGuards()
@@ -115,72 +116,86 @@ const linkPeers = async () => {
   return { left, right, leftChannel, rightChannel }
 }
 
-globalThis.runRtcScenario = async () => {
-  let dispatchPayload: unknown
+/** Prepare original native ICE/DTLS carriers and canonical protected endpoints before business. */
+async function prepareRtcScenario() {
+  /** Notification output remains a fixture observation, independent from native carrier state. */
+  const observation: { dispatchPayload?: unknown } = {}
   const peers = await linkPeers()
   const codec = defineJsonCodec({ version: 1 })
   const carrierCodec = defineJsonCodec({ version: 1 })
   const leftTransport = createRtcDataChannelTransport(peers.leftChannel)
   const rightTransport = createRtcDataChannelTransport(peers.rightChannel)
-  const left = await createEndpoint({
-    id: 'left',
-    targetIds: ['right'],
-    codec,
-    framer: createStringFramer({ chunkBytes: 4 }),
-    middlewares: [
-      connect({ transport: leftTransport }),
-      authentication({
-        encodedType: 'string',
-        sign: (value) => value,
-        verify: (value) => value,
-        encrypt: (value) => carrierCodec.encode(value as ICodecValue),
-        decrypt: (value) => carrierCodec.decode(value as string)
-      }),
-      timeout({ timeoutMs: 500 }),
-      abort(),
-      ping(),
-      contract({
-        schemas: {
-          schema: {
-            params: {
-              parse: () => {
-                throw new Error('schema rejected')
-              }
-            },
-            result: { parse: (value) => value }
+  const left = await createRuntimeEndpointComposition(
+    {
+      id: 'left',
+      targetIds: ['right'],
+      codec,
+      framer: createStringFramer({ chunkBytes: 4 }),
+      middlewares: [
+        connect({ transport: leftTransport }),
+        authentication({
+          encodedType: 'string',
+          sign: (value) => value,
+          verify: (value) => value,
+          encrypt: (value) => carrierCodec.encode(value as ICodecValue),
+          decrypt: (value) => carrierCodec.decode(value as string)
+        }),
+        timeout({ timeoutMs: 500 }),
+        abort(),
+        ping(),
+        contract({
+          schemas: {
+            schema: {
+              params: {
+                parse: () => {
+                  throw new Error('schema rejected')
+                }
+              },
+              result: { parse: (value) => value }
+            }
           }
-        }
-      })
-    ]
-  })
-  const right = await createEndpoint({
-    id: 'right',
-    targetIds: ['left'],
-    codec,
-    framer: createStringFramer({ chunkBytes: 4 }),
-    provider: {
-      echo: (context) => context.success(context.data),
-      notify: (context) => {
-        dispatchPayload = context.data
-        return context.success(undefined)
-      },
-      fail: (context) => context.failed('remote failure', 'REMOTE_FAILURE'),
-      hang: async () => await new Promise<never>(() => undefined)
+        })
+      ]
     },
-    middlewares: [
-      connect({ transport: rightTransport }),
-      authentication({
-        encodedType: 'string',
-        sign: (value) => value,
-        verify: (value) => value,
-        encrypt: (value) => carrierCodec.encode(value as ICodecValue),
-        decrypt: (value) => carrierCodec.decode(value as string)
-      }),
-      timeout({ timeoutMs: 500 }),
-      abort(),
-      ping()
-    ]
-  })
+    { peerId: 'right', agreement: { capabilities: [RpcCapability.ping] } }
+  ).installing
+  const right = await createRuntimeEndpointComposition(
+    {
+      id: 'right',
+      targetIds: ['left'],
+      codec,
+      framer: createStringFramer({ chunkBytes: 4 }),
+      provider: {
+        echo: (context) => context.success(context.data),
+        notify: (context) => {
+          observation.dispatchPayload = context.data
+          return context.success(undefined)
+        },
+        fail: (context) => context.failed('remote failure', 'REMOTE_FAILURE'),
+        hang: async () => await new Promise<never>(() => undefined)
+      },
+      middlewares: [
+        connect({ transport: rightTransport }),
+        authentication({
+          encodedType: 'string',
+          sign: (value) => value,
+          verify: (value) => value,
+          encrypt: (value) => carrierCodec.encode(value as ICodecValue),
+          decrypt: (value) => carrierCodec.decode(value as string)
+        }),
+        timeout({ timeoutMs: 500 }),
+        abort(),
+        ping()
+      ]
+    },
+    { peerId: 'left', agreement: { capabilities: [RpcCapability.ping] } }
+  ).installing
+  return { peers, left, right, observation }
+}
+
+/** Keep every original RTC business, cancellation and physical-close oracle in the same transaction. */
+globalThis.runRtcScenario = async () => {
+  const { peers, left, right, observation } = await prepareRtcScenario()
   const result = await left.send('right', 'echo', 'rtc-ok')
   const chunkedRequest = await left.send('right', 'echo', 'rtc-chunked-request-😀')
   const chunkedRemoteError = await left.send('right', 'fail', 'rtc-chunked-error-😀').then(
@@ -263,7 +278,7 @@ globalThis.runRtcScenario = async () => {
     chunkedTimeout,
     chunkedAbort,
     chunkedSchemaError,
-    dispatchPayload: String(dispatchPayload),
+    dispatchPayload: String(observation.dispatchPayload),
     remoteError,
     timeoutResult,
     aborted,

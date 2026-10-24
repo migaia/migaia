@@ -1,4 +1,4 @@
-import { createBroadcastChannelTransport } from '@migaia/rpc-plugin-browser/adapters/broadcast-channel'
+import { createBroadcastChannelTransport } from '../../../../rpc-plugin-browser/dist/browser/adapters/broadcast-channel.js'
 import { readEndpointDebugSnapshot } from '../../../../rpc-host/dist/core/internal/test-observer.js'
 import { createRpc, installErrorGuards, terminalProviders } from './rpc.js'
 

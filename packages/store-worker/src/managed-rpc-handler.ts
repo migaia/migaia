@@ -30,45 +30,81 @@ export type IManagedRpcHandler = {
 /** Managed callback disposal needs only this actual cleanup operation, never an endpoint contract. */
 type IManagedEndpoint = Readonly<{ dispose(): Promise<void> }>
 
-/** Preserve terminal admission and Promise identity while the actual bridge owns connection setup. */
+/** One callable handler owns terminal admission, pending delivery and one disposal receipt. */
+class ManagedRpcHandler {
+  /** Native endpoint readiness is shared by every delivery and cleanup caller. */
+  #endpoint: Promise<IManagedEndpoint>
+  /** The original bridge alone interprets admitted messages. */
+  #deliver: (message: unknown) => void
+  /** Pending delivery excludes provider computation after raw dispatch. */
+  #pending = 0
+  /** Close wins over any delivery still waiting for endpoint readiness. */
+  #disposed = false
+  /** Repeated cleanup callers receive this same original promise. */
+  #disposal: Promise<void> | undefined
+
+  /** Capture the canonical endpoint and bridge without opening another connection. */
+  constructor(endpoint: Promise<IManagedEndpoint>, deliver: (message: unknown) => void) {
+    this.#endpoint = endpoint
+    this.#deliver = deliver
+  }
+
+  /** Dispatch one raw message only while admission remains open, releasing its count on every exit. */
+  handle = async (message: unknown): Promise<void> => {
+    if (this.#disposed) return
+    this.#pending++
+    try {
+      await this.#endpoint
+      if (this.#disposed) return
+      this.#deliver(message)
+      await Promise.resolve()
+    } finally {
+      this.#pending--
+    }
+  }
+
+  /** Terminal admission changes synchronously and never performs user cleanup. */
+  close = (): void => {
+    this.#disposed = true
+  }
+
+  /** Join the one actual endpoint disposal after synchronously closing admission. */
+  dispose = (): Promise<void> => {
+    this.#disposal ??= this.#disposeEndpoint()
+    return this.#disposal
+  }
+
+  /** Report admitted deliveries still waiting for setup or raw dispatch. */
+  get pendingCount(): number {
+    return this.#pending
+  }
+
+  /** Expose the terminal admission marker without granting mutation authority. */
+  get disposed(): boolean {
+    return this.#disposed
+  }
+
+  /** The endpoint retains resource cleanup and its original failure. */
+  async #disposeEndpoint(): Promise<void> {
+    this.close()
+    /** Cleanup uses the original endpoint after its readiness settles. */
+    const endpoint = await this.#endpoint
+    await endpoint.dispose()
+  }
+}
+
+/** Preserve the callable public shape while its one named owner holds lifecycle state. */
 export function toManagedRpcHandler(
   endpointPromise: Promise<IManagedEndpoint>,
   deliver: (message: unknown) => void
 ): IManagedRpcHandler {
-  let pendingCount = 0
-  let disposed = false
-  let disposePromise: Promise<void> | undefined
-
-  const handler = (async (message: unknown): Promise<void> => {
-    if (disposed) return
-    pendingCount += 1
-    try {
-      await endpointPromise
-      // Readiness may resolve after close/dispose; never deliver into a terminal endpoint.
-      if (disposed) return
-      deliver(message)
-      await Promise.resolve()
-    } finally {
-      pendingCount -= 1
-    }
-  }) as IManagedRpcHandler
-
-  handler.close = () => {
-    disposed = true
-  }
-
-  handler.dispose = () => {
-    if (disposePromise === undefined) {
-      disposePromise = (async () => {
-        handler.close()
-        const endpoint = await endpointPromise
-        await endpoint.dispose()
-      })()
-    }
-    return disposePromise
-  }
-
-  Object.defineProperty(handler, 'pendingCount', { get: () => pendingCount })
-  Object.defineProperty(handler, 'disposed', { get: () => disposed })
+  /** The callable is an API receipt, not another resource or connection owner. */
+  const owner = new ManagedRpcHandler(endpointPromise, deliver)
+  /** Native message listeners need this exact bound callable identity. */
+  const handler = owner.handle as IManagedRpcHandler
+  handler.close = owner.close
+  handler.dispose = owner.dispose
+  Object.defineProperty(handler, 'pendingCount', { get: () => owner.pendingCount })
+  Object.defineProperty(handler, 'disposed', { get: () => owner.disposed })
   return handler
 }

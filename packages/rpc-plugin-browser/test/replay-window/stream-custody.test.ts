@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createMemoryTransportPair } from '@migaia/rpc-host/adapters/memory'
+import { createMemoryTransportPair } from '../../../rpc-host/test/fixtures/memory-transport.js'
 import { createComposedEndpoint } from '../../../rpc-host/dist/core/composed.js'
-import { connect } from '../../../rpc-host/dist/core/index.js'
-import { authentication } from '../../../rpc-host/dist/core/index.js'
-import type { IRpcHookEvent } from '../../../rpc-host/dist/core/index.js'
-import type { IRpcProviderRejection } from '../../../rpc-host/dist/core/index.js'
+import { connect } from '../../../rpc-host/dist/core/middleware/connect.js'
+import { authentication } from '../../../rpc-host/dist/core/middleware/authentication.js'
+import type { IRpcHookEvent } from '../../../rpc-host/dist/core/typing.js'
+import type { IRpcProviderRejection } from '../../../rpc-host/dist/core/provider-admission.js'
 import { streamRoots } from '../../../rpc-host/test/streaming/fixture.js'
 
 describe('stream replay custody through public endpoint behavior', () => {

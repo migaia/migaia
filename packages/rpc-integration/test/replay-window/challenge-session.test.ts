@@ -1,14 +1,16 @@
+import { createRuntimeEndpointComposition } from '../../../rpc-host/dist/core/runtime-api-endpoint.js'
+import { RpcCapability } from '@migaia/rpc-contract'
 import assert from 'node:assert/strict'
 import { createHmac, randomUUID } from 'node:crypto'
 import { it, vi } from 'vitest'
-import { createFullEndpoint as createEndpoint } from '../../../rpc-host/dist/core/full.js'
+
 import { createComposedEndpoint } from '../../../rpc-host/dist/core/composed.js'
 import { streamRoots } from '../../../rpc-host/test/streaming/fixture.js'
 import { createDiscoveryFeature } from '../../../rpc-host/dist/core/features/discovery.js'
-import { createBroadcastChannelTransport } from '@migaia/rpc-plugin-browser/adapters/broadcast-channel'
-import { authentication } from '../../../rpc-host/dist/core/index.js'
-import { connect } from '../../../rpc-host/dist/core/index.js'
-import { ping } from '../../../rpc-host/dist/core/index.js'
+import { createBroadcastChannelTransport } from '../../../rpc-plugin-browser/dist/browser/adapters/broadcast-channel.js'
+import { authentication } from '../../../rpc-host/dist/core/middleware/authentication.js'
+import { connect } from '../../../rpc-host/dist/core/middleware/connect.js'
+import { ping } from '../../../rpc-host/dist/core/middleware/ping.js'
 import { readAuthenticationEnvelope } from '../../../rpc-host/dist/core/middleware/authentication-envelope.js'
 import { RpcAuthenticationControl } from '../../../rpc-host/dist/core/internal/authentication-replay.js'
 import { RpcEnvelopeKind, RpcRouteType } from '@migaia/rpc-contract'
@@ -16,7 +18,7 @@ import { MessageChannel } from 'node:worker_threads'
 import { createNodeMessagePortTransport } from '../../../rpc-host/dist/core/adapters/message-port.js'
 import { identityCodec } from '@migaia/serialize/codecs/identity/v1'
 import { installPlugin } from '../../../rpc-host/test/core/middleware/helpers.js'
-import { type IRpcAuthenticationCapability } from '../../../rpc-host/dist/core/index.js'
+import type { IRpcAuthenticationCapability } from '../../../rpc-host/dist/core/typing.js'
 
 /** Fixture controls model a lost physical reply and observe the original codec boundary only. */
 type IParticipantOptions = {
@@ -66,15 +68,18 @@ async function participant(
   }
   /** A dropped old reply witnesses business execution before receiver replacement. */
   const dropResponse = options?.dropResponse
-  const endpoint = await createEndpoint({
-    id,
-    transport,
-    middlewares: [connect({ transport }), signed(), ...(options?.ping ? [ping()] : [])],
-    ...(options?.decode ? { codec: { ...identityCodec, decode: options.decode } } : {}),
-    ...(execute
-      ? { provider: { echo: async (context) => context.success(await execute(context.data)) } }
-      : {})
-  })
+  const endpoint = await createRuntimeEndpointComposition(
+    {
+      id,
+      transport,
+      middlewares: [connect({ transport }), signed(), ...(options?.ping ? [ping()] : [])],
+      ...(options?.decode ? { codec: { ...identityCodec, decode: options.decode } } : {}),
+      ...(execute
+        ? { provider: { echo: async (context) => context.success(await execute(context.data)) } }
+        : {})
+    },
+    { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+  ).installing
   endpoint.hooks.on((event) => {
     if (event.name === 'failure') failures.push(event.error)
   })
@@ -632,39 +637,45 @@ it.each([false, true])(
         }
       }
     })
-    const server = await createEndpoint({
-      id: 'server',
-      transport: transports[1]!,
-      middlewares: [
-        connect({
-          transport: transports[1]!,
-          ...(source
-            ? {
-                useBaseIdVerifyOnly: false,
-                identifier: (context) => context.source === bases[0]
-              }
-            : {})
-        }),
-        signed()
-      ],
-      provider: { echo: (context) => context.success(context.data) }
-    })
-    const client = await createEndpoint({
-      id: 'client',
-      transport: transports[0]!,
-      middlewares: [
-        connect({
-          transport: transports[0]!,
-          ...(source
-            ? {
-                useBaseIdVerifyOnly: false,
-                identifier: (context) => context.source === bases[1]
-              }
-            : {})
-        }),
-        signed()
-      ]
-    })
+    const server = await createRuntimeEndpointComposition(
+      {
+        id: 'server',
+        transport: transports[1]!,
+        middlewares: [
+          connect({
+            transport: transports[1]!,
+            ...(source
+              ? {
+                  useBaseIdVerifyOnly: false,
+                  identifier: (context) => context.source === bases[0]
+                }
+              : {})
+          }),
+          signed()
+        ],
+        provider: { echo: (context) => context.success(context.data) }
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'client',
+        transport: transports[0]!,
+        middlewares: [
+          connect({
+            transport: transports[0]!,
+            ...(source
+              ? {
+                  useBaseIdVerifyOnly: false,
+                  identifier: (context) => context.source === bases[1]
+                }
+              : {})
+          }),
+          signed()
+        ]
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     for (const endpoint of [client, server])
       endpoint.hooks.on((event) => {
         if (event.name === 'failure')
@@ -695,13 +706,10 @@ it.each([false, true])(
       const counters = new Map<string, bigint>()
       for (const frame of frames) {
         const inner = readAuthenticationEnvelope(frame.value)
-        assert.deepEqual(Object.keys(frame.value).sort(), [
-          'authentication',
-          'counter',
-          'nonce',
-          'payload',
-          'version'
-        ])
+        assert.deepEqual(
+          new Set(Object.keys(frame.value)),
+          new Set(['authentication', 'counter', 'nonce', 'payload', 'version'])
+        )
         assert.equal(BigInt(inner.counter), (counters.get(inner.nonce) ?? 0n) + 1n)
         counters.set(inner.nonce, BigInt(inner.counter))
         assert.equal(inner.challenge, undefined)
@@ -733,7 +741,19 @@ it('two authenticated BroadcastChannel clients execute independently', async () 
       { status: 'fulfilled', value: 0 },
       { status: 'fulfilled', value: 1 }
     ])
-    assert.deepEqual(calls.sort(), [0, 1])
+    /**
+     * Counting preserves exact multiplicity as well as missing/extra business values in linear
+     * work.
+     */
+    const callCounts = new Map<unknown, number>()
+    for (const value of calls) callCounts.set(value, (callCounts.get(value) ?? 0) + 1)
+    assert.deepEqual(
+      callCounts,
+      new Map([
+        [0, 1],
+        [1, 1]
+      ])
+    )
   } finally {
     for (const client of clients) await close(client)
     await close(server)

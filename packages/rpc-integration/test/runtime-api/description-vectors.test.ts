@@ -1,9 +1,11 @@
+import { runtimeSources } from '../../../rpc-host/test/runtime-api/fixture.js'
+import { RUNTIME_API_CAPABILITIES } from '../../../rpc-host/dist/remote/runtime-api/constants.js'
+import { createRuntimePeer } from '../../../rpc-host/dist/remote/runtime-api/peer.js'
 import assert from 'node:assert/strict'
 import { it } from 'vitest'
 import vectors from '../../schema/vectors/runtime-description.json'
 import { normalizeRuntimeDescription } from '../../../rpc-host/dist/remote/runtime-api/description.js'
 import schemaVectors from '../../schema/vectors/description-schema.json'
-import { createPeerPair } from '../../../rpc-host/dist/testing/index.js'
 import {
   readRuntimePeerConnection,
   type IRuntimePeer
@@ -73,7 +75,7 @@ it('provider schemas survive compilation and a real directory exchange and satis
    * The existing memory pair creates the genuine provider and outbound owners and wire directory
    * handshake.
    */
-  const pair = await createPeerPair({
+  const pairOptions = {
     a: { provide: {} },
     b: {
       contract,
@@ -109,7 +111,24 @@ it('provider schemas survive compilation and a real directory exchange and satis
       }
     },
     report: () => undefined
-  })
+  }
+  /** Reuse the independently negotiated sources and actual canonical Peer constructors. */
+  const pairChannel = runtimeSources(RUNTIME_API_CAPABILITIES, RUNTIME_API_CAPABILITIES)
+  const [a, b] = await Promise.all([
+    createRuntimePeer({
+      ...pairOptions.a,
+      self: { name: 'a', instanceId: 'test-pair-a' },
+      connect: pairChannel.sources[0],
+      report: pairOptions.report
+    }),
+    createRuntimePeer({
+      ...pairOptions.b,
+      self: { name: 'b', instanceId: 'test-pair-b' },
+      connect: pairChannel.sources[1],
+      report: pairOptions.report
+    })
+  ])
+  const pair = { a, b }
   try {
     /**
      * Read only the accepted canonical receipt; no local describe projection can inject remote
@@ -148,5 +167,6 @@ it('provider schemas survive compilation and a real directory exchange and satis
     assert.ok(acceptsSchema(schema, description, schema))
   } finally {
     await Promise.all([pair.a.close(), pair.b.close()])
+    pairChannel.close()
   }
 })

@@ -1,88 +1,94 @@
 import { describe, expect, it } from 'vitest'
-import { RemoteMethodName } from '@migaia/rpc-host/plugin'
 import { spawn } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { mkdtemp, rm } from 'node:fs/promises'
+import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { nativeBorrowedPeer, nativeHostChildPath, nativeHostToken } from './fixtures/host-native.js'
 
-/** Start a genuinely independent peer and wait for the listener publication, not a fixed delay. */
-async function independentHostPeer(resolverMode = '') {
-  const directory = await mkdtemp('/tmp/rpc-host-')
-  const address = join(directory, 's')
-  const errors: string[] = []
-  const child = spawn(process.execPath, [nativeHostChildPath], {
-    stdio: ['ignore', 'ignore', 'pipe'],
-    env: {
-      RPC_HOST_ADDRESS: address,
-      RPC_RESOLVER_MODE: resolverMode,
-      RPC_HOST_TOKEN: nativeHostToken,
-      RPC_HOST_SECOND_TOKEN: 'host-second-fixture'
-    }
-  })
-  const exited = new Promise<void>((resolve, reject) => {
-    child.once('exit', () => resolve())
-    child.once('error', reject)
-  })
-  await new Promise<void>((resolve, reject) => {
-    const onData = (chunk: Buffer) => {
-      errors.push(chunk.toString())
-      if (errors.join('').includes('host-listener-ready')) {
-        child.stderr.off('data', onData)
-        resolve()
+/** The child and independent listener observer share the same fixture publication contract. */
+const readyText = JSON.parse(
+  readFileSync(
+    new URL('../../../rpc-plugin-process/test/process/fixtures/host-ready.json', import.meta.url),
+    'utf8'
+  )
+) as { committed: string }
+/** A failed independent child must reject publication before clients attempt their first dial. */
+const earlyExitText = 'Host listener fixture exited before publication'
+
+/** Own the independent native child, bounded publication observer and exact OS cleanup. */
+class IndependentHostPeer {
+  /** The Unix socket is private to this independent child and its borrowed clients. */
+  readonly address: string
+  /** Retain the native child identity for ownership and liveness assertions. */
+  readonly child
+  /** Diagnostic chunks retain the original transcript without rescanning it for every chunk. */
+  readonly errors: string[] = []
+  /** The temporary socket directory is removed only after the native child exits. */
+  readonly #directory: string
+  /** Native exit/error settlement stays independent of listener readiness. */
+  readonly #exited: Promise<void>
+  /** Publication is observed from the same child marker rather than a wall-clock sleep. */
+  readonly #ready: Promise<void>
+  /** At most marker length minus one characters bridge split native stderr chunks. */
+  #suffix = ''
+
+  /** Spawn one native child and attach publication/error observers before its first event. */
+  constructor(directory: string) {
+    this.#directory = directory
+    this.address = join(directory, 's')
+    this.child = spawn(process.execPath, [nativeHostChildPath], {
+      stdio: ['ignore', 'ignore', 'pipe'],
+      env: {
+        RPC_HOST_ADDRESS: this.address,
+        RPC_HOST_TOKEN: nativeHostToken,
+        RPC_HOST_SECOND_TOKEN: 'host-second-fixture'
       }
-    }
-    child.stderr.on('data', onData)
-    child.stderr.on('data', (chunk: Buffer) => errors.push(chunk.toString()))
-    child.once('error', reject)
-    child.once('exit', () => reject(new Error('Host listener fixture exited before publication')))
-  })
-  return {
-    address,
-    child,
-    errors,
-    async close() {
-      child.kill('SIGTERM')
-      await exited
-      await rm(directory, { recursive: true, force: true })
-    }
+    })
+    this.#exited = new Promise<void>((resolve, reject) => {
+      this.child.once('exit', () => resolve())
+      this.child.once('error', reject)
+    })
+    this.#ready = new Promise<void>((resolve, reject) => {
+      /** This short event listener mutates only its named fixture owner's transcript and suffix. */
+      const onData = (chunk: Buffer): void => {
+        /** A fixed marker suffix bounds readiness work to O(received bytes) across all chunks. */
+        const next = this.#suffix + chunk.toString()
+        this.errors.push(chunk.toString())
+        if (next.includes(readyText.committed)) {
+          this.child.stderr.off('data', onData)
+          resolve()
+        }
+        this.#suffix = next.slice(-(readyText.committed.length - 1))
+      }
+      this.child.stderr.on('data', onData)
+      this.child.stderr.on('data', (chunk: Buffer) => this.errors.push(chunk.toString()))
+      this.child.once('error', reject)
+      this.child.once('exit', () => reject(new Error(earlyExitText)))
+    })
+  }
+
+  /** Create one independent listener and wait for its actual publication before returning it. */
+  static async open(): Promise<IndependentHostPeer> {
+    /** The original temporary directory belongs exclusively to this fixture. */
+    const directory = await mkdtemp('/tmp/rpc-host-')
+    /** Construct native observers synchronously before waiting for publication. */
+    const peer = new IndependentHostPeer(directory)
+    await peer.#ready
+    return peer
+  }
+
+  /** Terminate only the fixture child, wait for exit, then remove its private socket directory. */
+  async close(): Promise<void> {
+    this.child.kill('SIGTERM')
+    await this.#exited
+    await rm(this.#directory, { recursive: true, force: true })
   }
 }
 
 describe('process Host real Unix service', () => {
-  it.each(['wrong-name', 'promise', 'invalid', 'throw'])(
-    'keeps invalid local resolver output off the real Host while other control stays live (%s)',
-    async (mode) => {
-      const peer = await independentHostPeer(mode)
-      let client: Awaited<ReturnType<typeof nativeBorrowedPeer>> | undefined
-      try {
-        client = await nativeBorrowedPeer(peer.address)
-        const error = await client.request(RemoteMethodName.hostUse, ['p']).then(
-          () => undefined,
-          (failure: unknown) => failure
-        )
-        if (mode === 'throw')
-          expect(error).toMatchObject({
-            code: 'PROCESS_HOST_INVALID_OPTION',
-            cause: { code: 'PROCESS_CHANNEL_CLOSED', stack: expect.any(String) }
-          })
-        else expect(error).toMatchObject({ code: 'REMOTE_CONTRACT_INVALID' })
-        expect(await client.request(RemoteMethodName.hostInspect, [])).toMatchObject({
-          plugins: []
-        })
-        await expect(
-          client.request(RemoteMethodName.hostUse, ['undeclared'])
-        ).rejects.toMatchObject({
-          code: 'REMOTE_CONTRACT_INVALID'
-        })
-      } finally {
-        await client?.close()
-        await peer.close()
-      }
-    }
-  )
   it('refuses connection 65 and request 33 at the default limits while another connection remains live', async () => {
-    const peer = await independentHostPeer()
+    const peer = await IndependentHostPeer.open()
     const clients: Awaited<ReturnType<typeof nativeBorrowedPeer>>[] = []
     try {
       for (let index = 0; index < 64; index += 1) {
@@ -92,19 +98,19 @@ describe('process Host real Unix service', () => {
       await expect(nativeBorrowedPeer(peer.address)).rejects.toBeDefined()
       const first = clients[0]!
       const second = clients[1]!
-      await first.request(RemoteMethodName.hostUse, ['p'])
-      await second.request(RemoteMethodName.hostUse, ['p'])
-      const held = Array.from({ length: 32 }, () => first.request('p.request', 'hold'))
+      const held = Array.from({ length: 32 }, () => first.peer.request('p.f.request', 'hold'))
       const outcomes = Promise.allSettled(held)
       await expect
-        .poll(async () => (await second.request('p.request', 'count')) as { calls: number })
+        .poll(async () => (await second.peer.request('p.f.request', 'count')) as { calls: number })
         .toMatchObject({ calls: 32 })
-      await expect(first.request('p.request', 'rejected')).rejects.toMatchObject({
+      await expect(first.peer.request('p.f.request', 'rejected')).rejects.toMatchObject({
         code: 'OVERLOADED'
       })
-      expect(await second.request('p.request', 'release-held')).toMatchObject({ calls: 33 })
+      expect(await second.peer.request('p.f.request', 'release-held')).toMatchObject({ calls: 33 })
       expect((await outcomes).every((row) => row.status === 'fulfilled')).toBe(true)
-      expect(await second.request('p.request', 'live')).toMatchObject({ pid: peer.child.pid })
+      expect(await second.peer.request('p.f.request', 'live')).toMatchObject({
+        pid: peer.child.pid
+      })
       expect(peer.errors.join('')).not.toContain(nativeHostToken)
     } finally {
       await Promise.allSettled(clients.map((client) => client.close()))
@@ -112,30 +118,29 @@ describe('process Host real Unix service', () => {
     }
   })
   it('shares authenticated caches but releases only the borrowed connection', async () => {
-    const peer = await independentHostPeer()
+    const peer = await IndependentHostPeer.open()
     const [first, second, other] = await Promise.all([
       nativeBorrowedPeer(peer.address),
       nativeBorrowedPeer(peer.address),
       nativeBorrowedPeer(peer.address, 'host-second-fixture')
     ])
     try {
-      await Promise.all(
-        [first, second, other].map((client) => client.request(RemoteMethodName.hostUse, ['p']))
-      )
       const key = randomUUID()
-      const result = await first.request('p.request', 'deduplicated', { idempotencyKey: key })
-      expect(await second.request('p.request', 'deduplicated', { idempotencyKey: key })).toEqual(
-        result
-      )
+      const result = await first.peer.request('p.f.request', 'deduplicated', {
+        idempotencyKey: key
+      })
+      expect(
+        await second.peer.request('p.f.request', 'deduplicated', { idempotencyKey: key })
+      ).toEqual(result)
       expect(result).toMatchObject({ pid: peer.child.pid, calls: 1 })
       expect(
-        await other.request('p.request', 'deduplicated', { idempotencyKey: key })
+        await other.peer.request('p.f.request', 'deduplicated', { idempotencyKey: key })
       ).toMatchObject({
         calls: 2
       })
       await expect(nativeBorrowedPeer(peer.address, 'wrong-fixture-token')).rejects.toBeDefined()
       await first.close()
-      expect((await first.describe()).connections).toEqual([
+      expect((await first.peer.describe()).connections).toEqual([
         expect.objectContaining({
           connection: expect.objectContaining({ status: 'departed' }),
           unit: expect.objectContaining({ state: 'disposed' })
@@ -143,7 +148,7 @@ describe('process Host real Unix service', () => {
       ])
       expect(peer.child.exitCode).toBeNull()
       expect(process.kill(peer.child.pid!, 0)).toBe(true)
-      expect(await second.request('p.request', 'still-live')).toMatchObject({
+      expect(await second.peer.request('p.f.request', 'still-live')).toMatchObject({
         pid: peer.child.pid,
         calls: 3
       })

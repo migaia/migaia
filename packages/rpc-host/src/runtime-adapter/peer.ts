@@ -2,7 +2,7 @@ import type {
   IRuntimePeerIdentity,
   IRuntimePeerOptions,
   IRuntimePeerSourceContext
-} from '../remote/index.js'
+} from '../remote/runtime-api/peer.js'
 import { createRuntimePeer, prepareRuntimePeerSourceContext } from '../remote/runtime-api/peer.js'
 import { createManagedRuntimePeer } from '../remote/runtime-api/managed-peer.js'
 import {

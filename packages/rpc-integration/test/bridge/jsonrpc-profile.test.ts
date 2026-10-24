@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import vectors from '../../schema/vectors/jsonrpc-bridge.json'
-import { bridgeFixture, flush, request } from './fixture.js'
+import { BridgeFixture, flush, request } from './fixture.js'
 
 describe('JSON-RPC profile boundary', () => {
   it.each(vectors.inbound)(
     'applies inbound vector $id without affecting a second connection',
     async (vector) => {
-      const fixture = bridgeFixture()
-      const other = bridgeFixture()
+      const fixture = new BridgeFixture()
+      const other = new BridgeFixture()
       const channel = await fixture.open()
       const otherChannel = await other.open()
       const responses: unknown[] = []
@@ -55,7 +55,7 @@ describe('JSON-RPC profile boundary', () => {
     }
   )
   it('rejects transfer through a Promise as native TypeError before any business byte', async () => {
-    const fixture = bridgeFixture()
+    const fixture = new BridgeFixture()
     const channel = await fixture.open()
     let sending: void | Promise<void> = undefined
     expect(() => {
@@ -71,7 +71,7 @@ describe('JSON-RPC profile boundary', () => {
     await channel.close()
   })
   it('rejects invalid args, streams and unmapped variation without writing business bytes', async () => {
-    const fixture = bridgeFixture()
+    const fixture = new BridgeFixture()
     const channel = await fixture.open()
     await expect(
       channel.transport.send(JSON.stringify(request('args', 'p.f.request', {}, { named: true })))

@@ -1,11 +1,9 @@
+import { createRuntimeEndpointComposition } from '../../../dist/core/runtime-api-endpoint.js'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { describe, expect, it, vi } from 'vitest'
 import { normalizeRpcEnvelope } from '@migaia/rpc-contract'
-import { createMemoryTransportPair } from '../../../dist/core/adapters/memory.js'
-import { createClientEndpoint } from '../../../dist/core/client.js'
-import { createProviderEndpoint } from '../../../dist/core/provider.js'
-import { createComposedEndpoint } from '../../../dist/core/composed.js'
-import { createClientFirstPartyRoots } from '../../../dist/core/internal/client-first-party-roots.js'
+import { createMemoryTransportPair } from '../../fixtures/memory-transport.js'
+
 import type { IRpcTransport } from '../../../dist/core/transport.js'
 import type { IRpcPlugin } from '../../../dist/core/typing.js'
 import { abort } from '../../../dist/core/middleware/abort.js'
@@ -15,54 +13,72 @@ import { createConstructionControl } from '../../../dist/core/internal/construct
 import { raceWithAsyncControl } from '../../../dist/core/internal/async-control.js'
 
 /** A signal double whose reason getter throws while its abort notification stays controllable. */
-function throwingSignal(
-  failure: Error,
-  initiallyAborted: boolean,
-  onRead?: () => void
-): {
+function throwingSignal(failure: Error, initiallyAborted: boolean, onRead?: () => void) {
+  return new ThrowingSignal(failure, initiallyAborted, onRead)
+}
+
+/** One controlled native-signal double owns reason reads and exact abort-listener membership. */
+class ThrowingSignal {
+  /** Original reason failure remains the exact error instance returned through caller cause chains. */
+  readonly #failure: Error
+  /** Optional original getter observer runs before throwing the same failure. */
+  readonly #onRead: (() => void) | undefined
+  /** Only fire changes the original controlled signal's aborted fact. */
+  #aborted: boolean
+  /** Getter reads remain independently observable without reading reason a second time. */
+  #reads = 0
+  /** Original external abort callbacks are delivered in the same Set insertion order. */
+  readonly #listeners = new Set<() => void>()
+  /** The held native-shaped signal keeps the original own getters and exact callback results. */
   readonly signal: AbortSignal
-  readonly reads: () => number
-  readonly fire: () => void
-} {
-  /** Tracks precisely one external abort listener and its removal. */
-  const listeners = new Set<() => void>()
-  let aborted = initiallyAborted
-  let reads = 0
-  const signal = {
-    get aborted() {
-      return aborted
-    },
-    get reason(): never {
-      reads += 1
-      onRead?.()
-      throw failure
-    },
-    addEventListener(_type: string, listener: () => void) {
-      listeners.add(listener)
-    },
-    removeEventListener(_type: string, listener: () => void) {
-      listeners.delete(listener)
-    }
-  } as unknown as AbortSignal
-  return {
-    signal,
-    reads: () => reads,
-    fire: () => {
-      aborted = true
-      for (const listener of listeners) listener()
-    }
+
+  /** Capture original getter inputs without reading reason or notifying listeners during setup. */
+  constructor(failure: Error, initiallyAborted: boolean, onRead?: () => void) {
+    this.#failure = failure
+    this.#aborted = initiallyAborted
+    this.#onRead = onRead
+    this.signal = ThrowingSignal.#view(this)
+  }
+  /** Preserve receiver-independent own getter semantics while state belongs to the named owner. */
+  static #view(owner: ThrowingSignal): AbortSignal {
+    return {
+      get aborted() {
+        return owner.#aborted
+      },
+      get reason(): never {
+        owner.#reads += 1
+        owner.#onRead?.()
+        throw owner.#failure
+      },
+      addEventListener(_type: string, listener: () => void) {
+        owner.#listeners.add(listener)
+      },
+      removeEventListener(_type: string, listener: () => void) {
+        owner.#listeners.delete(listener)
+      }
+    } as unknown as AbortSignal
+  }
+  /** Observe the original reason-read count without invoking the throwing getter. */
+  readonly reads = (): number => this.#reads
+  /** Publish the same synchronous abort fact before visiting the original listener Set. */
+  readonly fire = (): void => {
+    this.#aborted = true
+    for (const listener of this.#listeners) listener()
   }
 }
 
 describe('guarded abort reason policy', () => {
   it('rejects a pre-aborted caller with CANCELLED and the getter failure as cause', async () => {
     const [transport] = createMemoryTransportPair()
-    const client = await createClientEndpoint({
-      id: 'reason-client',
-      transport,
-      targetIds: ['reason-server'],
-      middlewares: [connect({ transport }), abort()]
-    })
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'reason-client',
+        transport,
+        targetIds: ['reason-server'],
+        middlewares: [connect({ transport }), abort()]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     const failure = new Error('reason getter')
     const source = throwingSignal(failure, true)
     try {
@@ -93,25 +109,31 @@ describe('guarded abort reason policy', () => {
     const providerStarted = new Promise<void>((resolve) => {
       started = resolve
     })
-    const provider = await createProviderEndpoint({
-      id: 'reason-provider',
-      transport: providerWire,
-      middlewares: [connect({ transport: providerWire }), abort()],
-      provider: {
-        wait: async (context) => {
-          started()
-          await new Promise<void>((resolve) =>
-            context.signal.addEventListener('abort', () => resolve(), { once: true })
-          )
-          return context.success('late')
+    const provider = await createRuntimeEndpointComposition(
+      {
+        id: 'reason-provider',
+        transport: providerWire,
+        middlewares: [connect({ transport: providerWire }), abort()],
+        provider: {
+          wait: async (context) => {
+            started()
+            await new Promise<void>((resolve) =>
+              context.signal.addEventListener('abort', () => resolve(), { once: true })
+            )
+            return context.success('late')
+          }
         }
-      }
-    })
-    const client = await createClientEndpoint({
-      id: 'reason-client-event',
-      transport: capture,
-      middlewares: [connect({ transport: capture }), abort()]
-    })
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'reason-client-event',
+        transport: capture,
+        middlewares: [connect({ transport: capture }), abort()]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     const failure = new Error('event reason getter')
     let source!: ReturnType<typeof throwingSignal>
     source = throwingSignal(failure, false, () => source.fire())
@@ -171,12 +193,15 @@ describe('guarded abort reason policy', () => {
     const source = throwingSignal(failure, true)
     let pending: Promise<unknown>
     expect(() => {
-      pending = createClientEndpoint({
-        id: 'construction-reason-client',
-        transport,
-        middlewares: [connect({ transport })],
-        construction: { signal: source.signal }
-      })
+      pending = createRuntimeEndpointComposition(
+        {
+          id: 'construction-reason-client',
+          transport,
+          middlewares: [connect({ transport })],
+          construction: { signal: source.signal }
+        },
+        { agreement: { capabilities: [] }, peerId: '' }
+      ).installing
     }).not.toThrow()
     let rejection: unknown
     try {
@@ -217,15 +242,15 @@ describe('guarded abort reason policy', () => {
         return new Promise<never>(() => undefined)
       }
     }
-    const construction = createComposedEndpoint(
+    const construction = createRuntimeEndpointComposition(
       {
         id: 'mid-install-reason',
         transport,
         middlewares: [connect({ transport }), pending],
         construction: { signal: source.signal }
       },
-      createClientFirstPartyRoots()
-    )
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     await installStarted
     source.fire()
     let rejection: unknown

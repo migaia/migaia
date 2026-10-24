@@ -1,13 +1,13 @@
 import { createUnitBudget } from '@migaia/supervision'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { describe, expect, it, vi } from 'vitest'
-import { assembleThreadFixture } from './fixture.js'
+import { threadPlugin } from '@migaia/rpc-plugin-thread'
+import { deferred } from '@migaia/utils/promise'
 import { runtimeTestHost } from '../../../rpc-host/test/runtime-api/public-host.js'
 import {
   createAdapterWebThreadLauncher as createWebThreadLauncher,
   createAdapterWebThreadChannelFactory as createWebThreadChannelFactory
 } from '../../dist/threads/web-launcher.js'
-import { nativeWorkerFor, nativeFixture, endpointFactory } from './fixture.js'
 
 /** Flush supervisor/remote promise ownership without running a second lifecycle scheduler. */
 async function flush(): Promise<void> {
@@ -15,30 +15,17 @@ async function flush(): Promise<void> {
 }
 
 describe('thread lifecycle ownership', () => {
-  it('endpoint construction failure preserves primary error and reaps the Worker', async () => {
-    const primary = new Error('endpoint factory failure')
-    const fixture = nativeFixture({
-      endpointFactory: async () => {
-        throw primary
-      }
-    })
-    try {
-      await expect(fixture.install()).rejects.toMatchObject({
-        code: 'PLUGIN_INSTALL_FAILED',
-        cause: primary
-      })
-      expect(fixture.budget.inUse).toBe(0)
-      expect(nativeWorkerFor(fixture.handles[0]!).threadId).toBe(-1)
-      expect(nativeWorkerFor(fixture.handles[0]!).listenerCount('message')).toBe(0)
-    } finally {
-      await fixture.close()
-    }
-  })
   it('unsupported exit retains its budget after bootstrap cancellation and abandon timeout', async () => {
     const scheduler = createManualScheduler()
     const report = vi.fn()
     const terminate = vi.fn()
+    /** Native construction proves that the actual launcher has acquired its original unit lease. */
+    const launched = deferred<void>()
     const Worker = class {
+      /** Signal the existing native launch phase without manufacturing a bootstrap acknowledgement. */
+      constructor() {
+        launched.resolve()
+      }
       postMessage() {}
       addEventListener() {}
       removeEventListener() {}
@@ -49,7 +36,7 @@ describe('thread lifecycle ownership', () => {
     const host = runtimeTestHost({
       host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
     })
-    const plugin = assembleThreadFixture({
+    const plugin = threadPlugin({
       name: 'p',
       spawn: {
         spec: { entry: 'file:///worker.mjs', data: { value: 1 } },
@@ -61,10 +48,11 @@ describe('thread lifecycle ownership', () => {
         health: { check: async () => undefined },
         supervisor: { isolation: 'best-effort', stop: { exitTimeoutMs: 5, reapTimeoutMs: 5 } }
       },
-      endpointFactory,
+
       report
     })
     const ready = host.use(plugin).catch((error: unknown) => error)
+    await launched.promise
     await flush()
     expect(budget.inUse).toBe(1)
     const release = host.dispose()

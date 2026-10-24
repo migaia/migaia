@@ -24,23 +24,55 @@ type IRoom = {
 }
 
 /** Open three real global BroadcastChannels; no synthetic transport or completed Peer is supplied. */
-async function openRoom(): Promise<IRoom> {
-  /** A fresh actual native channel namespace isolates each independent business case. */
+/** Allocate only the native listener's original membership and cleanup storage. */
+function broadcastRoomFixtureState() {
   const name = randomUUID()
-  /** These are the only fixture-owned native handles and logical resources. */
   const channels: BroadcastChannel[] = []
   const hosts: IRpcHost[] = []
   const states: IParticipant[] = []
-  /** Close the hosts first so explicit leave traverses a still-open native carrier. */
-  const close = async (): Promise<void> => {
+  return { name, channels, hosts, states }
+}
+
+/** Own one native browser listener while the Host keeps accepted endpoint and directory ownership. */
+class BroadcastRoomFixture {
+  /** Native membership, pending preparation and the one close receipt belong to this listener. */
+  #state: ReturnType<typeof broadcastRoomFixtureState>
+  /** Create storage before native callbacks can publish any accepted resource. */
+  constructor() {
+    this.#state = broadcastRoomFixtureState()
+  }
+  /** Attach native acceptance and retain the original rollback and close semantics. */
+  async open() {
     try {
-      await Promise.all(hosts.map((host) => host.close()))
-    } finally {
-      for (const channel of channels) channel.close()
+      await this.#add(1)
+      await this.#add(2)
+      await this.#add(3)
+      await vi.waitFor(() => {
+        for (const host of this.#state.hosts) expect(Object.keys(host.peers)).toHaveLength(2)
+      })
+      return {
+        name: this.#state.name,
+        channels: this.#state.channels,
+        hosts: this.#state.hosts,
+        states: this.#state.states,
+        add: this.#add,
+        close: this.#close
+      }
+    } catch (error) {
+      await this.#close()
+      throw error
     }
   }
-  /** Every participant exposes identical methods backed by distinct provider state. */
-  const add = async (value: number): Promise<IRpcHost> => {
+  /** Preserve the original listener operation against this listener's explicit state. */
+  #close = async (): Promise<void> => {
+    try {
+      await Promise.all(this.#state.hosts.map((host) => host.close()))
+    } finally {
+      for (const channel of this.#state.channels) channel.close()
+    }
+  }
+  /** Preserve the original listener operation against this listener's explicit state. */
+  #add = async (value: number): Promise<IRpcHost> => {
     /** The third provider's original Error is deliberately observed on its original report channel. */
     const state: IParticipant = {
       value,
@@ -48,10 +80,10 @@ async function openRoom(): Promise<IRoom> {
       reports: [],
       failure: new Error('third participant provider failure')
     }
-    states.push(state)
+    this.#state.states.push(state)
     /** Separate same-named channel objects are genuine independent native participants. */
-    const channel = new BroadcastChannel(name)
-    channels.push(channel)
+    const channel = new BroadcastChannel(this.#state.name)
+    this.#state.channels.push(channel)
     /** Default host identities must be unique without manually assigning aliases. */
     const host = await createRpcHost({
       plugins: [broadcastChannelPlugin({ channel, connect: { timeoutMs: 1000 } })],
@@ -77,21 +109,14 @@ async function openRoom(): Promise<IRoom> {
         }
       }
     })
-    hosts.push(host)
+    this.#state.hosts.push(host)
     return host
   }
-  try {
-    await add(1)
-    await add(2)
-    await add(3)
-    await vi.waitFor(() => {
-      for (const host of hosts) expect(Object.keys(host.peers)).toHaveLength(2)
-    })
-    return { name, channels, hosts, states, add, close }
-  } catch (error) {
-    await close()
-    throw error
-  }
+}
+
+/** Attach the one native listener without creating another Host or endpoint. */
+async function openRoom(): Promise<IRoom> {
+  return new BroadcastRoomFixture().open()
 }
 
 /** Fanout keys are the existing host target keys, using each actual accepted participant name. */

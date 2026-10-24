@@ -122,4 +122,6 @@ const sameDefinition = timeout({ ms: 1500 })
 
 传输和 feature 是真实 plugin-host 定义，也可交给普通 `PluginHost.use(...)`；它的原安装、替换和清理 owner 保持负责。自定义传输作者使用 `@migaia/rpc-host/plugin` 的冷部署及作用域工具；应用从 `createRpcHost` 开始，不需要底层工厂或私有文件。
 
+公开子路径为 `/probe`、`/plugin` 和 `/features` 及其功能子路径。`/probe` 编译观察定义；把定义交给 `/plugin` 的 `defineFeaturePlugin({ name, probe })` 安装到同一个 host。观察器只借用该 host 的调用与物理连接，不创建额外端点。
+
 更多调用、取消与迁移说明见[使用指南](./USEGUIDE.md)。

@@ -1,13 +1,12 @@
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { describe, expect, it, vi } from 'vitest'
-import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
 import { raceWithAsyncControl } from '../../dist/core/internal/async-control.js'
 import { prepareEndpoint as prepareEndpointImpl } from '../../dist/core/internal/endpoint-bootstrap.js'
 import { allocateRpcId } from '../../dist/core/internal/id.js'
 import { ResourceScope } from '../../dist/core/internal/resource-scope.js'
 import { createEndpointTimePort } from '../../dist/core/internal/time-port.js'
 import { createEndpointTransportActivation } from '../../dist/core/internal/transport-activation.js'
-import { PeerRegistry } from '../../dist/core/internal/peers.js'
 import { translateEndpointDisposalError } from '../../dist/core/internal/disposal-translation.js'
 import { RpcLifecycleError } from '../../dist/core/errors.js'
 import type { IRpcTransport } from '../../dist/core/transport.js'
@@ -336,21 +335,7 @@ describe('internal ownership boundary semantics', () => {
     })
   })
 
-  it('preserves configured peers while bounding learned peers and translating cleanup leaves', () => {
-    const peers = new PeerRegistry<string>(() => Date.now(), 1, 10)
-    peers.add('configured', true)
-    peers.add('learned-1')
-    peers.add('learned-2')
-    expect(peers.has('configured')).toBe(true)
-    expect(peers.has('learned-1')).toBe(false)
-    expect([...peers]).toEqual(['configured', 'learned-2'])
-    peers.removeLearned('learned-2')
-    peers.remove('configured')
-    peers.clear()
-    expect(peers.snapshot()).toEqual([])
-    expect(() => new PeerRegistry(() => Date.now(), 0)).toThrowError()
-    expect(() => new PeerRegistry(() => Date.now(), 1, 0)).toThrowError()
-
+  it('preserves cleanup leaves when translating disposal failures', () => {
     const lifecycle = new RpcLifecycleError('endpoint disposed')
     expect(translateEndpointDisposalError(lifecycle)).toBe(lifecycle)
     const rawError = new Error('raw cleanup')
@@ -373,19 +358,5 @@ describe('internal ownership boundary semantics', () => {
     ])
     expect(deduplicated.cleanupErrors).toHaveLength(1)
     expect(translateEndpointDisposalError(undefined).cause).toBeUndefined()
-  })
-
-  it('expires learned peer knowledge while retaining configured-peer semantics', () => {
-    vi.useFakeTimers()
-    try {
-      vi.setSystemTime(0)
-      const peers = new PeerRegistry<string>(() => Date.now(), 2, 10)
-      peers.add('learned')
-      expect(peers.has('learned')).toBe(true)
-      vi.setSystemTime(11)
-      expect(peers.has('learned')).toBe(false)
-    } finally {
-      vi.useRealTimers()
-    }
   })
 })

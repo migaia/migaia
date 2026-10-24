@@ -1,3 +1,4 @@
+import { orderStringKeys } from '@migaia/utils/string'
 import assert from 'node:assert/strict'
 import {
   openSync,
@@ -21,8 +22,8 @@ import {
 } from '../../../rpc-host/test/replay-window/native-telemetry.mjs'
 import { loadedModules } from './native-loaded.mjs'
 import { assertClosureFresh } from '../../../../scripts/dist-stamp.mjs'
-import { RpcCoreErrorCode } from '../../../rpc-host/dist/core/index.js'
-import { RpcProviderRejectionReason } from '../../../rpc-host/dist/core/index.js'
+import { RpcCoreErrorCode } from '../../../rpc-host/dist/core/errors.js'
+import { RpcProviderRejectionReason } from '../../../rpc-host/dist/core/semantic-constants.js'
 
 /** Each command owns one sustained cell; shorter duration is solely fixture preparation. */
 const [mode, rateText, durationText, destination] = process.argv.slice(2)
@@ -115,15 +116,14 @@ const contract = {
 /** Fingerprint all owned fixture sources before launch, independently of actual dist loader proof. */
 const fixtureDirectory = fileURLToPath(new URL('.', import.meta.url))
 contract.fixtures = Object.fromEntries(
-  readdirSync(fixtureDirectory)
-    .filter((name) => name.endsWith('.mjs'))
-    .sort()
-    .map((name) => [
+  orderStringKeys(readdirSync(fixtureDirectory).filter((name) => name.endsWith('.mjs'))).map(
+    (name) => [
       name,
       createHash('sha256')
         .update(readFileSync(join(fixtureDirectory, name)))
         .digest('hex')
-    ])
+    ]
+  )
 )
 writeFileSync(join(directory, 'contract.json'), JSON.stringify(contract, null, 2), { flag: 'wx' })
 process.stdout.write(JSON.stringify({ kind: 'classification-contract', ...contract }) + '\n')

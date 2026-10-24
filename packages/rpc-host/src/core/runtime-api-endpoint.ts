@@ -14,7 +14,7 @@ import type { RpcOutboundAttachment } from './internal/outbound-attachment.js'
 import { createComposedEndpoint } from './composed.js'
 import { createCanonicalChunkFeature } from './features/canonical-chunk.js'
 import { createOutboundFeature, type IOutboundSurface } from './features/outbound.js'
-import { createProviderFeatureWithScope } from './internal/provider-feature.js'
+import { createProviderFeature } from './internal/provider-feature.js'
 import { createOneWayFeature, type IOneWaySurface } from './features/one-way.js'
 import { createDiscoveryFeature, type IDiscoverySurface } from './features/discovery.js'
 import { createControlFeature, type IControlSurface } from './features/control.js'
@@ -23,10 +23,24 @@ import {
   type IRpcStreamRuntime,
   type IRpcStreamCapabilityPort
 } from './features/stream.js'
-import type { IRpcFactoryConfig, IRpcEndpoint, ISendOptions } from './typing.js'
+import type {
+  IRpcFactoryConfig,
+  IRpcEndpoint,
+  IRpcPingEndpointSurface,
+  ISendOptions
+} from './typing.js'
+import type { IRpcFeatureSurface } from './feature.js'
+import type { ICheckedInput, IFeatures, IMiddlewares } from './pipeline-contract.js'
+import type {
+  IFactoryDiscoveryMode,
+  IFactoryPingCapability,
+  INativeMiddlewareSurface,
+  IRecursiveProvideSurface
+} from './internal/factory-types.js'
 
 import { RpcCoreErrorText } from './error-text.js'
-import type { IProviderAdmissionScope, IProviderRegistrationSurface } from './features/provider.js'
+import type { IProviderAdmissionScope } from './internal/provider-admission.js'
+import type { IProviderRegistrationSurface } from './internal/provider-feature.js'
 import { RpcCapability } from '@migaia/rpc-contract/wire'
 import { deferred } from '@migaia/utils/promise'
 
@@ -142,55 +156,35 @@ type IRuntimeEndpointBinding = Readonly<{
   dispose(): Promise<void>
 }>
 
-/** Borrowing callable operations grants only the rights already held by that binding object. */
-export function createRuntimeApiEndpoint(
-  config: Readonly<{ binding: IRuntimeEndpointBinding }>
-): IRuntimeEndpointBinding
-/** Install the existing composed kernel behind a synchronous actual-channel resource. */
-export function createRuntimeApiEndpoint(
+/** Physical composition needs only the channel's actual agreement and resource admission rights. */
+type IRuntimeCompositionChannel = Pick<
+  IRuntimeEndpointChannel,
+  'agreement' | 'peerId' | 'supportsPeer' | 'chunk' | 'hostRegistration'
+>
+
+/** Refine physical controls only from the installed channel and original middleware tuple. */
+type IRuntimeCompositionSurface<
+  TConfig,
+  TChannel extends IRuntimeCompositionChannel
+> = IRecursiveProvideSurface<
+  Omit<IRuntimePhysicalEndpoint, 'connect' | 'discovery' | 'ping' | 'pingAll'> &
+    IRpcFeatureSurface<IFeatures<TConfig>> &
+    INativeMiddlewareSurface<IMiddlewares<TConfig>> &
+    (typeof RpcCapability.ping extends TChannel['agreement']['capabilities'][number]
+      ? Pick<
+          IRpcEndpoint<string, IFactoryDiscoveryMode<IMiddlewares<TConfig>>>,
+          'connect' | 'discovery'
+        > &
+          IRpcPingEndpointSurface<IFactoryPingCapability<IMiddlewares<TConfig>>>
+      : Record<never, never>)
+>
+
+/** Build the actual runtime's one native Feature record; private owner oracles reuse this assembly. */
+export function createRuntimeFeatureRoots(
   config: IRpcFactoryConfig,
-  channel: IRuntimeEndpointChannel,
+  channel: IRuntimeCompositionChannel,
   admission?: IProviderAdmissionScope
-): IRuntimeApiEndpoint
-export function createRuntimeApiEndpoint(
-  config: IRpcFactoryConfig | Readonly<{ binding: IRuntimeEndpointBinding }>,
-  channel?: IRuntimeEndpointChannel,
-  admission?: IProviderAdmissionScope
-): IRuntimeApiEndpoint | IRuntimeEndpointBinding {
-  if ('binding' in config) {
-    /** These are complete owned operations, never caller claims or public preparation plumbing. */
-    const binding = config.binding
-    /** Repeated and reentrant disposal share one facade-owned binding settlement. */
-    let closing: Promise<void> | undefined
-    return Object.freeze({
-      get ready() {
-        return binding.ready
-      },
-      request: (method: string, payload?: unknown, options?: IRuntimeEndpointGroupOptions) =>
-        binding.request(method, payload, options),
-      notify: (method: string, payload?: unknown, options?: IRuntimeEndpointGroupOptions) =>
-        binding.notify(method, payload, options),
-      stream: binding.stream,
-      dispose: () => {
-        if (closing) return closing
-        /** Publish before the held operation invokes user callbacks or synchronously reenters. */
-        const done = deferred<void>()
-        closing = done.promise
-        try {
-          void Promise.resolve(binding.dispose()).then(done.resolve, done.reject)
-        } catch (error) {
-          done.reject(error)
-        }
-        return closing
-      }
-    })
-  }
-  if (!channel) rejectRuntimeApiCapability()
-  /** Only the actual Host reservation records candidate limit policy. */
-  channel.hostRegistration?.stagePolicy(
-    config.providerLimits?.maxGlobal,
-    config.providerLimits?.maxPerPeer
-  )
+) {
   /** Actual agreement chooses installed roots; caller options never supply capability flags. */
   const nativeControl = channel.agreement.capabilities.includes(RpcCapability.ping)
   /** The stream predicate captures this exact channel and its actual bilateral agreement. */
@@ -208,7 +202,7 @@ export function createRuntimeApiEndpoint(
   /** Request, response, notify and stream share one sender and inbound identity owner. */
   const outbound = createOutboundFeature(chunk)
   /** Stream and scalar routes remain in the original provider namespace/registry. */
-  const provider = createProviderFeatureWithScope(
+  const provider = createProviderFeature(
     outbound,
     admission,
     () => channel.hostRegistration?.isCommitted() ?? true
@@ -218,7 +212,7 @@ export function createRuntimeApiEndpoint(
   /** Channel Features join the same explicit root batch rather than the user Feature tuple overload. */
   const { features, ...options } = config
   /** The canonical composition remains the only installation and rollback owner. */
-  const installing = createComposedEndpoint(options, {
+  const roots = {
     'first-party-chunk': chunk,
     'first-party-outbound': outbound,
     'first-party-provider': provider,
@@ -231,240 +225,401 @@ export function createRuntimeApiEndpoint(
         }
       : {}),
     ...Object.fromEntries((features ?? []).map((feature, index) => [`channel-${index}`, feature]))
-  }) as Promise<IRuntimePhysicalEndpoint>
-  /** Ready-path delegates retain original operation Promise and consumer identity. */
-  let physical: IRuntimePhysicalEndpoint | undefined
-  /** Disposal continues to share one original settlement result. */
-  let closing: Promise<void> | undefined
-  /** A new cold resource has no reflection-based owner or admission marker. */
-  const facade = Object.create(null) as Record<string, unknown>
-  /** Link only this resource's successfully constructed canonical endpoint. */
-  const ready = installing.then((endpoint) => {
-    physical = endpoint
-    retainEndpointProjection(endpoint, facade)
-  })
+  }
+  return { nativeControl, roots, options }
+}
+
+/** Install the physical kernel used by actual Host startup and owner-level protocol oracles. */
+export function createRuntimeEndpointComposition<
+  const TConfig extends ICheckedInput,
+  const TChannel extends IRuntimeCompositionChannel
+>(
+  config: TConfig,
+  channel: TChannel,
+  admission?: IProviderAdmissionScope
+): {
+  readonly nativeControl: boolean
+  readonly installing: Promise<IRuntimeCompositionSurface<TConfig, TChannel>>
+} {
+  channel.hostRegistration?.stagePolicy(
+    config.providerLimits?.maxGlobal,
+    config.providerLimits?.maxPerPeer
+  )
+  /** Root construction captures user options once at their original point in assembly. */
+  const { nativeControl, roots, options } = createRuntimeFeatureRoots(
+    config as IRpcFactoryConfig,
+    channel,
+    admission
+  )
+  /** Canonical composition remains the sole installation and rollback owner. */
+  const installing = createComposedEndpoint(options, roots)
+  return {
+    nativeControl,
+    installing: installing as unknown as Promise<IRuntimeCompositionSurface<TConfig, TChannel>>
+  }
+}
+
+/** Callable bindings retain one facade-owned disposal settlement even during synchronous reentry. */
+class RuntimeBindingEndpoint {
+  /** Borrowed operations remain owned by the original accepted binding. */
+  #binding: IRuntimeEndpointBinding
+  /** Every terminal caller observes the first disposal Promise. */
+  #closing: Promise<void> | undefined
+
+  /** Capture an existing binding without allocating another transport or endpoint. */
+  constructor(binding: IRuntimeEndpointBinding) {
+    this.#binding = binding
+  }
+
+  /** Publish the same frozen own-property surface as the original binding facade. */
+  surface(): IRuntimeEndpointBinding {
+    /** Borrowed ready identity belongs to the same original binding. */
+    const binding = this.#binding
+    return Object.freeze({
+      get ready() {
+        return binding.ready
+      },
+      request: (method: string, payload?: unknown, options?: IRuntimeEndpointGroupOptions) =>
+        this.#binding.request(method, payload, options),
+      notify: (method: string, payload?: unknown, options?: IRuntimeEndpointGroupOptions) =>
+        this.#binding.notify(method, payload, options),
+      stream: this.#binding.stream,
+      dispose: () => this.#dispose()
+    })
+  }
+
+  /** Publish settlement before disposal can synchronously reenter the facade. */
+  #dispose(): Promise<void> {
+    if (this.#closing) return this.#closing
+    /** The original binding may throw before returning its disposal Promise. */
+    const done = deferred<void>()
+    this.#closing = done.promise
+    try {
+      void Promise.resolve(this.#binding.dispose()).then(done.resolve, done.reject)
+    } catch (error) {
+      done.reject(error)
+    }
+    return this.#closing
+  }
+}
+
+/** Cold streams capture once and acquire their original iterator only on the first control. */
+class PendingRuntimeStream implements AsyncIterableIterator<IRpcPortableValue> {
+  /** The installed physical endpoint remains the sole stream owner. */
+  #owner: RuntimeEndpointResource
+  /** Captured stream routing and input preserve the original call-time snapshot. */
+  #args: Parameters<IRpcStreamRuntime['open']>
+  /** All controls share one lazy consumer Promise and installation failure. */
+  #consumer: Promise<AsyncIterableIterator<IRpcPortableValue>> | undefined
+
+  /** Retain the already captured request without activating an unpulled stream. */
+  constructor(owner: RuntimeEndpointResource, args: Parameters<IRpcStreamRuntime['open']>) {
+    this.#owner = owner
+    this.#args = args
+  }
+
+  /** Lazily activate exactly one original physical stream after installation. */
+  #active(): Promise<AsyncIterableIterator<IRpcPortableValue>> {
+    return (this.#consumer ??= this.#owner.ready.then(() =>
+      this.#owner.current().stream.open(...this.#args)
+    ))
+  }
+
+  /** Forward the next control to the original consumer and retain its result. */
+  next = (...values: Parameters<AsyncIterableIterator<IRpcPortableValue>['next']>) =>
+    this.#active().then((iterator) => iterator.next(...values))
+
+  /** Forward cancellation only after the same lazy consumer has been selected. */
+  return = (value?: IRpcPortableValue) => this.#active().then((iterator) => iterator.return!(value))
+
+  /** Preserve the original consumer's thrown reason semantics. */
+  throw = (reason?: unknown) => this.#active().then((iterator) => iterator.throw!(reason));
+
+  /** Iterator identity remains stable across every consumer request. */
+  [Symbol.asyncIterator](): AsyncIterableIterator<IRpcPortableValue> {
+    return this
+  }
+}
+
+/** Own one physical composition, its synchronous facade, and its cold operation admission. */
+class RuntimeEndpointResource {
+  /** Rights come only from the actual selected transport agreement. */
+  #channel: IRuntimeEndpointChannel
+  /** The installed kernel remains the only operation and resource owner. */
+  #physical: IRuntimePhysicalEndpoint | undefined
+  /** Disposal shares the first canonical terminal settlement. */
+  #closing: Promise<void> | undefined
+  /** Stable null-prototype projection preserves the original own-property contract. */
+  #facade = Object.create(null) as Record<string, unknown>
+  /** Installation is shared by all cold operations and never retried here. */
+  readonly ready: Promise<void>
+
+  /** Install canonical resources before publishing the synchronous operation facade. */
+  constructor(
+    config: IRpcFactoryConfig,
+    channel: IRuntimeEndpointChannel,
+    admission?: IProviderAdmissionScope
+  ) {
+    this.#channel = channel
+    /** Host startup and owner-level oracles consume the same physical assembly. */
+    const { nativeControl, installing } = createRuntimeEndpointComposition(
+      config,
+      channel,
+      admission
+    )
+    this.ready = installing.then((endpoint) => {
+      this.#physical = endpoint
+      retainEndpointProjection(endpoint, this.#facade)
+    })
+    this.#publishOperations()
+    this.#publishControls(nativeControl)
+    Object.freeze(this.#facade)
+  }
+
+  /** Return the existing frozen projection without creating another ownership layer. */
+  surface(): IRuntimeApiEndpoint {
+    return this.#facade as unknown as IRuntimeApiEndpoint
+  }
+
   /** Ancillary synchronous controls require the real installed composition. */
-  const current = (): IRuntimePhysicalEndpoint => physical ?? rejectRuntimeApiCapability()
-  /** Select grammar once at each operation's original position relative to payload capture. */
-  const usesNativeGrammar = (
-    callOptions: Omit<IRpcRuntimeOptions, 'timeoutMs'> &
-      Pick<ISendOptions, 'timeoutMs' | 'signal' | 'transfer'>
-  ): boolean =>
-    channel.agreement.capabilities.includes(RpcCapability.portableBinary) ||
-    callOptions.orderKey !== undefined ||
-    callOptions.cancel !== undefined ||
-    Object.hasOwn(callOptions, 'transfer')
-  /** New physical requests reuse the existing input and transport operations. */
-  const dispatch = (
+  current(): IRuntimePhysicalEndpoint {
+    return this.#physical ?? rejectRuntimeApiCapability()
+  }
+
+  /** Select native grammar at the original position relative to payload capture. */
+  #usesNativeGrammar(options: IRuntimeEndpointGroupOptions): boolean {
+    return (
+      this.#channel.agreement.capabilities.includes(RpcCapability.portableBinary) ||
+      options.orderKey !== undefined ||
+      options.cancel !== undefined ||
+      Object.hasOwn(options, 'transfer')
+    )
+  }
+
+  /** Dispatch through the original accepted generation and canonical input owner. */
+  #dispatch(
     input: IRuntimeRequestInput,
-    callOptions: Omit<IRpcRuntimeOptions, 'timeoutMs'> &
-      Pick<ISendOptions, 'timeoutMs' | 'signal' | 'transfer'>,
+    callOptions: IRuntimeEndpointGroupOptions,
     mode: 'request' | 'notify',
     native: boolean
-  ): Promise<IRpcPortableValue | undefined | void> => {
+  ): Promise<IRpcPortableValue | undefined | void> {
     if (native) {
-      /** The original sender and already accepted remote generation remain authoritative. */
+      /** Only the existing sender can admit the actual remote generation. */
       const sender = readEndpointOwner<RpcOutboundAttachment>(
-        current(),
+        this.current(),
         EndpointOwnerKey.outboundAttachment
       )
-      const generation = sender?.runtimeTargetGeneration(channel.peerId)
+      /** A missing generation cannot acquire rights from caller-supplied options. */
+      const generation = sender?.runtimeTargetGeneration(this.#channel.peerId)
       if (!sender || !generation) rejectRuntimeApiCapability()
       return sender.sendRuntimeOperation(
-        channel.peerId,
+        this.#channel.peerId,
         generation,
         mode,
         input,
         callOptions
       ) as Promise<IRpcPortableValue | undefined>
     }
-    /** Legacy formatting retains admitted forwarding provenance alongside the depth-two input. */
+    /** Legacy formatting retains admitted forwarding provenance alongside its captured input. */
     const options = retainForwardOptions(callOptions, { ...callOptions })
     retainRuntimeRequestInput(options, input)
     return mode === 'notify' && !isForwardedPayload(callOptions, input.payload)
-      ? current().sendOneWay(channel.peerId, input.method, input.payload, options)
-      : current().send<IRpcPortableValue>(channel.peerId, input.method, input.payload, options)
+      ? this.current().sendOneWay(this.#channel.peerId, input.method, input.payload, options)
+      : this.current().send<IRpcPortableValue>(
+          this.#channel.peerId,
+          input.method,
+          input.payload,
+          options
+        )
   }
-  /** Request selection precedes snapshot; notify keeps its separate original capture order. */
-  const request = (
+
+  /** Preserve request-before-capture and notify-after-capture grammar selection. */
+  #request(
     method: string,
     payload: unknown,
-    callOptions: Omit<IRpcRuntimeOptions, 'timeoutMs'> &
-      Pick<ISendOptions, 'timeoutMs' | 'signal' | 'transfer'> = {},
+    options: IRuntimeEndpointGroupOptions = {},
     mode: 'request' | 'notify' = 'request'
-  ) => {
-    /** Request selects before capture; notify selects after its original depth-zero capture. */
-    let native = mode === 'request' ? usesNativeGrammar(callOptions) : false
-    /** Preserve depth zero for native grammar and depth two for the legacy request carrier. */
+  ) {
+    /** Notify selects grammar after the original depth-zero snapshot. */
+    let native = mode === 'request' ? this.#usesNativeGrammar(options) : false
+    /** Only legacy scalar requests use the original depth-two capture. */
     const depth = mode === 'notify' || native ? 0 : 2
-    /** Reuse the existing canonical capture operation; no new proof pipeline is installed. */
+    /** The existing request input owns validation and forwarding provenance. */
     const input = createRuntimeRequestInput(
       method,
       payload,
-      channel.agreement.capabilities.includes(RpcCapability.portableBinary) ||
+      this.#channel.agreement.capabilities.includes(RpcCapability.portableBinary) ||
         rejectRuntimeApiCapability,
-      callOptions,
+      options,
       depth
     )
-    if (mode === 'notify') native = usesNativeGrammar(callOptions)
-    /** Only new cold requests await installation; an installed operation returns its own Promise. */
-    return physical
-      ? dispatch(input, callOptions, mode, native)
-      : ready.then(() => dispatch(input, callOptions, mode, native))
+    if (mode === 'notify') native = this.#usesNativeGrammar(options)
+    return this.#physical
+      ? this.#dispatch(input, options, mode, native)
+      : this.ready.then(() => this.#dispatch(input, options, mode, native))
   }
-  /** Bound and explicit-target forms share the actual composed endpoint's public group operation. */
-  function group(
-    steps: IRuntimeEndpointGroupSteps,
-    options?: IRuntimeEndpointGroupOptions
-  ): Promise<readonly IRpcRuntimeStepOutcome[]>
-  function group(
-    targetId: string,
-    steps: IRuntimeEndpointGroupSteps,
-    options?: IRuntimeEndpointGroupOptions
-  ): Promise<readonly IRpcRuntimeStepOutcome[]>
-  function group(
+
+  /** Both group overloads delegate to the same physical admission operation. */
+  #group(
     targetOrSteps: string | IRuntimeEndpointGroupSteps,
     stepsOrOptions?: IRuntimeEndpointGroupSteps | IRuntimeEndpointGroupOptions,
     options?: IRuntimeEndpointGroupOptions
   ): Promise<readonly IRpcRuntimeStepOutcome[]> {
     return typeof targetOrSteps === 'string'
-      ? current().group(targetOrSteps, stepsOrOptions as IRuntimeEndpointGroupSteps, options)
-      : current().group(
-          channel!.peerId,
+      ? this.current().group(targetOrSteps, stepsOrOptions as IRuntimeEndpointGroupSteps, options)
+      : this.current().group(
+          this.#channel.peerId,
           targetOrSteps,
           stepsOrOptions as IRuntimeEndpointGroupOptions | undefined
         )
   }
-  /** Lookup delegates directly to the same public kernel operation, preserving its Promise. */
-  function outcome(idempotencyKey: string): Promise<IRuntimeEndpointOutcomeResult>
-  function outcome(targetId: string, idempotencyKey: string): Promise<IRuntimeEndpointOutcomeResult>
-  function outcome(...args: [string] | [string, string]): Promise<IRuntimeEndpointOutcomeResult> {
+
+  /** Preserve explicit-target and bound-target lookup Promise identity. */
+  #outcome(...args: [string] | [string, string]): Promise<IRuntimeEndpointOutcomeResult> {
     return args.length === 1
-      ? current().outcome(channel!.peerId, args[0])
-      : current().outcome(args[0], args[1])
+      ? this.current().outcome(this.#channel.peerId, args[0])
+      : this.current().outcome(args[0], args[1])
   }
-  Object.defineProperties(facade, {
-    ready: { value: ready, enumerable: true },
-    request: {
-      value: (
-        method: string,
-        payload?: unknown,
-        options?: Omit<IRpcRuntimeOptions, 'timeoutMs'> &
-          Pick<ISendOptions, 'timeoutMs' | 'signal' | 'transfer'>
-      ) => request(method, payload, options),
-      enumerable: true
-    },
-    notify: {
-      value: (
-        method: string,
-        payload?: unknown,
-        options?: Omit<IRpcRuntimeOptions, 'timeoutMs'> &
-          Pick<ISendOptions, 'timeoutMs' | 'signal' | 'transfer'>
-      ) => request(method, payload, options, 'notify'),
-      enumerable: true
-    },
-    group: {
-      value: group,
-      enumerable: true
-    },
-    outcome: {
-      value: outcome,
-      enumerable: true
-    },
-    send: {
-      /** Existing generic admission remains at its original lower owner, including option getters. */
-      value: <T>(
-        targetId: string,
-        method: string,
-        data: unknown,
-        options?: ISendOptions
-      ): Promise<T> =>
-        physical
-          ? physical.send<T>(targetId, method, data, options)
-          : ready.then(() => current().send<T>(targetId, method, data, options)),
-      enumerable: true
-    },
-    sendOneWay: {
-      value: (...args: Parameters<IOneWaySurface['sendOneWay']>) =>
-        physical ? physical.sendOneWay(...args) : ready.then(() => current().sendOneWay(...args)),
-      enumerable: true
-    },
-    provide: {
-      value: (method: string, provider: Parameters<IProviderRegistrationSurface['provide']>[1]) => {
-        current().provide(method, provider)
-        return facade
+
+  /** Cold stream controls retain the original depth-zero snapshot and forwarding provenance. */
+  #openStream(...args: Parameters<IRpcStreamRuntime['open']>) {
+    if (this.#physical) return this.#physical.stream.open(...args)
+    /** Snapshot before readiness so later caller mutation remains unobservable. */
+    const input = createRuntimeRequestInput(
+      args[1],
+      args[2],
+      this.#channel.agreement.capabilities.includes(RpcCapability.portableBinary) ||
+        rejectRuntimeApiCapability,
+      args[3]
+    )
+    /** One options association retains the admitted input for the physical stream. */
+    const options = retainForwardOptions(args[3], { ...args[3] })
+    retainRuntimeRequestInput(options, input)
+    return Object.freeze(
+      new PendingRuntimeStream(this, [args[0], input.method, input.payload, options])
+    )
+  }
+
+  /** Publish operation callbacks without making closures the resource's state owner. */
+  #publishOperations(): void {
+    Object.defineProperties(this.#facade, {
+      ready: { value: this.ready, enumerable: true },
+      request: {
+        value: (method: string, payload?: unknown, options?: IRuntimeEndpointGroupOptions) =>
+          this.#request(method, payload, options),
+        enumerable: true
       },
-      enumerable: true
-    },
-    on: {
-      value: (...args: Parameters<IProviderRegistrationSurface['on']>) => current().on(...args),
-      enumerable: true
-    },
-    dispose: {
-      value: () =>
-        (closing ??= physical ? physical.dispose() : ready.then(() => current().dispose())),
-      enumerable: true
-    },
-    stream: {
-      value: Object.freeze({
-        open: (...args: Parameters<IRpcStreamRuntime['open']>) => {
-          if (physical) return physical.stream.open(...args)
-          /** New cold resource calls preserve the original depth-zero payload snapshot. */
-          const input = createRuntimeRequestInput(
-            args[1],
-            args[2],
-            channel.agreement.capabilities.includes(RpcCapability.portableBinary) ||
-              rejectRuntimeApiCapability,
-            args[3]
-          )
-          /** Cold controls retain admitted forwarding provenance on their one input association. */
-          const options = retainForwardOptions(args[3], { ...args[3] })
-          retainRuntimeRequestInput(options, input)
-          /** An unpulled stream observes only ready; the first control activates one consumer. */
-          let consumer: Promise<AsyncIterableIterator<IRpcPortableValue>> | undefined
-          /** Controls share installation failure and the same original lazy stream iterator. */
-          const activeConsumer = () =>
-            (consumer ??= ready.then(() =>
-              current().stream.open(args[0], input.method, input.payload, options)
-            ))
-          return Object.freeze({
-            next: (...values: Parameters<AsyncIterableIterator<IRpcPortableValue>['next']>) =>
-              activeConsumer().then((iterator) => iterator.next(...values)),
-            return: (value?: IRpcPortableValue) =>
-              activeConsumer().then((iterator) => iterator.return!(value)),
-            throw: (reason?: unknown) =>
-              activeConsumer().then((iterator) => iterator.throw!(reason)),
-            [Symbol.asyncIterator]() {
-              return this
-            }
-          })
+      notify: {
+        value: (method: string, payload?: unknown, options?: IRuntimeEndpointGroupOptions) =>
+          this.#request(method, payload, options, 'notify'),
+        enumerable: true
+      },
+      group: {
+        value: (
+          target: string | IRuntimeEndpointGroupSteps,
+          steps?: IRuntimeEndpointGroupSteps | IRuntimeEndpointGroupOptions,
+          options?: IRuntimeEndpointGroupOptions
+        ) => this.#group(target, steps, options),
+        enumerable: true
+      },
+      outcome: {
+        value: (...args: [string] | [string, string]) => this.#outcome(...args),
+        enumerable: true
+      },
+      send: {
+        value: <T>(
+          targetId: string,
+          method: string,
+          data: unknown,
+          options?: ISendOptions
+        ): Promise<T> =>
+          this.#physical
+            ? this.#physical.send<T>(targetId, method, data, options)
+            : this.ready.then(() => this.current().send<T>(targetId, method, data, options)),
+        enumerable: true
+      },
+      sendOneWay: {
+        value: (...args: Parameters<IOneWaySurface['sendOneWay']>) =>
+          this.#physical
+            ? this.#physical.sendOneWay(...args)
+            : this.ready.then(() => this.current().sendOneWay(...args)),
+        enumerable: true
+      },
+      provide: {
+        value: (
+          method: string,
+          provider: Parameters<IProviderRegistrationSurface['provide']>[1]
+        ) => {
+          this.current().provide(method, provider)
+          return this.#facade
         },
-        provide: (...args: Parameters<IRpcStreamRuntime['provide']>) =>
-          current().stream.provide(...args),
-        dispose: () => current().stream.dispose()
-      }),
-      enumerable: true
-    }
-  })
-  /** Existing optional surfaces retain their exact physical functions and property availability. */
-  for (const key of [
-    'hooks',
-    'sendAll',
-    'dispatch',
-    'dispatchAll',
-    'announceClose',
-    'connect',
-    'discovery'
-  ] as const)
-    Object.defineProperty(facade, key, {
-      get: () => (current() as unknown as IRpcEndpoint)[key],
-      enumerable: true
+        enumerable: true
+      },
+      on: {
+        value: (...args: Parameters<IProviderRegistrationSurface['on']>) =>
+          this.current().on(...args),
+        enumerable: true
+      },
+      dispose: {
+        value: () =>
+          (this.#closing ??= this.#physical
+            ? this.#physical.dispose()
+            : this.ready.then(() => this.current().dispose())),
+        enumerable: true
+      },
+      stream: {
+        value: Object.freeze({
+          open: (...args: Parameters<IRpcStreamRuntime['open']>) => this.#openStream(...args),
+          provide: (...args: Parameters<IRpcStreamRuntime['provide']>) =>
+            this.current().stream.provide(...args),
+          dispose: () => this.current().stream.dispose()
+        }),
+        enumerable: true
+      }
     })
-  if (nativeControl)
-    for (const key of ['ping', 'pingAll'] as const)
-      Object.defineProperty(facade, key, {
-        get: () => (current() as unknown as IRpcEndpoint)[key],
+  }
+
+  /** Fixed public control keys preserve property availability and original physical functions. */
+  #publishControls(nativeControl: boolean): void {
+    // Seven base keys and two optional ping keys are compile-time fixed, independent of peer count.
+    for (const key of [
+      'hooks',
+      'sendAll',
+      'dispatch',
+      'dispatchAll',
+      'announceClose',
+      'connect',
+      'discovery'
+    ] as const)
+      Object.defineProperty(this.#facade, key, {
+        get: () => (this.current() as unknown as IRpcEndpoint)[key],
         enumerable: true
       })
-  return Object.freeze(facade) as unknown as IRuntimeApiEndpoint
+    if (nativeControl)
+      for (const key of ['ping', 'pingAll'] as const)
+        Object.defineProperty(this.#facade, key, {
+          get: () => (this.current() as unknown as IRpcEndpoint)[key],
+          enumerable: true
+        })
+  }
+}
+
+/** Borrow callable operations with one facade-owned terminal settlement. */
+export function createRuntimeApiEndpoint(
+  config: Readonly<{ binding: IRuntimeEndpointBinding }>
+): IRuntimeEndpointBinding
+/** Install canonical physical owners behind one synchronous actual-channel resource. */
+export function createRuntimeApiEndpoint(
+  config: IRpcFactoryConfig,
+  channel: IRuntimeEndpointChannel,
+  admission?: IProviderAdmissionScope
+): IRuntimeApiEndpoint
+export function createRuntimeApiEndpoint(
+  config: IRpcFactoryConfig | Readonly<{ binding: IRuntimeEndpointBinding }>,
+  channel?: IRuntimeEndpointChannel,
+  admission?: IProviderAdmissionScope
+): IRuntimeApiEndpoint | IRuntimeEndpointBinding {
+  if ('binding' in config) return new RuntimeBindingEndpoint(config.binding).surface()
+  if (!channel) rejectRuntimeApiCapability()
+  return new RuntimeEndpointResource(config, channel, admission).surface()
 }

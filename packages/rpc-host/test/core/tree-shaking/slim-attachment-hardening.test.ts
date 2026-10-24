@@ -1,7 +1,10 @@
+import { readEndpointOwner } from '../../../dist/core/internal/endpoint-projection.js'
+import { EndpointOwnerKey } from '../../../dist/core/endpoint-kernel.js'
+import type { PendingRegistry } from '../../../dist/core/internal/pending.js'
+import { createRuntimeEndpointComposition } from '../../../dist/core/runtime-api-endpoint.js'
 import { describe, expect, it, vi } from 'vitest'
-import { createClientEndpoint } from '../../../dist/core/client.js'
-import { createProviderEndpoint } from '../../../dist/core/provider.js'
-import { createMemoryTransportPair } from '../../../dist/core/adapters/memory.js'
+
+import { createMemoryTransportPair } from '../../fixtures/memory-transport.js'
 import { abort } from '../../../dist/core/middleware/abort.js'
 import { connect } from '../../../dist/core/middleware/connect.js'
 import { hooks } from '../../../dist/core/middleware/hooks.js'
@@ -79,18 +82,21 @@ describe('slim attachment hostile equivalence', () => {
     const driven = createDrivenTransport(
       (source) => !enforceSourceProof || source === acceptedSource
     )
-    const endpoint = await createClientEndpoint({
-      id: 'client-source-proof',
-      targetIds: ['provider-source-proof'],
-      transport: driven.transport,
-      middlewares: [
-        connect({
-          transport: driven.transport,
-          useBaseIdVerifyOnly: false,
-          identifier: () => true
-        })
-      ]
-    })
+    const endpoint = await createRuntimeEndpointComposition(
+      {
+        id: 'client-source-proof',
+        targetIds: ['provider-source-proof'],
+        transport: driven.transport,
+        middlewares: [
+          connect({
+            transport: driven.transport,
+            useBaseIdVerifyOnly: false,
+            identifier: () => true
+          })
+        ]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     const pending = endpoint.send('provider-source-proof', 'echo', 1, {
       timeoutMs: false,
       receiverId: 'provider-source-proof'
@@ -127,17 +133,20 @@ describe('slim attachment hostile equivalence', () => {
 
   it('isolates two accepted object sources instead of collapsing their provider replay keys', async () => {
     const driven = createDrivenTransport()
-    const endpoint = await createProviderEndpoint({
-      id: 'provider-source-isolation',
-      transport: driven.transport,
-      middlewares: [
-        connect({
-          transport: driven.transport,
-          useBaseIdVerifyOnly: false,
-          identifier: () => true
-        })
-      ]
-    })
+    const endpoint = await createRuntimeEndpointComposition(
+      {
+        id: 'provider-source-isolation',
+        transport: driven.transport,
+        middlewares: [
+          connect({
+            transport: driven.transport,
+            useBaseIdVerifyOnly: false,
+            identifier: () => true
+          })
+        ]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     let executions = 0
     endpoint.provide('event', (context) => {
       executions += 1
@@ -171,16 +180,27 @@ describe('slim attachment hostile equivalence', () => {
 
   it('cancels a pending request on caller abort and endpoint disposal', async () => {
     const driven = createDrivenTransport()
-    const endpoint = await createClientEndpoint({
-      id: 'abort-client',
-      targetIds: ['absent-provider'],
-      transport: driven.transport,
-      middlewares: [
-        connect({ transport: driven.transport }),
-        abort(),
-        timeout({ timeoutMs: false })
-      ]
-    })
+    const endpoint = await createRuntimeEndpointComposition(
+      {
+        id: 'abort-client',
+        targetIds: ['absent-provider'],
+        transport: driven.transport,
+        middlewares: [
+          connect({ transport: driven.transport }),
+          abort(),
+          timeout({ timeoutMs: false })
+        ]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
+    /**
+     * Observe the original request registry in the symmetric bundle, independently of its provider
+     * snapshot.
+     */
+    const pendingRegistry = readEndpointOwner<PendingRegistry<unknown>>(
+      endpoint,
+      EndpointOwnerKey.pendingRegistry
+    )!
     const controller = new AbortController()
     const callerAbort = endpoint.send('absent-provider', 'wait', null, {
       signal: controller.signal,
@@ -188,9 +208,9 @@ describe('slim attachment hostile equivalence', () => {
     })
     controller.abort()
     await expect(callerAbort).rejects.toMatchObject({ name: 'AbortError', code: 'CANCELLED' })
-    expect(readEndpointDebugSnapshot(endpoint)?.pending).toBe(0)
+    expect(pendingRegistry.size).toBe(0)
     const disposalAbort = endpoint.send('absent-provider', 'wait', null, { timeoutMs: false })
-    await vi.waitFor(() => expect(readEndpointDebugSnapshot(endpoint)?.pending).toBe(1))
+    await vi.waitFor(() => expect(pendingRegistry.size).toBe(1))
     await endpoint.dispose()
     await expect(disposalAbort).rejects.toMatchObject({ name: 'AbortError', code: 'CANCELLED' })
     expect(readEndpointDebugSnapshot(endpoint)).toMatchObject({
@@ -203,11 +223,14 @@ describe('slim attachment hostile equivalence', () => {
 
   it('routes caller abort through the verified provider variation owner', async () => {
     const [clientTransport, providerTransport] = createMemoryTransportPair()
-    const provider = await createProviderEndpoint({
-      id: 'verified-abort-provider',
-      transport: providerTransport,
-      middlewares: [connect({ transport: providerTransport }), abort()]
-    })
+    const provider = await createRuntimeEndpointComposition(
+      {
+        id: 'verified-abort-provider',
+        transport: providerTransport,
+        middlewares: [connect({ transport: providerTransport }), abort()]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     let started = false
     let aborted = false
     provider.provide('wait', (context) => {
@@ -223,12 +246,15 @@ describe('slim attachment hostile equivalence', () => {
         )
       })
     })
-    const client = await createClientEndpoint({
-      id: 'verified-abort-client',
-      targetIds: ['verified-abort-provider'],
-      transport: clientTransport,
-      middlewares: [connect({ transport: clientTransport }), abort()]
-    })
+    const client = await createRuntimeEndpointComposition(
+      {
+        id: 'verified-abort-client',
+        targetIds: ['verified-abort-provider'],
+        transport: clientTransport,
+        middlewares: [connect({ transport: clientTransport }), abort()]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     const controller = new AbortController()
     const pending = client.send('verified-abort-provider', 'wait', null, {
       signal: controller.signal,
@@ -243,12 +269,15 @@ describe('slim attachment hostile equivalence', () => {
 
   it('rejects a hostile abort signal with the original cause before sending', async () => {
     const driven = createDrivenTransport()
-    const endpoint = await createClientEndpoint({
-      id: 'hostile-signal-client',
-      targetIds: ['absent-provider'],
-      transport: driven.transport,
-      middlewares: [connect({ transport: driven.transport }), abort()]
-    })
+    const endpoint = await createRuntimeEndpointComposition(
+      {
+        id: 'hostile-signal-client',
+        targetIds: ['absent-provider'],
+        transport: driven.transport,
+        middlewares: [connect({ transport: driven.transport }), abort()]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
     const original = new Error('hostile addEventListener')
     const remove = vi.fn()
     const signal = {
@@ -297,22 +326,27 @@ describe('slim attachment hostile equivalence', () => {
         return { extension: {}, ports: {} }
       }
     }
-    const endpoint = await createClientEndpoint({
-      id: 'hook-client',
-      transport: driven.transport,
-      middlewares: [
-        connect({ transport: driven.transport }),
-        hooks({ listeners: listener, onHookError: reporter }),
-        eventMiddleware
-      ]
-    })
+    const endpoint = await createRuntimeEndpointComposition(
+      {
+        id: 'hook-client',
+        transport: driven.transport,
+        middlewares: [
+          connect({ transport: driven.transport }),
+          hooks({ listeners: listener, onHookError: reporter }),
+          eventMiddleware
+        ]
+      },
+      { agreement: { capabilities: [] }, peerId: '' }
+    ).installing
+    /** Hook ownership remains at the original registry even when a provider snapshot is selected. */
+    const hookRegistry = readEndpointOwner<{ readonly size: number }>(endpoint, 'hook-registry')!
     await flush()
     // Two constructor events fail independently; the retained endpoint hook receives its own
     // successful activation event after both failures without re-entering either reporter.
     expect(listener).toHaveBeenCalledTimes(3)
     expect(reporter).toHaveBeenCalledTimes(2)
     expect(reports).toHaveLength(2)
-    expect(readEndpointDebugSnapshot(endpoint)?.hooks).toBe(1)
+    expect(hookRegistry.size).toBe(1)
     await endpoint.dispose()
     expect(readEndpointDebugSnapshot(endpoint)).toMatchObject({ hooks: 0, resources: 0 })
   })

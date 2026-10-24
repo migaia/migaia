@@ -31,11 +31,6 @@ export const RpcTransportTopology = {
   /** One send can reach a group of listeners. */ broadcast: 'broadcast'
 } as const
 
-/** Endpoint admission state exposed in transport diagnostics. */
-export const RpcEndpointStatus = {
-  /** Endpoint is accepting operations. */ active: 'active'
-} as const
-
 /** Single-target operation labels used by receiver selection. */
 export const RpcOperation = {
   /** Select a receiver for a result-bearing request. */ send: 'send',

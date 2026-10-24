@@ -4,7 +4,7 @@ import { normalizePortable, type IRpcPortableValue } from '@migaia/rpc-contract'
 import { createRpcHost, type IRpcHost, type IRpcContext } from '@migaia/rpc-host'
 import { defineFeaturePlugin } from '@migaia/rpc-host/plugin'
 import { dedicatedWorkerPlugin } from '@migaia/rpc-plugin-browser'
-import type { IWebWorkerLikePort } from '@migaia/rpc-plugin-browser/adapters/web-worker'
+import type { IWebWorkerLikePort } from '@migaia/rpc-host/plugin'
 import { isArrayBuffer, isUint8Array } from '@migaia/utils/bytes'
 import { WorkerRpcBridgeFeatureName, WorkerRpcIdentity } from './worker-constants.js'
 
@@ -35,132 +35,171 @@ const workerBridgeFeature = defineFeaturePlugin((prepared: (host: IRpcHost<unkno
   setup: ({ host }) => prepared(host)
 }))
 
-/** Creates one Worker bridge while canonical Host/plugin owners retain handshake and physical I/O. */
+/** One bridge owns application handlers while the actual Host owns connections and providers. */
+class WorkerContractEndpoint implements IWorkerContractEndpoint {
+  /** Borrowed native port; physical lifetime remains with its caller. */
+  #port: IWebWorkerLikePort
+  /** Request configuration remains live exactly as in the original bridge. */
+  #options: IWorkerContractOptions
+  /** Default direct peer is captured once at construction. */
+  #targetId: string
+  /** Initial catalog is borrowed by the one actual Host compiler. */
+  #providers: IWorkerProviders = Object.create(null)
+  /** Native feature setup lends the Host before transport installation. */
+  #host!: IRpcHost<unknown>
+  /** Only synchronous local preparation may extend the initial catalog. */
+  #initializing = true
+  /** Ordered application callbacks are separate from Host provider registration. */
+  #handlers = new Map<string, Set<IWorkerHandler>>()
+  /** A method installs its canonical provider exactly once. */
+  #installed = new Set<string>()
+  /** Raw delivery is released after local preparation, independently of remote readiness. */
+  #prepared = deferred<unknown>()
+  /** The original preparation result includes any caller-owned disposal projection. */
+  #preparedResult: unknown
+  /** Remote readiness is awaited by request and notification callers. */
+  #opening: Promise<unknown>
+
+  /** Capture logical identity, then start the single canonical Host and its borrowed transport. */
+  constructor(
+    port: IWebWorkerLikePort,
+    options: IWorkerContractOptions,
+    prepare?: (endpoint: IWorkerContractEndpoint) => unknown
+  ) {
+    /** Preserve identity option reads before native preparation. */
+    const id = options.id ?? WorkerRpcIdentity.main
+    this.#targetId = options.targetId ?? WorkerRpcIdentity.worker
+    this.#port = port
+    this.#options = options
+    this.#opening = createRpcHost({
+      self: { name: id, instanceId: id },
+      provide: this.#providers,
+      plugins: [
+        workerBridgeFeature((owner) => this.#prepare(owner, prepare)),
+        dedicatedWorkerPlugin({
+          worker: {
+            postMessage: (message, transfer) => this.#port.postMessage(message, transfer),
+            addEventListener: (type, listener) => {
+              this.#port.addEventListener(type, listener)
+              // Native subscription must exist before disposal or raw delivery can begin.
+              if (type === 'message') this.#prepared.resolve(this.#preparedResult)
+            },
+            removeEventListener: (type, listener) => this.#port.removeEventListener(type, listener)
+          }
+        })
+      ]
+    })
+    // Request callers retain the rejected opening; this observer only releases local setup.
+    void this.#opening.catch((error) => this.#prepared.reject(error))
+  }
+
+  /** Return the original local preparation receipt without waiting on raw delivery itself. */
+  get prepared(): Promise<unknown> {
+    return this.#prepared.promise
+  }
+
+  /** Perform synchronous managed registration before remote discovery begins. */
+  #prepare(
+    host: IRpcHost<unknown>,
+    prepare?: (endpoint: IWorkerContractEndpoint) => unknown
+  ): void {
+    this.#host = host
+    this.#preparedResult = prepare ? prepare(this) : this
+    this.#initializing = false
+  }
+
+  /** Decode per handler invocation and preserve callback order and the final result. */
+  async #invoke(method: string, payload: unknown, signal: INativeAbortSignal): Promise<unknown> {
+    /** Each handler may replace the previous handler's result. */
+    let result: unknown
+    for (const handler of this.#handlers.get(method) ?? [])
+      result = await handler(decodeWorkerValue(payload), signal, { method })
+    return result
+  }
+
+  /** Update the actual Host directory; this bridge never creates a second endpoint. */
+  #install(method: string): void {
+    if (this.#installed.has(method)) return
+    this.#installed.add(method)
+    /** One provider serves both initial and later registration. */
+    const provider = async (payload: unknown, context: IRpcContext) =>
+      encodeWorkerValue(await this.#invoke(method, payload, context.signal))
+    /** Initial siblings share own-data groups in the borrowed canonical catalog. */
+    const definition: IWorkerProviders = this.#initializing ? this.#providers : Object.create(null)
+    /** Dot-separated segments are literal method paths. */
+    const segments = method.split('.')
+    /** Cursor into the canonical nested provider shape. */
+    let group = definition
+    for (let index = 0; index < segments.length - 1; index++)
+      group = (group[segments[index]!] ??= Object.create(null)) as IWorkerProviders
+    group[segments.at(-1)!] = provider
+    if (!this.#initializing) this.#host.provide(definition)
+  }
+
+  /** Wait for remote readiness before sending the encoded computation to the captured peer. */
+  request: IWorkerContractEndpoint['request'] = (payload, options) =>
+    this.#opening
+      .then(() =>
+        this.#host.send(this.#targetId, WorkerRpcIdentity.call, encodeWorkerValue(payload), {
+          signal: options?.signal,
+          /** Omission historically means no application deadline. */
+          timeoutMs: this.#options.timeoutMs ?? false
+        })
+      )
+      .then(decodeWorkerValue)
+
+  /** Notifications share the same Host and complete at its physical write boundary. */
+  notify: IWorkerContractEndpoint['notify'] = (payload, method = 'notify', options) => {
+    /** Explicit target selection is captured before asynchronous readiness. */
+    const targetId = options?.targetId ?? this.#targetId
+    return this.#opening.then(
+      () => this.#host.notify(method, encodeWorkerValue(payload), { targetId }) as Promise<void>
+    )
+  }
+
+  /** Register ordered application handlers without reinstalling an existing Host provider. */
+  onRequest = (
+    methodOrHandler: string | IWorkerHandler,
+    maybeHandler?: IWorkerHandler
+  ): (() => void) => {
+    /** Preserve the existing optional call-method shorthand. */
+    const method = typeof methodOrHandler === 'string' ? methodOrHandler : WorkerRpcIdentity.call
+    /** The returned disposer removes exactly this callback registration. */
+    const handler = typeof methodOrHandler === 'string' ? maybeHandler : methodOrHandler
+    if (!handler) return () => undefined
+    this.#install(method)
+    /** Insertion order remains observable when several handlers share a method. */
+    const methodHandlers = this.#handlers.get(method) ?? new Set<IWorkerHandler>()
+    methodHandlers.add(handler)
+    this.#handlers.set(method, methodHandlers)
+    return () => {
+      methodHandlers.delete(handler)
+      if (methodHandlers.size === 0) this.#handlers.delete(method)
+    }
+  }
+
+  /** The actual Host retains cleanup ownership and the original cleanup result. */
+  close = (): Promise<void> => this.#host.close()
+}
+
+/** Create a Worker bridge without transferring physical port ownership. */
 export function createWorkerContractEndpoint(
   port: IWebWorkerLikePort,
   endpointOptions?: IWorkerContractOptions
 ): Promise<IWorkerContractEndpoint>
-/** Managed raw callbacks register known providers during native setup before remote handshaking. */
+/** Managed raw callbacks register providers during local setup before remote handshaking. */
 export function createWorkerContractEndpoint<T>(
   port: IWebWorkerLikePort,
   endpointOptions: IWorkerContractOptions,
   prepare: (endpoint: IWorkerContractEndpoint) => T
 ): Promise<T>
-/** Local managed preparation and remote readiness remain owned by the same actual Host. */
+/** The named bridge keeps local preparation separate from the one Host's remote readiness. */
 export function createWorkerContractEndpoint(
   port: IWebWorkerLikePort,
   endpointOptions: IWorkerContractOptions = {},
   prepare?: (endpoint: IWorkerContractEndpoint) => unknown
 ): Promise<unknown> {
-  const id = endpointOptions.id ?? WorkerRpcIdentity.main
-  const defaultTargetId = endpointOptions.targetId ?? WorkerRpcIdentity.worker
-  /** Local preparation is distinct from remote readiness, which consumes the raw managed callback. */
-  const prepared = deferred<unknown>()
-  /** The original Host borrows this initial provider object when its canonical assembly starts. */
-  const providers: IWorkerProviders = Object.create(null)
-  /** Native feature setup lends this Host before transport installation begins. */
-  let host!: IRpcHost<unknown>
-  /** Only synchronous managed preparation may populate the initial canonical provider input. */
-  let initializing = true
-  /** Native listener capture releases this already prepared projection without waiting on a peer. */
-  let preparedResult: unknown
-  /** Store-worker owns its ordered application handlers; Host alone owns provider registration. */
-  const handlers = new Map<string, Set<IWorkerHandler>>()
-  /** One canonical provider handles both result-bearing and physically completed one-way calls. */
-  const installed = new Set<string>()
-  /** Invocations preserve original handler order, payload decoding and provider cancellation. */
-  const invoke = async (
-    method: string,
-    payload: unknown,
-    signal: INativeAbortSignal
-  ): Promise<unknown> => {
-    let result: unknown
-    for (const handler of handlers.get(method) ?? [])
-      result = await handler(decodeWorkerValue(payload), signal, { method })
-    return result
-  }
-  /** Incremental registration updates the real Host directory rather than a second endpoint. */
-  const install = (method: string): void => {
-    if (installed.has(method)) return
-    installed.add(method)
-    /** The same provider function serves initial setup and later incremental registration. */
-    const provider = async (payload: unknown, context: IRpcContext) =>
-      encodeWorkerValue(await invoke(method, payload, context.signal))
-    /** Dot-separated worker methods use the Host compiler's original nested catalog form. */
-    const definition: IWorkerProviders = initializing ? providers : Object.create(null)
-    /** Each segment below is a literal method path, never a separate provider/connection owner. */
-    const segments = method.split('.')
-    /** Existing sibling methods share their canonical own-data group during initial preparation. */
-    let group = definition
-    for (const segment of segments.slice(0, -1))
-      group = (group[segment] ??= Object.create(null)) as IWorkerProviders
-    group[segments.at(-1)!] = provider
-    if (!initializing) host.provide(definition)
-  }
-  /** Operations use one Host, while raw delivery can proceed after local managed preparation. */
-  const bridge: IWorkerContractEndpoint = {
-    request(payload, options) {
-      return opening
-        .then(() =>
-          host.send(defaultTargetId, WorkerRpcIdentity.call, encodeWorkerValue(payload), {
-            signal: options?.signal,
-            /** Omission historically means no application deadline, not the Host default. */
-            timeoutMs: endpointOptions.timeoutMs ?? false
-          })
-        )
-        .then(decodeWorkerValue)
-    },
-    notify(payload, method = 'notify', options) {
-      const targetId = options?.targetId ?? defaultTargetId
-      return opening.then(
-        () =>
-          host.notify(method, encodeWorkerValue(payload), {
-            targetId
-          }) as Promise<void>
-      )
-    },
-    onRequest(methodOrHandler, maybeHandler) {
-      const method = typeof methodOrHandler === 'string' ? methodOrHandler : WorkerRpcIdentity.call
-      const handler = typeof methodOrHandler === 'string' ? maybeHandler : methodOrHandler
-      if (!handler) return () => undefined
-      install(method)
-      const methodHandlers = handlers.get(method) ?? new Set<IWorkerHandler>()
-      methodHandlers.add(handler)
-      handlers.set(method, methodHandlers)
-      return () => {
-        methodHandlers.delete(handler)
-        if (methodHandlers.size === 0) handlers.delete(method)
-      }
-    },
-    close: () => host.close()
-  }
-  /** The single native Host owns the borrowed Worker and every subsequent request/notification. */
-  const opening = createRpcHost({
-    self: { name: id, instanceId: id },
-    provide: providers,
-    plugins: [
-      workerBridgeFeature((owner) => {
-        host = owner
-        /** Managed preparation returns the original disposal projection without awaiting a peer. */
-        preparedResult = prepare ? prepare(bridge) : bridge
-        initializing = false
-      }),
-      dedicatedWorkerPlugin({
-        worker: {
-          postMessage: (message, transfer) => port.postMessage(message, transfer),
-          addEventListener: (type, listener) => {
-            port.addEventListener(type, listener)
-            // The actual native subscription must exist before callers can dispose or deliver raw frames.
-            if (type === 'message') prepared.resolve(preparedResult)
-          },
-          removeEventListener: (type, listener) => port.removeEventListener(type, listener)
-        }
-      })
-    ]
-  })
-  /** The original opening stays rejected for request callers; this observer only releases setup. */
-  void opening.catch((error) => prepared.reject(error))
-  return prepared.promise
+  return new WorkerContractEndpoint(port, endpointOptions, prepare).prepared
 }
 
 /** Public worker bridge surface shared by the normal and serialization worker consumers. */

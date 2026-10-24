@@ -38,8 +38,6 @@ const migratedFiles: Readonly<Record<string, string>> = {
     'packages/rpc-host/test/core/adapters/message-port.test.ts',
   'packages/web-rpc/test/adapters/rtc-data-channel.test.ts':
     'packages/rpc-plugin-browser/test/browser/adapters/rtc-data-channel.test.ts',
-  'packages/web-rpc/test/adapters/web-transport.test.ts':
-    'packages/rpc-plugin-browser/test/browser/adapters/web-transport.test.ts',
   'packages/web-rpc/test/adapters/window-source-proof.test.ts':
     'packages/rpc-plugin-browser/test/browser/adapters/window-source-proof.test.ts',
   'packages/web-rpc/test/adapters/worker-lifecycle.test.ts':
@@ -195,10 +193,48 @@ const retiredSuites = new Set([
   'provenance.test.ts',
   'delivery-successor-transaction.test.ts',
   'intended-cost-custody.test.ts',
-  'error-serialization.test.ts'
+  'error-serialization.test.ts',
+  // The corresponding private preset implementations and their exclusive cost harness were deleted.
+  'core-retained-causal.test.ts',
+  'continuation-b01.red.test.ts',
+  'retained-inventory-equality.test.ts'
 ])
 /** Exact historical titles retired by rpc-layering after deleting unused control code. */
 const retiredLayeringTitles = new Set([
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix selected control roots keep dependencies private and disposal endpoint-local',
+  // Exact old preset selection, alias and cost titles retire with their deleted implementations.
+  'packages/web-rpc/test/composed-ping-parity.test.ts::composed root ping() parity root createEndpoint is the same value as createFullEndpoint',
+  'packages/web-rpc/test/tree-shaking/retained-allocation-attribution.test.ts::retained and allocation attribution binds pending byte drift to the current and historical retained graphs',
+  'packages/web-rpc/test/tree-shaking/retained-allocation-attribution.test.ts::retained and allocation attribution proves selected endpoint owner allocation is unique and attributable',
+  'packages/web-rpc/test/tree-shaking/static-composition-contracts.test.ts::static composition contracts accepts every pair with one canonical outbound dependency closure',
+  'packages/web-rpc/test/tree-shaking/static-composition-contracts.test.ts::static composition contracts constructs and disposes each remaining valid native singleton root',
+  'packages/web-rpc/test/tree-shaking/static-composition-contracts.test.ts::static composition contracts constructs and disposes the valid client singleton preset',
+  'packages/web-rpc/test/tree-shaking/static-composition-contracts.test.ts::static composition contracts constructs and disposes the valid provider singleton preset',
+  'packages/web-rpc/test/tree-shaking/static-composition-contracts.test.ts::static composition contracts observes the current root without treating historical cost custody as live identity',
+  'packages/web-rpc/test/tree-shaking/static-composition-contracts.test.ts::static composition contracts observes the exact full runtime allocation topology through the root factory',
+  'packages/web-rpc/test/tree-shaking/static-composition-contracts.test.ts::static composition contracts projects selected root keys from exposed metadata',
+  'packages/web-rpc/test/tree-shaking/static-composition-contracts.test.ts::static composition contracts publishes feature: ../../src/features/canonical-chunk.js',
+  'packages/web-rpc/test/tree-shaking/static-composition-contracts.test.ts::static composition contracts publishes feature: ../../src/features/control.js',
+  'packages/web-rpc/test/tree-shaking/static-composition-contracts.test.ts::static composition contracts publishes feature: ../../src/features/discovery.js',
+  'packages/web-rpc/test/tree-shaking/static-composition-contracts.test.ts::static composition contracts publishes feature: ../../src/features/outbound.js',
+  'packages/web-rpc/test/tree-shaking/static-composition-contracts.test.ts::static composition contracts publishes feature: ../../src/features/provider.js',
+  'packages/web-rpc/test/tree-shaking/static-composition-contracts.test.ts::static composition contracts publishes preset: ../../src/client.js',
+  'packages/web-rpc/test/tree-shaking/static-composition-contracts.test.ts::static composition contracts publishes preset: ../../src/core.js',
+  'packages/web-rpc/test/tree-shaking/static-composition-contracts.test.ts::static composition contracts publishes preset: ../../src/full.js',
+  'packages/web-rpc/test/tree-shaking/static-composition-contracts.test.ts::static composition contracts publishes preset: ../../src/provider.js',
+  'packages/web-rpc/test/tree-shaking/static-composition-contracts.test.ts::static composition contracts requires every baseline owner category to declare a non-empty owner list',
+  'packages/web-rpc/test/type-contract.test.ts::factory type contract discriminates discovery mode and ping capability',
+
+  // Unconsumed datagram-only carrier is deleted; reliable webTransportPlugin remains covered separately.
+  'packages/web-rpc/test/adapters/web-transport.test.ts::WebTransport datagram adapter contains a reader acquisition failure at the transport boundary',
+  'packages/web-rpc/test/adapters/web-transport.test.ts::WebTransport datagram adapter contains an asynchronous reader failure at the transport boundary',
+  'packages/web-rpc/test/adapters/web-transport.test.ts::WebTransport datagram adapter declares its datagram reader and writer as owned',
+  'packages/web-rpc/test/adapters/web-transport.test.ts::WebTransport datagram adapter keeps the transport-owned reader across unsubscribe and resubscribe',
+  'packages/web-rpc/test/adapters/web-transport.test.ts::WebTransport datagram adapter returns reader release failures from close',
+  'packages/web-rpc/test/adapters/web-transport.test.ts::WebTransport datagram adapter shares the in-flight close promise',
+  'packages/web-rpc/test/adapters/web-transport.test.ts::WebTransport datagram adapter surfaces writer cleanup failure from close',
+  'packages/web-rpc/test/adapters/web-transport.test.ts::WebTransport datagram adapter treats a normal datagram EOF as terminal',
+  'packages/web-rpc/test/adapters/web-transport.test.ts::WebTransport datagram adapter waits for the read owner and rejects operations after close',
   'packages/web-rpc/test/internal/control-task-registry.test.ts::ControlTaskRegistry purges expired unordered aborts before applying its hard cap',
   'packages/web-rpc/test/internal/control-task-registry.test.ts::ControlTaskRegistry deduplicates control tasks before they reach the wire owner',
   'packages/web-rpc/test/internal/control-task-registry.test.ts::ControlTaskRegistry keeps variation admission in the control owner',
@@ -207,7 +243,18 @@ const retiredLayeringTitles = new Set([
   'packages/web-rpc/test/internal/async-control.test.ts::async control removes abort listeners when delay completes',
   'packages/web-rpc/test/internal/async-control.test.ts::async control rolls back earlier delay listeners when a later registration fails',
   'packages/web-rpc/test/internal/async-control.test.ts::async control observes delay listener cleanup failures without replacing the result',
-  'packages/web-rpc/test/internal-ownership-boundaries.test.ts::internal ownership boundary semantics keeps control and variation admission duplicate-safe and expiry-aware'
+  'packages/web-rpc/test/internal-ownership-boundaries.test.ts::internal ownership boundary semantics keeps control and variation admission duplicate-safe and expiry-aware',
+  // Final-host reachability deletes these exact test-only owners; current lifecycle owners stay covered.
+  'packages/web-rpc/test/internal/peers.test.ts::PeerRegistry bounds learned peers without evicting configured targets',
+  'packages/web-rpc/test/internal/peers.test.ts::PeerRegistry clears all peer state at endpoint disposal',
+  'packages/web-rpc/test/internal/peers.test.ts::PeerRegistry expires learned peers while retaining configured targets',
+  'packages/web-rpc/test/internal/settlement.test.ts::settlement reports cleanup failure without replacing the primary result',
+  'packages/web-rpc/test/internal/settlement.test.ts::settlement runs cleanup and settles only once',
+  'packages/web-rpc/test/internal/settlement.test.ts::settlement still settles when cleanup throws',
+  'packages/web-rpc/test/property.test.ts::property invariants keeps settlement exactly-once across arbitrary completion races',
+  'packages/web-rpc/test/duplicate-owner-contract.test.ts::candidate-specific duplicate-owner contracts keeps peer leases in PeerRegistry',
+  'packages/web-rpc/test/hardening-regressions.spec.ts::#1 splitUtf8 会产出超过 maxBytes 的分片，接收端必然拒收 chunk budget 小于最大 UTF-8 code point 时拒绝配置',
+  'packages/web-rpc/test/internal-ownership-boundaries.test.ts::internal ownership boundary semantics expires learned peer knowledge while retaining configured-peer semantics'
 ])
 
 /** Map each non-retired frozen title to its required current file and test name. */
@@ -219,6 +266,10 @@ function migratedTitle(title: string): string | undefined {
   const path = migratedFiles[file]
   expect(path, file).toBeDefined()
   const mappedName = name
+    .replace(
+      'preserves configured peers while bounding learned peers and translating cleanup leaves',
+      'preserves cleanup leaves when translating disposal failures'
+    )
     .replace(
       'publishes only runtime-neutral root/framing exports and dependencies',
       'publishes only runtime-neutral contract/framing exports with an explicit dependency allowlist'

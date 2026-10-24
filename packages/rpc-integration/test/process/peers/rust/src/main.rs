@@ -77,16 +77,71 @@ fn runtime_schema_equal(left: &Value, right: &Value) -> bool {
                     .all(|(a, b)| runtime_schema_equal(a, b))
         }
         (Value::Object(left), Value::Object(right)) => {
-            left.len() == right.len()
-                && left.iter().all(|(key, value)| {
-                    right
-                        .iter()
-                        .find(|(name, _)| name == key)
-                        .is_some_and(|(_, other)| runtime_schema_equal(value, other))
-                })
+            if left.len() != right.len() {
+                return false;
+            }
+            // Preserve first-field lookup even for manually constructed values; parsed objects are unique.
+            let mut indexed = std::collections::HashMap::with_capacity(right.len());
+            for (key, value) in right {
+                indexed.entry(key.as_str()).or_insert(value);
+            }
+            left.iter().all(|(key, value)| {
+                indexed
+                    .get(key.as_str())
+                    .is_some_and(|other| runtime_schema_equal(value, other))
+            })
         }
         _ => left == right,
     }
+}
+
+/// Hash already-admitted JSON once, retaining exact equality for private collision buckets.
+/// Arrays stay ordered, object fields combine without key order, and numeric spellings use f64 equality.
+fn runtime_schema_hash(value: &Value, hashes: &std::collections::hash_map::RandomState) -> u64 {
+    use std::hash::{BuildHasher, Hash, Hasher};
+    // This seed is local to one validated directory and never enters the wire.
+    let mut hash = hashes.build_hasher();
+    match value {
+        Value::Null => 0u8.hash(&mut hash),
+        Value::Bool(value) => {
+            1u8.hash(&mut hash);
+            value.hash(&mut hash);
+        }
+        Value::String(value) | Value::SurrogateString(value) => {
+            2u8.hash(&mut hash);
+            value.hash(&mut hash);
+        }
+        Value::Number(value) => {
+            3u8.hash(&mut hash);
+            // runtime_schema_data already accepted this finite number before hashing.
+            let number = value.parse::<f64>().unwrap();
+            // JSON numeric equality treats both signed zeros as the same value.
+            let normalized = if number == 0.0 { 0.0 } else { number };
+            normalized.to_bits().hash(&mut hash);
+        }
+        Value::Array(values) => {
+            4u8.hash(&mut hash);
+            values.len().hash(&mut hash);
+            for value in values {
+                runtime_schema_hash(value, hashes).hash(&mut hash);
+            }
+        }
+        Value::Object(fields) => {
+            5u8.hash(&mut hash);
+            fields.len().hash(&mut hash);
+            // Commutative field accumulation preserves object key-order independence.
+            let mut combined = 0u64;
+            for (key, value) in fields {
+                // Hash the key/value pair before combining it with sibling fields.
+                let mut field = hashes.build_hasher();
+                key.hash(&mut field);
+                runtime_schema_hash(value, hashes).hash(&mut field);
+                combined = combined.wrapping_add(field.finish());
+            }
+            combined.hash(&mut hash);
+        }
+    }
+    hash.finish()
 }
 
 /// Validate actual schema positions; references never follow network, file, or recursive targets.
@@ -96,6 +151,7 @@ fn valid_runtime_schema(value: &Value) -> bool {
         path: &str,
         nodes: &mut std::collections::HashSet<String>,
         references: &mut Vec<&'a str>,
+        hashes: &std::collections::hash_map::RandomState,
     ) -> bool {
         let Value::Object(fields) = value else {
             return false;
@@ -140,13 +196,14 @@ fn valid_runtime_schema(value: &Value) -> bool {
                             &format!("{path}/{key}/{pointer}"),
                             nodes,
                             references,
+                            hashes,
                         ) {
                             return false;
                         }
                     }
                 }
                 "items" => {
-                    if !visit(child, &format!("{path}/items"), nodes, references) {
+                    if !visit(child, &format!("{path}/items"), nodes, references, hashes) {
                         return false;
                     }
                 }
@@ -157,18 +214,32 @@ fn valid_runtime_schema(value: &Value) -> bool {
                     if members.is_empty() {
                         return false;
                     }
+                    // Structural hashes are only indexes; exact equality still decides collisions.
+                    let mut seen: std::collections::HashMap<u64, Vec<&Value>> =
+                        std::collections::HashMap::new();
                     for (index, member) in members.iter().enumerate() {
                         if key == "anyOf"
-                            && !visit(member, &format!("{path}/anyOf/{index}"), nodes, references)
+                            && !visit(
+                                member,
+                                &format!("{path}/anyOf/{index}"),
+                                nodes,
+                                references,
+                                hashes,
+                            )
                         {
                             return false;
                         }
-                        if key == "enum"
-                            && members[..index]
+                        if key == "enum" {
+                            // Only an index; the existing equality decides duplicate membership.
+                            let digest = runtime_schema_hash(member, hashes);
+                            let bucket = seen.entry(digest).or_default();
+                            if bucket
                                 .iter()
                                 .any(|other| runtime_schema_equal(member, other))
-                        {
-                            return false;
+                            {
+                                return false;
+                            }
+                            bucket.push(member);
                         }
                     }
                 }
@@ -197,7 +268,9 @@ fn valid_runtime_schema(value: &Value) -> bool {
     }
     let mut nodes = std::collections::HashSet::new();
     let mut references = Vec::new();
-    visit(value, "", &mut nodes, &mut references)
+    // All enum buckets in this single walk share one private standard-library seed.
+    let hashes = std::collections::hash_map::RandomState::new();
+    visit(value, "", &mut nodes, &mut references, &hashes)
         && references.iter().all(|pointer| nodes.contains(*pointer))
 }
 

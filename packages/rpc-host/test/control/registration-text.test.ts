@@ -1,11 +1,13 @@
+import { createRuntimeEndpointComposition } from '../../dist/core/runtime-api-endpoint.js'
+import { RpcCapability } from '@migaia/rpc-contract'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { parseSync, Visitor, type Span } from 'oxc-parser'
 import { describe, expect, it } from 'vitest'
-import { createMemoryTransportPair } from '../../dist/core/adapters/memory.js'
+import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
 import { RpcError } from '../../dist/core/errors.js'
 import { RpcCoreErrorText } from '../../dist/core/error-text.js'
-import { createFullEndpoint } from '../../dist/core/full.js'
+
 import { RpcVariationCoordinator } from '../../dist/core/internal/variation-coordinator.js'
 import { connect } from '../../dist/core/middleware/connect.js'
 
@@ -76,11 +78,14 @@ describe('canonical control registration texts', () => {
 
   it('preserves manual query listener ownership and canonical conflict text', async () => {
     const [transport] = createMemoryTransportPair()
-    const endpoint = await createFullEndpoint({
-      id: 'manual-text',
-      transport,
-      middlewares: [connect({ transport, discoveryMode: 'manual' })] as const
-    })
+    const endpoint = await createRuntimeEndpointComposition(
+      {
+        id: 'manual-text',
+        transport,
+        middlewares: [connect({ transport, discoveryMode: 'manual' })] as const
+      },
+      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
+    ).installing
     try {
       const first = endpoint.connect.onQuery!(() => undefined)
       try {

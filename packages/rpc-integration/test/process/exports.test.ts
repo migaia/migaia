@@ -45,12 +45,14 @@ describe('process package layering and exports', () => {
     expect(manifest.exports['./contract/framing/stream']).toBeUndefined()
     const common = await import('@migaia/rpc-plugin-process')
     const framing = await import('@migaia/rpc-contract/framing/stream')
-    expect(Object.keys(common).sort()).toEqual([
-      'RPC_PROCESS_ERROR_SOURCE',
-      'RpcProcessErrorCode',
-      'isProcessChild',
-      'processPlugin'
-    ])
+    expect(new Set(Object.keys(common))).toEqual(
+      new Set([
+        'RPC_PROCESS_ERROR_SOURCE',
+        'RpcProcessErrorCode',
+        'isProcessChild',
+        'processPlugin'
+      ])
+    )
     expect(framing.encodeRpcStreamFrame).toBeTypeOf('function')
   })
 
@@ -76,12 +78,9 @@ describe('process package layering and exports', () => {
       true
     )
     expect(manifest.dependencies).toHaveProperty('@migaia/supervision')
-    expect(Object.keys(manifest.peerDependencies).sort()).toEqual([
-      '@migaia/rpc-contract',
-      '@migaia/rpc-host',
-      'electron',
-      'koffi'
-    ])
+    expect(new Set(Object.keys(manifest.peerDependencies))).toEqual(
+      new Set(['@migaia/rpc-contract', '@migaia/rpc-host', 'electron', 'koffi'])
+    )
     for (const peer of ['@migaia/rpc-contract', '@migaia/rpc-host']) {
       /**
        * Source uses the workspace protocol; the packed smoke test checks the exact lockstep

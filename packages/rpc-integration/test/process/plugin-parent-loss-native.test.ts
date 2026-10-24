@@ -1,20 +1,20 @@
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
-import { matrixFixture, type IMatrixFeature } from './matrix-fixture.js'
+import { matrixFixture } from './matrix-fixture.js'
+import { processPlugin } from '@migaia/rpc-plugin-process'
 
 describe('real Node parent-loss ownership', () => {
   it.each(['graceful', 'hung', 'explicit'] as const)(
     'real Node parent-loss %s uses original manual grace deadline',
     async (mode) => {
       const test = await matrixFixture()
-      if (test.options.deployment.kind !== 'spawn') throw new Error('spawn required')
-      const { createProcessPlugin } = await import('../../../rpc-plugin-process/test/protocol.ts')
-      const plugin = createProcessPlugin({
-        ...test.options,
-        deployment: {
-          ...test.options.deployment,
+      if (!test.spawn) throw new Error('spawn required')
+      const plugin = processPlugin({
+        ...test.settings,
+        spawn: {
+          ...test.spawn,
           supervision: {
-            ...test.options.deployment.supervision,
+            ...test.spawn.supervision,
             spec: {
               ...test.spec,
               env: {
@@ -30,10 +30,9 @@ describe('real Node parent-loss ownership', () => {
         }
       })
       try {
-        const [installed] = await test.host.use(plugin)
-        const proxy = installed.getFeature('f') as IMatrixFeature
+        await test.host.use(plugin)
         if (mode === 'explicit') {
-          await proxy.request(['explicit-close'])
+          await test.outlet.request('p', 'p.f.request', ['explicit-close'])
           await vi.waitFor(() => expect(test.chunks.join('')).toContain('matrix:explicit-closed'))
           expect(test.chunks.join(''), 'parent loss contract').not.toContain('matrix:exit:')
           expect(test.chunks.join('')).not.toContain('matrix:parent-lost')

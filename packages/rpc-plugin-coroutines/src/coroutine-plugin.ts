@@ -1,3 +1,4 @@
+import { RpcTransportMode } from '@migaia/rpc-host/plugin'
 import {
   createAdapterDeployment,
   createAdapterConfigurationError,
@@ -140,7 +141,7 @@ export function coroutinePlugin(options: ICoroutinePluginOptions): IRpcTransport
     name: options.name ?? RuntimePluginKey.coroutine,
     expose: options.expose,
     connect: options.connect,
-    mode: task ? 'spawn' : 'connect-to-parent',
+    mode: task ? RpcTransportMode.spawn : RpcTransportMode['connect-to-parent'],
     deployment
   })
 }

@@ -70,14 +70,12 @@ Explicit socket/TCP addresses require matching credentials and protocol. Default
 
 ## Features and platform entries
 
-| Entry                                                         | Purpose                                                                                                      |
-| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| Root                                                          | `processPlugin`, `isProcessChild`, options, and error identity                                               |
-| `/features`                                                   | `sendQueueFeature`, `ipcLogFeature`, and original flow-control constants/types configure existing IPC owners |
-| `/adapters/node-child-process`, `/adapters/node-socket`       | Native Node process and socket                                                                               |
-| `/adapters/bun-spawn`, `/adapters/bun-socket`                 | Native Bun launch and socket                                                                                 |
-| `/adapters/deno-command`, `/adapters/deno-socket`             | Native Deno launch and socket                                                                                |
-| `/adapters/electron-utility-process`, `/adapters/windows-job` | Electron utility processes and Windows Jobs                                                                  |
+| Entry       | Purpose                                                                                                      |
+| ----------- | ------------------------------------------------------------------------------------------------------------ |
+| Root        | `processPlugin`, `isProcessChild`, options, and error identity                                               |
+| `/features` | `sendQueueFeature`, `ipcLogFeature`, and original flow-control constants/types configure existing IPC owners |
+
+Native process/socket implementations remain package-owned. Applications select the existing short or full deployment recipe; carrier authors use the host `/plugin` deployment SDK.
 
 Install shared deadlines, authentication, chunking, retry, and type generation from [rpc-host/features](../rpc-host/README.en.md#choose-transport-and-features). Process-specific features override their matching IPC fields without creating another logging or sending queue.
 

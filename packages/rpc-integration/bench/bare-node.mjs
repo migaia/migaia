@@ -18,110 +18,168 @@ const readyText = 'BARE_READY\n'
  * @throws {Error} Observer startup or failed native reading never becomes unsupported.
  */
 export async function createMacPidObserver(pids, intervalMs = 10) {
-  /** Python owns one persistent native library handle, created before readiness/warmup. */
-  const child = spawn(
-    'python3',
-    ['-B', fileURLToPath(new URL('./native-pid-observer.py', import.meta.url))],
-    { stdio: ['pipe', 'pipe', 'pipe'] }
-  )
-  /** Ordered replies bind each requested snapshot to exactly one pending read. */
-  const pending = []
-  /** The observer's first line proves ctypes/libproc are loaded before sampling can begin. */
-  let resolveReady
-  /** Startup and pipe errors reject readiness rather than hanging the paired driver. */
-  let rejectReady
-  /** Startup receipt has a different shape from resource snapshots. */
-  const ready = new Promise((resolve, reject) => {
-    resolveReady = resolve
-    rejectReady = reject
-  })
-  /** Fixed observer diagnostics are kept outside CPU/RSS endpoint totals. */
-  let diagnostic = ''
-  child.stderr.on('data', (chunk) => {
-    diagnostic += chunk.toString()
-  })
-  /** Reject every queued read on startup, pipe or observer exit failure. */
-  const fail = (error) => {
-    rejectReady(error)
-    for (const waiter of pending.splice(0)) waiter.reject(error)
+  /** One actual native observer owns both readiness and its original ordered replies. */
+  const observer = new MacPidObserver(pids, intervalMs)
+  await observer.ready()
+  return observer
+}
+
+/** One observer process owns its native input, output framing and pending snapshot requests. */
+class MacPidObserver {
+  /**
+   * Native commands retain the original admitted PID array even if a public observation is
+   * reassigned.
+   */
+  #pids
+  /** Sampling retains the admitted original interval independently of mutable receipt properties. */
+  #intervalMs
+  /** Python keeps its original persistent libproc handle outside measured endpoint totals. */
+  #child
+  /** Readline retains original physical line boundaries. */
+  #lines
+  /** FIFO membership is constant work per native reply without shifting a growing array. */
+  #pending = new Map()
+  /** Monotonic positions preserve the original ordered request/reply correlation. */
+  #issued = 0
+  /** Next physical reply consumes exactly one original queued request. */
+  #received = 0
+  /** Startup diagnostics remain outside endpoint CPU/RSS observations. */
+  #diagnostic = ''
+  /** Native readiness remains a separate receipt from resource snapshots. */
+  #ready
+  /** The original first readiness line settles this startup operation. */
+  #resolveReady
+  /** Startup and native pipe failure reject the same original readiness operation. */
+  #rejectReady
+  /**
+   * @param {number[]} pids Actual distinct endpoint PIDs. @param {number} intervalMs Original
+   *   interval.
+   */
+  constructor(pids, intervalMs) {
+    this.#pids = [...new Set(pids)]
+    this.pids = this.#pids
+    this.#intervalMs = intervalMs
+    this.intervalMs = intervalMs
+    this.method = 'macOS proc_pid_rusage(RUSAGE_INFO_V0); no child totals; resident bytes'
+    this.#child = spawn(
+      'python3',
+      ['-B', fileURLToPath(new URL('./native-pid-observer.py', import.meta.url))],
+      { stdio: ['pipe', 'pipe', 'pipe'] }
+    )
+    this.#ready = new Promise((resolve, reject) => {
+      this.#resolveReady = resolve
+      this.#rejectReady = reject
+    })
+    this.#child.stderr.on('data', (chunk) => {
+      this.#diagnostic += chunk.toString()
+    })
+    this.#child.on('error', (error) => this.#fail(error))
+    this.#child.on('exit', (code) => {
+      if (code !== 0) this.#fail(new Error(`PID observer exited ${code}: ${this.#diagnostic}`))
+    })
+    this.#lines = createInterface({ input: this.#child.stdout })
+    this.#lines.on('line', (line) => this.#receive(line))
   }
-  child.on('error', fail)
-  child.on('exit', (code) => {
-    if (code !== 0) fail(new Error(`PID observer exited ${code}: ${diagnostic}`))
-  })
-  /** Line framing is only observer control; it is not an RPC protocol implementation. */
-  const lines = createInterface({ input: child.stdout })
-  lines.on('line', (line) => {
+  /** @returns {Promise<void>} Startup failure still kills only this native observer. */
+  async ready() {
     try {
-      /** Native observation data is consumed without substituting local resource totals. */
+      await this.#ready
+    } catch (error) {
+      this.#child.kill()
+      throw error
+    }
+  }
+  /** @param {unknown} error Reject all original queued snapshots and the readiness receipt. */
+  #fail(error) {
+    this.#rejectReady(error)
+    for (const waiter of this.#pending.values()) waiter.reject(error)
+    this.#pending.clear()
+    this.#received = this.#issued
+  }
+  /** @param {string} line Decode one physical reply without changing error ownership. */
+  #receive(line) {
+    try {
+      /** Native observation data never substitutes the driver's own counters. */
       const message = JSON.parse(line)
       if (message.ready) {
-        resolveReady(message)
+        this.#resolveReady(message)
         return
       }
-      /** Each native error rejects its own snapshot instead of emitting a ratio assertion. */
-      const waiter = pending.shift()
+      /** Only the next original request may consume this ordered native reply. */
+      const waiter = this.#pending.get(this.#received)
+      this.#pending.delete(this.#received++)
       if (!waiter) throw new Error('Unexpected PID observer reply')
       if (message.error) waiter.reject(new Error(message.error))
       else waiter.resolve(message.rows)
     } catch (error) {
-      fail(error)
+      this.#fail(error)
     }
-  })
-  try {
-    await ready
-  } catch (error) {
-    child.kill()
-    throw error
   }
-  /** Deduplicated PID array is sent on every read, so thread endpoints count once. */
-  const uniquePids = [...new Set(pids)]
-  /** A single read promise includes both endpoint PID syscalls. */
-  const read = () =>
-    new Promise((resolve, reject) => {
-      pending.push({ resolve, reject })
-      child.stdin.write(JSON.stringify(uniquePids) + '\n')
+  /**
+   * @param {unknown} payload Original observer command. @returns {Promise<object[]>} Actual PID
+   *   rows.
+   */
+  #request(payload) {
+    return new Promise((resolve, reject) => {
+      this.#pending.set(this.#issued++, { resolve, reject })
+      this.#child.stdin.write(JSON.stringify(payload) + '\n')
     })
-  return {
-    pids: uniquePids,
-    method: 'macOS proc_pid_rusage(RUSAGE_INFO_V0); no child totals; resident bytes',
-    intervalMs,
-    read,
-    /**
-     * Resource runs reuse the same native observer; benchmark reads retain their exact CPU/RSS
-     * path.
-     */
-    readResources: () =>
-      new Promise((resolve, reject) => {
-        pending.push({ resolve, reject })
-        child.stdin.write(JSON.stringify({ pids: uniquePids, resources: true }) + '\n')
-      }),
-    start(receive) {
-      /** All samples are serialized; one slow read cannot create overlapping sampler children. */
-      let sampling = Promise.resolve()
-      /** Timer failure is retained and surfaced when the sampling owner joins. */
-      let error
-      /** Interval runs only inside measureBare's ready/warmup-completed window. */
-      const timer = setInterval(() => {
-        sampling = sampling.then(async () => {
-          try {
-            receive(await read())
-          } catch (failure) {
-            error ??= failure
-          }
-        })
-      }, intervalMs)
-      return async () => {
-        clearInterval(timer)
-        await sampling
-        if (error) throw error
-      }
-    },
-    async close() {
-      child.stdin.end()
-      await once(child, 'close')
-      lines.close()
+  }
+  /** @returns {Promise<object[]>} Original CPU/RSS request over the same native pipe. */
+  read = () => this.#request(this.#pids)
+  /** @returns {Promise<object[]>} Original extended resource command over the same native pipe. */
+  readResources = () => this.#request({ pids: this.#pids, resources: true })
+  /**
+   * @param {(rows: object[]) => void} receive Sampling observer. @returns {()=>Promise<void>}
+   *   Original join.
+   */
+  start(receive) {
+    return new MacPidSampling(this, receive, this.#intervalMs).stop
+  }
+  /** @returns {Promise<void>} Join this observer's original physical close before readline teardown. */
+  async close() {
+    this.#child.stdin.end()
+    await once(this.#child, 'close')
+    this.#lines.close()
+  }
+}
+
+/** One interval serializes its original native reads and retains the first sampling failure. */
+class MacPidSampling {
+  /** Original observer performs every native read; this owner only serializes interval receipts. */
+  #observer
+  /** Caller retains the same per-snapshot resource observation callback. */
+  #receive
+  /** One Promise chain preserves the original non-overlapping sample order. */
+  #sampling = Promise.resolve()
+  /** First interval error is surfaced when its original owner joins. */
+  #error
+  /** The same native interval is cleared exactly when sampling stops. */
+  #timer
+  /**
+   * @param {MacPidObserver} observer Native owner. @param {(rows:object[])=>void} receive
+   *   Observation.
+   */
+  constructor(observer, receive, intervalMs) {
+    this.#observer = observer
+    this.#receive = receive
+    this.#timer = setInterval(() => {
+      this.#sampling = this.#sampling.then(() => this.#sample())
+    }, intervalMs)
+  }
+  /** @returns {Promise<void>} A failed sample retains the original first error without overlap. */
+  async #sample() {
+    try {
+      this.#receive(await this.#observer.read())
+    } catch (failure) {
+      this.#error ??= failure
     }
+  }
+  /** @returns {Promise<void>} Stop the original timer and join every outstanding native read. */
+  stop = async () => {
+    clearInterval(this.#timer)
+    await this.#sampling
+    if (this.#error) throw this.#error
   }
 }
 
@@ -135,91 +193,154 @@ export async function createMacPidObserver(pids, intervalMs = 10) {
 export async function createBareNodeSession(payload) {
   if (!payload.length || payload.length > maxFrameBytes)
     throw new RangeError('Bare frame outside carrier limit')
-  /** A bare peer performs JSON business work without handshake, endpoint or business dispatch. */
-  const peer = spawn(process.execPath, [fileURLToPath(import.meta.url), '--echo'], {
-    stdio: ['pipe', 'pipe', 'pipe']
-  })
-  /** Exactly one outstanding echo represents concurrency one for the paired unit. */
-  let resolveEcho
-  /** The outstanding echo fails on process or stream failure. */
-  let rejectEcho
-  /** Partial physical bytes are bounded by one supported frame. */
-  let buffered = Buffer.alloc(0)
-  /** Reusable full frame preserves identical encoded payload bytes across all echoes. */
-  const frame = Buffer.alloc(4 + payload.length)
-  frame.writeUInt32BE(payload.length)
-  frame.set(payload, 4)
-  peer.stdout.on('data', (chunk) => {
-    buffered = Buffer.concat([buffered, chunk])
-    if (buffered.length < frame.length) return
-    if (!buffered.equals(frame)) {
-      rejectEcho?.(new Error('Bare echo byte mismatch'))
+  /** One actual peer retains its own readiness, physical frame and current echo. */
+  const session = new BareNodeSession(payload)
+  await session.ready()
+  return session
+}
+
+/** One sequential bare peer owns the exact native process and outstanding echo receipt. */
+class BareNodeSession {
+  /** The actual child retains original stderr readiness and physical stdio lifetime. */
+  #peer
+  /** Encoded bytes remain the same reusable full frame for every exchange. */
+  #frame
+  /** Each partial echo is copied directly into its final comparison buffer. */
+  #buffer
+  /** Bytes received in the current original sequential echo. */
+  #received = 0
+  /** Original current echo success receipt. */
+  #resolveEcho
+  /** Original current echo failure receipt. */
+  #rejectEcho
+  /** Startup remains a distinct Promise that every ready caller receives unchanged. */
+  #ready
+  /** Physical readiness marker is accumulated outside formal timing. */
+  #status = ''
+  /** @param {Uint8Array} payload Exact paired encoded bytes. */
+  constructor(payload) {
+    this.#peer = spawn(process.execPath, [fileURLToPath(import.meta.url), '--echo'], {
+      stdio: ['pipe', 'pipe', 'pipe']
+    })
+    this.#frame = Buffer.alloc(4 + payload.length)
+    this.#frame.writeUInt32BE(payload.length)
+    this.#frame.set(payload, 4)
+    this.#buffer = Buffer.alloc(this.#frame.length)
+    this.#peer.stdout.on('data', (chunk) => this.#receive(chunk))
+    this.#ready = new Promise((resolve, reject) => {
+      this.#peer.stderr.on('data', (chunk) => {
+        this.#status += chunk.toString()
+        if (this.#status === readyText) resolve()
+      })
+      this.#peer.on('error', reject)
+      this.#peer.on('exit', (code) => {
+        if (code !== 0) {
+          const error = new Error(`Bare peer exited ${code}`)
+          reject(error)
+          this.#rejectEcho?.(error)
+        }
+      })
+    })
+  }
+  /** @param {Uint8Array} chunk Same incoming bytes, copied once instead of repeated concatenation. */
+  #receive(chunk) {
+    if (this.#received + chunk.length > this.#frame.length) {
+      this.#rejectEcho?.(new Error('Bare echo byte mismatch'))
       return
     }
-    buffered = Buffer.alloc(0)
-    resolveEcho?.()
-  })
-  /** Readiness precedes all warmup and endpoint observation. */
-  const ready = new Promise((resolve, reject) => {
-    /** The worker emits one fixed marker before handling echo bytes. */
-    let status = ''
-    peer.stderr.on('data', (chunk) => {
-      status += chunk.toString()
-      if (status === readyText) resolve()
-    })
-    peer.on('error', reject)
-    peer.on('exit', (code) => {
-      if (code !== 0) {
-        const error = new Error(`Bare peer exited ${code}`)
-        reject(error)
-        rejectEcho?.(error)
-      }
-    })
-  })
-  await ready
-  return {
-    peerPid: peer.pid,
-    ready: () => ready,
-    exchange: () =>
-      new Promise((resolve, reject) => {
-        resolveEcho = resolve
-        rejectEcho = reject
-        peer.stdin.write(frame)
-      }),
-    async close() {
-      peer.stdin.end()
-      await once(peer, 'close')
+    this.#buffer.set(chunk, this.#received)
+    this.#received += chunk.length
+    if (this.#received < this.#frame.length) return
+    if (!this.#buffer.equals(this.#frame)) {
+      this.#rejectEcho?.(new Error('Bare echo byte mismatch'))
+      return
     }
+    this.#received = 0
+    this.#resolveEcho?.()
+  }
+  /** @returns {number} Actual peer process identity. */
+  get peerPid() {
+    return this.#peer.pid
+  }
+  /** @returns {Promise<void>} Exact original readiness Promise. */
+  ready = () => this.#ready
+  /** @returns {Promise<void>} Original one-at-a-time physical echo Promise. */
+  exchange = () =>
+    new Promise((resolve, reject) => {
+      this.#resolveEcho = resolve
+      this.#rejectEcho = reject
+      this.#peer.stdin.write(this.#frame)
+    })
+  /** @returns {Promise<void>} End original stdin and join native child close. */
+  async close() {
+    this.#peer.stdin.end()
+    await once(this.#peer, 'close')
+  }
+}
+
+/** Bare child parser fills one prefix and body, with total work linear in physical input. */
+class BareEchoFrames {
+  /** Four-byte native header is reused across complete frames. */
+  #prefix = Buffer.alloc(4)
+  /** Number of prefix bytes already received. */
+  #prefixBytes = 0
+  /** Only one validated frame body is allocated at a time. */
+  #body
+  /** Body bytes copied once into the final payload. */
+  #bodyBytes = 0;
+  /** @param {Uint8Array} chunk Physical input. @returns {Iterable<Buffer>} Complete original bodies. */
+  *receive(chunk) {
+    /** Each byte is consumed exactly once by its prefix or final body. */
+    let cursor = 0
+    while (cursor < chunk.length) {
+      if (!this.#body) {
+        /** Prefix completion never rescans already received bytes. */
+        const take = Math.min(4 - this.#prefixBytes, chunk.length - cursor)
+        this.#prefix.set(chunk.subarray(cursor, cursor + take), this.#prefixBytes)
+        this.#prefixBytes += take
+        cursor += take
+        if (this.#prefixBytes < 4) continue
+        /** Original encoded payload limit excludes the four-byte prefix. */
+        const length = this.#prefix.readUInt32BE(0)
+        if (!length || length > maxFrameBytes)
+          throw new RangeError('Bare frame outside carrier limit')
+        this.#body = Buffer.alloc(length)
+        this.#bodyBytes = 0
+      }
+      /** Body fragments fill only their final assigned range. */
+      const take = Math.min(this.#body.length - this.#bodyBytes, chunk.length - cursor)
+      this.#body.set(chunk.subarray(cursor, cursor + take), this.#bodyBytes)
+      this.#bodyBytes += take
+      cursor += take
+      if (this.#bodyBytes !== this.#body.length) continue
+      yield this.#body
+      this.#body = undefined
+      this.#prefixBytes = 0
+    }
+  }
+  /** @returns {boolean} The same EOF oracle rejects any partial physical frame. */
+  get incomplete() {
+    return this.#prefixBytes !== 0 || this.#body !== undefined
   }
 }
 
 /** Echo framed payloads after one JSON parse and serialization, matching the reference baseline. */
 async function echo() {
   process.stderr.write(readyText)
-  /**
-   * Buffer holds at most one validated frame and any coalesced input from the same sequential
-   * sender.
-   */
-  let bytes = Buffer.alloc(0)
+  /** Only bare framing state persists across original physical stdin fragments. */
+  const frames = new BareEchoFrames()
   for await (const chunk of process.stdin) {
-    bytes = Buffer.concat([bytes, chunk])
-    while (bytes.length >= 4) {
-      /** Length counts encoded payload bytes, never the four-byte prefix. */
-      const length = bytes.readUInt32BE(0)
-      if (!length || length > maxFrameBytes)
-        throw new RangeError('Bare frame outside carrier limit')
-      if (bytes.length < length + 4) break
-      /** Bare JSON work matches the peer codec cost while excluding RPC envelope processing. */
-      const body = Buffer.from(JSON.stringify(JSON.parse(bytes.subarray(4, length + 4).toString())))
-      /** The physical length follows the serialized JSON body rather than the input text. */
+    for (const payload of frames.receive(chunk)) {
+      /** Bare JSON work retains one original parse and serialization per payload. */
+      const body = Buffer.from(JSON.stringify(JSON.parse(payload.toString())))
+      /** Physical length follows the same serialized JSON body. */
       const frame = Buffer.alloc(4 + body.length)
       frame.writeUInt32BE(body.length)
       frame.set(body, 4)
-      bytes = bytes.subarray(length + 4)
       if (!process.stdout.write(frame)) await once(process.stdout, 'drain')
     }
   }
-  if (bytes.length) throw new Error('Incomplete bare frame at EOF')
+  if (frames.incomplete) throw new Error('Incomplete bare frame at EOF')
 }
 
 /** CLI starts an isolated Node parent; preparation mode does not measure performance. */

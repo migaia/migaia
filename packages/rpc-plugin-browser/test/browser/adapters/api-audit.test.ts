@@ -1,7 +1,6 @@
 import { expect, it } from 'vitest'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { createBroadcastChannelTransport } from '../../../src/browser/adapters/broadcast-channel.js'
-import { createWebTransportDatagramTransport } from '../../../src/browser/adapters/web-transport.js'
 import { createRtcDataChannelTransport } from '../../../src/browser/adapters/rtc-data-channel.js'
 import { createSharedWorkerTransport } from '../../../src/browser/adapters/shared-worker.js'
 import { createServiceWorkerTransport } from '../../../src/browser/adapters/service-worker.js'
@@ -65,54 +64,6 @@ it('classifies the native BroadcastChannel clone failure without replacing it', 
     )
   } finally {
     channel.close()
-  }
-})
-
-it('classifies a native stream write rejection and preserves the original Error', async () => {
-  /** The stream propagates this exact application exception through its native write Promise. */
-  const original = new Error('audit datagram write failed')
-  /** Real Web Streams exercise the public writer boundary without replacing private methods. */
-  const transport = createWebTransportDatagramTransport({
-    readable: new ReadableStream<Uint8Array>(),
-    writable: new WritableStream<Uint8Array>({
-      write() {
-        throw original
-      }
-    })
-  })
-  try {
-    await expect(transport.send(new Uint8Array([1]))).rejects.toBe(original)
-    expect(original).toMatchObject({ source: 'rpc.endpoint', code: 'TRANSPORT' })
-  } finally {
-    await expect(transport.close?.()).rejects.toBeDefined()
-  }
-})
-
-it('classifies a native stream read rejection and preserves the original Error', async () => {
-  /** A real stream controller terminates the adapter with this exact input failure. */
-  const original = new Error('audit datagram read failed')
-  /** Publish the native controller before subscribing starts the adapter's reader. */
-  let controller!: ReadableStreamDefaultController<Uint8Array>
-  /** The writable side remains healthy so read ownership can close normally. */
-  const transport = createWebTransportDatagramTransport({
-    readable: new ReadableStream<Uint8Array>({
-      start(value) {
-        controller = value
-      }
-    }),
-    writable: new WritableStream<Uint8Array>()
-  })
-  /** Resolve through the public transport error channel, rather than assuming a microtask count. */
-  const failure = new Promise<unknown>((resolve) => transport.onTransportError!(resolve))
-  /** This disposer retires the real business subscription. */
-  const off = transport.subscribe(() => undefined)
-  try {
-    controller.error(original)
-    expect(await failure).toBe(original)
-    expect(original).toMatchObject({ source: 'rpc.endpoint', code: 'TRANSPORT' })
-  } finally {
-    off()
-    await transport.close?.()
   }
 })
 

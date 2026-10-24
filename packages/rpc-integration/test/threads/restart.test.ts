@@ -1,3 +1,5 @@
+import { readRuntimeCarrier } from '@migaia/rpc-contract/runtime'
+import { readRpcBatchMembers } from '@migaia/rpc-contract/framing'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { describe, expect, it, vi } from 'vitest'
@@ -15,6 +17,18 @@ async function until(predicate: () => boolean): Promise<void> {
   throw new Error('Worker observation did not arrive')
 }
 
+/** Read the real packet's members while keeping each original native generation/transfer receipt. */
+function sentFrames(fixture: ReturnType<typeof nativeFixture>) {
+  return fixture.frames.flatMap((frame) =>
+    (
+      (readRpcBatchMembers(frame.message) ?? [frame.message]) as readonly (typeof frame.message)[]
+    ).map((message) => ({
+      ...frame,
+      message: readRuntimeCarrier(message)?.frame ?? message
+    }))
+  )
+}
+
 describe('thread generation recovery', () => {
   it('retries a sent idempotent request once with its original key across real Node generations', async () => {
     const factory = vi.spyOn(remoteRetry, 'createRemoteRetryPort')
@@ -28,9 +42,11 @@ describe('thread generation recovery', () => {
       expect(
         fixture.channels.every((channel) => channel.scheduler === fixture.pluginScheduler)
       ).toBe(true)
-      const sent = fixture.frames.filter(({ message }) => message.method === 'p.read')
+      const sent = sentFrames(fixture).filter(
+        ({ message }) => message.kind === 'runtime-call' && message.task?.method === 'p.read'
+      )
       expect(sent.map(({ generation }) => generation)).toEqual([1, 2])
-      expect(sent.map(({ message }) => message.data.route.idempotencyKey)).toEqual([
+      expect(sent.map(({ message }) => message.options.idempotencyKey)).toEqual([
         'thread-stable-key',
         'thread-stable-key'
       ])
@@ -52,7 +68,11 @@ describe('thread generation recovery', () => {
         detail: { generation: 1 }
       })
       await until(() => fixture.handles.length === 2)
-      expect(fixture.frames.filter(({ message }) => message.method === 'p.write')).toHaveLength(1)
+      expect(
+        sentFrames(fixture).filter(
+          ({ message }) => message.kind === 'runtime-call' && message.task?.method === 'p.write'
+        )
+      ).toHaveLength(1)
     } finally {
       await fixture.close()
     }
@@ -88,7 +108,11 @@ describe('thread generation recovery', () => {
         method: 'p.read',
         generation: 1
       })
-      expect(fixture.frames.filter(({ message }) => message.method === 'p.read')).toHaveLength(2)
+      expect(
+        sentFrames(fixture).filter(
+          ({ message }) => message.kind === 'runtime-call' && message.task?.method === 'p.read'
+        )
+      ).toHaveLength(2)
     } finally {
       await fixture.close()
       factory.mockRestore()
@@ -102,19 +126,36 @@ describe('thread generation recovery', () => {
       const result = feature
         .hold([], { signal: controller.signal })
         .catch((error: unknown) => error)
-      await until(() => fixture.frames.some(({ message }) => message.method === 'p.hold'))
+      await until(() =>
+        sentFrames(fixture).some(
+          ({ message }) => message.kind === 'runtime-call' && message.task?.method === 'p.hold'
+        )
+      )
       controller.abort(new Error('cancel logical call'))
       expect(await result).toMatchObject({ code: 'CANCELLED' })
       fixture.handles[0]!.terminate()
       await until(() => fixture.handles.length === 2)
-      expect(fixture.frames.filter(({ message }) => message.method === 'p.hold')).toHaveLength(1)
+      expect(
+        sentFrames(fixture).filter(
+          ({ message }) => message.kind === 'runtime-call' && message.task?.method === 'p.hold'
+        )
+      ).toHaveLength(1)
     } finally {
       await fixture.close()
     }
   })
   it('callWallTimeMs bounds the total request and cancels its timer', async () => {
     /** Policy timers are virtual; original native generation jobs retain host ordering. */
-    const scheduler = { ...createManualScheduler(), defer: systemScheduler.defer }
+    const clock = createManualScheduler()
+    /** Host turns retain native ordering while policy deadlines stay on the original virtual clock. */
+    const scheduler = {
+      ...clock,
+      defer: systemScheduler.defer,
+      /** Read the original clock owner; class accessors do not participate in object spread. */
+      get pendingCount() {
+        return clock.pendingCount
+      }
+    }
     const fixture = nativeFixture({
       scheduler,
       spec: {
@@ -128,10 +169,18 @@ describe('thread generation recovery', () => {
     try {
       const feature = await fixture.install()
       const result = feature.hold([], { timeoutMs: 200 }).catch((error: unknown) => error)
-      await until(() => fixture.frames.some(({ message }) => message.method === 'p.hold'))
+      await until(() =>
+        sentFrames(fixture).some(
+          ({ message }) => message.kind === 'runtime-call' && message.task?.method === 'p.hold'
+        )
+      )
       scheduler.advance(100)
       expect(await result).toMatchObject({ code: 'DEADLINE_EXCEEDED' })
-      expect(fixture.frames.filter(({ message }) => message.method === 'p.hold')).toHaveLength(1)
+      expect(
+        sentFrames(fixture).filter(
+          ({ message }) => message.kind === 'runtime-call' && message.task?.method === 'p.hold'
+        )
+      ).toHaveLength(1)
     } finally {
       await fixture.close()
     }
@@ -141,7 +190,19 @@ describe('thread generation recovery', () => {
     'preserves the original 100ms total deadline across a %sms rebind',
     async (delay) => {
       /** Policy timers are virtual; original native generation jobs retain host ordering. */
-      const scheduler = { ...createManualScheduler(), defer: systemScheduler.defer }
+      const clock = createManualScheduler()
+      /**
+       * Host turns retain native ordering while policy deadlines stay on the original virtual
+       * clock.
+       */
+      const scheduler = {
+        ...clock,
+        defer: systemScheduler.defer,
+        /** Read the original clock owner; class accessors do not participate in object spread. */
+        get pendingCount() {
+          return clock.pendingCount
+        }
+      }
       const fixture = nativeFixture(
         {
           scheduler,
@@ -160,7 +221,11 @@ describe('thread generation recovery', () => {
         const result = feature
           .read(['bounded'], { timeoutMs: 200 })
           .catch((error: unknown) => error)
-        await until(() => fixture.frames.some(({ message }) => message.method === 'p.read'))
+        await until(() =>
+          sentFrames(fixture).some(
+            ({ message }) => message.kind === 'runtime-call' && message.task?.method === 'p.read'
+          )
+        )
         await fixture.handles[0]!.exited
         for (let turn = 0; turn < 20; turn += 1) await Promise.resolve()
         scheduler.advance(delay)
@@ -168,17 +233,23 @@ describe('thread generation recovery', () => {
           expect(await result).toMatchObject({ code: 'DEADLINE_EXCEEDED' })
           await until(() => fixture.handles.length === 2)
           expect(
-            fixture.frames.filter(
-              ({ generation, message }) => generation === 2 && message.method === 'p.read'
+            sentFrames(fixture).filter(
+              ({ generation, message }) =>
+                generation === 2 &&
+                message.kind === 'runtime-call' &&
+                message.task?.method === 'p.read'
             )
           ).toHaveLength(0)
         } else {
           expect(await result).toBe('bounded')
-          const sent = fixture.frames.find(
-            ({ generation, message }) => generation === 2 && message.method === 'p.read'
+          const sent = sentFrames(fixture).find(
+            ({ generation, message }) =>
+              generation === 2 &&
+              message.kind === 'runtime-call' &&
+              message.task?.method === 'p.read'
           )!
-          expect(sent.message.data.route.timeoutMs).toBeGreaterThan(0)
-          expect(sent.message.data.route.timeoutMs).toBeLessThanOrEqual(40)
+          expect(sent.message.options.timeoutMs).toBeGreaterThan(0)
+          expect(sent.message.options.timeoutMs).toBeLessThanOrEqual(40)
         }
       } finally {
         await fixture.close()
@@ -217,7 +288,11 @@ describe('thread generation recovery', () => {
       for (let turn = 0; turn < 20; turn += 1) await Promise.resolve()
       resume()
       expect(await result).toMatchObject({ code: 'REMOTE_CLOSED', detail: { generation: 1 } })
-      expect(fixture.frames.filter(({ message }) => message.method === 'p.write')).toHaveLength(0)
+      expect(
+        sentFrames(fixture).filter(
+          ({ message }) => message.kind === 'runtime-call' && message.task?.method === 'p.write'
+        )
+      ).toHaveLength(0)
     } finally {
       resume()
       await fixture.close()
@@ -233,23 +308,11 @@ describe('thread generation recovery', () => {
       await fixture.handles[0]!.exited
       await until(() => fixture.handles.length === 2)
       const failure = await stream.next().catch((error: unknown) => error)
-      const chain: unknown[] = []
-      let current: unknown = failure
-      for (let depth = 0; depth < 6 && current && typeof current === 'object'; depth += 1) {
-        const error = current as {
-          name?: unknown
-          source?: unknown
-          code?: unknown
-          cause?: unknown
-        }
-        chain.push({ name: error.name, source: error.source, code: error.code })
-        current = error.cause
-      }
-      console.log('THREAD_A5_STREAM_FAILURE', JSON.stringify(chain))
       expect(failure).toMatchObject({ code: 'STREAM_RESULT_UNKNOWN' })
       expect(
-        fixture.frames.filter(
-          ({ generation, message }) => generation === 2 && message.kind === 'stream'
+        sentFrames(fixture).filter(
+          ({ generation, message }) =>
+            generation === 2 && message.kind === 'runtime-call' && message.task?.mode === 'stream'
         )
       ).toHaveLength(0)
     } finally {
@@ -258,7 +321,16 @@ describe('thread generation recovery', () => {
   })
   it('terminal restart budget drains retry while another facade remains callable', async () => {
     /** Policy timers are virtual; original native generation jobs retain host ordering. */
-    const scheduler = { ...createManualScheduler(), defer: systemScheduler.defer }
+    const clock = createManualScheduler()
+    /** Host turns retain native ordering while policy deadlines stay on the original virtual clock. */
+    const scheduler = {
+      ...clock,
+      defer: systemScheduler.defer,
+      /** Read the original clock owner; class accessors do not participate in object spread. */
+      get pendingCount() {
+        return clock.pendingCount
+      }
+    }
     const terminal = nativeFixture(
       { scheduler, supervisor: { restart: { maxRestarts: 0 } } },
       { crash: true }

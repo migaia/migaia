@@ -378,6 +378,7 @@ func response(message record, pending map[string]record) ([]record, error) {
 		for waitingID := range pending {
 			ids = append(ids, waitingID)
 		}
+		// Test-oracle exception: n is the current pending-request ID count; preserve the independent peer.finish reply sequence.
 		sort.Strings(ids)
 		replies := make([]record, 0, len(ids)+1)
 		for _, waitingID := range ids {

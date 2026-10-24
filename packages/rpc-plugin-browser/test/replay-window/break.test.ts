@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'vitest'
-import { authentication } from '../../../rpc-host/dist/core/index.js'
-import type { IRpcAuthenticationCapability } from '../../../rpc-host/dist/core/index.js'
+import { authentication } from '../../../rpc-host/dist/core/middleware/authentication.js'
+import type { IRpcAuthenticationCapability } from '../../../rpc-host/dist/core/typing.js'
 import { installPlugin } from '../../../rpc-host/test/core/middleware/helpers.js'
 
 /** Creates the production plugin port without introducing a substitute authentication path. */

@@ -1,45 +1,22 @@
-import { RemoteMethodName } from '../../../rpc-host/dist/remote/constants.js'
-import type { IRuntimeDynamicSurface } from '../../../rpc-host/dist/remote/runtime-api/typing.js'
 import { runtimeTestHost } from '../../../rpc-host/test/runtime-api/fixture.js'
 import assert from 'node:assert/strict'
-import { it } from 'vitest'
-import { defineFeature, definePlugin, getPluginRuntimeIntegration } from '@migaia/plugin-host'
+import { it, vi, expect } from 'vitest'
+import { defineFeature, definePlugin } from '@migaia/plugin-host'
 import { threadProtocolDefinition as createThreadPlugin } from './fixtures/thread-protocol.js'
-import { createThreadPeer } from '../../../rpc-plugin-thread/test/protocol.ts'
-import * as callable from '../../../rpc-host/dist/remote/runtime-api/peer.js'
-import type {
-  IRuntimePeerSource,
-  IRuntimePeer
-} from '../../../rpc-host/dist/remote/runtime-api/peer.js'
+import type { IRuntimePeerSource } from '../../../rpc-host/dist/remote/runtime-api/peer.js'
 import { runtimeSources } from '../../../rpc-host/test/runtime-api/fixture.js'
 import type { IThreadProtocolOptions as IRuntimeThreadPluginOptions } from './fixtures/thread-protocol.js'
 import type { IRpcPortableValue } from '@migaia/rpc-contract'
+import { RpcStreamOwner } from '../../../rpc-host/dist/core/internal/stream/owner.js'
 
-/** The baseline's ordinary callable owner also uses a real managed Host and real Feature refs. */
+/** The ordinary Host compiles the real current Feature whitelist into its cold transport. */
 function connection(name: string, source: IRuntimePeerSource) {
-  if (Reflect.get(callable, 'readRuntimePeerConnection'))
-    return createThreadPlugin({
-      name,
-      self: { name, instanceId: `${name}-instance` },
-      connect: source,
-      expose: ['service'],
-      report: () => undefined
-    } as never)
-  return definePlugin({
+  return createThreadPlugin({
     name,
-    async install(core) {
-      /** This supported baseline keeps the old Feature segment and delegates to the true Peer. */
-      const snapshot = getPluginRuntimeIntegration(core).readFeatureOutputs('service')
-      /** Baseline exposure forwards the original Feature output without a fixture dispatcher. */
-      const peer = await createThreadPeer<IRuntimeDynamicSurface>({
-        self: { name, instanceId: `${name}-instance` },
-        connect: source,
-        provide: { service: { data: snapshot.outputs.data as callable.IRuntimePeerProvide } },
-        report: () => undefined
-      })
-      core.onDispose(() => peer.close())
-      return { thread: peer }
-    }
+    self: { name, instanceId: `${name}-instance` },
+    connect: source,
+    expose: ['service'],
+    report: () => undefined
   })
 }
 
@@ -73,32 +50,16 @@ it('two genuine Host installations flatten real Feature names into plugin.method
           install: () => ({})
         })
       )
-    const installed = await Promise.all(
+    await Promise.all(
       hosts.map((host, index) => host.use(connection(`side-${index}`, channels.sources[index]!)))
     )
-    /** The pre-change assembly has a genuine callable directory containing the Feature segment. */
-    const migrated = Boolean(Reflect.get(callable, 'readRuntimePeerConnection'))
     for (const [index, host] of hosts.entries()) {
-      /** Only this acceptance fixture reads the existing baseline Peer or the new canonical outlet. */
-      const owner = (
-        migrated
-          ? Reflect.get(host, 'thread')
-          : (installed[index]![0] as unknown as { extensions: { thread: IRuntimePeer } }).extensions
-              .thread
-      ) as IRuntimePeer & {
-        request(target: string, method: string): Promise<unknown>
-      }
-      assert.equal(
-        await (migrated
-          ? owner.request(`side-${index}`, 'service.read')
-          : owner.request('service.data.read')),
-        42
-      )
+      /** The installed shared outlet routes directly through the actual Feature whitelist. */
+      const owner = host.thread!
+      assert.equal(await owner.request(`side-${index}`, 'service.read'), 42)
       /** A true remote dispatch rejection is caught so the intended business assertion is the RED. */
       const result = await Promise.resolve()
-        .then(() =>
-          migrated ? owner.request(`side-${index}`, 'service.read') : owner.request('service.read')
-        )
+        .then(() => owner.request(`side-${index}`, 'service.read'))
         .then(
           (value) => value,
           (failure) => failure
@@ -182,12 +143,35 @@ it('default empty exposure keeps the connection ready, hides business, and grant
       false,
       'empty expose cannot create a mutable Host facet'
     )
-    for (const mode of ['request', 'notify', 'stream'] as const)
-      assert.throws(
-        () => hosts[0].thread![mode]('remote', 'service.read'),
-        { code: 'PROVIDER_NOT_FOUND' },
-        'hidden methods reject before transport dispatch'
+    await expect(hosts[0].thread!.request('remote', 'service.read')).rejects.toMatchObject({
+      source: 'rpc.endpoint',
+      code: 'INTERNAL',
+      name: 'RpcRemoteError',
+      cause: { source: 'rpc.endpoint', code: 'TARGET_UNKNOWN' }
+    })
+    /** Join the preceding request's original report before isolating notify's single report. */
+    await vi.waitFor(() => assert.equal(connection!.reports[1]!.length, 1))
+    /** The preceding rejected request has its own original provider report. */
+    const priorReports = connection.reports[1]!.length
+    await hosts[0].thread!.notify('remote', 'service.read')
+    await vi.waitFor(() => assert.equal(connection!.reports[1]!.length, priorReports + 1))
+    assert.equal(Reflect.get(connection.reports[1]!.at(-1) as object, 'source'), 'rpc.endpoint')
+    assert.equal(Reflect.get(connection.reports[1]!.at(-1) as object, 'code'), 'TARGET_UNKNOWN')
+    /** Legacy stream-open has no rejection frame for an absent handler, so its route must exist. */
+    const opening = vi.spyOn(RpcStreamOwner.prototype, 'open')
+    try {
+      assert.throws(() => hosts[0].thread!.stream('remote', 'service.read'), {
+        source: 'rpc.endpoint',
+        code: 'PROVIDER_NOT_FOUND'
+      })
+      assert.equal(
+        opening.mock.calls.length,
+        0,
+        'unadvertised legacy stream never physically opens'
       )
+    } finally {
+      opening.mockRestore()
+    }
     assert.equal(calls, 0, 'hidden real Feature executes zero times')
   } finally {
     for (const host of hosts) await host.dispose()
@@ -248,12 +232,14 @@ it('explicit Feature exposure supports all three modes and keeps other Plugins h
     for await (const value of hosts[0].thread!.stream('remote', 'service.values'))
       values.push(value)
     assert.deepEqual(values, [1, 2])
-    assert.throws(() => hosts[0].thread!.request('remote', 'hidden.read'), {
-      code: 'PROVIDER_NOT_FOUND'
-    })
-    assert.throws(() => hosts[0].thread!.request('remote', 'service.data.read'), {
-      code: 'PROVIDER_NOT_FOUND'
-    })
+    for (const method of ['hidden.read', 'service.data.read'])
+      await expect(hosts[0].thread!.request('remote', method)).rejects.toMatchObject({
+        source: 'rpc.endpoint',
+        code: 'INTERNAL',
+        name: 'RpcRemoteError',
+        cause: { source: 'rpc.endpoint', code: 'TARGET_UNKNOWN' }
+      })
+    assert.deepEqual(invoked, ['request', 'notify', 'barrier'], 'hidden paths execute no business')
   } finally {
     for (const host of hosts) await host.dispose()
     connection?.channels.close()
@@ -299,237 +285,5 @@ it('conflicting real Feature methods reject before source effects without replac
     assert.equal(service.getFeature('first').read(), 42)
   } finally {
     await host.dispose()
-  }
-})
-
-it('child Host controls reuse the real resolver, exact adopter and dry-run transaction', async () => {
-  /** Source and destination are genuine managed Hosts with separate mutation queues. */
-  const hosts = [managedHost(), managedHost()] as const
-  /** Resolver business is counted independently of Host-use results. */
-  let resolved = 0
-  /** The actual target definition belongs to the destination Host, never the wire. */
-  const definition = definePlugin({
-    name: 'added',
-    features: { data: defineFeature(() => ({ read: () => 42 })) },
-    install: () => ({})
-  })
-  /** The original catalog is the canonical remote Host-control schema. */
-  const catalog = {
-    added: {
-      schemaVersion: 1 as const,
-      plugin: 'added',
-      features: { data: { methods: { read: { mode: 'request' as const, idempotent: false } } } }
-    }
-  }
-  /** Both original resource scopes finish before the borrowed test carrier is released. */
-  let connection: Awaited<ReturnType<typeof attach>> | undefined
-  try {
-    connection = await attach(hosts, [
-      { name: 'remote' },
-      {
-        name: 'remote',
-        expose: ['host'],
-        host: hosts[1],
-        catalog,
-        resolvePlugin: (name, config) => {
-          assert.equal(name, 'added')
-          assert.deepEqual(config, Object.assign(Object.create(null), { answer: 42 }))
-          resolved += 1
-          return definition
-        }
-      }
-    ])
-    /** Only explicitly negotiated reserved methods create this facet. */
-    const child = await hosts[0].thread!.get('remote')
-    assert.deepEqual(
-      child.methods,
-      [RemoteMethodName.hostUse, RemoteMethodName.hostUnUse, RemoteMethodName.hostInspect],
-      'explicit Host exposure advertises the actual reserved control operations'
-    )
-    assert.equal(hosts[1].revision, 1)
-    await assert.rejects(
-      hosts[0].thread!.request('remote', RemoteMethodName.hostUnUse, ['added']),
-      (error: unknown) => {
-        assert.equal((error as { code?: string }).code, 'REMOTE_HOST_NOT_ADOPTED')
-        return true
-      }
-    )
-    assert.equal(hosts[1].revision, 1, 'unadopted removal mutates zero times')
-    assert.equal(resolved, 0)
-    assert.deepEqual(
-      await hosts[0].thread!.request('remote', RemoteMethodName.hostUse, ['added', { answer: 42 }]),
-      Object.assign(Object.create(null), {
-        name: 'added',
-        state: 'enabled',
-        revision: 2,
-        features: ['data']
-      })
-    )
-    assert.equal(resolved, 1)
-    assert.deepEqual(
-      await hosts[0].thread!.request('remote', RemoteMethodName.hostInspect, []),
-      Object.assign(Object.create(null), {
-        revision: 2,
-        plugins: [
-          Object.assign(Object.create(null), {
-            name: 'added',
-            state: 'enabled',
-            revision: 2,
-            features: ['data']
-          })
-        ]
-      })
-    )
-    await hosts[0].thread!.request('remote', RemoteMethodName.hostUnUse, [
-      'added',
-      { dryRun: true }
-    ])
-    assert.equal(hosts[1].revision, 2, 'dryRun leaves the adopted registration intact')
-    assert.deepEqual(
-      await hosts[0].thread!.request('remote', RemoteMethodName.hostUnUse, ['added']),
-      Object.assign(Object.create(null), { ok: true })
-    )
-    assert.equal(hosts[1].revision, 3)
-    assert.equal(
-      (await hosts[1].thread!.get('remote')).methods.some(
-        (method) => method === RemoteMethodName.hostUse
-      ),
-      false,
-      'the reverse empty exposure has no control grant'
-    )
-  } finally {
-    for (const host of hosts) await host.dispose()
-    connection?.channels.close()
-  }
-})
-
-it('explicit catalog methods prepare before local installation and remain adopter guarded', async () => {
-  /** Both callers and the empty destination use genuine managed Host transactions. */
-  const hosts = [managedHost(), managedHost()] as const
-  /** One original reference carrier is borrowed by the genuine opposing registrations. */
-  const channels = runtimeSources()
-  /** Business execution is distinct from successful catalog preparation or Host mutation. */
-  let calls = 0
-  /** Resolver calls occur only after an explicitly permitted Host use operation. */
-  let resolved = 0
-  /** These definitions remain local; only catalog names and portable configs cross the channel. */
-  const definition = definePlugin({
-    name: 'added',
-    features: {
-      data: defineFeature(() => ({
-        read: () => ++calls,
-        hidden: () => {
-          assert.fail('an unexposed catalog method cannot execute')
-        }
-      }))
-    },
-    install: () => ({})
-  })
-  const catalog = {
-    added: {
-      schemaVersion: 1 as const,
-      plugin: 'added',
-      features: {
-        data: {
-          methods: {
-            read: { mode: 'request' as const, idempotent: false },
-            hidden: { mode: 'request' as const, idempotent: false }
-          }
-        }
-      }
-    }
-  }
-  /** A cold source checkpoint distinguishes a supported pending installation from an early reject. */
-  let entered!: () => void
-  const sourceEntered = new Promise<{ entered: true }>((resolve) => {
-    entered = () => resolve({ entered: true })
-  })
-  /**
-   * Observe the exact original rejection immediately; an invalid candidate cannot leave a peer
-   * wait.
-   */
-  const service = hosts[1]
-    .use(
-      createThreadPlugin({
-        name: 'remote',
-        expose: ['host', 'added.read'],
-        host: hosts[1],
-        catalog,
-        resolvePlugin: () => {
-          resolved += 1
-          return definition
-        },
-        connect: async (context) => {
-          entered()
-          return channels.sources[1](context)
-        },
-        report: () => undefined
-      })
-    )
-    .then(
-      (value) => ({ value }),
-      (error: unknown) => ({ error })
-    )
-  try {
-    const starting = await Promise.race([sourceEntered, service])
-    assert.equal(
-      'entered' in starting,
-      true,
-      'an explicitly exposed catalog method must not require its target to be installed'
-    )
-    await hosts[0].use(
-      createThreadPlugin({ name: 'remote', connect: channels.sources[0], report: () => undefined })
-    )
-    const prepared = await service
-    if ('error' in prepared) throw prepared.error
-    await assert.rejects(hosts[0].thread!.request('remote', 'added.read'), {
-      code: 'REMOTE_CLOSED'
-    })
-    assert.equal(calls, 0)
-    assert.equal(resolved, 0)
-    assert.throws(() => hosts[0].thread!.request('remote', 'added.hidden'), {
-      code: 'PROVIDER_NOT_FOUND'
-    })
-    await hosts[0].thread!.request('remote', RemoteMethodName.hostUse, ['added'])
-    assert.equal(resolved, 1)
-    assert.equal(await hosts[0].thread!.request('remote', 'added.read'), 1)
-    hosts[1].plugin.disable('added')
-    await assert.rejects(hosts[0].thread!.request('remote', 'added.read'), {
-      code: 'REMOTE_CLOSED'
-    })
-    assert.equal(calls, 1)
-    hosts[1].plugin.enable('added')
-    assert.equal(await hosts[0].thread!.request('remote', 'added.read'), 2)
-    await hosts[0].thread!.request('remote', RemoteMethodName.hostUnUse, ['added'])
-    await assert.rejects(hosts[0].thread!.request('remote', 'added.read'), {
-      code: 'REMOTE_CLOSED'
-    })
-    assert.equal(calls, 2)
-    await hosts[0].thread!.request('remote', RemoteMethodName.hostUse, ['added'])
-    assert.equal(await hosts[0].thread!.request('remote', 'added.read'), 3)
-    /** An external same-name replacement cannot inherit this connection's captured adoption. */
-    let replacementCalls = 0
-    await hosts[1].replace(
-      'added',
-      definePlugin({
-        name: 'added',
-        features: { data: defineFeature(() => ({ read: () => ++replacementCalls })) },
-        install: () => ({})
-      })
-    )
-    await assert.rejects(hosts[0].thread!.request('remote', 'added.read'), {
-      code: 'REMOTE_CLOSED'
-    })
-    await assert.rejects(
-      hosts[0].thread!.request('remote', RemoteMethodName.hostUnUse, ['added']),
-      {
-        code: 'REMOTE_HOST_NOT_ADOPTED'
-      }
-    )
-    assert.equal(calls, 3)
-    assert.equal(replacementCalls, 0)
-  } finally {
-    for (const host of hosts) await host.dispose()
-    channels.close()
   }
 })

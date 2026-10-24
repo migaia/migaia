@@ -9,60 +9,90 @@ import type {
 import { RpcStreamOwner } from '../../dist/core/internal/stream/owner.js'
 
 /** Drive admitted producer frames and record transport/report effects without a queue. */
-function producerFixture(rejectOpen: boolean, rejectFail = false) {
-  const commands: IRpcOutboundCommand[] = []
-  let route!: IEndpointKernelRoute
-  let accept!: (message: unknown) => void | Promise<void>
-  const sendError = new Error('open send failed')
-  const kernel = {
-    registerOwner: () => undefined,
-    /** This isolated stream has no optional provider policy owner, as on the real kernel. */
-    readOwner: () => undefined,
-    generation: 0,
-    closingSignal: new AbortController().signal,
-    state: 'active',
-    assertActive: () => undefined,
-    registerRoute: (_kind: string, handler: IEndpointKernelRoute) => {
-      route = handler
-      return () => undefined
-    },
-    time: {
-      now: () => 0,
-      timestamp: () => 0,
-      setTimeout: (task: () => void, delayMs: number) => {
-        const timer = setTimeout(task, delayMs)
-        return { clear: () => clearTimeout(timer) }
+class ProducerFailureFixture {
+  /** Retain the exact original ordered transport and report effects. */
+  readonly #commands: IRpcOutboundCommand[] = []
+  /** Only the actual stream owner supplies this admitted receive route. */
+  #route!: IEndpointKernelRoute
+  /** The original producer registration supplies this fixture request entry. */
+  #accept!: (message: unknown) => void | Promise<void>
+  /** Every selected physical refusal retains this exact original error instance. */
+  readonly #sendError = new Error('open send failed')
+  /** This case-selected flag controls only the original open-write failure. */
+  readonly #rejectOpen: boolean
+  /** This case-selected flag controls only the original terminal fail-write refusal. */
+  readonly #rejectFail: boolean
+  /** Original own fixture shape and callback order remain unchanged. */
+  readonly value
+  /** Construct only the same real stream owner and original per-case ports. */
+  constructor(rejectOpen: boolean, rejectFail = false) {
+    this.#rejectOpen = rejectOpen
+    this.#rejectFail = rejectFail
+
+    /**
+     * Only the original stream port owner publishes receive routing and the injected lifetime
+     * clock.
+     */
+    const kernel = {
+      registerOwner: () => undefined,
+      /** This isolated stream has no optional provider policy owner, as on the real kernel. */
+      readOwner: () => undefined,
+      generation: 0,
+      closingSignal: new AbortController().signal,
+      state: 'active',
+      assertActive: () => undefined,
+      registerRoute: (_kind: string, handler: IEndpointKernelRoute) => {
+        this.#route = handler
+        return () => undefined
       },
-      clearTimeout: (timer: { clear: () => void }) => timer.clear()
-    }
-  } as unknown as IEndpointKernelHost
-  const prepared = {
-    id: 'server',
-    options: { uuid: { generate: () => 'unused' } }
-  } as unknown as IPreparedEndpoint<string>
-  const outbound = {
-    send: ((command: IRpcOutboundCommand) => {
-      commands.push(command)
-      if (command.kind === 'frame') {
-        const event = (command.message.data.payload as { event?: string }).event
-        if ((rejectOpen && event === 'open') || (rejectFail && event === 'fail'))
-          return Promise.reject(sendError)
+      time: {
+        now: () => 0,
+        timestamp: () => 0,
+        setTimeout: (task: () => void, delayMs: number) => {
+          /** Keep this native timeout receipt paired with its original clear callback. */
+          const timer = setTimeout(task, delayMs)
+          return { clear: () => clearTimeout(timer) }
+        },
+        clearTimeout: (timer: { clear: () => void }) => timer.clear()
       }
-      return Promise.resolve()
-    }) as IRpcOutboundOperationsPort['send'],
-    noteUnknownField: () => undefined
+    } as unknown as IEndpointKernelHost
+    /** Retain the original endpoint identity and exact deterministic id generator. */
+    const prepared = {
+      id: 'server',
+      options: { uuid: { generate: () => 'unused' } }
+    } as unknown as IPreparedEndpoint<string>
+    /** The original outbound port records physical effects without adding a queue or provider path. */
+    const outbound = {
+      send: ((command: IRpcOutboundCommand) => {
+        this.#commands.push(command)
+        if (command.kind === 'frame') {
+          /** Read only the original normalized stream event before selecting this physical failure. */
+          const event = (command.message.data.payload as { event?: string }).event
+          if ((this.#rejectOpen && event === 'open') || (this.#rejectFail && event === 'fail'))
+            return Promise.reject(this.#sendError)
+        }
+        return Promise.resolve()
+      }) as IRpcOutboundOperationsPort['send'],
+      noteUnknownField: () => undefined
+    }
+    /** Construct the same actual stream owner against these exact original per-case ports. */
+    const owner = new RpcStreamOwner(kernel, prepared, outbound, (_method, handler) => {
+      this.#accept = (message) => handler(message, (signal) => ({ signal }) as never)
+      return () => undefined
+    })
+    this.value = {
+      owner,
+      commands: this.#commands,
+      sendError: this.#sendError,
+      route: (message: unknown) => (0, this.#route)(message),
+      accept: (message: unknown) => (0, this.#accept)(message)
+    }
   }
-  const owner = new RpcStreamOwner(kernel, prepared, outbound, (_method, handler) => {
-    accept = (message) => handler(message, (signal) => ({ signal }) as never)
-    return () => undefined
-  })
-  return {
-    owner,
-    commands,
-    sendError,
-    route: (message: unknown) => route(message),
-    accept: (message: unknown) => accept(message)
-  }
+}
+
+/** Construct the original fixture surface with its actual state held by one owner. */
+function producerFixture(rejectOpen: boolean, rejectFail = false) {
+  return new ProducerFailureFixture(rejectOpen, rejectFail).value
 }
 
 /** Construct one admitted request or stream frame for the same sender and receiver. */

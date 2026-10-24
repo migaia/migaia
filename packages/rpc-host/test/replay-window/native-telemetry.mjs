@@ -2,7 +2,7 @@ import { threadId } from 'node:worker_threads'
 import { loadavg } from 'node:os'
 import { performance } from 'node:perf_hooks'
 import { RpcCoreErrorText } from '../../dist/core/error-text.js'
-import { RpcCoreErrorCode } from '../../dist/core/index.js'
+import { RpcCoreErrorCode } from '../../dist/core/errors.js'
 import { RpcDebugProperty } from '../../dist/core/internal/test-observer.js'
 
 /**

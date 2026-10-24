@@ -10,7 +10,6 @@ import {
   createAdapterDeployment,
   readAdapterDeployment,
   type IAdapterDeploymentContext,
-  type IAdapterDeployment,
   type IAdapterDeploymentRecipe
 } from '../../dist/runtime-adapter/deployment.js'
 import { createRuntimeEventByteIO } from '../../dist/runtime-adapter/byte/event-byte-io.js'
@@ -30,157 +29,222 @@ const adapter = defineMessageAdapter({
   })
 })
 
-/** One real listener's accepted channel retains the original definition preparation receipt. */
+/** One real governed listener owns native ports, acceptance context and original session scope. */
+class GovernedHost {
+  /** The actual listener receives native session authority only during installation. */
+  #context!: IAdapterDeploymentContext
+  /** Each accepted raw channel enters the same original Host operation. */
+  #accept!: (channel: IRuntimePeerSourceResult) => Promise<unknown>
+  /** Original definition preparation receipts remain attached to their exact raw source results. */
+  readonly #preparations = new WeakMap<IRuntimePeerSourceResult, IAdapterDeploymentRecipe>()
+  /** Test-owned native message ports retire only after Host cleanup. */
+  readonly #ports: MessagePort[] = []
+  /** Actual accepted client Hosts retain their original close order and Promise behavior. */
+  readonly #clients: IRpcHost<unknown>[] = []
+  /** Real scoped byte sessions use the original canonical native event-stream owner. */
+  readonly #byteAdapter = defineByteAdapter({
+    open: (io: ReturnType<typeof createRuntimeEventByteIO>) => io,
+    listen: (io: ReturnType<typeof createRuntimeEventByteIO>) => io
+  })
+  /** Authenticated reconnects share the same original principal quota/replay scope. */
+  readonly #scope: ReturnType<ReturnType<typeof defineByteAdapter>['scope']> | undefined
+  /** Native byte streams retire after their actual client/server Hosts close. */
+  readonly #streams: PassThrough[] = []
+  /** Message-governor policy keeps the original case-selected values and overrides. */
+  readonly #policy: Partial<IRuntimeProviderPolicy>
+  /** Original local providers are installed only by the canonical Host. */
+  readonly #provide: IRuntimePeerProvide
+  /** Global provider limits remain owned by the existing shared admission scope. */
+  readonly #providerLimits: IRpcProviderLimits | undefined
+  /** The sole real server Host is created during the original asynchronous fixture opening. */
+  #host!: IRpcHost<unknown>
+  /** Capture inputs and allocate only the original optional scope before native Host installation. */
+  constructor(
+    policy: Partial<IRuntimeProviderPolicy>,
+    provide: IRuntimePeerProvide,
+    scoped: boolean,
+    providerLimits?: IRpcProviderLimits
+  ) {
+    this.#policy = policy
+    this.#provide = provide
+    this.#providerLimits = providerLimits
+    this.#scope = scoped ? this.#byteAdapter.scope() : undefined
+  }
+  /** Install the real native listener and return the original own-method fixture shape. */
+  async open() {
+    /** Cold transport captures no private endpoint or alternate provider implementation. */
+    const transport = defineTransportPlugin({
+      name: 'governed-listener',
+      mode: 'listen',
+      deployment: createAdapterDeployment({
+        open: async () => {
+          throw new Error('listener only')
+        },
+        listen: this.#listen,
+        prepareEndpoint: this.#prepareEndpoint
+      })
+    })
+    this.#host = await createRpcHost({
+      self: { name: 'server', instanceId: 'server' },
+      plugins: [transport],
+      provide: this.#provide,
+      providerLimits: this.#providerLimits,
+      report: () => undefined
+    })
+    return { host: this.#host, connect: this.#connect, close: this.#close }
+  }
+  /** Actual listener installation publishes only its original native inputs and close receipt. */
+  readonly #listen: NonNullable<IAdapterDeploymentRecipe['listen']> = async (prepared, receive) => {
+    this.#context = prepared
+    this.#accept = receive
+    return { close() {} }
+  }
+  /** Reuse the exact original raw definition's preparation authority for this accepted channel. */
+  readonly #prepareEndpoint: NonNullable<IAdapterDeploymentRecipe['prepareEndpoint']> = (
+    channel,
+    limits
+  ) => this.#preparations.get(channel)!.prepareEndpoint!(channel, limits)
+
+  /** Open both original native sides concurrently, then retain the exact accepted client Host. */
+  readonly #connect = async (name: string, principal = name) => {
+    /** Physical source selection changes only the original case's message or scoped-byte profile. */
+    const { source, clientDeployment } = this.#scope
+      ? this.#byteConnection(name, principal)
+      : this.#messageConnection(name)
+    /** Join actual native acceptance without creating another endpoint or Peer readiness facade. */
+    const accepted = deferred<void>()
+    void source
+      .open(this.#context)
+      .then(async (channel) => {
+        this.#preparations.set(channel, source)
+        await this.#accept(channel)
+      })
+      .then(accepted.resolve, accepted.reject)
+    /** Client Host startup remains concurrent with this same source's server handshake. */
+    const opening = createRpcHost({
+      self: { name, instanceId: name },
+      plugins: [
+        defineTransportPlugin({
+          name: `${name}-transport`,
+          mode: 'connect',
+          connect: { timeoutMs: 1000 },
+          deployment: clientDeployment
+        })
+      ],
+      report: () => undefined
+    })
+    const [client] = await Promise.all([opening, accepted.promise])
+    this.#clients.push(client)
+    return client
+  }
+  /**
+   * Create only the original two ordered native byte streams and their authenticated source
+   * recipes.
+   */
+  #byteConnection(name: string, principal: string) {
+    /** The two physical stream directions retain their original drain and destruction semantics. */
+    const upstream = new PassThrough()
+    /** Replies use the opposite original physical stream, never a synthetic frame transport. */
+    const downstream = new PassThrough()
+    this.#streams.push(upstream, downstream)
+    /** This actual shared carrier close destroys both original physical byte directions. */
+    const physical = {
+      close() {
+        upstream.destroy()
+        downstream.destroy()
+      }
+    }
+    /** Native EOF keeps the original package-owned error classification used by this fixture. */
+    const diagnostic = {
+      source: RPC_CORE_ERROR_SOURCE,
+      code: RpcCoreErrorCode.transport,
+      message: 'fixture stream closed'
+    }
+    /** Server and client each own one original canonical event-byte reader. */
+    const serverIO = createRuntimeEventByteIO(upstream, downstream, physical, diagnostic)
+    /** The opposite canonical reader consumes only the original reply stream. */
+    const clientIO = createRuntimeEventByteIO(downstream, upstream, physical, diagnostic)
+    /** The exact server definition alone grants preparation and authenticated scope provenance. */
+    const source = readAdapterDeployment(
+      this.#byteAdapter.deployment({
+        listen: serverIO,
+        peerId: name,
+        scope: this.#scope,
+        auth: { mode: 'required', verify: (auth) => String(auth) }
+      })
+    )!
+    /** The real client offer retains this case's original authenticated principal. */
+    const clientDeployment = createAdapterDeployment({
+      open: (prepared) =>
+        readAdapterDeployment(
+          this.#byteAdapter.deployment({
+            connect: clientIO,
+            peerId: 'server',
+            offer: {
+              versions: [{ major: RpcProtocol.major, minor: RpcProtocol.minor }],
+              codecs: [RpcCodecId.json],
+              capabilities: prepared.capabilities,
+              peer: { id: name, runtime: 'fixture' },
+              auth: principal
+            }
+          })
+        )!.open(prepared)
+    })
+    return { source, clientDeployment }
+  }
+  /** Create one actual native MessageChannel and the same original per-session governor policy. */
+  #messageConnection(name: string) {
+    /** Existing native ports keep independent physical send and close identity. */
+    const pair = new MessageChannel()
+    this.#ports.push(pair.port1, pair.port2)
+    /** The original adapter creates both source recipes without constructing a complete Peer. */
+    const clientDeployment = adapter.deployment({ connect: pair.port2, peerId: 'server' })
+    /** Only this original server definition supplies its package-owned quota preparation. */
+    const source = readAdapterDeployment(
+      adapter.deployment({
+        listen: pair.port1,
+        peerId: name,
+        governor: {
+          maxCallsPerMinute: 1000,
+          maxPayloadBytes: 4096,
+          maxConsecutiveTimeouts: 10,
+          idleTimeoutMs: 60_000,
+          violationLimit: 10,
+          overflow: {
+            source: RPC_CORE_ERROR_SOURCE,
+            code: RpcCoreErrorCode.overloaded,
+            message: 'fixture quota exhausted'
+          },
+          ...this.#policy
+        }
+      })
+    )!
+    return { source, clientDeployment }
+  }
+  /**
+   * Preserve original sequential client, server, native-port, byte-stream and scope retirement
+   * order.
+   */
+  readonly #close = async (): Promise<void> => {
+    try {
+      for (const client of this.#clients) await client.close()
+      await this.#host.close()
+    } finally {
+      for (const port of this.#ports) port.close()
+      for (const stream of this.#streams) stream.destroy()
+      this.#scope?.close()
+    }
+  }
+}
+
+/** Open the original real listener fixture with explicit native session ownership. */
 async function governedHost(
   policy: Partial<IRuntimeProviderPolicy>,
   provide: IRuntimePeerProvide,
   scoped = false,
   providerLimits?: IRpcProviderLimits
 ) {
-  /** The native listener acquires these operations only during real plugin installation. */
-  let context!: IAdapterDeploymentContext
-  let accept!: (channel: IRuntimePeerSourceResult) => Promise<unknown>
-  /** This fixture records the exact raw producer receipt; it creates no endpoint or provider. */
-  const preparations = new WeakMap<IRuntimePeerSourceResult, IAdapterDeploymentRecipe>()
-  /** Test-owned physical ports close after the actual host's cleanup, including rejected setup. */
-  const ports: MessagePort[] = []
-  const clients: IRpcHost<unknown>[] = []
-  /** Authenticated scope fixtures use real ordered streams through the original byte owner. */
-  const byteAdapter = defineByteAdapter({
-    open: (io: ReturnType<typeof createRuntimeEventByteIO>) => io,
-    listen: (io: ReturnType<typeof createRuntimeEventByteIO>) => io
-  })
-  const scope = scoped ? byteAdapter.scope() : undefined
-  const streams: PassThrough[] = []
-  const transport = defineTransportPlugin({
-    name: 'governed-listener',
-    mode: 'listen',
-    deployment: createAdapterDeployment({
-      open: async () => {
-        throw new Error('listener only')
-      },
-      listen: async (prepared, receive) => {
-        context = prepared
-        accept = receive
-        return { close() {} }
-      },
-      prepareEndpoint: (channel, limits) =>
-        preparations.get(channel)!.prepareEndpoint!(channel, limits)
-    })
-  })
-  const host = await createRpcHost({
-    self: { name: 'server', instanceId: 'server' },
-    plugins: [transport],
-    provide,
-    providerLimits,
-    report: () => undefined
-  })
-  return {
-    host,
-    async connect(name: string, principal = name) {
-      let source: IAdapterDeploymentRecipe
-      let clientDeployment: IAdapterDeployment
-      if (scope) {
-        /** Both raw byte ends are actual native event streams, including drain/close ownership. */
-        const upstream = new PassThrough()
-        const downstream = new PassThrough()
-        streams.push(upstream, downstream)
-        const physical = {
-          close() {
-            upstream.destroy()
-            downstream.destroy()
-          }
-        }
-        const diagnostic = {
-          source: RPC_CORE_ERROR_SOURCE,
-          code: RpcCoreErrorCode.transport,
-          message: 'fixture stream closed'
-        }
-        const serverIO = createRuntimeEventByteIO(upstream, downstream, physical, diagnostic)
-        const clientIO = createRuntimeEventByteIO(downstream, upstream, physical, diagnostic)
-        source = readAdapterDeployment(
-          byteAdapter.deployment({
-            listen: serverIO,
-            peerId: name,
-            scope,
-            auth: { mode: 'required', verify: (auth) => String(auth) }
-          })
-        )!
-        clientDeployment = createAdapterDeployment({
-          open: (prepared) =>
-            readAdapterDeployment(
-              byteAdapter.deployment({
-                connect: clientIO,
-                peerId: 'server',
-                offer: {
-                  versions: [{ major: RpcProtocol.major, minor: RpcProtocol.minor }],
-                  codecs: [RpcCodecId.json],
-                  capabilities: prepared.capabilities,
-                  peer: { id: name, runtime: 'fixture' },
-                  auth: principal
-                }
-              })
-            )!.open(prepared)
-        })
-      } else {
-        const pair = new MessageChannel()
-        ports.push(pair.port1, pair.port2)
-        clientDeployment = adapter.deployment({ connect: pair.port2, peerId: 'server' })
-        source = readAdapterDeployment(
-          adapter.deployment({
-            listen: pair.port1,
-            peerId: name,
-            governor: {
-              maxCallsPerMinute: 1000,
-              maxPayloadBytes: 4096,
-              maxConsecutiveTimeouts: 10,
-              idleTimeoutMs: 60_000,
-              violationLimit: 10,
-              overflow: {
-                source: RPC_CORE_ERROR_SOURCE,
-                code: RpcCoreErrorCode.overloaded,
-                message: 'fixture quota exhausted'
-              },
-              ...policy
-            }
-          })
-        )!
-      }
-      const accepted = deferred<void>()
-      void source
-        .open(context)
-        .then(async (channel) => {
-          preparations.set(channel, source)
-          await accept(channel)
-        })
-        .then(accepted.resolve, accepted.reject)
-      const opening = createRpcHost({
-        self: { name, instanceId: name },
-        plugins: [
-          defineTransportPlugin({
-            name: `${name}-transport`,
-            mode: 'connect',
-            connect: { timeoutMs: 1000 },
-            deployment: clientDeployment
-          })
-        ],
-        report: () => undefined
-      })
-      const [client] = await Promise.all([opening, accepted.promise])
-      clients.push(client)
-      return client
-    },
-    async close() {
-      try {
-        for (const client of clients) await client.close()
-        await host.close()
-      } finally {
-        for (const port of ports) port.close()
-        for (const stream of streams) stream.destroy()
-        scope?.close()
-      }
-    }
-  }
+  return new GovernedHost(policy, provide, scoped, providerLimits).open()
 }
 
 describe('accepted host session provider policy', () => {

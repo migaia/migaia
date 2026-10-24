@@ -1,4 +1,3 @@
-import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { inspect } from 'node:util'
@@ -29,8 +28,6 @@ const OFFER: IRpcHandshakeOffer = {
 const HELLO = JSON.parse(createRpcHello(OFFER)) as Record<string, unknown>
 /** Resolve the package without relying on the process working directory. */
 const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
-/** Core owns the existing retained-root measurement; Contract consumes its actual result. */
-const CORE_PACKAGE_ROOT = resolve(PACKAGE_ROOT, '../rpc-host')
 
 /** Inspect visible, hidden, wire and cause values for every six-character token fragment. */
 function leaks(error: unknown, token: string): boolean {
@@ -615,21 +612,5 @@ describe('handshake redaction', () => {
     const sums = readFileSync(resolve(directory, 'SHA256SUMS'), 'utf8')
     expect(sums).toContain(createHash('sha256').update(vector).digest('hex') + '  handshake.json')
     expect(vector.toString('utf8')).not.toContain('"auth"')
-  })
-
-  it('keeps handshake modules outside the root retained graph', () => {
-    const run = spawnSync('node', ['test/core/tree-shaking-baseline.mjs'], {
-      cwd: CORE_PACKAGE_ROOT,
-      encoding: 'utf8'
-    })
-    expect(run.status, run.stderr).toBe(0)
-    const measurement = JSON.parse(run.stdout) as { modules: string[] }
-    expect(
-      measurement.modules.some((path) =>
-        /\/packages\/rpc-contract\/(?:src|dist)\/contract\/handshake(?:-text)?\.(?:ts|js)$/u.test(
-          path
-        )
-      )
-    ).toBe(false)
   })
 })
