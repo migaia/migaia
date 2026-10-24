@@ -1,196 +1,217 @@
-# Redis 原生驱动
+# Redis 使用指南
 
-适配入口借用真实已连接 SDK client 或 pool。`ioredisDriver` 接受 ioredis 6，`nodeRedisDriver` 接受 node-redis 6 pool，`bunRedisDriver` 接受 Bun 内置 `RedisClient`。根入口不加载 SDK。
+[English](./USEGUIDE.en.md)
 
-`withConnection` 在整个回调完成前持有原生 pool 租约或自有 duplicate。注入的 client 仍由调用方关闭。借用的 `getClient()` 类型不提供关闭与复制方法。订阅资源先封闭回调，再清理连接；释放 Promise 由共享资源实现缓存。
+下列完整程序需要 Redis 7.2+ 或 Valkey 7.2.5+，并设置 REDIS_URL。Search 示例额外设置 REDIS_SEARCH_URL，指向确实提供 Search 的服务。示例会实际写库，先结束 host，再关闭 pool。
 
-`exec` 在 WATCH 冲突时返回 `null`，否则逐条返回成功值或原生错误。某条命令失败时，其它命令可能已经提交。EXEC 后断连可能无法确定结果，适配器不自动重放。ioredis 与 node-redis 提供二进制命令；Bun 驱动在 MULTI 前拒绝二进制输入。
+## 按场景查找
 
-原生命令、连接与 EXEC 故障使用 `REDIS_FAILED`；用户回调的未知业务失败使用 `TRANSACTION_FAILED`。已有 contract、host 与本包错误保留原身份，原生 Error 类型、stack 和原始错误仍可追踪。
+| 任务                       | 场景                                          |
+| -------------------------- | --------------------------------------------- |
+| 会话、TTL、计数与组织隔离  | [带期限的组织数据](#带期限的组织数据)         |
+| 应用队列、消息、榜单和限流 | [选择原生功能](#选择原生功能)                 |
+| 断线后继续读标准提交       | [从变更历史继续](#从变更历史继续)             |
+| 服务器向量近邻检索         | [使用 Search 向量检索](#使用-search-向量检索) |
 
-ioredis 和 node-redis 的 `binaryCommand` 及 `exec` 保留任意原生 BLOB 字节。ioredis 的成功回复也可能是 Buffer，请按固定命令验证 `unknown` 回复。node-redis 6.3 的 multi builder 没有把类型映射传给最终 EXEC，适配器在同一真实 pool 租约内使用原生 raw MULTI/EXEC，并复用 SDK chainId；原始逐项 Error 保留，SDK 未产生聚合错误时不伪造 MultiErrorReply。连接在 EXEC 前变化会报 `REDIS_FAILED`，只有原生 EXEC 返回 null 才表示 WATCH 放弃。
+## 带期限的组织数据
 
-## 标准存储后端
+预期输出 `active`、`1`。锁显式保护同一逻辑键，组织使用 UUID。
 
-`redisBackendPlugin({ driver, prefix?, concurrency?, owner?, maxLockMs? })` 安装 KV、字节、记录、TTL、counter、原事务构建器和提交后变更提示。`prefix` 缺省为 `migaia`；`maxLockMs` 缺省 30000。服务版本经宿主检测：Redis >=7.2，Valkey >=7.2.5。禁用自动检测时先 `await host.detect()`。每个订阅占用独立原生连接；node-redis pool 需留出业务与订阅容量。
-
-```ts
+```ts doc-test=run
 import { createClientPool } from 'redis'
 import { createStorageHost } from '@migaia/storage-host'
-import { counter, kv, records, ttl } from '@migaia/storage-contract'
+import { kv, ttl, counter } from '@migaia/storage-contract'
+import { lockKey } from '@migaia/storage-host/authoring/concurrency'
 import { redisBackendPlugin } from '@migaia/storage-plugin-redis'
 import { nodeRedisDriver } from '@migaia/storage-plugin-redis/node-redis'
-const pool = createClientPool({ url: process.env.MIGAIA_REDIS_URL! }, { maximum: 8 })
+const pool = createClientPool({ url: process.env.REDIS_URL }, { maximum: 8 })
 await pool.connect()
-const host = await createStorageHost({
-  plugins: [
-    redisBackendPlugin({
-      driver: nodeRedisDriver(pool),
-      prefix: crypto.randomUUID()
-    })
-  ] as const
-})
-const store = host.backend('redis')
 try {
-  await store.use(kv).setMany([{ key: ['cache', 1], value: 'one' }])
-  await store.use(counter).increment('visits')
+  await using host = await createStorageHost({
+    plugins: [redisBackendPlugin({ driver: nodeRedisDriver(pool) })] as const
+  })
+  const store = host.org('10000000-0000-4000-8000-000000000001').backend('redis')
   await store
     .tx()
-    .lock({ channel: 'text', key: 'session' })
+    .lock(lockKey.text('example:session'))
     .run(async (tx) => {
-      await tx.set('session', 'active')
-      await tx.use(ttl).expire({ channel: 'text', key: 'session' }, 60000)
+      await tx.use(kv).setMany([{ key: 'example:session', value: 'active' }])
+      await tx.use(ttl).expire(lockKey.text('example:session'), 60000)
+      await tx.set('example:visits', '0')
+      await tx.use(counter).increment('example:visits')
     })
-  await store.putRecord({ active: true }, ['user', 1])
-  console.log(await store.use(records).query().count())
+  console.log(await store.get('example:session'))
+  console.log(await store.get('example:visits'))
 } finally {
-  await store.clearAll()
-  await host.dispose()
   await pool.close()
 }
 ```
 
-事务内读不加锁。显式 `.lock(...)` 才持有原生 SET NX PX 锁；普通写使用原并发策略。WATCH 在依赖读取前建立，数据、索引、修订与通知同一 EXEC。回调失败不发送 EXEC；null 表示真实 WATCH 放弃；逐项失败可能部分提交，未知 EXEC 不重放，并停止此安装的新写准入。后者仍允许读取和释放。
+普通覆盖保留活值 TTL，expire(0) 立即删除，期限与锁使用 Redis TIME/PTTL。小数毫秒向上取整；超出安全整数的绝对期限在 EXEC 前拒绝。getMany 保留输入顺序、重复与缺失位置；批量写拒绝规范等价重复键，空批零命令。标准 KV、记录、TTL、counter 都可在 tx 中使用；字节和文本、记录分别保存。
 
-文本、字节与记录分通道保存。普通覆盖保 TTL；`expire(0)` 立即删除；期限与锁用 Redis TIME/PTTL。毫秒小数向上取整到原生毫秒；超出安全整数的绝对期限在 EXEC 前拒绝。批量写拒绝规范等价重复键，空批零命令，getMany 保输入位置与重复。
+组织共用带 hash tag 的物理命名空间，相关键同槽；同名逻辑键、期限、修订和锁隔离。prefix 默认 migaia，maxLockMs 默认30000；concurrency 选择冲突策略。dropOrg 删除该组织标准数据及既有 Streams、sorted-set、限流和向量点，即使重启后没再选择对应 Feature；保留其它组织、调用方非托管键和共享检索 schema。clearAll 仍只清标准通道。
 
-P 是原规范 prefix 编码生成的非空 `{hex}` hash tag，所有键同槽。键尾逻辑身份含组织段，缺省组织也隔离。
+## 事务与并发限制
 
-| 数据                        | 原生结构     | 物理键                               |
-| --------------------------- | ------------ | ------------------------------------ |
-| 文本/字节/记录              | STRING       | P:t:orgKey / P:b:orgKey / P:r:orgKey |
-| 文本/记录顺序               | ZSET         | P:t:index / P:r:index                |
-| Vector points / 向量点      | HASH         | P:v:collectionHex:orgId:idHex        |
-| Search schema / 检索 schema | native index | P:vi:collectionHex                   |
-| 修订                        | HASH         | P:rev                                |
-| 锁                          | STRING       | P:lock:orgId:identity                |
-| 提交提示                    | Pub/Sub      | P:changes                            |
+事务读取不会自动加逻辑锁；显式 lock 才创建 SET NX PX 锁。普通写沿所选并发策略处理。WATCH 在依赖读取前建立，数据、索引、修订和通知进入同一 EXEC。回调在 EXEC 前失败时不写入；EXEC 返回 null 才是已确认的 WATCH 放弃，可按冲突策略重试。
 
-前缀删除通过 ZRANGEBYLEX 取匹配成员，跳过过期值并重新检查残留。`inspectLocks`/字节清空用 SCAN，成本包含全库扫描候选。变更提示是 best-effort，不承诺外部原生命令、断连重放或过期即时通知。`dispose()` 返回缓存主 Promise；符号释放返回另一个缓存 Promise，清理失败只报告。两者只清理自有订阅和租约，不关闭注入客户端。
+EXEC 逐项失败可能部分提交，发送后断连可能结果未知。这两者都不自动重放，并封闭这次安装的新写入；读取和释放仍可用。不能把 transactions:true 理解成原生错误后完整回滚。不要把外部副作用放进可能重试的回调。
 
-## 原生 Feature
+## 选择原生功能
 
-从独立子路径导入后作为 `redisBackendPlugin` 第二参数选择。API 只出现在 `store.api`，不进入 `tx.api`；固定 API 复用宿主已有的一次 pipeline。Streams/PubSub 二进制载荷用唯一 canonical base64 文本 wire。
+下面显式安装四个 Feature，实际写入 Stream、榜单与限流键，并发送一条消息。新命名空间首次运行通常输出 true、Ada、true、3；重复运行时已有队列内容或未到期配额可改变前几项结果。
 
-| 入口                      | API                                                                                    | 默认与边界                                                                                                 |
-| ------------------------- | -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `/features/streams`       | `redisStreamsFeature()`，`api.streams.add/range/createGroup/readGroup/ack/autoClaim`   | range -/+、count100；group 0-0、createStream=true；read count100、省略 block 不阻塞；仅同名 BUSYGROUP 幂等 |
-| `/features/pubsub`        | `redisPubSubFeature()`，`api.pubsub.publish/subscribe/keyspace`                        | 只接 expired/del/set；keyspace 回传真实物理键的 UTF-8 字节；过滤 namespace 与子组织；不修改服务通知配置    |
-| `/features/sorted-sets`   | `redisSortedSetsFeature()`，`api.sortedSets.add/rank/top`                              | 有限 score；top10、升序；同分按原 UTF16 键序；空 add 零命令                                                |
-| `/features/rate-limit`    | `redisRateLimitFeature({limit,windowMs})`，`api.rateLimit.consume`                     | 正安全整数；cost1；原子拒绝不增加计数；resetAfterMs 为原生 PTTL                                            |
-| `/features/change-stream` | `redisChangeStreamFeature({maxLen})`，`use(durableChangeFeed).readChanges/tailChanges` | maxLen 正安全整数；read limit100；原生 Stream ID；数据和 XADD 同 EXEC                                      |
-| `/features/search`        | `rediSearchVectorFeature()`，`use(vector).collection(name,options)`                    | 真实模块/二进制端口；默认 HNSW、exact 用 FLAT；vector TTL 同原 draft                                       |
-
-Streams group 阻塞读取使用专用真实连接。每条原生 BLOCK 最多1000ms；仅收到原生空结果才继续等待，原生错误立即拒绝、不重放。取消与关闭排空当前阻塞片后归还连接。订阅资源的取消预算持续到释放；回调拒绝只报告，不改变已提交写入。
-
-可靠变更流只覆盖标准库提交。`readChanges({after,limit})` 从排他 cursor 读取；`tailChanges({from:'now',onChange,onError})` 先取实际高水位再读，callback 成功才推进，失败报告并关闭，不确认失败项。落后于已保留首项的非初始 cursor 报 `CHANGE_CURSOR_EXPIRED`。初始 `0-0` 仅在原生 XINFO 确认从未移除条目时可续读，裁剪后同样拒绝；读取跨裁剪边界保守拒绝。MAXLEN 使用原生近似裁剪；外部原生命令不伪装成标准变更。
-
-```ts
+```ts doc-test=run
 import { createClientPool } from 'redis'
 import { createStorageHost } from '@migaia/storage-host'
-import { durableChangeFeed } from '@migaia/storage-contract'
 import { redisBackendPlugin } from '@migaia/storage-plugin-redis'
 import { nodeRedisDriver } from '@migaia/storage-plugin-redis/node-redis'
 import { redisStreamsFeature } from '@migaia/storage-plugin-redis/features/streams'
 import { redisPubSubFeature } from '@migaia/storage-plugin-redis/features/pubsub'
 import { redisSortedSetsFeature } from '@migaia/storage-plugin-redis/features/sorted-sets'
 import { redisRateLimitFeature } from '@migaia/storage-plugin-redis/features/rate-limit'
-import { redisChangeStreamFeature } from '@migaia/storage-plugin-redis/features/change-stream'
-const pool = createClientPool({ url: process.env.MIGAIA_REDIS_URL! }, { maximum: 8 })
+const pool = createClientPool({ url: process.env.REDIS_URL }, { maximum: 8 })
 await pool.connect()
-const host = await createStorageHost({
-  plugins: [
-    redisBackendPlugin(
-      {
-        driver: nodeRedisDriver(pool),
-        prefix: process.env.MIGAIA_EXAMPLE_REDIS_PREFIX ?? crypto.randomUUID()
-      },
-      {
-        streams: redisStreamsFeature(),
-        pubsub: redisPubSubFeature(),
-        scores: redisSortedSetsFeature(),
-        rate: redisRateLimitFeature({ limit: 3, windowMs: 1000 }),
-        history: redisChangeStreamFeature({ maxLen: 1000 })
-      }
-    )
-  ] as const
-})
-const store = host.backend('redis')
 try {
+  await using host = await createStorageHost({
+    plugins: [
+      redisBackendPlugin(
+        { driver: nodeRedisDriver(pool), prefix: 'example-features' },
+        {
+          streams: redisStreamsFeature(),
+          pubsub: redisPubSubFeature(),
+          scores: redisSortedSetsFeature(),
+          rate: redisRateLimitFeature({ limit: 3, windowMs: 1000 })
+        }
+      )
+    ] as const
+  })
+  const store = host.backend('redis')
   const id = await store.api.streams.add('jobs', { body: new Uint8Array([1, 2]) })
-  console.log((await store.api.streams.range('jobs'))[0]?.id === id)
-  await store.api.sortedSets.add('scores', [{ member: 'one', score: 1 }])
+  console.log((await store.api.streams.range('jobs')).some((entry) => entry.id === id))
+  await store.api.sortedSets.add('scores', [{ member: 'Ada', score: 1 }])
   console.log((await store.api.sortedSets.top('scores'))[0]?.member)
   console.log((await store.api.rateLimit.consume('quota')).allowed)
-  const subscription = await store.api.pubsub.subscribe('events', () => undefined)
+  const message = Promise.withResolvers<Uint8Array>()
+  await using subscription = await store.api.pubsub.subscribe('events', message.resolve)
   await store.api.pubsub.publish('events', new Uint8Array([3]))
-  await subscription.dispose()
-  await store.set('checkpoint', 'ready')
-  console.log((await store.use(durableChangeFeed).readChanges()).changes.length)
+  console.log((await message.promise)[0])
 } finally {
-  await host.dispose()
   await pool.close()
 }
 ```
 
-## 原生向量检索
+| Feature     | 方法与默认值                                                                                                                          |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| streams     | add/range/createGroup/readGroup/ack/autoClaim；range默认-/+、count100，group默认0-0与createStream:true，读取count100，省略block不等待 |
+| pubsub      | publish/subscribe/keyspace；二进制消息用规范base64文本传输，keyspace仅expired/del/set，回调收到实际物理键的UTF-8字节                  |
+| sorted-sets | add/rank/top；有限score，top默认10条升序，同分按逻辑UTF-16键序，空add零命令                                                           |
+| rate-limit  | limit/windowMs正安全整数，consume默认cost1；拒绝不增加计数，resetAfterMs来自PTTL                                                      |
 
-从 `/features/search` 选择 `rediSearchVectorFeature()` 安装 `vector`。检测要求真实 Search 模块与二进制 connection/EXEC 端口；Bun 内置驱动只拒绝所选向量 Feature，基础 KV 仍可用。Redis 8 可能已含 Search，缺模块的 Valkey 拒绝该 Feature。工厂与检测不创建 collection；新 collection 显式给 dimensions/metric，后续宿主通过 FT.INFO 取得真实 schema。
+这些原生 API 出现在 store.api，不在 tx.api。Streams 与 PubSub 各有自己的消息语义，不会自动成为标准提交日志。订阅需要专用真实连接；先释放订阅，再释放 host 和 SDK。Keyspace 过滤命名空间与组织，但不会替你开启服务器通知配置。
 
-托管点使用原生 HASH，同一 EXEC 将相同 FLOAT32 字节写入 HNSW 与 FLAT 字段；`exact:true` 选择 FLAT。cosine/dot 分数均为 `1-distance`，euclid 为 `-sqrt(distance)`。FLOAT32 溢出或转换后成为零 cosine 方向时，在修改点前拒绝。payload 真值沿原便携 codec；新 scalar 路径在 upsert 前由 FT.ALTER 建 TAG/NUMERIC 字段，不新增 schema 注册表。索引及点名复用规范 namespace 和 collection/id 的原便携编码，保留任意 UTF16 字符串身份。
+Streams group 阻塞读取使用专用连接，每次原生 BLOCK 最多1000ms；只有空结果才继续等待，原生错误直接拒绝。取消或关闭要等当前阻塞片结束。PubSub 回调拒绝只报告，不能撤回已提交的发布。
 
-组织 TAG 与期限 NUMERIC 在 KNN 排名前过滤。scalar 等值、成员、存在性及数值范围使用忠实原生过滤；其它条件及函数只处理引擎命中、不补搜，`requirePushdown()` 在原生 I/O 前拒绝。`minScore` 为有界客户端阈值，explain 如实标识。similar/recommend 仅按 ID 读取样本，原推荐助手合成方向后仍走同一原生查询。
+## 从变更历史继续
 
-vector TTL 与其它通道共用原 WATCH draft/锁拥有者。Redis TIME 产生一份绝对 deadline，同 EXEC 写 HASH expiry 与 PEXPIREAT；普通 upsert 保留期限，persist 同批写 expiry=0 与 PERSIST。根及真实事务 TTL 均支持 vector target；vector collection 不获得通用事务能力。成功向量写发布原 all 失效，并进入已选可靠流的同一提交摘要。
+显式选择 change-stream，让标准写入与历史 XADD 进入同一 EXEC。示例从当前高水位开始，等待一次标准提交，打印服务给出的 cursor；其值由服务决定。
 
-Search 将 TAG token 截断到 4096 字节，因此超过此长度的规范 scalar 等值/成员条件不声明原生下推。`.near().where(...)` 仍只在原生 topK 命中后过滤、不补搜；`requirePushdown()` 报 `QUERY_NOT_PUSHABLE`，`deleteWhere` 和原生 `search.filter` 在 I/O 前报 `UNSUPPORTED_CAPABILITY`。该长值原生过滤组合等待用户复核。完整 payload、ID 与物理键不截断。样本排除使用完整原 ID codec 字节的 SHA-256 短 TAG；它只是索引投影，不是可逆 ID 编码，也不承诺数学上零碰撞。
+```ts doc-test=run
+import { createClientPool } from 'redis'
+import { createStorageHost } from '@migaia/storage-host'
+import { durableChangeFeed } from '@migaia/storage-contract'
+import { redisBackendPlugin } from '@migaia/storage-plugin-redis'
+import { nodeRedisDriver } from '@migaia/storage-plugin-redis/node-redis'
+import { redisChangeStreamFeature } from '@migaia/storage-plugin-redis/features/change-stream'
+const pool = createClientPool({ url: process.env.REDIS_URL }, { maximum: 8 })
+await pool.connect()
+try {
+  await using host = await createStorageHost({
+    plugins: [
+      redisBackendPlugin(
+        { driver: nodeRedisDriver(pool), prefix: 'example-history' },
+        { history: redisChangeStreamFeature({ maxLen: 1000 }) }
+      )
+    ] as const
+  })
+  const store = host.backend('redis')
+  const received = Promise.withResolvers<void>()
+  await using tail = await store.use(durableChangeFeed).tailChanges({
+    from: 'now',
+    onChange: async (change) => {
+      console.log(change.cursor)
+      received.resolve()
+    },
+    onError: (error) => {
+      received.reject(error)
+    }
+  })
+  await store.set('example:checkpoint', 'ready')
+  await received.promise
+} finally {
+  await pool.close()
+}
+```
 
-`deleteWhere(where,{count?})` 默认 precount，两模式都沿 FT.SEARCH 分页收集后进入原 attempt，只计实际存在且提交删除的点，不额外 count、不加 expiry 过滤。原生已过期 HASH 不存在且不计数；不支持的条件在原生 I/O 前拒绝。`dropOrg` 只删除该组织的托管 HASH，保留共享 schema；重启后未选择 Search 或没有二进制端口时也清除历史点，只沿原身份元数据、WATCH/修订与同一 EXEC。检索成本为原生计划加返回命中字节；删除成本包含真实分页与选中点 draft。
+maxLen 必须是正安全整数，使用原生近似 MAXLEN 裁剪。readChanges({after,limit}) 默认limit100，从排他游标读起。处理效果和检查点应在回调成功前完成；tail 只在 onChange 成功后推进，失败报告并关闭，不越过失败项。游标是原生 Stream ID，按原样保存，不转成不精确的 JS number。
 
-```ts
+非初始游标落后于保留首项时报 CHANGE_CURSOR_EXPIRED。0-0 也不是“忽略丢失历史”：只有 XINFO 证明从未移除记录时可继续，裁剪后同样拒绝。跨裁剪边界保守拒绝。这份历史只覆盖标准库提交，不承诺外部原生命令或纯自然过期事件；普通 best-effort 变更提示也不能代替它。
+
+## 使用 Search 向量检索
+
+需要真实 Search 模块和二进制 connection/EXEC 端口。部分 Redis 8部署包含 Search，缺模块的 Valkey 会拒绝该 Feature。Bun 内置驱动缺少二进制端口，不能使用此例；基础 KV 不受影响。预期输出 guide。
+
+```ts doc-test=run
 import { createClientPool } from 'redis'
 import { createStorageHost } from '@migaia/storage-host'
 import { vector, ttl } from '@migaia/storage-contract'
 import { redisBackendPlugin } from '@migaia/storage-plugin-redis'
 import { nodeRedisDriver } from '@migaia/storage-plugin-redis/node-redis'
 import { rediSearchVectorFeature } from '@migaia/storage-plugin-redis/features/search'
-const pool = createClientPool({ url: process.env.MIGAIA_REDIS_STACK_URL! }, { maximum: 8 })
+const pool = createClientPool({ url: process.env.REDIS_SEARCH_URL }, { maximum: 8 })
 await pool.connect()
-const host = await createStorageHost({
-  plugins: [
-    redisBackendPlugin(
-      { driver: nodeRedisDriver(pool), prefix: crypto.randomUUID() },
-      { search: rediSearchVectorFeature() }
-    )
-  ] as const
-})
-const store = host.backend('redis')
 try {
+  await using host = await createStorageHost({
+    plugins: [
+      redisBackendPlugin(
+        { driver: nodeRedisDriver(pool), prefix: 'example-vectors' },
+        { search: rediSearchVectorFeature() }
+      )
+    ] as const
+  })
+  const store = host.backend('redis')
   const items = store
     .use(vector)
-    .collection<{ group: string }>('items', { dimensions: 2, metric: 'cosine' })
-  await items.upsert([{ id: 'one', vector: [1, 0], payload: { group: 'docs' } }])
-  console.log(
-    (await items.near([1, 0], { exact: true }).where({ group: 'docs' }).topK(1).all())[0]?.id
-  )
-  await store.use(ttl).expire({ channel: 'vector', collection: 'items', id: 'one' }, 60000)
+    .collection<{ category: string }>('documents', { dimensions: 2, metric: 'cosine' })
+  await items.upsert([{ id: 'guide', vector: [1, 0], payload: { category: 'guide' } }])
+  const hits = await items.near([1, 0], { exact: true }).where({ category: 'guide' }).topK(1).all()
+  console.log(hits[0]?.id)
+  await store.use(ttl).expire({ channel: 'vector', collection: 'documents', id: 'guide' }, 60000)
 } finally {
-  await store.clearAll()
-  await host.dispose()
   await pool.close()
 }
 ```
 
-## 提交后外置日志
+新集合给 dimensions/metric，随后连接通过 FT.INFO 读取实际配置。默认近邻索引用HNSW，exact:true用FLAT；相同FLOAT32字节进入两组字段。cosine/dot分数为1-distance，euclid为-sqrt(distance)。FLOAT32溢出、转换后为零的cosine方向在修改前拒绝。
 
-宿主 `journal` 可借用仅安装 `binlog` 的原 Logger，且不配置 WAL、undo 或 atomic log stores。每个组织经原 journalBinding 捕获有序 draft 修改；只有原生 EXEC 所有项成功才触发原 onCommit，操作等待原 settle 完成。回调在 EXEC 前失败不写业务或日志；部分执行或回复未知不追加成功日志、不重放，并封闭后续写入。外置 append 失败沿原宿主报告，已经提交的数据不改为失败回滚，仍存在既定提交后日志窗口。
+组织TAG、期限NUMERIC在KNN排名中过滤；可忠实表达的scalar条件下推，其它条件或函数仅过滤引擎命中，不补搜。requirePushdown在I/O前拒绝客户端条件，minScore是有界客户端阈值。payload保留完整便携编码，scalar索引字段按需通过FT.ALTER增加。相似/推荐查询读取指定样本后生成方向，不保证其它候选被补搜。
 
-该终端如实声明 `nativeAtomic:false`，不把 Redis 执行隔离冒充失败回滚。标准值、字节、记录和向量的 image 使用原便携 codec，保留实际 wire 与绝对期限；仅日志启用时额外读取原生 PEXPIRETIME。历史向量删除的完整 before image 需要原二进制端口；缺少时该新增日志组合在修改前 `UNSUPPORTED_CAPABILITY`，普通历史删除不受影响。
+Search 的TAG token上限4096字节。超过上限的规范等值/成员条件不承诺下推；普通where仍可过滤topK命中，requirePushdown报QUERY_NOT_PUSHABLE；deleteWhere与原生search.filter在I/O前报UNSUPPORTED_CAPABILITY。完整payload、ID与物理键不截断。样本排除使用SHA-256短TAG，不承诺数学上零碰撞。
 
-`storageLogStore` 在 `indexExclusive:false` 时每次操作从原生私有命名空间读取当前索引，不保留跨操作缓存。原 WATCH/MULTI/EXEC 同时提交私有 HEAD 与记录；同 namespace 的独立实例共享连续序号、当前状态和重开恢复，不新增资源期租约或协调器。Redis 的 `nativeAtomic:false` 保持不变：EXEC 逐项错误可能部分提交，未知结果不自动重放。同 EXEC 强原子 binlog、undo 与 WAL intent/marker 组合仍在准备阶段拒绝并等待用户复核。原生 Streams/PubSub/sorted-set/rate-limit API 保持原调用行为，不冒充标准业务通道的 journal 来源。
+vector TTL使用同一WATCH/EXEC：TIME生成绝对期限，HASH字段与PEXPIREAT一起写，普通upsert保期限，persist同时清期限字段和原生expiry。根与真实事务TTL都接受vector target，但向量集合不因此获得通用事务能力。deleteWhere默认precount，两种count模式都分页找点后实际删除，只返回存在并提交删除的数量；原生已过期HASH不计数。
 
-`host.dropOrg(orgId)` 也通过原 WATCH/draft/EXEC 删除该组织既定 Streams、有序集合及限流物理键；重启后未选择这些 Feature 仍生效。只匹配原 layout 的合法字符串名称，保留其它组织与调用方非托管键。PubSub 无持久业务值；共享可靠变更历史保留原 retention/cursor，不按组织改写。普通 `clearAll()` 保留原标准通道范围。删除成本包含原生 SCAN 实际候选。
+## 驱动、清理和错误
 
-普通宿主遥测通过 `journal: { logger, namespace, telemetry: true }` 显式启用，并使用原 Logger level 插件。根读写记录规范逻辑键与实际 pipeline 载荷。公开事务跨原有重试只记录一个完成终点；事务 scope 与私有 journal 操作不重复记录。logger 仍为借用，原有 pipeline/hook 次数保持。
+宿主默认自动检测。设置 autoDetect:false 时，使用所选后端能力前先 await host.detect()。版本满足不等于安装了 Search 模块。
 
-提交 binlog 按原跨通道顺序保留已接纳的 draft 修改，包括重复写入与中间新值。原始值与绝对期限在每次 staging 时捕获，最终原生修订由同一 attempt 补齐。undo 合并仍归宿主；Redis 的 WAL/undo 准入仍明确不支持。
+nodeRedisDriver接受node-redis 6的pool；ioredisDriver接受ioredis 6 client；bunRedisDriver接受Bun RedisClient，分别从/node-redis、/ioredis、/bun导入。它们借用已连接客户端，不关闭原对象。ioredis内部连接禁用未确认命令重发；node-redis保留同一pool租约和EXEC逐项错误；Bun在MULTI前拒绝二进制输入。根入口不加载SDK，每个订阅消耗独立连接。
+
+标准记录字段查询在客户端执行，不提供标准secondaryIndexes、SQL或RDF。文本/字节缺失为null，记录为undefined。物理索引可能残留已过期条目，读取会核对真实键；前缀删除使用有序索引，inspectLocks和部分清理需SCAN，成本包含实际扫描候选。
+
+本包错误source为storage.backend.redis，REDIS_FAILED表示原生命令/连接/EXEC故障，TRANSACTION_FAILED表示未分类的业务回调/草稿失败，DECODE_FAILED表示协议或持久化数据不能解码。共享契约、host和本包已有错误保留身份，原始错误沿cause可达。dispose重复返回同一主Promise，符号释放用另一个报告型Promise，只清理自有订阅和租约。
+
+## 可选日志边界
+
+host journal可以选择提交后外置binlog和遥测。只有EXEC全部成功才追加成功提交日志；原生部分错误或未知结果不追加、不重放。binlog失败经report报告，不能撤回已提交数据，外置日志与业务数据并非强原子提交。标准值、字节、记录与向量的镜像保留实际wire和绝对期限；历史向量完整before镜像需要二进制端口，缺少时此日志组合在修改前拒绝。
+
+此后端明确nativeAtomic:false。要求同EXEC强原子binlog、WAL intent/marker或undo的组合当前拒绝，不得当作已支持能力。storageLogStore单独从`@migaia/storage-host/journal`导入，每次在原生命名空间读当前索引；多个实例可共用namespace和连续序号，不跨操作缓存索引。原生Feature API不冒充标准业务通道的日志来源。遥测显式启用，根操作和完整事务跨重试各记一次；logger及载体仍由调用方在host之后释放。

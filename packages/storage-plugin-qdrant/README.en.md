@@ -1,88 +1,116 @@
-# Qdrant storage backend
+# @migaia/storage-plugin-qdrant
 
-Native Qdrant vectors and vector TTL for `@migaia/storage-host`. Install a real Qdrant server and `@qdrant/js-client-rest` 1.11 or later. The SDK is a required peer; only the explicit `/client` adapter accesses it at runtime.
+Store vectors and their payloads in a real Qdrant service, then use query chains for nearest-neighbor search, filtering and supported reranking instead of repeating native requests and organization filters throughout the application. Configure the service URL, install the plugin in a host, and select the vector capability and a collection. Standard queries apply organization and expiry filters before ranking; physically removing expired points is an explicit application operation.
 
-```ts
+## Sound familiar?
+
+- Another tenant's points appear because one native request forgot its tenant condition.
+- Search returns too few hits because filtering happened after candidate selection.
+- Expired vectors still occupy disk because query visibility was mistaken for physical deletion.
+- Reranking fails on an older collection that has no extra named vector slot.
+
+## Why choose it?
+
+- Standard queries apply organization and expiry filters before native ranking. See [Organization isolation](./USEGUIDE.en.md#organization-isolation).
+- `explain()` identifies client filtering; `requirePushdown()` can reject it. See [Search and filters](./USEGUIDE.en.md#search-and-filters).
+- Native reranking supports two-row all-integer multivectors. Float JSON tokens avoid ambiguous sparse-tuple decoding. See [Multivector reranking](./USEGUIDE.en.md#multivector-reranking).
+- Deletion makes preliminary counting and paged ID collection explicit choices. See [Expiry and deletion](./USEGUIDE.en.md#expiry-and-deletion).
+
+## Start here
+
+Start Qdrant first. The default URL is `http://127.0.0.1:6333`; set `QDRANT_URL` for another service address. This writes one vector and reads its nearest-neighbor ID.
+
+```ts doc-test=run
 import { createStorageHost } from '@migaia/storage-host'
 import { vector } from '@migaia/storage-contract'
 import { qdrantBackendPlugin } from '@migaia/storage-plugin-qdrant'
 
 await using host = await createStorageHost({
-  plugins: [qdrantBackendPlugin({ url: 'http://127.0.0.1:6333' })] as const
+  plugins: [qdrantBackendPlugin({ url: process.env.QDRANT_URL ?? 'http://127.0.0.1:6333' })]
 })
+const name = 'guide_' + crypto.randomUUID().replaceAll('-', '')
 const documents = host
   .backend('qdrant')
   .use(vector)
-  .collection<{ category: string }>('documents', { dimensions: 2, metric: 'cosine' })
-await documents.upsert([{ id: 'a', vector: [100, 0], payload: { category: 'guide' } }])
-console.log(await documents.near([1, 0], { exact: true }).topK(5).withVector().all())
+  .collection<{ category: string }>(name, { dimensions: 2, metric: 'dot' })
+await documents.upsert([{ id: 'a', vector: [2, 0], payload: { category: 'guide' } }])
+console.log((await documents.near([1, 0], { exact: true }).topK(1).all())[0]?.id)
 ```
 
-Collections are pure descriptors until execution. Cosine uses native search and source vector slots so `withVector`, `similarTo` and the standard centroid recommendation retain the original amplitude at native float32 precision. Dot and Euclid use one native slot; Euclid distances become negative scores. This backend does not score candidates in JavaScript.
+Expected output:
 
-| Entry                  | Purpose                                                                           |
-| ---------------------- | --------------------------------------------------------------------------------- |
-| Root                   | `qdrantBackendPlugin`, `qdrantBackendKind`, error identity and types              |
-| `/http`                | `fetchHttp(url, apiKey?)` using runtime fetch                                     |
-| `/client`              | `qdrantClientHttp(client)` borrowing an actual SDK client                         |
-| `/features/hybrid`     | Two native dense/sparse RRF branches and sparse-only updates                      |
-| `/features/recommend`  | Native `best_score`, lookup and sample semantics                                  |
-| `/features/group-by`   | Native multivalue grouping; no `with_lookup`                                      |
-| `/features/management` | Collections, aliases, snapshots, filter deletion and explicit expired-point purge |
-
-Only `vector` and vector-target `ttl` are provided. KV, records, RDF, transactions, secondary indexes, change feeds and native live queries are absent. Use the existing host reactive Feature when polling is needed. Explicit lock/concurrency combinations are rejected before native modification.
-
-Read [USEGUIDE.en.md](./USEGUIDE.en.md) for deletion counts, TTL, organization isolation, detection and failure boundaries.
-
-Deletion and standard recommendation capture dense string ID arrays through the shared vector input owner. Native requests retain first-occurrence ID deduplication. Deletion count options use the same shared admission without changing precount or scroll behavior.
-
-Cancellation after SDK dispatch does not undo a native modification; the request can still return success. Backend disposal waits for that actual result. A lost response leaves the outcome unknown and is never replayed automatically. Synchronous observer errors and rejected observer Promises are only reported; intervention uses the host's original pipeline.
-
-## Native named-vector rescoring
-
-`qdrantRescoreFeature` from `@migaia/storage-plugin-qdrant/features/rescore` declares one extra vector slot per logical collection at installation. `dimensions` is required, `metric` defaults to `cosine`, and `multivector: 'max_sim'` selects multivectors instead of dense vectors. Only collections declared in the `collections` map are eligible.
-
-```ts
-import { createStorageHost } from '@migaia/storage-host'
-import { vector } from '@migaia/storage-contract'
-import { qdrantBackendPlugin } from '@migaia/storage-plugin-qdrant'
-import { qdrantRescoreFeature } from '@migaia/storage-plugin-qdrant/features/rescore'
-await using host = await createStorageHost({
-  plugins: [
-    qdrantBackendPlugin(
-      { url: 'http://localhost:6333' },
-      {
-        rescore: qdrantRescoreFeature({
-          collections: { articles: { dimensions: 2, metric: 'dot' } }
-        })
-      }
-    )
-  ]
-})
-const store = host.backend('qdrant')
-const articles = store.use(vector).collection('articles', { dimensions: 2, metric: 'dot' })
-await articles.upsert([
-  { id: 'a', vector: [2, 0] },
-  { id: 'b', vector: [1, 0] }
-])
-await store.api.qdrantRescore.updateVectors('articles', [
-  { id: 'a', vector: [0, 1] },
-  { id: 'b', vector: [3, 0] }
-])
-const hits = await articles
-  .near([1, 0])
-  .topK(10)
-  .rescore({ query: [1, 0], topN: 2 })
-  .all()
-console.log(hits.map((hit) => ({ id: hit.id, score: hit.score })))
+```text
+a
 ```
 
-`updateVectors(collection,points,ctx?)` changes only the extra slot of existing points in the current organization, uses `wait:true`, and returns the original native `operation_id/status` record. It leaves search/source, payload and TTL intact. Duplicate IDs, sparse arrays and invalid vectors reject before I/O. Multivector writes and queries use nonempty matrices with consistent inner dimensions. Native missing-point failures and unknown write results retain their original error chain and are never replayed automatically.
+For payload conditions, read [Search and filters](./USEGUIDE.en.md#search-and-filters). For a second ranking stage, read [Multivector reranking](./USEGUIDE.en.md#multivector-reranking).
 
-`rescore` is available only after `topK(k)`. `topN` defaults to k and must be a positive safe integer no greater than k. Each terminal sends one Query API call: prefetch retains the original search slot, k, pushed where, organization, expiry and original minScore; the outer query uses the extra slot and retains topN. `score` is the outer engine score; the protocol does not return prefetch scores. Function where predicates run through the shared reader after outer hits, without refilling, so fewer than topN hits may remain. `withVector()` still returns the original standard vector. Portable `rerank` may follow, preserving the current engine score and adding rerankScore.
+## What hand-written code gets wrong
 
-Qdrant 1.15.5 needs the extra slot at initial collection creation; existing collections cannot acquire it online. New operations on a missing or incompatible slot reject with `UNSUPPORTED_CAPABILITY`, while standard reads and writes remain usable. No collection is recreated and no data is migrated. Standard upsert still replaces the whole point and can clear the extra slot; applications must rewrite extra vectors afterward. Removing the Feature preserves that same standard replacement behavior. Qdrant owns rescoring and its score; JavaScript does not score candidates.
+A direct native request leaves these boundaries to the application. This example is shown without execution.
 
-Qdrant 1.15.5 has a native JSON ambiguity for two-row multivectors whose first row consists of nonnegative integers: it may decode the matrix as a sparse vector and reject it. The original QDRANT_REQUEST_FAILED evidence is preserved; the adapter does not reshape vectors or retry. Three-row matrices and dense vectors are verified against this version.
+```ts doc-test=check
+export async function writePoint(url: string) {
+  const response = await fetch(url + '/collections/articles/points?wait=true', {
+    method: 'PUT',
+    body: JSON.stringify({ points: [{ id: 1, vector: [1, 0] }] })
+  })
+  // Pitfall: IDs share one physical collection without organization mapping.
+  // Pitfall: an HTTP rejection can be mistaken for a successful write.
+  return response.json()
+}
+```
 
-Conditions that native filters cannot express exactly reject before precount or management `deleteByFilter`, with source `@migaia/storage-contract`, code `UNSUPPORTED_CAPABILITY`. Explicit `count: 'scroll'` supports the shared conditions by scanning the current organization. `requirePushdown()` still rejects client-only conditions with `QUERY_NOT_PUSHABLE`.
+The backend handles managed identities, organization filters and native errors. The application still decides what to do when a dispatched mutation has an unknown outcome.
+
+## The model in three minutes
+
+| Tool                        | Use it for                                                                    |
+| --------------------------- | ----------------------------------------------------------------------------- |
+| `qdrantBackendPlugin`       | Add a real connection to a storage host.                                      |
+| `collection(name, options)` | Describe a logical collection; execution checks or creates its native schema. |
+| `near(...).topK(k)`         | Ask the engine for k candidates.                                              |
+| `where` / `explain`         | Add conditions and inspect client work.                                       |
+| `store.use(ttl)`            | Manage a vector's visible lifetime.                                           |
+| Feature                     | Select backend-specific native operations.                                    |
+
+A logical collection is the application's name. Its physical Qdrant collection includes `collectionPrefix`. Host disposal waits for requests; it does not delete persistent data.
+
+## Typical scenarios
+
+| Scenario                               | Building blocks                    | Details                                                           |
+| -------------------------------------- | ---------------------------------- | ----------------------------------------------------------------- |
+| Search classified documents            | `near` + `where` + `topK`          | [Search and filters](./USEGUIDE.en.md#search-and-filters)         |
+| Expiring recommendations and deletion  | `ttl` + `deleteWhere`              | [Expiry and deletion](./USEGUIDE.en.md#expiry-and-deletion)       |
+| Rank with extra vectors                | `qdrantRescoreFeature` + `rescore` | [Multivector reranking](./USEGUIDE.en.md#multivector-reranking)   |
+| Share collections across organizations | `host.org(id)`                     | [Organization isolation](./USEGUIDE.en.md#organization-isolation) |
+
+## Install
+
+This package is currently `private: true` for use in this repository's workspace. Do not assume a registry release. From an application directory in the same workspace, install the neighboring packages and the real SDK peer:
+
+```bash
+pnpm add --workspace @migaia/storage-host @migaia/storage-contract @migaia/storage-plugin-qdrant
+pnpm add @qdrant/js-client-rest@^1.11.0
+```
+
+Use Node.js 24 or later and Qdrant protocol 1.11 or later. The default fetch entry does not load the SDK at runtime; `/client` borrows a real `QdrantClient`. The multivector example uses capabilities supported by Qdrant 1.15.5.
+
+## Essential API
+
+| API                                       | Purpose                                         |
+| ----------------------------------------- | ----------------------------------------------- |
+| `qdrantBackendPlugin(options, features?)` | Connection, namespace and optional features.    |
+| `collection.upsert(points, options?)`     | Write vectors and payloads.                     |
+| `collection.near(query).topK(k)`          | Build a nearest-neighbor query.                 |
+| `similarTo(id)` / `recommend(...)`        | Build standard queries from stored samples.     |
+| `deleteWhere(where, options?)`            | Delete by condition and return a numeric count. |
+| `store.use(ttl)`                          | `expire`, `persist` and `remaining`.            |
+
+## Contract details
+
+The backend supplies `vector` and vector-target `ttl`. It has no KV, records, RDF, transactions, secondary indexes, change feed or native live query. Explicit locks and unsupported concurrency policies reject before mutation.
+
+`url` is required. `id` defaults to `qdrant`, and `collectionPrefix` to `migaia_`. `apiKey` and a supplied `http` port are optional. Supplied HTTP/SDK clients remain with the caller and are never closed by the host. Hosts detect by default; if disabled, call `await host.detect()` first.
+
+Error source is `storage.backend.qdrant`. Native 4xx, network/5xx failures and invalid responses use `QDRANT_REQUEST_FAILED`, `QDRANT_UNAVAILABLE` and `QDRANT_RESPONSE_INVALID`. Original errors remain on cause chains. Cancellation cannot undo a dispatched mutation; it is never replayed automatically, and disposal waits for its actual result. See the [usage guide](./USEGUIDE.en.md).

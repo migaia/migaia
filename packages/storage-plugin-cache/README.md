@@ -1,55 +1,114 @@
-# 多级缓存
+# @migaia/storage-plugin-cache
 
-`cachePlugin` 组合已经发布的存储后端。先在较早宿主批次安装各层，再安装缓存，并显式调用 `host.detect()`。
+把已安装的键值后端按快慢顺序组合成多级缓存，让重复查询共享回源结果，并把下层读到的数据补到上层。适合同时使用内存和持久存储、又不想逐次手写回填与失效传播的应用；可设置缓存期限、缺失值缓存和延后写入，各层之间不提供原子提交，延后写入也不是持久队列。
 
-```ts
+[English](./README.en.md) · [使用指南](./USEGUIDE.md)
+
+## 你可能遇到过
+
+- 同一个热点请求同时回源很多次：每个请求独立执行了加载函数。
+- 查不到的数据反复查询数据库：未命中没有短期缓存。
+- 下层已经更新，上层还在返回旧数据：副本缺少失效传播或硬期限。
+- 为了批量回源自己维护 Map、去重和取消：单键与批量请求没有共享加载状态。
+
+## 为什么选它
+
+- 多级读取、回填与写入使用已安装后端，层顺序由你指定。[多级缓存](./USEGUIDE.md#组合多个层)
+- `getOrLoad` 和 `getOrLoadMany` 合并同键加载；一个调用方取消不会中断其它等待者。[回源策略](./USEGUIDE.md#加载缺失值与负缓存)
+- 可分别设置新鲜期、最大年龄和负缓存期限，旧值可以先返回并后台刷新。[期限](./USEGUIDE.md#期限刷新与取消)
+- 语义检索由显式选择的 Feature 提供，普通缓存无需嵌入模型或向量后端。[语义缓存](./USEGUIDE.md#选择语义缓存)
+
+## 从这里开始
+
+先安装数据层，再安装缓存。第二次请求从缓存取得同一值，不再运行加载函数。
+
+```ts doc-test=run
 import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
-import { cachePlugin, cacheKey } from '@migaia/storage-plugin-cache'
+import { cachePlugin } from '@migaia/storage-plugin-cache'
 
-const original = await createStorageHost({ plugins: [memoryBackendPlugin({ id: 'memory' })] })
-const host = await original.use(
-  cachePlugin({
-    tiers: [{ backend: 'memory', ttlMs: 30000 }],
-    maxAgeMs: 30000,
-    staleAfterMs: 10000,
-    negativeTtlMs: 1000
-  })
-)
-await host.detect()
+const base = await createStorageHost({ plugins: [memoryBackendPlugin({ id: 'values' })] })
 try {
+  const host = await base.use(cachePlugin({ tiers: [{ backend: 'values', ttlMs: 30000 }] }))
+  await host.detect()
   const cache = host.backend('cache')
-  const key = await cacheKey('response', { model: 'model-one', version: 1 })
-  const value = await cache.getOrLoad(
-    key,
-    async (signal) => {
-      if (signal.aborted) return undefined
-      return { answer: 42 }
-    },
-    { meta: { model: 'model-one' } }
-  )
-  console.log(value, await cache.peek(key), cache.stats())
-  await cache.invalidate(key)
+  let loads = 0
+  const load = async () => ({ answer: ++loads })
+  await cache.getOrLoad('answer', load)
+  console.log(await cache.getOrLoad('answer', load), loads) // { answer: 1 } 1
 } finally {
-  await host.dispose()
+  await base.dispose()
 }
 ```
 
-层按从快到慢排列。through 写入从最慢层向上完成；back 写入按键合并，由宿主 scheduler 刷出，失败只报告并丢弃，不重试。最慢层必须为 through。`flush()` 立即处理待写项；释放时等待已准入工作、刷出一次、取消订阅，不关闭借用层。
+预期输出：
 
-缓存提供最终一致与失效通知，不提供跨 store 原子提交，也不声明事务。建议专用后端实例，避免宽业务通知清除无关缓存副本。变更流之上的层必须设置硬 TTL，限制漏通知的陈旧上界；可靠变更流沿后端原游标协议。
+```text
+{ answer: 1 } 1
+```
 
-逻辑键只接受字符串。平铺 `get` 只读取平铺 `set` 写入的条目；codec 值与负条目经 `getOrLoad`、`getOrLoadEntry` 和 `peek` 访问。`cacheKey` 复用原 portable serializer 与 SHA-256，对象字段顺序不影响结果，非法值保留原 serializer 错误。
+## 手写时的隐患
 
-带计数的 KV `removeByPrefix` 仅单层可用；多层在 I/O 前报 `UNSUPPORTED_CAPABILITY`，因为原生计数无法识别跨层重复逻辑副本。多层无计数删除使用 `invalidate({ prefix })` 或清空方法。`removeMany` 按已给出的不同逻辑键计数，多个副本只计一次。
+只用 Map 包住一个加载函数，容易遗漏共享请求、过期和负缓存：
 
-各层条目同时以该层采样后的有效硬期限限制自身到期时间。原生 `expire` 失败会报告，不能留下可无限命中的副本。正数单次 TTL 在回源或写入前要求所有目标层具有 TTL 能力；共享 KV `setMany` 保留非负有限 TTL 域，零表示立即删除。
+```ts doc-test=check
+const values = new Map<string, unknown>()
+async function read(key: string) {
+  if (values.has(key)) return values.get(key) // 没有到期时间，旧值会一直留下。
+  const value = await Promise.resolve({ answer: 42 }) // 并发请求各自回源。
+  values.set(key, value) // undefined 的缓存策略也需要单独决定。
+  return value
+}
+console.log(await read('answer'))
+```
 
-传播仅在显式检测阶段订阅。可靠源的游标写入紧邻上层的缺省组织，`$cache.cursor` 为内部元数据保留键。游标缺失或过期时先清除所管上层前缀，再从 now 继续。删除或游标持久化失败不保留积压队列：下一原生批次先清上层，再于成功后推进游标。仅游标过期会替换原生 tail 资源，不为断线启动重连定时器。
+## 三分钟理解
 
-## 语义缓存
+`请求 → 按层查找 → 命中则返回并回填 → 缺失则共享回源 → 写入各层`。
 
-从 `@migaia/storage-plugin-cache/features/semantic` 导入 `semanticCacheFeature`，在 `cachePlugin` 第二参数中选择 `{ semantic: semanticCacheFeature(options) }`。向量后端必须在更早批次发布。配置 collection、维度、原生 metric、最低分与调用方嵌入函数。候选顺序沿原向量引擎，逐个执行 `accept`；复核失败只报告并跳过，不在 JavaScript 中计算向量分数。
+| 名称     | 含义                                     |
+| -------- | ---------------------------------------- |
+| tier 层  | 从快到慢排列的已安装 KV 后端             |
+| through  | 等本次写入结算，从最慢层向上处理         |
+| back     | 同键待写项合并后延迟处理，失败报告并丢弃 |
+| negative | 对加载结果 `undefined` 的短期缓存        |
+| stale    | 已过新鲜期但仍在有效期限内的值           |
 
-`cache.api.semantic.set(prompt, value, { payload: { model: 'one' } })` 按 prompt 与模型元数据独立存储。`get` 可设置 `where`、`minScore`、一至十个 `candidates` 和异步 `accept`。`getOrLoad` 按组织、prompt 与规范 payload 合并回源，单调用取消不影响共享任务，并支持缩短 TTL 与 `cacheIf`。关闭时排空任务，不关闭借用的向量后端。`$cache.*` 为保留字段。
+## 常见场景
 
-`invalidate(where, { count: 'scroll' })` 返回原 `deleteWhere` 数字，缺省保留 `precount`。删除包含物理仍存在的过期匹配点；Qdrant 两策略继承原并发边界，不强制切换、不重新计数、不承诺全局快照。原 context 与 count 由该原生删除拥有者单次校验；向量 TTL 由原 `upsert` 设置。
+| 想做什么                   | 组合                           | 示例                                       |
+| -------------------------- | ------------------------------ | ------------------------------------------ |
+| 合并热门请求和缺失查询     | `getOrLoad` + `negativeTtlMs`  | [缺失值](./USEGUIDE.md#加载缺失值与负缓存) |
+| 本地层加持久层             | 多个 tiers                     | [组合多个层](./USEGUIDE.md#组合多个层)     |
+| 按标签失效，较大值放对象层 | `tagIndex` + `offload`         | [标签与大值](./USEGUIDE.md#标签与大值)     |
+| 用模型元数据筛选相似回答   | semantic Feature + vector 后端 | [语义缓存](./USEGUIDE.md#选择语义缓存)     |
+
+## 安装
+
+这些 storage 包当前是 `private: true` 的仓库 workspace 包，尚不作为已发布的 registry 包提供。以下命令用于仓库内的消费包：
+
+```bash
+pnpm add --workspace @migaia/storage-plugin-cache @migaia/storage-host @migaia/storage-contract
+```
+
+运行环境要求 Node.js 24 或相应兼容环境。使用 Redis、PostgreSQL 等层时，还需安装各后端插件及其真实客户端 peer。语义 Feature 额外需要你提供嵌入函数和支持 vector 的后端；根入口不自动启用它。
+
+## 常用 API
+
+| API                                              | 用途                                    |
+| ------------------------------------------------ | --------------------------------------- |
+| `cachePlugin(options, features?)`                | 选择已有数据层与可选 Feature            |
+| `getOrLoad` / `getOrLoadEntry` / `getOrLoadMany` | 读取或共享回源；Entry 形式还给出状态    |
+| `peek(key)` / `stats()`                          | 查看条目与计数，不调用加载函数          |
+| `invalidate(key \| { prefix } \| { tag })`       | 删除匹配副本                            |
+| `flush()` / `sweepOffload()`                     | 刷出待写项，或清理已到期的外置对象      |
+| `cacheKey(namespace, input)`                     | 用 portable 序列化与 SHA-256 生成稳定键 |
+
+## 使用边界
+
+- 每个层必须在更早安装批次中已经可用，并支持 KV。配置 `ttlMs` 的层还必须支持 TTL；最慢层必须使用 `through`。缓存不提供跨层原子提交或事务。
+- 层读取失败会报告并按未命中处理；层写入失败会报告并跳过。加载或编码失败报 `CACHE_LOAD_FAILED`，嵌入失败报 `CACHE_EMBED_FAILED`，原错误在 `cause` 中。缓存错误 source 为 `storage.backend.cache`；参数与能力错误也可能来自 storage-contract。
+- 普通 `get/set` 用于字符串；`get` 只读普通 `set` 写入的条目。对象值和负条目请用 `getOrLoad`、`getOrLoadEntry` 与 `peek`。
+- 默认启用失效传播，订阅在 `detect()` 时建立。变更源上方各层必须有硬 TTL；通知不是跨层提交保证。建议使用专门的缓存后端，避免业务 clear 通知清掉无关副本。
+- `write: 'back'` 不是持久队列。失败不重试；`flush()` 立即处理当前待写项，关闭前也会刷出一次。开启传播时，back 层必须位于所有变更源下方且有 TTL；不满足会拒绝配置。
+- 多层 `removeByPrefix` 无法给出可靠去重数量，会在 I/O 前报 `UNSUPPORTED_CAPABILITY`。用无计数的 `invalidate({ prefix })` 删除多层副本；`removeMany` 对已知不同逻辑键只计一次。
+- `host.org(uuid).backend('cache')` 把各层路由到同一组织。关闭缓存排空已接纳工作并取消订阅，不单独关闭借用层；关闭宿主会统一释放它安装的后端。

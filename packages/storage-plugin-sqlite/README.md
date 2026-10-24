@@ -1,151 +1,107 @@
 # @migaia/storage-plugin-sqlite
 
-通过 `@migaia/storage-host` 安装原生 SQLite 后端。Node 与 Deno 使用
-`node:sqlite`；Bun 使用 `bun:sqlite`。包根不会加载驱动，也不依赖 npm 原生 addon。
+[English](./README.en.md)
 
-## 安装
+用运行时内置的 SQLite 保存本地设置、离线记录和缓存，让文本、记录、过期时间与应用 SQL 可以在同一个数据库事务内提交。选择运行时对应的驱动和数据库文件或内存库，再把插件安装到 host，无需另装 npm 原生数据库扩展；连接由应用创建和关闭，根入口不自动选择或加载驱动。
 
-```ts
+## 你可能遇到过
+
+- 本地设置写了一半：几个更新各自提交，中途失败没有回滚。
+- 两个进程同时改同一项：只有内存锁，另一个进程看不到。
+- 到期缓存仍被当成有效数据：值和期限分开保存，读取时没有统一处理。
+- 事务还在运行，根查询却抢了连接：同一连接混用了事务内外操作。
+
+## 为什么选它
+
+- **数据与期限一起写。** 批量值、记录和 TTL 在同一个原生事务内更新，见[一起保存值和期限](./USEGUIDE.md#一起保存值和期限)。
+- **应用 SQL 与存储方法共用事务。** 使用同一 tx，SQL 与 KV 可以共同提交或回滚，见[把应用-sql-和存储修改一起提交](./USEGUIDE.md#把应用-sql-和存储修改一起提交)。
+- **连接释放顺序明确。** 你创建连接，host 使用它；先释放 host，再释放连接。Node/Bun 使用各自内置模块，不增加 npm 原生 addon。
+- **并发限制说清楚。** 文件 WAL 模式支持跨连接逻辑锁；非 WAL 模式只在当前进程协调，见[并发与取消](./USEGUIDE.md#并发与取消)。不以此声称更快。
+
+## 从这里开始
+
+下面在真正的 SQLite 内存数据库中写入并读取。持久保存时把 `:memory:` 换成文件路径。Node 需要24或更新版本。
+
+```ts doc-test=run
 import { createStorageHost } from '@migaia/storage-host'
 import { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'
 import { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'
-
-await using connection = nodeSqliteDriver('./settings.sqlite')
+await using connection = nodeSqliteDriver(':memory:')
 await using host = await createStorageHost({
   plugins: [sqliteBackendPlugin({ driver: connection })] as const
 })
-const storage = host.backend('sqlite')
-await storage.set('theme', 'dark')
-console.log(await storage.get('theme'))
+const store = host.backend('sqlite')
+await store.set('theme', 'dark')
+console.log(await store.get('theme'))
 ```
 
-先创建 connection，再创建 host，释放时先结束 host。store 只独占借用 driver，
-不关闭连接。每个 driver 同时交给一个 store；多个连接可以使用同一文件。
-`table` 缺省 `migaia`，不同前缀隔离物理表。
+预期输出：
 
-Bun 从 `/bun` 导入 `bunSqliteDriver`。Deno 也使用 `/node`，需要数据库及日志文件
-的读写权限。Node 要求运行时内置 SQLite（Node 24 或更新版本）。子路径是明确的
-运行时要求，不自动探测或回退到其它驱动。
-
-## 数据与 SQL
-
-store 提供文本、字节、记录、有序记录迭代、同步文本方法、metadata、完整原生事务
-及绑定的 SQL 标签。`kv`、`records` 使用 `@migaia/storage-contract` 的原令牌；
-记录查询复用其真实 `where`/`select`/`all` 执行器，并如实标明客户端求值。
-
-`storage.use(kv)` 原生支持 `getMany`、`setMany`、`removeMany` 与 `removeByPrefix`，
-事务内用 `tx.use(kv)` 或对应短方法。批次键接受规范结构键；读取按输入顺序保留重复
-位置，缺失返回 `undefined`。重复写键在 I/O 前拒绝；写入与删除在同一原生事务中
-提交或回滚，删除返回实际数量。读取和删除的 IN 参数分块，读取分块共享一个原生
-快照。每批只有一次 pipeline 与计数 hook；空批仍检查有效期，但不执行这些工作。
-`setMany` 的 `ttlMs` 接受有限非负毫秒数，期限与值同事务写入。SQLite 不提供向量
-集合或 RDF 图；对应锁在任何原生调用前报 `UNSUPPORTED_CAPABILITY`。
-
-文本和字节缺失返回 `null`，记录和 metadata 缺失返回 `undefined`。`keys()` 只列
-文本通道的字符串 key。删除指定通道不影响其它通道；`clearAll()` 保留 metadata。
-跨通道同 key 写入报 `DUPLICATE_KEY`；显式选择 `{ conflictPolicy: 'replace' }`
-才在同一原子段替换。同通道更新直接覆盖。
-
-文本通过现有 JSON codec 保留 NUL 与孤立 UTF-16 代理项。记录及 metadata 使用
-collections codec，保留 Map/Set。不可 portable 的值在改表前拒绝。输入和输出
-字节均复制；键使用唯一规范保序编码。
-
-```ts
-import { sqlFragment } from '@migaia/storage-host/authoring/sql'
-
-await storage.sql`CREATE TABLE users(id INTEGER PRIMARY KEY, name TEXT)`.run()
-await storage.transaction(async (tx) => {
-  await tx.sql`INSERT INTO users VALUES(${1}, ${'Ada'})`.run()
-  await tx.set('user-count', '1')
-})
-const rows = await storage.sql<{ id: number; name: string }>`
-  SELECT id, name FROM ${sqlFragment.id('users')} WHERE id = ${1}
-`.all()
+```text
+dark
 ```
 
-插值均作为绑定参数，标识符通过 `sqlFragment.id` 引用，共同片段支持组合与 join。
-SQL 只接受单条语句及可选末尾分号；事务控制、journal_mode 修改在驱动前拒绝。
-提交与回滚通过 `transaction`；含内部语句列表的完整 trigger body 不在此入口范围。
-行类型是调用方声明，不验证列名、不转换 Date。
+多项数据共同保存，看[一起保存值和期限](./USEGUIDE.md#一起保存值和期限)；文件备份看[备份数据库文件](./USEGUIDE.md#备份数据库文件)。
 
-标准 `sql` 令牌通过 `storage.use(sql).sql` 复用同一个原生标签；
-事务内 `tx.use(sql).sql` 沿原事务拥有者绑定当前短效视图。原生结果、
-精确行类型和 SQLite 的必有 lastInsertRowid 保持不变，不增加预算或编译器。
+## 手写时的隐患
 
-安全整数归一为 number，其余整数保持精确 bigint。boolean 输入绑定为 0/1；BLOB
-返回独立 Uint8Array。run 的 changes 与 lastInsertRowid 均为 number | bigint。
-每实例 statement LRU 最多 64 项；Node 淘汰引用不代表立即 finalize 原生 statement。
+下面假定应用表已存在，只展示，不执行。
 
-## 并发与连接归属
+```ts doc-test=check
+import { DatabaseSync } from 'node:sqlite'
+export function save(database: DatabaseSync, name: string) {
+  database.prepare('INSERT INTO app_users(name) VALUES(?)').run(name)
+  // 第二条语句失败时，第一条已经提交。
+  database.prepare('UPDATE app_counts SET count=count+1').run()
+  // 事务期间误用另一个根入口，可能打乱同一连接上的工作。
+}
+```
 
-文件库缺省 wal:true，安装会请求并确认实际 WAL。wal:false 复用宿主进程内逻辑锁
-与修订事实，同时保留原生 BEGIN/COMMIT/ROLLBACK；不创建锁表/修订表，不承诺
-跨进程逻辑锁。内存库缺省 false，显式 true 报错；已有 journal_mode=OFF 的连接拒绝。
+使用 `store.transaction`，并且在回调里只使用 tx。被捕获或未 await 的数据操作失败，仍会使该事务回滚。
 
-通过 `storage.tx().lock(lockKey.text('key')).run(...)` 与 contract 的策略配置并发。
-只有同一逻辑键才冲突；SQLite writer 串行属于物理等待，fail 策略也不会把它当冲突。
-inspectLocks 返回真实持锁方与过期信息。WAL 租约 maxLockMs 缺省 30,000 ms，
-没有 heartbeat。取消是协作式；接受的原生工作真实结束或回滚后才释放资源，不能
-抢占忽略取消的回调。
+## 三分钟心智模型
 
-本连接被事务占用时，根读取、同步方法与根 SQL 报 TRANSACTION_FAILED，应使用 tx。
-回调结算后旧 tx 失效；已准入操作与最终检查使用原拥有者的新短视图。被 catch 或
-未 await 的数据失败仍使事务回滚。tx.sql 与 KV 始终处于同一个原生事务；不会从
-用户 SQL 文本猜测逻辑键。
+| 要做什么                      | 使用什么                                   |
+| ----------------------------- | ------------------------------------------ |
+| 打开与关闭 SQLite 文件        | `/node` 或 `/bun` 创建的 connection        |
+| 使用文件中的标准存储          | host 安装后的 `backend('sqlite')`          |
+| 选择 KV、记录、SQL、TTL、计数 | `store.use(token)`                         |
+| 多项操作共同提交              | `transaction` 或 `tx().lock(...).run(...)` |
+| 备份和整理文件                | 显式选择维护 Feature                       |
 
-`readTransactionOperationContext(tx)` 读取原事务拥有者保存的冻结 attempt context。
-组合操作与最终检查复用同一份字段及原实时 signal；不会重读调用方 getter、重置期限
-或另建取消控制器。合作取消的异步工作结算后，原生回滚与逻辑锁释放才完成。
+能力令牌标识一组方法；Feature 是额外安装的功能。WAL 是 SQLite 把变更先记入旁边日志文件的模式，允许本包通过共享文件协调逻辑锁。
 
-选中的 Feature 复用同一事务和查询创建器。`tx.api` 在原事务短视图冻结前绑定；
-其 SQL 与 KV 操作一起提交或回滚，被捕获或未 await 的失败也沿原事务拥有者处理。
-Feature 的 `query` 和 `tx` 链方法保留在实际派生链上。Feature 借用的原生 client
-是同一连接的冻结 `exec`/`prepare` 视图，不含 `dispose` 或符号释放方法；连接仍由
-创建调用方释放。
+## 典型场景
 
-所有托管表以 org_id 作为主键第一列。根原生 SQL 属于调用方 schema 访问；自建表的
-组织过滤由调用方显式提供，不能直接修改内部表。
+| 场景                 | 怎么组合           | 详细说明                                                          |
+| -------------------- | ------------------ | ----------------------------------------------------------------- |
+| 多租户本地缓存       | org + kv + ttl     | [一起保存值和期限](./USEGUIDE.md#一起保存值和期限)                |
+| 业务表与设置共同更新 | tx.sql + tx.set    | [SQL 与存储共同提交](./USEGUIDE.md#把应用-sql-和存储修改一起提交) |
+| 导出可重新打开的备份 | maintenance.backup | [备份数据库文件](./USEGUIDE.md#备份数据库文件)                    |
 
-通过 `host.org(orgId).backend('sqlite')` 访问固定组织。缺省组织及其它组织都使用
-同一套表；创建组织不执行 DDL，也不另开连接。各组织复用同一个原生准入队列，
-数据、期限、锁与修订按 `org_id` 隔离；`host.dropOrg(orgId)` 只删除该组织的托管行。
-原生 Feature 借用同一个冻结 client，工厂只安装一次。显式组织视图不提供任意 SQL
-或数据库维护；事务内调用这些跨组织入口也会拒绝，并保留原事务错误链。
+## 安装
 
-原生日志通过 `@migaia/storage-host/journal` 的 `storageLogStore(host, 'sqlite',
-{ prefix })` 使用。调用方拥有的内存连接在原进程锁中独占该日志 namespace，私有行
-与业务键隔离，业务 clear 不清日志；释放日志后可用同一 prefix 重开。文件连接使用 indexExclusive:false，无跨操作索引；每次日志读写在原 BEGIN IMMEDIATE 事务内读取当前 head、records 与 states，多个连接可共用同一日志 namespace。
+当前包 `private: true`，用于本仓库工作区。它不是公共 registry 发布承诺。消费包中添加：
 
-## 维护与错误
+```bash
+pnpm add @migaia/storage-host @migaia/storage-contract @migaia/storage-plugin-sqlite --workspace
+```
 
-从 `/features/maintenance` 导入 sqliteMaintenanceFeature，并放入插件第二参数。
-它经原 SQL 标签增加 `storage.api.maintenance.backup(path)` 与 vacuum；tx 没有维护
-入口。backup 使用 VACUUM INTO，不预删、不覆盖目标；原生失败可能留下不完整目标。
-同步维护开始后，取消不能声称文件未被写入。
+Node 24+ 与 Deno 使用 `/node` 的 `nodeSqliteDriver(path)`；Bun 使用 `/bun` 的 `bunSqliteDriver(path)`。Deno 需要数据库及其日志文件的读写权限。子入口明确选择运行时，不自动回退。根入口不加载任何数据库驱动。
 
-本包错误 source 为 @migaia/storage-plugin-sqlite，码为 SQLITE_FAILED、
-TRANSACTION_FAILED、DUPLICATE_KEY 或 DECODE_FAILED。原生/codec 错误保留在 cause；
-回滚也失败时 AggregateError.errors 第一项保留原主错。校验、取消与并发沿 contract
-原码。解码失败不自动改写损坏数据。
+## 常用 API
 
-显式 dispose 重复返回同一 Promise；符号释放使用不同的缓存 Promise，报告失败后
-成功，共享一次真实清理。始终先释放 host/store，再释放调用方拥有的 connection。
-清理失败后 store 仍然终止。
+| API                                             | 用途                       |
+| ----------------------------------------------- | -------------------------- |
+| `sqliteBackendPlugin({ driver, table?, wal? })` | 安装 SQLite 存储           |
+| `store.use(kv / records / sql / ttl / counter)` | 标准数据、查询、期限与计数 |
+| `store.transaction` / `store.tx()`              | 同一连接中的原生事务       |
+| `store.sql` / `tx.sql`                          | 绑定参数 SQL               |
+| `host.org(id).backend('sqlite')`                | 固定组织的数据视图         |
+| `sqliteMaintenanceFeature()`                    | 增加 backup 与 vacuum      |
 
-标准 `ttl` 为 text/bytes/records 提供 expire、remaining、persist，使用本地 Date.now。
-期限与值同一原生事务写入；覆盖活值保留期限，删除/clear/替换清除旧期限。
-读取、枚举和查询沿原生写路径惰性回收到期行，不启动 timer。
-标准 `counter.increment` 在同一原生文本事务内验证规范十进制与安全整数后更新，
-缺失从 0 开始；非法文本、非法增量和溢出在写入前拒绝。两项能力均支持 tx.use。
+## 契约细节
 
-事务首次读取的活值和期限保留原生快照；观察后到期由原提交检查交回既有并发策略，
-不能把已过期的观察当作有效提交。迭代跳过首次返回前到期的项，关闭计数只统计实际
-返回的项。
+每个 driver 同时只交给一个 store；多个连接可以使用同一个文件。文件库默认 WAL，内存库默认非 WAL；内存库要求 WAL 会拒绝。默认表前缀 `migaia`，默认锁期限30000ms，无 heartbeat。事务占用连接时根操作会失败，应改用 tx。
 
-全局 `journal` 配置按真实原生修改顺序记录日志，保留同键多写。SQLite 在原事务内保留完整原始值与绝对期限；undo 复用原键锁事务，先核对全部完整修订与 after 镜像，再恢复任一值。外置 binlog 与 undo 可使用既有 WAL；恢复只核对与数据同提交的 marker，不重放已提交的业务修改。文件 WAL 修订行保留不可变 birth，组织删除后重建不会让旧 undo 再次有效。`wal: false` 的修订身份归原存活本地 group，重开 group 会拒绝旧镜像。metadata 写入推进原私有 guard，不作为业务日志。
-
-内存和文件连接均可通过 initializer 的 `storageLogStore` 打开同库日志；文件路径每次在原生事务内读取当前索引，不缓存跨操作状态。raw SQL 没有完整共享镜像目标，启用提交日志时在原生执行前拒绝。全局 journal 配置沿宿主既有异步管线边界，所有同步入口报 `ASYNC_STAGE_IN_SYNC_ENTRY`；普通宿主仍保留同步 API。Logger 及日志载体继续归调用方释放。`UNDO_CONFLICT` 等宿主日志错误保留原 source 与 cause。
-
-启用全局 journal 遥测时，每个异步根操作与完整事务各发一条 storage 事件，键来自原生读写实际观察；短效事务操作与私有日志、元数据工作不重复发业务事件。重试仍由原并发循环负责。
-
-配置提交日志时，get、has、keys、二进制与记录读取、getMany、TTL remaining 和记录迭代所触发的过期清理，均加入同一原生事务并记录实际删除。undo 恢复原始值和绝对期限，已过期的期限不会被刷新。仅遥测或初始化器不选择提交日志时，读取仍使用原读取段；无 journal 的路径不变。
+本包不提供向量、RDF 或实时变更流。记录字段查询在客户端求值；取消不能抢占已经开始的同步 SQLite 工作。错误、数据类型、维护与日志的详细限制见 [USEGUIDE](./USEGUIDE.md#数据与错误边界)。

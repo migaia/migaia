@@ -1,114 +1,224 @@
-# Qdrant 存储用法
+# Qdrant 使用指南
 
-## 查询与 payload
+先运行真实 Qdrant 服务。示例默认连接 `http://127.0.0.1:6333`；服务地址不同时，设置环境变量 `QDRANT_URL`。每例使用新的集合名并写数据，释放 host 不删除集合。
 
-新建逻辑 collection 时声明真实维度与 `cosine`、`dot` 或 `euclid`。无 options 的描述在执行时读取既有原生 schema；不匹配时拒绝，不创建占位向量。`collectionPrefix` 缺省 `migaia_`，选择托管命名空间。
+## 按场景查找
 
-`near`、`similarTo`、标准 `recommend` 使用共享不可变链。`topK` 要求正安全整数；低层 `search(query,{k})` 也接受 0，且不发送搜索。`exact` 缺省 false，沿引擎原生索引；true 请求原生精确检索。标准 `groupBy` 只处理所选 top-k 命中；标准推荐读取请求的原样本，以共享正样本均值减负样本均值合成查询，不调用原生 `best_score`。
+| 需求                      | 场景                      |
+| ------------------------- | ------------------------- |
+| 按 payload 搜索并取回向量 | [搜索与筛选](#搜索与筛选) |
+| 设置期限或条件删除        | [期限与删除](#期限与删除) |
+| 额外 multivector 排名     | [多向量重排](#多向量重排) |
+| 共用集合隔离组织          | [组织隔离](#组织隔离)     |
 
-可忠实表达的标量相等、成员、存在性与数字范围在引擎排名前执行。字符串范围、子串/前缀条件及 JavaScript 函数只处理实际原生命中，不补搜，结果可少于 k。`explain()` 区分两者；需要客户端处理时，`requirePushdown()` 在原生读取前拒绝。仅组织与期限保留路径强制建立索引，任意动态标量路径可能未索引。真实成本取决于引擎计划、输入及输出字节。
+## 搜索与筛选
 
-portable payload 与任意 UTF-16 ID 由原 codec 往返。用户不能替换 payload 根 `$org`、`$expiresAt`。整批在 I/O 前快照与验证；重复 ID 保留最后一个已验证点。
+分类条件应尽量在引擎排名前执行；客户端条件只能筛掉已返回的命中。
 
-## 期限与数字删除
+```ts doc-test=run
+import { createStorageHost } from '@migaia/storage-host'
+import { vector } from '@migaia/storage-contract'
+import { qdrantBackendPlugin } from '@migaia/storage-plugin-qdrant'
 
-```ts
-import { ttl, DeleteCountMode } from '@migaia/storage-contract'
-import { lockKey } from '@migaia/storage-host/authoring/concurrency'
-
-await documents.upsert([{ id: 'temporary', vector: [1, 0], payload: { category: 'guide' } }], {
-  ttlMs: 5000
+await using host = await createStorageHost({
+  plugins: [qdrantBackendPlugin({ url: process.env.QDRANT_URL ?? 'http://127.0.0.1:6333' })]
 })
-const target = lockKey.vector('documents', 'temporary')
-await host.backend('qdrant').use(ttl).expire(target, 10000)
-console.log(await host.backend('qdrant').use(ttl).remaining(target))
-await host.backend('qdrant').use(ttl).persist(target)
-const deleted = await documents.deleteWhere(
-  { category: 'guide' },
-  { count: DeleteCountMode.scroll }
-)
+const name = 'guide_' + crypto.randomUUID().replaceAll('-', '')
+const documents = host
+  .backend('qdrant')
+  .use(vector)
+  .collection<{ category: string }>(name, { dimensions: 2, metric: 'dot' })
+await documents.upsert([
+  { id: 'a', vector: [2, 0], payload: { category: 'guide' } },
+  { id: 'b', vector: [1, 0], payload: { category: 'news' } }
+])
+const query = documents.near([1, 0], { exact: true }).where({ category: 'guide' }).topK(2)
+const hits = await query.withVector().all()
+console.log(hits.map((hit) => hit.id).join(','))
+console.log(hits[0]?.vector?.join(','))
 ```
 
-TTL 以一次客户端墙钟采样及原生 datetime payload 字段实现，客户端时钟偏差会影响期限。省略 `ttlMs` 时保留活点期限，新点或已过期点变为无限期；0 立即不可见。`remaining` 对缺失/无限期返回 undefined；`expire`、`persist` 对缺失/已过期返回 false。text、bytes、record TTL 目标不受支持。没有后台 timer 删除数据。
+预期输出：
 
-删除包含物理仍存在的过期点。缺省 `precount` 发送一次 exact count，再以同一 filter 做一次 wait:true 删除；并发写入会使预统计数不同于之后实际删除数。显式 `scroll` 在任何删除前收集原生各页实际读到的 ID，再按 ID 批删并返回成功提交的 ID 数。扫描期间新增点可能被读到，也可能保留；收集结束后未在集合中的新增 ID 不参与。已收集 ID 即使随后改为不匹配也会删除。
-
-原生 precount 与管理 filter 删除对不能忠实表示的条件（如通用 `contains`、`startsWith`）在 I/O 前拒绝。对此可显式选 `scroll`，以共享 predicate 检查当前组织各页真实候选；成本包含扫描候选与所收集 ID。
-
-## 原生 Feature
-
-```ts
-import { qdrantManagementFeature } from '@migaia/storage-plugin-qdrant/features/management'
-import { qdrantHybridFeature } from '@migaia/storage-plugin-qdrant/features/hybrid'
-import { qdrantRecommendFeature } from '@migaia/storage-plugin-qdrant/features/recommend'
-import { qdrantGroupByFeature } from '@migaia/storage-plugin-qdrant/features/group-by'
+```text
+a
+2,0
 ```
 
-将需要的 Feature 作为工厂第二参数，增加 `store.api.qdrantManagement`、`qdrantHybrid`、`qdrantRecommend`、`qdrantGroupBy`，没有 transaction API。原生方法使用调用方自管的物理 collection 名，保留真实 SDK 参数与结果类型。
+`dimensions` 是维度，`metric` 可为 cosine、dot、euclid。省略整个 options 时读取已有 schema，不匹配时拒绝。构造 collection 不发 I/O。`exact` 默认 false，true 请求原生精确检索；`topK(k)` 要求正安全整数。低层 `search(query, {k: 0})` 返回空且不发送搜索。
 
-Hybrid 接受恰两个 named dense/sparse prefetch 分支及 `{fusion:'rrf'}`。sparse 更新只接受已配置的 sparse 名，indices 是唯一非负整数，长度匹配且数值有限，不改 dense。原生推荐保留 lookup 与策略差异；原生分组保留多值成员语义，不提供 SDK 1.11 未转发的 `with_lookup`。
+`near` 使用查询向量；`similarTo(id)` 读取原样本；标准 `recommend` 用正样本均值减负样本均值构成查询。Cosine 使用搜索槽和原样本槽，`withVector()` 保留输入幅度，受原生 float32 精度限制。Euclid 距离取负成为 score。标准 `groupBy` 只处理已选出的 top-k 命中。
 
-`qdrantManagement.deleteByFilter(logicalCollection,where,{wait?,ordering?},ctx)` 追加当前组织，不加存活过滤。`purgeExpired(logicalCollection,{wait?},ctx)` 仅一次采样墙钟，原生删除当前组织中早于此刻的期限点。两者零 count/scroll，返回 `{operationId,status}`，wait 缺省 true；operation ID 不代表删除数。其它管理方法保留原生 boolean 与可空 snapshot。
+可精确表达的标量相等、成员、存在性和数字范围在引擎执行。字符串范围、子串/前缀条件和函数 where 在命中后执行，不补搜，可能少于 k。`explain()` 展示两者；`requirePushdown()` 遇到客户端步骤报 `QUERY_NOT_PUSHABLE`，不会先发搜索。payload 不能覆盖根路径 `$org`、`$expiresAt`。portable payload 与任意 UTF-16 字符串 ID 通过统一 codec 往返。upsert 在请求前验证整批，重复 ID 保留最后一个已验证点；删除和标准推荐的重复 ID 按首次出现去重。
 
-## 组织、释放与失败
+## 期限与删除
 
-`host.org(orgId).backend('qdrant')` 共享物理 collection，在原生排名前加租户条件；点身份包含 org。新组织不创建 collection 或索引。组织视图不能调用自管 collection 的原生 Feature 方法；`deleteByFilter`、`purgeExpired` 仍可按组织执行。`host.dropOrg` 发现当前配置命名空间内全部托管 collection，仅清理目标组织（含物理过期点），保留共享 collection 与其它命名空间。
+下面把临时点改成永久点，再扫描删除，不依赖计时器恰好到期。
 
-缺省在 host 创建时检测；`autoDetect:false` 必须显式 `host.detect()`。未检测的业务终点拒绝且不发送隐式检测。服务端与 SDK 至少 1.11。
+```ts doc-test=run
+import { createStorageHost } from '@migaia/storage-host'
+import { vector, ttl, DeleteCountMode } from '@migaia/storage-contract'
+import { lockKey } from '@migaia/storage-host/authoring/concurrency'
+import { qdrantBackendPlugin } from '@migaia/storage-plugin-qdrant'
 
-检测检查标准 vector、TTL 与组织清理所需方法。可选原生 Feature 方法在调用时检查；缺少方法时在发送修改前报 `UNSUPPORTED_CAPABILITY`。
+await using host = await createStorageHost({
+  plugins: [qdrantBackendPlugin({ url: process.env.QDRANT_URL ?? 'http://127.0.0.1:6333' })]
+})
+const name = 'guide_' + crypto.randomUUID().replaceAll('-', '')
+const documents = host
+  .backend('qdrant')
+  .use(vector)
+  .collection<{ category: string }>(name, { dimensions: 2, metric: 'dot' })
+await documents.upsert([{ id: 'a', vector: [1, 0], payload: { category: 'guide' } }], {
+  ttlMs: 60_000
+})
+const ttlApi = host.backend('qdrant').use(ttl)
+const target = lockKey.vector(name, 'a')
+console.log(await ttlApi.persist(target))
+console.log(await ttlApi.remaining(target))
+console.log(await documents.deleteWhere({ category: 'guide' }, { count: DeleteCountMode.scroll }))
+```
 
-`dispose()` 封闭新调用，等待已接受的实际请求及 iterator。主释放与符号释放分别缓存 Promise，共用一次清理。后端从不关闭借用的 HTTP/SDK client。fetch 接收原操作取消信号；SDK 1.11 没有 per-call signal，必须等真实请求结算。写入不自动重试或跟随重定向，已发送失败的结果可能未知。
+预期输出：
 
-错误域 `storage.backend.qdrant`：原生 4xx 为 `QDRANT_REQUEST_FAILED`；网络/5xx 为 `QDRANT_UNAVAILABLE`；坏响应或意外响应为 `QDRANT_RESPONSE_INVALID`。保留原错误及适配端能取得的全部证据。HTTP 保留完整 status/body；SDK 1.11 的非等待 snapshot 遇到 202 时，自身 `QdrantClientUnexpectedResponseError` 会丢弃 status 并截断文案，适配器报告 response-invalid，但快照可能已接受。HTTP 端口对此返回原生 null。没有自动 fallback 或重放。hooks 只含净化路由、耗时与可取得的 status，不含认证头或正文。
+```text
+true
+undefined
+1
+```
 
-删除与标准推荐通过共享向量输入拥有者捕获稠密字符串 ID 数组；原生请求仍按首次出现去重。删除计数选项复用同一准入，不改变 precount 或 scroll 行为。
+`ttlMs` 为非负毫秒数，0 立即不可见。省略时保留活点期限；新点或已过期点没有期限。`expire`、`persist` 对缺失或已过期点返回 false；`remaining` 对缺失或无限期点返回 undefined。只支持 `lockKey.vector(collection, id)`。客户端墙钟决定期限，时钟偏差会影响结果；没有后台物理删除任务。
 
-SDK 请求发出后，取消不会撤销原生修改；即使调用方随后取消，请求仍可能成功返回。后端释放等待该真实结果，响应丢失时保留结果未知且不自动重放。hooks 的同步异常或异步拒绝仅上报，介入操作使用宿主原 pipeline。
+删除包含仍物理存在的过期点。默认 precount 先 exact count，再以同一 filter 做 wait:true 删除；并发修改可能让计数不同于最终删除量。scroll 在删除前逐页收集匹配 ID，再按 ID 批删，返回成功提交的 ID 数。扫描不是快照：新点可能被读到或留下，收集后变得不匹配的 ID 仍会删除。
 
-## 原生命名向量重排
+precount 与管理 `deleteByFilter` 无法精确表达条件时，报 source `@migaia/storage-contract`、code `UNSUPPORTED_CAPABILITY`。通用条件可显式选 `count: 'scroll'`，扫描当前组织候选并执行共享 predicate。
 
-`@migaia/storage-plugin-qdrant/features/rescore` 的 `qdrantRescoreFeature` 在安装时按逻辑集合声明一个额外向量槽。`dimensions` 必填，`metric` 默认 `cosine`；`multivector: 'max_sim'` 选择多向量，否则使用 dense。只接受顶层 `collections` 映射中声明的集合。
+## 多向量重排
 
-```ts
+先用标准向量召回，再用额外 multivector 槽选择最终结果。
+
+```ts doc-test=run
 import { createStorageHost } from '@migaia/storage-host'
 import { vector } from '@migaia/storage-contract'
 import { qdrantBackendPlugin } from '@migaia/storage-plugin-qdrant'
 import { qdrantRescoreFeature } from '@migaia/storage-plugin-qdrant/features/rescore'
+
+const name = 'guide_' + crypto.randomUUID().replaceAll('-', '')
 await using host = await createStorageHost({
   plugins: [
     qdrantBackendPlugin(
-      { url: 'http://localhost:6333' },
+      { url: process.env.QDRANT_URL ?? 'http://127.0.0.1:6333' },
       {
         rescore: qdrantRescoreFeature({
-          collections: { articles: { dimensions: 2, metric: 'dot' } }
+          collections: { [name]: { dimensions: 2, metric: 'dot', multivector: 'max_sim' } }
         })
       }
     )
   ]
 })
 const store = host.backend('qdrant')
-const articles = store.use(vector).collection('articles', { dimensions: 2, metric: 'dot' })
-await articles.upsert([
+const documents = store.use(vector).collection(name, { dimensions: 2, metric: 'dot' })
+await documents.upsert([
   { id: 'a', vector: [2, 0] },
   { id: 'b', vector: [1, 0] }
 ])
-await store.api.qdrantRescore.updateVectors('articles', [
-  { id: 'a', vector: [0, 1] },
-  { id: 'b', vector: [3, 0] }
+await store.api.qdrantRescore.updateVectors(name, [
+  {
+    id: 'a',
+    vector: [
+      [0, 1],
+      [0, 1]
+    ]
+  },
+  {
+    id: 'b',
+    vector: [
+      [3, 0],
+      [3, 0]
+    ]
+  }
 ])
-const hits = await articles
+const hits = await documents
   .near([1, 0])
-  .topK(10)
-  .rescore({ query: [1, 0], topN: 2 })
+  .topK(2)
+  .rescore({
+    query: [
+      [1, 0],
+      [1, 0]
+    ],
+    topN: 1
+  })
   .all()
-console.log(hits.map((hit) => ({ id: hit.id, score: hit.score })))
+console.log(hits.map((hit) => hit.id).join(','))
 ```
 
-`updateVectors(collection,points,ctx?)` 只更新当前组织已存在点的额外槽，使用 `wait:true`，返回原生 `operation_id/status` 操作记录，不改变 search/source、payload 或 TTL。重复 ID、非稠密数组和非法向量在 I/O 前拒绝。多向量写入与 query 使用非空二维数组，内层维度一致。原生缺点错误及未知写结果沿原错误链，不自动重试。
+预期输出：
 
-`rescore` 只可接在 `topK(k)` 后；`topN` 默认 k，必须为不大于 k 的正安全整数。每次终点只发一次 Query API：prefetch 使用原 search 槽、k、可下推 where、组织、期限与原 minScore；outer 使用额外槽并取 topN。`score` 是 outer 引擎分数；prefetch 分数不由协议返回。函数 where 在 outer 命中后由原共享 reader 执行且不补搜，因此可能不足 topN。`withVector()` 仍返回原标准向量，之后可接通用 `rerank`，后者保留当前引擎 score 并新增 rerankScore。
+```text
+b
+```
 
-Qdrant 1.15.5 必须在集合首次创建时声明额外槽，不能在线给旧集合补槽。已有缺槽或配置不符集合的新操作报 `UNSUPPORTED_CAPABILITY`，原标准读写保持可用；不会重建集合或迁移数据。标准 upsert 仍整点替换，可能清除额外槽，应用需在其后重写额外向量。移除 Feature 后标准读写仍保留此原替换语义。额外槽检索及分数由 Qdrant 完成，不在 JavaScript 评分。
+安装时 `collections` 按逻辑名称声明额外槽。`dimensions` 必填；`metric` 默认 cosine；`multivector: 'max_sim'` 选择非空二维向量，省略则为 dense。只接受声明过的集合。两行全整数矩阵可用于更新和查询；fetch 与 SDK 适配器把 multivector 数字编码为 `1.0` 等 float JSON 字面量，不改变数值、payload 或 sparse indices。
 
-Qdrant 1.15.5 对首行全为非负整数的两行多向量矩阵存在原生 JSON 歧义：它可能把矩阵解码为 sparse vector 并拒绝。适配器保留原 QDRANT_REQUEST_FAILED 证据，不变形向量或重试；本版本的三行矩阵与 dense 向量已实际验证。
+`updateVectors` 只更新当前组织已存在点的额外槽，wait:true，返回原生操作结果，不改标准向量、payload 或期限。重复 ID、空/不规则矩阵、非法数字在请求前拒绝。`rescore` 接在 `topK(k)` 后，`topN` 默认 k，必须是 1 到 k 的安全整数。一次终点使用一个 Query API 请求：prefetch 使用原搜索槽、组织、期限、可下推条件与 minScore 召回 k，outer 返回 topN。score 是最终引擎分数；函数 where 在 outer 命中后执行且不补搜。`withVector()` 仍返回标准向量；通用 `rerank` 另加 rerankScore。
+
+Qdrant 1.15.5 必须在集合首次创建时声明额外槽。旧集合缺槽或配置不符时，新功能报 `UNSUPPORTED_CAPABILITY`；不会重建集合或迁移数据，标准读写仍可用。标准 upsert 整点替换，可能清除额外槽，应在其后重写额外向量。
+
+## 组织隔离
+
+相同逻辑 ID 可以在两个组织分别存储。组织条件在排名前执行。
+
+```ts doc-test=run
+import { createStorageHost } from '@migaia/storage-host'
+import { vector } from '@migaia/storage-contract'
+import { qdrantBackendPlugin } from '@migaia/storage-plugin-qdrant'
+
+await using host = await createStorageHost({
+  plugins: [qdrantBackendPlugin({ url: process.env.QDRANT_URL ?? 'http://127.0.0.1:6333' })]
+})
+const name = 'guide_' + crypto.randomUUID().replaceAll('-', '')
+const documents = host
+  .backend('qdrant')
+  .use(vector)
+  .collection<{ category: string }>(name, { dimensions: 2, metric: 'dot' })
+const tenant = host
+  .org('11111111-1111-4111-8111-111111111111')
+  .backend('qdrant')
+  .use(vector)
+  .collection(name, { dimensions: 2, metric: 'dot' })
+await documents.upsert([{ id: 'a', vector: [1, 0] }])
+await tenant.upsert([{ id: 'a', vector: [2, 0] }])
+console.log((await documents.near([1, 0]).topK(1).all())[0]?.score)
+console.log((await tenant.near([1, 0]).topK(1).all())[0]?.score)
+```
+
+预期输出：
+
+```text
+1
+2
+```
+
+组织视图共享物理集合，不为每个组织创建集合或索引。`dropOrg(id)` 在当前 collectionPrefix 中发现托管集合，仅清理该组织，包含过期点，保留共享集合及其他组织。
+
+## 选择原生功能
+
+工厂第二参数选择 Feature，增加 store.api 下的方法，没有事务投影。
+
+| 子入口与工厂                                          | API 与边界                                                                                                                                                            |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/features/hybrid` · `qdrantHybridFeature()`          | qdrantHybrid.query 恰好两个 named dense/sparse prefetch 分支，fusion 为 rrf；updateSparseVectors 只更新已配置 sparse 槽，indices 为唯一非负整数且与有限 values 等长。 |
+| `/features/recommend` · `qdrantRecommendFeature()`    | qdrantRecommend.recommend 保留 best_score、lookup 与原生样本策略。                                                                                                    |
+| `/features/group-by` · `qdrantGroupByFeature()`       | qdrantGroupBy.search 保留原生多值分组，不提供 SDK 1.11 未转发的 with_lookup。                                                                                         |
+| `/features/management` · `qdrantManagementFeature()`  | 集合、别名、快照与显式删除。                                                                                                                                          |
+| `/features/rescore` · `qdrantRescoreFeature(options)` | 额外槽更新与查询链重排。                                                                                                                                              |
+
+自管原生方法使用物理 collection 名，仅默认组织可用。管理 `deleteByFilter(logicalCollection, where, options?, ctx?)` 与 `purgeExpired(logicalCollection, options?, ctx?)` 也可按组织执行。前者不加存活条件；后者一次采样墙钟清理过期点。两者无 count/scroll，返回 `{operationId, status}`；wait 默认 true，filter 删除的 ordering 可为 weak、medium、strong。operationId 不是删除数；其他方法保留原生 boolean/可空 snapshot。
+
+## 连接与失败处理
+
+根默认使用 fetch。`/http` 的 `fetchHttp(url, apiKey?)` 可创建端口；`/client` 的 `qdrantClientHttp(client)` 借用真实 SDK client，不改其配置，也不关闭它。SDK 1.11 没有 per-call signal，已发请求必须等待真实结算；fetch 接收操作取消信号。关闭拒绝新调用，等待实际请求与 iterator。检测检查标准 vector、TTL 和组织清理所需方法；可选原生 Feature 方法在调用时检查，缺少时在修改前报 UNSUPPORTED_CAPABILITY。
+
+修改不自动重试，不跟随重定向。4xx 用 QDRANT_REQUEST_FAILED，网络/5xx 用 QDRANT_UNAVAILABLE，坏响应用 QDRANT_RESPONSE_INVALID，source 为 storage.backend.qdrant。HTTP 保留可取得的 status/body；SDK 1.11 非等待 snapshot 遇到 202 可能丢失 status 并截断消息，此时 response-invalid 不代表操作未接受；fetch 返回原生 null。先核实原生状态，再决定是否重试。
+
+hooks 仅观察，抛错或拒绝交给 report，不取消业务；修改行为使用 host pipeline。遥测不含认证头或正文。只有组织和期限保留路径强制建索引，动态 payload 路径可能没有索引；成本取决于引擎计划、候选数和传输字节。

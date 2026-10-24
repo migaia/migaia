@@ -1,114 +1,224 @@
-# Using Qdrant storage
+# Qdrant usage guide
 
-## Queries and payloads
+Start a real Qdrant service first. Examples default to `http://127.0.0.1:6333`; set `QDRANT_URL` for another service address. Each uses a fresh collection name and writes data. Host disposal does not delete collections.
 
-Declare real dimensions and one metric (`cosine`, `dot`, `euclid`) when creating a new logical collection. A descriptor without options resolves an existing native schema on execution. Incompatible schemas reject instead of creating placeholder vectors. `collectionPrefix` defaults to `migaia_` and selects the managed namespace.
+## Find your scenario
 
-`near`, `similarTo` and standard `recommend` return the shared immutable vector chain. `topK` requires a positive safe integer; low-level `search(query, { k })` also accepts zero and performs no search. `exact` defaults to false and uses the engine's native index. `exact: true` requests native exact retrieval. Standard `groupBy` processes only the selected top-k hits. Standard recommendation reads requested source samples and uses the shared positive mean minus negative mean; it does not invoke native `best_score`.
+| Need                                   | Scenario                                          |
+| -------------------------------------- | ------------------------------------------------- |
+| Search payloads and retrieve vectors   | [Search and filters](#search-and-filters)         |
+| Set expiry or delete by condition      | [Expiry and deletion](#expiry-and-deletion)       |
+| Rank using extra multivectors          | [Multivector reranking](#multivector-reranking)   |
+| Share collections across organizations | [Organization isolation](#organization-isolation) |
 
-Faithful scalar equality, membership, existence and numeric ranges execute before native ranking. String ranges, substring/prefix predicates and JavaScript functions process only actual bounded native hits. Results can contain fewer than k rows; no refill search occurs. `explain()` reports this distinction, and `requirePushdown()` rejects before native reads when a condition needs client evaluation. Only the reserved organization and expiration paths have mandatory native indexes; arbitrary dynamic scalar paths may be unindexed. Native query cost depends on the actual engine plan, input and returned bytes.
+## Search and filters
 
-Portable payloads and arbitrary UTF-16 IDs round-trip through the original codec. User payloads cannot replace root `$org` or `$expiresAt`. Complete batches are detached and checked before I/O; repeated IDs retain the last validated point.
+A category condition should run before ranking when possible. Client conditions can only remove hits already returned by the engine.
 
-## Expiration and numeric deletion
+```ts doc-test=run
+import { createStorageHost } from '@migaia/storage-host'
+import { vector } from '@migaia/storage-contract'
+import { qdrantBackendPlugin } from '@migaia/storage-plugin-qdrant'
 
-```ts
-import { ttl, DeleteCountMode } from '@migaia/storage-contract'
-import { lockKey } from '@migaia/storage-host/authoring/concurrency'
-
-await documents.upsert([{ id: 'temporary', vector: [1, 0], payload: { category: 'guide' } }], {
-  ttlMs: 5000
+await using host = await createStorageHost({
+  plugins: [qdrantBackendPlugin({ url: process.env.QDRANT_URL ?? 'http://127.0.0.1:6333' })]
 })
-const target = lockKey.vector('documents', 'temporary')
-await host.backend('qdrant').use(ttl).expire(target, 10000)
-console.log(await host.backend('qdrant').use(ttl).remaining(target))
-await host.backend('qdrant').use(ttl).persist(target)
-const deleted = await documents.deleteWhere(
-  { category: 'guide' },
-  { count: DeleteCountMode.scroll }
-)
+const name = 'guide_' + crypto.randomUUID().replaceAll('-', '')
+const documents = host
+  .backend('qdrant')
+  .use(vector)
+  .collection<{ category: string }>(name, { dimensions: 2, metric: 'dot' })
+await documents.upsert([
+  { id: 'a', vector: [2, 0], payload: { category: 'guide' } },
+  { id: 'b', vector: [1, 0], payload: { category: 'news' } }
+])
+const query = documents.near([1, 0], { exact: true }).where({ category: 'guide' }).topK(2)
+const hits = await query.withVector().all()
+console.log(hits.map((hit) => hit.id).join(','))
+console.log(hits[0]?.vector?.join(','))
 ```
 
-TTL uses one client wall-clock sample and a native datetime payload field. Clock skew between clients affects expiration. Omitted `ttlMs` preserves a live point's deadline; a new or expired point becomes unlimited. Zero means immediately invisible. Missing/unlimited `remaining` returns undefined; `expire` and `persist` return false for missing or expired points. Text, bytes and record TTL targets are unsupported. No background timer removes data.
+Expected output:
 
-Deletion includes physically present expired points. Default `precount` sends one exact count followed by one deletion with the same filter and `wait: true`; concurrent writes can make that count differ from the later actual deletion. Explicit `scroll` collects IDs observed on native pages before sending any ID deletion and returns the number of successfully submitted IDs. Writes during scanning may or may not be observed; uncollected IDs added after collection remain. Once collected, an ID is deleted even if its payload changes.
-
-Native precount and management filter deletion reject conditions that Qdrant cannot represent faithfully, including general `contains` and `startsWith`. Use explicit `scroll` for those declarative conditions; it evaluates the shared predicate on actual organization-page candidates. Its cost includes all scanned candidates and collected IDs.
-
-## Native Features
-
-```ts
-import { qdrantManagementFeature } from '@migaia/storage-plugin-qdrant/features/management'
-import { qdrantHybridFeature } from '@migaia/storage-plugin-qdrant/features/hybrid'
-import { qdrantRecommendFeature } from '@migaia/storage-plugin-qdrant/features/recommend'
-import { qdrantGroupByFeature } from '@migaia/storage-plugin-qdrant/features/group-by'
+```text
+a
+2,0
 ```
 
-Pass selected Features as the factory's second argument. They add `store.api.qdrantManagement`, `qdrantHybrid`, `qdrantRecommend` and `qdrantGroupBy`, without transaction APIs. Native methods operate on caller-managed physical collection names and preserve genuine SDK parameter/result types.
+`dimensions` sets vector size. `metric` is cosine, dot or euclid. Omitting the whole options object reads an existing schema; a mismatch rejects. Constructing a collection performs no I/O. `exact` defaults to false; true requests native exact search. `topK(k)` requires a positive safe integer. Low-level `search(query, {k: 0})` returns no hits without sending a search.
 
-Hybrid accepts exactly two named dense/sparse prefetch branches and `{ fusion: 'rrf' }`. Sparse updates require configured sparse names, unique nonnegative integer indices, matching lengths and finite values; dense vectors remain untouched. Native recommendation preserves lookup and strategy differences. Native group search preserves multivalue membership and omits the SDK 1.11 `with_lookup` option because that method does not forward it.
+`near` uses the supplied vector, `similarTo(id)` reads an original sample, and standard `recommend` uses the positive-sample mean minus the negative-sample mean. Cosine keeps search and original-sample slots so `withVector()` retains input magnitude within native float32 precision. Euclid distance is negated to produce score. Standard `groupBy` handles only the selected top-k hits.
 
-`qdrantManagement.deleteByFilter(logicalCollection, where, { wait?, ordering? }, ctx)` adds the current organization without expiration filtering. `purgeExpired(logicalCollection, { wait? }, ctx)` sends one organization-scoped deletion for deadlines strictly before one client clock sample. Neither counts or scrolls. Both return `{ operationId, status }`, with wait defaulting to true; operation IDs are never counts. Other management methods preserve native booleans and nullable snapshots.
+Exactly expressible scalar equality, membership, existence and numeric ranges run in the engine. String ranges, substring/prefix conditions and function predicates run after ranking, without refill; fewer than k hits can remain. `explain()` identifies client work. `requirePushdown()` rejects it with QUERY_NOT_PUSHABLE before search I/O. Payloads cannot overwrite reserved root paths `$org` and `$expiresAt`. Portable payloads and arbitrary UTF-16 string IDs round-trip through the shared codec. Upsert validates the whole batch before I/O and keeps the last validated point for a repeated ID. Deletion and standard recommendation deduplicate IDs by first occurrence.
 
-## Organizations, lifetime and failures
+## Expiry and deletion
 
-`host.org(orgId).backend('qdrant')` shares physical collections and adds native tenant filtering before ranking. Point identities include organization identity. Creating an organization does not create collections or indexes. Native self-managed Feature methods are unavailable in organization views; `deleteByFilter` and `purgeExpired` remain organization-scoped. `host.dropOrg` discovers all managed collections in this configuration's namespace and deletes only the requested organization's points, including expired data, while retaining shared collections and other namespaces.
+Persist a temporary point, then delete it through an explicit scan without relying on a timer firing at a particular instant.
 
-Detection normally runs during host creation. With `autoDetect: false`, call `host.detect()` explicitly; business terminals reject before detection without sending implicit detection requests. Server and SDK require version 1.11 or later.
+```ts doc-test=run
+import { createStorageHost } from '@migaia/storage-host'
+import { vector, ttl, DeleteCountMode } from '@migaia/storage-contract'
+import { lockKey } from '@migaia/storage-host/authoring/concurrency'
+import { qdrantBackendPlugin } from '@migaia/storage-plugin-qdrant'
 
-Detection checks the standard vector, TTL and organization cleanup methods. Optional native Feature methods are checked when called; an absent method rejects with `UNSUPPORTED_CAPABILITY` before sending a modification.
+await using host = await createStorageHost({
+  plugins: [qdrantBackendPlugin({ url: process.env.QDRANT_URL ?? 'http://127.0.0.1:6333' })]
+})
+const name = 'guide_' + crypto.randomUUID().replaceAll('-', '')
+const documents = host
+  .backend('qdrant')
+  .use(vector)
+  .collection<{ category: string }>(name, { dimensions: 2, metric: 'dot' })
+await documents.upsert([{ id: 'a', vector: [1, 0], payload: { category: 'guide' } }], {
+  ttlMs: 60_000
+})
+const ttlApi = host.backend('qdrant').use(ttl)
+const target = lockKey.vector(name, 'a')
+console.log(await ttlApi.persist(target))
+console.log(await ttlApi.remaining(target))
+console.log(await documents.deleteWhere({ category: 'guide' }, { count: DeleteCountMode.scroll }))
+```
 
-`dispose()` seals new calls and waits for accepted native requests and iterators. Its primary and symbolic cleanup Promises are separately cached. The backend never closes a borrowed HTTP or SDK client. Native fetch receives the operation cancellation signal. SDK 1.11 lacks per-call signals, so its request must actually settle before admission is released. No write is automatically retried or redirected; sent failures may have an unknown result.
+Expected output:
 
-Errors use `storage.backend.qdrant`: native 4xx is `QDRANT_REQUEST_FAILED`, network/5xx is `QDRANT_UNAVAILABLE`, and malformed or unexpected responses are `QDRANT_RESPONSE_INVALID`. Original errors and all evidence available from the adapter stay reachable. HTTP retains full status/body; SDK 1.11 itself discards status and truncates the message of `QdrantClientUnexpectedResponseError` for a non-waiting snapshot returning 202. That path reports response-invalid even though the snapshot may be accepted. The HTTP port returns native null for that accepted response. There is no automatic fallback or replay. Hooks contain sanitized route, elapsed time and available status, without authentication headers or payloads.
+```text
+true
+undefined
+1
+```
 
-Deletion and standard recommendation capture dense string ID arrays through the shared vector input owner. Native requests retain first-occurrence ID deduplication. Deletion count options use the same shared admission without changing precount or scroll behavior.
+`ttlMs` is nonnegative milliseconds; 0 makes a point immediately invisible. Omission retains an active point's expiry; new or already-expired points become persistent. `expire` and `persist` return false for missing/expired points. `remaining` returns undefined for missing/persistent points. Only `lockKey.vector(collection, id)` targets are supported. Expiry uses the client wall clock, so skew matters. There is no background physical-deletion task.
 
-Cancellation after SDK dispatch does not undo a native modification; the request can still return success. Backend disposal waits for that actual result. A lost response leaves the outcome unknown and is never replayed automatically. Synchronous observer errors and rejected observer Promises are only reported; intervention uses the host's original pipeline.
+Deletion includes expired points that physically remain. Default precount issues an exact count and a wait:true deletion with the same filter. Concurrent changes may make the count differ from the final deletion. scroll collects matching IDs before deleting them in batches and returns successfully committed IDs. Scanning is not a snapshot: new points may be seen or left behind, and collected IDs are deleted even if they later stop matching.
 
-## Native named-vector rescoring
+If a condition cannot be represented exactly, precount and management deleteByFilter reject with source `@migaia/storage-contract`, code UNSUPPORTED_CAPABILITY. Explicit `count: 'scroll'` supports common predicates by scanning this organization's candidates.
 
-`qdrantRescoreFeature` from `@migaia/storage-plugin-qdrant/features/rescore` declares one extra vector slot per logical collection at installation. `dimensions` is required, `metric` defaults to `cosine`, and `multivector: 'max_sim'` selects multivectors instead of dense vectors. Only collections declared in the `collections` map are eligible.
+## Multivector reranking
 
-```ts
+Recall candidates with standard vectors, then select final hits with an extra multivector slot.
+
+```ts doc-test=run
 import { createStorageHost } from '@migaia/storage-host'
 import { vector } from '@migaia/storage-contract'
 import { qdrantBackendPlugin } from '@migaia/storage-plugin-qdrant'
 import { qdrantRescoreFeature } from '@migaia/storage-plugin-qdrant/features/rescore'
+
+const name = 'guide_' + crypto.randomUUID().replaceAll('-', '')
 await using host = await createStorageHost({
   plugins: [
     qdrantBackendPlugin(
-      { url: 'http://localhost:6333' },
+      { url: process.env.QDRANT_URL ?? 'http://127.0.0.1:6333' },
       {
         rescore: qdrantRescoreFeature({
-          collections: { articles: { dimensions: 2, metric: 'dot' } }
+          collections: { [name]: { dimensions: 2, metric: 'dot', multivector: 'max_sim' } }
         })
       }
     )
   ]
 })
 const store = host.backend('qdrant')
-const articles = store.use(vector).collection('articles', { dimensions: 2, metric: 'dot' })
-await articles.upsert([
+const documents = store.use(vector).collection(name, { dimensions: 2, metric: 'dot' })
+await documents.upsert([
   { id: 'a', vector: [2, 0] },
   { id: 'b', vector: [1, 0] }
 ])
-await store.api.qdrantRescore.updateVectors('articles', [
-  { id: 'a', vector: [0, 1] },
-  { id: 'b', vector: [3, 0] }
+await store.api.qdrantRescore.updateVectors(name, [
+  {
+    id: 'a',
+    vector: [
+      [0, 1],
+      [0, 1]
+    ]
+  },
+  {
+    id: 'b',
+    vector: [
+      [3, 0],
+      [3, 0]
+    ]
+  }
 ])
-const hits = await articles
+const hits = await documents
   .near([1, 0])
-  .topK(10)
-  .rescore({ query: [1, 0], topN: 2 })
+  .topK(2)
+  .rescore({
+    query: [
+      [1, 0],
+      [1, 0]
+    ],
+    topN: 1
+  })
   .all()
-console.log(hits.map((hit) => ({ id: hit.id, score: hit.score })))
+console.log(hits.map((hit) => hit.id).join(','))
 ```
 
-`updateVectors(collection,points,ctx?)` changes only the extra slot of existing points in the current organization, uses `wait:true`, and returns the original native `operation_id/status` record. It leaves search/source, payload and TTL intact. Duplicate IDs, sparse arrays and invalid vectors reject before I/O. Multivector writes and queries use nonempty matrices with consistent inner dimensions. Native missing-point failures and unknown write results retain their original error chain and are never replayed automatically.
+Expected output:
 
-`rescore` is available only after `topK(k)`. `topN` defaults to k and must be a positive safe integer no greater than k. Each terminal sends one Query API call: prefetch retains the original search slot, k, pushed where, organization, expiry and original minScore; the outer query uses the extra slot and retains topN. `score` is the outer engine score; the protocol does not return prefetch scores. Function where predicates run through the shared reader after outer hits, without refilling, so fewer than topN hits may remain. `withVector()` still returns the original standard vector. Portable `rerank` may follow, preserving the current engine score and adding rerankScore.
+```text
+b
+```
 
-Qdrant 1.15.5 needs the extra slot at initial collection creation; existing collections cannot acquire it online. New operations on a missing or incompatible slot reject with `UNSUPPORTED_CAPABILITY`, while standard reads and writes remain usable. No collection is recreated and no data is migrated. Standard upsert still replaces the whole point and can clear the extra slot; applications must rewrite extra vectors afterward. Removing the Feature preserves that same standard replacement behavior. Qdrant owns rescoring and its score; JavaScript does not score candidates.
+At installation, collections maps logical names to extra slots. dimensions is required; metric defaults to cosine. `multivector: 'max_sim'` selects a nonempty matrix; omission selects dense vectors. Only declared collections are accepted. Updates and queries support two-row all-integer matrices. Both fetch and SDK adapters encode multivector numbers as float JSON literals such as `1.0`, preserving values, payloads and sparse indices.
 
-Qdrant 1.15.5 has a native JSON ambiguity for two-row multivectors whose first row consists of nonnegative integers: it may decode the matrix as a sparse vector and reject it. The original QDRANT_REQUEST_FAILED evidence is preserved; the adapter does not reshape vectors or retry. Three-row matrices and dense vectors are verified against this version.
+updateVectors changes only the extra slot of existing points in the current organization, with wait:true. It returns a native operation result without changing standard vectors, payload or expiry. Duplicate IDs, empty/ragged matrices and invalid numbers reject before the request. Put rescore after topK(k). topN defaults to k and must be a safe integer from 1 through k. Each terminal uses one Query API request: prefetch uses the original search slot, organization, expiry, pushable conditions and minScore to recall k, then the outer query selects topN. Score is the final engine score. Function predicates filter outer hits without refill. withVector() still returns standard vectors; common rerank adds rerankScore separately.
+
+Qdrant 1.15.5 requires the extra slot when a collection is first created. Missing/mismatched slots in older collections reject the new feature with UNSUPPORTED_CAPABILITY. No collection is recreated and no data migrated; standard reads/writes remain available. Standard upsert replaces the whole point and may clear its extra slot, so update extra vectors afterwards.
+
+## Organization isolation
+
+The same logical ID can hold different vectors in two organizations. Organization filtering happens before ranking.
+
+```ts doc-test=run
+import { createStorageHost } from '@migaia/storage-host'
+import { vector } from '@migaia/storage-contract'
+import { qdrantBackendPlugin } from '@migaia/storage-plugin-qdrant'
+
+await using host = await createStorageHost({
+  plugins: [qdrantBackendPlugin({ url: process.env.QDRANT_URL ?? 'http://127.0.0.1:6333' })]
+})
+const name = 'guide_' + crypto.randomUUID().replaceAll('-', '')
+const documents = host
+  .backend('qdrant')
+  .use(vector)
+  .collection<{ category: string }>(name, { dimensions: 2, metric: 'dot' })
+const tenant = host
+  .org('11111111-1111-4111-8111-111111111111')
+  .backend('qdrant')
+  .use(vector)
+  .collection(name, { dimensions: 2, metric: 'dot' })
+await documents.upsert([{ id: 'a', vector: [1, 0] }])
+await tenant.upsert([{ id: 'a', vector: [2, 0] }])
+console.log((await documents.near([1, 0]).topK(1).all())[0]?.score)
+console.log((await tenant.near([1, 0]).topK(1).all())[0]?.score)
+```
+
+Expected output:
+
+```text
+1
+2
+```
+
+Organization views share physical collections without creating collections/indexes per organization. dropOrg(id) discovers managed collections within collectionPrefix and removes only that organization's points, including expired ones. Shared collections and other organizations remain.
+
+## Choose native features
+
+Pass Features as the factory's second argument to add methods under store.api. None has a transaction projection.
+
+| Entry and factory                                     | API and limits                                                                                                                                                                                                                    |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/features/hybrid` · `qdrantHybridFeature()`          | qdrantHybrid.query requires exactly two named dense/sparse prefetch branches with rrf fusion. updateSparseVectors changes configured sparse slots only; indices are unique nonnegative integers with equally sized finite values. |
+| `/features/recommend` · `qdrantRecommendFeature()`    | qdrantRecommend.recommend preserves best_score, lookup and native sample strategies.                                                                                                                                              |
+| `/features/group-by` · `qdrantGroupByFeature()`       | qdrantGroupBy.search preserves multivalue groups; SDK 1.11's unforwarded with_lookup option is absent.                                                                                                                            |
+| `/features/management` · `qdrantManagementFeature()`  | Collections, aliases, snapshots and explicit deletion.                                                                                                                                                                            |
+| `/features/rescore` · `qdrantRescoreFeature(options)` | Extra-slot writes and query reranking.                                                                                                                                                                                            |
+
+Self-managed native methods use physical collection names and are available only in the default organization. Management deleteByFilter(logicalCollection, where, options?, ctx?) and purgeExpired(logicalCollection, options?, ctx?) also work in organization views. The former does not add an active-point condition; the latter samples the wall clock once. Neither counts nor scrolls. Both return `{operationId, status}`; wait defaults to true. Filter deletion accepts weak, medium or strong ordering. An operationId is not a deletion count. Other methods retain native boolean/nullable snapshot results.
+
+## Connections and failures
+
+The root uses fetch by default. `/http` exports fetchHttp(url, apiKey?); `/client` exports qdrantClientHttp(client) for a real SDK client. Configuration and lifetime remain with the caller. SDK 1.11 has no per-call signal, so a dispatched request must settle. Fetch receives the operation signal. Closing rejects new calls and waits for actual requests and iterators. Detection checks methods needed for standard vector, TTL and organization cleanup. Optional native Feature methods are checked when called; a missing method rejects with UNSUPPORTED_CAPABILITY before mutation.
+
+Mutations are sent once without automatic retry or redirect following. Explicit 4xx errors use QDRANT_REQUEST_FAILED, network/5xx errors use QDRANT_UNAVAILABLE, and invalid responses use QDRANT_RESPONSE_INVALID, all with source storage.backend.qdrant. HTTP retains available status/body evidence. For a nonwaiting snapshot with HTTP 202, SDK 1.11 may discard status and truncate the message. response-invalid then does not establish rejection; fetch returns native null. Inspect native state before deciding to retry.
+
+Hooks observe only; their throws/rejections are reported without cancelling the operation. Use the host pipeline to change behavior. Telemetry contains neither authentication headers nor request bodies. Only reserved organization/expiry paths are guaranteed indexes. Dynamic payload paths may be unindexed; cost depends on the engine plan, candidate count and transferred bytes.

@@ -1,88 +1,215 @@
 # SPARQL usage guide
 
-Use the installation example in [README.en.md](./README.en.md). All configuration factories are synchronous and perform no I/O; the host owns installation, detection, pipelines and disposal. With `autoDetect: false`, call `await host.detect()` explicitly before any endpoint operation. An undetected endpoint rejects before business I/O without running detection implicitly.
+## Find your scenario
 
-## HTTP and native endpoints
+| Need                               | Scenario                                                      |
+| ---------------------------------- | ------------------------------------------------------------- |
+| Filter, delete or replace RDF      | [Query and change quads](#query-and-change-quads)             |
+| Check an old value before a change | [Detect competing updates](#detect-competing-updates)         |
+| Use a remote SPARQL service        | [HTTP reads and writes](#http-reads-and-writes)               |
+| Import or export one graph         | [Graph documents and ontology](#graph-documents-and-ontology) |
 
-```ts
-import { httpEndpoint } from '@migaia/storage-plugin-sparql/http'
-const endpoint = httpEndpoint({
-  queryUrl: 'http://localhost:3030/storage/sparql',
-  updateUrl: 'http://localhost:3030/storage/update',
-  graphStoreUrl: 'http://localhost:3030/storage/data',
-  auth: { bearer: 'deployment-token' }
+## Query and change quads
+
+Write two names and delete only Alice.
+
+```ts doc-test=run
+import { Store } from 'oxigraph'
+import { createStorageHost } from '@migaia/storage-host'
+import { rdf } from '@migaia/storage-contract'
+import { term } from '@migaia/storage-host/authoring/rdf'
+import { sparqlBackendPlugin } from '@migaia/storage-plugin-sparql'
+import { oxigraphEndpoint } from '@migaia/storage-plugin-sparql/oxigraph'
+
+await using host = await createStorageHost({
+  plugins: [sparqlBackendPlugin({ endpoint: oxigraphEndpoint(new Store()) })]
 })
-```
-
-Use absolute HTTP(S) URLs without embedded credentials. `auth` is exactly Basic `{ basic: { user, password } }` or Bearer `{ bearer }`, and is optional. `graphStoreUrl` is optional unless Graph Store or ontology is selected. URL API encodes each graph query value once. Mutation redirects are not followed; requests are sent once. HEAD404 returns false; GET404 rejects. Reads may follow native fetch redirects. Do not put credentials or raw query text in telemetry.
-
-A supported deployment must atomically execute one conditional SPARQL 1.1 Modify and provide read-after-write visibility on the same dataset. The protocol alone cannot certify that guarantee. Actual validation covers Apache Jena Fuseki 6.2.0 and Oxigraph 0.4.11; other deployments require the same native checks. `httpEndpoint` supplies no `atomicUpdate`; `oxigraphEndpoint(new Store())` supplies one genuine native Store.update. Never infer interactive transactions from multiple HTTP requests.
-
-## Ground RDF and shared query chains
-
-```ts
-const rdfApi = store.use(rdf)
-await rdfApi.add([quad])
-const selected = rdfApi
+const store = host.backend('sparql')
+const quad = {
+  subject: term.iri('urn:example:alice'),
+  predicate: term.iri('urn:example:name'),
+  object: term.literal('Alice'),
+  graph: term.defaultGraph
+}
+await store
+  .use(rdf)
+  .add([quad, { ...quad, subject: term.iri('urn:example:bob'), object: term.literal('Bob') }])
+const selected = store
+  .use(rdf)
   .match({ predicate: quad.predicate })
-  .where((q) => q.object.value === 'Alice')
-console.log(selected.explain())
-const count = await selected.delete()
-const replaced = await rdfApi.match({}).replace(quad, { ...quad, object: term.literal('Ada') })
+  .where((value) => value.object.value === 'Alice')
+console.log(await selected.count())
+console.log(await selected.delete())
+console.log(await store.use(rdf).match({}).count())
 ```
 
-`match` uses the original shared immutable query chain: where, traversal `follow`/`inverse`, orderBy, distinct, skip, limit, pages, scalar terminals and streaming. Native SELECT supplies ground matches; remaining operators use the shared executor. `requirePushdown()` rejects unsupported client operators before native I/O. `delete()` counts canonical selected quads accepted by the draft; `replace(old,new)` changes only a selected old quad and returns 0 if it was not selected. Root counts settle only after native commit confirmation; transaction counts describe the current draft. No query mutation bypasses its filters or creates another executor.
+Expected output:
 
-Each organization maps logical default/named graphs into its own named graph prefix `urn:migaia:org:<orgId>:`. Root and borrowed organization views use the same mapping. Raw SPARQL is available only in the configured default organization. `host.dropOrg(id)` removes all its physical graphs, including blank-node documents and empty named graphs; it does not drop other organizations.
+```text
+1
+1
+1
+```
 
-## Native optimistic transactions
+A quad uses named subject/predicate nodes, a named or literal object, and a default/named graph. term.literal accepts language or datatype. Term binding handles escaping. Standard RDF rejects blank nodes and variables.
 
-```ts
+match(pattern) accepts a subset of quad fields. Its query chain supports where, follow/inverse traversal, orderBy, distinct, skip, limit, pages, aggregates and stream. explain() distinguishes native from client steps; requirePushdown() rejects unsupported client steps before I/O.
+
+delete counts deduplicated canonical quads actually selected and accepted for change. replace(old, new) changes only a selected old quad, returning 0 otherwise. Root calls wait for commit confirmation; counts inside a transaction describe its draft.
+
+## Detect competing updates
+
+Require Alice to remain present before replacing it with Ada. If another transaction removed Alice, this commit conflicts.
+
+```ts doc-test=run
+import { Store } from 'oxigraph'
+import { createStorageHost } from '@migaia/storage-host'
+import { rdf } from '@migaia/storage-contract'
+import { ConcurrencyPolicy } from '@migaia/storage-host/authoring/concurrency'
+import { term } from '@migaia/storage-host/authoring/rdf'
+import { sparqlBackendPlugin } from '@migaia/storage-plugin-sparql'
+import { oxigraphEndpoint } from '@migaia/storage-plugin-sparql/oxigraph'
+
+await using host = await createStorageHost({
+  plugins: [sparqlBackendPlugin({ endpoint: oxigraphEndpoint(new Store()) })]
+})
+const store = host.backend('sparql')
+const quad = {
+  subject: term.iri('urn:example:alice'),
+  predicate: term.iri('urn:example:name'),
+  object: term.literal('Alice'),
+  graph: term.defaultGraph
+}
+await store.use(rdf).add([quad])
 await store
   .tx()
   .concurrency(ConcurrencyPolicy.optimistic({ retries: 1 }))
   .run(async (scope) => {
     scope.use(rdf).expect([quad])
-    scope.use(rdf).expectAbsent([{ ...quad, object: term.literal('new') }])
     await scope.use(rdf).delete([quad])
-    await scope.use(rdf).add([{ ...quad, object: term.literal('new') }])
-    console.log(await scope.use(rdf).match({}).count())
+    await scope.use(rdf).add([{ ...quad, object: term.literal('Ada') }])
   })
+console.log((await store.use(rdf).match({}).all()).map((value) => value.object.value).join(','))
 ```
 
-Import `ConcurrencyPolicy` from `@migaia/storage-contract`. The scope retains only native RDF with `expect`/`expectAbsent` and an update-only raw tag; no KV or lock methods exist. The original transaction owner handles accepted work, first failure, iterators, finalizers and expired scopes. The draft deduplicates canonical quads with last-operation-wins. Preconditions are conjunctions; each absent quad gets an independent NOT EXISTS.
+Expected output:
 
-One conditional DELETE/INSERT WHERE writes user data and a random commit marker in `urn:migaia:commit`. One ASK confirms it, then a separate cleanup removes the marker. Only a successful Update plus a successful false ASK is a confirmed conflict eligible for the original optimistic retry policy. An ASK failure or unknown sent Update seals further writes with `SPARQL_COMMIT_UNKNOWN`, without replay. Cleanup failure only reports because user data already committed. Without preconditions, add/delete use canonical quad set identity: the final membership operation for the same quad wins, but concurrent transactions inserting different objects can retain both quads. Predicate values have no last-writer guarantee and the read set is not checked automatically; use `expect` for that protection.
+```text
+Ada
+```
 
-On an actual `atomicUpdate` endpoint, a transaction may instead contain exactly one `scope.use(sparql)\`INSERT DATA { ... }\`.update()`body. It cannot mix any RDF operations/preconditions or a second raw body; generic HTTP rejects this authority before writing. Root raw`select/ask/construct/update` tags use shared value binding and do not expose endpoint fields. Never interpolate SPARQL grammar as an ordinary value; use the original trusted fragment helpers where grammar is intentional.
+expect conditions are conjunctions; expectAbsent requires each supplied quad to be absent. Draft changes deduplicate canonical quad identities with last-operation-wins for the same quad. Reads do not automatically form a read set. Concurrent insertions of different objects can both survive; predicates have no single-value guarantee.
 
-The marker graph is reserved in standard RDF, Graph Store and ontology. A crashed process may leave markers. After inspecting active operations, an administrator may run `CLEAR SILENT GRAPH <urn:migaia:commit>` directly against the native database. Raw administrative access or direct native mutation of the reserved graph is outside standard conditional-commit guarantees.
+ConcurrencyPolicy.optimistic({retries: 1}) retries one real conflict at most. The callback may run again, so perform external side effects after the transaction succeeds. backoffMs defaults to 20. Omitting the policy does not enable automatic optimistic retry. Only optimistic concurrency is supported, without key locks, wait/fail policies or interactive remote transactions.
 
-## Graph Store and ontology
+One conditional DELETE/INSERT WHERE writes user quads and a commit marker, followed by ASK confirmation and marker cleanup. Only a successful Update followed by a successful ASK explicitly finding no marker is a retryable conflict. Unknown Update outcomes, failed ASK and cancellation during confirmation produce SPARQL_COMMIT_UNKNOWN. Later writes on that backend stop and are not replayed. Marker cleanup failures are reported after user data has committed.
 
-```ts
-const target = { graph: term.iri('https://example/schema') }
+A transaction may execute one raw update body only when its endpoint supplies atomicUpdate. It cannot mix RDF operations/preconditions or a second raw body. Oxigraph provides one native Store.update; httpEndpoint does not provide this capability and rejects before sending a write. Transaction raw templates expose update only, without select/ask/construct.
+
+## HTTP reads and writes
+
+Start a real service that supports SPARQL Query and Update. The defaults use the `storage` dataset on local port 3030. For other addresses, set `SPARQL_QUERY_URL`, `SPARQL_UPDATE_URL` and `SPARQL_GRAPH_STORE_URL` to the same dataset; the Graph Store URL is used for graph document operations. This inserts data and reads it with ASK; the data remains in the service.
+
+```ts doc-test=run
+import { createStorageHost } from '@migaia/storage-host'
+import { sparql } from '@migaia/storage-contract'
+import { term } from '@migaia/storage-host/authoring/rdf'
+import { sparqlBackendPlugin } from '@migaia/storage-plugin-sparql'
+import { httpEndpoint } from '@migaia/storage-plugin-sparql/http'
+
+await using host = await createStorageHost({
+  plugins: [
+    sparqlBackendPlugin({
+      endpoint: httpEndpoint({
+        queryUrl: process.env.SPARQL_QUERY_URL ?? 'http://127.0.0.1:3030/storage/sparql',
+        updateUrl: process.env.SPARQL_UPDATE_URL ?? 'http://127.0.0.1:3030/storage/update',
+        graphStoreUrl: process.env.SPARQL_GRAPH_STORE_URL ?? 'http://127.0.0.1:3030/storage/data'
+      })
+    })
+  ]
+})
+const query = host.backend('sparql').use(sparql)
+const subject = term.iri('urn:example:' + crypto.randomUUID())
+const predicate = term.iri('urn:example:name')
+const value = term.literal('Alice')
+await query`INSERT DATA { ${subject} ${predicate} ${value} }`.update()
+console.log(await query`ASK { ${subject} ${predicate} ${value} }`.ask())
+```
+
+Expected output:
+
+```text
+true
+```
+
+queryUrl/updateUrl are required; graphStoreUrl is needed only for graph-document features. URLs must be absolute HTTP(S) without embedded credentials. Optional auth is exactly `{basic: {user, password}}` or `{bearer}`. Mutations are sent once without redirect following. Reads retain fetch behavior. Graph Store HEAD404 returns false; GET404 rejects. Authentication headers are not diagnostic data.
+
+The root raw tag supports select, ask, construct and update. A normal string is data, not syntax; bind RDF terms as template values. Raw SELECT/CONSTRUCT also support blank nodes scoped to one response.
+
+Deployment must guarantee atomic execution of one conditional Modify and read-after-write visibility on the same dataset. Native paths cover Fuseki 6.2.0 and Oxigraph 0.4.11; other deployments must supply equivalent guarantees. An HTTP protocol is not itself a database transaction.
+
+## Graph documents and ontology
+
+Write a graph, export it and import with replace. Every Feature used here is installed in this example.
+
+```ts doc-test=run
+import { Store } from 'oxigraph'
+import { createStorageHost } from '@migaia/storage-host'
+import { rdf } from '@migaia/storage-contract'
+import { term } from '@migaia/storage-host/authoring/rdf'
+import { sparqlBackendPlugin } from '@migaia/storage-plugin-sparql'
+import { oxigraphEndpoint } from '@migaia/storage-plugin-sparql/oxigraph'
+import { graphStoreFeature } from '@migaia/storage-plugin-sparql/features/graph-store'
+import { ontologyFeature } from '@migaia/storage-plugin-sparql/features/ontology'
+
+await using host = await createStorageHost({
+  plugins: [
+    sparqlBackendPlugin(
+      { endpoint: oxigraphEndpoint(new Store()) },
+      {
+        graphs: graphStoreFeature(),
+        ontology: ontologyFeature()
+      }
+    )
+  ]
+})
+const store = host.backend('sparql')
+const target = { graph: term.iri('urn:example:people') }
 const document = {
   format: 'text/turtle' as const,
-  text: '<https://example/a> <https://example/p> "value" .'
+  text: '<urn:example:alice> <urn:example:name> "Alice" .'
 }
 await store.api.graphStore.putGraph(target, document)
-await store.api.graphStore.mergeGraph(target, document)
 console.log(await store.api.graphStore.hasGraph(target))
-console.log(await store.api.graphStore.getGraph(target, 'application/n-triples'))
+console.log((await store.api.graphStore.getGraph(target)).text.includes('Alice'))
+console.log(await store.api.ontology.importOntology(target, document, { mode: 'replace' }))
 await store.api.graphStore.removeGraph(target)
-const parsed = await store.api.ontology.importOntology(target, document, { mode: 'replace' })
-console.log(await store.api.ontology.exportOntology(target, 'text/turtle'))
+console.log(await store.api.graphStore.hasGraph(target))
 ```
 
-Select `graphStoreFeature()` and/or `ontologyFeature()` during installation. Both expose root-only `store.api` methods and empty transaction projections. Targets are exactly `{ default: true }` or `{ graph: namedNode }`. Every method accepts the original operation context as its last argument. Get/export default to Turtle; documents require explicit Turtle or N-Triples format. Missing native graph ports reject in host detection; there is no Feature prepare or transaction client.
+Expected output:
 
-Ontology import defaults to merge; replace uses one native per-graph replace. Its count is parsed quads, including duplicates, not newly inserted rows. N3 parser/writer preserve RDF 1.1 literals and blank sharing within a document, assign a fresh prefix per import, and reject RDF-star. Inference and supplier-specific rule configuration stay with the native database.
+```text
+true
+true
+1
+false
+```
 
-## Observability and cost
+target selects exactly `{default: true}` or `{graph: namedNode}`. A document has format text/turtle or application/n-triples and complete document text. get/export default to Turtle. Graph Store offers getGraph, putGraph, mergeGraph, removeGraph and hasGraph. Ontology offers importOntology/exportOntology. Import mode defaults to merge; replace uses a real per-graph replacement. Its count is parsed statements including duplicates, not newly inserted statements.
 
-Operations and Feature leaves enter the original async pipeline. Storage hooks and `beforeSparqlUpdate`, `onPreconditionFailed`, `onHttpRequest` only observe; throwing/rejecting observers report and cannot cancel or rewrite operations. The update hook exposes operation/precondition counts; HTTP events expose sanitized route, method, optional status and elapsed time, never authentication or bodies. Use pipeline stages for intervention.
+n3 handles RDF1.1 syntax. Blank nodes share identity within a document and receive fresh identities across imports. RDF-star and document variables reject. No reasoning is performed. The endpoint must actually provide graphStore. Feature methods are on store.api; organization views retain their graph mapping. Transaction scopes have no graph-document API.
 
-Point work is proportional to actual quad bytes. Draft accumulation and deduplication are expected O(q); conditional text is O(q + p) plus RDF bytes. Match fetches its native result and shared client operators follow their original query budgets; documents cost O(bytes + parsed quads) and transfer the whole document. These costs exclude database planning, network latency and inference. No second retry, clock, resource or query platform is installed.
+## Organizations and the reserved graph
 
-A business failure in the original transaction callback, accepted draft task or finalizer uses `TRANSACTION_FAILED`. The original failure remains primary and its native type/stack survives. Native read failures are classified at the native read boundary, so a transport failure inside a transaction still uses `SPARQL_UNAVAILABLE`; existing contract/protocol failures are not relabelled.
+host.org(id).backend('sparql') maps logical default/named graphs into physical named graphs under `urn:migaia:org:<orgId>:`. Organizations remain separate. dropOrg removes all the target organization's graphs, including empty named graphs and blank-node documents. Raw SPARQL is available only in the configured default organization.
+
+Standard RDF, graph documents and ontology reject the reserved `urn:migaia:commit` graph. A crash can leave markers. Only after confirming that no commits are active should an administrator run `CLEAR SILENT GRAPH <urn:migaia:commit>` directly in the database. Bypassing the standard API to change that graph breaks confirmation guarantees.
+
+## Failures and disposal
+
+Error source is storage.backend.sparql. SPARQL_REQUEST_FAILED means explicit native rejection and retains status/body/cause. SPARQL_UNAVAILABLE means read transport/5xx failure. SPARQL_RESPONSE_INVALID means invalid results/documents. SPARQL_COMMIT_UNKNOWN requires checking the dataset before constructing a new backend. Callback, draft-task and finalizer business failures use TRANSACTION_FAILED while retaining native type, primary failure and cause chain. Existing contract/protocol errors keep their identities.
+
+Hosts detect by default; with autoDetect:false, call await host.detect() first. Closing rejects new calls, cancels active reads and waits for dispatched commits. dispose() retains cleanup failures in its main Promise. Symbol.asyncDispose shares cleanup and reports failures. Endpoints, Oxigraph Stores and supplied clients remain with the caller, and the plugin never closes them. Oxigraph 0.4.11 has no public close/dispose method.
+
+Hooks observe only and report failures; use the host pipeline for intervention. HTTP observations contain neither authentication nor bodies. Query cost includes actual result bytes and remaining client work. Graph documents are parsed/transferred as a whole; transaction condition text grows with quads/preconditions. No database-plan or inference performance claim is made.

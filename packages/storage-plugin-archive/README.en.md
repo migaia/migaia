@@ -1,41 +1,134 @@
 # @migaia/storage-plugin-archive
 
-Explicitly move eligible string-key records from a transactional hot backend into immutable gzip NDJSON blob segments. Install the ordinary extension after both borrowed backends, then call `detect()` before operations. Memory, SQLite and PostgreSQL hot backends allow the required external I/O; IndexedDB hot storage is rejected before cold I/O.
+Move rarely read records out of the storage used for everyday updates and into blob storage, while keeping reads by original key and an explicit restore operation. Connect the plugin to installed hot and object backends, then run archive rules when your application chooses. Each segment commits separately; the whole archive job is not a transaction across both stores.
+
+## Sound familiar?
+
+- Hot tables grow, but deleting old records makes historical queries lose data.
+- A record changes after archive upload, so deleting the earlier snapshot would lose the new value.
+- An archive job fails halfway through without showing what already committed.
+- Cold objects remain after restoration because there is no way to tell which ones are still referenced.
+
+## Why choose it?
+
+- After upload, it rereads hot values and moves only unchanged records that still match. See [Archive by retention time](./USEGUIDE.en.md#archive-by-retention-time).
+- Reads prefer hot values; explicit restore does not overwrite concurrent hot writes. See [Read restore and clean up](./USEGUIDE.en.md#read-restore-and-clean-up).
+- Progress includes only certainly committed records and segments. See [Observe committed progress](./USEGUIDE.en.md#observe-committed-progress).
+- Explicit sweep removes only this plugin's unreferenced archive objects. See [Read restore and clean up](./USEGUIDE.en.md#read-restore-and-clean-up).
+
+## Start here
+
+Use real in-memory records and blobs to demonstrate the whole flow. Choose persistent backends for production data.
 
 ```ts doc-test=run
 import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
 import { archivePlugin } from '@migaia/storage-plugin-archive'
 
-const base = await createStorageHost({
+await using base = await createStorageHost({
   plugins: [memoryBackendPlugin({ id: 'hot' }), memoryBackendPlugin({ id: 'cold' })]
 })
 const host = await base.use(
   archivePlugin({
-    id: 'history',
+    id: 'archive',
     hot: 'hot',
     cold: 'cold',
-    rules: [{ name: 'old', prefix: 'event:', olderThanMs: 0, where: () => ({ old: true }) }]
+    rules: [
+      {
+        name: 'old',
+        prefix: 'event:',
+        olderThanMs: 86_400_000,
+        where: (cutoff) => ({ createdAt: { lt: cutoff } })
+      }
+    ]
   })
 )
 await host.detect()
-try {
-  await host.backend('hot').putRecord({ old: true, answer: 42 }, 'event:one')
-  console.log(await host.extensions.historyRun())
-  console.log(await host.extensions.historyGet('event:one', { restore: true }))
-  console.log(await host.extensions.historySweep())
-} finally {
-  await host.dispose()
-}
+const hot = host.backend('hot')
+await hot.putRecord({ createdAt: 0, value: 42 }, 'event:a')
+console.log((await host.extensions.archiveRun()).archived)
+console.log((await hot.getRecord('event:a')) === undefined)
+console.log((await host.extensions.archiveGet('event:a')) !== undefined)
 ```
 
-The plugin id supplies the function prefix: `history` publishes `historyRun`, `historyGet`, and `historySweep`.
+Expected output:
 
-`historyRun({ rule?, limit?, signal?, timeoutMs? })` applies rules in declaration order and counts matching candidates toward the limit. Each segment defaults to 1,048,576 uncompressed UTF-8 bytes; an oversized record gets its own segment. A completed cold upload precedes one original hot transaction that checks the immutable object, rechecks records, updates manifests/reference counts and deletes unchanged eligible hot rows. Earlier committed segments survive later failures; cold orphans remain for explicit `historySweep()`.
+```text
+1
+true
+true
+```
 
-`historyGet(key, { restore? })` checks hot storage first, otherwise validates the entire gzip/NDJSON snapshot through EOF before its finite hot/manifest recheck. Restore is opt-in and preserves a concurrently written hot value. Map/Set use the shared collections codec; bytes become its tagged portable representation. Date and functions are unsupported.
+For age-based selection, read [Archive by retention time](./USEGUIDE.en.md#archive-by-retention-time). To bring data back, read [Read restore and clean up](./USEGUIDE.en.md#read-restore-and-clean-up).
 
-`historySweep()` follows opaque blob pages and point-checks segment directories under the same original control lock. It removes only unreferenced objects with this plugin's prefix and format/version metadata. It never scans every manifest. All methods use the current host organization, and closing drains accepted work without closing borrowed storage independently.
+## What hand-written code gets wrong
 
-Errors use `storage.backend.archive`: `INVALID_OPTION`, `INVALID_ARGUMENT`, `ARCHIVE_OPERATION_FAILED`, `ARCHIVE_SEGMENT_INVALID`. Original causes remain reachable. Host admission/close, contract capability, conflict and coded cancellation errors preserve their identity. Archive-owned run failures expose only certainly committed `{ archived, skipped, segments }` progress; frozen original conflicts keep their identity and expose these counts through `onArchiveRunError`.
+Upload-then-delete looks simple, but it is not one atomic operation across two stores. This example is shown without execution.
 
-Frozen contract errors keep their original identity, including source `@migaia/storage-contract` and code `WRITE_CONFLICT`; use `onArchiveRunError` to read committed progress.
+```ts doc-test=check
+import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { blob } from '@migaia/storage-contract'
+
+await using host = await createStorageHost({
+  plugins: [memoryBackendPlugin({ id: 'hot' }), memoryBackendPlugin({ id: 'cold' })]
+})
+const hot = host.backend('hot')
+const value = await hot.getRecord('event:a')
+await host
+  .backend('cold')
+  .use(blob)
+  .put('archive:a', new TextEncoder().encode(JSON.stringify(value)))
+// Pitfall: a newer hot value may have appeared during upload.
+await hot.deleteRecord('event:a')
+// Pitfall: a failure here has no manifest for read-through or orphan cleanup.
+```
+
+After upload, archive uses the hot transaction to compare records, commit references and delete only eligible originals. It does not pretend that the entire job is a cross-store transaction.
+
+## The model in three minutes
+
+| Name              | Meaning                                                                        |
+| ----------------- | ------------------------------------------------------------------------------ |
+| hot               | A backend with records, iteration, transactions and the required control lock. |
+| cold              | A blob backend.                                                                |
+| rule              | A string-key prefix, business condition and retention duration.                |
+| segment           | An immutable gzip NDJSON object containing records.                            |
+| Run / Get / Sweep | Explicit movement, read/restore by key, and unreferenced-object cleanup.       |
+
+Publish hot/cold first, then call host.use(archivePlugin(...)) and detect. Operations use the current host organization. The plugin id sets function prefixes; it creates no backend slot.
+
+## Typical scenarios
+
+| Scenario                           | Building blocks           | Details                                                                                 |
+| ---------------------------------- | ------------------------- | --------------------------------------------------------------------------------------- |
+| Archive events older than a day    | rule + archiveRun         | [Archive by retention time](./USEGUIDE.en.md#archive-by-retention-time)                 |
+| Read history and restore on demand | archiveGet + archiveSweep | [Read restore and clean up](./USEGUIDE.en.md#read-restore-and-clean-up)                 |
+| Share rules across organizations   | host.org + historyRun/Get | [Organizations and custom prefixes](./USEGUIDE.en.md#organizations-and-custom-prefixes) |
+| Monitor a partially completed job  | hooks + progress results  | [Observe committed progress](./USEGUIDE.en.md#observe-committed-progress)               |
+
+## Install
+
+The package is currently private: true for this repository's workspace. Do not assume a registry release. From an application in the same workspace:
+
+```bash
+pnpm add --workspace @migaia/storage-host @migaia/storage-contract @migaia/storage-plugin-archive
+```
+
+Use Node.js 24 or later with gzip CompressionStream/DecompressionStream. The in-memory example needs no additional peer. For PostgreSQL, SQLite or object storage, install the corresponding workspace plugin and its real driver dependencies.
+
+## Essential API
+
+| API                                         | Purpose                                             |
+| ------------------------------------------- | --------------------------------------------------- |
+| `archivePlugin({id, hot, cold, rules})`     | Install an ordinary extension.                      |
+| `host.extensions.archiveRun(options?)`      | Move matching records and return progress.          |
+| `host.extensions.archiveGet(key, options?)` | Read a hot/archived value, optionally restoring it. |
+| `host.extensions.archiveSweep(ctx?)`        | Remove unreferenced archive objects.                |
+| `host.org(id).extensions`                   | Call the same flat functions for an organization.   |
+
+## Contract details
+
+With id archive, the functions are archiveRun, archiveGet and archiveSweep. With id history, they are historyRun, historyGet and historySweep. There is no nested archive object or extension-specific dispose.
+
+Memory, SQLite and PostgreSQL can supply hot storage. IndexedDB cannot perform cold I/O during its transaction and rejects installation before cold I/O. Cold storage must supply blob. The plugin creates no drivers and does not replace hot transactions or independently close borrowed backends.
+
+Segments commit separately; later failures do not roll back earlier segments. Explicit Sweep removes unreferenced cold objects. Get does not restore by default. Sweep neither archives nor deletes records by age. Error source is storage.backend.archive. See the [usage guide](./USEGUIDE.en.md) for rules, cancellation and failure progress.

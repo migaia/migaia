@@ -1,325 +1,177 @@
-# Storage host authoring
+# storage-host usage guide
 
-Use a named descriptor factory when defining a generic backend factory. This preserves its actual store, literal instance id, client and selected Feature types without application casts.
+[中文](./USEGUIDE.md) · [Overview and installation](./README.en.md)
 
-```ts
-import { createStorageHost, definePlugin } from '@migaia/storage-host'
+| Your task                                          | Start here                                                          |
+| -------------------------------------------------- | ------------------------------------------------------------------- |
+| Store data, then add another backend               | [Install and add backends](#install-and-add-backends)               |
+| Commit several writes together                     | [Transactions and record queries](#transactions-and-record-queries) |
+| Read and query objects by their primary key        | [Use an entity repository](#use-an-entity-repository)               |
+| Keep the same key separate for each organization   | [Separate organization data](#separate-organization-data)           |
+| Store application log records                      | [Open a log store](#open-a-log-store)                               |
+| Handle installation, callback or shutdown failures | [Handle errors and finish work](#handle-errors-and-finish-work)     |
 
-const health = definePlugin('health', (core) => ({
-  install: () => {
-    core.onDispose(() => undefined)
-    return { status: () => 'ready' }
-  }
-}))
-await using host = await createStorageHost({ plugins: [health] })
-console.log(host.extensions.status())
+## Install and add backends
+
+Put initial plugins in `plugins`. A later `use()` returns a host type that includes the new backends. Both references share one lifetime; close either host reference once.
+
+```ts doc-test=run
+import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+
+const original = await createStorageHost({
+  plugins: [memoryBackendPlugin({ id: 'session' })]
+})
+try {
+  const host = await original.use(memoryBackendPlugin({ id: 'drafts' }))
+  await host.detect()
+  await host.backend('session').set('user', 'ada')
+  await host.backend('drafts').set('title', 'First draft')
+  console.log(await host.backend('session').get('user')) // ada
+  console.log(await host.backend('drafts').get('title')) // First draft
+} finally {
+  await original.dispose()
+}
 ```
 
-Ordinary plugins can expose application extensions without pretending to provide a storage backend. They retain PluginHost's original Feature dependency protocol. Backend plugins additionally declare an authentic kind token and register one admitted store.
+Plugins in one batch cannot borrow each other's unpublished backends. Install base backends first, then install a cache, archive or other composed plugin with `use()`. IDs must be unique throughout the host.
 
-`host.api[id]` exposes that published backend's original `store.api`; different instances may use the same method names. Each read returns a frozen backend-id snapshot, so later `use` batches do not change a saved snapshot and failed batches publish no ids. Methods retain the original Feature lifetime guard, including extracted methods after disposal.
+`autoDetect` defaults to `true`. Set it to `false` when configuration must finish before checks, then explicitly call `detect()`. Concurrent checks share their Promise; successful checks are cached and failed checks can be retried. `installTimeoutMs` bounds the entire install batch in milliseconds, defaults to `30000`, and accepts finite nonnegative numbers. Failed installation rolls back that batch's resources without deleting previously installed backends.
 
-Keep native connections private. `featureExpose` contains own enumerable string-keyed functions, including `getClient`; additional transaction-aware backends supply `getTransactionClient(scope)` through the original transaction owner. The host reserves `getKind`, `getStore`, `getBackendId`, `getLifecycle`, `onDispose` and `getScheduler`.
+## Transactions and record queries
 
-Register resources in the original install window through `core.onDispose`. Pass supported operations through `core.execution` before native I/O. Do not create a second transaction owner, middleware runner, capability table or Feature graph. `capabilityInstaller` returns the original port issued by `provideCapabilities`; genuine `implement(...)` records carry runtime authority.
+The memory backend can write strings, bytes and records in one transaction. A failed callback does not commit its draft. Obtain queries through the `records` capability; this example reads committed data after the transaction finishes.
 
-Installation timeout applies to one entire batch. A late store that loses publication authority is disposed rather than published. A failed batch does not change previously published membership. Disposal seals admission immediately, waits for the original cleanup completion and preserves collected errors.
-
-Schema and codec adapters live in `@migaia/storage-host/entity`: `passthrough`, `fromStandardSchema`, `jsonCodec`, `structuredCodec`, `binaryCodec` and `selectCodec`. Codec contracts remain owned by `@migaia/storage-contract`. The JSON route is named `json@1` and delegates to the portable JSON codec; undefined, nonfinite numbers and other unsupported values reject instead of being silently converted. Encoding and decoding errors carry host `SERIALIZE_FAILED` or `DESERIALIZE_FAILED`, with the contract and original codec failures on cause. Structured and binary identity codecs retain their original references; binary output can use explicit base64 routing on text backends.
-
-The entity entry also owns the existing `REPOSITORY_KEY_PREFIX` and `repositoryMigrationKey(entityName)` layout markers shared by repositories and backend raw-record firewalls. Their persisted strings remain unchanged.
-
-`host.hooks.on(name, listener)` and constructor `hooks` share one synchronous observation registry. Installed plugins use `core.hooks.on` during their original install window; the registration owns its unsubscribe handle. `core.emit(name, () => payload)` and the injected Feature `emit` evaluate a payload once only when listeners exist. Listener throws, hostile then getters and asynchronous rejection are reported without changing the storage result. Backend packages can augment the public `IStorageHookMap` interface.
-
-Use `core.stageBindings` inside the backend constructor to bind its real store before `registerStore`. The seven observer families remain observation-only. Host methods such as `codecStages(store)` and `transactionStages(store)` accept only an exact store published by that host; transaction projections validate the original transaction owner. Bindings created before listeners still observe later registration and cancellation.
-
-Register environment checks through `core.registerDetect(check)` or the injected Feature function during the original installation window. Checks run in plugin installation and registration order, using the original registration cancellation signal. `createStorageHost` completes them before returning by default; failure retains the original error and releases constructed resources in reverse order. With `autoDetect: false`, explicitly call `await host.detect()`. Until it succeeds, real execution endpoints reject with contract `UNSUPPORTED_CAPABILITY` before business I/O and never run implicit probes. Concurrent `detect()` calls share one Promise. Success is cached, failure can be retried, and a newly installed plugin batch requires explicit detection of its new registrations. The original resource scope drains checks already running during closure.
-
-`createOrgId()` generates a lowercase UUID through the host's original `crypto.randomUUID()`. The `org` option is validated by the contract and captured before plugins run, defaulting to the zero UUID. Observation payloads use this immutable default organization identity.
-
-`host.org(orgId)` returns an immutable business view with the same plugin, Feature API and transaction inference. Extracted methods retain their organization. Neither the view nor its backends expose installation, drop or close authority. Native backends register actual targets through `core.registerOrgBinding(store, { backend, drop })` in the original installation window. `core.getOrgContext(orgId)` exposes only the original execution, observation, call context and transaction API projections. Ordinary extensions and Feature APIs receive immutable `this.orgId`; `this.backend(borrowed)` projects only dependencies captured during that registration's installation.
-
-Backend authors that construct physical organization children lazily must capture core.createOrgAuthoringPort() during their original installation. Retain that port only inside the backend closure. It forwards the original controller, local key-lock, createRevisionPort independent revision-fact factory, and exact-store controller/value-commit registration functions after installation, while the same registration owns child cleanup. It rejects after registration revocation. No business view or getOrgContext result exposes this authority. Native organization views use their own registered controller when present, preserving their physical resource lifetime and filtered notifications.
-
-The authoring entry also re-exports asyncDisposeKey from the original plugin-host owner. Backends use that same symbol when a supported runtime lacks native Symbol.asyncDispose; no new symbol or lifecycle owner is created.
-
-Entities accept `defineEntity(...).connect(host.org(orgId).backend(id))` and installation-borrowed `core.getPublishedBackend(id)` views with a KV declaration. Dynamic IDs do not declare KV channels by default; callers must state the known dependency channel type. Only the exact view authenticated by the original host registry can reuse resource-free KV/record facts. Copies and additional Proxies inherit no admission. Entity gains no close authority; native transaction ownership remains unchanged. Arbitrary raw inputs still require the original resource admission, and record metadata uses the same business view.
-
-The memory default organization shares the configured namespace with ordinary root calls. Other organizations use `namespace + "/" + orgId`; plugin instances remain independent. Data, deadlines, revisions and locks are separate per namespace under one original controller. Root change subscriptions receive all organizations; organization backends and hooks receive their own organization only. `host.dropOrg(orgId)` attempts every published backend and retains successful deletions. Failure throws a native `AggregateError` with `ORG_DELETE_FAILED`, every original failure in `errors` and the first failure as `cause`.
-
-An organization backend grants only capabilities held by that native namespace's provider. Arbitrary custom Feature capabilities that capture the root store are not copied implicitly to another organization: absent tokens return false from `has` and `UNSUPPORTED_CAPABILITY` from `use`. Original root capabilities remain unchanged. Feature store/transaction APIs use the call-context projection above. Organization SQL/SPARQL entry points reject before the driver; root calls retain their original behavior.
-
-`host.envelopeStages(store, { operation, targetVersion })` binds an exact published store and captures immutable operation metadata. Pass its `observe` directly to the contract `migrateEnvelope` or `migrateEnvelopeSync`; the other callbacks observe the original envelope checks and migration completion. It executes no migration, retains no state, preserves an unknown version as undefined, and only reports listener failure.
-
-Backend authors consume finite shared functions and `IBackendChangeController` types from `@migaia/storage-host/authoring/backend`. Call `core.createChangeController(options)` and `core.registerChangeController(store, controller)` only during the original installation window: construct, admit through `registerStore`, then register that exact store controller. The original scope rolls back partial construction; the controller retains its original mutation leases, event queue and idempotent cleanup Promise. Features use the injected `getChangeController()` to read their own store controller, returning undefined when none is registered. Authors cannot replace this getter.
-
-`/authoring/backend` also provides the original flat-key encoding/decoding, range snapshots/comparisons, JSON byte budgets and opaque-token functions. Import pure key and context validation directly from the contract. `resolveStorageNamespace(configured)` validates and returns the original target; the three-argument form `resolveStorageNamespace(configured, orgId, defaultOrgId)` preserves each instance prefix: the default organization uses configured; other organizations use `configured + "/" + orgId`. A configured value ending in `/` plus a canonical UUID rejects with contract `INVALID_ARGUMENT`; a bare UUID is allowed. Empty values and configuration defaults remain owned by each backend.
-
-Opaque tokens retain their original format and conditional fallback. Native entropy failures reject with contract `UNSUPPORTED_CAPABILITY`, retaining the original error as cause.
-
-`planChannelWrite` and `collectUniqueIndexOwners` share channel-conflict and unique-index rules; each backend supplies only its own error constructors. `normalizeError`, `isStorageErrorFamily` and `invokeExtension` preserve real error objects, original causes and extension context. Cancellation and timeout helpers reuse the original utils signal path and send cleanup failures to the existing operation reporter.
-
-`observeStorageBatch(stages, scheduler, operation, count, invoke)` shares the original batch-observation algorithm. Admit the operation through the original store/scope before supplying its actual operation stages and host scheduler. The helper invokes native work once and emits one before/after or before/error pair; elapsed time includes the original pipeline and native settlement. Before/error count is the input entry count; after uses a numeric result as the actual count, otherwise the input count. Rejection preserves the original error object. The helper owns no pipeline, transaction or close authority; callers return empty batches directly after admission.
-
-`core.getPublishedBackend(id)` and the Feature port borrow only backends committed by an earlier batch, during the original installation window. Current-batch, future and unknown IDs reject with `BACKEND_NOT_INSTALLED`. Borrowed views expose neither `dispose` nor the async-disposal symbol, and releasing a consumer never closes its dependencies. Business methods retain their original receiver, Promise and registration admission. `has`/`use` read the same contract capability table, including valid frozen or unprovided bases, and observe later capability publication and release immediately.
-
-Backend core `createKeyLockPort()` constructs the shared local key-lock port only during the original installation window; `/authoring/backend` exports only its `IBackendKeyLockPort` type. `attempt(ctx, holder, native, stages?, admissionSignal?, ranges?)` consumes original contract identities and attempt ordinals: try first, enter the existing utils FIFO only after a wait decision, and retain locks through actual native commit, rollback and cleanup. `inspectLocks()` returns detached snapshots in canonical order. The physical backend closure owns the port and disposes it after its final reference; the creating plugin never automatically closes a shared port. Disposal seals admission and drains actual work, with distinct cached primary and symbolic cleanup Promises. Optional ranges enables the same FIFO protection for async root points and ranges; an empty array protects points only. Optimistic roots wait for existing pessimistic holders, while omission preserves original transaction behavior.
-
-`probe(identities, ranges?, current?)` probes canonical identities directly in the same original lock table, returning the first detached `ILockHolding` or undefined. Point probes use at most three fixed channel Map.get calls; ranges inspect only active locks in the selected channel. Range entries contain `{channel,lower,upper}`, with bounds from contract `snapshotConcurrencyLockRange`. `attemptWrite(ctx,holder,write,stages?,admissionSignal?,ranges?,admit?)` shares the original attempt and FIFO. Its native write callback is synchronous, so the final lock check and mutation occupy one uninterrupted turn. Optimistic root writes create no lock row while respecting existing pessimistic protection. Waiting or observation callbacks require a final recheck excluding this attempt's own lease; no range locks are created. Optional current must be an original live attempt context; only entries of its actual held lease are excluded while other holders remain visible. Declared keys or matching owner text grant no exemption. Optional admit(commit) connects existing physical admission after logical keys; commit runs at most once and rechecks both operation and member signals. The original lease remains held until real physical cleanup settles.
-
-`core.registerValueCommit(store, commit)` accepts the exact handed-off store only during its original installation window. `/authoring/backend` exports `IBackendValueCommit`, which receives fixed `{prefix,expected,key,value}` plus optional write context; expected contains the raw string key/value snapshot. Entity borrows this endpoint after asynchronous schema, codec and projection preparation. The native backend compares and writes in one uninterrupted turn inside its existing physical admission. Controller, envelope observation and this endpoint share one internal row, released by the original scope; entity receives no registration or closure authority. When multiple hosts admit the same frozen or raw store, envelope boundaries fan out to its still-registered original observers. Release removes only that host binding; one host keeps its original observer endpoint.
-
-The controller exposes its original `closingSignal`. Pass it as the optional admission signal so direct member disposal removes only that member’s queued request; it never closes a shared provider or releases an already running native attempt.
-
-The original backend installation core exposes the captured host default identity as readonly `defaultOrgId`. `createRevisionPort()` creates local revision facts during that same installation window. One physical data universe shares this object; `read/write/epoch/clear` use the existing text/bytes/record channels and backend-captured key identities. Advance revisions only after native commit succeeds. Clear drops tombstones and advances the channel epoch so older snapshots cannot pass an ABA check. This port owns no resources or closure authority over other members.
-
-The host root exports `memoryBackendPlugin()` and `memoryBackendKind`. Each installation owns isolated memory data, including when namespaces match. Text, bytes and record transactions reuse the original transaction owner, concurrency policy and local locks. `scope.use(kv)` exposes eight text operations on that same transaction; `scope.use(records)` executes queries through its actual record cursor. A configured owner.label is captured once; defaults use runtime and pid, or browser. The native client getter returns undefined; the transaction client checks the original scope and returns undefined. Pass selected Feature roots as the separate final argument: `memoryBackendPlugin(options, features)`. Use undefined to omit options; the default id remains memory.
-
-Memory root asynchronous `set/setBytes/putRecord/remove/removeBytes/deleteRecord`, clears and record prefix deletion share the original concurrency policy and one operation budget; ctx.concurrency overrides the original default. Replacement protects the target and every potentially displaced channel in canonical order. Synchronous set/remove/clearValues probe active locks directly and immediately throw LOCK_REJECTED when busy, without executing asynchronous policies. Clears and prefix deletion inspect only the affected channels; final checks and native data/revision changes have no await gap. Keys and mutable payloads are captured before waiting. Reads acquire no write locks; concurrency policy does not change ConflictPolicy duplicate/replacement rules.
-
-```ts
+```ts doc-test=run
 import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
 import { records } from '@migaia/storage-contract'
 
-type Order = { state: string; total: number }
-await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
-const memory = host.backend('memory')
-await memory.transaction(async (tx) => {
-  await tx.set('status', 'ready')
-  await tx.setBytes('receipt', new Uint8Array([1, 2]))
-  await tx.putRecord({ state: 'paid', total: 20 }, 'order-1')
-})
-console.log(await memory.use(records).query<Order>().where({ state: 'paid' }).select('total').all())
+type IOrder = { state: string; total: number }
+const host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+try {
+  const memory = host.backend('memory')
+  await memory.transaction(async (tx) => {
+    await tx.set('status', 'ready')
+    await tx.setBytes('receipt', new Uint8Array([1, 2]))
+    await tx.putRecord({ state: 'paid', total: 20 }, 'order-1')
+  })
+  console.log(await memory.get('status')) // ready
+  const rows = await memory
+    .use(records)
+    .query<IOrder>()
+    .where({ state: 'paid' })
+    .select('total')
+    .all()
+  console.log(rows) // [{ total: 20 }]
+} finally {
+  await host.dispose()
+}
 ```
 
-Memory root `getMany`, `setMany`, `removeMany` and `removeByPrefix` are also available through `use(kv)`. Batch structural keys share the original text-channel identity; string writes remain readable through single-key and sync methods. Nonempty write batches commit once through the original transaction draft, and failure leaves no earlier items behind. Duplicate write keys reject before opening the transaction; repeated removals count once. Each high-level call enters one pipeline and one operation observation pair. Empty batches enter neither a pipeline nor a new transaction; prefix deletion uses the existing radix range.
+Memory filters records on the client. With a database backend, pushdown and transaction scope depend on that backend. Conflict handling may replay a transaction callback. Keep email, payments and other effects that cannot roll back outside it.
 
-Record where/select/all reuse the contract query core; this memory source honestly declares client execution. Transaction text batches support canonical structural keys, prefixes and validated ttlMs durations. Failure discards the draft, while commit checks key revisions and clear epochs before publishing committed batches. Closing the resource cancels this instance queued lock admission and drains accepted native transactions through actual settlement.
+Strings, bytes and records have channel-conflict rules for the same logical key. Choose the appropriate write policy when replacing another channel. Do not treat these channels as unrelated key spaces. Duplicate batch-write keys reject before commit; duplicate deletion keys count once.
 
-Native ranges, transaction drafts and prefix deletion reuse one package-private compressed radix implementation. Hash maps retain point lookups; ranges localize their bounds and merge only matching draft candidates, with tombstones masking physical entries. The tree maintains extrema and adjacent leaves without query-time full sorting. Text and records retain independent index instances.
+## Use an entity repository
 
-The /entity registerRecordIndexBackfillStore entry registers only the backfill provider captured by the original backend factory. RecordIndexBackfillPhase retains the persisted canonical/legacy values. Native backends mark their existing coded contention error with markRecordIndexBackfillContentionFailure without replacing it. Sessions, checkpoints and actual native transactions stay with the backend; entity orchestration uses the same original private table.
+`defineEntity<T>()({...})` declares an object's primary key and indexes. `connect(store)` attaches it to a backend. This example writes first, then queries through the same definition.
 
-The original backend scope factory calls `core.createTransactionApi(scope)` before freezing that same view; no selected transaction methods returns undefined. Selected methods enter original `runTransactionOperation` admission, draining and first-failure handling before execution and the lazy client getter for its current scope. Expired methods preserve the original backend transaction error. `core.getChainMethods(family)` supplies selected methods to the original query/builder creators; derived branches retain the same method references and original this. Pure fluent configuration stays synchronous and does not enter intervention; actual I/O terminals enter the original runner. Built-in and duplicate names reject before capability publication.
-
-Memory root operations wrap the complete pipeline inside the original concurrency budget. Intervention fixes input once and its terminal invokes the sole original loop, so `await next()` still observes actual mutation and failure. Stage waits count toward the same deadline; cancellation starts neither derived locks nor native writes. Transaction loops remain outside the pipeline and reenter it for each actual attempt, including callback replay after commit conflicts.
-
-`defineEntity` is available from `@migaia/storage-host/entity`. Record repositories compose through the original `repo.in(scope)` view and `repo.batch` uses one native transaction. Schema, codec and migration work borrows that transaction's original signal. Unique constraints validate the final draft; swaps and delete/reuse remain atomic. A cached index handle is used only after the current native scope confirms readiness; otherwise the same scope scans without building indexes.
-
-Entity archives use `{version, state}` and the shared immutable migration plan. Invalid archives and invalid encoded states keep host `DESERIALIZE_FAILED`/`SERIALIZE_FAILED`, with contract `ENVELOPE_INVALID` as first cause. Unsupported versions and failed migration steps keep the host code with the original contract failure on cause. Legacy `{__v,data}` is not accepted. Comparators require a finite limit and use the shared bounded heap; streams expose the actual disposable iterator.
-
-Entity queries use the shared immutable core: `repo.query().index(name, keyOrRange).where(...).select(...).all()` replaces `findManyBy`; use `.stream()` in place of `streamBy`. Root and transaction queries preserve installed query Feature methods. Object and field conditions execute on the client for this source; explicit indexed queries retain native index preparation or the authoritative fallback. Comparator queries require a finite bound and retain only the selected candidates in the original heap. Transaction queries inherit the original signal and deadline; their terminals accept no separate context.
-
-Entity query `delete()` and `update(patch)` use the same shared selection and page executor. A root repository opens one original record transaction; `repo.in(tx)` joins the current transaction. Counts describe records accepted by that draft, and root calls settle only after native commit confirmation. Patches retain repository validation, normalization, encoding and unique-index checks; validation, encoding or uniqueness failure prevents those writes from committing. Native commit failure or an unknown outcome retains the backend error without automatic replay. Query updates cannot move a primary key: a patch or normalizer that changes the selected physical identity rejects with `INVALID_CONFIG` before writing and cannot replace another entity. Deletion targets the actual selected physical record even when migration changes its logical id. A custom pure KV backend without real record transactions rejects with `UNSUPPORTED_CAPABILITY` before modification, rather than performing non-atomic item writes.
-
-```ts
+```ts doc-test=run
 import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
 import { defineEntity } from '@migaia/storage-host/entity'
 
-await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
-const memory = host.backend('memory')
-const orders = defineEntity<{ id: string; state: string; total: number }>()({
-  name: 'orders',
-  key: 'id',
-  indexes: { byState: { path: 'state' } }
-}).connect(memory)
-const paid = await orders
-  .query()
-  .index('byState', 'paid')
-  .where('total', 'gt', 100)
-  .orderByComparator((left, right) => right.total - left.total)
-  .limit(20)
-  .select('id', 'total')
-  .all()
-await using stream = orders.query().limit(20).stream()
-for await (const order of stream) console.log(order)
-await memory.transaction(async (tx) => {
-  await orders.in(tx).put({ id: 'next', state: 'paid', total: 200 })
-  console.log(await orders.in(tx).query().where({ state: 'paid' }).select('id').all())
-})
+type IOrder = { id: string; state: string; total: number }
+const host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+try {
+  const orders = defineEntity<IOrder>()({
+    name: 'orders',
+    key: 'id',
+    indexes: { byState: { path: 'state' } }
+  }).connect(host.backend('memory'))
+  await orders.put({ id: 'o1', state: 'paid', total: 20 })
+  console.log(await orders.get('o1'))
+  console.log(await orders.query().index('byState', 'paid').select('id', 'total').all())
+  // [{ id: 'o1', total: 20 }]
+} finally {
+  await host.dispose()
+}
 ```
 
-`connect(store, {codecStages, queryStages})` accepts the corresponding original host stage ports. Codec observations surround each actual conversion. Each query `all` and each stream `next` observes the actual operation; stream counts accumulate, and pauses between advances do not count toward elapsed execution time. Observers never delay or veto storage work; synchronous failures and late rejections go to the existing reporter.
+The repository does not close its backend. Use `orders.in(tx)` inside a transaction; `orders.batch(...)` uses one native record transaction. Schemas and codecs perform runtime validation and conversion; TypeScript types alone do not validate external input. `fromStandardSchema` is available from the same `/entity` entry. Conversion failures retain the original error through `cause`.
 
-Unique writes on a custom value-only backend require record transactions or an atomic value commit endpoint; a sync channel alone does not provide that atomic endpoint. Without either, only that unique-write combination rejects `UNSUPPORTED_CAPABILITY` before modification; ordinary KV writes continue to work. During the original backend installation, call `core.registerStore(store)` before `core.registerValueCommit(store, commit)`. The `IBackendValueCommit` type is exported from `@migaia/storage-host/authoring/backend`: `commit({prefix, expected, key, value}, ctx?)` returns `Promise<void>`. `expected` is the captured array of raw `[key,value]` pairs under `prefix`. After all asynchronous schema and codec preparation, the backend must atomically compare that exact prefix snapshot and write `key/value`, with no await gap between comparison and mutation; changed snapshots reject `WRITE_CONFLICT` without modifying data. The endpoint borrows the original native store and adds no resource or close authority.
+Select `index` or `range` first and only once. `where`, `select`, `skip` and `limit` create new query branches. Pair custom comparators with a finite `limit`, or use `first()`. `stream()` returns a disposable iterator; use `await using` or explicit `dispose()` if stopping early. When available, `watch()` supplies invalidation notifications, not result rows or reliable replay. Transaction queries do not expose `watch()`.
 
-Memory publishes native `ttl` and `counter` capabilities. `expire`, `remaining` and `persist` address the existing text, bytes or record channel; canonical structured text keys share batch identity. Durations are finite and nonnegative, with zero expiring immediately. Lazy expiry applies equally to sync and async reads, enumeration and cross-channel conflict checks. Overwriting a live row preserves its deadline; delete, clear and replacement remove the old channel deadline. `setMany` accepts `ttlMs` in the same atomic draft. Transaction reads retain their first value and deadline, and commit detects expiry of an observed row through the existing revision checks.
+## Separate organization data
 
-`store.use(counter).increment('visits', 1)` atomically updates canonical decimal text in the same original single-key mutation. Missing text starts at zero; malformed decimals, unsafe deltas and overflow reject `INVALID_ARGUMENT` without writing. `tx.use(ttl)` and `tx.use(counter)` use the current native draft and original transaction budget.
+Organization IDs are canonical lowercase UUIDs. Saving an organization view, including extracting one of its methods, keeps that organization fixed.
 
-`@migaia/storage-host/authoring/vector` exports only `recommendStorageVector(positive, negative?)`. It computes positive mean minus negative mean in input order and returns an independent readonly vector. Positive samples must be nonempty; negative samples may be empty. All samples require matching dimensions and finite components. Invalid input reports shared contract `INVALID_ARGUMENT`; original getter failures remain on cause. The function creates no collection, query, or connection. The collection's original query admission rejects a zero cosine direction before native retrieval. Memory scoring, filter execution, and ranking stay private.
+```ts doc-test=run
+import { createStorageHost, createOrgId, memoryBackendPlugin } from '@migaia/storage-host'
 
-Memory natively provides `vector`: `store.use(vector).collection('docs', { dimensions: 2, metric: 'cosine' })` describes a collection in the same namespace; later descriptors may omit matching configuration. Upsert snapshots the complete batch and the last duplicate ID wins. Near/topK, similarTo, and recommend use the contract query chain. Memory is always exact, with descending scores and UTF-16 ID ties, and exposes no native groupBy. Declarative payload, org, and TTL filtering precede ranking; JavaScript predicates inspect only the original bounded hits without refilling. Direct search validates `k: 0` without scanning; chain topK retains its positive-safe-integer contract.
-
-Vector deadlines share the original physical rows and transaction draft. `tx.use(ttl)` can update a vector deadline atomically with KV writes, while vector itself has no generic transaction projection. DeleteWhere includes physically retained expired matches and returns the actual deleted count; both count strategies are equivalent in memory. Organization collections, extracted queries, and native iterators retain their namespace. Drop clears that target and root closure invalidates it. Writes retain the original pipeline, concurrency attempt, vector lock bucket, and controller. Legacy three-channel replace rules remain unchanged.
-
-Optional `capacity: { maxEntries?, maxBytes?, eviction? }` limits public physical entries per native namespace; omission preserves unbounded memory. Both limits must be positive safe integers. `eviction` is `lru` (default) or `lfu`; plugin construction captures the options once and rejects invalid values with `INVALID_ARGUMENT` before native allocation. Doubly linked nodes and frequency buckets maintain LRU/LFU without scanning history. LFU counts writes as hits, so a new low-frequency entry can evict itself. Successful reads update the policy. The original deadline owner and compressed radix reclaim elapsed entries before capacity victims, without timers. Transaction and batch victims commit only with the original draft; waiting and rollback delete no victims early. Busy victims use the original lock budget. `onEvict` reports `{ backendId, backend, orgId, count, channel }` once per affected channel; ordinary deletion and expiry do not emit it, and listener failure is only reported.
-
-`maxBytes` counts actual canonical encodings: UTF-8 text, byteLength for bytes, serialize collections-json for records and vector payloads, plus 8 bytes per vector component. Keys, capacity indexes and TTL metadata are not counted again. An oversized entry follows the same policy and need not remain stored. The original structuredClone record domain is broader: only explicit maxBytes rejects values the existing codec cannot encode (including Date, cycles, undefined and nonfinite numbers) with `UNSUPPORTED_CAPABILITY` before any modification, retaining the original cause. Unbounded memory and maxEntries-only memory preserve the original domain. Map, Set and codec-admitted Uint8Array remain supported.
-
-This is a canonical encoding budget, not a JavaScript heap measurement. Existing codec own-field projection also applies: a raw record ArrayBuffer encodes as `{}` for accounting while native reads still preserve its actual structured-clone value.
-
-Selected Feature APIs and query families retain a native optimistic transaction builder’s original scope and builder methods. Its run terminal remains directly available, key locking stays absent, and concurrency accepts only optimistic policies. The host publishes the original native tx method; it creates no replacement builder.
-
-Memory natively provides `rdf`: `store.use(rdf).add(quads)`, `delete(quads)` and `match(pattern)` reuse shared ground-term admission and canonical identity. Complete batches snapshot before mutation and duplicate quads are idempotent; blank nodes remain in the raw/parser domain. Six fixed compressed radix indexes cover global and graph-local SPO/POS/OSP access. Matching seeks the actual bound prefix and streams candidates without a complete result array. Logical default and named graphs map to real named graphs in the fixed organization and use the shared inverse on output. Namespace, extracted methods, queries and original transaction scopes retain their organization. `tx.use(rdf)` shares the original KV draft, revisions, commit, rollback and iterator lifetime. RDF locks and capacity victims use the same namespace's logical quad identity. New RDF changes broadly invalidate the `all` channel. `maxBytes` counts the shared canonical quad encoding; its six indexes do not count as extra entries.
-
-RDF patterns are native access paths. Where, follow, inverse, ordering and page/after retain the shared query reader's client execution; `requirePushdown()` rejects required client steps truthfully. Native traversal and whole-database snapshots across successive next calls are not provided. Native pattern watch uses the genuine change-feed port. Transactions retain the existing first-read/draft semantics. Legal large literals are never reclassified as public binary keys with a 1 MiB limit.
-
-Memory's real text `watch(key, ctx?)` and existing `subscribeChanges` share the original controller. Root watch stays on the default organization and an org view stays on its own organization; existing root subscribeChanges still observes all organizations. Watch delivers post-commit invalidation hints. One unconsumed slot coalesces matching events to the latest sequence with channel `all` and no keys/scope; it provides no per-event history or replay. The original native generator serializes advances and the iterator owner retains distinct cached main/symbolic cleanup promises. Disposal, abort and root closure wake accepted next calls before draining and unsubscribing, retaining original cancellation reasons. After genuine change-feed admission, records, native RDF patterns and bounded vector queries expose watch. Queries requiring client predicates or traversal reject before subscribing.
-
-Backend authors can reuse `createBackendChangeIterator(controller, { orgId, channel, key?, ctx?, execute? })`. It borrows only the original controller subscription and closing signal, fixes organization/channel/optional text key, coalesces hints in one slot, and reuses resource, context and diagnostic owners. Optional execute receives the original advance and the once-captured context to preserve the backend's existing per-next pipeline. It introduces no controller, event queue, registry or retry platform.
-
-Memory natively provides `blob`, independently of KV/record entries with the same key. `put` uses shared byte/metadata snapshots and checks conditions before taking reader ownership. After complete upload and successful cleanup, the original synchronous commit rechecks etag/nonexistence conditions and applies capacity changes. Cancellation, closure or stream failure writes no partial object. `get` returns the metadata/content snapshot captured at read time; range end is inclusive. Stream and bytes share one consumption right and the original shared resource owner. `list` pages the original compressed radix in UTF-16 key order with cursors bound to org and prefix; `removeByPrefix` removes only matching objects in that org. Blob has no transaction projection or text lock. Capacity counts one entry and body byteLength per object, without counting metadata/indexes again. Notifications broadly invalidate all without exposing physical org keys.
-
-```ts
-import { blob } from '@migaia/storage-contract'
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
-
-await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
-const objects = host.backend('memory').use(blob)
-await objects.put('images/sample', new Uint8Array([1, 2, 3]), { ifNoneMatch: true })
-await using object = (await objects.get('images/sample', { range: { start: 1, end: 1 } }))!
-console.log((await object.bytes())[0]) // 2
+const host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+try {
+  const orgA = createOrgId()
+  const orgB = createOrgId()
+  const a = host.org(orgA).backend('memory')
+  const b = host.org(orgB).backend('memory')
+  await a.set('name', 'Ada')
+  await b.set('name', 'Lin')
+  console.log(await a.get('name'), await b.get('name')) // Ada Lin
+  await host.dropOrg(orgA)
+  console.log(await b.get('name')) // Lin
+} finally {
+  await host.dispose()
+}
 ```
 
-Memory supports records query delete/update, bounded vector query delete after topK, and RDF query delete/replace. Counts include distinct rows actually accepted by the native draft. Root terminals wait for real commit; transaction terminals change only the current draft and rollback exposes no writes. Record patches modify actual stored rows and preserve memory's Date/Map value domain; selected projections remain read-only. RDF replacement affects only an old quad actually selected by the query. Replacing the same quad returns 0; an existing new quad is not duplicated. Vector deletion retains the original topK without refilling after client filtering. Writes retain the original concurrency policy, cancellation and one high-level pipeline; selection failures and conflicts stay with the original transaction.
+Without an `org` option, the root backend uses the zero UUID. Each memory plugin instance is independent even if namespaces match. Organization views provide business operations without installation or shutdown methods. `dropOrg()` attempts every backend; a failure does not reverse successful deletions elsewhere. Inspect the aggregate error rather than treating organization deletion as a cross-backend transaction.
 
-```ts
-import { records } from '@migaia/storage-contract'
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+A non-default organization receives the capabilities its backend actually provides. A custom capability on the root backend is not copied automatically; Feature `api` methods are routed through the organization view. Native SQL/SPARQL entry points do not support organization views; use the relevant organized data APIs.
 
-await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
-const store = host.backend('memory')
-await store.putRecord({ active: true }, 'one')
-console.log(
-  await store
-    .use(records)
-    .query<{ active: boolean }>()
-    .where({ active: true })
-    .update({ active: false })
-) // 1
-```
+## Open a log store
 
-Backend descriptors may provide `journalBinding(store)`. The original install window invokes it once after exact store admission and captures its native callbacks in that registration's store cell. `forOrg(orgId)` must return original I/O closures for that immutable physical organization. It cannot substitute public KV prefixes or another connection. `IStorageJournalNamespaceView` contains only the six original string methods (`get`, `has`, `set`, `remove`, `clearValues`, `clearAll`) plus `keys`; it does not inherit business bulk or TTL capabilities. A namespace forwards its original native transaction and commit/rollback callbacks, retains independent main/symbolic disposal promises, and drains accepted work through actual native terminal completion. The backend keeps transaction, resource, and registration authority.
+Install the optional `@migaia/logger` peer first. `storageLogStore()` is asynchronous and accepts a host or organization view, a backend ID and a nonempty `prefix`. A plain KV object is not accepted. Append one record, then inspect its sequence and pending state:
 
-Memory supplies this private namespace port. Private string rows stage sparsely beside the original business draft, commit atomically, and remain invisible before commit or after rollback. Business keys, clear, capacity, and change-feed notifications exclude these metadata rows; dropOrg removes the target's private rows. Explicit organization bindings reject foreign scopes, and extracted private views expire with their original operation. This author port does not itself add automatic binlog, undo/redo, or a public storageLogStore factory.
-
-A memory journal namespace holds one original canonical resource-owner text lease until disposal; another open of the same prefix and org rejects `LOCK_REJECTED`. Ordinary private transactions take the separate fixed head key in their initial native lock set. Root backend closure also closes partially constructed namespace resources through the original signal. `transactionInfo(scope)` returns the original authenticated transaction identity for this exact store/org, so same-transaction append grouping never trusts a caller id. Backend authors use `IBackendKeyLockPort.attemptMetadata` only for private metadata leases: canonical point conflicts and the original acquire/release/wait owner remain unchanged, while business clear ranges exclude rows they cannot touch. Ordinary business locks retain their existing range behavior.
-
-Memory `readImage`, `writeImage` and `readRevision` accept only an authentic native scope for their fixed organization. They reuse the original draft, write admission and complete `{epoch, revision}` tombstone facts. Images cover text, bytes, records, vectors, logical RDF quads and deadline metadata sharing the same point lock. Each image declares its existing JSON codec id/version; bytes use original base64, and absence stays distinct from null. Durable record images use the original serialize portable domain: values such as Date, Map and undefined retain their original validation failure when an image is read. Ordinary memory structured-clone support remains available. Restores join the same atomic commit or rollback. Image methods alone do not enable global journaling; automatic memory undo uses the original owner path below.
-
-The first memory `changes(scope)` call must precede business writes in that authentic attempt. Original `stageDraft` then checks recordability before mutation and retains actual text/bytes/record/vector/RDF and deadline order. Returned facts are frozen and carry final per-key revisions. A newly added row removed before commit has no physical change to report. Late activation rejects `UNSUPPORTED_CAPABILITY`; ordinary transactions allocate no image list. `writeCommitMarker` accepts only the original authenticated transaction id. Marker and business data commit or roll back together in an unexposed symbol partition of the existing private namespace Map. User prefixes, business clear and other orgs cannot access it. `hasCommitMarker` and `removeCommitMarker` use the original native transaction path. These author methods alone do not enable journaling; the explicit global option below routes supported root writes and capacity victims. Blobs still have no journal target.
-
-The package-internal native journal bridge is verified with real logger binlog/undoLog plugins and two storageLogStore handles. Readiness finishes before the business native scope; head locks join its original first canonical acquisition. Ordered storage.commit entries and undo images coalesced by original identity append in that same transaction. binlogValues omits values by default; undo always retains full encoded images and afterRevision. Rollback advances neither committed log index. A frozen empty identity on the original store cell supports only private exact-registration comparison: another host with the same backend id/org cannot supply its logs. Logger still checks its actual selected store. Global configuration now consumes this bridge for the supported memory paths described below; external WAL now joins the memory paths below; automatic memory undo uses the original owner path below.
-
-### Private log resources
-
-`storageLogStore(host, id, { prefix })` is exported only from `@migaia/storage-host/journal`. Pass the real host or fixed organization view and its installed backend ID. Public KV objects, raw stores and forged hosts grant no private access. The backend must supply its original private journal binding with reliable exclusivity or atomic read/write inside each operation. Opening completes recovery first. The cached exclusive path permits one live handle per organization/prefix; the uncached path permits independent handles and reads current state in each native transaction. Organizations remain isolated. The original host registration owns cleanup, and callers may close handles early. Explicit log close drains admitted FIFO work. Parent close preserves original pipeline admission: work not yet admitted by the backend can reject with the original HOST_DISPOSING cause, while all admitted Promises still settle. Business enumeration, clear and capacity leave private records untouched.
-
-Optional namespace fact `indexExclusive:false` selects storageLogStore without a cross-operation index. Append, read, lastSeq, states, state changes and recovery read current head/records/states inside the same original native transaction. Omission retains the exclusive cached path. Native transaction and terminal authority stay backend-owned; nativeAtomic independently governs atomicBinlog/atomicUndo composition. The optional namespace-view getOrInsert(key, initial) only initializes and locks an absent head row inside that transaction; it grants no commit or close authority.
-
-Append captures original logger JSON before the existing FIFO writes records and commits one final head. Only an actual nonempty commit updates the original logger index and publishes one frozen notice. State advances only from pending to done/aborted. Truncation commits its floor before physical reclamation; reopening retains sequence/time watermarks and never reuses committed sequences. An uncertain write seals the handle until close and reopen; recovery ignores uncommitted rows/state candidates and reclaims remnants, preserving original causes. Malformed private rows or payloads report `JOURNAL_RECORD_INVALID`, retaining original logger validation errors on cause. A non-native private namespace can use the same protocol when its backend supplies reliable exclusivity and atomic single-key head replacement. Built-in bindings cover memory, SQLite, PostgreSQL, Redis and IndexedDB, each retaining its original nativeAtomic fact. The internal host append port joins the same log object and exact organization through its original native scope and terminal, bypassing the ordinary log FIFO. Concurrent batches in one transaction reserve distinct sequences; only its real commit publishes one notice, and rollback publishes none. The backend also supplies optional `runCommitted(work, committed)`, delivering the actual result to synchronous publication before its original head lease ends. Without that port, only native append composition is unsupported; ordinary logs remain usable. Its callback is post-commit observation: failures report and never pretend to roll back. The append port is not exported from a public entry. Opening a log alone does not enable global journaling; the explicit host journal option selects it.
-
-```ts
+```ts doc-test=run
 import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
 import { storageLogStore } from '@migaia/storage-host/journal'
 import { LogRecordState } from '@migaia/logger/plugins/durable'
 
-await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
-await using log = await storageLogStore(host, 'memory', { prefix: 'history' })
-await log.append([{ kind: 'order.created', payload: { id: 'o1' } }])
-await log.setState(1, LogRecordState.done)
-console.log(await log.lastSeq(), await log.states(LogRecordState.pending)) // 1 []
+const host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+try {
+  const log = await storageLogStore(host, 'memory', { prefix: 'history' })
+  try {
+    await log.append([{ kind: 'order.created', payload: { id: 'o1' } }])
+    await log.setState(1, LogRecordState.done)
+    console.log(await log.lastSeq()) // 1
+    console.log(await log.states(LogRecordState.pending)) // []
+  } finally {
+    await log.dispose()
+  }
+} finally {
+  await host.dispose()
+}
 ```
 
-Global `journal` accepts a borrowed logger configuration or `async ({orgId, storageLogStore}) => configuration`. The final original install-batch bootstrap prepares the default organization; each later organization prepares once at its first supported asynchronous endpoint. Preparation shares one Promise, stays in the original operation budget, and is drained by the original controller. Configurations remain fixed across later `use` calls, including a failed preparation; storage never shuts down the borrowed logger. Select actual same-registration handles through `atomicBinlog[id]` and `atomicUndo[id]`. Native head locks join the original first acquisition.
+Log records are separate from business keys. Business enumeration, clear and capacity limits do not touch them. A backend must support the required log storage; opening it first recovers confirmed state. Exclusive storage permits one open handle for an organization and prefix, while shared transactional storage may permit several. Truncation does not reuse sequence numbers. An unconfirmed write stops further operations: close and reopen the log to recover. Old log handles reject with `STORE_DISPOSED` after `dropOrg()`.
 
-The current automatic memory unit covers root text/bytes/record writes, batches, prefix removal, counter/TTL, vector/RDF writes, clear, query mutations and explicit native transactions. The native draft captures portable images before modification. Capacity victims join that same draft's images; after asynchronous append, original revisions and the actual capacity plan are rechecked. A changed victim plan returns the original commit conflict and rolls back provisional logs. Actual data and victims finish before committed log indexes publish, preserving original eviction notifications. Empty writes generate no storage.commit, and selected asynchronous journaling uses the original sync-entry guard. Clear captures each actual deleted row while keeping the original channel epoch reset and one coarse clear notification; an empty clear generates no storage.commit. Blob writes currently reject UNSUPPORTED_CAPABILITY before modification (uploads retain reader ownership); no blob lock or image format is fabricated. Telemetry, other-backend global routing, external undo images and redo remain unfinished, and selected unsupported guarantees reject rather than silently omit records.
+Opening a log does not enable automatic business logging. Configure `createStorageHost({ journal: ... })` for that. Supply `{ logger, namespace, ... }` directly, or use an asynchronous initializer for each organization. The initializer receives `orgId` and asynchronous `storageLogStore(id, { prefix })`. The host borrows the logger and does not shut it down.
 
-A memory backend without `atomicBinlog[id]` uses external binlog append after its actual native COMMIT. The operation waits for that append to settle; failure reports through the original host `report` and metadata-only `onBinlogAppendError` hook without reversing committed data or the successful result. Later writes remain available; rollback and empty writes append nothing. Pure external binlog with no WAL, undo, atomicBinlog or atomicUndo can borrow an authentic nativeAtomic:false success terminal. Its fact stays false and original onCommit still decides append; every other selected journal guarantee retains the nativeAtomic:true requirement. Backend authors use optional `IStorageJournalAttempt.settle()` only to drain external work already started by the original terminal. Native append adds no such wait. External WAL uses the original intent/marker protocol below.
+Choose binlog, WAL, undo and same-transaction log stores as needed. `atomicBinlog` / `atomicUndo` select real log stores by backend ID and require a shared transaction with the business backend. Other combinations depend on backend support and reject before business mutation when unavailable. Failed external binlog appends are reported without rolling back committed business data. Do not recover unknown results by blindly replaying writes. Undo checks stored data and revisions first; conflicts use `UNDO_CONFLICT`, and missing history uses `UNDO_NOT_FOUND`.
 
-For external binlog with an actual `logger.wal`, the original binding must declare readonly `externalWal:true` and supply its original write/read/remove commit-marker ports. This certifies that its native owner can await external I/O after final images; backend names and nativeAtomic do not imply it. Memory implements this fact; strict IDB without it rejects the combination. A durable storage.binlog-intent precedes staging the original txId marker with business data in one native transaction. Commit starts binlog append, intent completion, then marker cleanup. Failure preserves pending intent and marker without pretending to roll back committed data. Preparation scans only the original logger pending index. For the full namespace/backendInstanceId/orgId target, a marker permits supplementing the same txId; no marker aborts the intent. Supplementation can duplicate records. Other kinds and targets remain untouched. Damaged owned kinds report JOURNAL_RECORD_INVALID; target recovery failure reports JOURNAL_RECOVERY_FAILED and does not open admission. WAL retains complete encoded images regardless of binlogValues, and observation payloads contain only metadata.
+`telemetry: true` additionally requires the logger level plugin. Logs can include operation payloads and errors; configure the logger for the application's needs. Even telemetry-only configuration installs an asynchronous stage, so use asynchronous data methods; synchronous reads and writes reject with `ASYNC_STAGE_IN_SYNC_ENTRY`. With neither journal configuration nor a `/journal` import, the host does not load logger at runtime. See the [logger guide](../logger/USEGUIDE.en.md) for logger configuration.
 
-A global configuration with an actual logger.undo gives the wired memory backend `store.undo(txId, ctx?)`, returning the new undo transaction id. No journal, binlog-only configurations, and widened legacy single-parameter Host types do not statically promise this method. Direct options and initializers preserve actual selected logger types. Captured borrowed-org methods remain fixed to their original organization without close authority. Global preparation requires the original physical backend to publish its own callable undo; otherwise it rejects the combination before business admission. Host does not modify frozen/raw bases or replace root store identity.
+## Handle errors and finish work
 
-Undo reads original committed logger images, then takes every target lock once through the backend's original tx().lock(...).run. binding.lockTarget maps private deadlines back to their original point lock without another lock table. It compares all complete afterRevision values (including clear epochs and tombstones), current encoded values and presence before writing any before image. Conflicts report UNDO_CONFLICT, missing records UNDO_NOT_FOUND, and foreign targets or duplicate canonical image identities JOURNAL_RECORD_INVALID. Legitimate value/deadline rows keep distinct image identities while sharing their original point lock. Restore uses the original draft, revisions, capacity and one pipeline, producing a new storage.commit and undo mirror. Concurrent and net-zero undo cannot both succeed; original context getters are read once and its operation budget is inherited. Memory text/bytes/records/null/absence/TTL/vectors/RDF and org isolation are verified. Other-backend wiring and redo remain unfinished.
+Business failures reject the operation's Promise. Observer and reporting-callback failures do not change completed data operations. Use `report(error)` for these diagnostics and inspect `source`, `code` and the original `cause`.
 
-After dropOrg, old journal handles reject with source `@migaia/storage-contract` and code `STORE_DISPOSED`. Close those handles and reopen the journal before continuing.
+| Situation                                                | Action                                                                   |
+| -------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `BACKEND_NOT_INSTALLED`, `INVALID_CONFIG`, duplicate IDs | Fix installation order, IDs or configuration                             |
+| `UNSUPPORTED_CAPABILITY`                                 | Check detection status and whether the backend supports this combination |
+| `SERIALIZE_FAILED` / `DESERIALIZE_FAILED`                | Inspect schemas, codecs and original input errors in cause               |
+| `WRITE_CONFLICT` / lock rejection                        | Follow backend concurrency policy; do not replay external effects        |
+| `ORG_DELETE_FAILED`                                      | Inspect each failure and determine which deletions completed             |
 
-Backend authors may call core.registerFeatureClientResolver(store, resolver) only in the original installation window for the exact registered store. resolver.getClient(orgId) may prepare through its original opener and return that organization's native client; only actual asynchronous results are awaited, followed by original registration admission. Optional getTransactionClient(scope, orgId) must synchronously return that authenticated scope's already-open transaction, without opening or waiting. Without a registered resolver, original Feature getClient/getTransactionClient order and behavior stay unchanged. The resolver occupies one optional original storeCell field; business views cannot register or receive it, and Feature factories do not rerun.
+Explicit `host.dispose()` waits for work already started, preserves cleanup failures and reuses its Promise. `await using host = ...` also releases resources, but reports cleanup failures instead of replacing an outer primary error. Finish reading data and consuming iterators before shutdown; do not continue using saved handles afterwards.
 
-External undo requires an actual `logger.wal` and the original binding's `nativeAtomic:true`, `externalWal:true` and commit-marker ports. Selecting neither atomicUndo nor WAL rejects before business admission. Undo-only and combined binlog configurations share one storage.binlog-intent. The original merge derives first-before, final-after and complete afterRevision from full ordered changes; commit publishes mirrors before completing the intent and cleaning its marker. A mirror publication failure reports the original error without reversing committed data, retaining pending intent and marker for reopen recovery. An existing mirror for the same txId is skipped only when its complete contents match; differing contents report JOURNAL_RECORD_INVALID without overwriting the borrowed log. Strict IDB has no external-await fact and retains its same-database atomicUndo path.
-
-`journal.telemetry:true` requires the actual `level()` extension's `atLevel` port. Ordinary logger entries keep tag `storage`, using debug on success and error on failure through the original threshold and filters. Metadata includes backend/orgId/operation, backend-supplied keys, durationMs/outcome/source/code/level and the normal payload; args retain the original error. Storage adds no masking or redaction. A failing or closed logger reports without changing storage results, and host never closes the borrowed logger. Disabled telemetry does not read atLevel or construct log data.
-
-Backend authors supply canonical original identities through `execution` requests' `keys?:()=>readonly ILockKey[]`. `internal?:true` excludes private journal work and attempts already covered by their outer public call; the original immutable closure supplies orgId. A retrying endpoint can use optional `execution.observe(describe, invoke)` around its original complete loop. The boolean passed to invoke only requests observation facts; disabled observation directly calls original work. Inner pipelines remain unchanged and mark internal. Memory verifies one transaction entry after an actual retry, without child-operation duplicates. Other backends supply complete facts from their own owners.
-
-`createBackendJournalNamespace(options)` from `@migaia/storage-host/authoring/backend` reuses the original namespace reservation, quiescence drain and dual disposal Promises; memory private namespaces consume it directly. `IBackendJournalNamespaceOptions` borrows assertLive/closingSignal/report, nativeAtomic/indexExclusive, reserve, authenticate(scope) and the original transaction entry. `IBackendJournalTransaction` exposes only private run(viewWork) and onCommit/onRollback/onEnd observations, without native handles, commit or backend close rights. onEnd drains an unknown outcome without pretending it rolled back. Data, generations, cross-instance exclusivity and actual terminal decisions remain backend-owned.
-
-The same authoring entry re-exports original `storageJournalLockKey(prefix, part)` and `StorageJournalLock` (head/resource). Backend owners pass this canonical identity to their original concurrency provider: ordinary private transactions and native append share one head, while resource ownership uses the separate resource key. The function returns only a logical key, without acquisition, installation or close rights. Empty prefixes and invalid parts reject with existing INVALID_ARGUMENT; adapters do not duplicate lock tuple encoding.
-
-For the first explicit-org endpoint, telemetry reads the same org cell configuration after the original operation's journal preparation. Observation does not prepare again or create another budget, so the first transaction is not omitted. A configuration already known to disable telemetry still directly invokes original work and emits no ordinary entry.
-
-Selecting global `journal` installs its existing asynchronous bootstrap stage. Public `sync.set`, `sync.remove` and `sync.clearValues` reject with the original ASYNC_STAGE_IN_SYNC_ENTRY before changing data or history. The same stage currently rejects synchronous reads, including telemetry-only configurations. Use async methods for this selected combination; hosts without journal retain their original synchronous methods. Supporting synchronous journal writes requires a real synchronous append completion port from the existing logger owner.
-
-`encodeStorageJournalImage(present, value?, bytes?)` and `decodeStorageJournalImage(image, bytes?)` from `/authoring/backend` reuse the original portable memory image codec for native adapters. Absence remains distinct from a present null; byte images use the existing base64 owner. The codec id/version and original serialize errors remain unchanged. Memory consumes this same implementation; callers gain no native, commit or installation authority.
-
-A native binding may declare `requiresIndexedDbUndo?: true`. The original descriptor snapshot reads and freezes this fact once. When the borrowed logger has undo, the same configuration owner requires `indexedDbUndo: true` before opening any native terminal; omitted/false rejects with UNSUPPORTED_CAPABILITY. Other backend bindings retain their existing default semantics, and binlog-only or telemetry-only configuration does not require undo opt-in.
-
-Native author `core.emit` skips optional diagnostics while the host is closing and does not evaluate a lazy payload factory, so HOST_DISPOSING cannot replace the result of already accepted native work. Open execution retains the original registration check and event channel; old handles still reject after full closure or registration revocation. The original host owner continues to publish host lifecycle events.
-
-Ordinary plugins return flat function extensions. Each function receives the current organization through the host-provided IStoragePluginCallContext. Archive prefixes its three functions with the plugin id, for example historyRun(), historyGet(key), and historySweep(). Saved functions stay bound to their organization and the plugin lifetime.
-
-Ordinary composition plugins can use the original createChangeController during installation and read getOrgContext().execution at runtime. Original onDispose owns the controller. Release beginMutation only after actual work settles; caller cancellation does not imply external I/O has drained.
-
-Text backend authors may provide optional `redo: IStorageJournalRedoBinding` through the original `journalBinding`: `transactionInfo` authenticates the original text-only scope, `changes` captures its same draft, `protect` delegates native protection, `apply` synchronously applies a prepared draft, `replay` restores full ordered images, and `seal` stops admission after an uncertain apply/completion. Optional `core.journal.beginRedo(scope)` / `runRedo(work, signal?)` forwards the original attempt signal to native protection and recovers the original WAL pending index and runs the operation within that same protection, with no extra FIFO, commit authority or nativeAtomic claim. WAL and redo share target/image parsing. Selection requires `redoWal === logger.wal`; all participants borrow the same actual object with current pending visibility. Matching names or independently constructed caches do not prove sharing. This selection grants no private log authority. Non-native undo and atomicBinlog/atomicUndo combinations still reject before business work. Concrete Web integration and cross-page evidence are accepted separately.
-
-An explicit redo backend without WAL rejects during installation. replay may return its original invalidation callback; only successful WAL completion dispatches it, and observer failure reports without changing the completed result.
-
-A backend without original native changes or redo cannot accept a WAL plugin alone: configuration preparation rejects UNSUPPORTED_CAPABILITY before ordinary writes could bypass the selected recovery.
-
-Entity `skip`, `limit`, `distinct`, `after`, and ordering branches retain `onInvalid` and original Feature methods. Select `index` or `range` once, before other chain steps. Selector ordering can append selectors but cannot switch to a comparator; a comparator requires `limit` before general terminals, or `first`. Runtime structure violations reject with `INVALID_CONFIG` before reading. Default and explicit comparators use the original shared query's bounded `skip + limit` candidates, followed by pagination. Repeated `skip` and `limit` keep their last values; `limit(0)` reads no candidate. `count` retains pagination without evaluating ordering or projection. Selector key validation reuses the portable key owner, and a thrown selector error remains the immediate `cause` of `EXTENSION_FAILED`.
-
-The original planner's leading declarative `where` prefix selects a declared index using static priority: unique `eq`, other `eq` / shorter `in`, bounded ranges, then one-sided ranges / `startsWith`, with declaration order breaking ties. Explicit `index` / `range` wins. `explain()` performs no I/O and names the selected rule and other candidates, conservatively retaining `fullScan: true` because opening can still prepare indexes or use the authoritative fallback. Broad membership and string-prefix candidates are rechecked by the original condition compiler. Explicit selectors and later `where` steps retain shared-core declaration order; place `where` before `orderBy` to filter first.
-
-When the original native record feed exists and the type carries `changeFeed: true`, root entity queries expose the original `watch()` invalidations. This is neither a row stream nor reliable replay. Organization borrows forward their original native organization iterator, without modifying frozen raw stores. Transaction queries expose no watcher. Client lambdas, ordering, or pagination that cannot be fully pushed reject with the original core's `QUERY_NOT_PUSHABLE` before subscription. Native backend and iterator owners retain subscription cleanup.
-
-## Pure MMR reranking
-
-`@migaia/storage-host/vector/mmr` independently exports `mmr` and `IStorageMmrOptions`; the host root does not re-export them. It performs no network calls and adds no dependencies. The scorer reuses the original cosine arithmetic, taking relevance from the engine `score` and diversity from cosine similarity between hit vectors. Call `withVector()` explicitly.
-
-```ts
-import { mmr } from '@migaia/storage-host/vector/mmr'
-const hits = await collection
-  .near([1, 0], { exact: true })
-  .withVector()
-  .topK(20)
-  .rerank(mmr({ lambda: 0.5, topN: 5 }), { topN: 5 })
-  .all()
-```
-
-`lambda` must be finite and in [0,1]. At 1 selection follows engine relevance; at 0 selection after the first candidate uses diversity alone. Equal objectives retain engine order. The helper's `topN` bounds only the computed greedy prefix: it still returns one finite rank per candidate, placing the unselected tail in engine order. Only `rerank` owns truncation. Omitted topN computes every candidate, using O(n) state and worst-case O(n²d) time. Vectors must share dimensions; zero directions contribute zero cosine similarity, retaining engine order for ties. Cancellation uses the original signal without another budget, resource or background task.
-
-Journal engines load only when journal is selected or the `/journal` entry is imported. Install the optional `@migaia/logger` peer when using these features. Hosts without journal do not load logger at runtime.
-
-## Shared authoring ownership
-
-Import interfaces, tokens and pure validators from `@migaia/storage-contract`; use the [entry table](../storage-contract/README.en.md#entries-and-dependency-direction) for execution helpers. Query, transaction, concurrency and publication identity maps live only in host. Native adapters use these entries rather than reimplementing key codecs, locking or resource lifetimes.
-
-```ts
-import { assertStorageKey, type IOperationContext } from '@migaia/storage-contract'
-import { snapshotStorageKey } from '@migaia/storage-host/authoring/key'
-import { snapshotOperationContext } from '@migaia/storage-host/authoring/context'
-
-const input = ['order', new Date(0)] as const
-assertStorageKey(input, 'memory')
-const key = snapshotStorageKey(input, 'memory')
-const context: IOperationContext | undefined = snapshotOperationContext({ timeoutMs: 100 })
-// Pass key/context to the original native owner before its first real await.
-```
-
-Do not snapshot again solely to validate private captured values. `projectStorageBatchKeys` recomputes canonical identity/firstIndex metadata while borrowing keys in a synchronous native terminal. `snapshotStorageBatchKeys` detaches caller keys before asynchronous work. Both use the same canonical projector and ordered encoder.
-
-`createStorageIteratorLifetime` remains on `/authoring/resource`, with the same accepted-read drain, close callback, main/symbolic/return Promise caches and original failure identity. SQL/SPARQL tags use `/authoring/sql` and `/authoring/sparql`; the shared template module is private. `provideCapabilities` and has/use helpers share the single publication table on `/authoring/capability`.
-
-Codec methods are called on their original object. `snapshotCodec(codec) === codec` after admission; it does not clone metadata/methods or run conversions. Use `assertCodec` when only synchronous validation is required, and `fromValueCodec` only when the existing format adapter is required.
+For backend implementations, see the [README migration table](./README.en.md#moving-backend-authoring-imports) and [contract entry table](../storage-contract/README.en.md#entries-and-dependency-direction).

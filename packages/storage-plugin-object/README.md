@@ -1,60 +1,122 @@
-# 对象存储后端
+# @migaia/storage-plugin-object
 
-`@migaia/storage-plugin-object` 通过原生文件系统或 S3 兼容服务提供共享 `blob` 能力。根工厂不加载 SDK 或打开目录。安装真实 peer：`@migaia/storage-host`、`@aws-sdk/client-s3` 和 `@aws-sdk/s3-request-presigner`。
+用同一套 `blob` API 将附件、导出文件等二进制内容保存到专用目录或 S3，并按需读取完整字节、流或指定范围。选择文件或 S3 驱动，再把 object 插件安装到 host，即可使用组织隔离与读取资源释放；条件写入须由所选驱动和服务实际支持，本包不提供普通键值存储或事务。
 
-```ts
+[English](./README.en.md) · [使用指南](./USEGUIDE.md)
+
+## 你可能遇到过
+
+- 数据文件写好了，元数据还没更新就被读走：两次文件写入分别可见。
+- 两个请求都按旧版本覆盖文件：更新前的检查与写入之间没有保护。
+- 只要文件的一小段，却读进了整个文件：接口没有范围读取。
+- 提前结束下载后句柄还开着：流与资源释放没有配套使用。
+
+## 为什么选它
+
+- 本地驱动把内容与元数据一起发布；已打开的读取仍看到原内容。[本地文件](./USEGUIDE.md#本地文件与条件写入)
+- `get()` 返回可释放对象，可选择 `bytes()` 或 `stream()`，也能指定闭区间范围。[流与范围](./USEGUIDE.md#流与范围读取)
+- S3 驱动区分写入失败、提交未知和写后元数据失败，便于决定如何恢复。[S3](./USEGUIDE.md#使用-s3)
+- 组织视图隔离逻辑键，分页游标绑定组织与前缀。[组织与分页](./USEGUIDE.md#组织与分页)
+
+## 从这里开始
+
+目录应专供这个插件使用。下面写入 `hello`，再从实际文件读取。
+
+```ts doc-test=run
 import { createStorageHost } from '@migaia/storage-host'
 import { blob } from '@migaia/storage-contract'
 import { objectBackendPlugin } from '@migaia/storage-plugin-object'
 import { fsObjectDriver } from '@migaia/storage-plugin-object/fs'
 
-await using host = await createStorageHost({
-  plugins: [objectBackendPlugin({ driver: fsObjectDriver({ root: './objects' }) })] as const
+const host = await createStorageHost({
+  plugins: [objectBackendPlugin({ driver: fsObjectDriver({ root: './example-objects' }) })]
 })
-const objects = host.backend('object').use(blob)
-const info = await objects.put('photo', new Uint8Array([1, 2, 3]), {
-  contentType: 'application/octet-stream',
-  metadata: { owner: 'ada' }
-})
-const object = await objects.get('photo', { range: { start: 1, end: 2 } })
-if (object) {
-  try {
-    console.log(object.info.size, await object.bytes())
-  } finally {
-    await object.dispose()
+try {
+  const objects = host.backend('object').use(blob)
+  await objects.put('greeting', new TextEncoder().encode('hello'))
+  const object = await objects.get('greeting')
+  if (object) {
+    try {
+      console.log(new TextDecoder().decode(await object.bytes()))
+    } finally {
+      // hello
+      await object.dispose()
+    }
   }
+  await objects.remove('greeting')
+} finally {
+  await host.dispose()
 }
-await objects.put('photo', new Uint8Array([4]), { ifMatch: info.etag })
 ```
 
-文件系统入口识别 Node、Bun、Deno，只加载对应原生适配。一个真实目录仅支持本进程内一个写实例；不要跨进程共享或混入其它文件。一次 pointer rename 同时发布不可变数据与元数据；覆盖或删除不改变已打开读句柄的快照。SHA-256 标识内容，相同内容的写入可能保留 etag。这里只保证原子可见性，不承诺 fsync 级掉电耐久。
+预期输出：
 
-`get` 返回一次内容快照，只能选择一次 `stream()` 或 `bytes()`。EOF 和 cancel 释放底层资源，未消费对象须 dispose。范围 end 为闭区间，`info.size` 始终是完整大小。缺失 get/head 返回 undefined；remove 返回删除前是否观察到对象。
-
-## S3
-
-```ts
-import { s3ObjectDriver } from '@migaia/storage-plugin-object/s3'
-import { objectPresignFeature } from '@migaia/storage-plugin-object/features/presign'
-
-const plugin = objectBackendPlugin(
-  {
-    driver: s3ObjectDriver({
-      config: { region: 'us-east-1', endpoint: 'http://127.0.0.1:19000', forcePathStyle: true },
-      bucket: 'objects',
-      prefix: 'app/'
-    })
-  },
-  { presign: objectPresignFeature() }
-)
+```text
+hello
 ```
 
-传入的 `client` 属于借用，始终不销毁；`config` 分支在安装时创建自有客户端。凭据沿 SDK 原有提供方。检测在保留前缀随机对象上验证单次条件写；权限或条件不支持只报告，不中断宿主创建。无条件操作仍按真实权限执行，条件 multipart 按实际 Complete 请求判定，不降级。
+## 手写时的隐患
 
-未知长度流及至少 16 MiB 的字节值使用 multipart；默认每段 8 MiB、并发四段，缓冲上限为五段加输入当前块。修改 command 局部禁用 SDK 重试及区域重定向，借用 client 配置不变。发出提交但确认未知时为 `OBJECT_COMMIT_UNKNOWN`，重放前先 head；已确认写后补读元数据失败为 `OBJECT_FAILED`，附 `committed: true`。
+直接写文件可以保存字节，但元数据与并发更新还需要额外设计：
 
-S3 metadata 名称为小写 HTTP token，值为无换行 ASCII 头字节。etag 不透明，updatedAt 来自原生 LastModified。上传签名返回调用方必须携带的所有内容、metadata 和条件头。期限为 1 至 604800 的整数秒，默认 900，不能超过凭据有效期；签名不执行上传或下载。
+```ts doc-test=check
+import { writeFile, readFile } from 'node:fs/promises'
 
-## 组织与分页
+await writeFile('./example.bin', new Uint8Array([1, 2, 3])) // 写入途中可能被其它请求读取。
+await writeFile('./example.meta', JSON.stringify({ size: 3 })) // 与内容不是同一次发布。
+console.log(await readFile('./example.bin')) // 全量读入；没有范围或 etag 条件。
+```
 
-通过 `host.org(orgId).backend('object').use(blob)` 获取不可变组织视图，首次写不建立注册数据。物理键复用共享组织元组与保序编码，返回键仍是逻辑键。`list({ prefix, limit, after })` 默认每页 100，按 UTF-16 字典序排列。游标绑定同一后端安装、组织和前缀，不承诺跨页快照。`removeByPrefix('')` 只清本组织。缓存与归档经宿主消费 `blob`，不依赖驱动文件。
+## 三分钟理解
+
+`选择 fs/S3 driver → 安装 objectBackendPlugin → use(blob) → put/get → 释放读取对象与宿主`。
+
+| 名称          | 含义                                              |
+| ------------- | ------------------------------------------------- |
+| key           | 应用逻辑键，不是目录中的文件路径                  |
+| `IBlobInfo`   | 完整对象大小、etag、内容类型、metadata 与更新时间 |
+| `IBlobObject` | 一次读取的内容与释放方法                          |
+| etag          | 传回后端用于条件写的标识，不应自行解析            |
+| driver        | 选择本地目录或 S3 客户端的配置                    |
+
+## 常见场景
+
+| 想做什么                       | 组合                   | 示例                                           |
+| ------------------------------ | ---------------------- | ---------------------------------------------- |
+| 保存本地附件，避免覆盖别人更新 | fs + `ifMatch`         | [本地与条件](./USEGUIDE.md#本地文件与条件写入) |
+| 处理大文件或部分内容           | 流 + range             | [流与范围](./USEGUIDE.md#流与范围读取)         |
+| 使用 S3 或兼容服务             | s3 driver              | [S3](./USEGUIDE.md#使用-s3)                    |
+| 生成上传或下载链接             | presign Feature，仅 S3 | [签名链接](./USEGUIDE.md#生成签名链接)         |
+| 多组织附件与翻页               | host org + blob list   | [组织与分页](./USEGUIDE.md#组织与分页)         |
+
+## 安装
+
+这些 storage 包当前是 `private: true` 的仓库 workspace 包，尚不作为已发布的 registry 包提供。在仓库内消费包添加：
+
+```bash
+pnpm add --workspace @migaia/storage-plugin-object @migaia/storage-host @migaia/storage-contract
+pnpm add @aws-sdk/client-s3@^3.1140.0 @aws-sdk/s3-request-presigner@^3.1140.0
+```
+
+SDK 是包声明的真实 peer。本地 `/fs` 入口按 Node、Bun、Deno 选择原生文件适配；S3 使用独立 `/s3` 入口，签名使用 `/features/presign`。根插件工厂不会打开目录或创建客户端，资源在安装时打开。包声明 Node.js `>=24`。
+
+## 常用 API
+
+| API                                                    | 用途                           |
+| ------------------------------------------------------ | ------------------------------ |
+| `objectBackendPlugin({ id?, driver }, features?)`      | 安装后端，默认 ID 为 `object`  |
+| `fsObjectDriver({ root })` / `s3ObjectDriver(options)` | 选择本地目录或 S3              |
+| `store.use(blob).put/get/head`                         | 写内容、开读取对象、只读元数据 |
+| `object.bytes()` / `stream()` / `dispose()`            | 消费一次内容并释放             |
+| `remove` / `removeByPrefix` / `list`                   | 删除或分页枚举本组织对象       |
+| `objectPresignFeature()`                               | 明确选择 S3 签名 API           |
+
+## 使用边界
+
+- 后端提供 blob，不提供普通 KV 或事务。逻辑键是字符串，空字符串也合法。metadata 值为字符串；S3 另要求名称为小写 HTTP token、值为无换行的 ASCII 头字节。
+- 一个真实目录只支持本进程内一个写实例；跨进程共享不受支持。目录必须可信且专用，不要放其它应用文件。文件更新提供原子可见性，不保证 fsync 级掉电耐久。文件 etag 基于内容 SHA-256，同字节内容可能保留同一 etag，不能把它当每次更新递增的版本号。
+- `get/head` 缺失返回 `undefined`；`remove` 返回删除前是否观察到对象。`get` 的 `stream/bytes` 共享一次消费机会；EOF 或 cancel 释放底层读取，未消费或提前结束应显式 dispose。
+- range 的 `start`、`end` 是非负安全整数，end 为闭区间；省略 end 读到末尾。`info.size` 始终是完整大小。范围起点超过内容时返回空内容，不把对象当作缺失。
+- `ifMatch` 与 `ifNoneMatch: true` 互斥，条件失败报 `WRITE_CONFLICT`。S3 条件能力由检测确认；不支持时条件写报 `UNSUPPORTED_CAPABILITY`，不会退回无条件写。
+- 对象错误 source 为 `storage.backend.object`。`OBJECT_DATA_INVALID` 表示数据或响应不完整；`OBJECT_COMMIT_UNKNOWN` 表示提交确认未知；`OBJECT_FAILED` 可能带 `committed: true`，表示写入已确认而后续元数据读取失败。先检查状态再决定重试。
+- `host.org(uuid).backend('object').use(blob)` 隔离组织；关闭宿主释放读资源和自建 S3 客户端。调用方传入的 `S3Client` 始终借用，需调用方自己关闭。

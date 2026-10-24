@@ -1,105 +1,122 @@
 # @migaia/storage-plugin-postgres
 
-Install PostgreSQL through the single storage-host owner. Standard KV, bytes, records, TTL, counters, SQL, transactions, key locks and PostgreSQL invalidations share native connections and the existing contract owners. The caller owns its driver/client/pool: dispose the host first, then close the client.
+[中文](./README.md)
 
-```ts
+Use PostgreSQL through one storage API when text, records, expiry and application SQL must commit together rather than leave half an update saved. Pass an existing client or pool to its driver and install the plugin in a host, then combine these operations in the same database transaction. Select notifications, logical replication or vectors separately when needed; your application still closes the client.
+
+## Sound familiar?
+
+- The order row exists but its status does not: the two writes committed separately.
+- A rebuilt cache still serves stale data: a notification channel was treated as replayable history.
+- Two tenants overwrite the same key: tenant filtering varies between queries.
+- Shutdown hangs: the client pool closes before subscriptions and storage work have finished.
+
+## Why choose it?
+
+- **Commit storage operations and SQL together.** KV, records and SQL in a transaction use the same connection. See [Transactions and organizations](./USEGUIDE.en.md#transactions-and-organizations).
+- **Add only the database features you need.** COPY, notifications, vectors and replayable changes have separate imports and explicit selection. See [Import and notify](./USEGUIDE.en.md#import-and-notify).
+- **Know when history is no longer safe to resume.** Notifications may be lost; logical replication supplies checkpoints and rejects unprovable gaps. See [Follow committed changes](./USEGUIDE.en.md#follow-committed-changes).
+- **Keep batch semantics clear.** Reads retain input order and duplicates, while writes reject equivalent duplicate keys. Array parameters avoid issuing one query per key; no speed comparison is claimed.
+
+## Start here
+
+Provide a PostgreSQL database through `DATABASE_URL`. Installation creates the storage tables, so the database role needs permission in the selected schema. This example writes a value and reads it back.
+
+```ts doc-test=run
 import { Pool } from 'pg'
 import { createStorageHost } from '@migaia/storage-host'
 import { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'
 import { pgDriver } from '@migaia/storage-plugin-postgres/pg'
-
 const pool = new Pool({ connectionString: process.env.DATABASE_URL })
 try {
   await using host = await createStorageHost({
     plugins: [postgresBackendPlugin({ driver: pgDriver(pool) })] as const
   })
   const store = host.backend('postgres')
-  await store.transaction(async (tx) => {
-    await tx.set('status', 'ready')
-    await tx.putRecord({ name: 'Ada' }, 'user:1')
-    await tx.sql`SELECT 1`.get()
-  })
+  await store.set('example:status', 'ready')
+  console.log(await store.get('example:status'))
 } finally {
   await pool.end()
 }
 ```
 
-## Adapters and capabilities
+Expected output:
 
-| Entry          | Caller-owned input                    | Native protocols                                                |
-| -------------- | ------------------------------------- | --------------------------------------------------------------- |
-| `/pg`          | `pg.Pool`                             | pg-copy-streams, dedicated LISTEN, optional logical replication |
-| `/postgres-js` | `postgres.Sql`                        | reserve, native COPY, shared dedicated listeners                |
-| `/bun`         | Bun 1.4.4+ `SQL` with `prepare:false` | reserve, native WritableStream COPY, listeners                  |
-
-The root loads no client. Each adapter references its real peer. Logical replication additionally requires Node 22+ and pg-logical-replication >=2.6.0 <3. Bun 1.4.3 rejects before I/O because required COPY and column metadata are absent.
-
-```ts
-import postgres from 'postgres'
-import { postgresJsDriver } from '@migaia/storage-plugin-postgres/postgres-js'
-const client = postgres(process.env.DATABASE_URL!)
-const driver = postgresJsDriver(client)
-// After disposing the host, its caller awaits client.end().
+```text
+ready
 ```
 
-```ts
-import { SQL } from 'bun'
-import { bunSqlDriver } from '@migaia/storage-plugin-postgres/bun'
-const client = new SQL(process.env.DATABASE_URL!, { prepare: false })
-const driver = bunSqlDriver(client)
-// After disposing the host, its caller awaits client.close().
+For writes that must succeed together, see [Transactions and organizations](./USEGUIDE.en.md#transactions-and-organizations). For reconnecting consumers, see [Follow committed changes](./USEGUIDE.en.md#follow-committed-changes).
+
+## Pitfalls in hand-written code
+
+This function assumes the application tables already exist. It is shown for comparison, without execution.
+
+```ts doc-test=check
+import type { Pool } from 'pg'
+export async function save(pool: Pool, key: string, value: string) {
+  await pool.query('INSERT INTO app_settings(key,value) VALUES($1,$2)', [key, value])
+  // Separate commits: a failure below leaves the first write in place.
+  await pool.query('UPDATE app_stats SET writes=writes+1')
+  // Repeating this function can insert twice; a lost connection does not prove zero writes.
+}
 ```
 
-`server` defaults to `postgres`; `cockroach` and `yugabyte` are admitted by actual version probes. Only PostgreSQL declares changeFeed; Cockroach rejects the pgvector Feature. Protocol compatibility is not runtime verification: this environment provides PostgreSQL only. Cockroach/Yugabyte remain unverified. Installed Bun is 1.4.3, so the 1.4.4+ native path remains unverified.
+Put changes that belong together inside `store.transaction`. Callback failure rolls them back. Keep email, payments and other external effects outside callbacks that may retry.
 
-## Optional Features
+## The model in three minutes
 
-- `/features/quantized`: `pgQuantizedFeature({mode:'halfvec'|'binary_quantize'})` accompanies `pgvectorFeature()` in the same Feature batch. Its bounded `rescore({topN?})` stage uses a quantized expression HNSW index and exactly reorders the recalled candidates by their original vectors. It publishes no second vector provider.
-- `/features/pgvector`: `pgvectorFeature()` publishes standard vector and `api.pgvector.search(target, query, options)` for caller-owned native tables. Unselected stores have no vector. registerDetect checks the extension; with autoDetect:false, the first actual vector endpoint still checks before writing.
-- `/features/listen`: `pgListenFeature()` provides root `api.notifications.listen/notify`; transactions expose notify only. Hints appear after real commit and do not promise reconnect replay.
-- `/features/copy`: `pgCopyFeature()` provides root/transaction `api.copy.from`. It accepts structured identifiers and client STDIN only. Each actual attempt invokes a fresh sourceFactory and retains native backpressure/drain.
-- `/features/logical-replication`: `pgLogicalReplicationFeature({slot,publication})` publishes durableChangeFeed. Deployment creates the persistent pgoutput slot, FOR ALL TABLES publication and REPLICATION permission. Only postgres with `/pg` supports it. Disposal never drops the slot. `truncate` defaults to `reset`: root TRUNCATE emits one reset without orgId, invalidating every organization. `block` stops without acknowledgement. Detection reports confirmedFlushLagBytes and retainedWalBytes, and warns when WAL retention is unlimited. Deployments without a live-stream requirement should keep no slot and use TTL or periodic synchronization instead.
+| Task                                            | Tool                                             |
+| ----------------------------------------------- | ------------------------------------------------ |
+| Connect to PostgreSQL and close the client      | Your selected PostgreSQL SDK                     |
+| Install storage and release its subscriptions   | `createStorageHost` and `host.dispose()`         |
+| Use text, records, TTL, counters and SQL        | `host.backend('postgres')` or `store.use(token)` |
+| Access one organization's data                  | `host.org(orgId).backend('postgres')`            |
+| Add vectors, COPY, notifications or replication | Features in the plugin's second argument         |
 
-Managed vectors use native `vector(d)`. The default uses the database plan and existing ANN indexes; exact:true disables ANN only in the current read transaction. Faithful where/org/expiry filters precede topK. Function conditions process hits without refill; requirePushdown rejects client conditions before I/O. All deleteWhere count modes return the actual DELETE RETURNING count, including physically present expired matches.
+A capability token such as `kv` or `ttl` selects a set of methods. A Feature is an explicitly installed addition. A cursor is an opaque checkpoint: save and return it unchanged.
 
-## Storage and failures
+## Typical scenarios
 
-Defaults are schema=public and prefix=migaia. KV/bytes/records/meta/revisions/locks/journal/commit_markers/vector_config and managed vector tables use `(org_id,key)` primary keys with org-leading indexes. Records use canonical bytea keys; other tables use hex over the same canonical bytes. Text and records retain portable/collections TEXT codecs. Payload JSONB exists only as a pushdown projection.
+| Scenario                                   | Building blocks                                 | Details                                                                           |
+| ------------------------------------------ | ----------------------------------------------- | --------------------------------------------------------------------------------- |
+| Commit values, records and expiry together | `transaction`, `kv`, `ttl`                      | [Transactions and organizations](./USEGUIDE.en.md#transactions-and-organizations) |
+| Find similar embeddings                    | `pgvectorFeature`, optional quantized rescoring | [Vector search](./USEGUIDE.en.md#vector-search)                                   |
+| Stream an import and notify after commit   | `pgCopyFeature`, `pgListenFeature`              | [Import and notify](./USEGUIDE.en.md#import-and-notify)                           |
+| Resume after disconnecting                 | `pgLogicalReplicationFeature`                   | [Follow committed changes](./USEGUIDE.en.md#follow-committed-changes)             |
 
-Locks and TTL use database clock_timestamp(). Replacing a live value preserves TTL; expiry/deletion keeps revision tombstones. Batch methods bind arrays. Empty batches open no transaction and invoke no pipeline/hooks. Organizations share tables and isolate equal keys. Organization views reject raw SQL/COPY caller-table endpoints.
+## Install
 
-Transactions request READ COMMITTED and SHOW reports the actual level. Trusted 40001/40P01 failures roll back before revision comparison: unchanged baselines replay physically without reentering the outer pipeline, strategy decisions or releasing the original locks; changed baselines enter the original WRITE_CONFLICT strategy. Callbacks may replay; external effects have no exactly-once guarantee. A transport failure after COMMIT is sent never causes blind replay or a claim of zero writes.
+The package is currently marked `private: true` for use in this repository's workspace. This does not imply a public registry release. Add workspace packages from a consuming workspace package:
 
-Owned error source is storage.backend.postgres: SQL_FAILED, DECODE_FAILED, TRANSACTION_FAILED and DUPLICATE_KEY. Shared admission/concurrency/cancellation/deadline errors retain original contract constants and original causes. Hooks observe only; thrown errors and rejected promises are reported. Use host pipeline stages for intervention.
-
-See [USEGUIDE.en.md](./USEGUIDE.en.md) for batching, native SQL, vectors, COPY and replication.
-
-Global `journal: { logger, namespace, binlogValues: true }` borrows the original logger's external binlog. PostgreSQL captures actual text/bytes/record/managed-vector changes and complete deadlines in the original transaction, appends only after actual COMMIT, and awaits the original append settlement. External append failures reach the host reporter and `onBinlogAppendError`; they cannot roll back committed data. External log and data commits are not atomic. When complete images are selected, native SQL/COPY/caller-owned vector tables reject before business queries or source pulls.
-
-PostgreSQL storageLogStore uses indexExclusive:false and reads current journal state inside each original native transaction, without a cross-operation index. INSERT ON CONFLICT DO NOTHING bootstraps the head under the existing journal primary key, then SELECT FOR UPDATE serializes its read/write inside that transaction. No table, lifetime lock or renewal owner is added. nativeAtomic and original scope/terminal authority remain unchanged; 40001/40P01 use the existing physical retry path. When the same logger supplies external WAL, the original shared owner awaits the intent, then writes an independently named commit marker in the same PostgreSQL transaction. Actual commit precedes append/complete; failure retains both intent and marker for recovery on reopen. This marker shares the existing private table with short-lived lost-COMMIT evidence but has a separate identity, so normal transaction cleanup preserves recovery evidence. When the same logger selects external WAL and undoLog, the host projects `store.undo(txId, ctx?)`. The original builder locks every target, checks complete revisions and images, then restores text/bytes/record/vector/metadata and absolute deadlines in one actual PostgreSQL transaction; the new commit enters the same journal. Metadata journal identities round-trip through the original flat-key codec, while complete versions and private locks reuse the original revision and lock owners. ABA fails even when the current value matches. Original revision rows retain a native UUID birth and increasing version. dropOrg still deletes every target organization row; a recreated birth prevents old undo from reusing the same version. Adding the private column preserves existing values and versions; old external images without birth safely reject with UNDO_CONFLICT. Organization targets cannot restore one another. With the same logger selecting `level()` and `telemetry: true`, the original host observer records ordinary payloads, complete original errors, fixed organizations and canonical keys. Each complete retry loop emits once; scopes and private metadata do not duplicate entries. Disabled observation does not read level methods, and logging failures only report.
-
-Every native commit writes its marker in the same transaction. A lost COMMIT acknowledgement is accepted only when that original marker is visible. Missing or unreadable evidence does not prove zero writes: the original physical controller seals, the original error chain survives, and no blind replay occurs. Known settlement removes the marker; cleanup failure reports and retains evidence.
-
-Selected journals retain every actual native mutation in execution order, including repeated writes to one target and intermediate values. The original SQL RETURNING row supplies each exact raw after value and absolute deadline; no later read substitutes the final value. Undo keeps the host's existing first-before/final-after merge and complete final revision checks. Unselected operations keep their original SQL and native path.
-
-## Quantized recall and native exact rescoring
-
-```ts
-import { pgQuantizedFeature } from '@migaia/storage-plugin-postgres/features/quantized'
-// postgresBackendPlugin({ driver }, {
-//   vector: pgvectorFeature(), quantized: pgQuantizedFeature({ mode: 'halfvec' })
-// })
-const selected = await embeddings
-  .near([1, 0, 0])
-  .where({ category: 'guide' })
-  .topK(20)
-  .rescore({ topN: 5 })
-  .rerank(({ hits }) => hits.map((hit) => hit.score))
-  .all()
+```bash
+pnpm add @migaia/storage-host @migaia/storage-contract @migaia/storage-plugin-postgres --workspace
+pnpm add pg pg-copy-streams pg-logical-replication postgres
 ```
 
-Choose `halfvec` or `binary_quantize` once at installation. `topN` defaults to k and must be a positive safe integer at most k; invalid bounds reject before I/O. The read-only result supports original `withVector`, selection, grouping and generic rerank, with unchanged engine scores; it cannot delete, watch or acquire a second native rescore. No extra vector retrieval is implicit.
+| Entry          | Injected client                         | Shutdown                                |
+| -------------- | --------------------------------------- | --------------------------------------- |
+| `/pg`          | A `Pool` from `pg` 8                    | Release the host, then `pool.end()`     |
+| `/postgres-js` | A `Sql` from `postgres` 3               | Release the host, then `client.end()`   |
+| `/bun`         | Bun 1.4.4+ `SQL`, with `prepare: false` | Release the host, then `client.close()` |
 
-The original schema owner prepares expression HNSW indexes, using the metric's halfvec opclass or `bit_hamming_ops`. Existing collection metadata is locked in the same native transaction so two hosts prepare one index safely. Layout checks/index preparation are separate native statements; the business query is one `MATERIALIZED` recall of k followed by exact original-vector ordering and topN. A metric override prepares its matching index. Sample-based origins retain their original sample-loading statements before the recall/rescore statement. This explicit quantized stage selects quantized recall even if its near call specified exact; plain `near(...,{exact:true})` keeps its original behavior.
+The root entry loads no SDK. Logical replication currently requires `/pg`, Node 22+ and `pg-logical-replication >=2.6.0 <3`. Bun 1.4.3 lacks required adapter features and rejects before I/O. See `package.json` for exact peer ranges.
 
-Recall includes organization, expiry and pushed payload conditions. HNSW filters do not promise physical prefiltering or k surviving candidates. JavaScript predicates run on the outer hits without refill; a following generic reranker receives those actual hits. Opt-in expression ANN indexes are the exception to the ordinary org-leading index layout. Original vectors remain float32; halfvec indexing supports at most 4000 dimensions, binary indexing at most 64000 but the original vector column at most 16000. Native casts may lose precision or reject values outside halfvec range with `SQL_FAILED` and the native cause. Quantization is not lossless. No dependencies or background workers are added.
+## Essential API
+
+| API                                                   | Purpose                                                |
+| ----------------------------------------------------- | ------------------------------------------------------ |
+| `postgresBackendPlugin(options, features?)`           | Install a PostgreSQL backend                           |
+| `store.use(kv / records / ttl / counter / sql)`       | Select standard functionality                          |
+| `store.transaction` / `store.tx().lock(...).run(...)` | Native transactions and explicit logical locks         |
+| `store.sql`                                           | Parameterized application SQL                          |
+| `host.org(id).backend('postgres')`                    | An organization-scoped store                           |
+| PostgreSQL Feature factories                          | Add native vectors, COPY, notifications or replication |
+
+## Contract details
+
+Defaults are `server: 'postgres'`, `schema: 'public'` and `prefix: 'migaia'`. `cockroach` and `yugabyte` require actual server detection. Only PostgreSQL provides the ordinary change notifications; Cockroach does not support this package's pgvector Feature. Wire compatibility does not verify every deployment combination.
+
+Organizations share tables while isolating equal keys, expiry, locks and standard vector points. Raw SQL, caller-table vector search and COPY access application tables; explicit organization views reject those endpoints. See [Behavior and limits](./USEGUIDE.en.md#behavior-and-limits) for data types, concurrency, failures and journal restrictions.
+
+Logical replication defaults to `truncate: 'reset'`. Root streams emit one reset without `orgId` per TRUNCATE commit: consumers must invalidate every organization. `block` stops without confirming that commit. Detection reports replication lag and retained WAL and warns about unlimited retention. Keep no replication slot when a live stream is unnecessary; TTL or periodic synchronization may suffice. Host disposal never removes a slot.

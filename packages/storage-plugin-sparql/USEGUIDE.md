@@ -1,93 +1,215 @@
 # SPARQL 使用指南
 
-安装代码见 [README.md](./README.md)。配置工厂同步且无 I/O；宿主拥有安装、检测、pipeline 与释放。`autoDetect: false` 时必须先显式 `await host.detect()`，未检测的真实终点在业务 I/O 前拒绝，不会隐式发起检测。
+## 按场景查找
 
-## 原生与 HTTP 入口
+| 需求                 | 场景                                  |
+| -------------------- | ------------------------------------- |
+| 筛选、删除或替换 RDF | [查询与修改四元组](#查询与修改四元组) |
+| 修改前检查旧值       | [检测并发修改](#检测并发修改)         |
+| 使用远程 SPARQL 服务 | [HTTP 读写](#http-读写)               |
+| 导入导出单个图       | [图文档与本体](#图文档与本体)         |
 
-```ts
-import { httpEndpoint } from '@migaia/storage-plugin-sparql/http'
-const endpoint = httpEndpoint({
-  queryUrl: 'http://localhost:3030/storage/sparql',
-  updateUrl: 'http://localhost:3030/storage/update',
-  graphStoreUrl: 'http://localhost:3030/storage/data',
-  auth: { basic: { user: 'deployment-user', password: 'deployment-password' } }
+## 查询与修改四元组
+
+此例写入两条姓名，再只删除 Alice。
+
+```ts doc-test=run
+import { Store } from 'oxigraph'
+import { createStorageHost } from '@migaia/storage-host'
+import { rdf } from '@migaia/storage-contract'
+import { term } from '@migaia/storage-host/authoring/rdf'
+import { sparqlBackendPlugin } from '@migaia/storage-plugin-sparql'
+import { oxigraphEndpoint } from '@migaia/storage-plugin-sparql/oxigraph'
+
+await using host = await createStorageHost({
+  plugins: [sparqlBackendPlugin({ endpoint: oxigraphEndpoint(new Store()) })]
 })
-```
-
-URL 必须为无内嵌凭据的绝对 HTTP(S) URL。可选 auth 在 Basic 与 Bearer 中精确选一；仅需要 Graph Store/ontology 时提供 graphStoreUrl。URL API 对图参数编码一次。修改请求仅发送一次，不跟随重定向；读取沿原 fetch 行为。HEAD404 返回 false，GET404 拒绝，认证与 raw 正文不进入埋点。
-
-部署必须保证同一 dataset 上单条条件 Modify 原子执行、随后读取可见；HTTP 协议本身不能证明此保证。实际验收为 Apache Jena Fuseki 6.2.0 与 Oxigraph 0.4.11，其他部署须做同一原生验收。`httpEndpoint` 不提供 atomicUpdate；`oxigraphEndpoint(new Store())` 提供真实单次 Store.update，不把多个 HTTP 请求当成交互事务。
-
-## Ground RDF 与统一查询链
-
-`store.use(rdf).add/delete` 只收 ground quad，语言、datatype、图与转义保持共享规范。`match(pattern)` 使用原不可变查询链，支持 where、follow/inverse、orderBy、distinct、skip、limit、分页、聚合终点与 stream。原生 SELECT 供给 ground 匹配，客户端剩余工作归共享执行器，explain 如实描述；requirePushdown 对不支持的客户端步骤在 I/O 前拒绝。
-
-```ts
+const store = host.backend('sparql')
+const quad = {
+  subject: term.iri('urn:example:alice'),
+  predicate: term.iri('urn:example:name'),
+  object: term.literal('Alice'),
+  graph: term.defaultGraph
+}
+await store
+  .use(rdf)
+  .add([quad, { ...quad, subject: term.iri('urn:example:bob'), object: term.literal('Bob') }])
 const selected = store
   .use(rdf)
   .match({ predicate: quad.predicate })
-  .where((q) => q.object.value === 'Alice')
-console.log(selected.explain())
-const removed = await selected.delete()
-const replaced = await store
-  .use(rdf)
-  .match({})
-  .replace(quad, { ...quad, object: term.literal('Ada') })
+  .where((value) => value.object.value === 'Alice')
+console.log(await selected.count())
+console.log(await selected.delete())
+console.log(await store.use(rdf).match({}).count())
 ```
 
-删除按实际选择并接受的规范 quad 去重计数；replace 仅替换选中的 old quad，未选中返回 0。根调用等原生提交确认才返回计数；事务内计数描述草稿。筛选和 traversal 不绕过共享链。
+预期输出：
 
-每个组织的逻辑 default/named 图映射到 `urn:migaia:org:<orgId>:` 前缀下的真实命名图，根与借用组织视图同样隔离。非配置缺省组织禁止 raw SPARQL。`host.dropOrg(id)` 删除其全部真实图，包括 blank 文档与空命名图，不影响其他组织。
+```text
+1
+1
+1
+```
 
-## 乐观事务与提交确认
+quad 的 subject/predicate 用命名节点，object 用命名节点或字面量，graph 用缺省图或命名节点。`term.literal` 支持 language 或 datatype；term 绑定负责转义。标准 API 不接受 blank node 或变量。
 
-```ts
+`match(pattern)` 的 pattern 是 quad 字段子集。查询链支持 where、follow/inverse、orderBy、distinct、skip、limit、分页、聚合和 stream。`explain()` 区分原生步骤与客户端步骤；`requirePushdown()` 对不支持的客户端步骤在请求前拒绝。
+
+`delete` 对实际选中、接受修改的规范 quad 去重计数；`replace(old, new)` 仅替换选中的 old，未选中返回 0。根调用等提交确认后才返回；事务内数量描述当前修改草稿。
+
+## 检测并发修改
+
+先声明 Alice 仍存在，再把它改为 Ada。若另一个事务移除了 Alice，这次提交会冲突。
+
+```ts doc-test=run
+import { Store } from 'oxigraph'
+import { createStorageHost } from '@migaia/storage-host'
+import { rdf } from '@migaia/storage-contract'
 import { ConcurrencyPolicy } from '@migaia/storage-host/authoring/concurrency'
+import { term } from '@migaia/storage-host/authoring/rdf'
+import { sparqlBackendPlugin } from '@migaia/storage-plugin-sparql'
+import { oxigraphEndpoint } from '@migaia/storage-plugin-sparql/oxigraph'
+
+await using host = await createStorageHost({
+  plugins: [sparqlBackendPlugin({ endpoint: oxigraphEndpoint(new Store()) })]
+})
+const store = host.backend('sparql')
+const quad = {
+  subject: term.iri('urn:example:alice'),
+  predicate: term.iri('urn:example:name'),
+  object: term.literal('Alice'),
+  graph: term.defaultGraph
+}
+await store.use(rdf).add([quad])
 await store
   .tx()
   .concurrency(ConcurrencyPolicy.optimistic({ retries: 1 }))
   .run(async (scope) => {
     scope.use(rdf).expect([quad])
-    scope.use(rdf).expectAbsent([{ ...quad, object: term.literal('new') }])
     await scope.use(rdf).delete([quad])
-    await scope.use(rdf).add([{ ...quad, object: term.literal('new') }])
-    console.log(await scope.use(rdf).match({}).count())
+    await scope.use(rdf).add([{ ...quad, object: term.literal('Ada') }])
   })
+console.log((await store.use(rdf).match({}).all()).map((value) => value.object.value).join(','))
 ```
 
-scope 仅提供带 expect/expectAbsent 的 native RDF 与 update-only raw tag，不提供 KV、lock 或 wait/fail 策略。原 transaction owner 管理 accepted work、首错、iterator、finalizer 与过期 scope；不另建生命周期。草稿按规范身份去重，最后操作覆盖前操作。present 条件按合取，每个 absent 独立 NOT EXISTS。
+预期输出：
 
-一次条件 DELETE/INSERT WHERE 原子写用户 quad 与 `urn:migaia:commit` 中随机 marker；一次 ASK 确认，再单独清理 marker。只有 Update 成功且 ASK 成功并明确 marker 不存在才是可沿原 optimistic policy 重试的冲突。Update 已发送但结果未知、ASK 失败/取消均为 SPARQL_COMMIT_UNKNOWN，停止当前安装后端后续写入，不重放；先检查原生数据库再创建新后端。清理 marker 失败只上报，用户数据已经提交。没有写前提时仍按规范 quad 的集合身份执行 add/delete：同一 quad 的最后成员操作生效，但并发事务写入不同宾语可同时保留两条 quad，不提供谓词单值覆盖，也不自动校验读集。需要此类竞争保护时，使用 `expect`。
+```text
+Ada
+```
 
-有真实 atomicUpdate 的端点才可在事务内执行一个 `scope.use(sparql)\`INSERT DATA { ... }\`.update()` body，不能混任何 RDF 操作/前提或第二个 raw body。通用 HTTP 在写入前拒绝此能力。根 raw tag 支持 select/ask/construct/update，值绑定归共享编译器；普通字符串不是 SPARQL 语法，不得作为语法插入。
+`expect` 条件按合取检查；`expectAbsent` 要求各 quad 不存在。草稿按规范 quad 身份去重，同一 quad 最后成员操作生效。未声明前提的读取不会自动成为读集；两个事务分别插入不同宾语时可同时保留，不提供谓词单值覆盖。
 
-标准 RDF、Graph Store、ontology 禁止保留 marker 图。进程崩溃可能遗留 marker；管理员先确认活动提交后，可直接在数据库执行 `CLEAR SILENT GRAPH <urn:migaia:commit>`。直接 native/raw 管理操作修改该图不在标准条件提交保证范围。
+`ConcurrencyPolicy.optimistic({retries: 1})` 最多重试一次真实冲突；callback 可能重新执行，外部副作用应放在事务成功之后。backoffMs 默认 20；省略策略时不自动启用乐观重试。只支持乐观并发，不支持键锁、wait/fail 策略或交互式远程事务。
 
-## Graph Store 与 ontology
+一次条件 DELETE/INSERT WHERE 同时写用户数据和提交 marker，随后 ASK 确认，再清理 marker。只有 Update 成功且 ASK 明确 marker 不存在才是可重试的冲突。已发送 Update 结果未知、ASK 失败或取消为 SPARQL_COMMIT_UNKNOWN；停止该后端后续写入，不重放。清理 marker 失败只 report，用户数据已提交。
 
-安装时选择 graphStoreFeature()/ontologyFeature()。前者五方法为 getGraph、putGraph、mergeGraph、removeGraph、hasGraph；后者为 importOntology、exportOntology，均只在根 store.api，事务投影为空，不存在 prepare 或 transaction client。target 精确为 `{default:true}` 或 `{graph:namedNode}`，末参为原 ctx。get/export 缺省 Turtle，文档显式 Turtle 或 N-Triples。
+有 atomicUpdate 的端点才可在事务内执行一个 raw update body，不能混 RDF 操作/前提或第二个 raw body。Oxigraph 提供一次原生 Store.update；httpEndpoint 不提供此能力，在写入前拒绝。raw 事务模板只提供 update，不提供 select/ask/construct。
 
-```ts
-const target = { graph: term.iri('https://example/schema') }
+## HTTP 读写
+
+先运行支持 SPARQL Query 与 Update 的真实服务。示例默认连接本机 3030 端口的 `storage` dataset；地址不同时，设置 `SPARQL_QUERY_URL`、`SPARQL_UPDATE_URL` 和 `SPARQL_GRAPH_STORE_URL`，三者应指向同一 dataset。Graph Store URL 供图文档操作使用。此例先插入再 ASK，写入的数据会留在服务中。
+
+```ts doc-test=run
+import { createStorageHost } from '@migaia/storage-host'
+import { sparql } from '@migaia/storage-contract'
+import { term } from '@migaia/storage-host/authoring/rdf'
+import { sparqlBackendPlugin } from '@migaia/storage-plugin-sparql'
+import { httpEndpoint } from '@migaia/storage-plugin-sparql/http'
+
+await using host = await createStorageHost({
+  plugins: [
+    sparqlBackendPlugin({
+      endpoint: httpEndpoint({
+        queryUrl: process.env.SPARQL_QUERY_URL ?? 'http://127.0.0.1:3030/storage/sparql',
+        updateUrl: process.env.SPARQL_UPDATE_URL ?? 'http://127.0.0.1:3030/storage/update',
+        graphStoreUrl: process.env.SPARQL_GRAPH_STORE_URL ?? 'http://127.0.0.1:3030/storage/data'
+      })
+    })
+  ]
+})
+const query = host.backend('sparql').use(sparql)
+const subject = term.iri('urn:example:' + crypto.randomUUID())
+const predicate = term.iri('urn:example:name')
+const value = term.literal('Alice')
+await query`INSERT DATA { ${subject} ${predicate} ${value} }`.update()
+console.log(await query`ASK { ${subject} ${predicate} ${value} }`.ask())
+```
+
+预期输出：
+
+```text
+true
+```
+
+queryUrl/updateUrl 必填，graphStoreUrl 仅图文档功能需要。URL 为不含内嵌凭据的绝对 HTTP(S)。可选 auth 精确选择 `{basic: {user, password}}` 或 `{bearer}`。修改请求一次发送，不跟随重定向；读取沿 fetch 行为。Graph Store HEAD404 返回 false，GET404 拒绝。认证头不进入诊断数据。
+
+根 raw tag 支持 select、ask、construct、update。普通字符串是数据，不应作为语法插入；用 term 绑定 RDF 参数。raw SELECT/CONSTRUCT 支持结果内 blank node，标识仅限同一响应。
+
+部署须保证单条条件 Modify 原子执行、同 dataset 写后读可见。已覆盖 Fuseki 6.2.0、Oxigraph 0.4.11 的原生路径，其他部署需确认等价保证；HTTP 协议不等于数据库事务。
+
+## 图文档与本体
+
+写入一个图，导出后按 replace 再导入；所有操作都来自本例安装的 Feature。
+
+```ts doc-test=run
+import { Store } from 'oxigraph'
+import { createStorageHost } from '@migaia/storage-host'
+import { rdf } from '@migaia/storage-contract'
+import { term } from '@migaia/storage-host/authoring/rdf'
+import { sparqlBackendPlugin } from '@migaia/storage-plugin-sparql'
+import { oxigraphEndpoint } from '@migaia/storage-plugin-sparql/oxigraph'
+import { graphStoreFeature } from '@migaia/storage-plugin-sparql/features/graph-store'
+import { ontologyFeature } from '@migaia/storage-plugin-sparql/features/ontology'
+
+await using host = await createStorageHost({
+  plugins: [
+    sparqlBackendPlugin(
+      { endpoint: oxigraphEndpoint(new Store()) },
+      {
+        graphs: graphStoreFeature(),
+        ontology: ontologyFeature()
+      }
+    )
+  ]
+})
+const store = host.backend('sparql')
+const target = { graph: term.iri('urn:example:people') }
 const document = {
   format: 'text/turtle' as const,
-  text: '<https://example/a> <https://example/p> "value" .'
+  text: '<urn:example:alice> <urn:example:name> "Alice" .'
 }
 await store.api.graphStore.putGraph(target, document)
-await store.api.graphStore.mergeGraph(target, document)
 console.log(await store.api.graphStore.hasGraph(target))
-console.log(await store.api.graphStore.getGraph(target, 'application/n-triples'))
+console.log((await store.api.graphStore.getGraph(target)).text.includes('Alice'))
+console.log(await store.api.ontology.importOntology(target, document, { mode: 'replace' }))
 await store.api.graphStore.removeGraph(target)
-const parsed = await store.api.ontology.importOntology(target, document, { mode: 'replace' })
-console.log(await store.api.ontology.exportOntology(target, 'text/turtle'))
+console.log(await store.api.graphStore.hasGraph(target))
 ```
 
-ontology 缺省 merge，replace 沿真实 per-graph replace。返回解析条数（含重复），不是新增条数。相同文档内 blank 共享保持，每次导入新 blank 前缀，跨文档独立。N3 负责 RDF1.1 parser/writer，RDF-star 拒绝；推理及供应商规则由数据库管理。
+预期输出：
 
-## 观察、错误与成本
+```text
+true
+true
+1
+false
+```
 
-store 操作及 Feature 终点均经原 async pipeline。存储 hooks、beforeSparqlUpdate、onPreconditionFailed、onHttpRequest 只观察，抛错/拒绝只 report，不能中止或改写；干预写 pipeline stage。更新事件只有操作/前提数量，HTTP 只有脱敏 route、method、可选 status 与耗时，无认证或正文。
+target 精确选择 `{default: true}` 或 `{graph: namedNode}`。document 的 format 是 text/turtle 或 application/n-triples，text 是完整文档。get/export 默认 Turtle。Graph Store 提供 getGraph、putGraph、mergeGraph、removeGraph、hasGraph；ontology 提供 importOntology/exportOntology。import mode 默认 merge，replace 替换真实单图；返回解析条数，含重复，不是新增数。
 
-错误域与四类原生错误见 README。读写成本按实际 RDF 字节；草稿预期 O(q)，条件文本 O(q+p) 加实际 quad 字节，native match 读取实际结果后沿共享客户端预算执行，文档 O(字节+quad) 并完整传输。不含数据库计划、网络与推理成本，不增加第二套时钟、重试器或执行平台。
+n3 处理 RDF1.1 文档语法。同一文档的 blank node 共享身份，不同导入重新命名。拒绝 RDF-star 和文档变量，不执行推理。端点须实际提供 graphStore；Feature 方法在 store.api；组织视图仍按自身图映射执行，事务内没有图文档 API。
 
-原事务 callback、已接受 draft 任务或 finalizer 的业务失败使用 `TRANSACTION_FAILED`，原失败仍为 primary，原生类型与 stack 保留。原生读取在读取边界归族，因此事务内 transport 失败仍为 `SPARQL_UNAVAILABLE`；已有 contract/协议错误不改身份。
+## 组织与保留图
+
+`host.org(id).backend('sparql')` 将 default/named 逻辑图映射到 `urn:migaia:org:<orgId>:` 下的真实命名图。不同组织隔离；dropOrg 删除目标组织全部物理图，包括空命名图与含 blank node 的文档。raw SPARQL 只允许配置的默认组织。
+
+标准 RDF、图文档和 ontology 禁止操作 `urn:migaia:commit` 保留图。进程崩溃可能留下 marker；管理员确认没有活动提交后才可在数据库执行 `CLEAR SILENT GRAPH <urn:migaia:commit>`。绕过标准 API 修改该图会破坏提交确认。
+
+## 失败与释放
+
+错误 source 为 storage.backend.sparql。SPARQL_REQUEST_FAILED 是原生明确拒绝，保留 status/body/cause；SPARQL_UNAVAILABLE 是读取 transport/5xx 失败；SPARQL_RESPONSE_INVALID 是非法结果/文档；SPARQL_COMMIT_UNKNOWN 是写结果无法确认，须先核实 dataset，再创建新的后端。callback、草稿任务和 finalizer 的业务失败使用 TRANSACTION_FAILED，原生类型、primary 和原因链保留；已有 contract/协议错误不改身份。
+
+host 默认检测；autoDetect:false 时先 await host.detect()。关闭拒绝新调用，取消活动读取，等待已发提交。dispose() 的主 Promise 保留清理失败；Symbol.asyncDispose 共享清理并只 report。endpoint、Oxigraph Store 与自备客户端由调用方管理，不由插件关闭。Oxigraph 0.4.11 无公开 close/dispose 方法。
+
+hooks 只观察，失败交给 report；干预使用 host pipeline。HTTP 观察不含认证或正文。查询成本包含真实结果字节和客户端剩余操作；图文档整体解析和传输，事务条件文本随 quad/前提数量增长，不承诺数据库计划或推理性能。

@@ -1,193 +1,107 @@
 # @migaia/storage-plugin-sqlite
 
-A native SQLite backend installed in `@migaia/storage-host`. Node and Deno use
-`node:sqlite`; Bun uses `bun:sqlite`. The package root loads neither driver.
-No npm native addon is required.
+[中文](./README.md)
 
-`storage.use(kv)` provides native `getMany`, `setMany`, `removeMany`, and `removeByPrefix`.
-Use `tx.use(kv)` or the corresponding short methods inside a transaction. Canonical structured
-keys preserve input order and duplicate read positions; missing values are `undefined`. Duplicate
-write keys reject before I/O. Writes and removals commit or roll back in one native transaction;
-removals return the actual count. Bounded IN chunks share one native read snapshot. Each batch
-enters one pipeline and count hook; empty admitted batches do neither. `setMany` accepts finite,
-nonnegative `ttlMs`, stored atomically with its value. Vector and RDF locks reject with
-`UNSUPPORTED_CAPABILITY` before native I/O because SQLite owns neither domain.
+Store local settings, offline records and caches with the runtime's built-in SQLite, combining text, records, expiry and application SQL in one database transaction. Select the driver for your runtime and a database file or in-memory database, then install the plugin in a host without adding an npm native database extension. Your application creates and closes the connection; the root import does not choose or load a driver automatically.
 
-## Install a backend
+## Sound familiar?
 
-```ts
+- A settings update is only half saved: each statement committed separately.
+- Two processes change the same item: an in-memory lock cannot coordinate them.
+- Expired cache data still looks valid: values and deadlines follow different write paths.
+- A root query runs during a transaction: both are trying to use one connection.
+
+## Why choose it?
+
+- **Write data and expiry together.** Batch values, records and TTL share one native transaction. See [Save values with expiry](./USEGUIDE.en.md#save-values-with-expiry).
+- **Combine application SQL with storage methods.** Use the same tx to commit or roll back SQL and KV together. See [Commit SQL and storage together](./USEGUIDE.en.md#commit-sql-and-storage-together).
+- **Keep connection cleanup explicit.** Your application creates the connection; release the host before releasing it. Node and Bun use built-in modules, with no npm native addon.
+- **Understand concurrency limits.** File WAL mode coordinates logical locks across connections. Non-WAL mode coordinates only within the current process. See [Concurrency and cancellation](./USEGUIDE.en.md#concurrency-and-cancellation). No speed claim is made.
+
+## Start here
+
+This writes to a real SQLite in-memory database. Replace `:memory:` with a filename to persist data. Node 24 or later is required.
+
+```ts doc-test=run
 import { createStorageHost } from '@migaia/storage-host'
 import { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'
 import { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'
-
-await using connection = nodeSqliteDriver('./settings.sqlite')
+await using connection = nodeSqliteDriver(':memory:')
 await using host = await createStorageHost({
   plugins: [sqliteBackendPlugin({ driver: connection })] as const
 })
-const storage = host.backend('sqlite')
-await storage.set('theme', 'dark')
-console.log(await storage.get('theme'))
+const store = host.backend('sqlite')
+await store.set('theme', 'dark')
+console.log(await store.get('theme'))
 ```
 
-Create the connection before the host so disposal releases the host first.
-The store borrows its driver exclusively. Store disposal never closes the
-connection. Use one active store per driver; different connections can use
-one file. A `table` prefix isolates their physical tables (default `migaia`).
+Expected output:
 
-For Bun, import `bunSqliteDriver` from `/bun`. Deno uses `/node` and needs read
-and write permission for the database and its journal files. Node requires its
-built-in SQLite module (Node 24 or later). Driver subpaths are explicit hard
-runtime requirements; there is no driver detection or fallback.
-
-## Native storage and SQL
-
-The store provides text, bytes, records, ordered record iteration, synchronous
-text methods, metadata, complete native transactions and a bound SQL tag.
-`kv` and `records` use the shared capability identities from
-`@migaia/storage-contract`. Record queries use that package's actual
-`where`/`select`/`all` executor and report client evaluation honestly.
-
-Text and byte misses return `null`; record and metadata misses return
-`undefined`. `keys()` lists only string text keys. Channel-specific deletes
-leave the other channels unchanged. `clearAll()` preserves metadata.
-Cross-channel ownership conflicts throw `DUPLICATE_KEY`; explicitly choose
-`{ conflictPolicy: 'replace' }` to replace atomically. Updates within the same
-channel overwrite normally.
-
-Text preserves NUL and lone UTF-16 surrogate code units through the existing
-JSON codec. Records and metadata use the collections codec, preserving Maps
-and Sets. Unsupported portable values fail before table changes. Binary
-inputs and outputs are detached. Keys use the canonical ordered key codec.
-
-```ts
-import { sqlFragment } from '@migaia/storage-host/authoring/sql'
-
-await storage.sql`CREATE TABLE users(id INTEGER PRIMARY KEY, name TEXT)`.run()
-await storage.transaction(async (tx) => {
-  await tx.sql`INSERT INTO users VALUES(${1}, ${'Ada'})`.run()
-  await tx.set('user-count', '1')
-})
-const rows = await storage.sql<{ id: number; name: string }>`
-  SELECT id, name FROM ${sqlFragment.id('users')} WHERE id = ${1}
-`.all()
+```text
+dark
 ```
 
-SQL interpolation always binds values. `sqlFragment.id` quotes identifiers;
-shared fragments support composition and `join`. SQL accepts one statement,
-with an optional final semicolon. Transaction control and `journal_mode`
-changes reject before driver execution. Use `transaction` for commit and
-rollback; complete trigger bodies containing internal statement lists are
-outside this SQL entry's scope. SQL row types describe caller knowledge and
-do not validate column names or convert dates.
+For a multi-value update, see [Save values with expiry](./USEGUIDE.en.md#save-values-with-expiry). To create a database backup, see [Back up a database](./USEGUIDE.en.md#back-up-a-database).
 
-Native integers outside the safe number range remain `bigint`; safe integers
-become numbers. Boolean inputs bind as 0/1. BLOB columns return detached
-`Uint8Array` values. `run` returns `changes` and `lastInsertRowid`, each a
-`number | bigint`. Statements use an instance-local 64-entry LRU. Eviction
-removes references; it does not promise immediate native finalization on Node.
+## Pitfalls in hand-written code
 
-## Concurrency and ownership
+This function assumes its application tables already exist. It is shown without execution.
 
-File databases default to `wal: true`. Initialization requests and verifies
-actual WAL. `wal: false` uses the shared host process-local logical locks and
-revision facts while retaining native BEGIN/COMMIT/ROLLBACK. It creates no
-persistent lock or revision table and makes no cross-process logical-lock
-promise. An in-memory database defaults to false; explicit true rejects.
-A connection already configured with journal mode OFF rejects.
+```ts doc-test=check
+import { DatabaseSync } from 'node:sqlite'
+export function save(database: DatabaseSync, name: string) {
+  database.prepare('INSERT INTO app_users(name) VALUES(?)').run(name)
+  // The first statement has committed if the next one fails.
+  database.prepare('UPDATE app_counts SET count=count+1').run()
+  // A root operation during a transaction can interfere with work on this connection.
+}
+```
 
-Use `storage.tx().lock(lockKey.text('key')).run(...)` and policies from
-`@migaia/storage-contract`. Only equal logical keys conflict. SQLite writer
-serialization is physical waiting, including under `ConcurrencyPolicy.fail()`.
-`inspectLocks()` returns actual holder and expiry diagnostics. WAL logical
-leases default to 30,000 ms (`maxLockMs`); they have no heartbeat. Cancellation
-is cooperative: accepted native work must finish or roll back before resources
-are released. A callback that ignores cancellation cannot be forcibly stopped.
+Use `store.transaction` and use only tx inside its callback. A caught or unawaited data-operation failure still causes rollback.
 
-Root reads, synchronous methods and root SQL reject with `TRANSACTION_FAILED`
-while this connection belongs to a native transaction. Use the callback's
-`tx`. Callback views expire when the callback settles; accepted operations and
-final checks receive their own original-owner views. Caught or unawaited data
-failures still force rollback. `tx.sql` and KV always use the same native
-transaction. User SQL does not infer logical keys from SQL text.
+## The model in three minutes
 
-`readTransactionOperationContext(tx)` reads the frozen attempt context retained
-by the original transaction owner. Composed operations and final checks share
-its captured fields and original live signal without rereading caller getters,
-resetting deadlines or creating another cancellation controller. Cooperatively
-cancelled work settles before native rollback and logical lock release complete.
+| Task                                        | Tool                                           |
+| ------------------------------------------- | ---------------------------------------------- |
+| Open and close the SQLite file              | A connection created through `/node` or `/bun` |
+| Use standard storage in that database       | `host.backend('sqlite')`                       |
+| Select KV, records, SQL, expiry or counters | `store.use(token)`                             |
+| Commit several changes together             | `transaction` or `tx().lock(...).run(...)`     |
+| Back up or compact the file                 | The explicitly selected maintenance Feature    |
 
-Selected Features use the same transaction and query creators. `tx.api` is bound before
-its original short view is frozen. Its SQL and KV operations commit or roll back together;
-caught and unawaited failures still belong to the original transaction owner. Feature
-`query` and `tx` methods remain on actual derived chains. The borrowed native client is
-one frozen `exec`/`prepare` view of the same connection, without `dispose` or symbolic
-cleanup methods. The creating caller retains connection ownership.
+A capability token selects a set of methods. A Feature is an optional addition. WAL is SQLite's write-ahead log mode; here it also enables shared-file coordination for logical locks.
 
-Use `host.org(orgId).backend('sqlite')` for a fixed organization. The default and
-other organizations share the same tables; creating an organization runs no DDL
-and opens no connection. One native admission queue serves them all. Data,
-deadlines, locks and revisions remain isolated by `org_id`; `host.dropOrg(orgId)`
-removes only that organization's managed rows. Native Features borrow the same
-frozen client and their factories install once. Explicit organization views reject
-arbitrary SQL and database maintenance, including inside transactions; transaction
-failures retain the original error chain.
+## Typical scenarios
 
-Every managed table starts with `org_id` in its primary key. Native root SQL is
-caller-owned schema access; callers must supply their own organization filters
-for custom SQL tables and must not modify internal tables.
+| Scenario                               | Building blocks        | Details                                                                             |
+| -------------------------------------- | ---------------------- | ----------------------------------------------------------------------------------- |
+| Local tenant caches                    | Organizations, kv, ttl | [Save values with expiry](./USEGUIDE.en.md#save-values-with-expiry)                 |
+| Update application tables and settings | tx.sql, tx.set         | [Commit SQL and storage together](./USEGUIDE.en.md#commit-sql-and-storage-together) |
+| Create a database copy                 | maintenance.backup     | [Back up a database](./USEGUIDE.en.md#back-up-a-database)                           |
 
-Use `storageLogStore(host, 'sqlite', { prefix })` from
-`@migaia/storage-host/journal` for native logs. A caller-owned memory connection
-reserves that log namespace through the original process lock. Private rows stay
-outside business keys and business clear operations; dispose the log to reopen the
-same prefix. File connections use indexExclusive:false without a cross-operation index. Each log operation reads current head, records and states inside the existing BEGIN IMMEDIATE transaction, so independent connections can share that namespace.
+## Install
 
-## Maintenance
+This package is currently `private: true` for use within the repository workspace, rather than a promise of public registry availability. Add it to a consuming workspace package:
 
-Import `sqliteMaintenanceFeature` only from
-`@migaia/storage-plugin-sqlite/features/maintenance` and select it in the
-plugin's second argument. It adds `storage.api.maintenance.backup(path)` and
-`vacuum()` through the original SQL endpoint; transactions have neither method.
-Backup uses `VACUUM INTO` and never pre-deletes or overwrites a target. Native
-failure may leave an incomplete output file. Once synchronous native maintenance
-starts, cancellation cannot claim that the file was never written.
+```bash
+pnpm add @migaia/storage-host @migaia/storage-contract @migaia/storage-plugin-sqlite --workspace
+```
 
-## Errors and disposal
+Node 24+ and Deno use `nodeSqliteDriver(path)` from `/node`. Bun uses `bunSqliteDriver(path)` from `/bun`. Deno needs read/write permission for the database and its journal files. Entry selection is explicit; no runtime fallback occurs. The root entry loads no database SDK.
 
-Package errors carry source `@migaia/storage-plugin-sqlite` and one of
-`SQLITE_FAILED`, `TRANSACTION_FAILED`, `DUPLICATE_KEY`, or `DECODE_FAILED`.
-Native and codec errors remain reachable through `cause`; rollback cleanup
-failure retains the original primary first in `AggregateError.errors`.
-Contract validation, cancellation and concurrency use their original contract
-codes. Decoding failure never rewrites damaged data.
+## Essential API
 
-Repeated explicit `dispose()` calls return one cached Promise. Symbolic
-cleanup uses a separate cached Promise, reports failure and completes; both
-perform native cleanup once. Dispose the store/host before its caller-owned
-connection. A disposed store stays terminal even when cleanup fails.
+| API                                             | Purpose                                       |
+| ----------------------------------------------- | --------------------------------------------- |
+| `sqliteBackendPlugin({ driver, table?, wal? })` | Install SQLite storage                        |
+| `store.use(kv / records / sql / ttl / counter)` | Standard values, queries, expiry and counters |
+| `store.transaction` / `store.tx()`              | Native transactions on the same connection    |
+| `store.sql` / `tx.sql`                          | Parameterized SQL                             |
+| `host.org(id).backend('sqlite')`                | Organization-scoped data                      |
+| `sqliteMaintenanceFeature()`                    | Add backup and vacuum                         |
 
-The standard `sql` token exposes the same native tag as `storage.use(sql).sql`.
-Inside transactions, `tx.use(sql).sql` binds the current short view through the original owner.
-Native results, exact root row types and SQLite's required `lastInsertRowid` remain intact;
-there is no second budget or compiler.
+## Contract details
 
-The standard `ttl` capability provides expire, remaining and persist for text, bytes and records
-using local Date.now. Deadlines and values share the native transaction; live overwrites retain
-deadlines, while deletion, clear and replacement remove them. Reads, enumeration and queries
-lazily reclaim expired rows through the original native mutation path without a timer.
-The standard `counter.increment` validates canonical decimal text and safe integers before an
-atomic native text update. Missing values start at 0; malformed text, invalid deltas and overflow
-reject before writing. Both capabilities support tx.use on the original native scope.
+Give one driver to only one store at a time; multiple connections may open the same file. Files default to WAL and in-memory databases default to non-WAL. Requesting WAL for an in-memory database rejects. The default table prefix is `migaia`. Lock leases default to 30000ms without heartbeat. While a transaction occupies the connection, root operations fail; use tx instead.
 
-Transactions retain the first live value and deadline in their native snapshot. If an observed
-deadline expires, the original commit check returns the conflict to the existing concurrency
-policy. Iteration skips rows that expire before their first return; close counts include only
-rows actually returned.
-
-Global `journal` configuration records each native mutation in its actual order, including repeated writes. SQLite keeps complete raw values and absolute deadlines in the original transaction; undo uses the original locked transaction and checks every complete revision and after-image before restoring any value. External binlog and undo can use the existing WAL; recovery checks a marker committed with the data and never replays a committed mutation. File WAL revision rows retain an immutable birth, so dropping and recreating an organization cannot make an old undo valid again. With `wal: false`, revision identity remains local to the original live group; a reopened group rejects old undo images. Metadata writes advance their original private guard without becoming business log entries.
-
-Both memory and file connections can open native logs through the initializer's `storageLogStore`. File operations read their current index inside each native transaction rather than retaining cross-operation state. Raw SQL has no complete shared image target and rejects before native execution while commit journaling is active. Global journal configuration installs the host's existing asynchronous pipeline boundary, so synchronous entries report `ASYNC_STAGE_IN_SYNC_ENTRY`; ordinary hosts retain their synchronous API. The logger and its stores stay caller-owned. Host journal errors such as `UNDO_CONFLICT` retain their original source and cause.
-
-With global journal telemetry enabled, each asynchronous root operation or complete transaction emits one storage event using its actual native key observations. Short transaction operations and private journal or metadata work emit no duplicate business events. The original concurrency loop still owns retries.
-
-When a commit journal is selected, expiry cleanup triggered by get, has, keys, byte or record reads, getMany, TTL remaining, and record iteration joins the same native transaction and records the actual deletion. Undo restores the raw value and absolute deadline without refreshing expired data. Telemetry alone or an initializer selecting no commit journal keeps the original read segment; reads without journal configuration retain their original path.
+Vectors, RDF and live change feeds are not provided. Record field queries evaluate on the client. Cancellation cannot preempt synchronous SQLite work already in progress. See [Data and failures](./USEGUIDE.en.md#data-and-failures) for data types, maintenance, logging and error details.

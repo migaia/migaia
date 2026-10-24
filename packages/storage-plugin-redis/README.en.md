@@ -1,196 +1,121 @@
-# Redis native drivers
+# @migaia/storage-plugin-redis
 
-The adapter entries borrow a genuine connected SDK client or pool. `ioredisDriver` accepts ioredis 6, `nodeRedisDriver` accepts a node-redis 6 pool, and `bunRedisDriver` accepts Bun's built-in `RedisClient`. The root entry does not load an SDK.
+[中文](./README.md)
 
-`withConnection` holds the native pool lease or owned duplicate for the complete callback. The injected client remains caller-owned. Borrowed `getClient()` types omit connection closing and duplication methods. Subscription resources seal callbacks before cleanup and use cached disposal Promises.
+Use Redis or Valkey through one storage API that handles organization keys, expiry, record queries and explicit key locks, reducing repeated key-prefix and expiry code. Choose a driver for your connected client or pool, install the plugin, and add Streams, rate limiting or vector search when needed. Available capabilities depend on the server modules and driver; Redis transaction partial-failure limits still apply.
 
-`exec` returns `null` for an aborted WATCH, otherwise one success or original native error per command. A command error can leave other commands committed. A connection error after EXEC can have an unknown outcome; the adapters never replay it. ioredis and node-redis expose binary commands. Bun's driver rejects binary input before MULTI.
+## Sound familiar?
 
-Native command, connection and EXEC failures use `REDIS_FAILED`. Unknown user callback failures use `TRANSACTION_FAILED`. Existing contract, host and package errors retain their identity; native Error types, stacks and original failures remain reachable.
+- Tenant caches overwrite each other: raw keys lack consistent organization prefixes.
+- Updating a live value removes its expiry: value and TTL were written separately.
+- MULTI reports an error but data changed: an EXEC item error is not a rollback.
+- Reconnected consumers miss changes: Pub/Sub was treated as retained history.
 
-The ioredis and node-redis `binaryCommand` and `exec` ports retain arbitrary native BLOB bytes. Ioredis success replies can also be Buffers; validate each `unknown` reply for its fixed command. The node-redis 6.3 multi builder omits the mapping on its final EXEC. The adapter uses native raw MULTI/EXEC inside the same genuine pool lease and reuses the SDK chainId. Original item Errors remain intact; no MultiErrorReply is fabricated when the SDK produces none. A connection change before EXEC rejects with `REDIS_FAILED`; only a native null EXEC means WATCH abort.
+## Why choose it?
 
-## Standard storage backend
+- **Keep logical keys and organizations consistent.** Text, bytes and records use separate physical keys while equal keys in different organizations remain isolated. See [Organization data with expiry](./USEGUIDE.en.md#organization-data-with-expiry).
+- **Submit standard mutations in one EXEC.** Values, indexes, revisions and notifications share the commit, with identifiable input failures checked first. Redis's partial-failure limits still apply. See [Transactions and concurrency](./USEGUIDE.en.md#transactions-and-concurrency).
+- **Choose live hints or retained history deliberately.** Pub/Sub serves online listeners; the change Stream can resume from a cursor. See [Resume change history](./USEGUIDE.en.md#resume-change-history).
+- **Use capabilities the server actually has.** Vector selection checks the Search module and binary driver ports instead of silently replacing native search with local computation. No performance comparison is claimed.
 
-`redisBackendPlugin({ driver, prefix?, concurrency?, owner?, maxLockMs? })` installs KV, bytes, records, TTL, counters, the original transaction builder and committed change hints. Defaults are `prefix: 'migaia'` and `maxLockMs: 30000`. Host detection requires Redis >=7.2 or Valkey >=7.2.5. With automatic detection disabled, call `await host.detect()` first. Each subscription holds its own native connection; reserve pool capacity for subscriptions and business operations.
+## Start here
 
-```ts
+Run Redis 7.2+ or Valkey 7.2.5+ and set `REDIS_URL`. This program writes a value and reads it back.
+
+```ts doc-test=run
 import { createClientPool } from 'redis'
 import { createStorageHost } from '@migaia/storage-host'
-import { counter, kv, records, ttl } from '@migaia/storage-contract'
 import { redisBackendPlugin } from '@migaia/storage-plugin-redis'
 import { nodeRedisDriver } from '@migaia/storage-plugin-redis/node-redis'
-const pool = createClientPool({ url: process.env.MIGAIA_REDIS_URL! }, { maximum: 8 })
+const pool = createClientPool({ url: process.env.REDIS_URL }, { maximum: 8 })
 await pool.connect()
-const host = await createStorageHost({
-  plugins: [
-    redisBackendPlugin({
-      driver: nodeRedisDriver(pool),
-      prefix: crypto.randomUUID()
-    })
-  ] as const
-})
-const store = host.backend('redis')
 try {
-  await store.use(kv).setMany([{ key: ['cache', 1], value: 'one' }])
-  await store.use(counter).increment('visits')
-  await store
-    .tx()
-    .lock({ channel: 'text', key: 'session' })
-    .run(async (tx) => {
-      await tx.set('session', 'active')
-      await tx.use(ttl).expire({ channel: 'text', key: 'session' }, 60000)
-    })
-  await store.putRecord({ active: true }, ['user', 1])
-  console.log(await store.use(records).query().count())
+  await using host = await createStorageHost({
+    plugins: [redisBackendPlugin({ driver: nodeRedisDriver(pool) })] as const
+  })
+  const store = host.backend('redis')
+  await store.set('example:status', 'ready')
+  console.log(await store.get('example:status'))
 } finally {
-  await store.clearAll()
-  await host.dispose()
   await pool.close()
 }
 ```
 
-Reads inside a transaction do not acquire locks. Explicit `.lock(...)` holds a native SET NX PX lease; ordinary writes follow the original concurrency policy. WATCH precedes dependent reads. Data, ordered indexes, revisions and notifications share one EXEC. Callback failure sends no EXEC; null is an actual WATCH abort. Per-command failure may partially commit. An unknown EXEC is never replayed and seals this installation's new write admission while allowing reads and disposal.
+Expected output:
 
-Channels have separate wires. Overwrites preserve TTL; `expire(0)` removes immediately. TTL and locks use Redis TIME/PTTL. Fractional milliseconds round upward to a native millisecond; unsafe absolute deadlines reject before EXEC. Batch writes reject canonically equivalent duplicate keys; empty batches send nothing and getMany preserves positions and duplicates.
+```text
+ready
+```
 
-P is the original canonical prefix encoding rendered as a nonempty `{hex}` hash tag. Every physical key shares its slot and logical keys include their organization, including the default organization.
+For TTL and transactions, see [Organization data with expiry](./USEGUIDE.en.md#organization-data-with-expiry). For vectors, see [Search vectors](./USEGUIDE.en.md#search-vectors).
 
-| Data                        | Native type  | Physical key                         |
-| --------------------------- | ------------ | ------------------------------------ |
-| Text/bytes/records          | STRING       | P:t:orgKey / P:b:orgKey / P:r:orgKey |
-| Ordered text/records        | ZSET         | P:t:index / P:r:index                |
-| Vector points / 向量点      | HASH         | P:v:collectionHex:orgId:idHex        |
-| Search schema / 检索 schema | native index | P:vi:collectionHex                   |
-| Revisions                   | HASH         | P:rev                                |
-| Locks                       | STRING       | P:lock:orgId:identity                |
-| Commit hints                | Pub/Sub      | P:changes                            |
+## Pitfalls in hand-written code
 
-Prefix removal uses ZRANGEBYLEX, skips expired values and rechecks stale members. Lock inspection and byte clearing use SCAN, including all visited database candidates in their cost. Change hints are best-effort: external native writes, reconnect replay and timely expiry delivery are not promised. Explicit disposal caches its main Promise; symbolic disposal caches a separate reporting Promise. Cleanup releases owned subscriptions and leases without closing the injected client.
+This comparison is not executed.
 
-## Native Features
-
-Select imports from independent subpaths as the second argument to `redisBackendPlugin`. Direct native APIs appear only on `store.api`, never `tx.api`; capability Features use their original tokens; fixed native APIs use the host's existing single pipeline. Streams/PubSub byte payloads use the sole canonical base64 text wire.
-
-| Entry                     | API                                                                                    | Defaults and boundaries                                                                                                                                               |
-| ------------------------- | -------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/features/streams`       | `redisStreamsFeature()`, `api.streams.add/range/createGroup/readGroup/ack/autoClaim`   | range -/+ and count100; group 0-0 and createStream=true; read count100, omitted block is nonblocking; only existing same-name BUSYGROUP is idempotent                 |
-| `/features/pubsub`        | `redisPubSubFeature()`, `api.pubsub.publish/subscribe/keyspace`                        | Only expired/del/set; keyspace returns UTF-8 bytes of the actual physical key, filters namespace and child organization, and never changes notification configuration |
-| `/features/sorted-sets`   | `redisSortedSetsFeature()`, `api.sortedSets.add/rank/top`                              | Finite scores; ascending top10; equal scores use original UTF16 key order; empty add sends nothing                                                                    |
-| `/features/rate-limit`    | `redisRateLimitFeature({limit,windowMs})`, `api.rateLimit.consume`                     | Positive safe integers; cost1; atomic rejection does not increment; resetAfterMs is native PTTL                                                                       |
-| `/features/change-stream` | `redisChangeStreamFeature({maxLen})`, `use(durableChangeFeed).readChanges/tailChanges` | Positive safe maxLen; read limit100; native Stream ID; data and XADD share one EXEC                                                                                   |
-| `/features/search`        | `rediSearchVectorFeature()`, `use(vector).collection(name,options)`                    | Native module/binary port; HNSW default, exact FLAT; same original vector TTL draft                                                                                   |
-
-Consumer-group blocking uses a dedicated genuine connection. Each native BLOCK lasts at most1000ms; only an actual empty reply continues waiting, while native failures reject without replay. Cancellation and shutdown drain the current blocking slice before returning its lease. Subscription cancellation budgets remain active until disposal. Callback rejection is reported without altering committed data.
-
-The durable feed covers only standard library commits. `readChanges({after,limit})` reads after an exclusive cursor. `tailChanges({from:'now',onChange,onError})` captures the native high-water mark first, advances only after callback success, and reports/closes on failure without confirming it. A noninitial cursor before the retained first item raises `CHANGE_CURSOR_EXPIRED`. Initial `0-0` resumes only when native XINFO confirms that no entries were removed; trimming also expires this cursor. Reads crossing retention boundaries reject conservatively. MAXLEN uses native approximate trimming; external native commands do not fabricate standard changes.
-
-```ts
-import { createClientPool } from 'redis'
-import { createStorageHost } from '@migaia/storage-host'
-import { durableChangeFeed } from '@migaia/storage-contract'
-import { redisBackendPlugin } from '@migaia/storage-plugin-redis'
-import { nodeRedisDriver } from '@migaia/storage-plugin-redis/node-redis'
-import { redisStreamsFeature } from '@migaia/storage-plugin-redis/features/streams'
-import { redisPubSubFeature } from '@migaia/storage-plugin-redis/features/pubsub'
-import { redisSortedSetsFeature } from '@migaia/storage-plugin-redis/features/sorted-sets'
-import { redisRateLimitFeature } from '@migaia/storage-plugin-redis/features/rate-limit'
-import { redisChangeStreamFeature } from '@migaia/storage-plugin-redis/features/change-stream'
-const pool = createClientPool({ url: process.env.MIGAIA_REDIS_URL! }, { maximum: 8 })
-await pool.connect()
-const host = await createStorageHost({
-  plugins: [
-    redisBackendPlugin(
-      {
-        driver: nodeRedisDriver(pool),
-        prefix: process.env.MIGAIA_EXAMPLE_REDIS_PREFIX ?? crypto.randomUUID()
-      },
-      {
-        streams: redisStreamsFeature(),
-        pubsub: redisPubSubFeature(),
-        scores: redisSortedSetsFeature(),
-        rate: redisRateLimitFeature({ limit: 3, windowMs: 1000 }),
-        history: redisChangeStreamFeature({ maxLen: 1000 })
-      }
-    )
-  ] as const
-})
-const store = host.backend('redis')
-try {
-  const id = await store.api.streams.add('jobs', { body: new Uint8Array([1, 2]) })
-  console.log((await store.api.streams.range('jobs'))[0]?.id === id)
-  await store.api.sortedSets.add('scores', [{ member: 'one', score: 1 }])
-  console.log((await store.api.sortedSets.top('scores'))[0]?.member)
-  console.log((await store.api.rateLimit.consume('quota')).allowed)
-  const subscription = await store.api.pubsub.subscribe('events', () => undefined)
-  await store.api.pubsub.publish('events', new Uint8Array([3]))
-  await subscription.dispose()
-  await store.set('checkpoint', 'ready')
-  console.log((await store.use(durableChangeFeed).readChanges()).changes.length)
-} finally {
-  await host.dispose()
-  await pool.close()
+```ts doc-test=check
+import type { RedisClientType } from 'redis'
+export async function save(client: RedisClientType) {
+  await client.multi().set('session', 'active').incr('session').exec()
+  // INCR fails on a noninteger, but SET may already have committed.
+  // No organization is encoded in the key, so another tenant writes the same session.
 }
 ```
 
-## Native vector search
+The standard API centralizes keys, validation, WATCH and expiry. It cannot make Redis EXEC roll back all commands after an item failure. Unknown commit outcomes are never replayed automatically.
 
-Select `rediSearchVectorFeature()` from `/features/search` to install `vector`. Detection requires the actual Search module and a genuine binary connection/EXEC port; Bun's built-in driver therefore rejects this selected Feature while base KV remains usable. Redis 8 may already include Search; Valkey without the module rejects it. No collection DDL runs during factory construction or detection. Configure dimensions and metric on a new collection; later hosts resolve the native schema through FT.INFO.
+## The model in three minutes
 
-Managed points are native HASHes. One EXEC writes the same FLOAT32 bytes to HNSW and FLAT fields; `exact:true` selects FLAT. Scores are cosine `1-distance`, dot `1-distance`, and euclid `-sqrt(distance)`. Inputs that overflow FLOAT32, or become a zero cosine direction after conversion, reject before point modification. Payload truth uses the original portable codec. New scalar paths register native TAG/NUMERIC fields with FT.ALTER before upsert; there is no second schema registry. Index and document names use the original canonical namespace and portable collection/id encoding, keeping arbitrary UTF16 string identities.
+| Task                                    | Tool                                        |
+| --------------------------------------- | ------------------------------------------- |
+| Create and close the SDK client or pool | Your application                            |
+| Store values, records, TTL and counters | The installed backend and capability tokens |
+| Serialize a specific logical key        | tx().lock(...).run(...)                     |
+| Online messages or application queues   | PubSub and Streams Features                 |
+| Read standard commit history            | change-stream Feature and durableChangeFeed |
+| Native nearest-neighbor search          | search Feature and vector                   |
 
-Organization TAG and native expiry NUMERIC filters run before KNN. Scalar equality/membership/presence and numeric ranges use faithful native filters. Unsupported conditions and function predicates process only engine hits, without refilling; `requirePushdown()` rejects before native I/O. `minScore` remains a bounded client threshold and explain reports that boundary. Similar/recommend reads only the named samples and uses the original recommendation helper before the same native query.
+A capability token selects standard methods; a Feature adds optional methods. WATCH detects changes after a read. EXEC executes queued commands, but one command's failure does not undo successful commands.
 
-Vector TTL uses the same original WATCH draft and lock owner as other channels. Redis TIME supplies one absolute deadline, written as both HASH expiry and PEXPIREAT in the same EXEC. Ordinary upsert preserves the deadline; persist sets expiry=0 and PERSIST together. Both root and authentic transaction TTL methods support vector targets. Vector collections have no generic transaction capability. Successful vector mutations publish the original broad invalidation and selected durable commit summary.
+## Typical scenarios
 
-Search truncates TAG tokens at 4096 bytes. Canonical scalar equality/membership values beyond that boundary are not native pushdown candidates. `.near().where(...)` filters only native topK hits without refilling; `requirePushdown()` reports `QUERY_NOT_PUSHABLE`, while `deleteWhere` and native `search.filter` reject with `UNSUPPORTED_CAPABILITY` before I/O. This native long-value filter combination awaits user review. Complete payloads, IDs and physical keys are retained. Sample exclusion uses a short SHA-256 TAG over the complete original ID codec bytes; it is an index projection, not reversible ID encoding or a mathematical collision-free guarantee.
+| Scenario                                        | Building blocks                             | Details                                                                         |
+| ----------------------------------------------- | ------------------------------------------- | ------------------------------------------------------------------------------- |
+| Sessions and counters                           | Organizations, ttl, counter, explicit locks | [Organization data with expiry](./USEGUIDE.en.md#organization-data-with-expiry) |
+| Queues, rankings, rate limits and live messages | Native Features                             | [Select native features](./USEGUIDE.en.md#select-native-features)               |
+| Resume an invalidation consumer                 | durableChangeFeed                           | [Resume change history](./USEGUIDE.en.md#resume-change-history)                 |
+| Server-side vector search                       | Search module and binary driver             | [Search vectors](./USEGUIDE.en.md#search-vectors)                               |
 
-`deleteWhere(where,{count?})` defaults to precount. Both precount and scroll collect native FT.SEARCH pages then delete actual existing points in the original attempt, with no extra count command and no expiry filter. Already expired HASHes are absent and do not count. Unsupported conditions reject before native I/O. `dropOrg` deletes only managed HASHes in that organization and retains shared collection schema, including after reopening without Search selected or without a binary port. Cleanup uses only the original identity metadata, WATCH/revisions and the same EXEC. Search cost is the native engine plan plus returned hit bytes; deletion cost includes its actual native pages and selected point drafts.
+## Install
 
-```ts
-import { createClientPool } from 'redis'
-import { createStorageHost } from '@migaia/storage-host'
-import { vector, ttl } from '@migaia/storage-contract'
-import { redisBackendPlugin } from '@migaia/storage-plugin-redis'
-import { nodeRedisDriver } from '@migaia/storage-plugin-redis/node-redis'
-import { rediSearchVectorFeature } from '@migaia/storage-plugin-redis/features/search'
-const pool = createClientPool({ url: process.env.MIGAIA_REDIS_STACK_URL! }, { maximum: 8 })
-await pool.connect()
-const host = await createStorageHost({
-  plugins: [
-    redisBackendPlugin(
-      { driver: nodeRedisDriver(pool), prefix: crypto.randomUUID() },
-      { search: rediSearchVectorFeature() }
-    )
-  ] as const
-})
-const store = host.backend('redis')
-try {
-  const items = store
-    .use(vector)
-    .collection<{ group: string }>('items', { dimensions: 2, metric: 'cosine' })
-  await items.upsert([{ id: 'one', vector: [1, 0], payload: { group: 'docs' } }])
-  console.log(
-    (await items.near([1, 0], { exact: true }).where({ group: 'docs' }).topK(1).all())[0]?.id
-  )
-  await store.use(ttl).expire({ channel: 'vector', collection: 'items', id: 'one' }, 60000)
-} finally {
-  await store.clearAll()
-  await host.dispose()
-  await pool.close()
-}
+The package is currently `private: true` for this repository's workspace. Public registry availability is not implied. Link workspace dependencies from a consuming workspace package, then install the SDKs you use:
+
+```bash
+pnpm add @migaia/storage-host @migaia/storage-contract @migaia/storage-plugin-redis --workspace
+pnpm add redis ioredis
 ```
 
-## Commit-only external journal
+| Entry         | Injected object               | Application cleanup               |
+| ------------- | ----------------------------- | --------------------------------- |
+| `/node-redis` | A connected node-redis 6 pool | Release host, then pool.close()   |
+| `/ioredis`    | A connected ioredis 6 client  | Release host, then client.quit()  |
+| `/bun`        | A connected Bun RedisClient   | Release host, then client.close() |
 
-Host `journal` may borrow the original Logger with only `binlog`, without WAL, undo or atomic log stores. Each organization captures ordered draft mutations through the original journalBinding. Only a fully successful native EXEC triggers onCommit, and the operation awaits its original settle. Callback failure before EXEC writes neither data nor log; partial execution or an unknown reply appends no success log, never replays, and seals subsequent writes. External append failures use the host's report path; committed data is not described as rolled back. The existing post-commit logging window remains.
+The root entry loads no SDK. ioredis and node-redis provide binary commands/EXEC. The Bun adapter has no binary port: basic KV remains available, but Search vectors cannot be selected. Each subscription needs its own connection; leave pool capacity for both subscriptions and business operations. Exact peer ranges are in package.json.
 
-The terminal declares `nativeAtomic:false`; execution isolation does not imply failure rollback. Standard value, byte, record and vector images use the original portable codec with native wire and absolute expiry. Additional PEXPIRETIME capture runs only when journaling is active. Complete before-images for historical vector removal require the genuine binary port; without it, that new journal combination rejects with `UNSUPPORTED_CAPABILITY` before modification, while ordinary historical removal remains supported.
+## Essential API
 
-With `indexExclusive:false`, `storageLogStore` reads its current index from the native private namespace for every operation instead of retaining an index across calls. The original WATCH/MULTI/EXEC submits the private HEAD and records together. Independent handles sharing a namespace observe continuous sequences, current states and reopen recovery without a lifetime lease or coordinator. Redis retains `nativeAtomic:false`: individual EXEC errors may partially commit, and unknown outcomes are never replayed. Strong same-EXEC atomic binlog, undo and WAL intent/marker combinations still reject during preparation and await user review. Native Streams/PubSub/sorted-set/rate-limit APIs retain their behavior without claiming to be standard business-channel journal sources.
+| API                                                  | Purpose                                     |
+| ---------------------------------------------------- | ------------------------------------------- |
+| `redisBackendPlugin({ driver, prefix? }, features?)` | Install Redis storage                       |
+| `store.use(kv / records / ttl / counter)`            | Standard values, expiry and counters        |
+| `store.transaction` / `store.tx()`                   | WATCH/EXEC transactions and logical locks   |
+| `host.org(id).backend('redis')`                      | Organization-scoped data                    |
+| Streams / PubSub / sorted-sets / rate-limit Features | Add store.api methods                       |
+| change-stream / search Features                      | Add durableChangeFeed / vector capabilities |
 
-`host.dropOrg(orgId)` also removes that organization's known Streams, sorted-set and rate-limit physical keys through the original WATCH/draft/EXEC, including after reopening without those Features. Only valid string names in the original layout match; other organizations and unmanaged caller keys remain. PubSub has no persistent business value. Shared durable history retains its existing retention/cursor protocol. Ordinary `clearAll()` keeps its original standard-channel scope. Removal cost includes actual native SCAN candidates.
+## Contract details
 
-Ordinary host telemetry is opt-in through `journal: { logger, namespace, telemetry: true }` with the original Logger level plugin. Root reads and writes report canonical logical keys and their actual pipeline payload. A public transaction emits one completed record across its original retries; transaction-scope and private journal operations do not emit duplicate records. The borrowed logger and existing pipeline/hook counts remain unchanged.
+Prefix defaults to migaia and maxLockMs to 30000. Ordinary overwrites retain TTL; deadlines and locks use Redis time. Standard record queries evaluate on the client. Standard secondary indexes, SQL and RDF are absent. Organization views use the same namespace mapping; dropOrg also removes that organization's supported persistent Feature data.
 
-The commit binlog retains accepted draft mutations in their original cross-channel order, including repeated writes and intermediate values. Raw value and absolute TTL images are captured when each mutation is staged; final native revisions are added from the same attempt. Undo merging remains owned by the host, and Redis WAL/undo admission remains explicitly unsupported.
+Ordinary change hints are best effort, without external-command coverage, reconnect replay or instant expiry notification. Search requires the real module; connecting to Valkey does not imply vector support. EXEC item failures and disconnects after send can leave partial or unknown writes. New writes are then sealed rather than silently retried. See [Transactions and concurrency](./USEGUIDE.en.md#transactions-and-concurrency).
