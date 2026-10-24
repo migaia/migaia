@@ -508,7 +508,7 @@ export function createPgVectors(runtime: IPgVectorRuntime) {
               'vector',
               prepared.map((point) => [name, point.id])
             )
-            await state.client.query(
+            const written = await state.client.query(
               'INSERT INTO ' +
                 config.table +
                 ' (org_id,key,embedding,payload,projection,expires_at) SELECT $1,input.key,input.embedding::vector,input.payload,input.projection::jsonb,' +
@@ -520,7 +520,10 @@ export function createPgVectors(runtime: IPgVectorRuntime) {
                     '.expires_at<=clock_timestamp() THEN NULL ELSE ' +
                     config.table +
                     '.expires_at END'
-                  : 'excluded.expires_at'),
+                  : 'excluded.expires_at') +
+                (state.journal === undefined
+                  ? ''
+                  : ' RETURNING key,embedding::text AS value,payload,projection::text AS projection,expires_at::text AS deadline'),
               [
                 state.orgId,
                 { arrayType: 'text', values: prepared.map((point) => pgKey(point.id).hex) },
@@ -546,7 +549,12 @@ export function createPgVectors(runtime: IPgVectorRuntime) {
               ],
               state.ctx
             )
-            for (const point of prepared) markPgChanged(state, 'vector', [name, point.id])
+            const after =
+              state.journal === undefined
+                ? undefined
+                : new Map(written.rows.map((row) => [String(row.key), row]))
+            for (const point of prepared)
+              markPgChanged(state, 'vector', [name, point.id], after?.get(pgKey(point.id).hex))
           })
         },
         async delete(ids, ctx) {
@@ -696,6 +704,7 @@ export function createPgVectors(runtime: IPgVectorRuntime) {
         if (wire !== undefined) decodeVector(wire.value, config)
         await observePgRevision(state, tables, 'vector', [name, id])
         await state.guardKeys([lockKey.vector(name, id)])
+        let after: import('@migaia/storage-contract').ISqlRow | undefined
         if (wire === undefined) {
           const removed = await state.client.query(
             'DELETE FROM ' + config.table + ' WHERE org_id=$1 AND key=$2',
@@ -704,21 +713,26 @@ export function createPgVectors(runtime: IPgVectorRuntime) {
           )
           if (removed.rowCount === 0) return
         } else
-          await state.client.query(
-            'INSERT INTO ' +
-              config.table +
-              ' (org_id,key,embedding,payload,projection,expires_at) VALUES($1,$2,$3::vector,$4,$5::jsonb,$6::timestamptz) ON CONFLICT(org_id,key) DO UPDATE SET embedding=excluded.embedding,payload=excluded.payload,projection=excluded.projection,expires_at=excluded.expires_at',
-            [
-              state.orgId,
-              pgKey(id).hex,
-              wire.value,
-              wire.payload ?? null,
-              wire.projection ?? null,
-              wire.expiresAt
-            ],
-            state.ctx
-          )
-        markPgChanged(state, 'vector', [name, id])
+          after = (
+            await state.client.query(
+              'INSERT INTO ' +
+                config.table +
+                ' (org_id,key,embedding,payload,projection,expires_at) VALUES($1,$2,$3::vector,$4,$5::jsonb,$6::timestamptz) ON CONFLICT(org_id,key) DO UPDATE SET embedding=excluded.embedding,payload=excluded.payload,projection=excluded.projection,expires_at=excluded.expires_at' +
+                (state.journal === undefined
+                  ? ''
+                  : ' RETURNING key,embedding::text AS value,payload,projection::text AS projection,expires_at::text AS deadline'),
+              [
+                state.orgId,
+                pgKey(id).hex,
+                wire.value,
+                wire.payload ?? null,
+                wire.projection ?? null,
+                wire.expiresAt
+              ],
+              state.ctx
+            )
+          ).rows[0]
+        markPgChanged(state, 'vector', [name, id], after)
       }
     } satisfies IPgJournalVectorPort,
     standard,
@@ -757,21 +771,23 @@ export function createPgVectors(runtime: IPgVectorRuntime) {
         ).rows[0]
         return row?.remaining == null ? undefined : Number(row.remaining)
       }
-      const changed = (
-        await state.client.query(
-          'UPDATE ' +
-            config.table +
-            ' SET expires_at=' +
-            (persist ? 'NULL' : "clock_timestamp()+($3::float8*interval '1 millisecond')") +
-            ' WHERE org_id=$1 AND key=$2' +
-            (persist ? ' AND expires_at IS NOT NULL' : '') +
-            ' RETURNING key',
-          [state.orgId, key, ...(persist ? [] : [ms!])],
-          state.ctx
-        )
-      ).rowCount
-      if (changed) markPgChanged(state, 'vector', [target.collection, target.id])
-      return changed !== 0
+      const changed = await state.client.query(
+        'UPDATE ' +
+          config.table +
+          ' SET expires_at=' +
+          (persist ? 'NULL' : "clock_timestamp()+($3::float8*interval '1 millisecond')") +
+          ' WHERE org_id=$1 AND key=$2' +
+          (persist ? ' AND expires_at IS NOT NULL' : '') +
+          ' RETURNING key' +
+          (state.journal === undefined
+            ? ''
+            : ',embedding::text AS value,payload,projection::text AS projection,expires_at::text AS deadline'),
+        [state.orgId, key, ...(persist ? [] : [ms!])],
+        state.ctx
+      )
+      if (changed.rowCount)
+        markPgChanged(state, 'vector', [target.collection, target.id], changed.rows[0])
+      return changed.rowCount !== 0
     }
   }
 }

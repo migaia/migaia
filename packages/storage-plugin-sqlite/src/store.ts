@@ -151,6 +151,8 @@ type INativeState = {
   readonly orgId: string
   readonly context: IConcurrencyAttemptContext | undefined
   readonly baseline: Map<string, ISqliteRevision>
+  /** Canonical native observations exist only while original endpoint telemetry is enabled. */
+  readonly observed?: Map<string, ILockKey>
   readonly changed: Map<IChannel, Map<string, IStorageKey>>
   readonly expirations: Map<
     string,
@@ -215,6 +217,8 @@ type IRootMutation<R> = {
   readonly guard?: IWriteGuard
   /** Publish owner facts only after this mutation's actual native COMMIT. */
   readonly committed?: () => void
+  /** An unselected read keeps its original native segment instead of opening a writer. */
+  readonly read?: (observeKey?: (key: ILockKey) => void) => R
   run(state: INativeState): R
 }
 /** Native batch rows retain the one canonical key capture and detached text payload. */
@@ -716,6 +720,7 @@ export function createSqliteStore<TValue>(
   const revision = (state: INativeState, channel: IChannel, key: IStorageKey): void => {
     captureJournal(state, channel, key)
     const id = revisionIdentity(channel, key)
+    if (channel !== 'metadata') state.observed?.set(id, revisionKey(channel, key))
     if (!state.baseline.has(id)) state.baseline.set(id, currentRevision(state, channel, id))
   }
   /** Every real mutation is tracked once for revision updates and post-commit publication. */
@@ -806,8 +811,10 @@ export function createSqliteStore<TValue>(
     key: IStorageKey,
     orgId: string,
     state?: INativeState,
-    scope?: object
+    scope?: object,
+    observeKey?: (key: ILockKey) => void
   ): unknown => {
+    if (channel !== 'metadata') observeKey?.(revisionKey(channel, key))
     if (state) revision(state, channel, key)
     const row = statement<ISqliteRow | undefined>(
       `SELECT value${channel === 'metadata' ? '' : ',expires_at'} FROM ${tables[channel]} WHERE org_id=? AND key=?`,
@@ -1064,7 +1071,7 @@ export function createSqliteStore<TValue>(
       /** The existing executor remains the sole pipeline owner for either observation form. */
       const invoke = (): Promise<Awaited<R>> =>
         core.execution.run<I, Awaited<R>>(
-          { operation: name, input, ctx: context, scope: currentScope },
+          { operation: name, input, ctx: context, scope: currentScope, internal: true },
           async (captured): Promise<Awaited<R>> => {
             if (batch) return (await run(captured)) as Awaited<R>
             /** Existing single calls retain their original observer binding point after the stage. */
@@ -1202,36 +1209,103 @@ export function createSqliteStore<TValue>(
     name: string,
     input: unknown,
     ctx: IOperationContext | undefined,
-    run: (orgId: string, input: unknown) => R,
+    run: (
+      orgId: string,
+      input: unknown,
+      observeKey?: (key: ILockKey) => void,
+      state?: INativeState
+    ) => R,
     batch?: IBatchObservation
   ): Promise<Awaited<R>> => {
     controller.assertLive()
-    const finish = controller.beginMutation()
-    return withAbort<Awaited<R>>(ctx, async (signal, context): Promise<Awaited<R>> => {
-      assertRoot()
-      throwIfAborted(signal)
-      const selectedJournal = journalFor(context)
-      if (selectedJournal !== undefined) await selectedJournal.prepare()
-      return operation(
+    if (
+      core.journal !== undefined &&
+      name !== SqliteOperation.metadataGet &&
+      name !== SqliteOperation.metadataSet &&
+      name !== SqliteOperation.metadataDelete &&
+      name !== SqliteOperation.sql
+    ) {
+      /** The original loop starts the one budget before preparation or the existing pipeline. */
+      try {
+        assertRoot()
+      } catch (error) {
+        return Promise.reject(error)
+      }
+      return rootWrite(
         name,
         input,
-        context,
-        undefined,
-        (captured) => {
+        ctx,
+        (captured, context) => {
           assertRoot()
-          throwIfAborted(signal)
-          return run(operationOrg(context), captured)
+          const orgId = operationOrg(context)
+          return {
+            keys: [],
+            read: (observeKey) => {
+              assertRoot()
+              return run(orgId, captured, observeKey)
+            },
+            run: (state) => run(orgId, captured, undefined, state)
+          }
         },
         batch
       )
-    }).finally(finish)
+    }
+    const finish = controller.beginMutation()
+    /** Only the enabled observer retains actual synchronous read facts. */
+    let keys: ILockKey[] | undefined
+    let capturedInput = input
+    const execute = () =>
+      withAbort<Awaited<R>>(ctx, async (signal, context): Promise<Awaited<R>> => {
+        assertRoot()
+        throwIfAborted(signal)
+        const selectedJournal = journalFor(context)
+        if (selectedJournal !== undefined) await selectedJournal.prepare()
+        return operation(
+          name,
+          input,
+          context,
+          undefined,
+          (captured) => {
+            assertRoot()
+            throwIfAborted(signal)
+            capturedInput = captured
+            return run(
+              operationOrg(context),
+              captured,
+              keys === undefined ? undefined : (key) => keys!.push(key)
+            )
+          },
+          batch
+        )
+      })
+    const result =
+      core.execution.observe === undefined
+        ? execute()
+        : core.execution.observe(
+            () => ({
+              operation: name,
+              input: capturedInput,
+              keys: () => keys ?? [],
+              internal:
+                name === SqliteOperation.metadataGet ||
+                name === SqliteOperation.metadataSet ||
+                name === SqliteOperation.metadataDelete
+                  ? true
+                  : undefined
+            }),
+            (enabled) => {
+              if (enabled) keys = []
+              return execute()
+            }
+          )
+    return result.finally(finish)
   }
   /** Root mutations declare affected original channel keys before logical lock acquisition. */
   const rootWrite = <I, R>(
     name: string,
     input: I,
     ctx: IOperationContext | undefined,
-    prepare: (captured: I) => IRootMutation<R>,
+    prepare: (captured: I, context?: IOperationContext) => IRootMutation<R>,
     batch?: IBatchObservation
   ): Promise<Awaited<R>> => {
     controller.assertLive()
@@ -1241,134 +1315,171 @@ export function createSqliteStore<TValue>(
     /** Fixed preparation retains only this operation's payload and exact affected keys. */
     let mutation!: IRootMutation<R>
     let selectedJournal: IStorageJournalExecutionPort | undefined
-    return runWithConcurrency<Awaited<R>>(
-      {
-        store,
-        options: ctx === undefined ? {} : ctx,
-        prepare:
-          core.journal === undefined || name === SqliteOperation.dropOrg
-            ? undefined
-            : (context) => {
-                selectedJournal = journalFor(context)
-                return selectedJournal?.prepare()
+    /** Final-attempt facts remain owned by the original native state. */
+    let observing = false
+    let observedKeys: readonly ILockKey[] | undefined
+    const recordKeys = (state: INativeState): void => {
+      observedKeys = [...state.observed!.values()]
+    }
+    const execute = () =>
+      runWithConcurrency<Awaited<R>>(
+        {
+          store,
+          options: ctx === undefined ? {} : ctx,
+          prepare:
+            core.journal === undefined || name === SqliteOperation.dropOrg
+              ? undefined
+              : (context) => {
+                  selectedJournal = journalFor(context)
+                  return selectedJournal?.prepare()
+                },
+          execute: (context, proceed) =>
+            operation(
+              name,
+              input,
+              context,
+              undefined,
+              (captured) => {
+                capturedInput = captured
+                return proceed()
               },
-        execute: (context, proceed) =>
-          operation(
-            name,
-            input,
-            context,
-            undefined,
-            (captured) => {
-              capturedInput = captured
-              return proceed()
-            },
-            batch
-          ),
-        lock: () => {
-          mutation = prepare(capturedInput)
-          return [...mutation.keys, ...(selectedJournal?.headLocks() ?? [])]
-        }
-      },
-      {
-        attempt: async (context) => {
-          const guard = mutation.guard
-          const ranges = guard ? lockRanges(guard) : []
-          const ids = readConcurrencyLockIdentities(context)
-          /** Logical fail decisions remain observable before entering the physical queue. */
-          const conflict = wal ? conflictingLock(context, ids, '') : undefined
-          const range = wal && guard ? rangeConflict(operationOrg(context), guard) : undefined
-          if ((conflict || range) && context.admission === 'try')
-            return {
-              status: 'conflict' as const,
-              phase: 'acquire' as const,
-              keys: conflict ? [conflict.key] : range!.keys,
-              holder: conflict ? holderOf(conflict.row) : range!.holder
-            }
-          while (true) {
-            throwIfAborted(context.signal)
-            try {
-              const write = () =>
-                syncMutation(
-                  mutation.run,
-                  context.lock ?? [],
-                  guard,
-                  operationOrg(context),
-                  context,
-                  mutation.committed
-                ) as Awaited<R>
-              if (selectedJournal?.active()) {
-                const native = () =>
-                  nativeAttempt(
+              batch
+            ),
+          lock: (context) => {
+            mutation = prepare(capturedInput, context)
+            return [...mutation.keys, ...(selectedJournal?.headLocks() ?? [])]
+          }
+        },
+        {
+          attempt: async (context) => {
+            const guard = mutation.guard
+            const ranges = guard ? lockRanges(guard) : []
+            const ids = readConcurrencyLockIdentities(context)
+            /** Logical fail decisions remain observable before entering the physical queue. */
+            const conflict = wal ? conflictingLock(context, ids, '') : undefined
+            const range = wal && guard ? rangeConflict(operationOrg(context), guard) : undefined
+            if ((conflict || range) && context.admission === 'try')
+              return {
+                status: 'conflict' as const,
+                phase: 'acquire' as const,
+                keys: conflict ? [conflict.key] : range!.keys,
+                holder: conflict ? holderOf(conflict.row) : range!.holder
+              }
+            while (true) {
+              throwIfAborted(context.signal)
+              try {
+                if (mutation.read !== undefined && !selectedJournal?.active()) {
+                  const keys: ILockKey[] | undefined = observing ? [] : undefined
+                  try {
+                    return {
+                      status: 'committed' as const,
+                      value: mutation.read(
+                        keys === undefined ? undefined : (key) => keys.push(key)
+                      ) as Awaited<R>
+                    }
+                  } finally {
+                    observedKeys = keys
+                  }
+                }
+                const write = () =>
+                  syncMutation(
+                    mutation.run,
+                    context.lock ?? [],
+                    guard,
+                    operationOrg(context),
                     context,
-                    (scope) => mutation.run(journalScope(scope).state),
-                    true,
-                    mutation.committed
-                  )
-                const run = () =>
-                  physicalRun(context, () => (wal ? walAttempt(context, native) : native()))
+                    mutation.committed,
+                    observing ? recordKeys : undefined
+                  ) as Awaited<R>
+                if (selectedJournal?.active()) {
+                  const native = () =>
+                    nativeAttempt(
+                      context,
+                      (scope) => mutation.run(journalScope(scope).state),
+                      true,
+                      mutation.committed,
+                      observing ? recordKeys : undefined
+                    )
+                  const run = () =>
+                    physicalRun(context, () => (wal ? walAttempt(context, native) : native()))
+                  return wal
+                    ? await run()
+                    : await localGroup(operationOrg(context)).locks.attempt(
+                        context,
+                        {
+                          owner: controller.origin,
+                          since: Date.now(),
+                          status: 'held',
+                          scope: 'local'
+                        },
+                        { attempt: run },
+                        concurrencyStages,
+                        controller.closingSignal,
+                        ranges
+                      )
+                }
                 return wal
-                  ? await run()
-                  : await localGroup(operationOrg(context)).locks.attempt(
+                  ? await physicalRun(context, () =>
+                      walAttempt(context, async () => ({
+                        status: 'committed' as const,
+                        value: write() as Awaited<R>
+                      }))
+                    )
+                  : await localGroup(operationOrg(context)).locks.attemptWrite(
                       context,
                       {
                         owner: controller.origin,
+                        ...(label === undefined ? {} : { label }),
                         since: Date.now(),
                         status: 'held',
                         scope: 'local'
                       },
-                      { attempt: run },
+                      write,
                       concurrencyStages,
                       controller.closingSignal,
-                      ranges
+                      ranges,
+                      (commit) => physicalRun(context, commit)
                     )
+              } catch (error) {
+                if (error instanceof SqliteLogicalConflict) {
+                  if (context.admission === 'try')
+                    return {
+                      status: 'conflict' as const,
+                      phase: 'acquire' as const,
+                      keys: error.keys,
+                      holder: error.holder
+                    }
+                  await context.wait(sleep(SqliteLimits.pollMs, { signal: context.signal }))
+                } else if (!(error instanceof AggregateError) && isBusy(error))
+                  await context.waitPhysical(sleep(SqliteLimits.pollMs, { signal: context.signal }))
+                else throw error
               }
-              return wal
-                ? await physicalRun(context, () =>
-                    walAttempt(context, async () => ({
-                      status: 'committed' as const,
-                      value: write() as Awaited<R>
-                    }))
-                  )
-                : await localGroup(operationOrg(context)).locks.attemptWrite(
-                    context,
-                    {
-                      owner: controller.origin,
-                      ...(label === undefined ? {} : { label }),
-                      since: Date.now(),
-                      status: 'held',
-                      scope: 'local'
-                    },
-                    write,
-                    concurrencyStages,
-                    controller.closingSignal,
-                    ranges,
-                    (commit) => physicalRun(context, commit)
-                  )
-            } catch (error) {
-              if (error instanceof SqliteLogicalConflict) {
-                if (context.admission === 'try')
-                  return {
-                    status: 'conflict' as const,
-                    phase: 'acquire' as const,
-                    keys: error.keys,
-                    holder: error.holder
-                  }
-                await context.wait(sleep(SqliteLimits.pollMs, { signal: context.signal }))
-              } else if (!(error instanceof AggregateError) && isBusy(error))
-                await context.waitPhysical(sleep(SqliteLimits.pollMs, { signal: context.signal }))
-              else throw error
             }
           }
         }
-      }
-    ).finally(finish)
+      )
+    const result =
+      core.execution.observe === undefined
+        ? execute()
+        : core.execution.observe(
+            () => ({
+              operation: name,
+              input: capturedInput ?? input,
+              keys: () => observedKeys ?? []
+            }),
+            (enabled) => {
+              observing = enabled
+              return execute()
+            }
+          )
+    return result.finally(finish)
   }
   /** Standard channel preparation owns payload conversion before the shared lock provider runs. */
   const prepareWrite = (
     channel: 'text' | 'bytes' | 'record',
     key: IStorageKey,
     value: unknown
-  ): IRootMutation<void> => {
+  ): Omit<IRootMutation<void>, 'read'> => {
     const raw =
       channel === 'bytes'
         ? (value as Uint8Array).slice()
@@ -2193,7 +2304,8 @@ export function createSqliteStore<TValue>(
     context: IConcurrencyAttemptContext,
     callback: (scope: ISqliteTransactionScope<TValue>) => R,
     journaled = true,
-    committed?: () => void
+    committed?: () => void,
+    observeKeys?: (state: INativeState) => void
   ): Promise<IConcurrencyAttempt<Awaited<R>>> => {
     /** Original baseline survives only internal physical recovery, never a strategy retry. */
     const baseline = new Map<string, ISqliteRevision>()
@@ -2206,6 +2318,7 @@ export function createSqliteStore<TValue>(
         orgId: operationOrg(context),
         context,
         baseline,
+        observed: observeKeys === undefined ? undefined : new Map(),
         changed: new Map(),
         expirations,
         expiresAt: expectedToken?.expiresAt,
@@ -2357,6 +2470,7 @@ export function createSqliteStore<TValue>(
           }
         throw normalizeTransactionFailure(failure)
       } finally {
+        observeKeys?.(state)
         finishJournal(state, begun ? undefined : false)
         if (journalAttempt?.settle !== undefined) await journalAttempt.settle()
         registration?.close()
@@ -2435,66 +2549,98 @@ export function createSqliteStore<TValue>(
     assertTransactionCallback(callback, SqliteNames.backend)
     controller.assertLive()
     const finish = controller.beginMutation()
-    const result = runWithConcurrency<Awaited<R>>(
-      {
-        store,
-        options,
-        prepare:
-          !journaled || core.journal === undefined
-            ? undefined
-            : (context) => journalFor(context)?.prepare(),
-        lock: (context) => (journaled ? (journalFor(context)?.headLocks() ?? []) : [])
-      },
-      {
-        attempt: async (context) => {
-          /** This native backend owns no vector collection or RDF graph and never falls back to key. */
-          if (context.lock?.some(({ channel }) => channel === 'vector' || channel === 'rdf'))
-            throw new StorageContractError(StorageContractErrorCode.unsupported, {
-              backend: SqliteNames.backend
-            })
-          const run = () =>
-            physicalRun(context, () => {
-              const invoke = () => nativeAttempt(context, callback, journaled)
-              const execute = () => (wal ? walAttempt(context, invoke) : invoke())
-              return core.execution.run(
-                {
-                  operation: SqliteOperation.transaction,
-                  input: {},
-                  ctx: context,
-                  internal: journaled ? undefined : true
-                },
-                execute
-              )
-            })
-          if (wal && context.locking === 'pessimistic' && context.lock?.length) {
-            const ids = readConcurrencyLockIdentities(context)
-            const conflict = conflictingLock(context, ids, '')
-            if (conflict && context.admission === 'try')
-              return Promise.resolve({
-                status: 'conflict',
-                phase: 'acquire',
-                keys: context.lock,
-                holder: holderOf(conflict.row)
+    let observing = false
+    let observedKeys: readonly ILockKey[] | undefined
+    const execute = () =>
+      runWithConcurrency<Awaited<R>>(
+        {
+          store,
+          options,
+          prepare:
+            !journaled || core.journal === undefined
+              ? undefined
+              : (context) => journalFor(context)?.prepare(),
+          lock: (context) => (journaled ? (journalFor(context)?.headLocks() ?? []) : [])
+        },
+        {
+          attempt: async (context) => {
+            /**
+             * This native backend owns no vector collection or RDF graph and never falls back to
+             * key.
+             */
+            if (context.lock?.some(({ channel }) => channel === 'vector' || channel === 'rdf'))
+              throw new StorageContractError(StorageContractErrorCode.unsupported, {
+                backend: SqliteNames.backend
               })
+            const run = () =>
+              physicalRun(context, () => {
+                const invoke = () =>
+                  nativeAttempt(
+                    context,
+                    callback,
+                    journaled,
+                    undefined,
+                    observing
+                      ? (state) => {
+                          observedKeys = [...state.observed!.values()]
+                        }
+                      : undefined
+                  )
+                const execute = () => (wal ? walAttempt(context, invoke) : invoke())
+                return core.execution.run(
+                  {
+                    operation: SqliteOperation.transaction,
+                    input: {},
+                    ctx: context,
+                    internal: true
+                  },
+                  execute
+                )
+              })
+            if (wal && context.locking === 'pessimistic' && context.lock?.length) {
+              const ids = readConcurrencyLockIdentities(context)
+              const conflict = conflictingLock(context, ids, '')
+              if (conflict && context.admission === 'try')
+                return Promise.resolve({
+                  status: 'conflict',
+                  phase: 'acquire',
+                  keys: context.lock,
+                  holder: holderOf(conflict.row)
+                })
+            }
+            return wal
+              ? run()
+              : localGroup(operationOrg(context)).locks.attempt(
+                  context,
+                  {
+                    owner: controller.origin,
+                    ...(label === undefined ? {} : { label }),
+                    since: Date.now(),
+                    status: 'held',
+                    scope: 'local'
+                  },
+                  { attempt: run },
+                  concurrencyStages,
+                  controller.closingSignal
+                )
           }
-          return wal
-            ? run()
-            : localGroup(operationOrg(context)).locks.attempt(
-                context,
-                {
-                  owner: controller.origin,
-                  ...(label === undefined ? {} : { label }),
-                  since: Date.now(),
-                  status: 'held',
-                  scope: 'local'
-                },
-                { attempt: run },
-                concurrencyStages,
-                controller.closingSignal
-              )
         }
-      }
-    )
+      )
+    const result =
+      core.execution.observe === undefined
+        ? execute()
+        : core.execution.observe(
+            () => ({
+              operation: SqliteOperation.transaction,
+              input: {},
+              keys: () => observedKeys ?? [],
+              internal: journaled ? undefined : true
+            }),
+            (enabled) => {
+              observing = enabled
+              return execute()
+            }
+          )
     return result.finally(finish)
   }
 
@@ -2529,17 +2675,25 @@ export function createSqliteStore<TValue>(
     }
   }
   /** String-only legacy keys omit typed batch keys while retaining canonical identity. */
-  const textKeys = (orgId: string): string[] => {
-    cleanupExpiredRows('text', orgId)
+  const textKeys = (
+    orgId: string,
+    observeKey?: (key: ILockKey) => void,
+    state?: INativeState
+  ): string[] => {
+    cleanupExpiredRows('text', orgId, undefined, state)
     const rows = statement<readonly ISqliteRow[]>(
       `SELECT key FROM ${tables.text} WHERE org_id=? AND (expires_at IS NULL OR expires_at>?) ORDER BY key`,
       [orgId, Date.now()],
-      'all'
+      'all',
+      state
     )
     const keys: string[] = []
     for (const row of rows) {
       const key = decodeHexKey(row.key as string)
-      if (typeof key === 'string') keys.push(key)
+      if (typeof key === 'string') {
+        keys.push(key)
+        observeKey?.(lockKey.text(key))
+      }
     }
     return keys
   }
@@ -2550,7 +2704,8 @@ export function createSqliteStore<TValue>(
     guard?: IWriteGuard,
     orgId = runtime.orgId,
     context?: IConcurrencyAttemptContext,
-    committed?: () => void
+    committed?: () => void,
+    observeKeys?: (state: INativeState) => void
   ): R => {
     assertRoot()
     /** Synchronous entry cannot wait or invoke a user strategy while another logical holder exists. */
@@ -2598,6 +2753,7 @@ export function createSqliteStore<TValue>(
     const state = {
       orgId,
       baseline: new Map(),
+      observed: observeKeys === undefined ? undefined : new Map(),
       changed: new Map(),
       expirations: new Map(),
       mode: 'immediate',
@@ -2642,6 +2798,8 @@ export function createSqliteStore<TValue>(
             })
           : error
       )
+    } finally {
+      observeKeys?.(state)
     }
   }
   /** Root iterators own one detached native snapshot and no persistent cursor. */
@@ -2669,17 +2827,20 @@ export function createSqliteStore<TValue>(
           SqliteOperation.next,
           { range: captured },
           ctx,
-          (orgId) => {
+          (orgId, _input, observeKey, state) => {
             if (disposed) return { done: true, value: undefined }
             if (!rows) {
-              rows = recordRows(orgId, captured)
+              rows = recordRows(orgId, captured, state)
               snapshots.add(dispose)
             }
             while (position < rows.length) {
               const row = rows[position++]!
               const key = decodeKey(row.key as Uint8Array)
-              if (!liveExpiration('record', key, row.expires_at)) {
-                syncMutation((state) => prune('record', key, state), [], undefined, orgId)
+              observeKey?.(lockKey.record(key))
+              if (state) revision(state, 'record', key)
+              if (!liveExpiration('record', key, row.expires_at, state)) {
+                if (state) prune('record', key, state)
+                else syncMutation((current) => prune('record', key, current), [], undefined, orgId)
                 continue
               }
               returnedCount++
@@ -2726,7 +2887,8 @@ export function createSqliteStore<TValue>(
         SqliteOperation.get,
         { key },
         ctx,
-        (orgId) => read('text', key, orgId) as string | null
+        (orgId, _input, observeKey, state) =>
+          read('text', key, orgId, state, undefined, observeKey) as string | null
       )
     },
     set: (key, value, ctx) => {
@@ -2754,10 +2916,14 @@ export function createSqliteStore<TValue>(
         SqliteOperation.has,
         { key },
         ctx,
-        (orgId) => read('text', key, orgId) !== null
+        (orgId, _input, observeKey, state) =>
+          read('text', key, orgId, state, undefined, observeKey) !== null
       )
     },
-    keys: (ctx) => rootRead(SqliteOperation.keys, {}, ctx, textKeys),
+    keys: (ctx) =>
+      rootRead(SqliteOperation.keys, {}, ctx, (orgId, _input, observeKey, state) =>
+        textKeys(orgId, observeKey, state)
+      ),
     clearValues: (ctx) =>
       rootWrite(SqliteOperation.clearValues, {}, ctx, () => ({
         keys: [],
@@ -2776,7 +2942,8 @@ export function createSqliteStore<TValue>(
         SqliteOperation.getBytes,
         { key },
         ctx,
-        (orgId) => read('bytes', key, orgId) as Uint8Array | null
+        (orgId, _input, observeKey, state) =>
+          read('bytes', key, orgId, state, undefined, observeKey) as Uint8Array | null
       )
     },
     setBytes: (key, value, ctx) => {
@@ -2809,7 +2976,8 @@ export function createSqliteStore<TValue>(
         SqliteOperation.getRecord,
         { key: captured },
         ctx,
-        (orgId) => read('record', captured, orgId) as TValue | undefined
+        (orgId, _input, observeKey, state) =>
+          read('record', captured, orgId, state, undefined, observeKey) as TValue | undefined
       )
     },
     putRecord: (value, key, ctx) => {
@@ -3029,12 +3197,16 @@ export function createSqliteStore<TValue>(
         SqliteOperation.getMany,
         input,
         ctx,
-        (orgId, prepared) => {
+        (orgId, prepared, observeKey, state) => {
           const actual = snapshotStorageBatchKeys(
             (prepared as typeof input).keys,
             SqliteNames.backend
           )
-          return readSnapshot(orgId, (state) => getMany(actual, state))
+          for (const [index, { key, firstIndex }] of actual.entries())
+            if (firstIndex === index) observeKey?.(lockKey.text(key))
+          return state === undefined
+            ? readSnapshot(orgId, (current) => getMany(actual, current))
+            : getMany(actual, state)
         },
         { count }
       )
@@ -3213,12 +3385,19 @@ export function createSqliteStore<TValue>(
     remaining: async (target, ctx) => {
       controller.assertLive()
       const captured = captureTtlTarget(target)
-      return rootRead(SqliteOperation.ttlRemaining, captured, ctx, (orgId, input) => {
-        const row = expiration(captureTtlTarget(input as ITtlTarget), orgId)
-        return row?.expires_at == null
-          ? undefined
-          : Math.max(0, Number(row.expires_at) - Date.now())
-      })
+      return rootRead(
+        SqliteOperation.ttlRemaining,
+        captured,
+        ctx,
+        (orgId, input, observeKey, state) => {
+          const target = captureTtlTarget(input as ITtlTarget)
+          observeKey?.(target)
+          const row = expiration(target, orgId, state)
+          return row?.expires_at == null
+            ? undefined
+            : Math.max(0, Number(row.expires_at) - Date.now())
+        }
+      )
     },
     persist: async (target, ctx) => {
       controller.assertLive()

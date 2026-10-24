@@ -983,8 +983,8 @@ console.log(host.extensions.label('draft'))`,
     },
     IStorageHooks: {
       summary: t(
-        'One synchronous registry shared by constructor hooks, host listeners and original plugin installation scopes.',
-        '构造hooks、宿主监听器与原插件安装scope共用的同步注册表。'
+        'One synchronous registry shared by constructor hooks, host listeners and original plugin installation scopes. Optional native core.emit diagnostics skip closing without evaluating payloads; closed handles still reject.',
+        '构造 hooks、宿主监听器与原插件安装 scope 共用同步注册表。可选原生 core.emit 在 closing 时跳过且不构造载荷；closed 旧句柄仍拒绝。'
       ),
       example: `import { createStorageHost } from '@migaia/storage-host'
 

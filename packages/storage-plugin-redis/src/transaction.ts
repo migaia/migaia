@@ -15,6 +15,7 @@ import {
 } from '@migaia/storage-host/authoring/backend'
 import { planChannelWrite } from '@migaia/storage-host/authoring/backend'
 import type { IStorageJournalAttempt } from '@migaia/storage-host'
+import { captureRedisJournalStage, redisJournalTarget, type IRedisJournalStage } from './journal.js'
 import type { IRedisConnection, IRedisExecEntry } from './driver.js'
 import { redisError, invalidArgument } from './errors.js'
 import { RedisErrorCode } from './error-code.js'
@@ -128,6 +129,8 @@ export class RedisDraft {
   }
   /** One captured host journal attempt remains attached to this exact native draft. */
   journal?: IStorageJournalAttempt
+  /** Ordered accepted mutation facts exist only for the original active journal attempt. */
+  readonly journalStages: IRedisJournalStage[] | undefined
   /** Read ranges retain their original revision field without a parallel query engine. */
   readonly ranges = new Set<'text' | 'record'>()
   /** Native fixed-command observation wraps the same connection, never another lease. */
@@ -152,6 +155,7 @@ export class RedisDraft {
     this.context = context
     this.send = send
     this.guard = guard
+    this.journalStages = journalActive ? [] : undefined
   }
   /** The shared revision HASH is watched before callbacks can read or write a draft. */
   async start(): Promise<void> {
@@ -261,20 +265,16 @@ export class RedisDraft {
     )
     for (const other of plan.remove) await this.remove(other === 'value' ? 'text' : other, key)
     const entry = this.entries.get(this.layout.revision(channel, key))!
-    entry.value = wire
-    entry.changed = true
-    if (ttlMs !== undefined) {
-      entry.expiry = ttlMs === 0 ? 0 : (await this.now()) + Math.ceil(ttlMs)
-      if (ttlMs === 0) entry.value = undefined
-    }
+    const expiry =
+      ttlMs === undefined ? entry.expiry : ttlMs === 0 ? 0 : (await this.now()) + Math.ceil(ttlMs)
+    this.#changeEntry(entry, ttlMs === 0 ? undefined : wire, expiry)
   }
   /** Removal counts actual draft membership; no absent key receives a false mutation count. */
   async remove(channel: IRedisChannel, key: IStorageKey): Promise<boolean> {
     await this.guard(channel, key)
     const entry = await this.load(channel, key)
     if (entry.value === undefined) return false
-    entry.value = undefined
-    entry.changed = true
+    this.#changeEntry(entry, undefined)
     return true
   }
   /** TTL uses only Redis TIME and native PTTL, including deadlines changed by this same draft. */
@@ -292,10 +292,55 @@ export class RedisDraft {
     if (entry.value === undefined) return false
     const remaining = await this.remaining(channel, key)
     if (ms === undefined && remaining === undefined) return false
-    entry.changed = true
-    entry.expiry = ms === undefined ? 'persist' : ms === 0 ? 0 : (await this.now()) + Math.ceil(ms)
-    if (ms === 0) entry.value = undefined
+    const expiry = ms === undefined ? 'persist' : ms === 0 ? 0 : (await this.now()) + Math.ceil(ms)
+    this.#changeEntry(entry, ms === 0 ? undefined : entry.value, expiry)
     return true
+  }
+  /**
+   * Capture immutable raw before/after images at the actual staging point, then update this same
+   * draft.
+   */
+  #changeEntry(entry: IRedisDraftEntry, value: string | undefined, expiry = entry.expiry): void {
+    const deadline = (value: IRedisDraftEntry['expiry']) =>
+      value === 'keep' ? entry.originalExpiry : value === 'persist' ? undefined : value
+    this.journalStages?.push(
+      captureRedisJournalStage({
+        target: redisJournalTarget(entry.channel, entry.key),
+        revisionField: this.layout.revision(entry.channel, entry.key),
+        channel: entry.channel,
+        before: entry.value,
+        beforeExpiry: deadline(entry.expiry),
+        after: value,
+        afterExpiry: deadline(expiry)
+      })
+    )
+    entry.value = value
+    entry.expiry = expiry
+    entry.changed = true
+  }
+  /**
+   * Native vector calls stage through this same HASH owner, preserving cross-channel operation
+   * order.
+   */
+  changeHash(
+    entry: IRedisHashEntry,
+    fields: ReadonlyMap<string, Uint8Array>,
+    deadline = entry.deadline
+  ): void {
+    this.journalStages?.push(
+      captureRedisJournalStage({
+        target: entry.lock,
+        revisionField: entry.physical,
+        channel: 'vector',
+        before: entry.fields.size ? entry.fields : undefined,
+        beforeExpiry: entry.deadline,
+        after: fields.size ? fields : undefined,
+        afterExpiry: deadline
+      })
+    )
+    entry.fields = fields
+    entry.deadline = deadline
+    entry.changed = true
   }
   /** Canonical decimal arithmetic reuses the original counter validator and retains native TTL. */
   async increment(key: string, by?: number): Promise<number> {
@@ -392,8 +437,7 @@ export class RedisDraft {
         const existing = this.hashes.get(physical)
         if (existing) {
           if (existing.fields.size) {
-            existing.fields = new Map()
-            existing.changed = true
+            this.changeHash(existing, new Map())
           }
           continue
         }
@@ -422,8 +466,7 @@ export class RedisDraft {
               backend: RedisText.backend
             })
           const entry = await this.hash(physical, key)
-          entry.fields = new Map()
-          entry.changed = true
+          this.changeHash(entry, new Map())
           continue
         }
         this.hashes.set(physical, {

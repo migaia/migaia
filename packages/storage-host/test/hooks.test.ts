@@ -230,11 +230,17 @@ describe('the shared storage observation owner', () => {
     const listener = vi.fn()
     /** The ordinary plugin proves hooks do not require a fake backend registration. */
     let installedCore!: Pick<IStoragePluginCore, 'hooks' | 'emit'>
+    /** The actual registration remains closing until its accepted native disposer settles. */
+    let settle!: () => void
+    const nativeEnd = new Promise<void>((resolve) => {
+      settle = resolve
+    })
     /** Register through the actual install hook, retaining the original unsubscribe handle. */
     const plugin = definePlugin('listener', (core) => ({
       install: () => {
         installedCore = core
         core.hooks.on('beforeSql', listener)
+        core.onDispose(() => nativeEnd)
         return {}
       }
     }))
@@ -253,7 +259,22 @@ describe('the shared storage observation owner', () => {
     /** Close publishes its cache before invoking any synchronous observer. */
     const disposed = host.dispose()
     expect(reentrant).toBe(disposed)
-    await disposed
+    /** Closing native diagnostics neither create payloads nor replace the accepted native result. */
+    const payload = vi.fn(() => ({
+      backendId: 'none',
+      backend: 'none',
+      orgId: '00000000-0000-0000-0000-000000000000',
+      parameterCount: 0,
+      sqlBytes: 0
+    }))
+    try {
+      expect(() => installedCore.emit('beforeSql', payload)).not.toThrow()
+      expect(payload).not.toHaveBeenCalled()
+      expect(listener).not.toHaveBeenCalled()
+    } finally {
+      settle()
+      await disposed
+    }
     expect(() => hooks.on('beforeSql', listener)).toThrowError(
       expect.objectContaining({ code: 'STORAGE_HOST_DISPOSED' })
     )
