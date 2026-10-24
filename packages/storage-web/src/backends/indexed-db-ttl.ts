@@ -1,18 +1,12 @@
-import { compareStorageKeys } from '@migaia/storage-host/authoring/key'
 import {
-  StorageContractError,
-  StorageContractErrorCode,
-  type IStorageKey
-} from '@migaia/storage-contract'
-import { encodeFlatStorageKey, decodeFlatStorageKey } from '@migaia/storage-host/authoring/backend'
+  IndexedDbDeadlineMetadata,
+  IndexedDbTtlLayout,
+  indexedDbDeadlineMetadataKey
+} from './indexed-db-deadline-metadata.js'
+import type { IStorageKey } from '@migaia/storage-contract'
+import { encodeFlatStorageKey } from '@migaia/storage-host/authoring/backend'
 import type { IScheduler } from '@migaia/utils/scheduler'
 
-/** The original META store alone owns deadline rows and its native expiry index. */
-export const IndexedDbTtlLayout = {
-  namespace: 'ttl',
-  index: '__storage_web_ttl_expiry__',
-  expiresAt: '__storage_web_expires_at__'
-} as const
 /** Physical IDB channels retain their existing names; the public text lock maps to value. */
 export type IIndexedDbTtlChannel = 'value' | 'bytes' | 'record'
 /** One native snapshot remembers a deadline observation without creating a backend deadline cache. */
@@ -89,6 +83,8 @@ type IIndexedDbTtlAccess = {
 
 /** One native ttl snapshot owns its existing observations and original transaction ports. */
 type IIndexedDbTtlContext = {
+  /** Raw deadline layout is shared with basic overwrite/delete cleanup. */
+  metadata: IndexedDbDeadlineMetadata
   /** Original input is captured before native construction begins. */
   readonly input: IIndexedDbTtlInput
 
@@ -101,6 +97,7 @@ export function createIndexedDbTtlAccess(input: IIndexedDbTtlInput): IIndexedDbT
 
   /** Only this native snapshot's observed keys are retained; no history survives its transaction. */
   nativeState.observations = new Map<string, IIndexedDbTtlObservation>()
+  nativeState.metadata = new IndexedDbDeadlineMetadata(input)
   return createNativeMethods(nativeState)
 }
 
@@ -119,12 +116,7 @@ function metadataKey(
   channel: IIndexedDbTtlChannel,
   key: IStorageKey
 ): IDBValidKey {
-  return [
-    nativeState.input.namespace,
-    IndexedDbTtlLayout.namespace,
-    channel,
-    encodeFlatStorageKey(key)
-  ]
+  return indexedDbDeadlineMetadataKey(nativeState.input.namespace, channel, key)
 }
 
 /** First access decides expiry; subsequent reads retain this native snapshot and its own draft. */
@@ -344,37 +336,7 @@ async function nativeTtlClear(
   nativeState: IIndexedDbTtlContext,
   channel: IIndexedDbTtlChannel
 ): Promise<void> {
-  const prefix = [nativeState.input.namespace, IndexedDbTtlLayout.namespace, channel]
-  const cursorRequest = nativeState.input.metadata.openCursor(
-    nativeState.input.keyRange?.lowerBound(prefix)
-  )
-  let cursor = await nativeState.input.request(() => cursorRequest)
-  if (
-    nativeState.input.keyRange === undefined &&
-    cursor !== null &&
-    compareStorageKeys(cursor.key as IStorageKey, prefix) < 0
-  )
-    cursor = await nativeState.input.request(() => {
-      cursor!.continue(prefix)
-      return cursorRequest
-    })
-  while (cursor !== null) {
-    const key = cursor.key
-    if (!Array.isArray(key) || key[0] !== prefix[0] || key[1] !== prefix[1] || key[2] !== channel)
-      break
-    const before = cursor.value?.[IndexedDbTtlLayout.expiresAt] as number | undefined
-    const encoded = key[3]
-    const original = typeof encoded === 'string' ? decodeFlatStorageKey(encoded) : undefined
-    if (original === undefined)
-      throw new StorageContractError(StorageContractErrorCode.invalidArgument)
-    await nativeState.input.deadline(channel, original, before, undefined, () =>
-      nativeState.input.request(() => cursor!.delete())
-    )
-    cursor = await nativeState.input.request(() => {
-      cursor!.continue()
-      return cursorRequest
-    })
-  }
+  await nativeState.metadata.clear(channel)
   for (const value of nativeState.observations.values())
     if (value.channel === channel) {
       value.present = false
@@ -397,17 +359,7 @@ async function nativeTtlRestore(
   key: IStorageKey,
   deadline: number | undefined
 ): Promise<void> {
-  const target = metadataKey(nativeState, channel, key)
-  const stored = await nativeState.input.request(() => nativeState.input.metadata.get(target))
-  const before = stored?.[IndexedDbTtlLayout.expiresAt] as number | undefined
-  await nativeState.input.deadline(channel, key, before, deadline, async () => {
-    if (deadline === undefined)
-      await nativeState.input.request(() => nativeState.input.metadata.delete(target))
-    else
-      await nativeState.input.request(() =>
-        nativeState.input.metadata.put({ [IndexedDbTtlLayout.expiresAt]: deadline }, target)
-      )
-  })
+  await nativeState.metadata.write(channel, key, deadline)
   nativeState.input.changed(channel, key)
 }
 /** Perform native deadline through this snapshot's original ttl owner. */
@@ -416,8 +368,5 @@ async function nativeTtlDeadline(
   channel: IIndexedDbTtlChannel,
   key: IStorageKey
 ): Promise<number | undefined> {
-  const stored = await nativeState.input.request(() =>
-    nativeState.input.metadata.get(metadataKey(nativeState, channel, key))
-  )
-  return stored?.[IndexedDbTtlLayout.expiresAt] as number | undefined
+  return nativeState.metadata.read(channel, key)
 }
