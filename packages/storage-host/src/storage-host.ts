@@ -157,7 +157,7 @@ type IStorageRegistrationAssembly = {
 /** Assemble native ports without creating another install or resource owner. */
 function createStorageRegistrationCore(registration: IStorageRegistrationAssembly): object {
   /** Ports borrow the same original context and PluginHost. */
-  const { context, host } = registration
+  const { context } = registration
   return {
     setStorageRegistrationCore: (core: IStorageInstallCore) => {
       registration.registrationCore = core
@@ -190,138 +190,8 @@ function createStorageRegistrationCore(registration: IStorageRegistrationAssembl
     defaultOrgId: context.defaultOrgId,
     getScheduler: () => context.scheduler,
     getStageBindings: context.getStageBindings,
-    createKeyLockPort: (() => {
-      /** Only original window admission is acquired; the physical backend owns final release. */
-      registration.registrationCore!.onDispose(() => undefined)
-      return createBackendKeyLockPort()
-    }) satisfies IStoragePluginCore['createKeyLockPort'],
-    createOrgAuthoringPort: (() => {
-      /** Only this original installation can capture late child construction authority. */
-      registration.registrationCore!.onDispose(context.storeCell.releaseOrgBindings)
-      return Object.freeze({
-        createChangeController: (options) => {
-          context.assertExecution()
-          const controller = createBackendChangeController(options)
-          context.storeCell.retainOrgBinding(() => controller.dispose())
-          return controller
-        },
-        createKeyLockPort: () => {
-          context.assertExecution()
-          return createBackendKeyLockPort()
-        },
-        createRevisionPort: () => {
-          context.assertExecution()
-          return createBackendRevisionPort()
-        },
-        registerChangeController: (store, controller) => {
-          context.assertExecution()
-          context.storeCell.retainOrgBinding(registerBackendChangeController(store, controller))
-          /** Root observers retain all organizations through their original controller channel. */
-          const root = getBackendChangeController(context.storeCell.get())
-          if (root !== undefined && root !== controller)
-            context.storeCell.retainOrgBinding(
-              controller.subscribe((change) => root.publishExternal(change))
-            )
-        },
-        registerValueCommit: (store, commit) => {
-          context.assertExecution()
-          context.storeCell.retainOrgBinding(registerBackendValueCommit(store, commit))
-        }
-      }) satisfies ReturnType<IStoragePluginCore['createOrgAuthoringPort']>
-    }) satisfies IStoragePluginCore['createOrgAuthoringPort'],
-    createRevisionPort: (() => {
-      /** Window admission belongs to the original owner; physical backends retain the facts. */
-      registration.registrationCore!.onDispose(() => undefined)
-      return createBackendRevisionPort()
-    }) satisfies IStoragePluginCore['createRevisionPort'],
-    createChangeController: ((options) => {
-      /** Original resource admission owns partial-construction cleanup and the install window. */
-      let controller: IBackendChangeController | undefined
-      registration.registrationCore!.onDispose(() => controller?.dispose())
-      controller = createBackendChangeController(options)
-      return controller
-    }) satisfies IStoragePluginCore['createChangeController'],
-    registerChangeController: ((store, controller) => {
-      /** Exact registry release is attached to the same original registration scope. */
-      let release: (() => void) | undefined
-      registration.registrationCore!.onDispose(() => release?.())
-      if (context.storeCell.get() !== store)
-        throw createStorageTypeError(
-          StorageErrorCode.backendPluginInvalid,
-          StorageErrorText.backendPluginInvalid
-        )
-      release = registerBackendChangeController(store, controller)
-    }) satisfies IStoragePluginCore['registerChangeController'],
-    registerValueCommit: ((store, commit) => {
-      /** The original installation window owns both admission and exact registration cleanup. */
-      let release: (() => void) | undefined
-      registration.registrationCore!.onDispose(() => release?.())
-      if (context.storeCell.get() !== store)
-        throw createStorageTypeError(
-          StorageErrorCode.backendPluginInvalid,
-          StorageErrorText.backendPluginInvalid
-        )
-      release = registerBackendValueCommit(store, commit)
-    }) satisfies IStoragePluginCore['registerValueCommit'],
-    registerOrgBinding: ((store, binding) => {
-      /** The original window and exact store cell remain the only registration authority. */
-      registration.registrationCore!.onDispose(context.storeCell.releaseOrgBindings)
-      if (context.storeCell.get() !== store)
-        throw new StorageContractError(StorageContractErrorCode.invalidArgument)
-      context.storeCell.setOrgBinding(binding)
-    }) satisfies IStoragePluginCore['registerOrgBinding'],
-    registerFeatureClientResolver: ((store, resolver) => {
-      /** Window admission precedes callbacks, reflection, or any native client acquisition. */
-      registration.registrationCore!.onDispose(() => undefined)
-      if (context.storeCell.get() !== store)
-        throw new StorageContractError(StorageContractErrorCode.invalidArgument)
-      context.storeCell.setFeatureClientResolver(resolver)
-    }) satisfies IStoragePluginCore['registerFeatureClientResolver'],
-    getChangeController: () => {
-      context.assertCurrent()
-      return getBackendChangeController(context.storeCell.get())
-    },
-    getPublishedBackend: context.getPublishedBackend,
-    registerDetect: context.registerDetect,
-    getStorageHooks: () =>
-      ({
-        on(name, handler) {
-          /** Original resource admission owns the lifetime of this exact subscription handle. */
-          const release = context.hooks.on(name, handler)
-          try {
-            registration.registrationCore!.onDispose(release)
-          } catch (error) {
-            release()
-            throw error
-          }
-          return release
-        }
-      }) satisfies IStorageHooks,
-    emit: ((name, payload) => context.emit(name, payload)) satisfies IStorageHookEmitter,
-    setStorageKind: context.setKind,
-    execution: forwardStorageExecution(
-      host,
-      context.assertExecution,
-      () => ({
-        backendId: context.id,
-        backend: context.getKind()?.name ?? context.id,
-        orgId: context.defaultOrgId
-      }),
-      context.observeExecution === undefined
-        ? undefined
-        : (describe, invoke) => context.observeExecution!(context.defaultOrgId, describe, invoke)
-    ),
-    runStorageInstall: context.runInstall,
-    isStorageInstallExpired: context.isInstallExpired,
-    registerStore: (store: IStorageBase) => {
-      if (registration.registrationCore === undefined)
-        throw new StorageError(
-          StorageErrorCode.backendPluginInvalid,
-          {},
-          StorageErrorText.backendPluginInvalid
-        )
-      context.registerStore(store, registration.registrationCore)
-    }
+    ...createStorageNativeAuthoringPorts(registration),
+    ...createStorageExecutionPorts(registration)
   }
 }
 /** Own the native batch bridge while delegating lifecycle and pipelines to PluginHost. */
@@ -1881,5 +1751,152 @@ export async function createStorageHost<
       )
     }
     throw error
+  }
+}
+
+/** Borrow native authoring ports from the original install and resource scope. */
+function createStorageNativeAuthoringPorts(registration: IStorageRegistrationAssembly) {
+  /** Native authoring retains the batch entry's original store cell. */
+  const { context } = registration
+  return {
+    createKeyLockPort: (() => {
+      /** Only original window admission is acquired; the physical backend owns final release. */
+      registration.registrationCore!.onDispose(() => undefined)
+      return createBackendKeyLockPort()
+    }) satisfies IStoragePluginCore['createKeyLockPort'],
+    createOrgAuthoringPort: (() => {
+      /** Only this original installation can capture late child construction authority. */
+      registration.registrationCore!.onDispose(context.storeCell.releaseOrgBindings)
+      return Object.freeze({
+        createChangeController: (options) => {
+          context.assertExecution()
+          const controller = createBackendChangeController(options)
+          context.storeCell.retainOrgBinding(() => controller.dispose())
+          return controller
+        },
+        createKeyLockPort: () => {
+          context.assertExecution()
+          return createBackendKeyLockPort()
+        },
+        createRevisionPort: () => {
+          context.assertExecution()
+          return createBackendRevisionPort()
+        },
+        registerChangeController: (store, controller) => {
+          context.assertExecution()
+          context.storeCell.retainOrgBinding(registerBackendChangeController(store, controller))
+          /** Root observers retain all organizations through their original controller channel. */
+          const root = getBackendChangeController(context.storeCell.get())
+          if (root !== undefined && root !== controller)
+            context.storeCell.retainOrgBinding(
+              controller.subscribe((change) => root.publishExternal(change))
+            )
+        },
+        registerValueCommit: (store, commit) => {
+          context.assertExecution()
+          context.storeCell.retainOrgBinding(registerBackendValueCommit(store, commit))
+        }
+      }) satisfies ReturnType<IStoragePluginCore['createOrgAuthoringPort']>
+    }) satisfies IStoragePluginCore['createOrgAuthoringPort'],
+    createRevisionPort: (() => {
+      /** Window admission belongs to the original owner; physical backends retain the facts. */
+      registration.registrationCore!.onDispose(() => undefined)
+      return createBackendRevisionPort()
+    }) satisfies IStoragePluginCore['createRevisionPort'],
+    createChangeController: ((options) => {
+      /** Original resource admission owns partial-construction cleanup and the install window. */
+      let controller: IBackendChangeController | undefined
+      registration.registrationCore!.onDispose(() => controller?.dispose())
+      controller = createBackendChangeController(options)
+      return controller
+    }) satisfies IStoragePluginCore['createChangeController'],
+    registerChangeController: ((store, controller) => {
+      /** Exact registry release is attached to the same original registration scope. */
+      let release: (() => void) | undefined
+      registration.registrationCore!.onDispose(() => release?.())
+      if (context.storeCell.get() !== store)
+        throw createStorageTypeError(
+          StorageErrorCode.backendPluginInvalid,
+          StorageErrorText.backendPluginInvalid
+        )
+      release = registerBackendChangeController(store, controller)
+    }) satisfies IStoragePluginCore['registerChangeController'],
+    registerValueCommit: ((store, commit) => {
+      /** The original installation window owns both admission and exact registration cleanup. */
+      let release: (() => void) | undefined
+      registration.registrationCore!.onDispose(() => release?.())
+      if (context.storeCell.get() !== store)
+        throw createStorageTypeError(
+          StorageErrorCode.backendPluginInvalid,
+          StorageErrorText.backendPluginInvalid
+        )
+      release = registerBackendValueCommit(store, commit)
+    }) satisfies IStoragePluginCore['registerValueCommit'],
+    registerOrgBinding: ((store, binding) => {
+      /** The original window and exact store cell remain the only registration authority. */
+      registration.registrationCore!.onDispose(context.storeCell.releaseOrgBindings)
+      if (context.storeCell.get() !== store)
+        throw new StorageContractError(StorageContractErrorCode.invalidArgument)
+      context.storeCell.setOrgBinding(binding)
+    }) satisfies IStoragePluginCore['registerOrgBinding'],
+    registerFeatureClientResolver: ((store, resolver) => {
+      /** Window admission precedes callbacks, reflection, or any native client acquisition. */
+      registration.registrationCore!.onDispose(() => undefined)
+      if (context.storeCell.get() !== store)
+        throw new StorageContractError(StorageContractErrorCode.invalidArgument)
+      context.storeCell.setFeatureClientResolver(resolver)
+    }) satisfies IStoragePluginCore['registerFeatureClientResolver']
+  }
+}
+/** Publish operation and installation ports through the canonical managed host. */
+function createStorageExecutionPorts(registration: IStorageRegistrationAssembly) {
+  /** Execution uses the original registration context and sole PluginHost pipeline. */
+  const { context, host } = registration
+  return {
+    getChangeController: () => {
+      context.assertCurrent()
+      return getBackendChangeController(context.storeCell.get())
+    },
+    getPublishedBackend: context.getPublishedBackend,
+    registerDetect: context.registerDetect,
+    getStorageHooks: () =>
+      ({
+        on(name, handler) {
+          /** Original resource admission owns the lifetime of this exact subscription handle. */
+          const release = context.hooks.on(name, handler)
+          try {
+            registration.registrationCore!.onDispose(release)
+          } catch (error) {
+            release()
+            throw error
+          }
+          return release
+        }
+      }) satisfies IStorageHooks,
+    emit: ((name, payload) => context.emit(name, payload)) satisfies IStorageHookEmitter,
+    setStorageKind: context.setKind,
+    execution: forwardStorageExecution(
+      host,
+      context.assertExecution,
+      () => ({
+        backendId: context.id,
+        backend: context.getKind()?.name ?? context.id,
+        orgId: context.defaultOrgId
+      }),
+      context.observeExecution === undefined
+        ? undefined
+        : (describe, invoke) => context.observeExecution!(context.defaultOrgId, describe, invoke)
+    ),
+    runStorageInstall: context.runInstall,
+    isStorageInstallExpired: context.isInstallExpired,
+    registerStore: (store: IStorageBase) => {
+      if (registration.registrationCore === undefined)
+        throw new StorageError(
+          StorageErrorCode.backendPluginInvalid,
+          {},
+          StorageErrorText.backendPluginInvalid
+        )
+      context.registerStore(store, registration.registrationCore)
+    }
   }
 }
