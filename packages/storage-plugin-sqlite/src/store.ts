@@ -217,6 +217,8 @@ type IRootMutation<R> = {
   readonly guard?: IWriteGuard
   /** Publish owner facts only after this mutation's actual native COMMIT. */
   readonly committed?: () => void
+  /** An unselected read keeps its original native segment instead of opening a writer. */
+  readonly read?: (observeKey?: (key: ILockKey) => void) => R
   run(state: INativeState): R
 }
 /** Native batch rows retain the one canonical key capture and detached text payload. */
@@ -1207,10 +1209,47 @@ export function createSqliteStore<TValue>(
     name: string,
     input: unknown,
     ctx: IOperationContext | undefined,
-    run: (orgId: string, input: unknown, observeKey?: (key: ILockKey) => void) => R,
+    run: (
+      orgId: string,
+      input: unknown,
+      observeKey?: (key: ILockKey) => void,
+      state?: INativeState
+    ) => R,
     batch?: IBatchObservation
   ): Promise<Awaited<R>> => {
     controller.assertLive()
+    if (
+      core.journal !== undefined &&
+      name !== SqliteOperation.metadataGet &&
+      name !== SqliteOperation.metadataSet &&
+      name !== SqliteOperation.metadataDelete &&
+      name !== SqliteOperation.sql
+    ) {
+      /** The original loop starts the one budget before preparation or the existing pipeline. */
+      try {
+        assertRoot()
+      } catch (error) {
+        return Promise.reject(error)
+      }
+      return rootWrite(
+        name,
+        input,
+        ctx,
+        (captured, context) => {
+          assertRoot()
+          const orgId = operationOrg(context)
+          return {
+            keys: [],
+            read: (observeKey) => {
+              assertRoot()
+              return run(orgId, captured, observeKey)
+            },
+            run: (state) => run(orgId, captured, undefined, state)
+          }
+        },
+        batch
+      )
+    }
     const finish = controller.beginMutation()
     /** Only the enabled observer retains actual synchronous read facts. */
     let keys: ILockKey[] | undefined
@@ -1266,7 +1305,7 @@ export function createSqliteStore<TValue>(
     name: string,
     input: I,
     ctx: IOperationContext | undefined,
-    prepare: (captured: I) => IRootMutation<R>,
+    prepare: (captured: I, context?: IOperationContext) => IRootMutation<R>,
     batch?: IBatchObservation
   ): Promise<Awaited<R>> => {
     controller.assertLive()
@@ -1306,8 +1345,8 @@ export function createSqliteStore<TValue>(
               },
               batch
             ),
-          lock: () => {
-            mutation = prepare(capturedInput)
+          lock: (context) => {
+            mutation = prepare(capturedInput, context)
             return [...mutation.keys, ...(selectedJournal?.headLocks() ?? [])]
           }
         },
@@ -1329,6 +1368,19 @@ export function createSqliteStore<TValue>(
             while (true) {
               throwIfAborted(context.signal)
               try {
+                if (mutation.read !== undefined && !selectedJournal?.active()) {
+                  const keys: ILockKey[] | undefined = observing ? [] : undefined
+                  try {
+                    return {
+                      status: 'committed' as const,
+                      value: mutation.read(
+                        keys === undefined ? undefined : (key) => keys.push(key)
+                      ) as Awaited<R>
+                    }
+                  } finally {
+                    observedKeys = keys
+                  }
+                }
                 const write = () =>
                   syncMutation(
                     mutation.run,
@@ -1427,7 +1479,7 @@ export function createSqliteStore<TValue>(
     channel: 'text' | 'bytes' | 'record',
     key: IStorageKey,
     value: unknown
-  ): IRootMutation<void> => {
+  ): Omit<IRootMutation<void>, 'read'> => {
     const raw =
       channel === 'bytes'
         ? (value as Uint8Array).slice()
@@ -2623,12 +2675,17 @@ export function createSqliteStore<TValue>(
     }
   }
   /** String-only legacy keys omit typed batch keys while retaining canonical identity. */
-  const textKeys = (orgId: string, observeKey?: (key: ILockKey) => void): string[] => {
-    cleanupExpiredRows('text', orgId)
+  const textKeys = (
+    orgId: string,
+    observeKey?: (key: ILockKey) => void,
+    state?: INativeState
+  ): string[] => {
+    cleanupExpiredRows('text', orgId, undefined, state)
     const rows = statement<readonly ISqliteRow[]>(
       `SELECT key FROM ${tables.text} WHERE org_id=? AND (expires_at IS NULL OR expires_at>?) ORDER BY key`,
       [orgId, Date.now()],
-      'all'
+      'all',
+      state
     )
     const keys: string[] = []
     for (const row of rows) {
@@ -2770,17 +2827,20 @@ export function createSqliteStore<TValue>(
           SqliteOperation.next,
           { range: captured },
           ctx,
-          (orgId) => {
+          (orgId, _input, observeKey, state) => {
             if (disposed) return { done: true, value: undefined }
             if (!rows) {
-              rows = recordRows(orgId, captured)
+              rows = recordRows(orgId, captured, state)
               snapshots.add(dispose)
             }
             while (position < rows.length) {
               const row = rows[position++]!
               const key = decodeKey(row.key as Uint8Array)
-              if (!liveExpiration('record', key, row.expires_at)) {
-                syncMutation((state) => prune('record', key, state), [], undefined, orgId)
+              observeKey?.(lockKey.record(key))
+              if (state) revision(state, 'record', key)
+              if (!liveExpiration('record', key, row.expires_at, state)) {
+                if (state) prune('record', key, state)
+                else syncMutation((current) => prune('record', key, current), [], undefined, orgId)
                 continue
               }
               returnedCount++
@@ -2827,8 +2887,8 @@ export function createSqliteStore<TValue>(
         SqliteOperation.get,
         { key },
         ctx,
-        (orgId, _input, observeKey) =>
-          read('text', key, orgId, undefined, undefined, observeKey) as string | null
+        (orgId, _input, observeKey, state) =>
+          read('text', key, orgId, state, undefined, observeKey) as string | null
       )
     },
     set: (key, value, ctx) => {
@@ -2856,13 +2916,13 @@ export function createSqliteStore<TValue>(
         SqliteOperation.has,
         { key },
         ctx,
-        (orgId, _input, observeKey) =>
-          read('text', key, orgId, undefined, undefined, observeKey) !== null
+        (orgId, _input, observeKey, state) =>
+          read('text', key, orgId, state, undefined, observeKey) !== null
       )
     },
     keys: (ctx) =>
-      rootRead(SqliteOperation.keys, {}, ctx, (orgId, _input, observeKey) =>
-        textKeys(orgId, observeKey)
+      rootRead(SqliteOperation.keys, {}, ctx, (orgId, _input, observeKey, state) =>
+        textKeys(orgId, observeKey, state)
       ),
     clearValues: (ctx) =>
       rootWrite(SqliteOperation.clearValues, {}, ctx, () => ({
@@ -2882,8 +2942,8 @@ export function createSqliteStore<TValue>(
         SqliteOperation.getBytes,
         { key },
         ctx,
-        (orgId, _input, observeKey) =>
-          read('bytes', key, orgId, undefined, undefined, observeKey) as Uint8Array | null
+        (orgId, _input, observeKey, state) =>
+          read('bytes', key, orgId, state, undefined, observeKey) as Uint8Array | null
       )
     },
     setBytes: (key, value, ctx) => {
@@ -2916,8 +2976,8 @@ export function createSqliteStore<TValue>(
         SqliteOperation.getRecord,
         { key: captured },
         ctx,
-        (orgId, _input, observeKey) =>
-          read('record', captured, orgId, undefined, undefined, observeKey) as TValue | undefined
+        (orgId, _input, observeKey, state) =>
+          read('record', captured, orgId, state, undefined, observeKey) as TValue | undefined
       )
     },
     putRecord: (value, key, ctx) => {
@@ -3137,14 +3197,16 @@ export function createSqliteStore<TValue>(
         SqliteOperation.getMany,
         input,
         ctx,
-        (orgId, prepared, observeKey) => {
+        (orgId, prepared, observeKey, state) => {
           const actual = snapshotStorageBatchKeys(
             (prepared as typeof input).keys,
             SqliteNames.backend
           )
           for (const [index, { key, firstIndex }] of actual.entries())
             if (firstIndex === index) observeKey?.(lockKey.text(key))
-          return readSnapshot(orgId, (state) => getMany(actual, state))
+          return state === undefined
+            ? readSnapshot(orgId, (current) => getMany(actual, current))
+            : getMany(actual, state)
         },
         { count }
       )
@@ -3323,12 +3385,19 @@ export function createSqliteStore<TValue>(
     remaining: async (target, ctx) => {
       controller.assertLive()
       const captured = captureTtlTarget(target)
-      return rootRead(SqliteOperation.ttlRemaining, captured, ctx, (orgId, input) => {
-        const row = expiration(captureTtlTarget(input as ITtlTarget), orgId)
-        return row?.expires_at == null
-          ? undefined
-          : Math.max(0, Number(row.expires_at) - Date.now())
-      })
+      return rootRead(
+        SqliteOperation.ttlRemaining,
+        captured,
+        ctx,
+        (orgId, input, observeKey, state) => {
+          const target = captureTtlTarget(input as ITtlTarget)
+          observeKey?.(target)
+          const row = expiration(target, orgId, state)
+          return row?.expires_at == null
+            ? undefined
+            : Math.max(0, Number(row.expires_at) - Date.now())
+        }
+      )
     },
     persist: async (target, ctx) => {
       controller.assertLive()
