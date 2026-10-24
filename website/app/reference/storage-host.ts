@@ -22,11 +22,23 @@ import {
 } from './storage-host-backfill.js'
 import { storageHostNativeAuthorTypes } from './storage-host-native-authors.js'
 import { storageHostEntitySymbols, storageHostEntityTypes } from './storage-host-entity.js'
+import {
+  storageHostVectorSymbols,
+  storageHostVectorTypes,
+  storageHostMmrExample
+} from './storage-host-vector.js'
 /** Shared bilingual text keeps the reference descriptions aligned. */
 const t = (en: string, zh: string): IText => ({ en, zh })
 /** Neutral host and authoring entry, with no browser or native driver import. */
 export const storageHostReference: ILibraryReference = {
   modules: {
+    'vector/mmr': {
+      summary: t(
+        'Create a pure MMR scorer for portable vector rerank using engine relevance and explicitly requested vectors. Start with mmr and a withVector().topK(k) query; this independent entry performs no retrieval or network work.',
+        '使用引擎相关性与显式请求的向量创建纯 MMR 重排评分器，从 mmr 及 withVector().topK(k) 查询开始；此独立入口不执行检索或网络操作。'
+      ),
+      example: storageHostMmrExample
+    },
     journal: {
       summary: t(
         'Open a fixed-organization private log through its original admitted backend binding.',
@@ -477,7 +489,8 @@ console.log(host.extensions.label('draft'))`,
     ...storageHostAuthoringSymbols,
     ...storageHostRuntimeSymbols,
     ...storageHostBackfillSymbols,
-    ...storageHostEntitySymbols
+    ...storageHostEntitySymbols,
+    ...storageHostVectorSymbols
   },
   types: {
     IStorageJournalRedoAttempt: {
@@ -1046,7 +1059,8 @@ off()`
     ...storageHostHookTypes,
     ...storageHostBackfillTypes,
     ...storageHostNativeAuthorTypes,
-    ...storageHostEntityTypes
+    ...storageHostEntityTypes,
+    ...storageHostVectorTypes
   },
   enums: {
     StorageErrorCode: {

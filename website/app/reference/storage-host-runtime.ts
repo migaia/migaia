@@ -268,9 +268,11 @@ export const storageHostRuntimeSymbols: Readonly<Record<string, ISymbolDoc>> = {
   StorageErrorText: {
     role: 'constant',
     purpose: t(
-      'Canonical host messages and parameterized text factories; applications branch on semantic codes rather than these diagnostic strings.',
-      '宿主规范消息与参数化文本工厂；应用应按语义码分支，不把诊断字符串当作协议。'
-    )
+      'Canonical host messages and parameterized text factories; applications branch on semantic codes rather than these diagnostic strings. The vectorMmr entry diagnoses invalid MMR lambda, topN or hit vectors from the independent scorer.',
+      '宿主规范消息与参数化文本工厂，应用应按语义码分支，不把诊断字符串当作协议；vectorMmr 条目说明独立评分器的 MMR 权重、topN 或候选向量非法。'
+    ),
+    example: `import { StorageErrorText } from '@migaia/storage-host'
+console.log(StorageErrorText.vectorMmr)`
   },
   StorageHostFacade: {
     role: 'factory',
