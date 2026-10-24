@@ -34,8 +34,20 @@ export const LIBRARY_REFERENCE_DESCRIPTIONS_ZH = {
   'rpc-process': '在子进程或本机服务中运行隔离任务，并通过 RPC 调用和管理它们。',
   'rpc-threads': '把重计算移到 Worker，并通过 RPC 调用、管理和重启线程。',
   serialize: '把应用数据编码为可存储或传输的格式，并在读取时解码。',
-  'storage-contract': '为键值和记录存储定义统一接口，让应用可以接入不同存储后端。',
-  'storage-web': '通过统一接口读写 Web Storage、cookie、IndexedDB 和内存中的数据。',
+  'storage-contract': '定义键值、记录、向量、RDF 与对象存储能力、查询和事务契约。',
+  'storage-web': '通过宿主插件读写 Web Storage、Cookie 与 IndexedDB，按需启用响应式查询。',
+  'storage-host': '安装存储后端与 Feature，隔离组织数据，并提供内存后端、实体仓储与持久日志桥。',
+  'storage-plugin-redis':
+    '通过原生客户端读写 Redis 或 Valkey，并按需安装 Streams、发布订阅与检索能力。',
+  'storage-plugin-postgres':
+    '通过原生 PostgreSQL 事务读写数据，按需接入 pgvector、通知与逻辑复制。',
+  'storage-plugin-sqlite':
+    '通过 Node 或 Bun 原生 SQLite 连接读写数据，在同一事务中使用存储和 SQL。',
+  'storage-plugin-qdrant': '管理 Qdrant 向量集合，执行相似度查询并按需安装混合检索与管理能力。',
+  'storage-plugin-sparql': '通过 SPARQL 协议或 Oxigraph 管理 RDF，执行查询与有条件的批量更新。',
+  'storage-plugin-object': '通过文件系统或 S3 存储对象，使用流式读写、条件写入与可选签名链接。',
+  'storage-plugin-cache': '组合已安装的存储层进行缓存读取、回填与写入，并按需安装语义缓存。',
+  'storage-plugin-archive': '将事务型热存储中的记录显式归档到对象冷存储，并提供读取、恢复与清扫。',
   'store-devtools': '查看 Store 的状态与 action 历史，通过时间旅行和依赖树定位状态变化。',
   'store-indexed': '在对象、数组、Map 和 Set 中按键或索引订阅变化，让相关计算随集合更新。',
   'store-keyed': '在独立作用域中按业务 key 管理状态，并只订阅需要的部分。',
@@ -90,9 +102,27 @@ export const LIBRARY_REFERENCE_DESCRIPTIONS_EN = {
     'Move heavy computation into Workers and call, manage, and restart threads through RPC.',
   serialize: 'Encode application data for storage or transmission and decode it when reading.',
   'storage-contract':
-    'Define common interfaces for key-value and record storage so applications can use different backends.',
+    'Define capabilities, queries and transactions for key-value, record, vector, RDF and object storage.',
   'storage-web':
-    'Read and write data in Web Storage, cookies, IndexedDB, and memory through a common interface.',
+    'Read and write Web Storage, cookies and IndexedDB through host plugins, with optional reactive queries.',
+  'storage-host':
+    'Install storage backends and Features, isolate organization data, and use memory storage, entity repositories and durable journal bridges.',
+  'storage-plugin-redis':
+    'Read and write Redis or Valkey through native clients and optionally install Streams, pubsub and search capabilities.',
+  'storage-plugin-postgres':
+    'Read and write data through native PostgreSQL transactions and optionally add pgvector, notifications and logical replication.',
+  'storage-plugin-sqlite':
+    'Read and write through native Node or Bun SQLite connections and share storage and SQL within one transaction.',
+  'storage-plugin-qdrant':
+    'Manage Qdrant vector collections, run similarity queries and optionally install hybrid search and management features.',
+  'storage-plugin-sparql':
+    'Manage RDF through the SPARQL protocol or Oxigraph, execute queries and submit conditional batch updates.',
+  'storage-plugin-object':
+    'Store objects through the filesystem or S3 with streaming reads and writes, conditional updates and optional signed URLs.',
+  'storage-plugin-cache':
+    'Combine installed storage tiers for cache reads, backfill and writes, with an optional semantic cache.',
+  'storage-plugin-archive':
+    'Explicitly archive records from transactional hot storage to object cold storage, then read, restore or sweep them.',
   'store-devtools':
     'Inspect Store state and action history and use time travel and dependency trees to investigate changes.',
   'store-indexed':

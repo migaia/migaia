@@ -27,6 +27,15 @@ import { reference as rpcCoreReference } from './rpc-core.js'
 import { rpcDevtoolsReference } from './rpc-devtools.js'
 import { rpcPoolReference } from './rpc-pool.js'
 import { storageContractReference } from './storage-contract.js'
+import { storageHostReference } from './storage-host.js'
+import { storagePluginRedisReference } from './storage-plugin-redis.js'
+import { storagePluginPostgresReference } from './storage-plugin-postgres.js'
+import { storagePluginSqliteReference } from './storage-plugin-sqlite.js'
+import { storagePluginQdrantReference } from './storage-plugin-qdrant.js'
+import { storagePluginSparqlReference } from './storage-plugin-sparql.js'
+import { storagePluginObjectReference } from './storage-plugin-object.js'
+import { storagePluginCacheReference } from './storage-plugin-cache.js'
+import { storagePluginArchiveReference } from './storage-plugin-archive.js'
 import { storeDevtoolsReference } from './store-devtools.js'
 import { storeIndexedReference } from './store-indexed.js'
 import { storeKeyedReference } from './store-keyed.js'
@@ -64,6 +73,15 @@ export const libraryReferences: Readonly<Record<string, ILibraryReference>> = {
   'rpc-devtools': rpcDevtoolsReference,
   'rpc-pool': rpcPoolReference,
   'storage-contract': storageContractReference,
+  'storage-host': storageHostReference,
+  'storage-plugin-redis': storagePluginRedisReference,
+  'storage-plugin-postgres': storagePluginPostgresReference,
+  'storage-plugin-sqlite': storagePluginSqliteReference,
+  'storage-plugin-qdrant': storagePluginQdrantReference,
+  'storage-plugin-sparql': storagePluginSparqlReference,
+  'storage-plugin-object': storagePluginObjectReference,
+  'storage-plugin-cache': storagePluginCacheReference,
+  'storage-plugin-archive': storagePluginArchiveReference,
   'store-devtools': storeDevtoolsReference,
   'store-indexed': storeIndexedReference,
   'store-keyed': storeKeyedReference,

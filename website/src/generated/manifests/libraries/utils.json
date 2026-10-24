@@ -158,7 +158,9 @@
                     "模板插值、数字和金额格式化",
                     "`format`、`formatCurrency`",
                     "`@migaia/utils/string`、`/number`"
-                  ]
+                  ],
+                  ["识别启动程序的服务端运行时", "`detectServerRuntime`", "`@migaia/utils`"],
+                  ["分散缓存到期时间，且不延长原期限", "`jitter`", "`@migaia/utils/number`"]
                 ]
               },
               {
@@ -504,6 +506,25 @@
               {
                 "type": "paragraph",
                 "text": "首次失败会一直缓存，没有 reset。需要失败重试时，把重试放进被包装的初始化函数；需要刷新、登出后重建或按租户或请求隔离时，应选有对应生命周期的容器。如果把某一个调用者的取消信号交给共享任务，该调用者取消后，其他等待者也会受影响。每个包装函数的缓存独立，模块重复实例化或跨 iframe、Worker、Node `vm` 时不会共享。"
+              }
+            ]
+          },
+          {
+            "id": "可选值",
+            "heading": "可选值",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "`IMaybe<T>` 区分 `{ some: true, value: T }` 与 `{ some: false }`，包括“存在但值为 undefined”。root 导出 `isSome`/`isNone` 用于类型收窄，`unwrapOr(m, fallback)` 接受同值域的缺省值，`mapMaybe(m, mapper)` 仅对存在值同步映射一次，`toUndefined(m)` 用于有意合并缺失与 undefined。None 原样复用且不调用 mapper；mapper 结果保留身份、不等待 Promise。typed 可选值不附加运行时验证。"
+              },
+              {
+                "type": "paragraph",
+                "text": "mapper 失败保留原有带码错误；未编码且可写的原生 Error 在原实例附 utils INVALID_ARGUMENT，保留原生类型与 stack。身份冲突时原错位于包装 cause；附加身份失败时聚合原错首位、附加失败次位。非 Error 沿原 toError/NON_ERROR_VALUE 语义。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { isSome, isNone, unwrapOr, mapMaybe, toUndefined, type IMaybe } from '@migaia/utils'\nconst present: IMaybe<number | undefined> = { some: true, value: undefined }\nconst missing: IMaybe<number> = { some: false }\nconst mapped = mapMaybe({ some: true, value: 3 }, (value) => value * 2)\nconsole.log(isSome(present), isNone(missing))\nconsole.log(unwrapOr(mapped, 0), toUndefined(missing))\n// true true\n// 6 undefined"
               }
             ]
           }
@@ -2259,9 +2280,33 @@
             ]
           },
           {
+            "id": "识别服务端运行时",
+            "heading": "识别服务端运行时",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { detectServerRuntime } from '@migaia/utils'\n\nconsole.log(detectServerRuntime()) // Node 中为 'node'"
+              },
+              {
+                "type": "paragraph",
+                "text": "`detectServerRuntime(): 'deno' | 'bun' | 'node' | undefined` 先检查 `globalThis.Deno`，再检查 `process.versions.bun`，最后检查 `process.versions.node`。Deno 和 Bun 提供的 Node 兼容全局不会抢先匹配。浏览器返回 `undefined`。函数不导入文件系统或其它宿主 API；原生适配器根据结果只加载自己的运行时模块。"
+              }
+            ]
+          },
+          {
             "id": "value-string-number-高频工具",
             "heading": "/value、/string、/number 高频工具",
             "blocks": [
+              {
+                "type": "paragraph",
+                "text": "`jitter(value, ratio, random = Math.random)` 从 `@migaia/utils/number` 或根入口导出，返回 `[value * (1 - ratio), value]` 内的值，只缩短期限。`value` 必须有限且非负，`ratio` 与随机结果必须在闭区间 `[0, 1]`。无效输入抛出带 `@migaia/utils` / `INVALID_ARGUMENT` 的 `RangeError`；随机回调抛错时同样以该错误拒绝，原错保留在 `cause`。参数有效后每次只调用一次随机源，包括 `value` 或 `ratio` 为零时。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { jitter } from '@migaia/utils/number'\n\nconsole.log(jitter(60_000, 0.2, () => 0.5)) // 54000，永不超过原来的 60000"
+              },
               {
                 "type": "paragraph",
                 "text": "`isSafeIntegerValue(value)` 从 `/value` 导出，仅接受有限的安全整数 number，不转换字符串、bigint 或 boxed number。"
@@ -2847,6 +2892,11 @@
                     "先完整校验不可信的错误树，再重建原生错误图。"
                   ],
                   [
+                    "`detectServerRuntime`",
+                    "`@migaia/utils`",
+                    "依次识别 Deno、Bun、Node；没有服务端全局的浏览器返回 `undefined`。"
+                  ],
+                  [
                     "`diagnosticSnapshot`",
                     "`@migaia/utils/object`",
                     "尽力复制一个值，并给出明确的诊断列表。"
@@ -2963,6 +3013,11 @@
                     "`isUtilsTimeoutError`",
                     "`@migaia/utils/error`",
                     "先确认是本包的错误形状和身份，再检查代码是否为 `DEADLINE_EXCEEDED`。"
+                  ],
+                  [
+                    "`jitter`",
+                    "`@migaia/utils/number`",
+                    "将有限非负值随机缩短至 `[value * (1 - ratio), value]`；非法输入使用 `INVALID_ARGUMENT`。"
                   ],
                   [
                     "`noop`",
@@ -3148,6 +3203,25 @@
                 ]
               }
             ]
+          },
+          {
+            "id": "可选值",
+            "heading": "可选值",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "`IMaybe<T>` 区分 `{ some: true, value: T }` 与 `{ some: false }`，包括“存在但值为 undefined”。root 导出 `isSome`/`isNone` 用于类型收窄，`unwrapOr(m, fallback)` 接受同值域的缺省值，`mapMaybe(m, mapper)` 仅对存在值同步映射一次，`toUndefined(m)` 用于有意合并缺失与 undefined。None 原样复用且不调用 mapper；mapper 结果保留身份、不等待 Promise。typed 可选值不附加运行时验证。"
+              },
+              {
+                "type": "paragraph",
+                "text": "mapper 失败保留原有带码错误；未编码且可写的原生 Error 在原实例附 utils INVALID_ARGUMENT，保留原生类型与 stack。身份冲突时原错位于包装 cause；附加身份失败时聚合原错首位、附加失败次位。非 Error 沿原 toError/NON_ERROR_VALUE 语义。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { isSome, isNone, unwrapOr, mapMaybe, toUndefined, type IMaybe } from '@migaia/utils'\nconst present: IMaybe<number | undefined> = { some: true, value: undefined }\nconst missing: IMaybe<number> = { some: false }\nconst mapped = mapMaybe({ some: true, value: 3 }, (value) => value * 2)\nconsole.log(isSome(present), isNone(missing))\nconsole.log(unwrapOr(mapped, 0), toUndefined(missing))\n// true true\n// 6 undefined"
+              }
+            ]
           }
         ]
       },
@@ -3304,6 +3378,16 @@
                       "Fill templates, format numbers and money",
                       "`format`, `formatCurrency`",
                       "`@migaia/utils/string`, `/number`"
+                    ],
+                    [
+                      "Identify the server runtime running the program",
+                      "`detectServerRuntime`",
+                      "`@migaia/utils`"
+                    ],
+                    [
+                      "Spread cache expiry times without extending the original deadline",
+                      "`jitter`",
+                      "`@migaia/utils/number`"
                     ]
                   ]
                 },
@@ -3714,6 +3798,25 @@
                 {
                   "type": "paragraph",
                   "text": "If the shared task uses one caller's cancellation signal, that caller's cancellation affects every other waiter too. Each wrapper has its own cache; duplicated module instances, iframes, Workers and Node `vm` do not share it."
+                }
+              ]
+            },
+            {
+              "id": "optional-values",
+              "heading": "Optional values",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`IMaybe<T>` distinguishes `{ some: true, value: T }` from `{ some: false }`, including a present undefined. Root exports `isSome`/`isNone` for narrowing, `unwrapOr(m, fallback)` for a same-domain fallback, `mapMaybe(m, mapper)` for one synchronous mapping of a present value, and `toUndefined(m)` when collapsing absence is intentional. None is reused without calling the mapper; mapper results retain identity and are not awaited. Typed optional values receive no extra runtime validation."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Mapper failures retain existing coded errors. An uncoded mutable native Error receives utils INVALID_ARGUMENT on the same instance, preserving native type and stack. An identity conflict wraps the original on cause; failed identity attachment aggregates the original first and the attachment failure second. Non-Error values follow existing toError/NON_ERROR_VALUE semantics."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { isSome, isNone, unwrapOr, mapMaybe, toUndefined, type IMaybe } from '@migaia/utils'\nconst present: IMaybe<number | undefined> = { some: true, value: undefined }\nconst missing: IMaybe<number> = { some: false }\nconst mapped = mapMaybe({ some: true, value: 3 }, (value) => value * 2)\nconsole.log(isSome(present), isNone(missing))\nconsole.log(unwrapOr(mapped, 0), toUndefined(missing))\n// true true\n// 6 undefined"
                 }
               ]
             }
@@ -5357,9 +5460,33 @@
               ]
             },
             {
+              "id": "identify-the-server-runtime",
+              "heading": "Identify the server runtime",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { detectServerRuntime } from '@migaia/utils'\n\nconsole.log(detectServerRuntime()) // 'node' in Node"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`detectServerRuntime(): 'deno' | 'bun' | 'node' | undefined` checks `globalThis.Deno`, then `process.versions.bun`, then `process.versions.node`. Node compatibility globals in Deno and Bun do not take precedence. Browsers return `undefined`. The function imports no filesystem or other host APIs; native adapters use its result to load only their runtime module."
+                }
+              ]
+            },
+            {
               "id": "value-string-and-number-everyday-tools",
               "heading": "/value, /string and /number everyday tools",
               "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`jitter(value, ratio, random = Math.random)` is exported from `@migaia/utils/number` and the root entry. It returns a value in `[value * (1 - ratio), value]`, only shortening the deadline. `value` must be finite and non-negative; `ratio` and the random result must be in the inclusive interval `[0, 1]`. Invalid inputs throw a `RangeError` carrying `@migaia/utils` / `INVALID_ARGUMENT`. A throwing random callback produces the same coded error with the original failure on `cause`. Each call with valid arguments draws exactly one sample, including when `value` or `ratio` is zero."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { jitter } from '@migaia/utils/number'\n\nconsole.log(jitter(60_000, 0.2, () => 0.5)) // 54000, never above the original 60000"
+                },
                 {
                   "type": "paragraph",
                   "text": "`isSafeIntegerValue(value)` from `/value` accepts only finite safe-integer numbers and converts no strings, bigints or boxed numbers."
@@ -5965,6 +6092,11 @@
                       "Validates an untrusted error tree in full, then rebuilds the native error graph."
                     ],
                     [
+                      "`detectServerRuntime`",
+                      "`@migaia/utils`",
+                      "Identifies Deno before Bun before Node; browsers without server globals return `undefined`."
+                    ],
+                    [
                       "`diagnosticSnapshot`",
                       "`@migaia/utils/object`",
                       "Copies a value as far as possible and returns explicit diagnostics."
@@ -6093,6 +6225,11 @@
                       "`isUtilsTimeoutError`",
                       "`@migaia/utils/error`",
                       "Checks this module's error shape and identity, then that the code is `DEADLINE_EXCEEDED`."
+                    ],
+                    [
+                      "`jitter`",
+                      "`@migaia/utils/number`",
+                      "Shortens a finite non-negative value into `[value * (1 - ratio), value]`; invalid inputs use `INVALID_ARGUMENT`."
                     ],
                     [
                       "`noop`",
@@ -6282,6 +6419,25 @@
                   ]
                 }
               ]
+            },
+            {
+              "id": "optional-values",
+              "heading": "Optional values",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`IMaybe<T>` distinguishes `{ some: true, value: T }` from `{ some: false }`, including a present undefined. Root exports `isSome`/`isNone` for narrowing, `unwrapOr(m, fallback)` for a same-domain fallback, `mapMaybe(m, mapper)` for one synchronous mapping of a present value, and `toUndefined(m)` when collapsing absence is intentional. None is reused without calling the mapper; mapper results retain identity and are not awaited. Typed optional values receive no extra runtime validation."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Mapper failures retain existing coded errors. An uncoded mutable native Error receives utils INVALID_ARGUMENT on the same instance, preserving native type and stack. An identity conflict wraps the original on cause; failed identity attachment aggregates the original first and the attachment failure second. Non-Error values follow existing toError/NON_ERROR_VALUE semantics."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { isSome, isNone, unwrapOr, mapMaybe, toUndefined, type IMaybe } from '@migaia/utils'\nconst present: IMaybe<number | undefined> = { some: true, value: undefined }\nconst missing: IMaybe<number> = { some: false }\nconst mapped = mapMaybe({ some: true, value: 3 }, (value) => value * 2)\nconsole.log(isSome(present), isNone(missing))\nconsole.log(unwrapOr(mapped, 0), toUndefined(missing))\n// true true\n// 6 undefined"
+                }
+              ]
             }
           ]
         }
@@ -6384,6 +6540,72 @@
           "usageScore": 22,
           "configuration": [],
           "fragment": "utils-index--collect"
+        },
+        {
+          "name": "detectServerRuntime",
+          "kind": "function",
+          "signature": "export declare function detectServerRuntime(): ServerRuntime | undefined;",
+          "declarationLine": 13,
+          "source": "packages/utils/dist/runtime.d.ts",
+          "purpose": "Identifies the server runtime without importing host APIs, checking Deno before Bun before Node.",
+          "core": "`deno`, `bun` or `node`; `undefined` in browsers without server globals.",
+          "advanced": "",
+          "parameters": ["This function declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "ServerRuntime | undefined",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [
+            "import { detectServerRuntime } from '@migaia/utils'\n\nconsole.log(detectServerRuntime()) // Node 中为 'node'"
+          ],
+          "members": [],
+          "composes": [],
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare function detectServerRuntime(): ServerRuntime | undefined;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": ["ServerRuntime | undefined"],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Identifies the server runtime without importing host APIs, checking Deno before Bun before Node."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import detectServerRuntime from @migaia/utils, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use detectServerRuntime when its function contract and declared inputs match the result you need. Choose a different public symbol when detectServerRuntime does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "`deno`, `bun` or `node`; `undefined` in browsers without server globals."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/utils/dist/runtime.d.ts:detectServerRuntime:export declare function detectServerRuntime(): ServerRuntime | undefined;",
+          "guidance": [],
+          "usageScore": 24,
+          "configuration": [],
+          "fragment": "utils-index--detectServerRuntime"
         },
         {
           "name": "ICollector",
@@ -6740,6 +6962,263 @@
           "fragment": "utils-index--IFieldCollector"
         },
         {
+          "name": "IMaybe",
+          "kind": "type",
+          "signature": "export type IMaybe<T> = { readonly some: true; readonly value: T; } | { readonly some: false; };",
+          "declarationLine": 2,
+          "source": "packages/utils/dist/maybe.d.ts",
+          "purpose": "Presence union that distinguishes absent values from a present undefined.",
+          "core": "some: True for presence, false for absence; narrow before reading value.\nvalue: Exact T payload, available only on the some:true variant.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [
+            "import { isSome, isNone, unwrapOr, mapMaybe, toUndefined, type IMaybe } from '@migaia/utils'\nconst present: IMaybe<number | undefined> = { some: true, value: undefined }\nconst missing: IMaybe<number> = { some: false }\nconst mapped = mapMaybe({ some: true, value: 3 }, (value) => value * 2)\nconsole.log(isSome(present), isNone(missing))\nconsole.log(unwrapOr(mapped, 0), toUndefined(missing))\n// true true\n// 6 undefined"
+          ],
+          "members": [
+            {
+              "name": "some",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly some: true;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "true"
+            },
+            {
+              "name": "value",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly value: T;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "T"
+            },
+            {
+              "name": "some",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly some: false;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "false"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "IMaybe",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IMaybe<T> = { readonly some: true; readonly value: T; } | { readonly some: false; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Presence union that distinguishes absent values from a present undefined."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IMaybe from @migaia/utils, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IMaybe when its type contract and declared inputs match the result you need. Choose a different public symbol when IMaybe does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "some: True for presence, false for absence; narrow before reading value.\nvalue: Exact T payload, available only on the some:true variant."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/utils/dist/maybe.d.ts:IMaybe:export type IMaybe<T> = { readonly some: true; readonly value: T; } | { readonly some: false; };",
+          "guidance": [],
+          "usageScore": 36,
+          "configuration": [],
+          "fragment": "utils-index--IMaybe"
+        },
+        {
+          "name": "isNone",
+          "kind": "function",
+          "signature": "export declare function isNone<T>(value: IMaybe<T>): value is Extract<IMaybe<T>, { readonly some: false; }>;",
+          "declarationLine": 13,
+          "source": "packages/utils/dist/maybe.d.ts",
+          "purpose": "Narrow to the absent branch without reading a payload.",
+          "core": "value: Typed IMaybe<T>; no additional runtime shape validation is performed.\nBoolean type predicate narrowing the discriminated union.",
+          "advanced": "",
+          "parameters": ["value: IMaybe<T>"],
+          "parameterDetails": [
+            {
+              "name": "value",
+              "type": "IMaybe<T>",
+              "optional": false
+            }
+          ],
+          "returns": "value is Extract<IMaybe<T>, { readonly some: false; }>",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [
+            "import { isSome, isNone, unwrapOr, mapMaybe, toUndefined, type IMaybe } from '@migaia/utils'\nconst present: IMaybe<number | undefined> = { some: true, value: undefined }\nconst missing: IMaybe<number> = { some: false }\nconst mapped = mapMaybe({ some: true, value: 3 }, (value) => value * 2)\nconsole.log(isSome(present), isNone(missing))\nconsole.log(unwrapOr(mapped, 0), toUndefined(missing))\n// true true\n// 6 undefined"
+          ],
+          "members": [],
+          "composes": [],
+          "aliasOf": "isNone",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare function isNone<T>(value: IMaybe<T>): value is Extract<IMaybe<T>, { readonly some: false; }>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "value",
+                "type": "IMaybe<T>",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["value is Extract<IMaybe<T>, { readonly some: false; }>"],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Narrow to the absent branch without reading a payload."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import isNone from @migaia/utils, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use isNone when its function contract and declared inputs match the result you need. Choose a different public symbol when isNone does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "value: Typed IMaybe<T>; no additional runtime shape validation is performed.\nBoolean type predicate narrowing the discriminated union."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/utils/dist/maybe.d.ts:isNone:export declare function isNone<T>(value: IMaybe<T>): value is Extract<IMaybe<T>, { readonly some: false; }>;",
+          "guidance": [],
+          "usageScore": 30,
+          "configuration": [],
+          "fragment": "utils-index--isNone"
+        },
+        {
+          "name": "isSome",
+          "kind": "function",
+          "signature": "export declare function isSome<T>(value: IMaybe<T>): value is Extract<IMaybe<T>, { readonly some: true; }>;",
+          "declarationLine": 9,
+          "source": "packages/utils/dist/maybe.d.ts",
+          "purpose": "Narrow to present values without treating undefined as absence.",
+          "core": "value: Typed IMaybe<T>; no additional runtime shape validation is performed.\nBoolean type predicate narrowing the discriminated union.",
+          "advanced": "",
+          "parameters": ["value: IMaybe<T>"],
+          "parameterDetails": [
+            {
+              "name": "value",
+              "type": "IMaybe<T>",
+              "optional": false
+            }
+          ],
+          "returns": "value is Extract<IMaybe<T>, { readonly some: true; }>",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [
+            "import { isSome, isNone, unwrapOr, mapMaybe, toUndefined, type IMaybe } from '@migaia/utils'\nconst present: IMaybe<number | undefined> = { some: true, value: undefined }\nconst missing: IMaybe<number> = { some: false }\nconst mapped = mapMaybe({ some: true, value: 3 }, (value) => value * 2)\nconsole.log(isSome(present), isNone(missing))\nconsole.log(unwrapOr(mapped, 0), toUndefined(missing))\n// true true\n// 6 undefined"
+          ],
+          "members": [],
+          "composes": [],
+          "aliasOf": "isSome",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare function isSome<T>(value: IMaybe<T>): value is Extract<IMaybe<T>, { readonly some: true; }>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "value",
+                "type": "IMaybe<T>",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["value is Extract<IMaybe<T>, { readonly some: true; }>"],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Narrow to present values without treating undefined as absence."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import isSome from @migaia/utils, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use isSome when its function contract and declared inputs match the result you need. Choose a different public symbol when isSome does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "value: Typed IMaybe<T>; no additional runtime shape validation is performed.\nBoolean type predicate narrowing the discriminated union."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/utils/dist/maybe.d.ts:isSome:export declare function isSome<T>(value: IMaybe<T>): value is Extract<IMaybe<T>, { readonly some: true; }>;",
+          "guidance": [],
+          "usageScore": 30,
+          "configuration": [],
+          "fragment": "utils-index--isSome"
+        },
+        {
           "name": "isUrlObject",
           "kind": "function",
           "signature": "export declare function isUrlObject(value: unknown): value is Readonly<{ href: string; }>;",
@@ -6818,6 +7297,97 @@
           "fragment": "utils-index--isUrlObject"
         },
         {
+          "name": "mapMaybe",
+          "kind": "function",
+          "signature": "export declare function mapMaybe<T, N>(value: IMaybe<T>, mapper: (value: T) => N): IMaybe<N>;",
+          "declarationLine": 22,
+          "source": "packages/utils/dist/maybe.d.ts",
+          "purpose": "Map one present payload synchronously and retain the exact mapped result.",
+          "core": "value: Typed IMaybe<T>; no additional runtime shape validation is performed.\nmapper: Called once only for presence; not awaited. Existing coded failures survive; uncoded native failures receive utils INVALID_ARGUMENT, preserving identity when attachable.\nIMaybe<N>; missing input is reused, mapped results retain identity.",
+          "advanced": "",
+          "parameters": ["value: IMaybe<T>", "mapper: (value: T) => N"],
+          "parameterDetails": [
+            {
+              "name": "value",
+              "type": "IMaybe<T>",
+              "optional": false
+            },
+            {
+              "name": "mapper",
+              "type": "(value: T) => N",
+              "optional": false
+            }
+          ],
+          "returns": "IMaybe<N>",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [
+            "import { isSome, isNone, unwrapOr, mapMaybe, toUndefined, type IMaybe } from '@migaia/utils'\nconst present: IMaybe<number | undefined> = { some: true, value: undefined }\nconst missing: IMaybe<number> = { some: false }\nconst mapped = mapMaybe({ some: true, value: 3 }, (value) => value * 2)\nconsole.log(isSome(present), isNone(missing))\nconsole.log(unwrapOr(mapped, 0), toUndefined(missing))\n// true true\n// 6 undefined"
+          ],
+          "members": [],
+          "composes": [],
+          "aliasOf": "mapMaybe",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare function mapMaybe<T, N>(value: IMaybe<T>, mapper: (value: T) => N): IMaybe<N>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "value",
+                "type": "IMaybe<T>",
+                "optional": false
+              },
+              {
+                "name": "mapper",
+                "type": "(value: T) => N",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["IMaybe<N>"],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Map one present payload synchronously and retain the exact mapped result."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import mapMaybe from @migaia/utils, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use mapMaybe when its function contract and declared inputs match the result you need. Choose a different public symbol when mapMaybe does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "value: Typed IMaybe<T>; no additional runtime shape validation is performed.\nmapper: Called once only for presence; not awaited. Existing coded failures survive; uncoded native failures receive utils INVALID_ARGUMENT, preserving identity when attachable.\nIMaybe<N>; missing input is reused, mapped results retain identity."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/utils/dist/maybe.d.ts:mapMaybe:export declare function mapMaybe<T, N>(value: IMaybe<T>, mapper: (value: T) => N): IMaybe<N>;",
+          "guidance": [],
+          "usageScore": 30,
+          "configuration": [],
+          "fragment": "utils-index--mapMaybe"
+        },
+        {
           "name": "readUrlHref",
           "kind": "function",
           "signature": "export declare function readUrlHref(value: IUrlLike): string;",
@@ -6892,6 +7462,178 @@
           "usageScore": 4,
           "configuration": [],
           "fragment": "utils-index--readUrlHref"
+        },
+        {
+          "name": "toUndefined",
+          "kind": "function",
+          "signature": "export declare function toUndefined<T>(value: IMaybe<T>): T | undefined;",
+          "declarationLine": 24,
+          "source": "packages/utils/dist/maybe.d.ts",
+          "purpose": "Convert an optional value when collapsing absence and present undefined is intentional.",
+          "core": "value: Typed IMaybe<T>; no additional runtime shape validation is performed.\nT or undefined; presence of undefined is intentionally collapsed.",
+          "advanced": "",
+          "parameters": ["value: IMaybe<T>"],
+          "parameterDetails": [
+            {
+              "name": "value",
+              "type": "IMaybe<T>",
+              "optional": false
+            }
+          ],
+          "returns": "T | undefined",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [
+            "import { isSome, isNone, unwrapOr, mapMaybe, toUndefined, type IMaybe } from '@migaia/utils'\nconst present: IMaybe<number | undefined> = { some: true, value: undefined }\nconst missing: IMaybe<number> = { some: false }\nconst mapped = mapMaybe({ some: true, value: 3 }, (value) => value * 2)\nconsole.log(isSome(present), isNone(missing))\nconsole.log(unwrapOr(mapped, 0), toUndefined(missing))\n// true true\n// 6 undefined"
+          ],
+          "members": [],
+          "composes": [],
+          "aliasOf": "toUndefined",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare function toUndefined<T>(value: IMaybe<T>): T | undefined;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "value",
+                "type": "IMaybe<T>",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["T | undefined"],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Convert an optional value when collapsing absence and present undefined is intentional."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import toUndefined from @migaia/utils, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use toUndefined when its function contract and declared inputs match the result you need. Choose a different public symbol when toUndefined does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "value: Typed IMaybe<T>; no additional runtime shape validation is performed.\nT or undefined; presence of undefined is intentionally collapsed."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/utils/dist/maybe.d.ts:toUndefined:export declare function toUndefined<T>(value: IMaybe<T>): T | undefined;",
+          "guidance": [],
+          "usageScore": 30,
+          "configuration": [],
+          "fragment": "utils-index--toUndefined"
+        },
+        {
+          "name": "unwrapOr",
+          "kind": "function",
+          "signature": "export declare function unwrapOr<T>(value: IMaybe<T>, fallback: NoInfer<T>): T;",
+          "declarationLine": 17,
+          "source": "packages/utils/dist/maybe.d.ts",
+          "purpose": "Return the exact present value or a fallback in the same value domain.",
+          "core": "value: Typed IMaybe<T>; no additional runtime shape validation is performed.\nfallback: NoInfer<T>: fallback cannot widen the original value domain.\nThe original T payload when present, otherwise the supplied fallback.",
+          "advanced": "",
+          "parameters": ["value: IMaybe<T>", "fallback: NoInfer<T>"],
+          "parameterDetails": [
+            {
+              "name": "value",
+              "type": "IMaybe<T>",
+              "optional": false
+            },
+            {
+              "name": "fallback",
+              "type": "NoInfer<T>",
+              "optional": false
+            }
+          ],
+          "returns": "T",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [
+            "import { isSome, isNone, unwrapOr, mapMaybe, toUndefined, type IMaybe } from '@migaia/utils'\nconst present: IMaybe<number | undefined> = { some: true, value: undefined }\nconst missing: IMaybe<number> = { some: false }\nconst mapped = mapMaybe({ some: true, value: 3 }, (value) => value * 2)\nconsole.log(isSome(present), isNone(missing))\nconsole.log(unwrapOr(mapped, 0), toUndefined(missing))\n// true true\n// 6 undefined"
+          ],
+          "members": [],
+          "composes": [],
+          "aliasOf": "unwrapOr",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare function unwrapOr<T>(value: IMaybe<T>, fallback: NoInfer<T>): T;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "value",
+                "type": "IMaybe<T>",
+                "optional": false
+              },
+              {
+                "name": "fallback",
+                "type": "NoInfer<T>",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["T"],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Return the exact present value or a fallback in the same value domain."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import unwrapOr from @migaia/utils, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use unwrapOr when its function contract and declared inputs match the result you need. Choose a different public symbol when unwrapOr does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "value: Typed IMaybe<T>; no additional runtime shape validation is performed.\nfallback: NoInfer<T>: fallback cannot widen the original value domain.\nThe original T payload when present, otherwise the supplied fallback."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/utils/dist/maybe.d.ts:unwrapOr:export declare function unwrapOr<T>(value: IMaybe<T>, fallback: NoInfer<T>): T;",
+          "guidance": [],
+          "usageScore": 30,
+          "configuration": [],
+          "fragment": "utils-index--unwrapOr"
         }
       ],
       "aliases": [
@@ -8426,6 +9168,16 @@
           "ownerFragment": "utils-scheduler--IWallClock"
         },
         {
+          "identity": "packages/utils/dist/number.d.ts:jitter:export declare function jitter(value: number, ratio: number, random?: () => number): number;",
+          "name": "jitter",
+          "signature": "export declare function jitter(value: number, ratio: number, random?: () => number): number;",
+          "source": "packages/utils/dist/number.d.ts",
+          "exportPath": ".",
+          "ownerExportPath": "./number",
+          "ownerModule": "number",
+          "ownerFragment": "utils-number--jitter"
+        },
+        {
           "identity": "packages/utils/dist/function.d.ts:MAX_NATIVE_RECURSION_DEPTH:export declare const MAX_NATIVE_RECURSION_DEPTH = 256;",
           "name": "MAX_NATIVE_RECURSION_DEPTH",
           "signature": "export declare const MAX_NATIVE_RECURSION_DEPTH = 256;",
@@ -8866,9 +9618,9 @@
           "ownerFragment": "utils-error--UtilsError"
         },
         {
-          "identity": "packages/utils/dist/error-code.d.ts:UtilsErrorCode:export declare const UtilsErrorCode: { /** * A caller passed an argument outside its documented domain: a non-finite or negative delay or * timeout, a non-positive limiter concurrency, a Base64 decode target with the wrong genuine * Uint8Array brand or decoded length, or a scheduler `delayMs`/`advance(ms)` that is not a finite * non-negative number or overflows the virtual clock/shared absolute deadline, or a deferred * callback/scheduler method that is not callable. The native `TypeError`/`RangeError` type is * kept; the caller must fix the argument, retrying the same value fails again. */ readonly invalidArgument: 'INVALID_ARGUMENT'; /** * `toError()` wrapped a thrown value that was not an `Error`. The original value stays on * `cause`; callers that need the raw value read it from there instead of the message. */ readonly nonErrorValue: 'NON_ERROR_VALUE'; /** * A host capability this package needs is missing or misbehaves: `structuredClone`, or for the * default scheduler `performance.now` (missing or returning a non-finite value) and * `setTimeout`/`clearTimeout`/`queueMicrotask`. The caller must run on a host that provides it or * inject its own implementation (for example a custom `IScheduler`). */ readonly envUnsupported: 'ENV_UNSUPPORTED'; /** * A cooperative operation observed its abort signal (`UtilsAbortError`). The abort reason stays * on `cause`; callers treat it as cancellation, not as a failure to retry. */ readonly aborted: 'ABORTED'; /** * `withTimeout`, `retry` total timeout or a similar deadline elapsed before the operation settled * (`UtilsTimeoutError`). The caller may retry with a longer budget or report the timeout. */ readonly deadlineExceeded: 'DEADLINE_EXCEEDED'; /** * A manual scheduler `advance()` flushed more than 10000 callbacks, which indicates a callback * that keeps rescheduling itself at the current time. Thrown as a top-level `RangeError`; the * test or simulation must stop the self-scheduling loop. */ readonly schedulerRunaway: 'SCHEDULER_RUNAWAY'; /** * `attachErrorIdentity()` found an existing `source`/`code` property with a different value and * no conflict hook. Identity is never overwritten; the caller must supply an `onConflict` policy * or leave the existing identity in place. */ readonly errorIdentityConflict: 'ERROR_IDENTITY_CONFLICT'; /** * An incoming serialized error tree or its plain data violates the configured field, scalar, * depth, count, or text-byte contract. Enforces the cross-realm error-chain contract; callers * correct the input or supply their boundary's owning strategy. */ readonly errorChainInvalid: 'ERROR_CHAIN_INVALID'; /** * An immutable snapshot could not be produced because the host's structured clone rejected the * value (functions, symbols, host objects). The caller must pass cloneable data. */ readonly cloneUnsupported: 'CLONE_UNSUPPORTED'; /** * Byte or text decoding met malformed input at a reported offset. The caller must supply valid * input for the named encoding; the message carries the failing offset. */ readonly invalidEncoding: 'INVALID_ENCODING'; /** * `run()` was called on a concurrency limiter after `close()`/`dispose()`. The limiter accepts no * new work; the caller must create a new limiter. */ readonly limiterClosed: 'LIMITER_CLOSED'; /** * A non-reentrant operation was called from inside itself: a guarded function, a collector drain, * or a manual scheduler `advance()` called from one of its own callbacks. The outer call * continues unchanged; the caller must move the nested call outside the running operation. */ readonly reentrantCall: 'REENTRANT_CALL'; /** * A config value, root, patch or key has a shape the config model does not support (non-plain * records, symbol keys, values not owned by the config). The caller must pass plain owned data. */ readonly configUnsupported: 'CONFIG_UNSUPPORTED'; /** * A mutation was attempted on a readonly config view. The caller must derive a new config through * the documented merge/patch API instead of mutating the view. */ readonly configReadonly: 'CONFIG_READONLY'; /** * Config sources, profiles or ownership metadata disagree (different profiles, a delete where it * is not valid, conflicting ownership). The caller must reconcile the sources before merging. */ readonly configConflict: 'CONFIG_CONFLICT'; /** * A config graph exceeded a configured bound (`maxKeys`, `maxDepth`, `maxNodes`) or a limit * option was itself invalid. The caller must shrink the input or raise the bound deliberately. */ readonly configLimitExceeded: 'CONFIG_LIMIT_EXCEEDED'; /** * A config path or segment is malformed or dangerous (prototype keys, invalid length or segment). * The caller must pass a safe, well-formed path. */ readonly configPathInvalid: 'CONFIG_PATH_INVALID'; /** * `ConfigOwner.from()` received a non-string or text that is not valid JSON. The parser's native * `SyntaxError` stays on `cause`; the caller must fix the source text. */ readonly configParseFailed: 'CONFIG_PARSE_FAILED'; /** * `ConfigOwner.fromAsync()` observed a rejected source Promise or a throwing source factory. The * rejection stays on `cause`; the caller may retry the source or fall back to a default config. */ readonly configSourceFailed: 'CONFIG_SOURCE_FAILED'; /** * `ConfigOwner.require()` found no own value at the requested path. The caller must supply the * value in its config source or use `getOr()` with an explicit fallback. */ readonly configValueMissing: 'CONFIG_VALUE_MISSING'; /** * A `ConfigOwner` validator threw or returned `false` for a candidate snapshot. The previous * snapshot stays committed and the validator error stays on `cause`; the caller must correct the * rejected change. */ readonly configValidationFailed: 'CONFIG_VALIDATION_FAILED'; /** The supplied string or tuple cannot safely identify an object path. */ readonly objectPathInvalid: 'OBJECT_PATH_INVALID'; /** Template syntax, placeholder boundaries, or a resolved value cannot be formatted safely. */ readonly formatInvalid: 'FORMAT_INVALID'; /** Strict template formatting could not resolve one requested placeholder path. */ readonly formatValueMissing: 'FORMAT_VALUE_MISSING'; /** Intl rejected a locale, number-format option, currency, or numeric value. */ readonly numberFormatInvalid: 'NUMBER_FORMAT_INVALID'; };",
+          "identity": "packages/utils/dist/error-code.d.ts:UtilsErrorCode:export declare const UtilsErrorCode: { /** * A caller passed an argument outside its documented domain: a non-finite or negative delay or * timeout, a non-positive limiter concurrency, a Base64 decode target with the wrong genuine * Uint8Array brand or decoded length, or a scheduler `delayMs`/`advance(ms)` that is not a finite * non-negative number or overflows the virtual clock/shared absolute deadline, or a deferred * callback/scheduler method that is not callable. The native `TypeError`/`RangeError` type is * kept. Also covers jitter's non-finite/negative value, ratio or random result outside [0, 1], * and a throwing random callback (kept as cause). The caller must fix the argument; retrying the * same value fails again. */ readonly invalidArgument: 'INVALID_ARGUMENT'; /** * `toError()` wrapped a thrown value that was not an `Error`. The original value stays on * `cause`; callers that need the raw value read it from there instead of the message. */ readonly nonErrorValue: 'NON_ERROR_VALUE'; /** * A host capability this package needs is missing or misbehaves: `structuredClone`, or for the * default scheduler `performance.now` (missing or returning a non-finite value) and * `setTimeout`/`clearTimeout`/`queueMicrotask`. The caller must run on a host that provides it or * inject its own implementation (for example a custom `IScheduler`). */ readonly envUnsupported: 'ENV_UNSUPPORTED'; /** * A cooperative operation observed its abort signal (`UtilsAbortError`). The abort reason stays * on `cause`; callers treat it as cancellation, not as a failure to retry. */ readonly aborted: 'ABORTED'; /** * `withTimeout`, `retry` total timeout or a similar deadline elapsed before the operation settled * (`UtilsTimeoutError`). The caller may retry with a longer budget or report the timeout. */ readonly deadlineExceeded: 'DEADLINE_EXCEEDED'; /** * A manual scheduler `advance()` flushed more than 10000 callbacks, which indicates a callback * that keeps rescheduling itself at the current time. Thrown as a top-level `RangeError`; the * test or simulation must stop the self-scheduling loop. */ readonly schedulerRunaway: 'SCHEDULER_RUNAWAY'; /** * `attachErrorIdentity()` found an existing `source`/`code` property with a different value and * no conflict hook. Identity is never overwritten; the caller must supply an `onConflict` policy * or leave the existing identity in place. */ readonly errorIdentityConflict: 'ERROR_IDENTITY_CONFLICT'; /** * An incoming serialized error tree or its plain data violates the configured field, scalar, * depth, count, or text-byte contract. Enforces the cross-realm error-chain contract; callers * correct the input or supply their boundary's owning strategy. */ readonly errorChainInvalid: 'ERROR_CHAIN_INVALID'; /** * An immutable snapshot could not be produced because the host's structured clone rejected the * value (functions, symbols, host objects). The caller must pass cloneable data. */ readonly cloneUnsupported: 'CLONE_UNSUPPORTED'; /** * Byte or text decoding met malformed input at a reported offset. The caller must supply valid * input for the named encoding; the message carries the failing offset. */ readonly invalidEncoding: 'INVALID_ENCODING'; /** * `run()` was called on a concurrency limiter after `close()`/`dispose()`. The limiter accepts no * new work; the caller must create a new limiter. */ readonly limiterClosed: 'LIMITER_CLOSED'; /** * A non-reentrant operation was called from inside itself: a guarded function, a collector drain, * or a manual scheduler `advance()` called from one of its own callbacks. The outer call * continues unchanged; the caller must move the nested call outside the running operation. */ readonly reentrantCall: 'REENTRANT_CALL'; /** * A config value, root, patch or key has a shape the config model does not support (non-plain * records, symbol keys, values not owned by the config). The caller must pass plain owned data. */ readonly configUnsupported: 'CONFIG_UNSUPPORTED'; /** * A mutation was attempted on a readonly config view. The caller must derive a new config through * the documented merge/patch API instead of mutating the view. */ readonly configReadonly: 'CONFIG_READONLY'; /** * Config sources, profiles or ownership metadata disagree (different profiles, a delete where it * is not valid, conflicting ownership). The caller must reconcile the sources before merging. */ readonly configConflict: 'CONFIG_CONFLICT'; /** * A config graph exceeded a configured bound (`maxKeys`, `maxDepth`, `maxNodes`) or a limit * option was itself invalid. The caller must shrink the input or raise the bound deliberately. */ readonly configLimitExceeded: 'CONFIG_LIMIT_EXCEEDED'; /** * A config path or segment is malformed or dangerous (prototype keys, invalid length or segment). * The caller must pass a safe, well-formed path. */ readonly configPathInvalid: 'CONFIG_PATH_INVALID'; /** * `ConfigOwner.from()` received a non-string or text that is not valid JSON. The parser's native * `SyntaxError` stays on `cause`; the caller must fix the source text. */ readonly configParseFailed: 'CONFIG_PARSE_FAILED'; /** * `ConfigOwner.fromAsync()` observed a rejected source Promise or a throwing source factory. The * rejection stays on `cause`; the caller may retry the source or fall back to a default config. */ readonly configSourceFailed: 'CONFIG_SOURCE_FAILED'; /** * `ConfigOwner.require()` found no own value at the requested path. The caller must supply the * value in its config source or use `getOr()` with an explicit fallback. */ readonly configValueMissing: 'CONFIG_VALUE_MISSING'; /** * A `ConfigOwner` validator threw or returned `false` for a candidate snapshot. The previous * snapshot stays committed and the validator error stays on `cause`; the caller must correct the * rejected change. */ readonly configValidationFailed: 'CONFIG_VALIDATION_FAILED'; /** The supplied string or tuple cannot safely identify an object path. */ readonly objectPathInvalid: 'OBJECT_PATH_INVALID'; /** Template syntax, placeholder boundaries, or a resolved value cannot be formatted safely. */ readonly formatInvalid: 'FORMAT_INVALID'; /** Strict template formatting could not resolve one requested placeholder path. */ readonly formatValueMissing: 'FORMAT_VALUE_MISSING'; /** Intl rejected a locale, number-format option, currency, or numeric value. */ readonly numberFormatInvalid: 'NUMBER_FORMAT_INVALID'; };",
           "name": "UtilsErrorCode",
-          "signature": "export declare const UtilsErrorCode: { /** * A caller passed an argument outside its documented domain: a non-finite or negative delay or * timeout, a non-positive limiter concurrency, a Base64 decode target with the wrong genuine * Uint8Array brand or decoded length, or a scheduler `delayMs`/`advance(ms)` that is not a finite * non-negative number or overflows the virtual clock/shared absolute deadline, or a deferred * callback/scheduler method that is not callable. The native `TypeError`/`RangeError` type is * kept; the caller must fix the argument, retrying the same value fails again. */ readonly invalidArgument: 'INVALID_ARGUMENT'; /** * `toError()` wrapped a thrown value that was not an `Error`. The original value stays on * `cause`; callers that need the raw value read it from there instead of the message. */ readonly nonErrorValue: 'NON_ERROR_VALUE'; /** * A host capability this module needs is missing or misbehaves: `structuredClone`, or for the * default scheduler `performance.now` (missing or returning a non-finite value) and * `setTimeout`/`clearTimeout`/`queueMicrotask`. The caller must run on a host that provides it or * inject its own implementation (for example a custom `IScheduler`). */ readonly envUnsupported: 'ENV_UNSUPPORTED'; /** * A cooperative operation observed its abort signal (`UtilsAbortError`). The abort reason stays * on `cause`; callers treat it as cancellation, not as a failure to retry. */ readonly aborted: 'ABORTED'; /** * `withTimeout`, `retry` total timeout or a similar deadline elapsed before the operation settled * (`UtilsTimeoutError`). The caller may retry with a longer budget or report the timeout. */ readonly deadlineExceeded: 'DEADLINE_EXCEEDED'; /** * A manual scheduler `advance()` flushed more than 10000 callbacks, which indicates a callback * that keeps rescheduling itself at the current time. Thrown as a top-level `RangeError`; the * test or simulation must stop the self-scheduling loop. */ readonly schedulerRunaway: 'SCHEDULER_RUNAWAY'; /** * `attachErrorIdentity()` found an existing `source`/`code` property with a different value and * no conflict hook. Identity is never overwritten; the caller must supply an `onConflict` policy * or leave the existing identity in place. */ readonly errorIdentityConflict: 'ERROR_IDENTITY_CONFLICT'; /** * An incoming serialized error tree or its plain data violates the configured field, scalar, * depth, count, or text-byte contract. Enforces the cross-realm error-chain contract; callers * correct the input or supply their boundary's owning strategy. */ readonly errorChainInvalid: 'ERROR_CHAIN_INVALID'; /** * An immutable snapshot could not be produced because the host's structured clone rejected the * value (functions, symbols, host objects). The caller must pass cloneable data. */ readonly cloneUnsupported: 'CLONE_UNSUPPORTED'; /** * Byte or text decoding met malformed input at a reported offset. The caller must supply valid * input for the named encoding; the message carries the failing offset. */ readonly invalidEncoding: 'INVALID_ENCODING'; /** * `run()` was called on a concurrency limiter after `close()`/`dispose()`. The limiter accepts no * new work; the caller must create a new limiter. */ readonly limiterClosed: 'LIMITER_CLOSED'; /** * A non-reentrant operation was called from inside itself: a guarded function, a collector drain, * or a manual scheduler `advance()` called from one of its own callbacks. The outer call * continues unchanged; the caller must move the nested call outside the running operation. */ readonly reentrantCall: 'REENTRANT_CALL'; /** * A config value, root, patch or key has a shape the config model does not support (non-plain * records, symbol keys, values not owned by the config). The caller must pass plain owned data. */ readonly configUnsupported: 'CONFIG_UNSUPPORTED'; /** * A mutation was attempted on a readonly config view. The caller must derive a new config through * the documented merge/patch API instead of mutating the view. */ readonly configReadonly: 'CONFIG_READONLY'; /** * Config sources, profiles or ownership metadata disagree (different profiles, a delete where it * is not valid, conflicting ownership). The caller must reconcile the sources before merging. */ readonly configConflict: 'CONFIG_CONFLICT'; /** * A config graph exceeded a configured bound (`maxKeys`, `maxDepth`, `maxNodes`) or a limit * option was itself invalid. The caller must shrink the input or raise the bound deliberately. */ readonly configLimitExceeded: 'CONFIG_LIMIT_EXCEEDED'; /** * A config path or segment is malformed or dangerous (prototype keys, invalid length or segment). * The caller must pass a safe, well-formed path. */ readonly configPathInvalid: 'CONFIG_PATH_INVALID'; /** * `ConfigOwner.from()` received a non-string or text that is not valid JSON. The parser's native * `SyntaxError` stays on `cause`; the caller must fix the source text. */ readonly configParseFailed: 'CONFIG_PARSE_FAILED'; /** * `ConfigOwner.fromAsync()` observed a rejected source Promise or a throwing source factory. The * rejection stays on `cause`; the caller may retry the source or fall back to a default config. */ readonly configSourceFailed: 'CONFIG_SOURCE_FAILED'; /** * `ConfigOwner.require()` found no own value at the requested path. The caller must supply the * value in its config source or use `getOr()` with an explicit fallback. */ readonly configValueMissing: 'CONFIG_VALUE_MISSING'; /** * A `ConfigOwner` validator threw or returned `false` for a candidate snapshot. The previous * snapshot stays committed and the validator error stays on `cause`; the caller must correct the * rejected change. */ readonly configValidationFailed: 'CONFIG_VALIDATION_FAILED'; /** The supplied string or tuple cannot safely identify an object path. */ readonly objectPathInvalid: 'OBJECT_PATH_INVALID'; /** Template syntax, placeholder boundaries, or a resolved value cannot be formatted safely. */ readonly formatInvalid: 'FORMAT_INVALID'; /** Strict template formatting could not resolve one requested placeholder path. */ readonly formatValueMissing: 'FORMAT_VALUE_MISSING'; /** Intl rejected a locale, number-format option, currency, or numeric value. */ readonly numberFormatInvalid: 'NUMBER_FORMAT_INVALID'; };",
+          "signature": "export declare const UtilsErrorCode: { /** * A caller passed an argument outside its documented domain: a non-finite or negative delay or * timeout, a non-positive limiter concurrency, a Base64 decode target with the wrong genuine * Uint8Array brand or decoded length, or a scheduler `delayMs`/`advance(ms)` that is not a finite * non-negative number or overflows the virtual clock/shared absolute deadline, or a deferred * callback/scheduler method that is not callable. The native `TypeError`/`RangeError` type is * kept. Also covers jitter's non-finite/negative value, ratio or random result outside [0, 1], * and a throwing random callback (kept as cause). The caller must fix the argument; retrying the * same value fails again. */ readonly invalidArgument: 'INVALID_ARGUMENT'; /** * `toError()` wrapped a thrown value that was not an `Error`. The original value stays on * `cause`; callers that need the raw value read it from there instead of the message. */ readonly nonErrorValue: 'NON_ERROR_VALUE'; /** * A host capability this module needs is missing or misbehaves: `structuredClone`, or for the * default scheduler `performance.now` (missing or returning a non-finite value) and * `setTimeout`/`clearTimeout`/`queueMicrotask`. The caller must run on a host that provides it or * inject its own implementation (for example a custom `IScheduler`). */ readonly envUnsupported: 'ENV_UNSUPPORTED'; /** * A cooperative operation observed its abort signal (`UtilsAbortError`). The abort reason stays * on `cause`; callers treat it as cancellation, not as a failure to retry. */ readonly aborted: 'ABORTED'; /** * `withTimeout`, `retry` total timeout or a similar deadline elapsed before the operation settled * (`UtilsTimeoutError`). The caller may retry with a longer budget or report the timeout. */ readonly deadlineExceeded: 'DEADLINE_EXCEEDED'; /** * A manual scheduler `advance()` flushed more than 10000 callbacks, which indicates a callback * that keeps rescheduling itself at the current time. Thrown as a top-level `RangeError`; the * test or simulation must stop the self-scheduling loop. */ readonly schedulerRunaway: 'SCHEDULER_RUNAWAY'; /** * `attachErrorIdentity()` found an existing `source`/`code` property with a different value and * no conflict hook. Identity is never overwritten; the caller must supply an `onConflict` policy * or leave the existing identity in place. */ readonly errorIdentityConflict: 'ERROR_IDENTITY_CONFLICT'; /** * An incoming serialized error tree or its plain data violates the configured field, scalar, * depth, count, or text-byte contract. Enforces the cross-realm error-chain contract; callers * correct the input or supply their boundary's owning strategy. */ readonly errorChainInvalid: 'ERROR_CHAIN_INVALID'; /** * An immutable snapshot could not be produced because the host's structured clone rejected the * value (functions, symbols, host objects). The caller must pass cloneable data. */ readonly cloneUnsupported: 'CLONE_UNSUPPORTED'; /** * Byte or text decoding met malformed input at a reported offset. The caller must supply valid * input for the named encoding; the message carries the failing offset. */ readonly invalidEncoding: 'INVALID_ENCODING'; /** * `run()` was called on a concurrency limiter after `close()`/`dispose()`. The limiter accepts no * new work; the caller must create a new limiter. */ readonly limiterClosed: 'LIMITER_CLOSED'; /** * A non-reentrant operation was called from inside itself: a guarded function, a collector drain, * or a manual scheduler `advance()` called from one of its own callbacks. The outer call * continues unchanged; the caller must move the nested call outside the running operation. */ readonly reentrantCall: 'REENTRANT_CALL'; /** * A config value, root, patch or key has a shape the config model does not support (non-plain * records, symbol keys, values not owned by the config). The caller must pass plain owned data. */ readonly configUnsupported: 'CONFIG_UNSUPPORTED'; /** * A mutation was attempted on a readonly config view. The caller must derive a new config through * the documented merge/patch API instead of mutating the view. */ readonly configReadonly: 'CONFIG_READONLY'; /** * Config sources, profiles or ownership metadata disagree (different profiles, a delete where it * is not valid, conflicting ownership). The caller must reconcile the sources before merging. */ readonly configConflict: 'CONFIG_CONFLICT'; /** * A config graph exceeded a configured bound (`maxKeys`, `maxDepth`, `maxNodes`) or a limit * option was itself invalid. The caller must shrink the input or raise the bound deliberately. */ readonly configLimitExceeded: 'CONFIG_LIMIT_EXCEEDED'; /** * A config path or segment is malformed or dangerous (prototype keys, invalid length or segment). * The caller must pass a safe, well-formed path. */ readonly configPathInvalid: 'CONFIG_PATH_INVALID'; /** * `ConfigOwner.from()` received a non-string or text that is not valid JSON. The parser's native * `SyntaxError` stays on `cause`; the caller must fix the source text. */ readonly configParseFailed: 'CONFIG_PARSE_FAILED'; /** * `ConfigOwner.fromAsync()` observed a rejected source Promise or a throwing source factory. The * rejection stays on `cause`; the caller may retry the source or fall back to a default config. */ readonly configSourceFailed: 'CONFIG_SOURCE_FAILED'; /** * `ConfigOwner.require()` found no own value at the requested path. The caller must supply the * value in its config source or use `getOr()` with an explicit fallback. */ readonly configValueMissing: 'CONFIG_VALUE_MISSING'; /** * A `ConfigOwner` validator threw or returned `false` for a candidate snapshot. The previous * snapshot stays committed and the validator error stays on `cause`; the caller must correct the * rejected change. */ readonly configValidationFailed: 'CONFIG_VALIDATION_FAILED'; /** The supplied string or tuple cannot safely identify an object path. */ readonly objectPathInvalid: 'OBJECT_PATH_INVALID'; /** Template syntax, placeholder boundaries, or a resolved value cannot be formatted safely. */ readonly formatInvalid: 'FORMAT_INVALID'; /** Strict template formatting could not resolve one requested placeholder path. */ readonly formatValueMissing: 'FORMAT_VALUE_MISSING'; /** Intl rejected a locale, number-format option, currency, or numeric value. */ readonly numberFormatInvalid: 'NUMBER_FORMAT_INVALID'; };",
           "source": "packages/utils/dist/error-code.d.ts",
           "exportPath": ".",
           "ownerExportPath": "./error",
@@ -19866,7 +20618,7 @@
           "name": "IUtilsErrorCode",
           "kind": "type",
           "signature": "export type IUtilsErrorCode = (typeof UtilsErrorCode)[keyof typeof UtilsErrorCode];",
-          "declarationLine": 129,
+          "declarationLine": 131,
           "source": "packages/utils/dist/error-code.d.ts",
           "purpose": "Union of `UtilsErrorCode` values.",
           "core": "Union of `UtilsErrorCode` values.",
@@ -20906,7 +21658,7 @@
               ]
             }
           ],
-          "usageScore": 24,
+          "usageScore": 30,
           "configuration": [
             {
               "name": "message",
@@ -21615,7 +22367,7 @@
         {
           "name": "UtilsErrorCode",
           "kind": "const",
-          "signature": "export declare const UtilsErrorCode: { /** * A caller passed an argument outside its documented domain: a non-finite or negative delay or * timeout, a non-positive limiter concurrency, a Base64 decode target with the wrong genuine * Uint8Array brand or decoded length, or a scheduler `delayMs`/`advance(ms)` that is not a finite * non-negative number or overflows the virtual clock/shared absolute deadline, or a deferred * callback/scheduler method that is not callable. The native `TypeError`/`RangeError` type is * kept; the caller must fix the argument, retrying the same value fails again. */ readonly invalidArgument: 'INVALID_ARGUMENT'; /** * `toError()` wrapped a thrown value that was not an `Error`. The original value stays on * `cause`; callers that need the raw value read it from there instead of the message. */ readonly nonErrorValue: 'NON_ERROR_VALUE'; /** * A host capability this module needs is missing or misbehaves: `structuredClone`, or for the * default scheduler `performance.now` (missing or returning a non-finite value) and * `setTimeout`/`clearTimeout`/`queueMicrotask`. The caller must run on a host that provides it or * inject its own implementation (for example a custom `IScheduler`). */ readonly envUnsupported: 'ENV_UNSUPPORTED'; /** * A cooperative operation observed its abort signal (`UtilsAbortError`). The abort reason stays * on `cause`; callers treat it as cancellation, not as a failure to retry. */ readonly aborted: 'ABORTED'; /** * `withTimeout`, `retry` total timeout or a similar deadline elapsed before the operation settled * (`UtilsTimeoutError`). The caller may retry with a longer budget or report the timeout. */ readonly deadlineExceeded: 'DEADLINE_EXCEEDED'; /** * A manual scheduler `advance()` flushed more than 10000 callbacks, which indicates a callback * that keeps rescheduling itself at the current time. Thrown as a top-level `RangeError`; the * test or simulation must stop the self-scheduling loop. */ readonly schedulerRunaway: 'SCHEDULER_RUNAWAY'; /** * `attachErrorIdentity()` found an existing `source`/`code` property with a different value and * no conflict hook. Identity is never overwritten; the caller must supply an `onConflict` policy * or leave the existing identity in place. */ readonly errorIdentityConflict: 'ERROR_IDENTITY_CONFLICT'; /** * An incoming serialized error tree or its plain data violates the configured field, scalar, * depth, count, or text-byte contract. Enforces the cross-realm error-chain contract; callers * correct the input or supply their boundary's owning strategy. */ readonly errorChainInvalid: 'ERROR_CHAIN_INVALID'; /** * An immutable snapshot could not be produced because the host's structured clone rejected the * value (functions, symbols, host objects). The caller must pass cloneable data. */ readonly cloneUnsupported: 'CLONE_UNSUPPORTED'; /** * Byte or text decoding met malformed input at a reported offset. The caller must supply valid * input for the named encoding; the message carries the failing offset. */ readonly invalidEncoding: 'INVALID_ENCODING'; /** * `run()` was called on a concurrency limiter after `close()`/`dispose()`. The limiter accepts no * new work; the caller must create a new limiter. */ readonly limiterClosed: 'LIMITER_CLOSED'; /** * A non-reentrant operation was called from inside itself: a guarded function, a collector drain, * or a manual scheduler `advance()` called from one of its own callbacks. The outer call * continues unchanged; the caller must move the nested call outside the running operation. */ readonly reentrantCall: 'REENTRANT_CALL'; /** * A config value, root, patch or key has a shape the config model does not support (non-plain * records, symbol keys, values not owned by the config). The caller must pass plain owned data. */ readonly configUnsupported: 'CONFIG_UNSUPPORTED'; /** * A mutation was attempted on a readonly config view. The caller must derive a new config through * the documented merge/patch API instead of mutating the view. */ readonly configReadonly: 'CONFIG_READONLY'; /** * Config sources, profiles or ownership metadata disagree (different profiles, a delete where it * is not valid, conflicting ownership). The caller must reconcile the sources before merging. */ readonly configConflict: 'CONFIG_CONFLICT'; /** * A config graph exceeded a configured bound (`maxKeys`, `maxDepth`, `maxNodes`) or a limit * option was itself invalid. The caller must shrink the input or raise the bound deliberately. */ readonly configLimitExceeded: 'CONFIG_LIMIT_EXCEEDED'; /** * A config path or segment is malformed or dangerous (prototype keys, invalid length or segment). * The caller must pass a safe, well-formed path. */ readonly configPathInvalid: 'CONFIG_PATH_INVALID'; /** * `ConfigOwner.from()` received a non-string or text that is not valid JSON. The parser's native * `SyntaxError` stays on `cause`; the caller must fix the source text. */ readonly configParseFailed: 'CONFIG_PARSE_FAILED'; /** * `ConfigOwner.fromAsync()` observed a rejected source Promise or a throwing source factory. The * rejection stays on `cause`; the caller may retry the source or fall back to a default config. */ readonly configSourceFailed: 'CONFIG_SOURCE_FAILED'; /** * `ConfigOwner.require()` found no own value at the requested path. The caller must supply the * value in its config source or use `getOr()` with an explicit fallback. */ readonly configValueMissing: 'CONFIG_VALUE_MISSING'; /** * A `ConfigOwner` validator threw or returned `false` for a candidate snapshot. The previous * snapshot stays committed and the validator error stays on `cause`; the caller must correct the * rejected change. */ readonly configValidationFailed: 'CONFIG_VALIDATION_FAILED'; /** The supplied string or tuple cannot safely identify an object path. */ readonly objectPathInvalid: 'OBJECT_PATH_INVALID'; /** Template syntax, placeholder boundaries, or a resolved value cannot be formatted safely. */ readonly formatInvalid: 'FORMAT_INVALID'; /** Strict template formatting could not resolve one requested placeholder path. */ readonly formatValueMissing: 'FORMAT_VALUE_MISSING'; /** Intl rejected a locale, number-format option, currency, or numeric value. */ readonly numberFormatInvalid: 'NUMBER_FORMAT_INVALID'; };",
+          "signature": "export declare const UtilsErrorCode: { /** * A caller passed an argument outside its documented domain: a non-finite or negative delay or * timeout, a non-positive limiter concurrency, a Base64 decode target with the wrong genuine * Uint8Array brand or decoded length, or a scheduler `delayMs`/`advance(ms)` that is not a finite * non-negative number or overflows the virtual clock/shared absolute deadline, or a deferred * callback/scheduler method that is not callable. The native `TypeError`/`RangeError` type is * kept. Also covers jitter's non-finite/negative value, ratio or random result outside [0, 1], * and a throwing random callback (kept as cause). The caller must fix the argument; retrying the * same value fails again. */ readonly invalidArgument: 'INVALID_ARGUMENT'; /** * `toError()` wrapped a thrown value that was not an `Error`. The original value stays on * `cause`; callers that need the raw value read it from there instead of the message. */ readonly nonErrorValue: 'NON_ERROR_VALUE'; /** * A host capability this module needs is missing or misbehaves: `structuredClone`, or for the * default scheduler `performance.now` (missing or returning a non-finite value) and * `setTimeout`/`clearTimeout`/`queueMicrotask`. The caller must run on a host that provides it or * inject its own implementation (for example a custom `IScheduler`). */ readonly envUnsupported: 'ENV_UNSUPPORTED'; /** * A cooperative operation observed its abort signal (`UtilsAbortError`). The abort reason stays * on `cause`; callers treat it as cancellation, not as a failure to retry. */ readonly aborted: 'ABORTED'; /** * `withTimeout`, `retry` total timeout or a similar deadline elapsed before the operation settled * (`UtilsTimeoutError`). The caller may retry with a longer budget or report the timeout. */ readonly deadlineExceeded: 'DEADLINE_EXCEEDED'; /** * A manual scheduler `advance()` flushed more than 10000 callbacks, which indicates a callback * that keeps rescheduling itself at the current time. Thrown as a top-level `RangeError`; the * test or simulation must stop the self-scheduling loop. */ readonly schedulerRunaway: 'SCHEDULER_RUNAWAY'; /** * `attachErrorIdentity()` found an existing `source`/`code` property with a different value and * no conflict hook. Identity is never overwritten; the caller must supply an `onConflict` policy * or leave the existing identity in place. */ readonly errorIdentityConflict: 'ERROR_IDENTITY_CONFLICT'; /** * An incoming serialized error tree or its plain data violates the configured field, scalar, * depth, count, or text-byte contract. Enforces the cross-realm error-chain contract; callers * correct the input or supply their boundary's owning strategy. */ readonly errorChainInvalid: 'ERROR_CHAIN_INVALID'; /** * An immutable snapshot could not be produced because the host's structured clone rejected the * value (functions, symbols, host objects). The caller must pass cloneable data. */ readonly cloneUnsupported: 'CLONE_UNSUPPORTED'; /** * Byte or text decoding met malformed input at a reported offset. The caller must supply valid * input for the named encoding; the message carries the failing offset. */ readonly invalidEncoding: 'INVALID_ENCODING'; /** * `run()` was called on a concurrency limiter after `close()`/`dispose()`. The limiter accepts no * new work; the caller must create a new limiter. */ readonly limiterClosed: 'LIMITER_CLOSED'; /** * A non-reentrant operation was called from inside itself: a guarded function, a collector drain, * or a manual scheduler `advance()` called from one of its own callbacks. The outer call * continues unchanged; the caller must move the nested call outside the running operation. */ readonly reentrantCall: 'REENTRANT_CALL'; /** * A config value, root, patch or key has a shape the config model does not support (non-plain * records, symbol keys, values not owned by the config). The caller must pass plain owned data. */ readonly configUnsupported: 'CONFIG_UNSUPPORTED'; /** * A mutation was attempted on a readonly config view. The caller must derive a new config through * the documented merge/patch API instead of mutating the view. */ readonly configReadonly: 'CONFIG_READONLY'; /** * Config sources, profiles or ownership metadata disagree (different profiles, a delete where it * is not valid, conflicting ownership). The caller must reconcile the sources before merging. */ readonly configConflict: 'CONFIG_CONFLICT'; /** * A config graph exceeded a configured bound (`maxKeys`, `maxDepth`, `maxNodes`) or a limit * option was itself invalid. The caller must shrink the input or raise the bound deliberately. */ readonly configLimitExceeded: 'CONFIG_LIMIT_EXCEEDED'; /** * A config path or segment is malformed or dangerous (prototype keys, invalid length or segment). * The caller must pass a safe, well-formed path. */ readonly configPathInvalid: 'CONFIG_PATH_INVALID'; /** * `ConfigOwner.from()` received a non-string or text that is not valid JSON. The parser's native * `SyntaxError` stays on `cause`; the caller must fix the source text. */ readonly configParseFailed: 'CONFIG_PARSE_FAILED'; /** * `ConfigOwner.fromAsync()` observed a rejected source Promise or a throwing source factory. The * rejection stays on `cause`; the caller may retry the source or fall back to a default config. */ readonly configSourceFailed: 'CONFIG_SOURCE_FAILED'; /** * `ConfigOwner.require()` found no own value at the requested path. The caller must supply the * value in its config source or use `getOr()` with an explicit fallback. */ readonly configValueMissing: 'CONFIG_VALUE_MISSING'; /** * A `ConfigOwner` validator threw or returned `false` for a candidate snapshot. The previous * snapshot stays committed and the validator error stays on `cause`; the caller must correct the * rejected change. */ readonly configValidationFailed: 'CONFIG_VALIDATION_FAILED'; /** The supplied string or tuple cannot safely identify an object path. */ readonly objectPathInvalid: 'OBJECT_PATH_INVALID'; /** Template syntax, placeholder boundaries, or a resolved value cannot be formatted safely. */ readonly formatInvalid: 'FORMAT_INVALID'; /** Strict template formatting could not resolve one requested placeholder path. */ readonly formatValueMissing: 'FORMAT_VALUE_MISSING'; /** Intl rejected a locale, number-format option, currency, or numeric value. */ readonly numberFormatInvalid: 'NUMBER_FORMAT_INVALID'; };",
           "declarationLine": 2,
           "source": "packages/utils/dist/error-code.d.ts",
           "purpose": "Table of the stable error codes of this package (`source: \"@migaia/utils\"`); compare `error.code` with these keys instead of matching messages.",
@@ -21635,7 +22387,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly invalidArgument: 'INVALID_ARGUMENT';",
-              "description": "A caller passed an argument outside its documented domain: a non-finite or negative delay or * timeout, a non-positive limiter concurrency, a Base64 decode target with the wrong genuine * Uint8Array brand or decoded length, or a scheduler `delayMs`/`advance(ms)` that is not a finite * non-negative number or overflows the virtual clock/shared absolute deadline, or a deferred * callback/scheduler method that is not callable. The native `TypeError`/`RangeError` type is * kept; the caller must fix the argument, retrying the same value fails again.",
+              "description": "A caller passed an argument outside its documented domain: a non-finite or negative delay or * timeout, a non-positive limiter concurrency, a Base64 decode target with the wrong genuine * Uint8Array brand or decoded length, or a scheduler `delayMs`/`advance(ms)` that is not a finite * non-negative number or overflows the virtual clock/shared absolute deadline, or a deferred * callback/scheduler method that is not callable. The native `TypeError`/`RangeError` type is * kept. Also covers jitter's non-finite/negative value, ratio or random result outside [0, 1], * and a throwing random callback (kept as cause). The caller must fix the argument; retrying the * same value fails again.",
               "parameterDetails": [],
               "returns": "'INVALID_ARGUMENT'"
             },
@@ -21860,7 +22612,7 @@
           "aliasOf": "UtilsErrorCode",
           "exportPath": "./error",
           "overloadSignatures": [
-            "export declare const UtilsErrorCode: { /** * A caller passed an argument outside its documented domain: a non-finite or negative delay or * timeout, a non-positive limiter concurrency, a Base64 decode target with the wrong genuine * Uint8Array brand or decoded length, or a scheduler `delayMs`/`advance(ms)` that is not a finite * non-negative number or overflows the virtual clock/shared absolute deadline, or a deferred * callback/scheduler method that is not callable. The native `TypeError`/`RangeError` type is * kept; the caller must fix the argument, retrying the same value fails again. */ readonly invalidArgument: 'INVALID_ARGUMENT'; /** * `toError()` wrapped a thrown value that was not an `Error`. The original value stays on * `cause`; callers that need the raw value read it from there instead of the message. */ readonly nonErrorValue: 'NON_ERROR_VALUE'; /** * A host capability this module needs is missing or misbehaves: `structuredClone`, or for the * default scheduler `performance.now` (missing or returning a non-finite value) and * `setTimeout`/`clearTimeout`/`queueMicrotask`. The caller must run on a host that provides it or * inject its own implementation (for example a custom `IScheduler`). */ readonly envUnsupported: 'ENV_UNSUPPORTED'; /** * A cooperative operation observed its abort signal (`UtilsAbortError`). The abort reason stays * on `cause`; callers treat it as cancellation, not as a failure to retry. */ readonly aborted: 'ABORTED'; /** * `withTimeout`, `retry` total timeout or a similar deadline elapsed before the operation settled * (`UtilsTimeoutError`). The caller may retry with a longer budget or report the timeout. */ readonly deadlineExceeded: 'DEADLINE_EXCEEDED'; /** * A manual scheduler `advance()` flushed more than 10000 callbacks, which indicates a callback * that keeps rescheduling itself at the current time. Thrown as a top-level `RangeError`; the * test or simulation must stop the self-scheduling loop. */ readonly schedulerRunaway: 'SCHEDULER_RUNAWAY'; /** * `attachErrorIdentity()` found an existing `source`/`code` property with a different value and * no conflict hook. Identity is never overwritten; the caller must supply an `onConflict` policy * or leave the existing identity in place. */ readonly errorIdentityConflict: 'ERROR_IDENTITY_CONFLICT'; /** * An incoming serialized error tree or its plain data violates the configured field, scalar, * depth, count, or text-byte contract. Enforces the cross-realm error-chain contract; callers * correct the input or supply their boundary's owning strategy. */ readonly errorChainInvalid: 'ERROR_CHAIN_INVALID'; /** * An immutable snapshot could not be produced because the host's structured clone rejected the * value (functions, symbols, host objects). The caller must pass cloneable data. */ readonly cloneUnsupported: 'CLONE_UNSUPPORTED'; /** * Byte or text decoding met malformed input at a reported offset. The caller must supply valid * input for the named encoding; the message carries the failing offset. */ readonly invalidEncoding: 'INVALID_ENCODING'; /** * `run()` was called on a concurrency limiter after `close()`/`dispose()`. The limiter accepts no * new work; the caller must create a new limiter. */ readonly limiterClosed: 'LIMITER_CLOSED'; /** * A non-reentrant operation was called from inside itself: a guarded function, a collector drain, * or a manual scheduler `advance()` called from one of its own callbacks. The outer call * continues unchanged; the caller must move the nested call outside the running operation. */ readonly reentrantCall: 'REENTRANT_CALL'; /** * A config value, root, patch or key has a shape the config model does not support (non-plain * records, symbol keys, values not owned by the config). The caller must pass plain owned data. */ readonly configUnsupported: 'CONFIG_UNSUPPORTED'; /** * A mutation was attempted on a readonly config view. The caller must derive a new config through * the documented merge/patch API instead of mutating the view. */ readonly configReadonly: 'CONFIG_READONLY'; /** * Config sources, profiles or ownership metadata disagree (different profiles, a delete where it * is not valid, conflicting ownership). The caller must reconcile the sources before merging. */ readonly configConflict: 'CONFIG_CONFLICT'; /** * A config graph exceeded a configured bound (`maxKeys`, `maxDepth`, `maxNodes`) or a limit * option was itself invalid. The caller must shrink the input or raise the bound deliberately. */ readonly configLimitExceeded: 'CONFIG_LIMIT_EXCEEDED'; /** * A config path or segment is malformed or dangerous (prototype keys, invalid length or segment). * The caller must pass a safe, well-formed path. */ readonly configPathInvalid: 'CONFIG_PATH_INVALID'; /** * `ConfigOwner.from()` received a non-string or text that is not valid JSON. The parser's native * `SyntaxError` stays on `cause`; the caller must fix the source text. */ readonly configParseFailed: 'CONFIG_PARSE_FAILED'; /** * `ConfigOwner.fromAsync()` observed a rejected source Promise or a throwing source factory. The * rejection stays on `cause`; the caller may retry the source or fall back to a default config. */ readonly configSourceFailed: 'CONFIG_SOURCE_FAILED'; /** * `ConfigOwner.require()` found no own value at the requested path. The caller must supply the * value in its config source or use `getOr()` with an explicit fallback. */ readonly configValueMissing: 'CONFIG_VALUE_MISSING'; /** * A `ConfigOwner` validator threw or returned `false` for a candidate snapshot. The previous * snapshot stays committed and the validator error stays on `cause`; the caller must correct the * rejected change. */ readonly configValidationFailed: 'CONFIG_VALIDATION_FAILED'; /** The supplied string or tuple cannot safely identify an object path. */ readonly objectPathInvalid: 'OBJECT_PATH_INVALID'; /** Template syntax, placeholder boundaries, or a resolved value cannot be formatted safely. */ readonly formatInvalid: 'FORMAT_INVALID'; /** Strict template formatting could not resolve one requested placeholder path. */ readonly formatValueMissing: 'FORMAT_VALUE_MISSING'; /** Intl rejected a locale, number-format option, currency, or numeric value. */ readonly numberFormatInvalid: 'NUMBER_FORMAT_INVALID'; };"
+            "export declare const UtilsErrorCode: { /** * A caller passed an argument outside its documented domain: a non-finite or negative delay or * timeout, a non-positive limiter concurrency, a Base64 decode target with the wrong genuine * Uint8Array brand or decoded length, or a scheduler `delayMs`/`advance(ms)` that is not a finite * non-negative number or overflows the virtual clock/shared absolute deadline, or a deferred * callback/scheduler method that is not callable. The native `TypeError`/`RangeError` type is * kept. Also covers jitter's non-finite/negative value, ratio or random result outside [0, 1], * and a throwing random callback (kept as cause). The caller must fix the argument; retrying the * same value fails again. */ readonly invalidArgument: 'INVALID_ARGUMENT'; /** * `toError()` wrapped a thrown value that was not an `Error`. The original value stays on * `cause`; callers that need the raw value read it from there instead of the message. */ readonly nonErrorValue: 'NON_ERROR_VALUE'; /** * A host capability this module needs is missing or misbehaves: `structuredClone`, or for the * default scheduler `performance.now` (missing or returning a non-finite value) and * `setTimeout`/`clearTimeout`/`queueMicrotask`. The caller must run on a host that provides it or * inject its own implementation (for example a custom `IScheduler`). */ readonly envUnsupported: 'ENV_UNSUPPORTED'; /** * A cooperative operation observed its abort signal (`UtilsAbortError`). The abort reason stays * on `cause`; callers treat it as cancellation, not as a failure to retry. */ readonly aborted: 'ABORTED'; /** * `withTimeout`, `retry` total timeout or a similar deadline elapsed before the operation settled * (`UtilsTimeoutError`). The caller may retry with a longer budget or report the timeout. */ readonly deadlineExceeded: 'DEADLINE_EXCEEDED'; /** * A manual scheduler `advance()` flushed more than 10000 callbacks, which indicates a callback * that keeps rescheduling itself at the current time. Thrown as a top-level `RangeError`; the * test or simulation must stop the self-scheduling loop. */ readonly schedulerRunaway: 'SCHEDULER_RUNAWAY'; /** * `attachErrorIdentity()` found an existing `source`/`code` property with a different value and * no conflict hook. Identity is never overwritten; the caller must supply an `onConflict` policy * or leave the existing identity in place. */ readonly errorIdentityConflict: 'ERROR_IDENTITY_CONFLICT'; /** * An incoming serialized error tree or its plain data violates the configured field, scalar, * depth, count, or text-byte contract. Enforces the cross-realm error-chain contract; callers * correct the input or supply their boundary's owning strategy. */ readonly errorChainInvalid: 'ERROR_CHAIN_INVALID'; /** * An immutable snapshot could not be produced because the host's structured clone rejected the * value (functions, symbols, host objects). The caller must pass cloneable data. */ readonly cloneUnsupported: 'CLONE_UNSUPPORTED'; /** * Byte or text decoding met malformed input at a reported offset. The caller must supply valid * input for the named encoding; the message carries the failing offset. */ readonly invalidEncoding: 'INVALID_ENCODING'; /** * `run()` was called on a concurrency limiter after `close()`/`dispose()`. The limiter accepts no * new work; the caller must create a new limiter. */ readonly limiterClosed: 'LIMITER_CLOSED'; /** * A non-reentrant operation was called from inside itself: a guarded function, a collector drain, * or a manual scheduler `advance()` called from one of its own callbacks. The outer call * continues unchanged; the caller must move the nested call outside the running operation. */ readonly reentrantCall: 'REENTRANT_CALL'; /** * A config value, root, patch or key has a shape the config model does not support (non-plain * records, symbol keys, values not owned by the config). The caller must pass plain owned data. */ readonly configUnsupported: 'CONFIG_UNSUPPORTED'; /** * A mutation was attempted on a readonly config view. The caller must derive a new config through * the documented merge/patch API instead of mutating the view. */ readonly configReadonly: 'CONFIG_READONLY'; /** * Config sources, profiles or ownership metadata disagree (different profiles, a delete where it * is not valid, conflicting ownership). The caller must reconcile the sources before merging. */ readonly configConflict: 'CONFIG_CONFLICT'; /** * A config graph exceeded a configured bound (`maxKeys`, `maxDepth`, `maxNodes`) or a limit * option was itself invalid. The caller must shrink the input or raise the bound deliberately. */ readonly configLimitExceeded: 'CONFIG_LIMIT_EXCEEDED'; /** * A config path or segment is malformed or dangerous (prototype keys, invalid length or segment). * The caller must pass a safe, well-formed path. */ readonly configPathInvalid: 'CONFIG_PATH_INVALID'; /** * `ConfigOwner.from()` received a non-string or text that is not valid JSON. The parser's native * `SyntaxError` stays on `cause`; the caller must fix the source text. */ readonly configParseFailed: 'CONFIG_PARSE_FAILED'; /** * `ConfigOwner.fromAsync()` observed a rejected source Promise or a throwing source factory. The * rejection stays on `cause`; the caller may retry the source or fall back to a default config. */ readonly configSourceFailed: 'CONFIG_SOURCE_FAILED'; /** * `ConfigOwner.require()` found no own value at the requested path. The caller must supply the * value in its config source or use `getOr()` with an explicit fallback. */ readonly configValueMissing: 'CONFIG_VALUE_MISSING'; /** * A `ConfigOwner` validator threw or returned `false` for a candidate snapshot. The previous * snapshot stays committed and the validator error stays on `cause`; the caller must correct the * rejected change. */ readonly configValidationFailed: 'CONFIG_VALIDATION_FAILED'; /** The supplied string or tuple cannot safely identify an object path. */ readonly objectPathInvalid: 'OBJECT_PATH_INVALID'; /** Template syntax, placeholder boundaries, or a resolved value cannot be formatted safely. */ readonly formatInvalid: 'FORMAT_INVALID'; /** Strict template formatting could not resolve one requested placeholder path. */ readonly formatValueMissing: 'FORMAT_VALUE_MISSING'; /** Intl rejected a locale, number-format option, currency, or numeric value. */ readonly numberFormatInvalid: 'NUMBER_FORMAT_INVALID'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -21899,7 +22651,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/utils/dist/error-code.d.ts:UtilsErrorCode:export declare const UtilsErrorCode: { /** * A caller passed an argument outside its documented domain: a non-finite or negative delay or * timeout, a non-positive limiter concurrency, a Base64 decode target with the wrong genuine * Uint8Array brand or decoded length, or a scheduler `delayMs`/`advance(ms)` that is not a finite * non-negative number or overflows the virtual clock/shared absolute deadline, or a deferred * callback/scheduler method that is not callable. The native `TypeError`/`RangeError` type is * kept; the caller must fix the argument, retrying the same value fails again. */ readonly invalidArgument: 'INVALID_ARGUMENT'; /** * `toError()` wrapped a thrown value that was not an `Error`. The original value stays on * `cause`; callers that need the raw value read it from there instead of the message. */ readonly nonErrorValue: 'NON_ERROR_VALUE'; /** * A host capability this package needs is missing or misbehaves: `structuredClone`, or for the * default scheduler `performance.now` (missing or returning a non-finite value) and * `setTimeout`/`clearTimeout`/`queueMicrotask`. The caller must run on a host that provides it or * inject its own implementation (for example a custom `IScheduler`). */ readonly envUnsupported: 'ENV_UNSUPPORTED'; /** * A cooperative operation observed its abort signal (`UtilsAbortError`). The abort reason stays * on `cause`; callers treat it as cancellation, not as a failure to retry. */ readonly aborted: 'ABORTED'; /** * `withTimeout`, `retry` total timeout or a similar deadline elapsed before the operation settled * (`UtilsTimeoutError`). The caller may retry with a longer budget or report the timeout. */ readonly deadlineExceeded: 'DEADLINE_EXCEEDED'; /** * A manual scheduler `advance()` flushed more than 10000 callbacks, which indicates a callback * that keeps rescheduling itself at the current time. Thrown as a top-level `RangeError`; the * test or simulation must stop the self-scheduling loop. */ readonly schedulerRunaway: 'SCHEDULER_RUNAWAY'; /** * `attachErrorIdentity()` found an existing `source`/`code` property with a different value and * no conflict hook. Identity is never overwritten; the caller must supply an `onConflict` policy * or leave the existing identity in place. */ readonly errorIdentityConflict: 'ERROR_IDENTITY_CONFLICT'; /** * An incoming serialized error tree or its plain data violates the configured field, scalar, * depth, count, or text-byte contract. Enforces the cross-realm error-chain contract; callers * correct the input or supply their boundary's owning strategy. */ readonly errorChainInvalid: 'ERROR_CHAIN_INVALID'; /** * An immutable snapshot could not be produced because the host's structured clone rejected the * value (functions, symbols, host objects). The caller must pass cloneable data. */ readonly cloneUnsupported: 'CLONE_UNSUPPORTED'; /** * Byte or text decoding met malformed input at a reported offset. The caller must supply valid * input for the named encoding; the message carries the failing offset. */ readonly invalidEncoding: 'INVALID_ENCODING'; /** * `run()` was called on a concurrency limiter after `close()`/`dispose()`. The limiter accepts no * new work; the caller must create a new limiter. */ readonly limiterClosed: 'LIMITER_CLOSED'; /** * A non-reentrant operation was called from inside itself: a guarded function, a collector drain, * or a manual scheduler `advance()` called from one of its own callbacks. The outer call * continues unchanged; the caller must move the nested call outside the running operation. */ readonly reentrantCall: 'REENTRANT_CALL'; /** * A config value, root, patch or key has a shape the config model does not support (non-plain * records, symbol keys, values not owned by the config). The caller must pass plain owned data. */ readonly configUnsupported: 'CONFIG_UNSUPPORTED'; /** * A mutation was attempted on a readonly config view. The caller must derive a new config through * the documented merge/patch API instead of mutating the view. */ readonly configReadonly: 'CONFIG_READONLY'; /** * Config sources, profiles or ownership metadata disagree (different profiles, a delete where it * is not valid, conflicting ownership). The caller must reconcile the sources before merging. */ readonly configConflict: 'CONFIG_CONFLICT'; /** * A config graph exceeded a configured bound (`maxKeys`, `maxDepth`, `maxNodes`) or a limit * option was itself invalid. The caller must shrink the input or raise the bound deliberately. */ readonly configLimitExceeded: 'CONFIG_LIMIT_EXCEEDED'; /** * A config path or segment is malformed or dangerous (prototype keys, invalid length or segment). * The caller must pass a safe, well-formed path. */ readonly configPathInvalid: 'CONFIG_PATH_INVALID'; /** * `ConfigOwner.from()` received a non-string or text that is not valid JSON. The parser's native * `SyntaxError` stays on `cause`; the caller must fix the source text. */ readonly configParseFailed: 'CONFIG_PARSE_FAILED'; /** * `ConfigOwner.fromAsync()` observed a rejected source Promise or a throwing source factory. The * rejection stays on `cause`; the caller may retry the source or fall back to a default config. */ readonly configSourceFailed: 'CONFIG_SOURCE_FAILED'; /** * `ConfigOwner.require()` found no own value at the requested path. The caller must supply the * value in its config source or use `getOr()` with an explicit fallback. */ readonly configValueMissing: 'CONFIG_VALUE_MISSING'; /** * A `ConfigOwner` validator threw or returned `false` for a candidate snapshot. The previous * snapshot stays committed and the validator error stays on `cause`; the caller must correct the * rejected change. */ readonly configValidationFailed: 'CONFIG_VALIDATION_FAILED'; /** The supplied string or tuple cannot safely identify an object path. */ readonly objectPathInvalid: 'OBJECT_PATH_INVALID'; /** Template syntax, placeholder boundaries, or a resolved value cannot be formatted safely. */ readonly formatInvalid: 'FORMAT_INVALID'; /** Strict template formatting could not resolve one requested placeholder path. */ readonly formatValueMissing: 'FORMAT_VALUE_MISSING'; /** Intl rejected a locale, number-format option, currency, or numeric value. */ readonly numberFormatInvalid: 'NUMBER_FORMAT_INVALID'; };",
+          "identity": "packages/utils/dist/error-code.d.ts:UtilsErrorCode:export declare const UtilsErrorCode: { /** * A caller passed an argument outside its documented domain: a non-finite or negative delay or * timeout, a non-positive limiter concurrency, a Base64 decode target with the wrong genuine * Uint8Array brand or decoded length, or a scheduler `delayMs`/`advance(ms)` that is not a finite * non-negative number or overflows the virtual clock/shared absolute deadline, or a deferred * callback/scheduler method that is not callable. The native `TypeError`/`RangeError` type is * kept. Also covers jitter's non-finite/negative value, ratio or random result outside [0, 1], * and a throwing random callback (kept as cause). The caller must fix the argument; retrying the * same value fails again. */ readonly invalidArgument: 'INVALID_ARGUMENT'; /** * `toError()` wrapped a thrown value that was not an `Error`. The original value stays on * `cause`; callers that need the raw value read it from there instead of the message. */ readonly nonErrorValue: 'NON_ERROR_VALUE'; /** * A host capability this package needs is missing or misbehaves: `structuredClone`, or for the * default scheduler `performance.now` (missing or returning a non-finite value) and * `setTimeout`/`clearTimeout`/`queueMicrotask`. The caller must run on a host that provides it or * inject its own implementation (for example a custom `IScheduler`). */ readonly envUnsupported: 'ENV_UNSUPPORTED'; /** * A cooperative operation observed its abort signal (`UtilsAbortError`). The abort reason stays * on `cause`; callers treat it as cancellation, not as a failure to retry. */ readonly aborted: 'ABORTED'; /** * `withTimeout`, `retry` total timeout or a similar deadline elapsed before the operation settled * (`UtilsTimeoutError`). The caller may retry with a longer budget or report the timeout. */ readonly deadlineExceeded: 'DEADLINE_EXCEEDED'; /** * A manual scheduler `advance()` flushed more than 10000 callbacks, which indicates a callback * that keeps rescheduling itself at the current time. Thrown as a top-level `RangeError`; the * test or simulation must stop the self-scheduling loop. */ readonly schedulerRunaway: 'SCHEDULER_RUNAWAY'; /** * `attachErrorIdentity()` found an existing `source`/`code` property with a different value and * no conflict hook. Identity is never overwritten; the caller must supply an `onConflict` policy * or leave the existing identity in place. */ readonly errorIdentityConflict: 'ERROR_IDENTITY_CONFLICT'; /** * An incoming serialized error tree or its plain data violates the configured field, scalar, * depth, count, or text-byte contract. Enforces the cross-realm error-chain contract; callers * correct the input or supply their boundary's owning strategy. */ readonly errorChainInvalid: 'ERROR_CHAIN_INVALID'; /** * An immutable snapshot could not be produced because the host's structured clone rejected the * value (functions, symbols, host objects). The caller must pass cloneable data. */ readonly cloneUnsupported: 'CLONE_UNSUPPORTED'; /** * Byte or text decoding met malformed input at a reported offset. The caller must supply valid * input for the named encoding; the message carries the failing offset. */ readonly invalidEncoding: 'INVALID_ENCODING'; /** * `run()` was called on a concurrency limiter after `close()`/`dispose()`. The limiter accepts no * new work; the caller must create a new limiter. */ readonly limiterClosed: 'LIMITER_CLOSED'; /** * A non-reentrant operation was called from inside itself: a guarded function, a collector drain, * or a manual scheduler `advance()` called from one of its own callbacks. The outer call * continues unchanged; the caller must move the nested call outside the running operation. */ readonly reentrantCall: 'REENTRANT_CALL'; /** * A config value, root, patch or key has a shape the config model does not support (non-plain * records, symbol keys, values not owned by the config). The caller must pass plain owned data. */ readonly configUnsupported: 'CONFIG_UNSUPPORTED'; /** * A mutation was attempted on a readonly config view. The caller must derive a new config through * the documented merge/patch API instead of mutating the view. */ readonly configReadonly: 'CONFIG_READONLY'; /** * Config sources, profiles or ownership metadata disagree (different profiles, a delete where it * is not valid, conflicting ownership). The caller must reconcile the sources before merging. */ readonly configConflict: 'CONFIG_CONFLICT'; /** * A config graph exceeded a configured bound (`maxKeys`, `maxDepth`, `maxNodes`) or a limit * option was itself invalid. The caller must shrink the input or raise the bound deliberately. */ readonly configLimitExceeded: 'CONFIG_LIMIT_EXCEEDED'; /** * A config path or segment is malformed or dangerous (prototype keys, invalid length or segment). * The caller must pass a safe, well-formed path. */ readonly configPathInvalid: 'CONFIG_PATH_INVALID'; /** * `ConfigOwner.from()` received a non-string or text that is not valid JSON. The parser's native * `SyntaxError` stays on `cause`; the caller must fix the source text. */ readonly configParseFailed: 'CONFIG_PARSE_FAILED'; /** * `ConfigOwner.fromAsync()` observed a rejected source Promise or a throwing source factory. The * rejection stays on `cause`; the caller may retry the source or fall back to a default config. */ readonly configSourceFailed: 'CONFIG_SOURCE_FAILED'; /** * `ConfigOwner.require()` found no own value at the requested path. The caller must supply the * value in its config source or use `getOr()` with an explicit fallback. */ readonly configValueMissing: 'CONFIG_VALUE_MISSING'; /** * A `ConfigOwner` validator threw or returned `false` for a candidate snapshot. The previous * snapshot stays committed and the validator error stays on `cause`; the caller must correct the * rejected change. */ readonly configValidationFailed: 'CONFIG_VALIDATION_FAILED'; /** The supplied string or tuple cannot safely identify an object path. */ readonly objectPathInvalid: 'OBJECT_PATH_INVALID'; /** Template syntax, placeholder boundaries, or a resolved value cannot be formatted safely. */ readonly formatInvalid: 'FORMAT_INVALID'; /** Strict template formatting could not resolve one requested placeholder path. */ readonly formatValueMissing: 'FORMAT_VALUE_MISSING'; /** Intl rejected a locale, number-format option, currency, or numeric value. */ readonly numberFormatInvalid: 'NUMBER_FORMAT_INVALID'; };",
           "guidance": [
             {
               "id": "error-模块",
@@ -23534,7 +24286,7 @@
           "name": "createNumberFormatter",
           "kind": "function",
           "signature": "export declare function createNumberFormatter(options?: INumberFormatOptions): INumberFormatter;",
-          "declarationLine": 13,
+          "declarationLine": 20,
           "source": "packages/utils/dist/number.d.ts",
           "purpose": "Creates a reusable formatter so loops (tables, market data) parse the options once instead of per value.",
           "core": "A function `(value) => string`; invalid locales or options throw `NUMBER_FORMAT_INVALID`.\nlocales: Locale preference passed to `Intl` after canonicalisation, e.g. `zh-CN`.\nNot set: the host default locale.\nformat: Native `Intl.NumberFormat` options (fraction digits, rounding, notation...) merged with the helper defaults.\nNot set: only the helper defaults apply.",
@@ -23642,7 +24394,7 @@
           "name": "formatCompactNumber",
           "kind": "function",
           "signature": "export declare function formatCompactNumber(value: INumericValue, options?: INumberFormatOptions): string;",
-          "declarationLine": 23,
+          "declarationLine": 30,
           "source": "packages/utils/dist/number.d.ts",
           "purpose": "Formats large values with compact notation such as `1.2K` or `3.4M`, following the locale.",
           "core": "value: Number or bigint to format.\nThe formatted text.\nlocales: Locale preference passed to `Intl` after canonicalisation, e.g. `zh-CN`.\nNot set: the host default locale.\nformat: Native `Intl.NumberFormat` options (fraction digits, rounding, notation...) merged with the helper defaults.\nNot set: only the helper defaults apply.",
@@ -23760,7 +24512,7 @@
           "name": "formatCurrency",
           "kind": "function",
           "signature": "export declare function formatCurrency(value: INumericValue, currency: string, options?: INumberFormatOptions): string;",
-          "declarationLine": 17,
+          "declarationLine": 24,
           "source": "packages/utils/dist/number.d.ts",
           "purpose": "Formats money in the given currency; rounding policy stays with the caller.",
           "core": "value: Amount.\ncurrency: ISO 4217 code such as `CNY` or `USD`.\nThe formatted text.\nlocales: Locale preference passed to `Intl` after canonicalisation, e.g. `zh-CN`.\nNot set: the host default locale.\nformat: Native `Intl.NumberFormat` options (fraction digits, rounding, notation...) merged with the helper defaults.\nNot set: only the helper defaults apply.",
@@ -23894,7 +24646,7 @@
           "name": "formatInteger",
           "kind": "function",
           "signature": "export declare function formatInteger(value: INumericValue, options?: INumberFormatOptions): string;",
-          "declarationLine": 21,
+          "declarationLine": 28,
           "source": "packages/utils/dist/number.d.ts",
           "purpose": "Formats whole numbers (no fraction digits unless overridden).",
           "core": "value: Number or bigint to format.\nThe formatted text.\nlocales: Locale preference passed to `Intl` after canonicalisation, e.g. `zh-CN`.\nNot set: the host default locale.\nformat: Native `Intl.NumberFormat` options (fraction digits, rounding, notation...) merged with the helper defaults.\nNot set: only the helper defaults apply.",
@@ -24012,7 +24764,7 @@
           "name": "formatNumber",
           "kind": "function",
           "signature": "export declare function formatNumber(value: INumericValue, options?: INumberFormatOptions): string;",
-          "declarationLine": 15,
+          "declarationLine": 22,
           "source": "packages/utils/dist/number.d.ts",
           "purpose": "Formats one number or bigint with the given locale and `Intl` options, reusing cached formatters.",
           "core": "value: Number or bigint to format.\nThe formatted text.\nlocales: Locale preference passed to `Intl` after canonicalisation, e.g. `zh-CN`.\nNot set: the host default locale.\nformat: Native `Intl.NumberFormat` options (fraction digits, rounding, notation...) merged with the helper defaults.\nNot set: only the helper defaults apply.",
@@ -24130,7 +24882,7 @@
           "name": "formatPercent",
           "kind": "function",
           "signature": "export declare function formatPercent(value: INumericValue, options?: INumberFormatOptions): string;",
-          "declarationLine": 19,
+          "declarationLine": 26,
           "source": "packages/utils/dist/number.d.ts",
           "purpose": "Formats a ratio as a percentage (`0.25` → `25%`).",
           "core": "value: Ratio.\nThe formatted text.\nlocales: Locale preference passed to `Intl` after canonicalisation, e.g. `zh-CN`.\nNot set: the host default locale.\nformat: Native `Intl.NumberFormat` options (fraction digits, rounding, notation...) merged with the helper defaults.\nNot set: only the helper defaults apply.",
@@ -24248,7 +25000,7 @@
           "name": "INumberFormatOptions",
           "kind": "type",
           "signature": "export type INumberFormatOptions = { /** Locale preference passed through canonical `Intl.getCanonicalLocales` normalization. */ readonly locales?: Intl.LocalesArgument; /** Native `Intl.NumberFormat` policy merged with the helper-specific defaults. */ readonly format?: Intl.NumberFormatOptions; };",
-          "declarationLine": 4,
+          "declarationLine": 11,
           "source": "packages/utils/dist/number.d.ts",
           "purpose": "Options shared by the number formatting functions.",
           "core": "locales: Locale preference passed to `Intl` after canonicalisation, e.g. `zh-CN`.\nNot set: the host default locale.\nformat: Native `Intl.NumberFormat` options (fraction digits, rounding, notation...) merged with the helper defaults.\nNot set: only the helper defaults apply.",
@@ -24331,7 +25083,7 @@
           "name": "INumberFormatter",
           "kind": "type",
           "signature": "export type INumberFormatter = (value: INumericValue) => string;",
-          "declarationLine": 11,
+          "declarationLine": 18,
           "source": "packages/utils/dist/number.d.ts",
           "purpose": "Reusable formatter `(value) => string` from `createNumberFormatter()`.",
           "core": "Reusable formatter `(value) => string` from `createNumberFormatter()`.",
@@ -24395,7 +25147,7 @@
           "name": "INumericValue",
           "kind": "type",
           "signature": "export type INumericValue = number | bigint;",
-          "declarationLine": 2,
+          "declarationLine": 9,
           "source": "packages/utils/dist/number.d.ts",
           "purpose": "Numbers accepted by the formatters: `number` or `bigint` (no strings).",
           "core": "Numbers accepted by the formatters: `number` or `bigint` (no strings).",
@@ -24452,6 +25204,106 @@
           "usageScore": 4,
           "configuration": [],
           "fragment": "utils-number--INumericValue"
+        },
+        {
+          "name": "jitter",
+          "kind": "function",
+          "signature": "export declare function jitter(value: number, ratio: number, random?: () => number): number;",
+          "declarationLine": 7,
+          "source": "packages/utils/dist/number.d.ts",
+          "purpose": "Shortens a finite non-negative deadline by a bounded random fraction without extending it.",
+          "core": "value: Finite non-negative starting value.\nratio: Maximum reduction fraction in [0, 1].\nrandom: Optional sampler, default Math.random. Called once after argument validation; must return a finite value in [0, 1].\nA value in [value * (1 - ratio), value]. Invalid inputs or a failing sampler throw RangeError with utils INVALID_ARGUMENT; callback failures remain on cause.",
+          "advanced": "",
+          "parameters": ["value: number", "ratio: number", "random: () => number (optional)"],
+          "parameterDetails": [
+            {
+              "name": "value",
+              "type": "number",
+              "optional": false
+            },
+            {
+              "name": "ratio",
+              "type": "number",
+              "optional": false
+            },
+            {
+              "name": "random",
+              "type": "() => number",
+              "optional": true
+            }
+          ],
+          "returns": "number",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [
+            "import { jitter } from '@migaia/utils/number'\n\nconsole.log(jitter(60_000, 0.2, () => 0.5)) // 54000，永不超过原来的 60000"
+          ],
+          "members": [],
+          "composes": [],
+          "exportPath": "./number",
+          "overloadSignatures": [
+            "export declare function jitter(value: number, ratio: number, random?: () => number): number;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "value",
+                "type": "number",
+                "optional": false
+              },
+              {
+                "name": "ratio",
+                "type": "number",
+                "optional": false
+              },
+              {
+                "name": "random",
+                "type": "() => number",
+                "optional": true
+              }
+            ]
+          ],
+          "overloadReturns": ["number"],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Shortens a finite non-negative deadline by a bounded random fraction without extending it."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import jitter from @migaia/utils/number, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use jitter when its function contract and declared inputs match the result you need. Choose a different public symbol when jitter does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "value: Finite non-negative starting value.\nratio: Maximum reduction fraction in [0, 1].\nrandom: Optional sampler, default Math.random. Called once after argument validation; must return a finite value in [0, 1].\nA value in [value * (1 - ratio), value]. Invalid inputs or a failing sampler throw RangeError with utils INVALID_ARGUMENT; callback failures remain on cause."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/utils/dist/number.d.ts:jitter:export declare function jitter(value: number, ratio: number, random?: () => number): number;",
+          "guidance": [],
+          "usageScore": 24,
+          "configuration": [],
+          "fragment": "utils-number--jitter"
         }
       ],
       "aliases": []

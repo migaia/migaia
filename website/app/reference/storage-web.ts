@@ -134,8 +134,8 @@ const webStorageFields = (storage: string): Readonly<Record<string, IMemberDoc>>
     ),
     default: t('Omitted; transactions remain disabled.', '省略时不启用事务。'),
     whenToUse: t(
-      'All participating hosts must borrow one actual latest-pending WAL object. Matching names or independent caches do not establish cross-page recovery. Undo and raw native Feature clients are unavailable in this selected combination.',
-      '所有参与宿主必须借用同一个可见最新 pending 的真实 WAL 对象；同名或独立缓存不能证明跨页恢复。该组合不提供 undo 或 raw 原生 Feature 客户端。'
+      'All participating hosts must borrow one actual latest-pending WAL object. Matching names or independent caches do not establish cross-page recovery. Undo and raw native Feature clients are unavailable in this selected combination. While this instance has an active draft, root calls reject WRITE_CONFLICT even with wait policy; use its scope. Other instances retain native lock waiting.',
+      '所有参与宿主必须借用同一个可见最新 pending 的真实 WAL 对象；同名或独立缓存不能证明跨页恢复。该组合不提供 undo 或 raw 原生 Feature 客户端。同实例 draft 活跃时根调用即使选择 wait 也报 WRITE_CONFLICT，须使用 scope；其它实例仍沿原生锁等待。'
     )
   },
   namespaceCodec: {
@@ -283,8 +283,8 @@ const cookieFields: Readonly<Record<string, IMemberDoc>> = {
     ),
     default: t('Omitted; ordinary cookie semantics remain.', '省略时保持普通 Cookie 语义。'),
     whenToUse: t(
-      'Requires native Web Locks and the exact selected original WAL shared by every participant. maxAge resolves to one absolute expiry before WAL begin; replay never renews it.',
-      '要求原生 Web Locks 及所有参与者共享的选定原 WAL；maxAge 在 WAL begin 前解析为绝对期限，重放不续期。'
+      'Requires native Web Locks and the exact selected original WAL shared by every participant. maxAge resolves to one absolute expiry before WAL begin; replay never renews it. Root calls while this instance has an active draft reject WRITE_CONFLICT even with wait policy; use its scope.',
+      '要求原生 Web Locks 及所有参与者共享的选定原 WAL；maxAge 在 WAL begin 前解析为绝对期限，重放不续期。同实例 draft 活跃时根调用即使选择 wait 也报 WRITE_CONFLICT，须使用 scope。'
     )
   },
   namespace: webStorageFields('localStorage').namespace!,

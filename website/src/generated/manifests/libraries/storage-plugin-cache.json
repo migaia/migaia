@@ -1,0 +1,2992 @@
+{
+  "version": 1,
+  "library": {
+    "slug": "storage-plugin-cache",
+    "description": "Multi-tier cache orchestration over borrowed storage backends",
+    "version": "0.0.0",
+    "exports": [".", "./features/semantic"],
+    "readmeLocales": ["zh", "en"],
+    "documentation": {
+      "readme": {
+        "sections": [
+          {
+            "id": "多级缓存",
+            "heading": "多级缓存",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "`cachePlugin` 组合已经发布的存储后端。先在较早宿主批次安装各层，再安装缓存，并显式调用 `host.detect()`。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { cachePlugin, cacheKey } from '@migaia/storage-plugin-cache'\n\nconst original = await createStorageHost({ plugins: [memoryBackendPlugin({ id: 'memory' })] })\nconst host = await original.use(\n  cachePlugin({\n    tiers: [{ backend: 'memory', ttlMs: 30000 }],\n    maxAgeMs: 30000,\n    staleAfterMs: 10000,\n    negativeTtlMs: 1000\n  })\n)\nawait host.detect()\ntry {\n  const cache = host.backend('cache')\n  const key = await cacheKey('response', { model: 'model-one', version: 1 })\n  const value = await cache.getOrLoad(\n    key,\n    async (signal) => {\n      if (signal.aborted) return undefined\n      return { answer: 42 }\n    },\n    { meta: { model: 'model-one' } }\n  )\n  console.log(value, await cache.peek(key), cache.stats())\n  await cache.invalidate(key)\n} finally {\n  await host.dispose()\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "层按从快到慢排列。through 写入从最慢层向上完成；back 写入按键合并，由宿主 scheduler 刷出，失败只报告并丢弃，不重试。最慢层必须为 through。`flush()` 立即处理待写项；释放时等待已准入工作、刷出一次、取消订阅，不关闭借用层。"
+              },
+              {
+                "type": "paragraph",
+                "text": "缓存提供最终一致与失效通知，不提供跨 store 原子提交，也不声明事务。建议专用后端实例，避免宽业务通知清除无关缓存副本。变更流之上的层必须设置硬 TTL，限制漏通知的陈旧上界；可靠变更流沿后端原游标协议。"
+              },
+              {
+                "type": "paragraph",
+                "text": "逻辑键只接受字符串。平铺 `get` 只读取平铺 `set` 写入的条目；codec 值与负条目经 `getOrLoad`、`getOrLoadEntry` 和 `peek` 访问。`cacheKey` 复用原 portable serializer 与 SHA-256，对象字段顺序不影响结果，非法值保留原 serializer 错误。"
+              },
+              {
+                "type": "paragraph",
+                "text": "带计数的 KV `removeByPrefix` 仅单层可用；多层在 I/O 前报 `UNSUPPORTED_CAPABILITY`，因为原生计数无法识别跨层重复逻辑副本。多层无计数删除使用 `invalidate({ prefix })` 或清空方法。`removeMany` 按已给出的不同逻辑键计数，多个副本只计一次。"
+              },
+              {
+                "type": "paragraph",
+                "text": "各层条目同时以该层采样后的有效硬期限限制自身到期时间。原生 `expire` 失败会报告，不能留下可无限命中的副本。正数单次 TTL 在回源或写入前要求所有目标层具有 TTL 能力；共享 KV `setMany` 保留非负有限 TTL 域，零表示立即删除。"
+              },
+              {
+                "type": "paragraph",
+                "text": "传播仅在显式检测阶段订阅。可靠源的游标写入紧邻上层的缺省组织，`$cache.cursor` 为内部元数据保留键。游标缺失或过期时先清除所管上层前缀，再从 now 继续。删除或游标持久化失败不保留积压队列：下一原生批次先清上层，再于成功后推进游标。仅游标过期会替换原生 tail 资源，不为断线启动重连定时器。"
+              }
+            ]
+          },
+          {
+            "id": "语义缓存",
+            "heading": "语义缓存",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "从 `@migaia/storage-plugin-cache/features/semantic` 导入 `semanticCacheFeature`，在 `cachePlugin` 第二参数中选择 `{ semantic: semanticCacheFeature(options) }`。向量后端必须在更早批次发布。配置 collection、维度、原生 metric、最低分与调用方嵌入函数。候选顺序沿原向量引擎，逐个执行 `accept`；复核失败只报告并跳过，不在 JavaScript 中计算向量分数。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`cache.api.semantic.set(prompt, value, { payload: { model: 'one' } })` 按 prompt 与模型元数据独立存储。`get` 可设置 `where`、`minScore`、一至十个 `candidates` 和异步 `accept`。`getOrLoad` 按组织、prompt 与规范 payload 合并回源，单调用取消不影响共享任务，并支持缩短 TTL 与 `cacheIf`。关闭时排空任务，不关闭借用的向量后端。`$cache.*` 为保留字段。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`invalidate(where, { count: 'scroll' })` 返回原 `deleteWhere` 数字，缺省保留 `precount`。删除包含物理仍存在的过期匹配点；Qdrant 两策略继承原并发边界，不强制切换、不重新计数、不承诺全局快照。原 context 与 count 由该原生删除拥有者单次校验；向量 TTL 由原 `upsert` 设置。"
+              }
+            ]
+          }
+        ]
+      },
+      "guide": {
+        "sections": [
+          {
+            "id": "多级缓存",
+            "heading": "多级缓存",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "`cachePlugin` 组合已经发布的存储后端。先在较早宿主批次安装各层，再安装缓存，并显式调用 `host.detect()`。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { cachePlugin, cacheKey } from '@migaia/storage-plugin-cache'\n\nconst original = await createStorageHost({ plugins: [memoryBackendPlugin({ id: 'memory' })] })\nconst host = await original.use(\n  cachePlugin({\n    tiers: [{ backend: 'memory', ttlMs: 30000 }],\n    maxAgeMs: 30000,\n    staleAfterMs: 10000,\n    negativeTtlMs: 1000\n  })\n)\nawait host.detect()\ntry {\n  const cache = host.backend('cache')\n  const key = await cacheKey('response', { model: 'model-one', version: 1 })\n  const value = await cache.getOrLoad(\n    key,\n    async (signal) => {\n      if (signal.aborted) return undefined\n      return { answer: 42 }\n    },\n    { meta: { model: 'model-one' } }\n  )\n  console.log(value, await cache.peek(key), cache.stats())\n  await cache.invalidate(key)\n} finally {\n  await host.dispose()\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "层按从快到慢排列。through 写入从最慢层向上完成；back 写入按键合并，由宿主 scheduler 刷出，失败只报告并丢弃，不重试。最慢层必须为 through。`flush()` 立即处理待写项；释放时等待已准入工作、刷出一次、取消订阅，不关闭借用层。"
+              },
+              {
+                "type": "paragraph",
+                "text": "缓存提供最终一致与失效通知，不提供跨 store 原子提交，也不声明事务。建议专用后端实例，避免宽业务通知清除无关缓存副本。变更流之上的层必须设置硬 TTL，限制漏通知的陈旧上界；可靠变更流沿后端原游标协议。"
+              },
+              {
+                "type": "paragraph",
+                "text": "逻辑键只接受字符串。平铺 `get` 只读取平铺 `set` 写入的条目；codec 值与负条目经 `getOrLoad`、`getOrLoadEntry` 和 `peek` 访问。`cacheKey` 复用原 portable serializer 与 SHA-256，对象字段顺序不影响结果，非法值保留原 serializer 错误。"
+              }
+            ]
+          },
+          {
+            "id": "条目策略",
+            "heading": "条目策略",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "单次 `ttlMs`、`maxAgeMs`、`staleAfterMs`、`negativeTtlMs` 只能缩短配置上界；延长时报 `CACHE_TIER_INVALID`。`jitterRatio` 在零至 0.5 之间，复用原数值 helper 只缩短期限；可注入 `clock`、`random`。旧值立即返回，共享一次后台刷新。仅配置负缓存期限时缓存 undefined；`cacheIf` 返回 false 则跳过全部层。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`mode: 'refresh'` 跳过读取，作废旧普通回源并合并已有刷新；`mode: 'bypass'` 只回源。单个调用方取消只让自身以 contract `ABORTED` 拒绝，共享任务只接收缓存关闭 signal。回源与编码失败以 `CACHE_LOAD_FAILED` 保留原 cause 与原生错误类型。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`getOrLoadMany` 去重输入键，每个经过的层调用一次原生 `getMany`，每个 through 回填层调用一次 `setMany`；缺失键进入与单键相同的单飞 Map，共享一次批量回源。`maxEntryBytes` 让超限条目跳过对应层。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`stampedeLock` 选取支持真实事务与键锁的层，由原事务锁内复查并把 TTL 写在同一 draft。物理重放可能再次回源，不承诺 exactly-once；锁与事务原错误保持。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`tagIndex` 选 records 与 TTL 后端。先写标签记录，再写缓存值；索引失败报告并跳过值写入。`invalidate({ tag })` 只迭代该标签范围。`offload` 选 blob 后端且要求层 TTL：达到 `minBytes` 的编码内容以 SHA-256 对象键存储，值层只存引用。失效只删除引用，显式 `sweepOffload()` 清理旧对象；共享对象后端按各引用层最长 TTL 保留。"
+              },
+              {
+                "type": "paragraph",
+                "text": "观察事件为 `onCacheHit`、`onCacheMiss`、`onCacheLoad`、`onCacheInvalidate`、`onCacheTierError`、`onCacheWriteBackDropped`，只含数量与身份，不含键值。层失败降级为未命中或跳过写入，经宿主报告原诊断。组织视图把所有层路由到同一不可变宿主组织上下文。"
+              },
+              {
+                "type": "paragraph",
+                "text": "带计数的 KV `removeByPrefix` 仅单层可用；多层在 I/O 前报 `UNSUPPORTED_CAPABILITY`，因为原生计数无法识别跨层重复逻辑副本。多层无计数删除使用 `invalidate({ prefix })` 或清空方法。`removeMany` 按已给出的不同逻辑键计数，多个副本只计一次。"
+              },
+              {
+                "type": "paragraph",
+                "text": "各层条目同时以该层采样后的有效硬期限限制自身到期时间。原生 `expire` 失败会报告，不能留下可无限命中的副本。正数单次 TTL 在回源或写入前要求所有目标层具有 TTL 能力；共享 KV `setMany` 保留非负有限 TTL 域，零表示立即删除。"
+              },
+              {
+                "type": "paragraph",
+                "text": "传播仅在显式检测阶段订阅。可靠源的游标写入紧邻上层的缺省组织，`$cache.cursor` 为内部元数据保留键。游标缺失或过期时先清除所管上层前缀，再从 now 继续。删除或游标持久化失败不保留积压队列：下一原生批次先清上层，再于成功后推进游标。仅游标过期会替换原生 tail 资源，不为断线启动重连定时器。"
+              }
+            ]
+          },
+          {
+            "id": "语义缓存",
+            "heading": "语义缓存",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "从 `@migaia/storage-plugin-cache/features/semantic` 导入 `semanticCacheFeature`，在 `cachePlugin` 第二参数中选择 `{ semantic: semanticCacheFeature(options) }`。向量后端必须在更早批次发布。配置 collection、维度、原生 metric、最低分与调用方嵌入函数。候选顺序沿原向量引擎，逐个执行 `accept`；复核失败只报告并跳过，不在 JavaScript 中计算向量分数。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`cache.api.semantic.set(prompt, value, { payload: { model: 'one' } })` 按 prompt 与模型元数据独立存储。`get` 可设置 `where`、`minScore`、一至十个 `candidates` 和异步 `accept`。`getOrLoad` 按组织、prompt 与规范 payload 合并回源，单调用取消不影响共享任务，并支持缩短 TTL 与 `cacheIf`。关闭时排空任务，不关闭借用的向量后端。`$cache.*` 为保留字段。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`invalidate(where, { count: 'scroll' })` 返回原 `deleteWhere` 数字，缺省保留 `precount`。删除包含物理仍存在的过期匹配点；Qdrant 两策略继承原并发边界，不强制切换、不重新计数、不承诺全局快照。原 context 与 count 由该原生删除拥有者单次校验；向量 TTL 由原 `upsert` 设置。"
+              }
+            ]
+          },
+          {
+            "id": "四层原生组合",
+            "heading": "四层原生组合",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'\nimport { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'\nimport { redisBackendPlugin } from '@migaia/storage-plugin-redis'\nimport { nodeRedisDriver } from '@migaia/storage-plugin-redis/node-redis'\nimport { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'\nimport { pgDriver } from '@migaia/storage-plugin-postgres/pg'\nimport { createClientPool } from 'redis'\nimport { Pool } from 'pg'\nimport { cachePlugin } from '@migaia/storage-plugin-cache'\n\nconst redis = createClientPool({ url: process.env.MIGAIA_REDIS_URL })\nconst postgres = new Pool({ connectionString: process.env.MIGAIA_PG_URL })\nawait redis.connect()\nconst prefix = 'cache_guide_' + crypto.randomUUID().replaceAll('-', '')\nconst base = await createStorageHost({\n  plugins: [\n    memoryBackendPlugin({ id: 'l1' }),\n    sqliteBackendPlugin({ id: 'l2', driver: nodeSqliteDriver(':memory:') }),\n    redisBackendPlugin({ id: 'l3', driver: nodeRedisDriver(redis), prefix }),\n    postgresBackendPlugin({ id: 'l4', driver: pgDriver(postgres), prefix })\n  ]\n})\nconst host = await base.use(\n  cachePlugin({\n    propagate: false,\n    tiers: [\n      { backend: 'l1', ttlMs: 10000 },\n      { backend: 'l2', ttlMs: 20000 },\n      { backend: 'l3', ttlMs: 30000 },\n      { backend: 'l4', ttlMs: 60000 }\n    ],\n    stampedeLock: { backend: 'l3', timeoutMs: 1000 }\n  })\n)\nawait host.detect()\ntry {\n  const answer = await host.backend('cache').getOrLoad('answer', async () => ({ text: 'Hello' }))\n  console.log(answer)\n  await host.backend('cache').clearAll()\n} finally {\n  await host.dispose()\n  await redis.close()\n  await postgres.end()\n}"
+              }
+            ]
+          },
+          {
+            "id": "原生语义示例",
+            "heading": "原生语义示例",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { cachePlugin } from '@migaia/storage-plugin-cache'\nimport { semanticCacheFeature } from '@migaia/storage-plugin-cache/features/semantic'\n\nconst base = await createStorageHost({\n  plugins: [memoryBackendPlugin({ id: 'values' }), memoryBackendPlugin({ id: 'vectors' })]\n})\nconst host = await base.use(\n  cachePlugin(\n    {\n      tiers: [{ backend: 'values', ttlMs: 30000 }]\n    },\n    {\n      semantic: semanticCacheFeature({\n        backend: 'vectors',\n        collection: 'answers',\n        dimensions: 2,\n        minScore: 0.8,\n        ttlMs: 30000,\n        embed: async () => [1, 0]\n      })\n    }\n  )\n)\nawait host.detect()\ntry {\n  const semantic = host.backend('cache').api.semantic\n  await semantic.set('Question', { text: 'Answer' }, { payload: { model: 'one' } })\n  const hit = await semantic.get('Question', { where: { model: 'one' }, candidates: 3 })\n  console.log(hit?.value)\n  await semantic.invalidate({ model: 'one' }, { count: 'scroll' })\n} finally {\n  await host.dispose()\n}"
+              }
+            ]
+          }
+        ]
+      },
+      "en": {
+        "readme": {
+          "sections": [
+            {
+              "id": "multi-tier-cache",
+              "heading": "Multi-tier cache",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`cachePlugin` composes already-published storage backends. Install tiers in an earlier host batch, then install the cache and explicitly call `host.detect()`."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { cachePlugin, cacheKey } from '@migaia/storage-plugin-cache'\n\nconst original = await createStorageHost({ plugins: [memoryBackendPlugin({ id: 'memory' })] })\nconst host = await original.use(\n  cachePlugin({\n    tiers: [{ backend: 'memory', ttlMs: 30000 }],\n    maxAgeMs: 30000,\n    staleAfterMs: 10000,\n    negativeTtlMs: 1000\n  })\n)\nawait host.detect()\ntry {\n  const cache = host.backend('cache')\n  const key = await cacheKey('response', { model: 'model-one', version: 1 })\n  const value = await cache.getOrLoad(\n    key,\n    async (signal) => {\n      if (signal.aborted) return undefined\n      return { answer: 42 }\n    },\n    { meta: { model: 'model-one' } }\n  )\n  console.log(value, await cache.peek(key), cache.stats())\n  await cache.invalidate(key)\n} finally {\n  await host.dispose()\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Layers are ordered fastest to slowest. Through writes finish from the slowest layer upwards. Back writes coalesce by key and flush through the host scheduler; failures are reported and dropped without retries. The slowest layer must be through. `flush()` sends pending writes immediately; disposal drains admitted work, flushes once and releases subscriptions without closing borrowed tiers."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "The cache is eventually consistent with invalidation notifications; it has no cross-store atomic commit and advertises no transactions. Use dedicated backend instances to avoid broad business notifications evicting unrelated cache copies. Upper layers of a change feed require hard TTLs to bound missed notifications. Durable feeds use their original cursor protocol."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Logical keys are strings. Flat `get` sees only entries written by flat `set`; codec values and negative entries are available through `getOrLoad`, `getOrLoadEntry` and `peek`. `cacheKey` uses the original portable serializer and SHA-256, preserving field-order equivalence and original serializer errors."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "The counted KV `removeByPrefix` is available for one tier. With multiple tiers it rejects `UNSUPPORTED_CAPABILITY` before I/O: native counts cannot identify duplicate logical copies across tiers. Use `invalidate({ prefix })` or clear methods for multi-tier deletion without a count. `removeMany` counts distinct supplied logical keys, even when several copies are removed."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Each stored envelope also caps its expiry at that layer's sampled effective hard deadline. A failed native `expire` is reported and cannot leave an unlimited valid cache copy. Positive per-call TTL requires each target tier's TTL capability before loading or writing. Shared KV `setMany` retains its finite nonnegative TTL domain: zero removes immediately."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Propagation subscribes only during explicit detection. Reliable sources persist cursors in the immediately upper default-org tier; `$cache.cursor` is reserved for that metadata. Missing or expired cursors clear managed upper prefixes before continuing from now. Failed invalidation or cursor persistence retains no backlog: the next native batch first clears the upper prefixes, then advances the cursor only after success. Only cursor expiry replaces the native tail resource; disconnects do not start a reconnect timer."
+                }
+              ]
+            },
+            {
+              "id": "semantic-cache",
+              "heading": "Semantic cache",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Import `semanticCacheFeature` from `@migaia/storage-plugin-cache/features/semantic` and select it as `{ semantic: semanticCacheFeature(options) }` in the second `cachePlugin` argument. Its vector backend must be published in an earlier batch. Configure a collection, dimensions, native metric, minimum score and your embedding callback. The Feature uses the original engine's candidate ordering and sequential `accept` callbacks; failed acceptance reports and skips that candidate. It performs no JavaScript vector scoring."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`cache.api.semantic.set(prompt, value, { payload: { model: 'one' } })` stores independent prompt/model identities. `get` accepts `where`, `minScore`, one to ten `candidates`, and optional asynchronous `accept`. `getOrLoad` shares a loader by organization, prompt and canonical payload, retains caller-only cancellation, and supports shortened TTL and `cacheIf`. Closing drains shared work without closing the vector backend. `$cache.*` payload fields are reserved."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`invalidate(where, { count: 'scroll' })` returns the native `deleteWhere` number; omission retains `precount`. Physical expired matches are included. Qdrant's two modes retain their documented concurrent-write boundaries; the Feature does not switch mode, recount, or claim a global snapshot. Original context and count are validated once by that native deletion owner. Native `upsert` owns vector TTL."
+                }
+              ]
+            }
+          ]
+        },
+        "guide": {
+          "sections": [
+            {
+              "id": "multi-tier-cache",
+              "heading": "Multi-tier cache",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`cachePlugin` composes already-published storage backends. Install tiers in an earlier host batch, then install the cache and explicitly call `host.detect()`."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { cachePlugin, cacheKey } from '@migaia/storage-plugin-cache'\n\nconst original = await createStorageHost({ plugins: [memoryBackendPlugin({ id: 'memory' })] })\nconst host = await original.use(\n  cachePlugin({\n    tiers: [{ backend: 'memory', ttlMs: 30000 }],\n    maxAgeMs: 30000,\n    staleAfterMs: 10000,\n    negativeTtlMs: 1000\n  })\n)\nawait host.detect()\ntry {\n  const cache = host.backend('cache')\n  const key = await cacheKey('response', { model: 'model-one', version: 1 })\n  const value = await cache.getOrLoad(\n    key,\n    async (signal) => {\n      if (signal.aborted) return undefined\n      return { answer: 42 }\n    },\n    { meta: { model: 'model-one' } }\n  )\n  console.log(value, await cache.peek(key), cache.stats())\n  await cache.invalidate(key)\n} finally {\n  await host.dispose()\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Layers are ordered fastest to slowest. Through writes finish from the slowest layer upwards. Back writes coalesce by key and flush through the host scheduler; failures are reported and dropped without retries. The slowest layer must be through. `flush()` sends pending writes immediately; disposal drains admitted work, flushes once and releases subscriptions without closing borrowed tiers."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "The cache is eventually consistent with invalidation notifications; it has no cross-store atomic commit and advertises no transactions. Use dedicated backend instances to avoid broad business notifications evicting unrelated cache copies. Upper layers of a change feed require hard TTLs to bound missed notifications. Durable feeds use their original cursor protocol."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Logical keys are strings. Flat `get` sees only entries written by flat `set`; codec values and negative entries are available through `getOrLoad`, `getOrLoadEntry` and `peek`. `cacheKey` uses the original portable serializer and SHA-256, preserving field-order equivalence and original serializer errors."
+                }
+              ]
+            },
+            {
+              "id": "entry-policy",
+              "heading": "Entry policy",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Call `ttlMs`, `maxAgeMs`, `staleAfterMs` and `negativeTtlMs` may shorten configured bounds. A longer override rejects with `CACHE_TIER_INVALID`. `jitterRatio` is between zero and 0.5 and only shortens expiry through the original numeric helper; `clock` and `random` can be injected. A stale hit returns immediately while one shared refresh runs. Undefined results are cached only when a negative TTL exists. `cacheIf` false skips all layers."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`mode: 'refresh'` skips reads, supersedes an earlier normal load and joins an existing refresh. `mode: 'bypass'` performs only the source call. One caller's cancellation rejects that caller with contract `ABORTED`; shared work receives only the cache closing signal. Source or encoder failures use `CACHE_LOAD_FAILED` with the original cause and native class."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`getOrLoadMany` deduplicates input keys, performs one native `getMany` per visited tier and one native `setMany` per through fill tier. New misses enter the same single-flight Map as single-key requests and share one batch source call. `maxEntryBytes` skips oversized entries for that tier."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`stampedeLock` selects a tier with native transactions and key locks. The original transaction rechecks the locked key before loading and writes its TTL in the same draft. Callback replay may load again; this is at least once, not exactly once. Native lock and transaction errors remain unchanged."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`tagIndex` selects a records-and-TTL backend. Tag records are written before cache values; a tag-index failure reports and skips cache writes. `invalidate({ tag })` visits only that tag's key range. `offload` selects a blob backend and requires a tier TTL: encoded values above `minBytes` use SHA-256 object keys and references. Invalidating values removes references only; explicit `sweepOffload()` removes old objects. Shared object backends retain objects for the longest configured tier TTL."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Hooks report counts and identities, never keys or values: `onCacheHit`, `onCacheMiss`, `onCacheLoad`, `onCacheInvalidate`, `onCacheTierError`, `onCacheWriteBackDropped`. Layer failures degrade to misses or skipped writes and retain their original diagnostics through the host reporter. Organization views route every tier through the same immutable host org context."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "The counted KV `removeByPrefix` is available for one tier. With multiple tiers it rejects `UNSUPPORTED_CAPABILITY` before I/O: native counts cannot identify duplicate logical copies across tiers. Use `invalidate({ prefix })` or clear methods for multi-tier deletion without a count. `removeMany` counts distinct supplied logical keys, even when several copies are removed."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Each stored envelope also caps its expiry at that layer's sampled effective hard deadline. A failed native `expire` is reported and cannot leave an unlimited valid cache copy. Positive per-call TTL requires each target tier's TTL capability before loading or writing. Shared KV `setMany` retains its finite nonnegative TTL domain: zero removes immediately."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Propagation subscribes only during explicit detection. Reliable sources persist cursors in the immediately upper default-org tier; `$cache.cursor` is reserved for that metadata. Missing or expired cursors clear managed upper prefixes before continuing from now. Failed invalidation or cursor persistence retains no backlog: the next native batch first clears the upper prefixes, then advances the cursor only after success. Only cursor expiry replaces the native tail resource; disconnects do not start a reconnect timer."
+                }
+              ]
+            },
+            {
+              "id": "semantic-cache",
+              "heading": "Semantic cache",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Import `semanticCacheFeature` from `@migaia/storage-plugin-cache/features/semantic` and select it as `{ semantic: semanticCacheFeature(options) }` in the second `cachePlugin` argument. Its vector backend must be published in an earlier batch. Configure a collection, dimensions, native metric, minimum score and your embedding callback. The Feature uses the original engine's candidate ordering and sequential `accept` callbacks; failed acceptance reports and skips that candidate. It performs no JavaScript vector scoring."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`cache.api.semantic.set(prompt, value, { payload: { model: 'one' } })` stores independent prompt/model identities. `get` accepts `where`, `minScore`, one to ten `candidates`, and optional asynchronous `accept`. `getOrLoad` shares a loader by organization, prompt and canonical payload, retains caller-only cancellation, and supports shortened TTL and `cacheIf`. Closing drains shared work without closing the vector backend. `$cache.*` payload fields are reserved."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`invalidate(where, { count: 'scroll' })` returns the native `deleteWhere` number; omission retains `precount`. Physical expired matches are included. Qdrant's two modes retain their documented concurrent-write boundaries; the Feature does not switch mode, recount, or claim a global snapshot. Original context and count are validated once by that native deletion owner. Native `upsert` owns vector TTL."
+                }
+              ]
+            },
+            {
+              "id": "four-native-tiers",
+              "heading": "Four native tiers",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'\nimport { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'\nimport { redisBackendPlugin } from '@migaia/storage-plugin-redis'\nimport { nodeRedisDriver } from '@migaia/storage-plugin-redis/node-redis'\nimport { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'\nimport { pgDriver } from '@migaia/storage-plugin-postgres/pg'\nimport { createClientPool } from 'redis'\nimport { Pool } from 'pg'\nimport { cachePlugin } from '@migaia/storage-plugin-cache'\n\nconst redis = createClientPool({ url: process.env.MIGAIA_REDIS_URL })\nconst postgres = new Pool({ connectionString: process.env.MIGAIA_PG_URL })\nawait redis.connect()\nconst prefix = 'cache_guide_' + crypto.randomUUID().replaceAll('-', '')\nconst base = await createStorageHost({\n  plugins: [\n    memoryBackendPlugin({ id: 'l1' }),\n    sqliteBackendPlugin({ id: 'l2', driver: nodeSqliteDriver(':memory:') }),\n    redisBackendPlugin({ id: 'l3', driver: nodeRedisDriver(redis), prefix }),\n    postgresBackendPlugin({ id: 'l4', driver: pgDriver(postgres), prefix })\n  ]\n})\nconst host = await base.use(\n  cachePlugin({\n    propagate: false,\n    tiers: [\n      { backend: 'l1', ttlMs: 10000 },\n      { backend: 'l2', ttlMs: 20000 },\n      { backend: 'l3', ttlMs: 30000 },\n      { backend: 'l4', ttlMs: 60000 }\n    ],\n    stampedeLock: { backend: 'l3', timeoutMs: 1000 }\n  })\n)\nawait host.detect()\ntry {\n  const answer = await host.backend('cache').getOrLoad('answer', async () => ({ text: 'Hello' }))\n  console.log(answer)\n  await host.backend('cache').clearAll()\n} finally {\n  await host.dispose()\n  await redis.close()\n  await postgres.end()\n}"
+                }
+              ]
+            },
+            {
+              "id": "native-semantic-example",
+              "heading": "Native semantic example",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { cachePlugin } from '@migaia/storage-plugin-cache'\nimport { semanticCacheFeature } from '@migaia/storage-plugin-cache/features/semantic'\n\nconst base = await createStorageHost({\n  plugins: [memoryBackendPlugin({ id: 'values' }), memoryBackendPlugin({ id: 'vectors' })]\n})\nconst host = await base.use(\n  cachePlugin(\n    {\n      tiers: [{ backend: 'values', ttlMs: 30000 }]\n    },\n    {\n      semantic: semanticCacheFeature({\n        backend: 'vectors',\n        collection: 'answers',\n        dimensions: 2,\n        minScore: 0.8,\n        ttlMs: 30000,\n        embed: async () => [1, 0]\n      })\n    }\n  )\n)\nawait host.detect()\ntry {\n  const semantic = host.backend('cache').api.semantic\n  await semantic.set('Question', { text: 'Answer' }, { payload: { model: 'one' } })\n  const hit = await semantic.get('Question', { where: { model: 'one' }, candidates: 3 })\n  console.log(hit?.value)\n  await semantic.invalidate({ model: 'one' }, { count: 'scroll' })\n} finally {\n  await host.dispose()\n}"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  },
+  "apis": [
+    {
+      "id": "storage-plugin-cache:index",
+      "library": "storage-plugin-cache",
+      "module": "index",
+      "exportPath": ".",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/docs/storage-plugin-cache/getting-started",
+      "architecturePath": "/en/docs/storage-plugin-cache",
+      "symbols": [
+        {
+          "name": "cacheBackendKind",
+          "kind": "const",
+          "signature": "export declare const cacheBackendKind: import(\"@migaia/storage-host\").IStorageBackendKind<\"cache\", ICacheStore, undefined, {}>;",
+          "declarationLine": 3,
+          "source": "packages/storage-plugin-cache/dist/kind.d.ts",
+          "purpose": "Authenticate the exact cache Feature target with no native client exposure.",
+          "core": "Authenticate the exact cache Feature target with no native client exposure.",
+          "advanced": "",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "aliasOf": "cacheBackendKind",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const cacheBackendKind: import(\"@migaia/storage-host\").IStorageBackendKind<\"cache\", ICacheStore, undefined, {}>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Authenticate the exact cache Feature target with no native client exposure."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import cacheBackendKind from @migaia/storage-plugin-cache, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use cacheBackendKind when its const contract and declared inputs match the result you need. Choose a different public symbol when cacheBackendKind does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "Authenticate the exact cache Feature target with no native client exposure."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-cache/dist/kind.d.ts:cacheBackendKind:export declare const cacheBackendKind: import(\"@migaia/storage-host\").IStorageBackendKind<\"cache\", ICacheStore, undefined, {}>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-cache-index--cacheBackendKind"
+        },
+        {
+          "name": "CacheErrorCode",
+          "kind": "const",
+          "signature": "export declare const CacheErrorCode: { /** * Invalid tier, policy or propagation configuration; correct the configuration before * installation. */ readonly tierInvalid: 'CACHE_TIER_INVALID'; /** The caller's loader or value encoding failed; inspect the original cause and retry explicitly. */ readonly loadFailed: 'CACHE_LOAD_FAILED'; /** The caller's embedding function failed; inspect its cause without treating it as a cache miss. */ readonly embedFailed: 'CACHE_EMBED_FAILED'; };",
+          "declarationLine": 4,
+          "source": "packages/storage-plugin-cache/dist/error-code.d.ts",
+          "purpose": "Distinguish configuration, loader and embedding failures.",
+          "core": "tierInvalid: Correct invalid tier or call policy configuration.\nloadFailed: Inspect the original loader or encoding failure on cause.\nembedFailed: Inspect the original embedding failure on cause.",
+          "advanced": "",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "tierInvalid",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly tierInvalid: 'CACHE_TIER_INVALID';",
+              "description": "Invalid tier, policy or propagation configuration; correct the configuration before * installation.",
+              "parameterDetails": [],
+              "returns": "'CACHE_TIER_INVALID'"
+            },
+            {
+              "name": "loadFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly loadFailed: 'CACHE_LOAD_FAILED';",
+              "description": "The caller's loader or value encoding failed; inspect the original cause and retry explicitly.",
+              "parameterDetails": [],
+              "returns": "'CACHE_LOAD_FAILED'"
+            },
+            {
+              "name": "embedFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly embedFailed: 'CACHE_EMBED_FAILED';",
+              "description": "The caller's embedding function failed; inspect its cause without treating it as a cache miss.",
+              "parameterDetails": [],
+              "returns": "'CACHE_EMBED_FAILED'"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "CacheErrorCode",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const CacheErrorCode: { /** * Invalid tier, policy or propagation configuration; correct the configuration before * installation. */ readonly tierInvalid: 'CACHE_TIER_INVALID'; /** The caller's loader or value encoding failed; inspect the original cause and retry explicitly. */ readonly loadFailed: 'CACHE_LOAD_FAILED'; /** The caller's embedding function failed; inspect its cause without treating it as a cache miss. */ readonly embedFailed: 'CACHE_EMBED_FAILED'; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Distinguish configuration, loader and embedding failures."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import CacheErrorCode from @migaia/storage-plugin-cache, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use CacheErrorCode when its const contract and declared inputs match the result you need. Choose a different public symbol when CacheErrorCode does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "tierInvalid: Correct invalid tier or call policy configuration.\nloadFailed: Inspect the original loader or encoding failure on cause.\nembedFailed: Inspect the original embedding failure on cause."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-cache/dist/error-code.d.ts:CacheErrorCode:export declare const CacheErrorCode: { /** * Invalid tier, policy or propagation configuration; correct the configuration before * installation. */ readonly tierInvalid: 'CACHE_TIER_INVALID'; /** The caller's loader or value encoding failed; inspect the original cause and retry explicitly. */ readonly loadFailed: 'CACHE_LOAD_FAILED'; /** The caller's embedding function failed; inspect its cause without treating it as a cache miss. */ readonly embedFailed: 'CACHE_EMBED_FAILED'; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-cache-index--CacheErrorCode"
+        },
+        {
+          "name": "cacheKey",
+          "kind": "function",
+          "signature": "export declare function cacheKey(...parts: readonly [ICodecValue, ...ICodecValue[]]): Promise<string>;",
+          "declarationLine": 5,
+          "source": "packages/storage-plugin-cache/dist/key.d.ts",
+          "purpose": "Hash canonical portable request parts without accessing storage.",
+          "core": "parts: Ordered portable request parts; at least one is required.\nLowercase SHA-256 identity after canonical portable projection, without storage I/O.",
+          "advanced": "",
+          "parameters": ["parts: readonly [ICodecValue, ...ICodecValue[]]"],
+          "parameterDetails": [
+            {
+              "name": "parts",
+              "type": "readonly [ICodecValue, ...ICodecValue[]]",
+              "optional": false
+            }
+          ],
+          "returns": "Promise<string>",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [
+            "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { cachePlugin, cacheKey } from '@migaia/storage-plugin-cache'\n\nconst original = await createStorageHost({ plugins: [memoryBackendPlugin({ id: 'memory' })] })\nconst host = await original.use(\n  cachePlugin({\n    tiers: [{ backend: 'memory', ttlMs: 30000 }],\n    maxAgeMs: 30000,\n    staleAfterMs: 10000,\n    negativeTtlMs: 1000\n  })\n)\nawait host.detect()\ntry {\n  const cache = host.backend('cache')\n  const key = await cacheKey('response', { model: 'model-one', version: 1 })\n  const value = await cache.getOrLoad(\n    key,\n    async (signal) => {\n      if (signal.aborted) return undefined\n      return { answer: 42 }\n    },\n    { meta: { model: 'model-one' } }\n  )\n  console.log(value, await cache.peek(key), cache.stats())\n  await cache.invalidate(key)\n} finally {\n  await host.dispose()\n}"
+          ],
+          "members": [],
+          "composes": [],
+          "aliasOf": "cacheKey",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare function cacheKey(...parts: readonly [ICodecValue, ...ICodecValue[]]): Promise<string>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "parts",
+                "type": "readonly [ICodecValue, ...ICodecValue[]]",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["Promise<string>"],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Hash canonical portable request parts without accessing storage."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import cacheKey from @migaia/storage-plugin-cache, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use cacheKey when its function contract and declared inputs match the result you need. Choose a different public symbol when cacheKey does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "parts: Ordered portable request parts; at least one is required.\nLowercase SHA-256 identity after canonical portable projection, without storage I/O."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-cache/dist/key.d.ts:cacheKey:export declare function cacheKey(...parts: readonly [ICodecValue, ...ICodecValue[]]): Promise<string>;",
+          "guidance": [],
+          "usageScore": 30,
+          "configuration": [],
+          "fragment": "storage-plugin-cache-index--cacheKey"
+        },
+        {
+          "name": "cachePlugin",
+          "kind": "function",
+          "signature": "export declare function cachePlugin<const TId extends string = 'cache', const F extends IStorageFeatureRecord = {}>(options: ICacheOptions & { readonly id?: TId; }, features?: F & IStorageFeatureStoreCompatibility<typeof cacheBackendKind, NoInfer<F>>): IStorageBackendPlugin<typeof cacheBackendKind, NoInfer<TId>, F>;",
+          "declarationLine": 5,
+          "source": "packages/storage-plugin-cache/dist/plugin.d.ts",
+          "purpose": "Compose earlier published KV tiers without taking their client or transaction ownership.",
+          "core": "options: Ordered borrowed tiers and cache policy. Backend IDs come from an earlier host batch.\nfeatures: Optional Features targeting the exact cache kind.\nInstall with host.use after its tiers and explicitly detect before business operations.\nInstall after borrowed tiers and detect explicitly before calls.",
+          "advanced": "Compose published tiers in a later installation batch.",
+          "parameters": [
+            "options: ICacheOptions & { readonly id?: TId; }",
+            "features: F & IStorageFeatureStoreCompatibility<typeof cacheBackendKind, NoInfer<F>> (optional)"
+          ],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "ICacheOptions & { readonly id?: TId; }",
+              "optional": false
+            },
+            {
+              "name": "features",
+              "type": "F & IStorageFeatureStoreCompatibility<typeof cacheBackendKind, NoInfer<F>>",
+              "optional": true
+            }
+          ],
+          "returns": "IStorageBackendPlugin<typeof cacheBackendKind, NoInfer<TId>, F>",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [
+            "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { cachePlugin, cacheKey } from '@migaia/storage-plugin-cache'\n\nconst original = await createStorageHost({ plugins: [memoryBackendPlugin({ id: 'memory' })] })\nconst host = await original.use(\n  cachePlugin({\n    tiers: [{ backend: 'memory', ttlMs: 30000 }],\n    maxAgeMs: 30000,\n    staleAfterMs: 10000,\n    negativeTtlMs: 1000\n  })\n)\nawait host.detect()\ntry {\n  const cache = host.backend('cache')\n  const key = await cacheKey('response', { model: 'model-one', version: 1 })\n  const value = await cache.getOrLoad(\n    key,\n    async (signal) => {\n      if (signal.aborted) return undefined\n      return { answer: 42 }\n    },\n    { meta: { model: 'model-one' } }\n  )\n  console.log(value, await cache.peek(key), cache.stats())\n  await cache.invalidate(key)\n} finally {\n  await host.dispose()\n}",
+            "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'\nimport { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'\nimport { redisBackendPlugin } from '@migaia/storage-plugin-redis'\nimport { nodeRedisDriver } from '@migaia/storage-plugin-redis/node-redis'\nimport { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'\nimport { pgDriver } from '@migaia/storage-plugin-postgres/pg'\nimport { createClientPool } from 'redis'\nimport { Pool } from 'pg'\nimport { cachePlugin } from '@migaia/storage-plugin-cache'\n\nconst redis = createClientPool({ url: process.env.MIGAIA_REDIS_URL })\nconst postgres = new Pool({ connectionString: process.env.MIGAIA_PG_URL })\nawait redis.connect()\nconst prefix = 'cache_guide_' + crypto.randomUUID().replaceAll('-', '')\nconst base = await createStorageHost({\n  plugins: [\n    memoryBackendPlugin({ id: 'l1' }),\n    sqliteBackendPlugin({ id: 'l2', driver: nodeSqliteDriver(':memory:') }),\n    redisBackendPlugin({ id: 'l3', driver: nodeRedisDriver(redis), prefix }),\n    postgresBackendPlugin({ id: 'l4', driver: pgDriver(postgres), prefix })\n  ]\n})\nconst host = await base.use(\n  cachePlugin({\n    propagate: false,\n    tiers: [\n      { backend: 'l1', ttlMs: 10000 },\n      { backend: 'l2', ttlMs: 20000 },\n      { backend: 'l3', ttlMs: 30000 },\n      { backend: 'l4', ttlMs: 60000 }\n    ],\n    stampedeLock: { backend: 'l3', timeoutMs: 1000 }\n  })\n)\nawait host.detect()\ntry {\n  const answer = await host.backend('cache').getOrLoad('answer', async () => ({ text: 'Hello' }))\n  console.log(answer)\n  await host.backend('cache').clearAll()\n} finally {\n  await host.dispose()\n  await redis.close()\n  await postgres.end()\n}",
+            "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { cachePlugin } from '@migaia/storage-plugin-cache'\nimport { semanticCacheFeature } from '@migaia/storage-plugin-cache/features/semantic'\n\nconst base = await createStorageHost({\n  plugins: [memoryBackendPlugin({ id: 'values' }), memoryBackendPlugin({ id: 'vectors' })]\n})\nconst host = await base.use(\n  cachePlugin(\n    {\n      tiers: [{ backend: 'values', ttlMs: 30000 }]\n    },\n    {\n      semantic: semanticCacheFeature({\n        backend: 'vectors',\n        collection: 'answers',\n        dimensions: 2,\n        minScore: 0.8,\n        ttlMs: 30000,\n        embed: async () => [1, 0]\n      })\n    }\n  )\n)\nawait host.detect()\ntry {\n  const semantic = host.backend('cache').api.semantic\n  await semantic.set('Question', { text: 'Answer' }, { payload: { model: 'one' } })\n  const hit = await semantic.get('Question', { where: { model: 'one' }, candidates: 3 })\n  console.log(hit?.value)\n  await semantic.invalidate({ model: 'one' }, { count: 'scroll' })\n} finally {\n  await host.dispose()\n}"
+          ],
+          "members": [],
+          "composes": [],
+          "aliasOf": "cachePlugin",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare function cachePlugin<const TId extends string = 'cache', const F extends IStorageFeatureRecord = {}>(options: ICacheOptions & { readonly id?: TId; }, features?: F & IStorageFeatureStoreCompatibility<typeof cacheBackendKind, NoInfer<F>>): IStorageBackendPlugin<typeof cacheBackendKind, NoInfer<TId>, F>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "ICacheOptions & { readonly id?: TId; }",
+                "optional": false
+              },
+              {
+                "name": "features",
+                "type": "F & IStorageFeatureStoreCompatibility<typeof cacheBackendKind, NoInfer<F>>",
+                "optional": true
+              }
+            ]
+          ],
+          "overloadReturns": ["IStorageBackendPlugin<typeof cacheBackendKind, NoInfer<TId>, F>"],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Compose earlier published KV tiers without taking their client or transaction ownership."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import cachePlugin from @migaia/storage-plugin-cache, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use cachePlugin when its function contract and declared inputs match the result you need. Choose a different public symbol when cachePlugin does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "options: Ordered borrowed tiers and cache policy. Backend IDs come from an earlier host batch.\nfeatures: Optional Features targeting the exact cache kind.\nInstall with host.use after its tiers and explicitly detect before business operations.\nInstall after borrowed tiers and detect explicitly before calls."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "Compose published tiers in a later installation batch."
+            }
+          ],
+          "declaredConfiguration": [
+            {
+              "name": "id",
+              "type": "TId",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "tiers",
+              "type": "readonly [ICacheTierOptions, ...ICacheTierOptions[]]",
+              "optional": false,
+              "description": ""
+            },
+            {
+              "name": "prefix",
+              "type": "string",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "maxAgeMs",
+              "type": "number",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "staleAfterMs",
+              "type": "number",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "negativeTtlMs",
+              "type": "number",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "stampedeLock",
+              "type": "{ readonly backend: string; readonly timeoutMs?: number; }",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "stampedeLock.backend",
+              "type": "string",
+              "optional": false,
+              "description": ""
+            },
+            {
+              "name": "stampedeLock.timeoutMs",
+              "type": "number",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "writeBackIntervalMs",
+              "type": "number",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "propagate",
+              "type": "boolean",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "clock",
+              "type": "() => number",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "jitterRatio",
+              "type": "number",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "random",
+              "type": "() => number",
+              "optional": true,
+              "description": "The original jitter helper consumes this source; omitted uses Math.random."
+            },
+            {
+              "name": "codec",
+              "type": "ICodec<ICodecValue, string>",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "tagIndex",
+              "type": "{ readonly backend: string; }",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "tagIndex.backend",
+              "type": "string",
+              "optional": false,
+              "description": ""
+            }
+          ],
+          "identity": "packages/storage-plugin-cache/dist/plugin.d.ts:cachePlugin:export declare function cachePlugin<const TId extends string = 'cache', const F extends IStorageFeatureRecord = {}>(options: ICacheOptions & { readonly id?: TId; }, features?: F & IStorageFeatureStoreCompatibility<typeof cacheBackendKind, NoInfer<F>>): IStorageBackendPlugin<typeof cacheBackendKind, NoInfer<TId>, F>;",
+          "guidance": [],
+          "usageScore": 64,
+          "configuration": [
+            {
+              "name": "id",
+              "type": "TId",
+              "optional": true,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            },
+            {
+              "name": "tiers",
+              "type": "readonly [ICacheTierOptions, ...ICacheTierOptions[]]",
+              "optional": false,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            },
+            {
+              "name": "prefix",
+              "type": "string",
+              "optional": true,
+              "description": "带计数的 KV `removeByPrefix` 仅单层可用；多层在 I/O 前报 `UNSUPPORTED_CAPABILITY`，因为原生计数无法识别跨层重复逻辑副本。多层无计数删除使用 `invalidate({ prefix })` 或清空方法。`removeMany` 按已给出的不同逻辑键计数，多个副本只计一次。",
+              "descriptionEn": "",
+              "descriptionZh": "带计数的 KV `removeByPrefix` 仅单层可用；多层在 I/O 前报 `UNSUPPORTED_CAPABILITY`，因为原生计数无法识别跨层重复逻辑副本。多层无计数删除使用 `invalidate({ prefix })` 或清空方法。`removeMany` 按已给出的不同逻辑键计数，多个副本只计一次。"
+            },
+            {
+              "name": "maxAgeMs",
+              "type": "number",
+              "optional": true,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            },
+            {
+              "name": "staleAfterMs",
+              "type": "number",
+              "optional": true,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            },
+            {
+              "name": "negativeTtlMs",
+              "type": "number",
+              "optional": true,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            },
+            {
+              "name": "stampedeLock",
+              "type": "{ readonly backend: string; readonly timeoutMs?: number; }",
+              "optional": true,
+              "description": "Groups `stampedeLock.backend`, `stampedeLock.timeoutMs`; configure the nested fields below.",
+              "descriptionEn": "Groups `stampedeLock.backend`, `stampedeLock.timeoutMs`; configure the nested fields below.",
+              "descriptionZh": ""
+            },
+            {
+              "name": "stampedeLock.backend",
+              "type": "string",
+              "optional": false,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            },
+            {
+              "name": "stampedeLock.timeoutMs",
+              "type": "number",
+              "optional": true,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            },
+            {
+              "name": "writeBackIntervalMs",
+              "type": "number",
+              "optional": true,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            },
+            {
+              "name": "propagate",
+              "type": "boolean",
+              "optional": true,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            },
+            {
+              "name": "clock",
+              "type": "() => number",
+              "optional": true,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            },
+            {
+              "name": "jitterRatio",
+              "type": "number",
+              "optional": true,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            },
+            {
+              "name": "random",
+              "type": "() => number",
+              "optional": true,
+              "description": "The original jitter helper consumes this source; omitted uses Math.random.",
+              "descriptionEn": "The original jitter helper consumes this source; omitted uses Math.random.",
+              "descriptionZh": ""
+            },
+            {
+              "name": "codec",
+              "type": "ICodec<ICodecValue, string>",
+              "optional": true,
+              "description": "逻辑键只接受字符串。平铺 `get` 只读取平铺 `set` 写入的条目；codec 值与负条目经 `getOrLoad`、`getOrLoadEntry` 和 `peek` 访问。`cacheKey` 复用原 portable serializer 与 SHA-256，对象字段顺序不影响结果，非法值保留原 serializer 错误。",
+              "descriptionEn": "",
+              "descriptionZh": "逻辑键只接受字符串。平铺 `get` 只读取平铺 `set` 写入的条目；codec 值与负条目经 `getOrLoad`、`getOrLoadEntry` 和 `peek` 访问。`cacheKey` 复用原 portable serializer 与 SHA-256，对象字段顺序不影响结果，非法值保留原 serializer 错误。"
+            },
+            {
+              "name": "tagIndex",
+              "type": "{ readonly backend: string; }",
+              "optional": true,
+              "description": "Groups `tagIndex.backend`; configure the nested fields below.",
+              "descriptionEn": "Groups `tagIndex.backend`; configure the nested fields below.",
+              "descriptionZh": ""
+            },
+            {
+              "name": "tagIndex.backend",
+              "type": "string",
+              "optional": false,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            }
+          ],
+          "fragment": "storage-plugin-cache-index--cachePlugin"
+        },
+        {
+          "name": "CacheWriteMode",
+          "kind": "const",
+          "signature": "export declare const CacheWriteMode: { readonly through: 'through'; readonly back: 'back'; };\nexport type CacheWriteMode = keyof typeof CacheWriteMode;",
+          "declarationLine": 2,
+          "source": "packages/storage-plugin-cache/dist/constants.d.ts",
+          "purpose": "Name through and back tier write policies.",
+          "core": "through: Wait for this layer before returning.\nback: Coalesce writes in the configured pending table.",
+          "advanced": "",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "through",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly through: 'through';",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "'through'"
+            },
+            {
+              "name": "back",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly back: 'back';",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "'back'"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "CacheWriteMode",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const CacheWriteMode: { readonly through: 'through'; readonly back: 'back'; };",
+            "export type CacheWriteMode = keyof typeof CacheWriteMode;"
+          ],
+          "overloadParameterDetails": [[], []],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Name through and back tier write policies."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import CacheWriteMode from @migaia/storage-plugin-cache, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use CacheWriteMode when its const contract and declared inputs match the result you need. Choose a different public symbol when CacheWriteMode does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "through: Wait for this layer before returning.\nback: Coalesce writes in the configured pending table."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-cache/dist/constants.d.ts:CacheWriteMode:export declare const CacheWriteMode: { readonly through: 'through'; readonly back: 'back'; };\nexport type CacheWriteMode = keyof typeof CacheWriteMode;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-cache-index--CacheWriteMode"
+        },
+        {
+          "name": "ERROR_SOURCE",
+          "kind": "const",
+          "signature": "export declare const ERROR_SOURCE: 'storage.backend.cache';",
+          "declarationLine": 2,
+          "source": "packages/storage-plugin-cache/dist/error-code.d.ts",
+          "purpose": "Registered cache error domain storage.backend.cache.",
+          "core": "Registered cache error domain storage.backend.cache.",
+          "advanced": "",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "aliasOf": "ERROR_SOURCE",
+          "exportPath": ".",
+          "overloadSignatures": ["export declare const ERROR_SOURCE: 'storage.backend.cache';"],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Registered cache error domain storage.backend.cache."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ERROR_SOURCE from @migaia/storage-plugin-cache, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ERROR_SOURCE when its const contract and declared inputs match the result you need. Choose a different public symbol when ERROR_SOURCE does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "Registered cache error domain storage.backend.cache."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-cache/dist/error-code.d.ts:ERROR_SOURCE:export declare const ERROR_SOURCE: 'storage.backend.cache';",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-cache-index--ERROR_SOURCE"
+        },
+        {
+          "name": "ICacheBatchLoader",
+          "kind": "type",
+          "signature": "export type ICacheBatchLoader<T> = (keys: readonly string[], signal: AbortSignal) => Promise<ReadonlyMap<string, T | undefined>>;",
+          "declarationLine": 62,
+          "source": "packages/storage-plugin-cache/dist/types.d.ts",
+          "purpose": "One source call for missing keys not already in flight.",
+          "core": "One source call for missing keys not already in flight.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "aliasOf": "ICacheBatchLoader",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type ICacheBatchLoader<T> = (keys: readonly string[], signal: AbortSignal) => Promise<ReadonlyMap<string, T | undefined>>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "One source call for missing keys not already in flight."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ICacheBatchLoader from @migaia/storage-plugin-cache, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ICacheBatchLoader when its type contract and declared inputs match the result you need. Choose a different public symbol when ICacheBatchLoader does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "One source call for missing keys not already in flight."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-cache/dist/types.d.ts:ICacheBatchLoader:export type ICacheBatchLoader<T> = (keys: readonly string[], signal: AbortSignal) => Promise<ReadonlyMap<string, T | undefined>>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-cache-index--ICacheBatchLoader"
+        },
+        {
+          "name": "ICacheCallOptions",
+          "kind": "type",
+          "signature": "export type ICacheCallOptions<T = unknown> = { readonly ctx?: IOperationContext; readonly ttlMs?: number; readonly staleAfterMs?: number; readonly maxAgeMs?: number; readonly negativeTtlMs?: number; readonly tags?: readonly string[]; readonly meta?: Readonly<Record<string, string | number | boolean>>; readonly cacheIf?: (value: T) => boolean; readonly mode?: 'default' | 'refresh' | 'bypass'; };",
+          "declarationLine": 38,
+          "source": "packages/storage-plugin-cache/dist/types.d.ts",
+          "purpose": "Per-call policy only shortens configured deadlines.",
+          "core": "ctx: Original caller operation context and cancellation budget.\nttlMs: Native hard lifetime; per-call values can only shorten a configured bound.\nstaleAfterMs: Return older hits while one shared background refresh proceeds.\nmaxAgeMs: Overall wall-clock expiry bound recorded in the envelope.\nnegativeTtlMs: Finite lifetime for cached undefined source results.\ntags: Dependency labels indexed before any cache entry is written.\nmeta: Detached scalar observations returned with the cached value.\ncacheIf: False returns the source result without storing it.\nmode: Default reads; refresh forces loading; bypass avoids all tier I/O.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "ctx",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly ctx?: IOperationContext;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IOperationContext"
+            },
+            {
+              "name": "ttlMs",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly ttlMs?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "staleAfterMs",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly staleAfterMs?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "maxAgeMs",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly maxAgeMs?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "negativeTtlMs",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly negativeTtlMs?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "tags",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly tags?: readonly string[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly string[]"
+            },
+            {
+              "name": "meta",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly meta?: Readonly<Record<string, string | number | boolean>>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Readonly<Record<string, string | number | boolean>>"
+            },
+            {
+              "name": "cacheIf",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly cacheIf?: (value: T) => boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "(value: T) => boolean"
+            },
+            {
+              "name": "mode",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly mode?: 'default' | 'refresh' | 'bypass';",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "'default' | 'refresh' | 'bypass'"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "ICacheCallOptions",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type ICacheCallOptions<T = unknown> = { readonly ctx?: IOperationContext; readonly ttlMs?: number; readonly staleAfterMs?: number; readonly maxAgeMs?: number; readonly negativeTtlMs?: number; readonly tags?: readonly string[]; readonly meta?: Readonly<Record<string, string | number | boolean>>; readonly cacheIf?: (value: T) => boolean; readonly mode?: 'default' | 'refresh' | 'bypass'; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Per-call policy only shortens configured deadlines."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ICacheCallOptions from @migaia/storage-plugin-cache, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ICacheCallOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when ICacheCallOptions does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "ctx: Original caller operation context and cancellation budget.\nttlMs: Native hard lifetime; per-call values can only shorten a configured bound.\nstaleAfterMs: Return older hits while one shared background refresh proceeds.\nmaxAgeMs: Overall wall-clock expiry bound recorded in the envelope.\nnegativeTtlMs: Finite lifetime for cached undefined source results.\ntags: Dependency labels indexed before any cache entry is written.\nmeta: Detached scalar observations returned with the cached value.\ncacheIf: False returns the source result without storing it.\nmode: Default reads; refresh forces loading; bypass avoids all tier I/O."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-cache/dist/types.d.ts:ICacheCallOptions:export type ICacheCallOptions<T = unknown> = { readonly ctx?: IOperationContext; readonly ttlMs?: number; readonly staleAfterMs?: number; readonly maxAgeMs?: number; readonly negativeTtlMs?: number; readonly tags?: readonly string[]; readonly meta?: Readonly<Record<string, string | number | boolean>>; readonly cacheIf?: (value: T) => boolean; readonly mode?: 'default' | 'refresh' | 'bypass'; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-cache-index--ICacheCallOptions"
+        },
+        {
+          "name": "ICacheEntryInfo",
+          "kind": "type",
+          "signature": "export type ICacheEntryInfo<T> = Readonly<{ value: T | undefined; tier: number | undefined; stale: boolean; negative: boolean; ageMs: number | undefined; meta?: Readonly<Record<string, string | number | boolean>>; tags: readonly string[]; }>;",
+          "declarationLine": 50,
+          "source": "packages/storage-plugin-cache/dist/types.d.ts",
+          "purpose": "Decoded value and original hit provenance.",
+          "core": "value: Decoded application value; source ownership stays with the caller.\ntier: Zero-based hit tier; semantic diagnostics use minus one.\nstale: The hit exceeded its selected soft deadline.\nnegative: The envelope records an undefined source result.\nageMs: Elapsed wall-clock age since the original write.\nmeta: Detached scalar observations returned with the cached value.\ntags: Dependency labels indexed before any cache entry is written.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "value",
+              "kind": "property",
+              "optional": false,
+              "signature": "value: T | undefined;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "T | undefined"
+            },
+            {
+              "name": "tier",
+              "kind": "property",
+              "optional": false,
+              "signature": "tier: number | undefined;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number | undefined"
+            },
+            {
+              "name": "stale",
+              "kind": "property",
+              "optional": false,
+              "signature": "stale: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "negative",
+              "kind": "property",
+              "optional": false,
+              "signature": "negative: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "ageMs",
+              "kind": "property",
+              "optional": false,
+              "signature": "ageMs: number | undefined;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number | undefined"
+            },
+            {
+              "name": "meta",
+              "kind": "property",
+              "optional": true,
+              "signature": "meta?: Readonly<Record<string, string | number | boolean>>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Readonly<Record<string, string | number | boolean>>"
+            },
+            {
+              "name": "tags",
+              "kind": "property",
+              "optional": false,
+              "signature": "tags: readonly string[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly string[]"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "ICacheEntryInfo",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type ICacheEntryInfo<T> = Readonly<{ value: T | undefined; tier: number | undefined; stale: boolean; negative: boolean; ageMs: number | undefined; meta?: Readonly<Record<string, string | number | boolean>>; tags: readonly string[]; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Decoded value and original hit provenance."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ICacheEntryInfo from @migaia/storage-plugin-cache, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ICacheEntryInfo when its type contract and declared inputs match the result you need. Choose a different public symbol when ICacheEntryInfo does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "value: Decoded application value; source ownership stays with the caller.\ntier: Zero-based hit tier; semantic diagnostics use minus one.\nstale: The hit exceeded its selected soft deadline.\nnegative: The envelope records an undefined source result.\nageMs: Elapsed wall-clock age since the original write.\nmeta: Detached scalar observations returned with the cached value.\ntags: Dependency labels indexed before any cache entry is written."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-cache/dist/types.d.ts:ICacheEntryInfo:export type ICacheEntryInfo<T> = Readonly<{ value: T | undefined; tier: number | undefined; stale: boolean; negative: boolean; ageMs: number | undefined; meta?: Readonly<Record<string, string | number | boolean>>; tags: readonly string[]; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-cache-index--ICacheEntryInfo"
+        },
+        {
+          "name": "ICacheErrorCode",
+          "kind": "type",
+          "signature": "export type ICacheErrorCode = (typeof CacheErrorCode)[keyof typeof CacheErrorCode];",
+          "declarationLine": 15,
+          "source": "packages/storage-plugin-cache/dist/error-code.d.ts",
+          "purpose": "Registered cache configuration, source and embedding failure identities.",
+          "core": "Registered cache configuration, source and embedding failure identities.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "aliasOf": "ICacheErrorCode",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type ICacheErrorCode = (typeof CacheErrorCode)[keyof typeof CacheErrorCode];"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Registered cache configuration, source and embedding failure identities."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ICacheErrorCode from @migaia/storage-plugin-cache, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ICacheErrorCode when its type contract and declared inputs match the result you need. Choose a different public symbol when ICacheErrorCode does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "Registered cache configuration, source and embedding failure identities."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-cache/dist/error-code.d.ts:ICacheErrorCode:export type ICacheErrorCode = (typeof CacheErrorCode)[keyof typeof CacheErrorCode];",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-cache-index--ICacheErrorCode"
+        },
+        {
+          "name": "ICacheLoader",
+          "kind": "type",
+          "signature": "export type ICacheLoader<T> = (signal: AbortSignal) => Promise<T | undefined>;",
+          "declarationLine": 60,
+          "source": "packages/storage-plugin-cache/dist/types.d.ts",
+          "purpose": "Original source callback receiving only the cache closing signal.",
+          "core": "Original source callback receiving only the cache closing signal.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "aliasOf": "ICacheLoader",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type ICacheLoader<T> = (signal: AbortSignal) => Promise<T | undefined>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Original source callback receiving only the cache closing signal."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ICacheLoader from @migaia/storage-plugin-cache, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ICacheLoader when its type contract and declared inputs match the result you need. Choose a different public symbol when ICacheLoader does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "Original source callback receiving only the cache closing signal."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-cache/dist/types.d.ts:ICacheLoader:export type ICacheLoader<T> = (signal: AbortSignal) => Promise<T | undefined>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-cache-index--ICacheLoader"
+        },
+        {
+          "name": "ICacheOptions",
+          "kind": "type",
+          "signature": "export type ICacheOptions = { readonly tiers: readonly [ICacheTierOptions, ...ICacheTierOptions[]]; readonly prefix?: string; readonly maxAgeMs?: number; readonly staleAfterMs?: number; readonly negativeTtlMs?: number; readonly stampedeLock?: { readonly backend: string; readonly timeoutMs?: number; }; readonly writeBackIntervalMs?: number; readonly propagate?: boolean; readonly clock?: () => number; readonly jitterRatio?: number; /** The original jitter helper consumes this source; omitted uses Math.random. */ readonly random?: () => number; readonly codec?: ICodec<ICodecValue, string>; readonly tagIndex?: { readonly backend: string; }; };",
+          "declarationLine": 16,
+          "source": "packages/storage-plugin-cache/dist/types.d.ts",
+          "purpose": "Installed cache policy over ordered borrowed tiers.",
+          "core": "tiers: Nonempty distinct tiers ordered fastest to slowest; the final tier is through.\nprefix: Physical managed string prefix; default includes the cache plugin ID.\nmaxAgeMs: Overall wall-clock expiry bound recorded in the envelope.\nstaleAfterMs: Return older hits while one shared background refresh proceeds.\nnegativeTtlMs: Finite lifetime for cached undefined source results.\nstampedeLock: Existing tier whose native key transaction rechecks and loads the missing key.\nwriteBackIntervalMs: Original scheduler interval for flushing the pending key table.\npropagate: Consume native invalidations; upper tiers need expiry bounds.\nclock: Injected wall-clock milliseconds for shared timestamps.\njitterRatio: Zero to one-half reduction; never extends a lifetime.\nrandom: Sample source for the original numeric jitter helper.\ncodec: Original text-output value codec; defaults to strict JSON.\ntagIndex: Earlier records and TTL backend indexing entry dependencies.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "tiers",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly tiers: readonly [ICacheTierOptions, ...ICacheTierOptions[]];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly [ICacheTierOptions, ...ICacheTierOptions[]]"
+            },
+            {
+              "name": "prefix",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly prefix?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "maxAgeMs",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly maxAgeMs?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "staleAfterMs",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly staleAfterMs?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "negativeTtlMs",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly negativeTtlMs?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "stampedeLock",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly stampedeLock?: { readonly backend: string; readonly timeoutMs?: number; };",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "{ readonly backend: string; readonly timeoutMs?: number; }"
+            },
+            {
+              "name": "writeBackIntervalMs",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly writeBackIntervalMs?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "propagate",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly propagate?: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "clock",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly clock?: () => number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "() => number"
+            },
+            {
+              "name": "jitterRatio",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly jitterRatio?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "random",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly random?: () => number;",
+              "description": "The original jitter helper consumes this source; omitted uses Math.random.",
+              "parameterDetails": [],
+              "returns": "() => number"
+            },
+            {
+              "name": "codec",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly codec?: ICodec<ICodecValue, string>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ICodec<ICodecValue, string>"
+            },
+            {
+              "name": "tagIndex",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly tagIndex?: { readonly backend: string; };",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "{ readonly backend: string; }"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "ICacheOptions",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type ICacheOptions = { readonly tiers: readonly [ICacheTierOptions, ...ICacheTierOptions[]]; readonly prefix?: string; readonly maxAgeMs?: number; readonly staleAfterMs?: number; readonly negativeTtlMs?: number; readonly stampedeLock?: { readonly backend: string; readonly timeoutMs?: number; }; readonly writeBackIntervalMs?: number; readonly propagate?: boolean; readonly clock?: () => number; readonly jitterRatio?: number; /** The original jitter helper consumes this source; omitted uses Math.random. */ readonly random?: () => number; readonly codec?: ICodec<ICodecValue, string>; readonly tagIndex?: { readonly backend: string; }; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Installed cache policy over ordered borrowed tiers."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ICacheOptions from @migaia/storage-plugin-cache, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ICacheOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when ICacheOptions does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "tiers: Nonempty distinct tiers ordered fastest to slowest; the final tier is through.\nprefix: Physical managed string prefix; default includes the cache plugin ID.\nmaxAgeMs: Overall wall-clock expiry bound recorded in the envelope.\nstaleAfterMs: Return older hits while one shared background refresh proceeds.\nnegativeTtlMs: Finite lifetime for cached undefined source results.\nstampedeLock: Existing tier whose native key transaction rechecks and loads the missing key.\nwriteBackIntervalMs: Original scheduler interval for flushing the pending key table.\npropagate: Consume native invalidations; upper tiers need expiry bounds.\nclock: Injected wall-clock milliseconds for shared timestamps.\njitterRatio: Zero to one-half reduction; never extends a lifetime.\nrandom: Sample source for the original numeric jitter helper.\ncodec: Original text-output value codec; defaults to strict JSON.\ntagIndex: Earlier records and TTL backend indexing entry dependencies."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-cache/dist/types.d.ts:ICacheOptions:export type ICacheOptions = { readonly tiers: readonly [ICacheTierOptions, ...ICacheTierOptions[]]; readonly prefix?: string; readonly maxAgeMs?: number; readonly staleAfterMs?: number; readonly negativeTtlMs?: number; readonly stampedeLock?: { readonly backend: string; readonly timeoutMs?: number; }; readonly writeBackIntervalMs?: number; readonly propagate?: boolean; readonly clock?: () => number; readonly jitterRatio?: number; /** The original jitter helper consumes this source; omitted uses Math.random. */ readonly random?: () => number; readonly codec?: ICodec<ICodecValue, string>; readonly tagIndex?: { readonly backend: string; }; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-cache-index--ICacheOptions"
+        },
+        {
+          "name": "ICacheStats",
+          "kind": "type",
+          "signature": "export type ICacheStats = Readonly<{ hits: readonly number[]; misses: readonly number[]; loads: number; staleServed: number; negativeHits: number; invalidations: number; writeBackDropped: number; skipped: readonly number[]; }>;",
+          "declarationLine": 64,
+          "source": "packages/storage-plugin-cache/dist/types.d.ts",
+          "purpose": "Immutable counts without application keys or values.",
+          "core": "hits: Observed hits count without stored application content.\nmisses: Observed misses count without stored application content.\nloads: Observed loads count without stored application content.\nstaleServed: Observed staleServed count without stored application content.\nnegativeHits: Observed negativeHits count without stored application content.\ninvalidations: Observed invalidations count without stored application content.\nwriteBackDropped: Observed writeBackDropped count without stored application content.\nskipped: Observed skipped count without stored application content.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "hits",
+              "kind": "property",
+              "optional": false,
+              "signature": "hits: readonly number[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly number[]"
+            },
+            {
+              "name": "misses",
+              "kind": "property",
+              "optional": false,
+              "signature": "misses: readonly number[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly number[]"
+            },
+            {
+              "name": "loads",
+              "kind": "property",
+              "optional": false,
+              "signature": "loads: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "staleServed",
+              "kind": "property",
+              "optional": false,
+              "signature": "staleServed: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "negativeHits",
+              "kind": "property",
+              "optional": false,
+              "signature": "negativeHits: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "invalidations",
+              "kind": "property",
+              "optional": false,
+              "signature": "invalidations: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "writeBackDropped",
+              "kind": "property",
+              "optional": false,
+              "signature": "writeBackDropped: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "skipped",
+              "kind": "property",
+              "optional": false,
+              "signature": "skipped: readonly number[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly number[]"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "ICacheStats",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type ICacheStats = Readonly<{ hits: readonly number[]; misses: readonly number[]; loads: number; staleServed: number; negativeHits: number; invalidations: number; writeBackDropped: number; skipped: readonly number[]; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Immutable counts without application keys or values."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ICacheStats from @migaia/storage-plugin-cache, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ICacheStats when its type contract and declared inputs match the result you need. Choose a different public symbol when ICacheStats does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "hits: Observed hits count without stored application content.\nmisses: Observed misses count without stored application content.\nloads: Observed loads count without stored application content.\nstaleServed: Observed staleServed count without stored application content.\nnegativeHits: Observed negativeHits count without stored application content.\ninvalidations: Observed invalidations count without stored application content.\nwriteBackDropped: Observed writeBackDropped count without stored application content.\nskipped: Observed skipped count without stored application content."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-cache/dist/types.d.ts:ICacheStats:export type ICacheStats = Readonly<{ hits: readonly number[]; misses: readonly number[]; loads: number; staleServed: number; negativeHits: number; invalidations: number; writeBackDropped: number; skipped: readonly number[]; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-cache-index--ICacheStats"
+        },
+        {
+          "name": "ICacheStore",
+          "kind": "type",
+          "signature": "export type ICacheStore = ICapabilityStore<IStorageBase & IKeyValueApi & { readonly backend: 'cache'; getOrLoad<T extends ICodecValue>(key: string, load: ICacheLoader<T>, options?: ICacheCallOptions<T>): Promise<T | undefined>; getOrLoadEntry<T extends ICodecValue>(key: string, load: ICacheLoader<T>, options?: ICacheCallOptions<T>): Promise<ICacheEntryInfo<T>>; getOrLoadMany<T extends ICodecValue>(keys: readonly string[], load: ICacheBatchLoader<T>, options?: ICacheCallOptions<T>): Promise<ReadonlyMap<string, T | undefined>>; peek<T extends ICodecValue>(key: string, ctx?: IOperationContext): Promise<ICacheEntryInfo<T> | undefined>; invalidate(target: string | { readonly prefix: string; } | { readonly tag: string; }, ctx?: IOperationContext): Promise<void>; flush(ctx?: IOperationContext): Promise<void>; sweepOffload(ctx?: IOperationContext): Promise<number>; stats(): ICacheStats; }, typeof kv, readonly [ICapabilityImpl<typeof kv>]>;",
+          "declarationLine": 78,
+          "source": "packages/storage-plugin-cache/dist/types.d.ts",
+          "purpose": "KV orchestration, source loading and explicit cache invalidation.",
+          "core": "getOrLoad: Read tiers and share one source load for a missing logical key.\ngetOrLoadEntry: Load with the same policy and return hit provenance with the value.\ngetOrLoadMany: Batch tier reads and load only missing keys without an existing flight.\npeek: Inspect a live entry without invoking a source loader.\ninvalidate: Invalidate one key, a managed prefix or an indexed dependency tag.\nflush: Await actual writes for the current coalesced back entries.\nsweepOffload: Delete unreferenced offloaded blobs beyond the shared retention bound.\nstats: Return immutable counters without retaining application content.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": ["ICapabilityStore"],
+          "aliasOf": "ICacheStore",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type ICacheStore = ICapabilityStore<IStorageBase & IKeyValueApi & { readonly backend: 'cache'; getOrLoad<T extends ICodecValue>(key: string, load: ICacheLoader<T>, options?: ICacheCallOptions<T>): Promise<T | undefined>; getOrLoadEntry<T extends ICodecValue>(key: string, load: ICacheLoader<T>, options?: ICacheCallOptions<T>): Promise<ICacheEntryInfo<T>>; getOrLoadMany<T extends ICodecValue>(keys: readonly string[], load: ICacheBatchLoader<T>, options?: ICacheCallOptions<T>): Promise<ReadonlyMap<string, T | undefined>>; peek<T extends ICodecValue>(key: string, ctx?: IOperationContext): Promise<ICacheEntryInfo<T> | undefined>; invalidate(target: string | { readonly prefix: string; } | { readonly tag: string; }, ctx?: IOperationContext): Promise<void>; flush(ctx?: IOperationContext): Promise<void>; sweepOffload(ctx?: IOperationContext): Promise<number>; stats(): ICacheStats; }, typeof kv, readonly [ICapabilityImpl<typeof kv>]>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "KV orchestration, source loading and explicit cache invalidation."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ICacheStore from @migaia/storage-plugin-cache, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ICacheStore when its type contract and declared inputs match the result you need. Choose a different public symbol when ICacheStore does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "getOrLoad: Read tiers and share one source load for a missing logical key.\ngetOrLoadEntry: Load with the same policy and return hit provenance with the value.\ngetOrLoadMany: Batch tier reads and load only missing keys without an existing flight.\npeek: Inspect a live entry without invoking a source loader.\ninvalidate: Invalidate one key, a managed prefix or an indexed dependency tag.\nflush: Await actual writes for the current coalesced back entries.\nsweepOffload: Delete unreferenced offloaded blobs beyond the shared retention bound.\nstats: Return immutable counters without retaining application content."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-cache/dist/types.d.ts:ICacheStore:export type ICacheStore = ICapabilityStore<IStorageBase & IKeyValueApi & { readonly backend: 'cache'; getOrLoad<T extends ICodecValue>(key: string, load: ICacheLoader<T>, options?: ICacheCallOptions<T>): Promise<T | undefined>; getOrLoadEntry<T extends ICodecValue>(key: string, load: ICacheLoader<T>, options?: ICacheCallOptions<T>): Promise<ICacheEntryInfo<T>>; getOrLoadMany<T extends ICodecValue>(keys: readonly string[], load: ICacheBatchLoader<T>, options?: ICacheCallOptions<T>): Promise<ReadonlyMap<string, T | undefined>>; peek<T extends ICodecValue>(key: string, ctx?: IOperationContext): Promise<ICacheEntryInfo<T> | undefined>; invalidate(target: string | { readonly prefix: string; } | { readonly tag: string; }, ctx?: IOperationContext): Promise<void>; flush(ctx?: IOperationContext): Promise<void>; sweepOffload(ctx?: IOperationContext): Promise<number>; stats(): ICacheStats; }, typeof kv, readonly [ICapabilityImpl<typeof kv>]>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-cache-index--ICacheStore"
+        },
+        {
+          "name": "ICacheTierHookPayload",
+          "kind": "type",
+          "signature": "export type ICacheTierHookPayload = IStorageHookIdentity & Readonly<{ tier: number; }>;",
+          "declarationLine": 3,
+          "source": "packages/storage-plugin-cache/dist/hooks.d.ts",
+          "purpose": "Original host identity and observed tier number.",
+          "core": "backendId: Original host registration backendId identity.\nbackend: ID published by an earlier host installation batch.\norgId: Original host registration orgId identity.\ntransactionId: Original host registration transactionId identity.\ntier: Zero-based hit tier; semantic diagnostics use minus one.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "tier",
+              "kind": "property",
+              "optional": false,
+              "signature": "tier: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            }
+          ],
+          "composes": ["IStorageHookIdentity"],
+          "aliasOf": "ICacheTierHookPayload",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type ICacheTierHookPayload = IStorageHookIdentity & Readonly<{ tier: number; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Original host identity and observed tier number."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ICacheTierHookPayload from @migaia/storage-plugin-cache, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ICacheTierHookPayload when its type contract and declared inputs match the result you need. Choose a different public symbol when ICacheTierHookPayload does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "backendId: Original host registration backendId identity.\nbackend: ID published by an earlier host installation batch.\norgId: Original host registration orgId identity.\ntransactionId: Original host registration transactionId identity.\ntier: Zero-based hit tier; semantic diagnostics use minus one."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-cache/dist/hooks.d.ts:ICacheTierHookPayload:export type ICacheTierHookPayload = IStorageHookIdentity & Readonly<{ tier: number; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-cache-index--ICacheTierHookPayload"
+        },
+        {
+          "name": "ICacheTierOptions",
+          "kind": "type",
+          "signature": "export type ICacheTierOptions = { readonly backend: string; readonly ttlMs?: number; readonly write?: CacheWriteMode; readonly maxEntryBytes?: number; readonly offload?: { readonly backend: string; readonly minBytes: number; }; };",
+          "declarationLine": 5,
+          "source": "packages/storage-plugin-cache/dist/types.d.ts",
+          "purpose": "One native tier with explicit write timing and hard lifetime.",
+          "core": "backend: ID published by an earlier host installation batch.\nttlMs: Native hard lifetime; per-call values can only shorten a configured bound.\nwrite: Through waits for the native write; back coalesces by key until flush.\nmaxEntryBytes: Skip entries exceeding this complete encoded byte size.\noffload: Earlier blob backend and minimum encoded content byte size.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "backend",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly backend: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "ttlMs",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly ttlMs?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "write",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly write?: CacheWriteMode;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "CacheWriteMode"
+            },
+            {
+              "name": "maxEntryBytes",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly maxEntryBytes?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "offload",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly offload?: { readonly backend: string; readonly minBytes: number; };",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "{ readonly backend: string; readonly minBytes: number; }"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "ICacheTierOptions",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type ICacheTierOptions = { readonly backend: string; readonly ttlMs?: number; readonly write?: CacheWriteMode; readonly maxEntryBytes?: number; readonly offload?: { readonly backend: string; readonly minBytes: number; }; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "One native tier with explicit write timing and hard lifetime."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ICacheTierOptions from @migaia/storage-plugin-cache, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ICacheTierOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when ICacheTierOptions does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "backend: ID published by an earlier host installation batch.\nttlMs: Native hard lifetime; per-call values can only shorten a configured bound.\nwrite: Through waits for the native write; back coalesces by key until flush.\nmaxEntryBytes: Skip entries exceeding this complete encoded byte size.\noffload: Earlier blob backend and minimum encoded content byte size."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-cache/dist/types.d.ts:ICacheTierOptions:export type ICacheTierOptions = { readonly backend: string; readonly ttlMs?: number; readonly write?: CacheWriteMode; readonly maxEntryBytes?: number; readonly offload?: { readonly backend: string; readonly minBytes: number; }; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-cache-index--ICacheTierOptions"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "storage-plugin-cache:features/semantic",
+      "library": "storage-plugin-cache",
+      "module": "features/semantic",
+      "exportPath": "./features/semantic",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/docs/storage-plugin-cache/getting-started",
+      "architecturePath": "/en/docs/storage-plugin-cache",
+      "symbols": [
+        {
+          "name": "ISemanticCacheApi",
+          "kind": "type",
+          "signature": "export type ISemanticCacheApi = { get<T extends ICodecValue>(prompt: string, options?: ISemanticGetOptions<T>): Promise<ISemanticHit<T> | undefined>; set<T extends ICodecValue>(prompt: string, value: T, options?: { readonly payload?: ISemanticPayload; readonly ctx?: IOperationContext; }): Promise<void>; getOrLoad<T extends ICodecValue>(prompt: string, load: (signal: AbortSignal) => Promise<T>, options?: ISemanticGetOptions<T> & { readonly payload?: ISemanticPayload; readonly ttlMs?: number; readonly cacheIf?: (value: T) => boolean; }): Promise<ISemanticHit<T> | ISemanticLoaded<T>>; invalidate(where: IWhere<ISemanticPayload>, ctx?: IOperationContext & { readonly count?: DeleteCountMode; }): Promise<number>; };",
+          "declarationLine": 37,
+          "source": "packages/storage-plugin-cache/dist/features/semantic.d.ts",
+          "purpose": "Native semantic reads, writes, shared source loads and counted deletion.",
+          "core": "get: Embed the prompt and verify candidates in native score order.\nset: Store a response through the original vector upsert and native expiry owner.\ngetOrLoad: Share a source load only after native semantic matching misses.\ninvalidate: Return the original counted native deletion result, including physically expired matches.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "get",
+              "kind": "method",
+              "optional": false,
+              "signature": "get<T extends ICodecValue>(prompt: string, options?: ISemanticGetOptions<T>): Promise<ISemanticHit<T> | undefined>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "prompt",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "options",
+                  "type": "ISemanticGetOptions<T>",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<ISemanticHit<T> | undefined>"
+            },
+            {
+              "name": "set",
+              "kind": "method",
+              "optional": false,
+              "signature": "set<T extends ICodecValue>(prompt: string, value: T, options?: { readonly payload?: ISemanticPayload; readonly ctx?: IOperationContext; }): Promise<void>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "prompt",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "value",
+                  "type": "T",
+                  "optional": false,
+                  "configurationType": "ICodecValue"
+                },
+                {
+                  "name": "options",
+                  "type": "{ readonly payload?: ISemanticPayload; readonly ctx?: IOperationContext; }",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<void>"
+            },
+            {
+              "name": "getOrLoad",
+              "kind": "method",
+              "optional": false,
+              "signature": "getOrLoad<T extends ICodecValue>(prompt: string, load: (signal: AbortSignal) => Promise<T>, options?: ISemanticGetOptions<T> & { readonly payload?: ISemanticPayload; readonly ttlMs?: number; readonly cacheIf?: (value: T) => boolean; }): Promise<ISemanticHit<T> | ISemanticLoaded<T>>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "prompt",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "load",
+                  "type": "(signal: AbortSignal) => Promise<T>",
+                  "optional": false
+                },
+                {
+                  "name": "options",
+                  "type": "ISemanticGetOptions<T> & { readonly payload?: ISemanticPayload; readonly ttlMs?: number; readonly cacheIf?: (value: T) => boolean; }",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<ISemanticHit<T> | ISemanticLoaded<T>>"
+            },
+            {
+              "name": "invalidate",
+              "kind": "method",
+              "optional": false,
+              "signature": "invalidate(where: IWhere<ISemanticPayload>, ctx?: IOperationContext & { readonly count?: DeleteCountMode; }): Promise<number>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "where",
+                  "type": "IWhere<ISemanticPayload>",
+                  "optional": false
+                },
+                {
+                  "name": "ctx",
+                  "type": "IOperationContext & { readonly count?: DeleteCountMode; }",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<number>"
+            }
+          ],
+          "composes": [],
+          "exportPath": "./features/semantic",
+          "overloadSignatures": [
+            "export type ISemanticCacheApi = { get<T extends ICodecValue>(prompt: string, options?: ISemanticGetOptions<T>): Promise<ISemanticHit<T> | undefined>; set<T extends ICodecValue>(prompt: string, value: T, options?: { readonly payload?: ISemanticPayload; readonly ctx?: IOperationContext; }): Promise<void>; getOrLoad<T extends ICodecValue>(prompt: string, load: (signal: AbortSignal) => Promise<T>, options?: ISemanticGetOptions<T> & { readonly payload?: ISemanticPayload; readonly ttlMs?: number; readonly cacheIf?: (value: T) => boolean; }): Promise<ISemanticHit<T> | ISemanticLoaded<T>>; invalidate(where: IWhere<ISemanticPayload>, ctx?: IOperationContext & { readonly count?: DeleteCountMode; }): Promise<number>; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Native semantic reads, writes, shared source loads and counted deletion."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ISemanticCacheApi from @migaia/storage-plugin-cache/features/semantic, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ISemanticCacheApi when its type contract and declared inputs match the result you need. Choose a different public symbol when ISemanticCacheApi does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "get: Embed the prompt and verify candidates in native score order.\nset: Store a response through the original vector upsert and native expiry owner.\ngetOrLoad: Share a source load only after native semantic matching misses.\ninvalidate: Return the original counted native deletion result, including physically expired matches."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-cache/dist/features/semantic.d.ts:ISemanticCacheApi:export type ISemanticCacheApi = { get<T extends ICodecValue>(prompt: string, options?: ISemanticGetOptions<T>): Promise<ISemanticHit<T> | undefined>; set<T extends ICodecValue>(prompt: string, value: T, options?: { readonly payload?: ISemanticPayload; readonly ctx?: IOperationContext; }): Promise<void>; getOrLoad<T extends ICodecValue>(prompt: string, load: (signal: AbortSignal) => Promise<T>, options?: ISemanticGetOptions<T> & { readonly payload?: ISemanticPayload; readonly ttlMs?: number; readonly cacheIf?: (value: T) => boolean; }): Promise<ISemanticHit<T> | ISemanticLoaded<T>>; invalidate(where: IWhere<ISemanticPayload>, ctx?: IOperationContext & { readonly count?: DeleteCountMode; }): Promise<number>; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-cache-features/semantic--ISemanticCacheApi"
+        },
+        {
+          "name": "ISemanticCacheOptions",
+          "kind": "type",
+          "signature": "export type ISemanticCacheOptions = { readonly backend: string; readonly collection: string; readonly dimensions: number; readonly metric?: 'cosine' | 'dot' | 'euclid'; readonly minScore: number; readonly ttlMs?: number; readonly embed: (text: string, signal?: AbortSignal) => Promise<readonly number[]>; };",
+          "declarationLine": 7,
+          "source": "packages/storage-plugin-cache/dist/features/semantic.d.ts",
+          "purpose": "Native vector schema, score threshold and application embedder.",
+          "core": "backend: ID published by an earlier host installation batch.\ncollection: Native collection storing semantic answer points.\ndimensions: Exact positive vector dimension owned by the original schema.\nmetric: Native cosine, dot or euclid metric; defaults to cosine.\nminScore: Minimum native score before application acceptance.\nttlMs: Native hard lifetime; per-call values can only shorten a configured bound.\nembed: Application callback generating vectors; original failures remain on cause.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "backend",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly backend: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "collection",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly collection: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "dimensions",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly dimensions: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "metric",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly metric?: 'cosine' | 'dot' | 'euclid';",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "'cosine' | 'dot' | 'euclid'"
+            },
+            {
+              "name": "minScore",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly minScore: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "ttlMs",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly ttlMs?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "embed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly embed: (text: string, signal?: AbortSignal) => Promise<readonly number[]>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "(text: string, signal?: AbortSignal) => Promise<readonly number[]>"
+            }
+          ],
+          "composes": [],
+          "exportPath": "./features/semantic",
+          "overloadSignatures": [
+            "export type ISemanticCacheOptions = { readonly backend: string; readonly collection: string; readonly dimensions: number; readonly metric?: 'cosine' | 'dot' | 'euclid'; readonly minScore: number; readonly ttlMs?: number; readonly embed: (text: string, signal?: AbortSignal) => Promise<readonly number[]>; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Native vector schema, score threshold and application embedder."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ISemanticCacheOptions from @migaia/storage-plugin-cache/features/semantic, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ISemanticCacheOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when ISemanticCacheOptions does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "backend: ID published by an earlier host installation batch.\ncollection: Native collection storing semantic answer points.\ndimensions: Exact positive vector dimension owned by the original schema.\nmetric: Native cosine, dot or euclid metric; defaults to cosine.\nminScore: Minimum native score before application acceptance.\nttlMs: Native hard lifetime; per-call values can only shorten a configured bound.\nembed: Application callback generating vectors; original failures remain on cause."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-cache/dist/features/semantic.d.ts:ISemanticCacheOptions:export type ISemanticCacheOptions = { readonly backend: string; readonly collection: string; readonly dimensions: number; readonly metric?: 'cosine' | 'dot' | 'euclid'; readonly minScore: number; readonly ttlMs?: number; readonly embed: (text: string, signal?: AbortSignal) => Promise<readonly number[]>; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-cache-features/semantic--ISemanticCacheOptions"
+        },
+        {
+          "name": "ISemanticGetOptions",
+          "kind": "type",
+          "signature": "export type ISemanticGetOptions<T> = { readonly where?: IWhere<ISemanticPayload>; readonly minScore?: number; readonly candidates?: number; readonly accept?: (hit: ISemanticHit<T>) => boolean | Promise<boolean>; readonly ctx?: IOperationContext; };",
+          "declarationLine": 29,
+          "source": "packages/storage-plugin-cache/dist/features/semantic.d.ts",
+          "purpose": "Bounded native candidates with optional ordered application acceptance.",
+          "core": "where: Original declarative scalar filter excluding reserved fields.\nminScore: Minimum native score before application acceptance.\ncandidates: One to ten native candidates, defaulting to one.\naccept: Ordered asynchronous verification; failures report and skip.\nctx: Original caller operation context and cancellation budget.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "where",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly where?: IWhere<ISemanticPayload>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IWhere<ISemanticPayload>"
+            },
+            {
+              "name": "minScore",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly minScore?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "candidates",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly candidates?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "accept",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly accept?: (hit: ISemanticHit<T>) => boolean | Promise<boolean>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "(hit: ISemanticHit<T>) => boolean | Promise<boolean>"
+            },
+            {
+              "name": "ctx",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly ctx?: IOperationContext;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IOperationContext"
+            }
+          ],
+          "composes": [],
+          "exportPath": "./features/semantic",
+          "overloadSignatures": [
+            "export type ISemanticGetOptions<T> = { readonly where?: IWhere<ISemanticPayload>; readonly minScore?: number; readonly candidates?: number; readonly accept?: (hit: ISemanticHit<T>) => boolean | Promise<boolean>; readonly ctx?: IOperationContext; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Bounded native candidates with optional ordered application acceptance."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ISemanticGetOptions from @migaia/storage-plugin-cache/features/semantic, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ISemanticGetOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when ISemanticGetOptions does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "where: Original declarative scalar filter excluding reserved fields.\nminScore: Minimum native score before application acceptance.\ncandidates: One to ten native candidates, defaulting to one.\naccept: Ordered asynchronous verification; failures report and skip.\nctx: Original caller operation context and cancellation budget."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-cache/dist/features/semantic.d.ts:ISemanticGetOptions:export type ISemanticGetOptions<T> = { readonly where?: IWhere<ISemanticPayload>; readonly minScore?: number; readonly candidates?: number; readonly accept?: (hit: ISemanticHit<T>) => boolean | Promise<boolean>; readonly ctx?: IOperationContext; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-cache-features/semantic--ISemanticGetOptions"
+        },
+        {
+          "name": "ISemanticHit",
+          "kind": "type",
+          "signature": "export type ISemanticHit<T> = Readonly<{ value: T; score: number; prompt: string; }>;",
+          "declarationLine": 17,
+          "source": "packages/storage-plugin-cache/dist/features/semantic.d.ts",
+          "purpose": "Application response accepted from a native vector candidate.",
+          "core": "value: Decoded application value; source ownership stays with the caller.\nscore: Original native engine score; source loads have no score.\nprompt: Original prompt stored in the reserved semantic envelope.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "value",
+              "kind": "property",
+              "optional": false,
+              "signature": "value: T;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "T"
+            },
+            {
+              "name": "score",
+              "kind": "property",
+              "optional": false,
+              "signature": "score: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "prompt",
+              "kind": "property",
+              "optional": false,
+              "signature": "prompt: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            }
+          ],
+          "composes": [],
+          "exportPath": "./features/semantic",
+          "overloadSignatures": [
+            "export type ISemanticHit<T> = Readonly<{ value: T; score: number; prompt: string; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Application response accepted from a native vector candidate."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ISemanticHit from @migaia/storage-plugin-cache/features/semantic, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ISemanticHit when its type contract and declared inputs match the result you need. Choose a different public symbol when ISemanticHit does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "value: Decoded application value; source ownership stays with the caller.\nscore: Original native engine score; source loads have no score.\nprompt: Original prompt stored in the reserved semantic envelope."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-cache/dist/features/semantic.d.ts:ISemanticHit:export type ISemanticHit<T> = Readonly<{ value: T; score: number; prompt: string; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-cache-features/semantic--ISemanticHit"
+        },
+        {
+          "name": "ISemanticLoaded",
+          "kind": "type",
+          "signature": "export type ISemanticLoaded<T> = Readonly<{ value: T; score: undefined; prompt: string; }>;",
+          "declarationLine": 23,
+          "source": "packages/storage-plugin-cache/dist/features/semantic.d.ts",
+          "purpose": "Source value returned without inventing an engine score.",
+          "core": "value: Decoded application value; source ownership stays with the caller.\nscore: Original native engine score; source loads have no score.\nprompt: Original prompt stored in the reserved semantic envelope.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "value",
+              "kind": "property",
+              "optional": false,
+              "signature": "value: T;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "T"
+            },
+            {
+              "name": "score",
+              "kind": "property",
+              "optional": false,
+              "signature": "score: undefined;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "undefined"
+            },
+            {
+              "name": "prompt",
+              "kind": "property",
+              "optional": false,
+              "signature": "prompt: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            }
+          ],
+          "composes": [],
+          "exportPath": "./features/semantic",
+          "overloadSignatures": [
+            "export type ISemanticLoaded<T> = Readonly<{ value: T; score: undefined; prompt: string; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Source value returned without inventing an engine score."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ISemanticLoaded from @migaia/storage-plugin-cache/features/semantic, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ISemanticLoaded when its type contract and declared inputs match the result you need. Choose a different public symbol when ISemanticLoaded does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "value: Decoded application value; source ownership stays with the caller.\nscore: Original native engine score; source loads have no score.\nprompt: Original prompt stored in the reserved semantic envelope."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-cache/dist/features/semantic.d.ts:ISemanticLoaded:export type ISemanticLoaded<T> = Readonly<{ value: T; score: undefined; prompt: string; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-cache-features/semantic--ISemanticLoaded"
+        },
+        {
+          "name": "ISemanticPayload",
+          "kind": "type",
+          "signature": "export type ISemanticPayload = Readonly<Record<string, string | number | boolean>>;",
+          "declarationLine": 5,
+          "source": "packages/storage-plugin-cache/dist/features/semantic.d.ts",
+          "purpose": "Native scalar filter fields excluding reserved $cache. names.",
+          "core": "Native scalar filter fields excluding reserved $cache. names.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": ["Record"],
+          "exportPath": "./features/semantic",
+          "overloadSignatures": [
+            "export type ISemanticPayload = Readonly<Record<string, string | number | boolean>>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Native scalar filter fields excluding reserved $cache. names."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ISemanticPayload from @migaia/storage-plugin-cache/features/semantic, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ISemanticPayload when its type contract and declared inputs match the result you need. Choose a different public symbol when ISemanticPayload does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "Native scalar filter fields excluding reserved $cache. names."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-cache/dist/features/semantic.d.ts:ISemanticPayload:export type ISemanticPayload = Readonly<Record<string, string | number | boolean>>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-cache-features/semantic--ISemanticPayload"
+        },
+        {
+          "name": "semanticCacheFeature",
+          "kind": "function",
+          "signature": "export declare function semanticCacheFeature(options: ISemanticCacheOptions): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"cache\", import(\"../types.js\").ICacheStore, undefined, {}>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly semantic: ISemanticCacheApi; }; readonly transaction: {}; }>, {}>;",
+          "declarationLine": 53,
+          "source": "packages/storage-plugin-cache/dist/features/semantic.d.ts",
+          "purpose": "Add native semantic answer matching and bounded candidate verification to a cache.",
+          "core": "options: Earlier vector backend, collection schema, minimum score and application embedder.\nSelect the Feature in cachePlugin; native query, expiry and deletion owners remain unchanged.\nSelect in cachePlugin to expose api.semantic on the store.",
+          "advanced": "Retrieve similar answers using a native vector collection.",
+          "parameters": ["options: ISemanticCacheOptions"],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "ISemanticCacheOptions",
+              "optional": false
+            }
+          ],
+          "returns": "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"cache\", import(\"../types.js\").ICacheStore, undefined, {}>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly semantic: ISemanticCacheApi; }; readonly transaction: {}; }>, {}>",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [
+            "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { cachePlugin } from '@migaia/storage-plugin-cache'\nimport { semanticCacheFeature } from '@migaia/storage-plugin-cache/features/semantic'\n\nconst base = await createStorageHost({\n  plugins: [memoryBackendPlugin({ id: 'values' }), memoryBackendPlugin({ id: 'vectors' })]\n})\nconst host = await base.use(\n  cachePlugin(\n    {\n      tiers: [{ backend: 'values', ttlMs: 30000 }]\n    },\n    {\n      semantic: semanticCacheFeature({\n        backend: 'vectors',\n        collection: 'answers',\n        dimensions: 2,\n        minScore: 0.8,\n        ttlMs: 30000,\n        embed: async () => [1, 0]\n      })\n    }\n  )\n)\nawait host.detect()\ntry {\n  const semantic = host.backend('cache').api.semantic\n  await semantic.set('Question', { text: 'Answer' }, { payload: { model: 'one' } })\n  const hit = await semantic.get('Question', { where: { model: 'one' }, candidates: 3 })\n  console.log(hit?.value)\n  await semantic.invalidate({ model: 'one' }, { count: 'scroll' })\n} finally {\n  await host.dispose()\n}"
+          ],
+          "members": [],
+          "composes": [],
+          "exportPath": "./features/semantic",
+          "overloadSignatures": [
+            "export declare function semanticCacheFeature(options: ISemanticCacheOptions): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"cache\", import(\"../types.js\").ICacheStore, undefined, {}>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly semantic: ISemanticCacheApi; }; readonly transaction: {}; }>, {}>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "ISemanticCacheOptions",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": [
+            "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"cache\", import(\"../types.js\").ICacheStore, undefined, {}>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly semantic: ISemanticCacheApi; }; readonly transaction: {}; }>, {}>"
+          ],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Add native semantic answer matching and bounded candidate verification to a cache."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import semanticCacheFeature from @migaia/storage-plugin-cache/features/semantic, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use semanticCacheFeature when its function contract and declared inputs match the result you need. Choose a different public symbol when semanticCacheFeature does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "options: Earlier vector backend, collection schema, minimum score and application embedder.\nSelect the Feature in cachePlugin; native query, expiry and deletion owners remain unchanged.\nSelect in cachePlugin to expose api.semantic on the store."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "Retrieve similar answers using a native vector collection."
+            }
+          ],
+          "declaredConfiguration": [
+            {
+              "name": "backend",
+              "type": "string",
+              "optional": false,
+              "description": ""
+            },
+            {
+              "name": "collection",
+              "type": "string",
+              "optional": false,
+              "description": ""
+            },
+            {
+              "name": "dimensions",
+              "type": "number",
+              "optional": false,
+              "description": ""
+            },
+            {
+              "name": "metric",
+              "type": "'cosine' | 'dot' | 'euclid'",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "minScore",
+              "type": "number",
+              "optional": false,
+              "description": ""
+            },
+            {
+              "name": "ttlMs",
+              "type": "number",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "embed",
+              "type": "(text: string, signal?: AbortSignal) => Promise<readonly number[]>",
+              "optional": false,
+              "description": ""
+            }
+          ],
+          "identity": "packages/storage-plugin-cache/dist/features/semantic.d.ts:semanticCacheFeature:export declare function semanticCacheFeature(options: ISemanticCacheOptions): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"cache\", import(\"../types.js\").ICacheStore, undefined, {}>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly semantic: ISemanticCacheApi; }; readonly transaction: {}; }>, {}>;",
+          "guidance": [],
+          "usageScore": 26,
+          "configuration": [
+            {
+              "name": "backend",
+              "type": "string",
+              "optional": false,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            },
+            {
+              "name": "collection",
+              "type": "string",
+              "optional": false,
+              "description": "从 `@migaia/storage-plugin-cache/features/semantic` 导入 `semanticCacheFeature`，在 `cachePlugin` 第二参数中选择 `{ semantic: semanticCacheFeature(options) }`。向量后端必须在更早批次发布。配置 collection、维度、原生 metric、最低分与调用方嵌入函数。候选顺序沿原向量引擎，逐个执行 `accept`；复核失败只报告并跳过，不在 JavaScript 中计算向量分数。",
+              "descriptionEn": "",
+              "descriptionZh": "从 `@migaia/storage-plugin-cache/features/semantic` 导入 `semanticCacheFeature`，在 `cachePlugin` 第二参数中选择 `{ semantic: semanticCacheFeature(options) }`。向量后端必须在更早批次发布。配置 collection、维度、原生 metric、最低分与调用方嵌入函数。候选顺序沿原向量引擎，逐个执行 `accept`；复核失败只报告并跳过，不在 JavaScript 中计算向量分数。"
+            },
+            {
+              "name": "dimensions",
+              "type": "number",
+              "optional": false,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            },
+            {
+              "name": "metric",
+              "type": "'cosine' | 'dot' | 'euclid'",
+              "optional": true,
+              "description": "从 `@migaia/storage-plugin-cache/features/semantic` 导入 `semanticCacheFeature`，在 `cachePlugin` 第二参数中选择 `{ semantic: semanticCacheFeature(options) }`。向量后端必须在更早批次发布。配置 collection、维度、原生 metric、最低分与调用方嵌入函数。候选顺序沿原向量引擎，逐个执行 `accept`；复核失败只报告并跳过，不在 JavaScript 中计算向量分数。",
+              "descriptionEn": "",
+              "descriptionZh": "从 `@migaia/storage-plugin-cache/features/semantic` 导入 `semanticCacheFeature`，在 `cachePlugin` 第二参数中选择 `{ semantic: semanticCacheFeature(options) }`。向量后端必须在更早批次发布。配置 collection、维度、原生 metric、最低分与调用方嵌入函数。候选顺序沿原向量引擎，逐个执行 `accept`；复核失败只报告并跳过，不在 JavaScript 中计算向量分数。"
+            },
+            {
+              "name": "minScore",
+              "type": "number",
+              "optional": false,
+              "description": "`cache.api.semantic.set(prompt, value, { payload: { model: 'one' } })` 按 prompt 与模型元数据独立存储。`get` 可设置 `where`、`minScore`、一至十个 `candidates` 和异步 `accept`。`getOrLoad` 按组织、prompt 与规范 payload 合并回源，单调用取消不影响共享任务，并支持缩短 TTL 与 `cacheIf`。关闭时排空任务，不关闭借用的向量后端。`$cache.*` 为保留字段。",
+              "descriptionEn": "",
+              "descriptionZh": "`cache.api.semantic.set(prompt, value, { payload: { model: 'one' } })` 按 prompt 与模型元数据独立存储。`get` 可设置 `where`、`minScore`、一至十个 `candidates` 和异步 `accept`。`getOrLoad` 按组织、prompt 与规范 payload 合并回源，单调用取消不影响共享任务，并支持缩短 TTL 与 `cacheIf`。关闭时排空任务，不关闭借用的向量后端。`$cache.*` 为保留字段。"
+            },
+            {
+              "name": "ttlMs",
+              "type": "number",
+              "optional": true,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            },
+            {
+              "name": "embed",
+              "type": "(text: string, signal?: AbortSignal) => Promise<readonly number[]>",
+              "optional": false,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            }
+          ],
+          "fragment": "storage-plugin-cache-features/semantic--semanticCacheFeature"
+        }
+      ],
+      "aliases": []
+    }
+  ]
+}

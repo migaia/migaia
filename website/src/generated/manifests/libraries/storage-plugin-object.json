@@ -1,0 +1,2099 @@
+{
+  "version": 1,
+  "library": {
+    "slug": "storage-plugin-object",
+    "description": "Native filesystem and S3 object storage backend",
+    "version": "0.0.0",
+    "exports": [".", "./features/presign", "./fs", "./s3"],
+    "readmeLocales": ["zh", "en"],
+    "documentation": {
+      "readme": {
+        "sections": [
+          {
+            "id": "对象存储后端",
+            "heading": "对象存储后端",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "`@migaia/storage-plugin-object` 通过原生文件系统或 S3 兼容服务提供共享 `blob` 能力。根工厂不加载 SDK 或打开目录。安装真实 peer：`@migaia/storage-host`、`@aws-sdk/client-s3` 和 `@aws-sdk/s3-request-presigner`。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { blob } from '@migaia/storage-contract'\nimport { objectBackendPlugin } from '@migaia/storage-plugin-object'\nimport { fsObjectDriver } from '@migaia/storage-plugin-object/fs'\n\nawait using host = await createStorageHost({\n  plugins: [objectBackendPlugin({ driver: fsObjectDriver({ root: './objects' }) })] as const\n})\nconst objects = host.backend('object').use(blob)\nconst info = await objects.put('photo', new Uint8Array([1, 2, 3]), {\n  contentType: 'application/octet-stream',\n  metadata: { owner: 'ada' }\n})\nconst object = await objects.get('photo', { range: { start: 1, end: 2 } })\nif (object) {\n  try {\n    console.log(object.info.size, await object.bytes())\n  } finally {\n    await object.dispose()\n  }\n}\nawait objects.put('photo', new Uint8Array([4]), { ifMatch: info.etag })"
+              },
+              {
+                "type": "paragraph",
+                "text": "文件系统入口识别 Node、Bun、Deno，只加载对应原生适配。一个真实目录仅支持本进程内一个写实例；不要跨进程共享或混入其它文件。一次 pointer rename 同时发布不可变数据与元数据；覆盖或删除不改变已打开读句柄的快照。SHA-256 标识内容，相同内容的写入可能保留 etag。这里只保证原子可见性，不承诺 fsync 级掉电耐久。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`get` 返回一次内容快照，只能选择一次 `stream()` 或 `bytes()`。EOF 和 cancel 释放底层资源，未消费对象须 dispose。范围 end 为闭区间，`info.size` 始终是完整大小。缺失 get/head 返回 undefined；remove 返回删除前是否观察到对象。"
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "heading": "S3",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { s3ObjectDriver } from '@migaia/storage-plugin-object/s3'\nimport { objectPresignFeature } from '@migaia/storage-plugin-object/features/presign'\n\nconst plugin = objectBackendPlugin(\n  {\n    driver: s3ObjectDriver({\n      config: { region: 'us-east-1', endpoint: 'http://127.0.0.1:19000', forcePathStyle: true },\n      bucket: 'objects',\n      prefix: 'app/'\n    })\n  },\n  { presign: objectPresignFeature() }\n)"
+              },
+              {
+                "type": "paragraph",
+                "text": "传入的 `client` 属于借用，始终不销毁；`config` 分支在安装时创建自有客户端。凭据沿 SDK 原有提供方。检测在保留前缀随机对象上验证单次条件写；权限或条件不支持只报告，不中断宿主创建。无条件操作仍按真实权限执行，条件 multipart 按实际 Complete 请求判定，不降级。"
+              },
+              {
+                "type": "paragraph",
+                "text": "未知长度流及至少 16 MiB 的字节值使用 multipart；默认每段 8 MiB、并发四段，缓冲上限为五段加输入当前块。修改 command 局部禁用 SDK 重试及区域重定向，借用 client 配置不变。发出提交但确认未知时为 `OBJECT_COMMIT_UNKNOWN`，重放前先 head；已确认写后补读元数据失败为 `OBJECT_FAILED`，附 `committed: true`。"
+              },
+              {
+                "type": "paragraph",
+                "text": "S3 metadata 名称为小写 HTTP token，值为无换行 ASCII 头字节。etag 不透明，updatedAt 来自原生 LastModified。上传签名返回调用方必须携带的所有内容、metadata 和条件头。期限为 1 至 604800 的整数秒，默认 900，不能超过凭据有效期；签名不执行上传或下载。"
+              }
+            ]
+          },
+          {
+            "id": "组织与分页",
+            "heading": "组织与分页",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "通过 `host.org(orgId).backend('object').use(blob)` 获取不可变组织视图，首次写不建立注册数据。物理键复用共享组织元组与保序编码，返回键仍是逻辑键。`list({ prefix, limit, after })` 默认每页 100，按 UTF-16 字典序排列。游标绑定同一后端安装、组织和前缀，不承诺跨页快照。`removeByPrefix('')` 只清本组织。缓存与归档经宿主消费 `blob`，不依赖驱动文件。"
+              }
+            ]
+          }
+        ]
+      },
+      "guide": {
+        "sections": [
+          {
+            "id": "对象存储后端",
+            "heading": "对象存储后端",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "`@migaia/storage-plugin-object` 通过原生文件系统或 S3 兼容服务提供共享 `blob` 能力。根工厂不加载 SDK 或打开目录。安装真实 peer：`@migaia/storage-host`、`@aws-sdk/client-s3` 和 `@aws-sdk/s3-request-presigner`。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { blob } from '@migaia/storage-contract'\nimport { objectBackendPlugin } from '@migaia/storage-plugin-object'\nimport { fsObjectDriver } from '@migaia/storage-plugin-object/fs'\n\nawait using host = await createStorageHost({\n  plugins: [objectBackendPlugin({ driver: fsObjectDriver({ root: './objects' }) })] as const\n})\nconst objects = host.backend('object').use(blob)\nconst info = await objects.put('photo', new Uint8Array([1, 2, 3]), {\n  contentType: 'application/octet-stream',\n  metadata: { owner: 'ada' }\n})\nconst object = await objects.get('photo', { range: { start: 1, end: 2 } })\nif (object) {\n  try {\n    console.log(object.info.size, await object.bytes())\n  } finally {\n    await object.dispose()\n  }\n}\nawait objects.put('photo', new Uint8Array([4]), { ifMatch: info.etag })"
+              },
+              {
+                "type": "paragraph",
+                "text": "文件系统入口识别 Node、Bun、Deno，只加载对应原生适配。一个真实目录仅支持本进程内一个写实例；不要跨进程共享或混入其它文件。一次 pointer rename 同时发布不可变数据与元数据；覆盖或删除不改变已打开读句柄的快照。SHA-256 标识内容，相同内容的写入可能保留 etag。这里只保证原子可见性，不承诺 fsync 级掉电耐久。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`get` 返回一次内容快照，只能选择一次 `stream()` 或 `bytes()`。EOF 和 cancel 释放底层资源，未消费对象须 dispose。范围 end 为闭区间，`info.size` 始终是完整大小。缺失 get/head 返回 undefined；remove 返回删除前是否观察到对象。"
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "heading": "S3",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { s3ObjectDriver } from '@migaia/storage-plugin-object/s3'\nimport { objectPresignFeature } from '@migaia/storage-plugin-object/features/presign'\n\nconst plugin = objectBackendPlugin(\n  {\n    driver: s3ObjectDriver({\n      config: { region: 'us-east-1', endpoint: 'http://127.0.0.1:19000', forcePathStyle: true },\n      bucket: 'objects',\n      prefix: 'app/'\n    })\n  },\n  { presign: objectPresignFeature() }\n)"
+              },
+              {
+                "type": "paragraph",
+                "text": "传入的 `client` 属于借用，始终不销毁；`config` 分支在安装时创建自有客户端。凭据沿 SDK 原有提供方。检测在保留前缀随机对象上验证单次条件写；权限或条件不支持只报告，不中断宿主创建。无条件操作仍按真实权限执行，条件 multipart 按实际 Complete 请求判定，不降级。"
+              },
+              {
+                "type": "paragraph",
+                "text": "未知长度流及至少 16 MiB 的字节值使用 multipart；默认每段 8 MiB、并发四段，缓冲上限为五段加输入当前块。修改 command 局部禁用 SDK 重试及区域重定向，借用 client 配置不变。发出提交但确认未知时为 `OBJECT_COMMIT_UNKNOWN`，重放前先 head；已确认写后补读元数据失败为 `OBJECT_FAILED`，附 `committed: true`。"
+              },
+              {
+                "type": "paragraph",
+                "text": "S3 metadata 名称为小写 HTTP token，值为无换行 ASCII 头字节。etag 不透明，updatedAt 来自原生 LastModified。上传签名返回调用方必须携带的所有内容、metadata 和条件头。期限为 1 至 604800 的整数秒，默认 900，不能超过凭据有效期；签名不执行上传或下载。"
+              }
+            ]
+          },
+          {
+            "id": "组织与分页",
+            "heading": "组织与分页",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "通过 `host.org(orgId).backend('object').use(blob)` 获取不可变组织视图，首次写不建立注册数据。物理键复用共享组织元组与保序编码，返回键仍是逻辑键。`list({ prefix, limit, after })` 默认每页 100，按 UTF-16 字典序排列。游标绑定同一后端安装、组织和前缀，不承诺跨页快照。`removeByPrefix('')` 只清本组织。缓存与归档经宿主消费 `blob`，不依赖驱动文件。"
+              }
+            ]
+          }
+        ]
+      },
+      "en": {
+        "readme": {
+          "sections": [
+            {
+              "id": "object-storage-backend",
+              "heading": "Object storage backend",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`@migaia/storage-plugin-object` supplies the shared `blob` capability through a native filesystem or an S3-compatible service. The root factory does not load the SDK or open a directory. Install the real peers `@migaia/storage-host`, `@aws-sdk/client-s3` and `@aws-sdk/s3-request-presigner`."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { blob } from '@migaia/storage-contract'\nimport { objectBackendPlugin } from '@migaia/storage-plugin-object'\nimport { fsObjectDriver } from '@migaia/storage-plugin-object/fs'\n\nawait using host = await createStorageHost({\n  plugins: [objectBackendPlugin({ driver: fsObjectDriver({ root: './objects' }) })] as const\n})\nconst objects = host.backend('object').use(blob)\nconst info = await objects.put('photo', new Uint8Array([1, 2, 3]), {\n  contentType: 'application/octet-stream',\n  metadata: { owner: 'ada' }\n})\nconst object = await objects.get('photo', { range: { start: 1, end: 2 } })\nif (object) {\n  try {\n    console.log(object.info.size, await object.bytes())\n  } finally {\n    await object.dispose()\n  }\n}\nawait objects.put('photo', new Uint8Array([4]), { ifMatch: info.etag })"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "The filesystem entry detects Node, Bun or Deno and loads only that runtime's native adapter. One real directory has one writer instance per process. Do not share it between processes or mix unrelated files into it. A pointer rename publishes immutable data and metadata together. Open reads retain their original generation after replacement or removal. SHA-256 identifies content; a same-content write may retain its etag. This is atomic visibility, without an fsync durability guarantee."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`get` returns one content snapshot. Choose `stream()` or `bytes()` once. EOF and cancel release the underlying resource; always dispose an unconsumed object. Range end is inclusive, and `info.size` remains the full size. Missing get/head return undefined; remove returns whether an object was observed before deletion."
+                }
+              ]
+            },
+            {
+              "id": "s3",
+              "heading": "S3",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { s3ObjectDriver } from '@migaia/storage-plugin-object/s3'\nimport { objectPresignFeature } from '@migaia/storage-plugin-object/features/presign'\n\nconst plugin = objectBackendPlugin(\n  {\n    driver: s3ObjectDriver({\n      config: { region: 'us-east-1', endpoint: 'http://127.0.0.1:19000', forcePathStyle: true },\n      bucket: 'objects',\n      prefix: 'app/'\n    })\n  },\n  { presign: objectPresignFeature() }\n)"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "An injected `client` is borrowed and never destroyed. A `config` creates an owned client during installation. Credentials follow the SDK's ordinary providers. Service detection uses a reserved random probe object to verify single-put conditional writes. Permission failure or unsupported conditions are reported without failing host creation; unconditional operations retain their native permission behavior. Conditional multipart support is determined by its actual completion request and never downgraded."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Unknown-length streams and byte values at least 16 MiB use multipart. Defaults are 8 MiB per part and four outstanding parts. The buffer bound is five part buffers plus the current input chunk. Modification commands disable SDK retries and regional redirects locally; the borrowed client's configuration is unchanged. An unknown dispatched commit reports `OBJECT_COMMIT_UNKNOWN`; inspect head before replaying. A confirmed put whose metadata follow-up fails reports `OBJECT_FAILED` with `committed: true`."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "S3 metadata names must be lowercase HTTP tokens; values use ASCII header bytes without newlines. Etag is opaque and updatedAt comes from native LastModified. Signed uploads return every content, metadata and condition header that the caller must send. Expiry is integer seconds from 1 through 604800, default 900, and cannot outlive the credentials. Signing executes no upload or download."
+                }
+              ]
+            },
+            {
+              "id": "organization-and-paging",
+              "heading": "Organization and paging",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Use `host.org(orgId).backend('object').use(blob)` for an immutable organization view. The host creates no registry data on first write. Physical keys use the shared organization tuple and ordered-key encoder; returned keys remain logical. `list({ prefix, limit, after })` defaults to 100 items in UTF-16 lexical order. Cursors bind one backend installation, organization and prefix. Listings have no cross-page snapshot. `removeByPrefix('')` clears only that organization. Cache and archive consume `blob` through the host and do not depend on driver files."
+                }
+              ]
+            }
+          ]
+        },
+        "guide": {
+          "sections": [
+            {
+              "id": "object-storage-backend",
+              "heading": "Object storage backend",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`@migaia/storage-plugin-object` supplies the shared `blob` capability through a native filesystem or an S3-compatible service. The root factory does not load the SDK or open a directory. Install the real peers `@migaia/storage-host`, `@aws-sdk/client-s3` and `@aws-sdk/s3-request-presigner`."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { blob } from '@migaia/storage-contract'\nimport { objectBackendPlugin } from '@migaia/storage-plugin-object'\nimport { fsObjectDriver } from '@migaia/storage-plugin-object/fs'\n\nawait using host = await createStorageHost({\n  plugins: [objectBackendPlugin({ driver: fsObjectDriver({ root: './objects' }) })] as const\n})\nconst objects = host.backend('object').use(blob)\nconst info = await objects.put('photo', new Uint8Array([1, 2, 3]), {\n  contentType: 'application/octet-stream',\n  metadata: { owner: 'ada' }\n})\nconst object = await objects.get('photo', { range: { start: 1, end: 2 } })\nif (object) {\n  try {\n    console.log(object.info.size, await object.bytes())\n  } finally {\n    await object.dispose()\n  }\n}\nawait objects.put('photo', new Uint8Array([4]), { ifMatch: info.etag })"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "The filesystem entry detects Node, Bun or Deno and loads only that runtime's native adapter. One real directory has one writer instance per process. Do not share it between processes or mix unrelated files into it. A pointer rename publishes immutable data and metadata together. Open reads retain their original generation after replacement or removal. SHA-256 identifies content; a same-content write may retain its etag. This is atomic visibility, without an fsync durability guarantee."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`get` returns one content snapshot. Choose `stream()` or `bytes()` once. EOF and cancel release the underlying resource; always dispose an unconsumed object. Range end is inclusive, and `info.size` remains the full size. Missing get/head return undefined; remove returns whether an object was observed before deletion."
+                }
+              ]
+            },
+            {
+              "id": "s3",
+              "heading": "S3",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { s3ObjectDriver } from '@migaia/storage-plugin-object/s3'\nimport { objectPresignFeature } from '@migaia/storage-plugin-object/features/presign'\n\nconst plugin = objectBackendPlugin(\n  {\n    driver: s3ObjectDriver({\n      config: { region: 'us-east-1', endpoint: 'http://127.0.0.1:19000', forcePathStyle: true },\n      bucket: 'objects',\n      prefix: 'app/'\n    })\n  },\n  { presign: objectPresignFeature() }\n)"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "An injected `client` is borrowed and never destroyed. A `config` creates an owned client during installation. Credentials follow the SDK's ordinary providers. Service detection uses a reserved random probe object to verify single-put conditional writes. Permission failure or unsupported conditions are reported without failing host creation; unconditional operations retain their native permission behavior. Conditional multipart support is determined by its actual completion request and never downgraded."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Unknown-length streams and byte values at least 16 MiB use multipart. Defaults are 8 MiB per part and four outstanding parts. The buffer bound is five part buffers plus the current input chunk. Modification commands disable SDK retries and regional redirects locally; the borrowed client's configuration is unchanged. An unknown dispatched commit reports `OBJECT_COMMIT_UNKNOWN`; inspect head before replaying. A confirmed put whose metadata follow-up fails reports `OBJECT_FAILED` with `committed: true`."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "S3 metadata names must be lowercase HTTP tokens; values use ASCII header bytes without newlines. Etag is opaque and updatedAt comes from native LastModified. Signed uploads return every content, metadata and condition header that the caller must send. Expiry is integer seconds from 1 through 604800, default 900, and cannot outlive the credentials. Signing executes no upload or download."
+                }
+              ]
+            },
+            {
+              "id": "organization-and-paging",
+              "heading": "Organization and paging",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Use `host.org(orgId).backend('object').use(blob)` for an immutable organization view. The host creates no registry data on first write. Physical keys use the shared organization tuple and ordered-key encoder; returned keys remain logical. `list({ prefix, limit, after })` defaults to 100 items in UTF-16 lexical order. Cursors bind one backend installation, organization and prefix. Listings have no cross-page snapshot. `removeByPrefix('')` clears only that organization. Cache and archive consume `blob` through the host and do not depend on driver files."
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  },
+  "apis": [
+    {
+      "id": "storage-plugin-object:index",
+      "library": "storage-plugin-object",
+      "module": "index",
+      "exportPath": ".",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/docs/storage-plugin-object/getting-started",
+      "architecturePath": "/en/docs/storage-plugin-object",
+      "symbols": [
+        {
+          "name": "ERROR_SOURCE",
+          "kind": "const",
+          "signature": "export declare const ERROR_SOURCE = \"storage.backend.object\";",
+          "declarationLine": 2,
+          "source": "packages/storage-plugin-object/dist/error-code.d.ts",
+          "purpose": "Registered native object error domain storage.backend.object.",
+          "core": "Registered native object error domain storage.backend.object.",
+          "advanced": "",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "aliasOf": "ERROR_SOURCE",
+          "exportPath": ".",
+          "overloadSignatures": ["export declare const ERROR_SOURCE = \"storage.backend.object\";"],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Registered native object error domain storage.backend.object."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ERROR_SOURCE from @migaia/storage-plugin-object, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ERROR_SOURCE when its const contract and declared inputs match the result you need. Choose a different public symbol when ERROR_SOURCE does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "Registered native object error domain storage.backend.object."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-object/dist/error-code.d.ts:ERROR_SOURCE:export declare const ERROR_SOURCE = \"storage.backend.object\";",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-object-index--ERROR_SOURCE"
+        },
+        {
+          "name": "IObjectAddress",
+          "kind": "type",
+          "signature": "export type IObjectAddress = Readonly<{ bucket: string; key: string; }>;",
+          "declarationLine": 21,
+          "source": "packages/storage-plugin-object/dist/types.d.ts",
+          "purpose": "Already-organized native address supplied only to an installed S3 Feature.",
+          "core": "bucket: Configured native bucket.\nkey: Configuration prefix plus canonical ordered organization key.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "bucket",
+              "kind": "property",
+              "optional": false,
+              "signature": "bucket: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "key",
+              "kind": "property",
+              "optional": false,
+              "signature": "key: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "IObjectAddress",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IObjectAddress = Readonly<{ bucket: string; key: string; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Already-organized native address supplied only to an installed S3 Feature."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IObjectAddress from @migaia/storage-plugin-object, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IObjectAddress when its type contract and declared inputs match the result you need. Choose a different public symbol when IObjectAddress does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "bucket: Configured native bucket.\nkey: Configuration prefix plus canonical ordered organization key."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-object/dist/types.d.ts:IObjectAddress:export type IObjectAddress = Readonly<{ bucket: string; key: string; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-object-index--IObjectAddress"
+        },
+        {
+          "name": "IObjectDriver",
+          "kind": "type",
+          "signature": "export type IObjectDriver = Readonly<{ kind: ObjectDriverKind; [objectDriverBrand]: true; }>;",
+          "declarationLine": 8,
+          "source": "packages/storage-plugin-object/dist/types.d.ts",
+          "purpose": "Authentic immutable descriptor issued by a native driver factory.",
+          "core": "kind: fs or s3 selects the real native family.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "kind",
+              "kind": "property",
+              "optional": false,
+              "signature": "kind: ObjectDriverKind;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ObjectDriverKind"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "IObjectDriver",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IObjectDriver = Readonly<{ kind: ObjectDriverKind; [objectDriverBrand]: true; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Authentic immutable descriptor issued by a native driver factory."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IObjectDriver from @migaia/storage-plugin-object, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IObjectDriver when its type contract and declared inputs match the result you need. Choose a different public symbol when IObjectDriver does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "kind: fs or s3 selects the real native family."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-object/dist/types.d.ts:IObjectDriver:export type IObjectDriver = Readonly<{ kind: ObjectDriverKind; [objectDriverBrand]: true; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-object-index--IObjectDriver"
+        },
+        {
+          "name": "IObjectErrorCode",
+          "kind": "type",
+          "signature": "export type IObjectErrorCode = (typeof ObjectErrorCode)[keyof typeof ObjectErrorCode];",
+          "declarationLine": 13,
+          "source": "packages/storage-plugin-object/dist/error-code.d.ts",
+          "purpose": "Stable union used by every native error constructor.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IObjectErrorCode.",
+          "advanced": "No additional advanced behavior is declared for IObjectErrorCode.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IObjectErrorCode."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IObjectErrorCode.",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "aliasOf": "IObjectErrorCode",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IObjectErrorCode = (typeof ObjectErrorCode)[keyof typeof ObjectErrorCode];"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IObjectErrorCode when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IObjectErrorCode does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Stable union used by every native error constructor."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IObjectErrorCode from @migaia/storage-plugin-object, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IObjectErrorCode when its type contract and declared inputs match the result you need. Choose a different public symbol when IObjectErrorCode does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IObjectErrorCode."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IObjectErrorCode."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-object/dist/error-code.d.ts:IObjectErrorCode:export type IObjectErrorCode = (typeof ObjectErrorCode)[keyof typeof ObjectErrorCode];",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-object-index--IObjectErrorCode"
+        },
+        {
+          "name": "IObjectPostCommitError",
+          "kind": "type",
+          "signature": "export type IObjectPostCommitError = Error & Readonly<{ committed: true; }>;",
+          "declarationLine": 17,
+          "source": "packages/storage-plugin-object/dist/types.d.ts",
+          "purpose": "A confirmed write whose required metadata follow-up failed. Inspect the original cause and do not replay automatically.",
+          "core": "committed: Always true; the native write itself was confirmed.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "committed",
+              "kind": "property",
+              "optional": false,
+              "signature": "committed: true;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "true"
+            }
+          ],
+          "composes": ["Error"],
+          "aliasOf": "IObjectPostCommitError",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IObjectPostCommitError = Error & Readonly<{ committed: true; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "A confirmed write whose required metadata follow-up failed. Inspect the original cause and do not replay automatically."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IObjectPostCommitError from @migaia/storage-plugin-object, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IObjectPostCommitError when its type contract and declared inputs match the result you need. Choose a different public symbol when IObjectPostCommitError does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "committed: Always true; the native write itself was confirmed."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-object/dist/types.d.ts:IObjectPostCommitError:export type IObjectPostCommitError = Error & Readonly<{ committed: true; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-object-index--IObjectPostCommitError"
+        },
+        {
+          "name": "IObjectStore",
+          "kind": "type",
+          "signature": "export type IObjectStore = ICapabilityStore<IStorageBase & { readonly backend: 'object'; }, typeof blob, readonly [ICapabilityImpl<typeof blob>]>;",
+          "declarationLine": 13,
+          "source": "packages/storage-plugin-object/dist/types.d.ts",
+          "purpose": "Original storage resource with the independent shared blob capability; no KV, SQL or transaction projection.",
+          "core": "Original storage resource with the independent shared blob capability; no KV, SQL or transaction projection.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": ["ICapabilityStore"],
+          "aliasOf": "IObjectStore",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IObjectStore = ICapabilityStore<IStorageBase & { readonly backend: 'object'; }, typeof blob, readonly [ICapabilityImpl<typeof blob>]>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Original storage resource with the independent shared blob capability; no KV, SQL or transaction projection."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IObjectStore from @migaia/storage-plugin-object, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IObjectStore when its type contract and declared inputs match the result you need. Choose a different public symbol when IObjectStore does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "Original storage resource with the independent shared blob capability; no KV, SQL or transaction projection."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-object/dist/types.d.ts:IObjectStore:export type IObjectStore = ICapabilityStore<IStorageBase & { readonly backend: 'object'; }, typeof blob, readonly [ICapabilityImpl<typeof blob>]>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-object-index--IObjectStore"
+        },
+        {
+          "name": "objectBackendKind",
+          "kind": "const",
+          "signature": "export declare const objectBackendKind: import(\"@migaia/storage-host\").IStorageBackendKind<\"object\", IObjectStore, S3Client | undefined, { getDriverKind(): ObjectDriverKind; getS3Client(): S3Client; getObjectAddress(key: string, ctx?: IOperationContext): IObjectAddress; }>;",
+          "declarationLine": 7,
+          "source": "packages/storage-plugin-object/dist/plugin.d.ts",
+          "purpose": "Authenticate object Feature targets and their native exposure by exact identity.",
+          "core": "Authenticate object Feature targets and their native exposure by exact identity.",
+          "advanced": "",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "aliasOf": "objectBackendKind",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const objectBackendKind: import(\"@migaia/storage-host\").IStorageBackendKind<\"object\", IObjectStore, S3Client | undefined, { getDriverKind(): ObjectDriverKind; getS3Client(): S3Client; getObjectAddress(key: string, ctx?: IOperationContext): IObjectAddress; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Authenticate object Feature targets and their native exposure by exact identity."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import objectBackendKind from @migaia/storage-plugin-object, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use objectBackendKind when its const contract and declared inputs match the result you need. Choose a different public symbol when objectBackendKind does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "Authenticate object Feature targets and their native exposure by exact identity."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-object/dist/plugin.d.ts:objectBackendKind:export declare const objectBackendKind: import(\"@migaia/storage-host\").IStorageBackendKind<\"object\", IObjectStore, S3Client | undefined, { getDriverKind(): ObjectDriverKind; getS3Client(): S3Client; getObjectAddress(key: string, ctx?: IOperationContext): IObjectAddress; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-object-index--objectBackendKind"
+        },
+        {
+          "name": "objectBackendPlugin",
+          "kind": "function",
+          "signature": "export declare function objectBackendPlugin<const TId extends string = 'object', const F extends IStorageFeatureRecord = {}>(options: { readonly id?: TId; readonly driver: IObjectDriver; }, features?: F & IStorageFeatureStoreCompatibility<typeof objectBackendKind, NoInfer<F>>): IStorageBackendPlugin<typeof objectBackendKind, NoInfer<TId>, F>;",
+          "declarationLine": 13,
+          "source": "packages/storage-plugin-object/dist/plugin.d.ts",
+          "purpose": "Define one lazy object backend and its selected Features. Native resources open only during host installation.",
+          "core": "features: Optional Features targeted at the exact objectBackendKind.\nAn exact-id storage backend plugin; no connection or directory is opened by the factory.\nid: Backend id used by host.backend.\nobject selects the default object backend name.\ndriver: Authentic fsObjectDriver or s3ObjectDriver descriptor.",
+          "advanced": "",
+          "parameters": [
+            "options: { readonly id?: TId; readonly driver: IObjectDriver; }",
+            "features: F & IStorageFeatureStoreCompatibility<typeof objectBackendKind, NoInfer<F>> (optional)"
+          ],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "{ readonly id?: TId; readonly driver: IObjectDriver; }",
+              "optional": false
+            },
+            {
+              "name": "features",
+              "type": "F & IStorageFeatureStoreCompatibility<typeof objectBackendKind, NoInfer<F>>",
+              "optional": true
+            }
+          ],
+          "returns": "IStorageBackendPlugin<typeof objectBackendKind, NoInfer<TId>, F>",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [
+            "import { createStorageHost } from '@migaia/storage-host'\nimport { blob } from '@migaia/storage-contract'\nimport { objectBackendPlugin } from '@migaia/storage-plugin-object'\nimport { fsObjectDriver } from '@migaia/storage-plugin-object/fs'\n\nawait using host = await createStorageHost({\n  plugins: [objectBackendPlugin({ driver: fsObjectDriver({ root: './objects' }) })] as const\n})\nconst objects = host.backend('object').use(blob)\nconst info = await objects.put('photo', new Uint8Array([1, 2, 3]), {\n  contentType: 'application/octet-stream',\n  metadata: { owner: 'ada' }\n})\nconst object = await objects.get('photo', { range: { start: 1, end: 2 } })\nif (object) {\n  try {\n    console.log(object.info.size, await object.bytes())\n  } finally {\n    await object.dispose()\n  }\n}\nawait objects.put('photo', new Uint8Array([4]), { ifMatch: info.etag })",
+            "import { s3ObjectDriver } from '@migaia/storage-plugin-object/s3'\nimport { objectPresignFeature } from '@migaia/storage-plugin-object/features/presign'\n\nconst plugin = objectBackendPlugin(\n  {\n    driver: s3ObjectDriver({\n      config: { region: 'us-east-1', endpoint: 'http://127.0.0.1:19000', forcePathStyle: true },\n      bucket: 'objects',\n      prefix: 'app/'\n    })\n  },\n  { presign: objectPresignFeature() }\n)"
+          ],
+          "members": [],
+          "composes": [],
+          "aliasOf": "objectBackendPlugin",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare function objectBackendPlugin<const TId extends string = 'object', const F extends IStorageFeatureRecord = {}>(options: { readonly id?: TId; readonly driver: IObjectDriver; }, features?: F & IStorageFeatureStoreCompatibility<typeof objectBackendKind, NoInfer<F>>): IStorageBackendPlugin<typeof objectBackendKind, NoInfer<TId>, F>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "{ readonly id?: TId; readonly driver: IObjectDriver; }",
+                "optional": false
+              },
+              {
+                "name": "features",
+                "type": "F & IStorageFeatureStoreCompatibility<typeof objectBackendKind, NoInfer<F>>",
+                "optional": true
+              }
+            ]
+          ],
+          "overloadReturns": ["IStorageBackendPlugin<typeof objectBackendKind, NoInfer<TId>, F>"],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Define one lazy object backend and its selected Features. Native resources open only during host installation."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import objectBackendPlugin from @migaia/storage-plugin-object, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use objectBackendPlugin when its function contract and declared inputs match the result you need. Choose a different public symbol when objectBackendPlugin does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "features: Optional Features targeted at the exact objectBackendKind.\nAn exact-id storage backend plugin; no connection or directory is opened by the factory.\nid: Backend id used by host.backend.\nobject selects the default object backend name.\ndriver: Authentic fsObjectDriver or s3ObjectDriver descriptor."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [
+            {
+              "name": "id",
+              "type": "TId",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "driver",
+              "type": "IObjectDriver",
+              "optional": false,
+              "description": ""
+            }
+          ],
+          "identity": "packages/storage-plugin-object/dist/plugin.d.ts:objectBackendPlugin:export declare function objectBackendPlugin<const TId extends string = 'object', const F extends IStorageFeatureRecord = {}>(options: { readonly id?: TId; readonly driver: IObjectDriver; }, features?: F & IStorageFeatureStoreCompatibility<typeof objectBackendKind, NoInfer<F>>): IStorageBackendPlugin<typeof objectBackendKind, NoInfer<TId>, F>;",
+          "guidance": [],
+          "usageScore": 42,
+          "configuration": [
+            {
+              "name": "id",
+              "type": "TId",
+              "optional": true,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            },
+            {
+              "name": "driver",
+              "type": "IObjectDriver",
+              "optional": false,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            }
+          ],
+          "fragment": "storage-plugin-object-index--objectBackendPlugin"
+        },
+        {
+          "name": "ObjectDriverKind",
+          "kind": "const",
+          "signature": "export declare const ObjectDriverKind: { readonly s3: 's3'; readonly fs: 'fs'; };\nexport type ObjectDriverKind = keyof typeof ObjectDriverKind;",
+          "declarationLine": 27,
+          "source": "packages/storage-plugin-object/dist/constants.d.ts",
+          "purpose": "Name the two actual object driver families without constructing either.",
+          "core": "fs: Single-writer native local filesystem.\ns3: Official SDK-backed S3-compatible service.",
+          "advanced": "",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "s3",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly s3: 's3';",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "'s3'"
+            },
+            {
+              "name": "fs",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly fs: 'fs';",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "'fs'"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "ObjectDriverKind",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const ObjectDriverKind: { readonly s3: 's3'; readonly fs: 'fs'; };",
+            "export type ObjectDriverKind = keyof typeof ObjectDriverKind;"
+          ],
+          "overloadParameterDetails": [[], []],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Name the two actual object driver families without constructing either."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ObjectDriverKind from @migaia/storage-plugin-object, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ObjectDriverKind when its const contract and declared inputs match the result you need. Choose a different public symbol when ObjectDriverKind does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "fs: Single-writer native local filesystem.\ns3: Official SDK-backed S3-compatible service."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-object/dist/constants.d.ts:ObjectDriverKind:export declare const ObjectDriverKind: { readonly s3: 's3'; readonly fs: 'fs'; };\nexport type ObjectDriverKind = keyof typeof ObjectDriverKind;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-object-index--ObjectDriverKind"
+        },
+        {
+          "name": "ObjectErrorCode",
+          "kind": "const",
+          "signature": "export declare const ObjectErrorCode: { /** Object I/O, signing or resource release failed; inspect cause before deciding whether to retry. */ readonly failed: 'OBJECT_FAILED'; /** Stored pointer, sidecar or required native response is corrupt; do not treat it as missing. */ readonly dataInvalid: 'OBJECT_DATA_INVALID'; /** The atomic commit was sent but acknowledgment is unknown; inspect head instead of replaying. */ readonly commitUnknown: 'OBJECT_COMMIT_UNKNOWN'; };",
+          "declarationLine": 4,
+          "source": "packages/storage-plugin-object/dist/error-code.d.ts",
+          "purpose": "Classify native failure, corrupt object data and unknown commit acknowledgment while retaining native causes.",
+          "core": "failed: Native I/O, signing or close failed; inspect cause and committed before replaying.\ndataInvalid: An existing object pointer, sidecar or required response cannot be decoded.\ncommitUnknown: A dispatched atomic commit has no confirmed outcome; inspect head.",
+          "advanced": "",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "failed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly failed: 'OBJECT_FAILED';",
+              "description": "Object I/O, signing or resource release failed; inspect cause before deciding whether to retry.",
+              "parameterDetails": [],
+              "returns": "'OBJECT_FAILED'"
+            },
+            {
+              "name": "dataInvalid",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly dataInvalid: 'OBJECT_DATA_INVALID';",
+              "description": "Stored pointer, sidecar or required native response is corrupt; do not treat it as missing.",
+              "parameterDetails": [],
+              "returns": "'OBJECT_DATA_INVALID'"
+            },
+            {
+              "name": "commitUnknown",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly commitUnknown: 'OBJECT_COMMIT_UNKNOWN';",
+              "description": "The atomic commit was sent but acknowledgment is unknown; inspect head instead of replaying.",
+              "parameterDetails": [],
+              "returns": "'OBJECT_COMMIT_UNKNOWN'"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "ObjectErrorCode",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const ObjectErrorCode: { /** Object I/O, signing or resource release failed; inspect cause before deciding whether to retry. */ readonly failed: 'OBJECT_FAILED'; /** Stored pointer, sidecar or required native response is corrupt; do not treat it as missing. */ readonly dataInvalid: 'OBJECT_DATA_INVALID'; /** The atomic commit was sent but acknowledgment is unknown; inspect head instead of replaying. */ readonly commitUnknown: 'OBJECT_COMMIT_UNKNOWN'; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Classify native failure, corrupt object data and unknown commit acknowledgment while retaining native causes."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ObjectErrorCode from @migaia/storage-plugin-object, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ObjectErrorCode when its const contract and declared inputs match the result you need. Choose a different public symbol when ObjectErrorCode does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "failed: Native I/O, signing or close failed; inspect cause and committed before replaying.\ndataInvalid: An existing object pointer, sidecar or required response cannot be decoded.\ncommitUnknown: A dispatched atomic commit has no confirmed outcome; inspect head."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-object/dist/error-code.d.ts:ObjectErrorCode:export declare const ObjectErrorCode: { /** Object I/O, signing or resource release failed; inspect cause before deciding whether to retry. */ readonly failed: 'OBJECT_FAILED'; /** Stored pointer, sidecar or required native response is corrupt; do not treat it as missing. */ readonly dataInvalid: 'OBJECT_DATA_INVALID'; /** The atomic commit was sent but acknowledgment is unknown; inspect head instead of replaying. */ readonly commitUnknown: 'OBJECT_COMMIT_UNKNOWN'; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-object-index--ObjectErrorCode"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "storage-plugin-object:features/presign",
+      "library": "storage-plugin-object",
+      "module": "features/presign",
+      "exportPath": "./features/presign",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/docs/storage-plugin-object/getting-started",
+      "architecturePath": "/en/docs/storage-plugin-object",
+      "symbols": [
+        {
+          "name": "IObjectPresignApi",
+          "kind": "type",
+          "signature": "export type IObjectPresignApi = { upload(key: string, options?: IObjectPresignUploadOptions): Promise<IObjectSignedRequest<'PUT'>>; download(key: string, options?: IObjectPresignDownloadOptions): Promise<IObjectSignedRequest<'GET'>>; };",
+          "declarationLine": 29,
+          "source": "packages/storage-plugin-object/dist/features/presign.d.ts",
+          "purpose": "Installed native S3 request signing with no transfer or transaction authority.",
+          "core": "upload: Sign one organized native upload.\nupload.key: Logical string object key.\nupload.options: Optional content, metadata, condition and expiry options.\nSigned PUT URL and required headers.\ndownload: Sign one organized native download.\ndownload.key: Logical string object key.\ndownload.options: Optional inclusive range and expiry options.\nSigned GET URL and required headers.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "upload",
+              "kind": "method",
+              "optional": false,
+              "signature": "upload(key: string, options?: IObjectPresignUploadOptions): Promise<IObjectSignedRequest<'PUT'>>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "options",
+                  "type": "IObjectPresignUploadOptions",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<IObjectSignedRequest<'PUT'>>"
+            },
+            {
+              "name": "download",
+              "kind": "method",
+              "optional": false,
+              "signature": "download(key: string, options?: IObjectPresignDownloadOptions): Promise<IObjectSignedRequest<'GET'>>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "options",
+                  "type": "IObjectPresignDownloadOptions",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<IObjectSignedRequest<'GET'>>"
+            }
+          ],
+          "composes": [],
+          "exportPath": "./features/presign",
+          "overloadSignatures": [
+            "export type IObjectPresignApi = { upload(key: string, options?: IObjectPresignUploadOptions): Promise<IObjectSignedRequest<'PUT'>>; download(key: string, options?: IObjectPresignDownloadOptions): Promise<IObjectSignedRequest<'GET'>>; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Installed native S3 request signing with no transfer or transaction authority."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IObjectPresignApi from @migaia/storage-plugin-object/features/presign, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IObjectPresignApi when its type contract and declared inputs match the result you need. Choose a different public symbol when IObjectPresignApi does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "upload: Sign one organized native upload.\nupload.key: Logical string object key.\nupload.options: Optional content, metadata, condition and expiry options.\nSigned PUT URL and required headers.\ndownload: Sign one organized native download.\ndownload.key: Logical string object key.\ndownload.options: Optional inclusive range and expiry options.\nSigned GET URL and required headers."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-object/dist/features/presign.d.ts:IObjectPresignApi:export type IObjectPresignApi = { upload(key: string, options?: IObjectPresignUploadOptions): Promise<IObjectSignedRequest<'PUT'>>; download(key: string, options?: IObjectPresignDownloadOptions): Promise<IObjectSignedRequest<'GET'>>; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-object-features/presign--IObjectPresignApi"
+        },
+        {
+          "name": "IObjectPresignDownloadOptions",
+          "kind": "type",
+          "signature": "export type IObjectPresignDownloadOptions = { readonly expiresInSeconds?: number; readonly range?: { readonly start: number; readonly end?: number; }; readonly ctx?: IOperationContext; };",
+          "declarationLine": 20,
+          "source": "packages/storage-plugin-object/dist/features/presign.d.ts",
+          "purpose": "Native signed-download expiry and inclusive range.",
+          "core": "expiresInSeconds: Integer seconds from 1 through 604800.\n900 seconds, capped by credential expiry.\nrange: Nonnegative safe-integer start and optional inclusive end at least start.\nFull object download.\nctx: Original storage operation context.\nNo caller cancellation or deadline.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "expiresInSeconds",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly expiresInSeconds?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "range",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly range?: { readonly start: number; readonly end?: number; };",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "{ readonly start: number; readonly end?: number; }"
+            },
+            {
+              "name": "ctx",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly ctx?: IOperationContext;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IOperationContext"
+            }
+          ],
+          "composes": [],
+          "exportPath": "./features/presign",
+          "overloadSignatures": [
+            "export type IObjectPresignDownloadOptions = { readonly expiresInSeconds?: number; readonly range?: { readonly start: number; readonly end?: number; }; readonly ctx?: IOperationContext; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Native signed-download expiry and inclusive range."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IObjectPresignDownloadOptions from @migaia/storage-plugin-object/features/presign, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IObjectPresignDownloadOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when IObjectPresignDownloadOptions does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "expiresInSeconds: Integer seconds from 1 through 604800.\n900 seconds, capped by credential expiry.\nrange: Nonnegative safe-integer start and optional inclusive end at least start.\nFull object download.\nctx: Original storage operation context.\nNo caller cancellation or deadline."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-object/dist/features/presign.d.ts:IObjectPresignDownloadOptions:export type IObjectPresignDownloadOptions = { readonly expiresInSeconds?: number; readonly range?: { readonly start: number; readonly end?: number; }; readonly ctx?: IOperationContext; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-object-features/presign--IObjectPresignDownloadOptions"
+        },
+        {
+          "name": "IObjectPresignUploadOptions",
+          "kind": "type",
+          "signature": "export type IObjectPresignUploadOptions = { readonly expiresInSeconds?: number; readonly contentType?: string; readonly metadata?: Readonly<Record<string, string>>; readonly ifMatch?: string; readonly ifNoneMatch?: true; readonly ctx?: IOperationContext; };",
+          "declarationLine": 11,
+          "source": "packages/storage-plugin-object/dist/features/presign.d.ts",
+          "purpose": "Native signed-upload content and condition inputs.",
+          "core": "expiresInSeconds: Integer seconds from 1 through 604800.\n900 seconds, capped by credential expiry.\ncontentType: Native content type included in the signature.\nNo content type header.\nmetadata: Lowercase HTTP-token names with ASCII header values; frozen at admission.\nEmpty metadata.\nifMatch: Opaque native etag required at commit; excludes ifNoneMatch.\nNo etag condition.\nifNoneMatch: Only true is valid: require absence at native commit.\nNo absence condition.\nctx: Original storage operation context.\nNo caller cancellation or deadline.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "expiresInSeconds",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly expiresInSeconds?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "contentType",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly contentType?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "metadata",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly metadata?: Readonly<Record<string, string>>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Readonly<Record<string, string>>"
+            },
+            {
+              "name": "ifMatch",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly ifMatch?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "ifNoneMatch",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly ifNoneMatch?: true;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "true"
+            },
+            {
+              "name": "ctx",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly ctx?: IOperationContext;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IOperationContext"
+            }
+          ],
+          "composes": [],
+          "exportPath": "./features/presign",
+          "overloadSignatures": [
+            "export type IObjectPresignUploadOptions = { readonly expiresInSeconds?: number; readonly contentType?: string; readonly metadata?: Readonly<Record<string, string>>; readonly ifMatch?: string; readonly ifNoneMatch?: true; readonly ctx?: IOperationContext; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Native signed-upload content and condition inputs."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IObjectPresignUploadOptions from @migaia/storage-plugin-object/features/presign, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IObjectPresignUploadOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when IObjectPresignUploadOptions does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "expiresInSeconds: Integer seconds from 1 through 604800.\n900 seconds, capped by credential expiry.\ncontentType: Native content type included in the signature.\nNo content type header.\nmetadata: Lowercase HTTP-token names with ASCII header values; frozen at admission.\nEmpty metadata.\nifMatch: Opaque native etag required at commit; excludes ifNoneMatch.\nNo etag condition.\nifNoneMatch: Only true is valid: require absence at native commit.\nNo absence condition.\nctx: Original storage operation context.\nNo caller cancellation or deadline."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-object/dist/features/presign.d.ts:IObjectPresignUploadOptions:export type IObjectPresignUploadOptions = { readonly expiresInSeconds?: number; readonly contentType?: string; readonly metadata?: Readonly<Record<string, string>>; readonly ifMatch?: string; readonly ifNoneMatch?: true; readonly ctx?: IOperationContext; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-object-features/presign--IObjectPresignUploadOptions"
+        },
+        {
+          "name": "IObjectSignedRequest",
+          "kind": "type",
+          "signature": "export type IObjectSignedRequest<TMethod extends 'GET' | 'PUT'> = Readonly<{ url: string; method: TMethod; headers: Readonly<Record<string, string>>; }>;",
+          "declarationLine": 5,
+          "source": "packages/storage-plugin-object/dist/features/presign.d.ts",
+          "purpose": "Official SDK-signed request; send its exact headers and method to its URL.",
+          "core": "url: Credential-bound URL; never place it in ordinary operation hooks.\nmethod: PUT uploads and GET downloads.\nheaders: All content, metadata, range and condition headers required by this signature.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "url",
+              "kind": "property",
+              "optional": false,
+              "signature": "url: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "method",
+              "kind": "property",
+              "optional": false,
+              "signature": "method: TMethod;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "TMethod"
+            },
+            {
+              "name": "headers",
+              "kind": "property",
+              "optional": false,
+              "signature": "headers: Readonly<Record<string, string>>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Readonly<Record<string, string>>"
+            }
+          ],
+          "composes": [],
+          "exportPath": "./features/presign",
+          "overloadSignatures": [
+            "export type IObjectSignedRequest<TMethod extends 'GET' | 'PUT'> = Readonly<{ url: string; method: TMethod; headers: Readonly<Record<string, string>>; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Official SDK-signed request; send its exact headers and method to its URL."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IObjectSignedRequest from @migaia/storage-plugin-object/features/presign, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IObjectSignedRequest when its type contract and declared inputs match the result you need. Choose a different public symbol when IObjectSignedRequest does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "url: Credential-bound URL; never place it in ordinary operation hooks.\nmethod: PUT uploads and GET downloads.\nheaders: All content, metadata, range and condition headers required by this signature."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-object/dist/features/presign.d.ts:IObjectSignedRequest:export type IObjectSignedRequest<TMethod extends 'GET' | 'PUT'> = Readonly<{ url: string; method: TMethod; headers: Readonly<Record<string, string>>; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-object-features/presign--IObjectSignedRequest"
+        },
+        {
+          "name": "objectPresignFeature",
+          "kind": "function",
+          "signature": "export declare function objectPresignFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"object\", import(\"../types.js\").IObjectStore, import(\"@aws-sdk/client-s3\").S3Client | undefined, { getDriverKind(): ObjectDriverKind; getS3Client(): import(\"@aws-sdk/client-s3\").S3Client; getObjectAddress(key: string, ctx?: IOperationContext): import(\"../types.js\").IObjectAddress; }>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly presign: IObjectPresignApi; }; readonly transaction: {}; }>, {}>;",
+          "declarationLine": 34,
+          "source": "packages/storage-plugin-object/dist/features/presign.d.ts",
+          "purpose": "Add store.api.presign upload/download signing with the same native S3 client and organized keys. Filesystem installation rejects this Feature.",
+          "core": "An object Feature with an empty transaction projection; signing executes no object transfer.",
+          "advanced": "",
+          "parameters": ["This function declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"object\", import(\"../types.js\").IObjectStore, import(\"@aws-sdk/client-s3\").S3Client | undefined, { getDriverKind(): ObjectDriverKind; getS3Client(): import(\"@aws-sdk/client-s3\").S3Client; getObjectAddress(key: string, ctx?: IOperationContext): import(\"../types.js\").IObjectAddress; }>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly presign: IObjectPresignApi; }; readonly transaction: {}; }>, {}>",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [
+            "import { s3ObjectDriver } from '@migaia/storage-plugin-object/s3'\nimport { objectPresignFeature } from '@migaia/storage-plugin-object/features/presign'\n\nconst plugin = objectBackendPlugin(\n  {\n    driver: s3ObjectDriver({\n      config: { region: 'us-east-1', endpoint: 'http://127.0.0.1:19000', forcePathStyle: true },\n      bucket: 'objects',\n      prefix: 'app/'\n    })\n  },\n  { presign: objectPresignFeature() }\n)"
+          ],
+          "members": [],
+          "composes": [],
+          "exportPath": "./features/presign",
+          "overloadSignatures": [
+            "export declare function objectPresignFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"object\", import(\"../types.js\").IObjectStore, import(\"@aws-sdk/client-s3\").S3Client | undefined, { getDriverKind(): ObjectDriverKind; getS3Client(): import(\"@aws-sdk/client-s3\").S3Client; getObjectAddress(key: string, ctx?: IOperationContext): import(\"../types.js\").IObjectAddress; }>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly presign: IObjectPresignApi; }; readonly transaction: {}; }>, {}>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [
+            "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"object\", import(\"../types.js\").IObjectStore, import(\"@aws-sdk/client-s3\").S3Client | undefined, { getDriverKind(): ObjectDriverKind; getS3Client(): import(\"@aws-sdk/client-s3\").S3Client; getObjectAddress(key: string, ctx?: IOperationContext): import(\"../types.js\").IObjectAddress; }>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly presign: IObjectPresignApi; }; readonly transaction: {}; }>, {}>"
+          ],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Add store.api.presign upload/download signing with the same native S3 client and organized keys. Filesystem installation rejects this Feature."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import objectPresignFeature from @migaia/storage-plugin-object/features/presign, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use objectPresignFeature when its function contract and declared inputs match the result you need. Choose a different public symbol when objectPresignFeature does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "An object Feature with an empty transaction projection; signing executes no object transfer."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-object/dist/features/presign.d.ts:objectPresignFeature:export declare function objectPresignFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"object\", import(\"../types.js\").IObjectStore, import(\"@aws-sdk/client-s3\").S3Client | undefined, { getDriverKind(): ObjectDriverKind; getS3Client(): import(\"@aws-sdk/client-s3\").S3Client; getObjectAddress(key: string, ctx?: IOperationContext): import(\"../types.js\").IObjectAddress; }>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly presign: IObjectPresignApi; }; readonly transaction: {}; }>, {}>;",
+          "guidance": [],
+          "usageScore": 24,
+          "configuration": [],
+          "fragment": "storage-plugin-object-features/presign--objectPresignFeature"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "storage-plugin-object:fs",
+      "library": "storage-plugin-object",
+      "module": "fs",
+      "exportPath": "./fs",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/docs/storage-plugin-object/getting-started",
+      "architecturePath": "/en/docs/storage-plugin-object",
+      "symbols": [
+        {
+          "name": "fsObjectDriver",
+          "kind": "function",
+          "signature": "export declare function fsObjectDriver(options: IFsObjectDriverOptions): IObjectDriver;",
+          "declarationLine": 7,
+          "source": "packages/storage-plugin-object/dist/fs.d.ts",
+          "purpose": "Capture a trusted plugin-managed directory without I/O. The selected runtime adapter opens it during installation.",
+          "core": "Authentic lazy filesystem driver; one real directory supports one active writer per process.\nroot: Nonempty directory path resolved to one absolute realpath on installation. Cross-process writers are unsupported.",
+          "advanced": "",
+          "parameters": ["options: IFsObjectDriverOptions"],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "IFsObjectDriverOptions",
+              "optional": false
+            }
+          ],
+          "returns": "IObjectDriver",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [
+            "import { createStorageHost } from '@migaia/storage-host'\nimport { blob } from '@migaia/storage-contract'\nimport { objectBackendPlugin } from '@migaia/storage-plugin-object'\nimport { fsObjectDriver } from '@migaia/storage-plugin-object/fs'\n\nawait using host = await createStorageHost({\n  plugins: [objectBackendPlugin({ driver: fsObjectDriver({ root: './objects' }) })] as const\n})\nconst objects = host.backend('object').use(blob)\nconst info = await objects.put('photo', new Uint8Array([1, 2, 3]), {\n  contentType: 'application/octet-stream',\n  metadata: { owner: 'ada' }\n})\nconst object = await objects.get('photo', { range: { start: 1, end: 2 } })\nif (object) {\n  try {\n    console.log(object.info.size, await object.bytes())\n  } finally {\n    await object.dispose()\n  }\n}\nawait objects.put('photo', new Uint8Array([4]), { ifMatch: info.etag })"
+          ],
+          "members": [],
+          "composes": [],
+          "exportPath": "./fs",
+          "overloadSignatures": [
+            "export declare function fsObjectDriver(options: IFsObjectDriverOptions): IObjectDriver;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "IFsObjectDriverOptions",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["IObjectDriver"],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Capture a trusted plugin-managed directory without I/O. The selected runtime adapter opens it during installation."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import fsObjectDriver from @migaia/storage-plugin-object/fs, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use fsObjectDriver when its function contract and declared inputs match the result you need. Choose a different public symbol when fsObjectDriver does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "Authentic lazy filesystem driver; one real directory supports one active writer per process.\nroot: Nonempty directory path resolved to one absolute realpath on installation. Cross-process writers are unsupported."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [
+            {
+              "name": "root",
+              "type": "string",
+              "optional": false,
+              "description": ""
+            }
+          ],
+          "identity": "packages/storage-plugin-object/dist/fs.d.ts:fsObjectDriver:export declare function fsObjectDriver(options: IFsObjectDriverOptions): IObjectDriver;",
+          "guidance": [],
+          "usageScore": 24,
+          "configuration": [
+            {
+              "name": "root",
+              "type": "string",
+              "optional": false,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            }
+          ],
+          "fragment": "storage-plugin-object-fs--fsObjectDriver"
+        },
+        {
+          "name": "IFsObjectDriverOptions",
+          "kind": "type",
+          "signature": "export type IFsObjectDriverOptions = { readonly root: string; };",
+          "declarationLine": 3,
+          "source": "packages/storage-plugin-object/dist/fs.d.ts",
+          "purpose": "Trusted plugin-managed native filesystem target.",
+          "core": "root: Nonempty directory path resolved to one absolute realpath on installation. Cross-process writers are unsupported.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "root",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly root: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            }
+          ],
+          "composes": [],
+          "exportPath": "./fs",
+          "overloadSignatures": [
+            "export type IFsObjectDriverOptions = { readonly root: string; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Trusted plugin-managed native filesystem target."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IFsObjectDriverOptions from @migaia/storage-plugin-object/fs, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IFsObjectDriverOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when IFsObjectDriverOptions does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "root: Nonempty directory path resolved to one absolute realpath on installation. Cross-process writers are unsupported."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-object/dist/fs.d.ts:IFsObjectDriverOptions:export type IFsObjectDriverOptions = { readonly root: string; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-object-fs--IFsObjectDriverOptions"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "storage-plugin-object:s3",
+      "library": "storage-plugin-object",
+      "module": "s3",
+      "exportPath": "./s3",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/docs/storage-plugin-object/getting-started",
+      "architecturePath": "/en/docs/storage-plugin-object",
+      "symbols": [
+        {
+          "name": "IS3ObjectDriverOptions",
+          "kind": "type",
+          "signature": "export type IS3ObjectDriverOptions = ({ readonly client: S3Client; readonly config?: never; } | { readonly client?: never; readonly config: S3ClientConfig; }) & { readonly bucket: string; readonly prefix?: string; readonly multipartThresholdBytes?: number; readonly partBytes?: number; readonly partConcurrency?: number; };",
+          "declarationLine": 4,
+          "source": "packages/storage-plugin-object/dist/s3.d.ts",
+          "purpose": "Exactly one borrowed client or owned-client config and one native bucket.",
+          "core": "client: Borrowed official S3Client; never copied, reconfigured or destroyed.\nOmitted requires config.\nconfig: Official SDK configuration used to create one owned client at installation.\nOmitted requires client.\nbucket: Nonempty existing native bucket; the backend does not create buckets.\nprefix: Native prefix outside the organization segment.\nEmpty string adds no configuration prefix.\nmultipartThresholdBytes: Positive safe integer byte threshold for known-size input; streams always use multipart except empty streams.\n16 MiB.\npartBytes: Positive safe integer part size at least 5 MiB; the final part may be smaller.\n8 MiB.\npartConcurrency: Positive safe integer bound on outstanding native part requests.\n4 outstanding parts.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "client",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly client: S3Client;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "S3Client"
+            },
+            {
+              "name": "config",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly config?: never;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "never"
+            },
+            {
+              "name": "client",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly client?: never;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "never"
+            },
+            {
+              "name": "config",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly config: S3ClientConfig;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "S3ClientConfig"
+            },
+            {
+              "name": "bucket",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly bucket: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "prefix",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly prefix?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "multipartThresholdBytes",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly multipartThresholdBytes?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "partBytes",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly partBytes?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "partConcurrency",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly partConcurrency?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            }
+          ],
+          "composes": [],
+          "exportPath": "./s3",
+          "overloadSignatures": [
+            "export type IS3ObjectDriverOptions = ({ readonly client: S3Client; readonly config?: never; } | { readonly client?: never; readonly config: S3ClientConfig; }) & { readonly bucket: string; readonly prefix?: string; readonly multipartThresholdBytes?: number; readonly partBytes?: number; readonly partConcurrency?: number; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Exactly one borrowed client or owned-client config and one native bucket."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IS3ObjectDriverOptions from @migaia/storage-plugin-object/s3, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IS3ObjectDriverOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when IS3ObjectDriverOptions does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "client: Borrowed official S3Client; never copied, reconfigured or destroyed.\nOmitted requires config.\nconfig: Official SDK configuration used to create one owned client at installation.\nOmitted requires client.\nbucket: Nonempty existing native bucket; the backend does not create buckets.\nprefix: Native prefix outside the organization segment.\nEmpty string adds no configuration prefix.\nmultipartThresholdBytes: Positive safe integer byte threshold for known-size input; streams always use multipart except empty streams.\n16 MiB.\npartBytes: Positive safe integer part size at least 5 MiB; the final part may be smaller.\n8 MiB.\npartConcurrency: Positive safe integer bound on outstanding native part requests.\n4 outstanding parts."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-object/dist/s3.d.ts:IS3ObjectDriverOptions:export type IS3ObjectDriverOptions = ({ readonly client: S3Client; readonly config?: never; } | { readonly client?: never; readonly config: S3ClientConfig; }) & { readonly bucket: string; readonly prefix?: string; readonly multipartThresholdBytes?: number; readonly partBytes?: number; readonly partConcurrency?: number; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-object-s3--IS3ObjectDriverOptions"
+        },
+        {
+          "name": "s3ObjectDriver",
+          "kind": "function",
+          "signature": "export declare function s3ObjectDriver(options: IS3ObjectDriverOptions): IObjectDriver;",
+          "declarationLine": 18,
+          "source": "packages/storage-plugin-object/dist/s3.d.ts",
+          "purpose": "Capture one borrowed SDK client or owned-client configuration. Detect conditional writes through the original host detection window.",
+          "core": "Authentic lazy S3 descriptor. Modification requests send once; unknown commit acknowledgment is never replayed automatically.\nclient: Borrowed official S3Client; never copied, reconfigured or destroyed.\nOmitted requires config.\nconfig: Official SDK configuration used to create one owned client at installation.\nOmitted requires client.\nbucket: Nonempty existing native bucket; the backend does not create buckets.\nprefix: Native prefix outside the organization segment.\nEmpty string adds no configuration prefix.\nmultipartThresholdBytes: Positive safe integer byte threshold for known-size input; streams always use multipart except empty streams.\n16 MiB.\npartBytes: Positive safe integer part size at least 5 MiB; the final part may be smaller.\n8 MiB.\npartConcurrency: Positive safe integer bound on outstanding native part requests.\n4 outstanding parts.",
+          "advanced": "",
+          "parameters": ["options: IS3ObjectDriverOptions"],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "IS3ObjectDriverOptions",
+              "optional": false
+            }
+          ],
+          "returns": "IObjectDriver",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [
+            "import { s3ObjectDriver } from '@migaia/storage-plugin-object/s3'\nimport { objectPresignFeature } from '@migaia/storage-plugin-object/features/presign'\n\nconst plugin = objectBackendPlugin(\n  {\n    driver: s3ObjectDriver({\n      config: { region: 'us-east-1', endpoint: 'http://127.0.0.1:19000', forcePathStyle: true },\n      bucket: 'objects',\n      prefix: 'app/'\n    })\n  },\n  { presign: objectPresignFeature() }\n)"
+          ],
+          "members": [],
+          "composes": [],
+          "exportPath": "./s3",
+          "overloadSignatures": [
+            "export declare function s3ObjectDriver(options: IS3ObjectDriverOptions): IObjectDriver;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "IS3ObjectDriverOptions",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["IObjectDriver"],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Capture one borrowed SDK client or owned-client configuration. Detect conditional writes through the original host detection window."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import s3ObjectDriver from @migaia/storage-plugin-object/s3, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use s3ObjectDriver when its function contract and declared inputs match the result you need. Choose a different public symbol when s3ObjectDriver does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "Authentic lazy S3 descriptor. Modification requests send once; unknown commit acknowledgment is never replayed automatically.\nclient: Borrowed official S3Client; never copied, reconfigured or destroyed.\nOmitted requires config.\nconfig: Official SDK configuration used to create one owned client at installation.\nOmitted requires client.\nbucket: Nonempty existing native bucket; the backend does not create buckets.\nprefix: Native prefix outside the organization segment.\nEmpty string adds no configuration prefix.\nmultipartThresholdBytes: Positive safe integer byte threshold for known-size input; streams always use multipart except empty streams.\n16 MiB.\npartBytes: Positive safe integer part size at least 5 MiB; the final part may be smaller.\n8 MiB.\npartConcurrency: Positive safe integer bound on outstanding native part requests.\n4 outstanding parts."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [
+            {
+              "name": "client",
+              "type": "S3Client",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "config",
+              "type": "S3ClientConfig",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "bucket",
+              "type": "string",
+              "optional": false,
+              "description": ""
+            },
+            {
+              "name": "prefix",
+              "type": "string",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "multipartThresholdBytes",
+              "type": "number",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "partBytes",
+              "type": "number",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "partConcurrency",
+              "type": "number",
+              "optional": true,
+              "description": ""
+            }
+          ],
+          "identity": "packages/storage-plugin-object/dist/s3.d.ts:s3ObjectDriver:export declare function s3ObjectDriver(options: IS3ObjectDriverOptions): IObjectDriver;",
+          "guidance": [],
+          "usageScore": 24,
+          "configuration": [
+            {
+              "name": "client",
+              "type": "S3Client",
+              "optional": true,
+              "description": "传入的 `client` 属于借用，始终不销毁；`config` 分支在安装时创建自有客户端。凭据沿 SDK 原有提供方。检测在保留前缀随机对象上验证单次条件写；权限或条件不支持只报告，不中断宿主创建。无条件操作仍按真实权限执行，条件 multipart 按实际 Complete 请求判定，不降级。",
+              "descriptionEn": "",
+              "descriptionZh": "传入的 `client` 属于借用，始终不销毁；`config` 分支在安装时创建自有客户端。凭据沿 SDK 原有提供方。检测在保留前缀随机对象上验证单次条件写；权限或条件不支持只报告，不中断宿主创建。无条件操作仍按真实权限执行，条件 multipart 按实际 Complete 请求判定，不降级。"
+            },
+            {
+              "name": "config",
+              "type": "S3ClientConfig",
+              "optional": true,
+              "description": "传入的 `client` 属于借用，始终不销毁；`config` 分支在安装时创建自有客户端。凭据沿 SDK 原有提供方。检测在保留前缀随机对象上验证单次条件写；权限或条件不支持只报告，不中断宿主创建。无条件操作仍按真实权限执行，条件 multipart 按实际 Complete 请求判定，不降级。",
+              "descriptionEn": "",
+              "descriptionZh": "传入的 `client` 属于借用，始终不销毁；`config` 分支在安装时创建自有客户端。凭据沿 SDK 原有提供方。检测在保留前缀随机对象上验证单次条件写；权限或条件不支持只报告，不中断宿主创建。无条件操作仍按真实权限执行，条件 multipart 按实际 Complete 请求判定，不降级。"
+            },
+            {
+              "name": "bucket",
+              "type": "string",
+              "optional": false,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            },
+            {
+              "name": "prefix",
+              "type": "string",
+              "optional": true,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            },
+            {
+              "name": "multipartThresholdBytes",
+              "type": "number",
+              "optional": true,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            },
+            {
+              "name": "partBytes",
+              "type": "number",
+              "optional": true,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            },
+            {
+              "name": "partConcurrency",
+              "type": "number",
+              "optional": true,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            }
+          ],
+          "fragment": "storage-plugin-object-s3--s3ObjectDriver"
+        }
+      ],
+      "aliases": []
+    }
+  ]
+}
