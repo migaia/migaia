@@ -7,6 +7,10 @@ import {
 } from './storage-plugin-postgres-quantized.js'
 /** Bilingual documentation covers one finite native public surface. */
 const t = (en: string, zh: string): IText => ({ en, zh })
+/** COPY and LISTEN share one complete native transaction and caller-owned pool example. */
+const postgresCopyListenExample =
+  "import { Pool } from 'pg'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'\nimport { pgDriver } from '@migaia/storage-plugin-postgres/pg'\nimport { pgCopyFeature } from '@migaia/storage-plugin-postgres/features/copy'\nimport { pgListenFeature } from '@migaia/storage-plugin-postgres/features/listen'\nconst pool = new Pool({ connectionString: process.env.DATABASE_URL })\ntry {\n  await using host = await createStorageHost({\n    plugins: [\n      postgresBackendPlugin(\n        { driver: pgDriver(pool) },\n        { copy: pgCopyFeature(), listen: pgListenFeature() }\n      )\n    ] as const\n  })\n  const store = host.backend('postgres')\n  await store.sql`CREATE TABLE IF NOT EXISTS app_example_import(name TEXT)`.run()\n  const message = Promise.withResolvers<string>()\n  await using subscription = await store.api.notifications.listen('example_ready', message.resolve)\n  await store.transaction(async (tx) => {\n    await tx.api.copy.from(\n      { table: ['app_example_import'], columns: ['name'] },\n      async function* () {\n        yield new TextEncoder().encode('Ada\\nLin\\n')\n      }\n    )\n    await tx.set('example:import', 'done')\n    await tx.api.notifications.notify('example_ready', 'done')\n  })\n  console.log(await message.promise)\n} finally {\n  await pool.end()\n}"
+
 /** Only explicit driver subpaths load their real peer clients. */
 export const storagePluginPostgresReference: ILibraryReference = {
   modules: {
@@ -141,6 +145,8 @@ export const storagePluginPostgresReference: ILibraryReference = {
       }
     },
     pgDriver: {
+      example:
+        "import { createStorageHost } from '@migaia/storage-host'\nimport { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'\nimport { Pool } from 'pg'\nimport { pgDriver } from '@migaia/storage-plugin-postgres/pg'\n\nconst pool = new Pool({ connectionString: process.env.DATABASE_URL })\ntry {\n  await using host = await createStorageHost({\n    plugins: [postgresBackendPlugin({ driver: pgDriver(pool) })]\n  })\n  const store = host.backend('postgres')\n  await store.set('theme', 'dark')\n  console.log(await store.get('theme'))\n} finally {\n  await pool.end()\n}",
       role: 'factory',
       purpose: {
         en: 'Borrow pg.Pool connections and dedicated native listeners; only this adapter supplies logical replication.',
@@ -158,6 +164,8 @@ export const storagePluginPostgresReference: ILibraryReference = {
       }
     },
     postgresJsDriver: {
+      example:
+        "import { createStorageHost } from '@migaia/storage-host'\nimport { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'\nimport postgres from 'postgres'\nimport { postgresJsDriver } from '@migaia/storage-plugin-postgres/postgres-js'\n\nconst client = postgres(process.env.DATABASE_URL!)\ntry {\n  await using host = await createStorageHost({\n    plugins: [postgresBackendPlugin({ driver: postgresJsDriver(client) })]\n  })\n  const store = host.backend('postgres')\n  await store.set('theme', 'dark')\n  console.log(await store.get('theme'))\n} finally {\n  await client.end()\n}",
       role: 'factory',
       purpose: {
         en: 'Borrow genuine postgres.Sql reservations, streaming COPY and original native subscription resources.',
@@ -175,6 +183,8 @@ export const storagePluginPostgresReference: ILibraryReference = {
       }
     },
     bunSqlDriver: {
+      example:
+        "import { createStorageHost } from '@migaia/storage-host'\nimport { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'\nimport { SQL } from 'bun'\nimport { bunSqlDriver } from '@migaia/storage-plugin-postgres/bun'\n\nconst client = new SQL({ url: process.env.DATABASE_URL!, prepare: false })\ntry {\n  await using host = await createStorageHost({\n    plugins: [postgresBackendPlugin({ driver: bunSqlDriver(client) })]\n  })\n  const store = host.backend('postgres')\n  await store.set('theme', 'dark')\n  console.log(await store.get('theme'))\n} finally {\n  await client.close()\n}",
       role: 'factory',
       purpose: {
         en: 'Admit a caller-owned Bun SQL client with prepare:false and the required runtime version before native I/O.',
@@ -204,6 +214,7 @@ export const storagePluginPostgresReference: ILibraryReference = {
       }
     },
     pgListenFeature: {
+      example: postgresCopyListenExample,
       role: 'factory',
       purpose: {
         en: 'Add dedicated root LISTEN resources and transaction-bound native NOTIFY calls without polling.',
@@ -215,6 +226,7 @@ export const storagePluginPostgresReference: ILibraryReference = {
       }
     },
     pgCopyFeature: {
+      example: postgresCopyListenExample,
       role: 'factory',
       purpose: {
         en: 'Add streaming client STDIN COPY with a fresh iterable for every actual native transaction attempt.',

@@ -108,6 +108,7 @@ export const storagePluginSqliteReference: ILibraryReference = {
   symbols: {
     sqliteBackendPlugin: {
       role: 'factory',
+      example: sqliteConfiguredExample,
       purpose: t(
         'Define one caller-owned driver backend for the storage host.',
         '为存储宿主定义一个借用调用方原生连接的 SQLite 后端，安装后共用原事务边界。'

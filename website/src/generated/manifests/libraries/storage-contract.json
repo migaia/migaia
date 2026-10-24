@@ -974,9 +974,9 @@
           "signature": "export declare function assertConcurrencyPolicy(policy: unknown, locking?: IConcurrencyPolicy['locking'], backend?: IBackendKind): asserts policy is IConcurrencyPolicy;",
           "declarationLine": 148,
           "source": "packages/storage-contract/dist/concurrency.d.ts",
-          "purpose": "Internal identity admission is reused by the original transaction owner and decision loop.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for assertConcurrencyPolicy.",
-          "advanced": "No additional advanced behavior is declared for assertConcurrencyPolicy.",
+          "purpose": "Validate that a policy came from defineConcurrencyPolicy and, when requested, matches the backend locking mode. This does not call its decision callback or acquire locks.",
+          "core": "policy: The policy object to validate.\nlocking: Optional required mode: pessimistic or optimistic. Omission accepts either registered mode.\nbackend: Your backend kind label for error details; undefined leaves the label unspecified.\nNo value; successful validation narrows policy to IConcurrencyPolicy. Unregistered input throws INVALID_ARGUMENT; a locking-mode mismatch throws UNSUPPORTED_CAPABILITY.",
+          "advanced": "",
           "parameters": [
             "policy: unknown",
             "locking: IConcurrencyPolicy['locking'] (optional)",
@@ -1000,8 +1000,8 @@
             }
           ],
           "returns": "asserts policy is IConcurrencyPolicy",
-          "errors": ["No documented errors are declared for assertConcurrencyPolicy."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for assertConcurrencyPolicy.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [],
           "composes": [],
@@ -1030,13 +1030,13 @@
             ]
           ],
           "overloadReturns": ["asserts policy is IConcurrencyPolicy"],
-          "whenToUse": "Use assertConcurrencyPolicy when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when assertConcurrencyPolicy does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Internal identity admission is reused by the original transaction owner and decision loop."
+              "content": "Validate that a policy came from defineConcurrencyPolicy and, when requested, matches the backend locking mode. This does not call its decision callback or acquire locks."
             },
             {
               "id": "getting-started",
@@ -1056,12 +1056,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for assertConcurrencyPolicy."
+              "content": "policy: The policy object to validate.\nlocking: Optional required mode: pessimistic or optimistic. Omission accepts either registered mode.\nbackend: Your backend kind label for error details; undefined leaves the label unspecified.\nNo value; successful validation narrows policy to IConcurrencyPolicy. Unregistered input throws INVALID_ARGUMENT; a locking-mode mismatch throws UNSUPPORTED_CAPABILITY."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for assertConcurrencyPolicy."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -1077,9 +1077,9 @@
           "signature": "export declare function assertLockKey(value: unknown, backend: IBackendKind | undefined): asserts value is ILockKey;",
           "declarationLine": 176,
           "source": "packages/storage-contract/dist/concurrency.d.ts",
-          "purpose": "Validate the canonical lock channels without allocating a detached lock or logical key.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for assertLockKey.",
-          "advanced": "No additional advanced behavior is declared for assertLockKey.",
+          "purpose": "Validate the text, bytes, record, vector or RDF fields of a lock request before the backend uses it. This pure check does not copy the key or acquire a lock.",
+          "core": "value: Unknown input containing a channel and that channel’s key fields.\nbackend: Your backend kind label for error details; undefined leaves the label unspecified.\nNo value; successful validation narrows value to ILockKey. An unknown channel or invalid channel fields throw INVALID_ARGUMENT.",
+          "advanced": "",
           "parameters": ["value: unknown", "backend: IBackendKind | undefined"],
           "parameterDetails": [
             {
@@ -1094,8 +1094,8 @@
             }
           ],
           "returns": "asserts value is ILockKey",
-          "errors": ["No documented errors are declared for assertLockKey."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for assertLockKey.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [],
           "composes": [],
@@ -1119,13 +1119,13 @@
             ]
           ],
           "overloadReturns": ["asserts value is ILockKey"],
-          "whenToUse": "Use assertLockKey when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when assertLockKey does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Validate the canonical lock channels without allocating a detached lock or logical key."
+              "content": "Validate the text, bytes, record, vector or RDF fields of a lock request before the backend uses it. This pure check does not copy the key or acquire a lock."
             },
             {
               "id": "getting-started",
@@ -1145,12 +1145,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for assertLockKey."
+              "content": "value: Unknown input containing a channel and that channel’s key fields.\nbackend: Your backend kind label for error details; undefined leaves the label unspecified.\nNo value; successful validation narrows value to ILockKey. An unknown channel or invalid channel fields throw INVALID_ARGUMENT."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for assertLockKey."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -1247,9 +1247,9 @@
           "signature": "export declare function assertRdfIri(value: unknown, backend: IBackendKind | undefined): asserts value is string;",
           "declarationLine": 67,
           "source": "packages/storage-contract/dist/capabilities/rdf.d.ts",
-          "purpose": "Absolute IRI admission preserves spelling without URL normalization or allocation.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for assertRdfIri.",
-          "advanced": "No additional advanced behavior is declared for assertRdfIri.",
+          "purpose": "Validate an absolute RDF resource address while preserving its exact spelling. The check performs no URL normalization, resolution or network request.",
+          "core": "value: The unknown value expected to be an absolute IRI string.\nbackend: Your backend kind label for error details; undefined leaves the label unspecified.\nNo value; valid input is narrowed to string. Invalid address syntax throws INVALID_ARGUMENT.",
+          "advanced": "",
           "parameters": ["value: unknown", "backend: IBackendKind | undefined"],
           "parameterDetails": [
             {
@@ -1264,8 +1264,8 @@
             }
           ],
           "returns": "asserts value is string",
-          "errors": ["No documented errors are declared for assertRdfIri."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for assertRdfIri.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [],
           "composes": [],
@@ -1289,13 +1289,13 @@
             ]
           ],
           "overloadReturns": ["asserts value is string"],
-          "whenToUse": "Use assertRdfIri when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when assertRdfIri does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Absolute IRI admission preserves spelling without URL normalization or allocation."
+              "content": "Validate an absolute RDF resource address while preserving its exact spelling. The check performs no URL normalization, resolution or network request."
             },
             {
               "id": "getting-started",
@@ -1315,12 +1315,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for assertRdfIri."
+              "content": "value: The unknown value expected to be an absolute IRI string.\nbackend: Your backend kind label for error details; undefined leaves the label unspecified.\nNo value; valid input is narrowed to string. Invalid address syntax throws INVALID_ARGUMENT."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for assertRdfIri."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -1336,9 +1336,9 @@
           "signature": "export declare function assertRdfLiteral(value: unknown, datatype: unknown, language: unknown, backend: IBackendKind | undefined): void;",
           "declarationLine": 69,
           "source": "packages/storage-contract/dist/capabilities/rdf.d.ts",
-          "purpose": "Literal validation is shared by structural terms and factories without allocating a term.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for assertRdfLiteral.",
-          "advanced": "No additional advanced behavior is declared for assertRdfLiteral.",
+          "purpose": "Validate RDF text, its datatype address and an optional language tag as one consistent value. Language-tagged text requires RdfDatatype.langString; checking does not rewrite the caller’s text or tag.",
+          "core": "value: Text made of valid Unicode scalar values.\ndatatype: Absolute datatype IRI, such as RdfDatatype.string or RdfDatatype.langString.\nlanguage: Optional well-formed language tag; undefined means no language tag.\nbackend: Your backend kind label for error details; undefined leaves the label unspecified.\nNo value; text, datatype and language agree. Invalid text, address, tag or datatype/tag pairing throws INVALID_ARGUMENT.",
+          "advanced": "",
           "parameters": [
             "value: unknown",
             "datatype: unknown",
@@ -1368,8 +1368,8 @@
             }
           ],
           "returns": "void",
-          "errors": ["No documented errors are declared for assertRdfLiteral."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for assertRdfLiteral.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [],
           "composes": [],
@@ -1403,13 +1403,13 @@
             ]
           ],
           "overloadReturns": ["void"],
-          "whenToUse": "Use assertRdfLiteral when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when assertRdfLiteral does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Literal validation is shared by structural terms and factories without allocating a term."
+              "content": "Validate RDF text, its datatype address and an optional language tag as one consistent value. Language-tagged text requires RdfDatatype.langString; checking does not rewrite the caller’s text or tag."
             },
             {
               "id": "getting-started",
@@ -1429,12 +1429,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for assertRdfLiteral."
+              "content": "value: Text made of valid Unicode scalar values.\ndatatype: Absolute datatype IRI, such as RdfDatatype.string or RdfDatatype.langString.\nlanguage: Optional well-formed language tag; undefined means no language tag.\nbackend: Your backend kind label for error details; undefined leaves the label unspecified.\nNo value; text, datatype and language agree. Invalid text, address, tag or datatype/tag pairing throws INVALID_ARGUMENT."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for assertRdfLiteral."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -1450,9 +1450,9 @@
           "signature": "export declare function assertStorageBlobGet(key: string, options: Parameters<IBlobApi['get']>[1], backend: IBackendKind | undefined): void;",
           "declarationLine": 58,
           "source": "packages/storage-contract/dist/capabilities/blob.d.ts",
-          "purpose": "Validate inclusive byte bounds without creating a new range or opening native content.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for assertStorageBlobGet.",
-          "advanced": "No additional advanced behavior is declared for assertStorageBlobGet.",
+          "purpose": "Check an object key, optional inclusive byte range and operation context before reading content. This does not open an object or allocate a replacement range.",
+          "core": "key: The object’s string key.\noptions: Read options with optional range and ctx; pass undefined for an unrestricted read.\nbackend: Your backend kind label for error details; undefined leaves the label unspecified.\nNo value; the request has valid domains. Invalid keys, bounds or operation options throw INVALID_ARGUMENT before content is opened.\nrange: Inclusive byte bounds; start is required and end is optional.\nOmitted: read the complete object.\nrange.start: Nonnegative safe integer giving the first byte position.\nrange.end: Safe integer at or after start, included in the result.\nOmitted: continue to the end of the object.\nctx: An optional IOperationContext carrying cancellation or a timeout.\nOmitted: no caller context is added.",
+          "advanced": "",
           "parameters": [
             "key: string",
             "options: Parameters<IBlobApi['get']>[1]",
@@ -1476,8 +1476,8 @@
             }
           ],
           "returns": "void",
-          "errors": ["No documented errors are declared for assertStorageBlobGet."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for assertStorageBlobGet.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [],
           "composes": [],
@@ -1506,13 +1506,13 @@
             ]
           ],
           "overloadReturns": ["void"],
-          "whenToUse": "Use assertStorageBlobGet when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when assertStorageBlobGet does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Validate inclusive byte bounds without creating a new range or opening native content."
+              "content": "Check an object key, optional inclusive byte range and operation context before reading content. This does not open an object or allocate a replacement range."
             },
             {
               "id": "getting-started",
@@ -1532,12 +1532,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for assertStorageBlobGet."
+              "content": "key: The object’s string key.\noptions: Read options with optional range and ctx; pass undefined for an unrestricted read.\nbackend: Your backend kind label for error details; undefined leaves the label unspecified.\nNo value; the request has valid domains. Invalid keys, bounds or operation options throw INVALID_ARGUMENT before content is opened.\nrange: Inclusive byte bounds; start is required and end is optional.\nOmitted: read the complete object.\nrange.start: Nonnegative safe integer giving the first byte position.\nrange.end: Safe integer at or after start, included in the result.\nOmitted: continue to the end of the object.\nctx: An optional IOperationContext carrying cancellation or a timeout.\nOmitted: no caller context is added."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for assertStorageBlobGet."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -1553,9 +1553,9 @@
           "signature": "export declare function assertStorageBlobList(options: Parameters<IBlobApi['list']>[0], ctx: IOperationContext | undefined, backend: IBackendKind | undefined): void;",
           "declarationLine": 60,
           "source": "packages/storage-contract/dist/capabilities/blob.d.ts",
-          "purpose": "Validate the shared prefix/cursor/limit domain without copying its caller options.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for assertStorageBlobList.",
-          "advanced": "No additional advanced behavior is declared for assertStorageBlobList.",
+          "purpose": "Check an object-list prefix, cursor, page size and operation context before listing. It validates the request without copying its options or contacting a backend.",
+          "core": "options: Optional prefix, after cursor and positive safe-integer limit.\nctx: Optional IOperationContext for this listing; undefined adds no caller context.\nbackend: Your backend kind label for error details; undefined leaves the label unspecified.\nNo value; the listing request is valid. Invalid prefix, cursor, limit or operation context throws INVALID_ARGUMENT.\nprefix: String prefix restricting matching object keys.\nOmitted: the empty prefix accepts every key.\nafter: String cursor returned by the backend’s previous listing.\nOmitted: start without a cursor.\nlimit: Positive safe integer bounding the requested page.\nOmitted: 100.",
+          "advanced": "",
           "parameters": [
             "options: Parameters<IBlobApi['list']>[0]",
             "ctx: IOperationContext | undefined",
@@ -1579,8 +1579,8 @@
             }
           ],
           "returns": "void",
-          "errors": ["No documented errors are declared for assertStorageBlobList."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for assertStorageBlobList.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [],
           "composes": [],
@@ -1609,13 +1609,13 @@
             ]
           ],
           "overloadReturns": ["void"],
-          "whenToUse": "Use assertStorageBlobList when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when assertStorageBlobList does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Validate the shared prefix/cursor/limit domain without copying its caller options."
+              "content": "Check an object-list prefix, cursor, page size and operation context before listing. It validates the request without copying its options or contacting a backend."
             },
             {
               "id": "getting-started",
@@ -1635,12 +1635,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for assertStorageBlobList."
+              "content": "options: Optional prefix, after cursor and positive safe-integer limit.\nctx: Optional IOperationContext for this listing; undefined adds no caller context.\nbackend: Your backend kind label for error details; undefined leaves the label unspecified.\nNo value; the listing request is valid. Invalid prefix, cursor, limit or operation context throws INVALID_ARGUMENT.\nprefix: String prefix restricting matching object keys.\nOmitted: the empty prefix accepts every key.\nafter: String cursor returned by the backend’s previous listing.\nOmitted: start without a cursor.\nlimit: Positive safe integer bounding the requested page.\nOmitted: 100."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for assertStorageBlobList."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -1656,9 +1656,9 @@
           "signature": "export declare function assertStorageBlobPut(key: string, body: Uint8Array | ReadableStream<Uint8Array>, options: Parameters<IBlobApi['put']>[2], backend: IBackendKind | undefined): void;",
           "declarationLine": 56,
           "source": "packages/storage-contract/dist/capabilities/blob.d.ts",
-          "purpose": "Validate upload domains without acquiring a reader or allocating detached data.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for assertStorageBlobPut.",
-          "advanced": "No additional advanced behavior is declared for assertStorageBlobPut.",
+          "purpose": "Validate upload bytes or an unlocked readable byte stream, metadata and conditional-write options before acquiring a reader. It does not consume the body or write an object.",
+          "core": "key: String key chosen for the uploaded object.\nbody: A Uint8Array or unlocked ReadableStream<Uint8Array>.\noptions: Optional contentType, string metadata, one write condition and ctx.\nbackend: Your backend kind label for error details; undefined leaves the label unspecified.\nNo value; upload arguments are valid. Invalid body shape, metadata, conflicting write conditions or context throws INVALID_ARGUMENT without reading bytes.\ncontentType: String media type supplied to the backend.\nOmitted: no media type is supplied by this validator.\nmetadata: Object whose own enumerable values are strings.\nOmitted: no metadata is supplied.\nifMatch: String ETag requiring an existing matching object; cannot accompany ifNoneMatch.\nOmitted: no match condition is requested.\nifNoneMatch: Only true is accepted; requests creation without replacing an existing object.\nOmitted: no create-only condition is requested.\nctx: Optional IOperationContext for cancellation and timeout.\nOmitted: no caller context is added.",
+          "advanced": "",
           "parameters": [
             "key: string",
             "body: Uint8Array | ReadableStream<Uint8Array>",
@@ -1688,8 +1688,8 @@
             }
           ],
           "returns": "void",
-          "errors": ["No documented errors are declared for assertStorageBlobPut."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for assertStorageBlobPut.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [],
           "composes": [],
@@ -1723,13 +1723,13 @@
             ]
           ],
           "overloadReturns": ["void"],
-          "whenToUse": "Use assertStorageBlobPut when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when assertStorageBlobPut does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Validate upload domains without acquiring a reader or allocating detached data."
+              "content": "Validate upload bytes or an unlocked readable byte stream, metadata and conditional-write options before acquiring a reader. It does not consume the body or write an object."
             },
             {
               "id": "getting-started",
@@ -1749,12 +1749,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for assertStorageBlobPut."
+              "content": "key: String key chosen for the uploaded object.\nbody: A Uint8Array or unlocked ReadableStream<Uint8Array>.\noptions: Optional contentType, string metadata, one write condition and ctx.\nbackend: Your backend kind label for error details; undefined leaves the label unspecified.\nNo value; upload arguments are valid. Invalid body shape, metadata, conflicting write conditions or context throws INVALID_ARGUMENT without reading bytes.\ncontentType: String media type supplied to the backend.\nOmitted: no media type is supplied by this validator.\nmetadata: Object whose own enumerable values are strings.\nOmitted: no metadata is supplied.\nifMatch: String ETag requiring an existing matching object; cannot accompany ifNoneMatch.\nOmitted: no match condition is requested.\nifNoneMatch: Only true is accepted; requests creation without replacing an existing object.\nOmitted: no create-only condition is requested.\nctx: Optional IOperationContext for cancellation and timeout.\nOmitted: no caller context is added."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for assertStorageBlobPut."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -1875,9 +1875,9 @@
           "signature": "export declare function assertStorageOrgId(value: unknown): asserts value is string;",
           "declarationLine": 2,
           "source": "packages/storage-contract/dist/org.d.ts",
-          "purpose": "Validates organization syntax once without supplying a host default or changing letter case.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for assertStorageOrgId.",
-          "advanced": "No additional advanced behavior is declared for assertStorageOrgId.",
+          "purpose": "Validate the exact lowercase UUID syntax used to select an organization, including the reserved zero UUID. It does not choose a default or change letter case.",
+          "core": "value: Organization identifier supplied by the application.\nNo value; valid input is narrowed to string. Invalid syntax throws INVALID_ARGUMENT.",
+          "advanced": "",
           "parameters": ["value: unknown"],
           "parameterDetails": [
             {
@@ -1887,8 +1887,8 @@
             }
           ],
           "returns": "asserts value is string",
-          "errors": ["No documented errors are declared for assertStorageOrgId."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for assertStorageOrgId.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [],
           "composes": [],
@@ -1907,13 +1907,13 @@
             ]
           ],
           "overloadReturns": ["asserts value is string"],
-          "whenToUse": "Use assertStorageOrgId when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when assertStorageOrgId does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Validates organization syntax once without supplying a host default or changing letter case."
+              "content": "Validate the exact lowercase UUID syntax used to select an organization, including the reserved zero UUID. It does not choose a default or change letter case."
             },
             {
               "id": "getting-started",
@@ -1933,12 +1933,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for assertStorageOrgId."
+              "content": "value: Organization identifier supplied by the application.\nNo value; valid input is narrowed to string. Invalid syntax throws INVALID_ARGUMENT."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for assertStorageOrgId."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -1954,9 +1954,9 @@
           "signature": "export declare function assertStorageRdfPattern(pattern: unknown, backend: IBackendKind | undefined): asserts pattern is Partial<IQuad>;",
           "declarationLine": 73,
           "source": "packages/storage-contract/dist/capabilities/rdf.d.ts",
-          "purpose": "Validate a partial ground pattern without allocating replacement terms or an input image.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for assertStorageRdfPattern.",
-          "advanced": "No additional advanced behavior is declared for assertStorageRdfPattern.",
+          "purpose": "Validate supplied positions of a partial RDF statement using ground-term rules. Omitted positions stay omitted, and blank-node labels are not accepted for repeated-identity storage.",
+          "core": "pattern: Unknown object with any subset of subject, predicate, object and graph.\nbackend: Your backend kind label for error details; undefined leaves the label unspecified.\nNo value; successful input is narrowed to Partial<IQuad>. Invalid supplied positions throw INVALID_ARGUMENT; no default graph is inserted.",
+          "advanced": "",
           "parameters": ["pattern: unknown", "backend: IBackendKind | undefined"],
           "parameterDetails": [
             {
@@ -1971,8 +1971,8 @@
             }
           ],
           "returns": "asserts pattern is Partial<IQuad>",
-          "errors": ["No documented errors are declared for assertStorageRdfPattern."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for assertStorageRdfPattern.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [],
           "composes": [],
@@ -1996,13 +1996,13 @@
             ]
           ],
           "overloadReturns": ["asserts pattern is Partial<IQuad>"],
-          "whenToUse": "Use assertStorageRdfPattern when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when assertStorageRdfPattern does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Validate a partial ground pattern without allocating replacement terms or an input image."
+              "content": "Validate supplied positions of a partial RDF statement using ground-term rules. Omitted positions stay omitted, and blank-node labels are not accepted for repeated-identity storage."
             },
             {
               "id": "getting-started",
@@ -2022,12 +2022,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for assertStorageRdfPattern."
+              "content": "pattern: Unknown object with any subset of subject, predicate, object and graph.\nbackend: Your backend kind label for error details; undefined leaves the label unspecified.\nNo value; successful input is narrowed to Partial<IQuad>. Invalid supplied positions throw INVALID_ARGUMENT; no default graph is inserted."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for assertStorageRdfPattern."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -2043,9 +2043,9 @@
           "signature": "export declare function assertStorageRdfQuad(quad: unknown, backend: IBackendKind | undefined): asserts quad is IQuad;",
           "declarationLine": 75,
           "source": "packages/storage-contract/dist/capabilities/rdf.d.ts",
-          "purpose": "A complete quad uses the same positional rules plus all four mandatory positions.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for assertStorageRdfQuad.",
-          "advanced": "No additional advanced behavior is declared for assertStorageRdfQuad.",
+          "purpose": "Validate a complete ground RDF statement before writing it. All four positions are required, including an explicit named or default graph.",
+          "core": "quad: Unknown statement containing subject, predicate, object and graph.\nbackend: Your backend kind label for error details; undefined leaves the label unspecified.\nNo value; successful input is narrowed to IQuad. Missing or invalid positions throw INVALID_ARGUMENT.",
+          "advanced": "",
           "parameters": ["quad: unknown", "backend: IBackendKind | undefined"],
           "parameterDetails": [
             {
@@ -2060,8 +2060,8 @@
             }
           ],
           "returns": "asserts quad is IQuad",
-          "errors": ["No documented errors are declared for assertStorageRdfQuad."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for assertStorageRdfQuad.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [],
           "composes": [],
@@ -2085,13 +2085,13 @@
             ]
           ],
           "overloadReturns": ["asserts quad is IQuad"],
-          "whenToUse": "Use assertStorageRdfQuad when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when assertStorageRdfQuad does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "A complete quad uses the same positional rules plus all four mandatory positions."
+              "content": "Validate a complete ground RDF statement before writing it. All four positions are required, including an explicit named or default graph."
             },
             {
               "id": "getting-started",
@@ -2111,12 +2111,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for assertStorageRdfQuad."
+              "content": "quad: Unknown statement containing subject, predicate, object and graph.\nbackend: Your backend kind label for error details; undefined leaves the label unspecified.\nNo value; successful input is narrowed to IQuad. Missing or invalid positions throw INVALID_ARGUMENT."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for assertStorageRdfQuad."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -2132,9 +2132,9 @@
           "signature": "export declare function assertStorageRdfTerm(value: unknown, backend: IBackendKind | undefined): asserts value is IRdfTerm;",
           "declarationLine": 71,
           "source": "packages/storage-contract/dist/capabilities/rdf.d.ts",
-          "purpose": "Validate raw RDF structure without copying terms or normalizing caller-owned fields.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for assertStorageRdfTerm.",
-          "advanced": "No additional advanced behavior is declared for assertStorageRdfTerm.",
+          "purpose": "Validate the raw structure of a named node, blank node, literal or default graph. Use the pattern or quad validator when its position in a stored statement also needs checking.",
+          "core": "value: Unknown RDF term carrying its termType and associated fields.\nbackend: Your backend kind label for error details; undefined leaves the label unspecified.\nNo value; successful input is narrowed to IRdfTerm. Unsupported tags or invalid lexical fields throw INVALID_ARGUMENT.",
+          "advanced": "",
           "parameters": ["value: unknown", "backend: IBackendKind | undefined"],
           "parameterDetails": [
             {
@@ -2149,8 +2149,8 @@
             }
           ],
           "returns": "asserts value is IRdfTerm",
-          "errors": ["No documented errors are declared for assertStorageRdfTerm."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for assertStorageRdfTerm.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [],
           "composes": [],
@@ -2174,13 +2174,13 @@
             ]
           ],
           "overloadReturns": ["asserts value is IRdfTerm"],
-          "whenToUse": "Use assertStorageRdfTerm when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when assertStorageRdfTerm does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Validate raw RDF structure without copying terms or normalizing caller-owned fields."
+              "content": "Validate the raw structure of a named node, blank node, literal or default graph. Use the pattern or quad validator when its position in a stored statement also needs checking."
             },
             {
               "id": "getting-started",
@@ -2200,12 +2200,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for assertStorageRdfTerm."
+              "content": "value: Unknown RDF term carrying its termType and associated fields.\nbackend: Your backend kind label for error details; undefined leaves the label unspecified.\nNo value; successful input is narrowed to IRdfTerm. Unsupported tags or invalid lexical fields throw INVALID_ARGUMENT."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for assertStorageRdfTerm."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -2310,9 +2310,9 @@
           "signature": "export declare function assertStorageTtlTarget(target: unknown, backend: IBackendKind | undefined): asserts target is ITtlTarget;",
           "declarationLine": 21,
           "source": "packages/storage-contract/dist/capabilities/ttl.d.ts",
-          "purpose": "Validate TTL's lock-domain subset without copying keys inside synchronous native terminals.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for assertStorageTtlTarget.",
-          "advanced": "No additional advanced behavior is declared for assertStorageTtlTarget.",
+          "purpose": "Validate the text, bytes, record or vector item selected for expiry. It reuses lock-key validation and rejects RDF targets without changing any stored lifetime.",
+          "core": "target: Unknown channel-specific target identifying the item to expire.\nbackend: Your backend kind label for error details; undefined leaves the label unspecified.\nNo value; successful input is narrowed to ITtlTarget. Invalid lock fields or an RDF channel throw INVALID_ARGUMENT.",
+          "advanced": "",
           "parameters": ["target: unknown", "backend: IBackendKind | undefined"],
           "parameterDetails": [
             {
@@ -2327,8 +2327,8 @@
             }
           ],
           "returns": "asserts target is ITtlTarget",
-          "errors": ["No documented errors are declared for assertStorageTtlTarget."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for assertStorageTtlTarget.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [],
           "composes": [],
@@ -2352,13 +2352,13 @@
             ]
           ],
           "overloadReturns": ["asserts target is ITtlTarget"],
-          "whenToUse": "Use assertStorageTtlTarget when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when assertStorageTtlTarget does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Validate TTL's lock-domain subset without copying keys inside synchronous native terminals."
+              "content": "Validate the text, bytes, record or vector item selected for expiry. It reuses lock-key validation and rejects RDF targets without changing any stored lifetime."
             },
             {
               "id": "getting-started",
@@ -2378,12 +2378,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for assertStorageTtlTarget."
+              "content": "target: Unknown channel-specific target identifying the item to expire.\nbackend: Your backend kind label for error details; undefined leaves the label unspecified.\nNo value; successful input is narrowed to ITtlTarget. Invalid lock fields or an RDF channel throw INVALID_ARGUMENT."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for assertStorageTtlTarget."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -2397,11 +2397,11 @@
           "name": "assertStorageVector",
           "kind": "function",
           "signature": "export declare function assertStorageVector(input: readonly number[], options?: IStorageVectorValidation, backend?: IBackendKind): void;",
-          "declarationLine": 104,
+          "declarationLine": 108,
           "source": "packages/storage-contract/dist/capabilities/vector.d.ts",
-          "purpose": "Validate finite dense components and the native schema without allocating another vector.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for assertStorageVector.",
-          "advanced": "No additional advanced behavior is declared for assertStorageVector.",
+          "purpose": "Validate a nonempty array of finite components against optional dimensions and distance settings. Cosine requires a nonzero direction; the function does not copy or normalize the vector.",
+          "core": "input: Vector components supplied by the caller.\noptions: Optional known dimensions and metric from the collection configuration.\nbackend: Your backend kind label for error details; undefined leaves the label unspecified.\nNo value; the vector satisfies every supplied constraint. Invalid settings, components, dimensions or a zero cosine direction throw INVALID_ARGUMENT.\ndimensions: Positive safe vector dimension count validated by the original vector-input owner.\nmetric: Native cosine, dot or Euclidean metric chosen for the original collection schema.\nCosine similarity under native engine precision.\nNative finite inner product.\nNative Euclidean distance converted to the shared score order.",
+          "advanced": "",
           "parameters": [
             "input: readonly number[]",
             "options: IStorageVectorValidation (optional)",
@@ -2425,8 +2425,8 @@
             }
           ],
           "returns": "void",
-          "errors": ["No documented errors are declared for assertStorageVector."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for assertStorageVector.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [],
           "composes": [],
@@ -2455,13 +2455,13 @@
             ]
           ],
           "overloadReturns": ["void"],
-          "whenToUse": "Use assertStorageVector when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when assertStorageVector does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Validate finite dense components and the native schema without allocating another vector."
+              "content": "Validate a nonempty array of finite components against optional dimensions and distance settings. Cosine requires a nonzero direction; the function does not copy or normalize the vector."
             },
             {
               "id": "getting-started",
@@ -2481,12 +2481,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for assertStorageVector."
+              "content": "input: Vector components supplied by the caller.\noptions: Optional known dimensions and metric from the collection configuration.\nbackend: Your backend kind label for error details; undefined leaves the label unspecified.\nNo value; the vector satisfies every supplied constraint. Invalid settings, components, dimensions or a zero cosine direction throw INVALID_ARGUMENT.\ndimensions: Positive safe vector dimension count validated by the original vector-input owner.\nmetric: Native cosine, dot or Euclidean metric chosen for the original collection schema.\nCosine similarity under native engine precision.\nNative finite inner product.\nNative Euclidean distance converted to the shared score order."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for assertStorageVector."
+              "content": ""
             }
           ],
           "declaredConfiguration": [
@@ -2494,13 +2494,13 @@
               "name": "dimensions",
               "type": "number",
               "optional": true,
-              "description": ""
+              "description": "Require the collection's exact component count when its schema is already known."
             },
             {
               "name": "metric",
               "type": "IStorageVectorConfiguration['metric']",
               "optional": true,
-              "description": ""
+              "description": "Apply this known distance family, including cosine's nonzero-direction requirement."
             }
           ],
           "identity": "packages/storage-contract/dist/capabilities/vector.d.ts:assertStorageVector:export declare function assertStorageVector(input: readonly number[], options?: IStorageVectorValidation, backend?: IBackendKind): void;",
@@ -2511,16 +2511,16 @@
               "name": "dimensions",
               "type": "number",
               "optional": true,
-              "description": "",
-              "descriptionEn": "",
+              "description": "Require the collection's exact component count when its schema is already known.",
+              "descriptionEn": "Require the collection's exact component count when its schema is already known.",
               "descriptionZh": ""
             },
             {
               "name": "metric",
               "type": "IStorageVectorConfiguration['metric']",
               "optional": true,
-              "description": "",
-              "descriptionEn": "",
+              "description": "Apply this known distance family, including cosine's nonzero-direction requirement.",
+              "descriptionEn": "Apply this known distance family, including cosine's nonzero-direction requirement.",
               "descriptionZh": ""
             }
           ],
@@ -2530,11 +2530,11 @@
           "name": "assertStorageVectorCollection",
           "kind": "function",
           "signature": "export declare function assertStorageVectorCollection(name: string, options?: IStorageVectorConfiguration, backend?: IBackendKind): void;",
-          "declarationLine": 102,
+          "declarationLine": 106,
           "source": "packages/storage-contract/dist/capabilities/vector.d.ts",
-          "purpose": "Validate declared collection metadata without copying private native schema values.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for assertStorageVectorCollection.",
-          "advanced": "No additional advanced behavior is declared for assertStorageVectorCollection.",
+          "purpose": "Validate a collection name and optional native vector configuration before creation. It checks parameter domains, not whether a backend already has a collection with that name.",
+          "core": "name: String collection name chosen by the application.\noptions: Optional positive dimensions and cosine, dot or euclid metric.\nbackend: Your backend kind label for error details; undefined leaves the label unspecified.\nNo value; the name and any supplied configuration are valid. Invalid types, dimensions or metric throw INVALID_ARGUMENT.\ndimensions: Positive safe vector dimension count validated by the original vector-input owner.\nmetric: Native cosine, dot or Euclidean metric chosen for the original collection schema.\nCosine similarity under native engine precision.\nNative finite inner product.\nNative Euclidean distance converted to the shared score order.",
+          "advanced": "",
           "parameters": [
             "name: string",
             "options: IStorageVectorConfiguration (optional)",
@@ -2558,8 +2558,8 @@
             }
           ],
           "returns": "void",
-          "errors": ["No documented errors are declared for assertStorageVectorCollection."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for assertStorageVectorCollection.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [],
           "composes": [],
@@ -2588,13 +2588,13 @@
             ]
           ],
           "overloadReturns": ["void"],
-          "whenToUse": "Use assertStorageVectorCollection when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when assertStorageVectorCollection does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Validate declared collection metadata without copying private native schema values."
+              "content": "Validate a collection name and optional native vector configuration before creation. It checks parameter domains, not whether a backend already has a collection with that name."
             },
             {
               "id": "getting-started",
@@ -2614,12 +2614,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for assertStorageVectorCollection."
+              "content": "name: String collection name chosen by the application.\noptions: Optional positive dimensions and cosine, dot or euclid metric.\nbackend: Your backend kind label for error details; undefined leaves the label unspecified.\nNo value; the name and any supplied configuration are valid. Invalid types, dimensions or metric throw INVALID_ARGUMENT.\ndimensions: Positive safe vector dimension count validated by the original vector-input owner.\nmetric: Native cosine, dot or Euclidean metric chosen for the original collection schema.\nCosine similarity under native engine precision.\nNative finite inner product.\nNative Euclidean distance converted to the shared score order."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for assertStorageVectorCollection."
+              "content": ""
             }
           ],
           "declaredConfiguration": [
@@ -2627,13 +2627,13 @@
               "name": "dimensions",
               "type": "number",
               "optional": false,
-              "description": ""
+              "description": "Positive component count shared by every vector stored in this native collection."
             },
             {
               "name": "metric",
               "type": "'cosine' | 'dot' | 'euclid'",
               "optional": false,
-              "description": ""
+              "description": "Native distance family; cosine additionally requires a nonzero vector direction."
             }
           ],
           "identity": "packages/storage-contract/dist/capabilities/vector.d.ts:assertStorageVectorCollection:export declare function assertStorageVectorCollection(name: string, options?: IStorageVectorConfiguration, backend?: IBackendKind): void;",
@@ -2644,16 +2644,16 @@
               "name": "dimensions",
               "type": "number",
               "optional": false,
-              "description": "",
-              "descriptionEn": "",
+              "description": "Positive component count shared by every vector stored in this native collection.",
+              "descriptionEn": "Positive component count shared by every vector stored in this native collection.",
               "descriptionZh": ""
             },
             {
               "name": "metric",
               "type": "'cosine' | 'dot' | 'euclid'",
               "optional": false,
-              "description": "",
-              "descriptionEn": "",
+              "description": "Native distance family; cosine additionally requires a nonzero vector direction.",
+              "descriptionEn": "Native distance family; cosine additionally requires a nonzero vector direction.",
               "descriptionZh": ""
             }
           ],
@@ -2663,11 +2663,11 @@
           "name": "assertStorageVectorIds",
           "kind": "function",
           "signature": "export declare function assertStorageVectorIds(ids: readonly string[], backend?: IBackendKind, rejectDuplicates?: boolean): void;",
-          "declarationLine": 106,
+          "declarationLine": 110,
           "source": "packages/storage-contract/dist/capabilities/vector.d.ts",
-          "purpose": "Validate native ID lists without copying already private recommendation batches.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for assertStorageVectorIds.",
-          "advanced": "No additional advanced behavior is declared for assertStorageVectorIds.",
+          "purpose": "Check that every vector ID is a string and optionally reject repeated IDs. This does not copy the list, remove duplicates or read a collection.",
+          "core": "ids: Caller-supplied array of vector ID strings; an empty list is allowed.\nbackend: Your backend kind label for error details; undefined leaves the label unspecified.\nrejectDuplicates: Boolean, default false. Set true when repeated IDs should reject instead of remaining in the list.\nNo value; IDs satisfy the selected policy. Invalid input, a non-string ID or a forbidden duplicate throws INVALID_ARGUMENT.",
+          "advanced": "",
           "parameters": [
             "ids: readonly string[]",
             "backend: IBackendKind (optional)",
@@ -2691,8 +2691,8 @@
             }
           ],
           "returns": "void",
-          "errors": ["No documented errors are declared for assertStorageVectorIds."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for assertStorageVectorIds.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [],
           "composes": [],
@@ -2721,13 +2721,13 @@
             ]
           ],
           "overloadReturns": ["void"],
-          "whenToUse": "Use assertStorageVectorIds when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when assertStorageVectorIds does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Validate native ID lists without copying already private recommendation batches."
+              "content": "Check that every vector ID is a string and optionally reject repeated IDs. This does not copy the list, remove duplicates or read a collection."
             },
             {
               "id": "getting-started",
@@ -2747,12 +2747,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for assertStorageVectorIds."
+              "content": "ids: Caller-supplied array of vector ID strings; an empty list is allowed.\nbackend: Your backend kind label for error details; undefined leaves the label unspecified.\nrejectDuplicates: Boolean, default false. Set true when repeated IDs should reject instead of remaining in the list.\nNo value; IDs satisfy the selected policy. Invalid input, a non-string ID or a forbidden duplicate throws INVALID_ARGUMENT."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for assertStorageVectorIds."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -3015,11 +3015,11 @@
           "name": "assertVectorObject",
           "kind": "function",
           "signature": "export declare function assertVectorObject(value: unknown, backend: IBackendKind | undefined): asserts value is object;",
-          "declarationLine": 100,
+          "declarationLine": 104,
           "source": "packages/storage-contract/dist/capabilities/vector.d.ts",
-          "purpose": "Shape admission accepts class options while reading only the requested public fields.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for assertVectorObject.",
-          "advanced": "No additional advanced behavior is declared for assertVectorObject.",
+          "purpose": "Validate the outer shape of vector-related options before checking their fields. Non-null objects, including class instances, are accepted; arrays and primitive values are rejected.",
+          "core": "value: Unknown vector options or metadata object.\nbackend: Your backend kind label for error details; undefined leaves the label unspecified.\nNo value; valid input is narrowed to object. Null, arrays and non-objects throw INVALID_ARGUMENT.",
+          "advanced": "",
           "parameters": ["value: unknown", "backend: IBackendKind | undefined"],
           "parameterDetails": [
             {
@@ -3034,8 +3034,8 @@
             }
           ],
           "returns": "asserts value is object",
-          "errors": ["No documented errors are declared for assertVectorObject."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for assertVectorObject.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [],
           "composes": [],
@@ -3059,13 +3059,13 @@
             ]
           ],
           "overloadReturns": ["asserts value is object"],
-          "whenToUse": "Use assertVectorObject when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when assertVectorObject does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Shape admission accepts class options while reading only the requested public fields."
+              "content": "Validate the outer shape of vector-related options before checking their fields. Non-null objects, including class instances, are accepted; arrays and primitive values are rejected."
             },
             {
               "id": "getting-started",
@@ -3085,12 +3085,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for assertVectorObject."
+              "content": "value: Unknown vector options or metadata object.\nbackend: Your backend kind label for error details; undefined leaves the label unspecified.\nNo value; valid input is narrowed to object. Null, arrays and non-objects throw INVALID_ARGUMENT."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for assertVectorObject."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -9667,9 +9667,9 @@
           "signature": "export declare function invalidBlobInput(backend: IBackendKind | undefined, cause?: unknown): StorageContractError;",
           "declarationLine": 54,
           "source": "packages/storage-contract/dist/capabilities/blob.d.ts",
-          "purpose": "The existing blob argument identity is shared by pure validation and byte-copy admission.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for invalidBlobInput.",
-          "advanced": "No additional advanced behavior is declared for invalidBlobInput.",
+          "purpose": "Create the shared object-input error for a malformed upload, range or listing request while preserving an optional original cause.",
+          "core": "backend: Your backend kind label for error details; undefined leaves the label unspecified.\ncause: Optional original failure to retain as cause.\nA StorageContractError with source @migaia/storage-contract and code INVALID_ARGUMENT. The function returns the error rather than throwing it; a supplied cause remains reachable on cause.",
+          "advanced": "",
           "parameters": ["backend: IBackendKind | undefined", "cause: unknown (optional)"],
           "parameterDetails": [
             {
@@ -9684,8 +9684,8 @@
             }
           ],
           "returns": "StorageContractError",
-          "errors": ["No documented errors are declared for invalidBlobInput."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for invalidBlobInput.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [],
           "composes": [],
@@ -9709,13 +9709,13 @@
             ]
           ],
           "overloadReturns": ["StorageContractError"],
-          "whenToUse": "Use invalidBlobInput when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when invalidBlobInput does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "The existing blob argument identity is shared by pure validation and byte-copy admission."
+              "content": "Create the shared object-input error for a malformed upload, range or listing request while preserving an optional original cause."
             },
             {
               "id": "getting-started",
@@ -9735,12 +9735,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for invalidBlobInput."
+              "content": "backend: Your backend kind label for error details; undefined leaves the label unspecified.\ncause: Optional original failure to retain as cause.\nA StorageContractError with source @migaia/storage-contract and code INVALID_ARGUMENT. The function returns the error rather than throwing it; a supplied cause remains reachable on cause."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for invalidBlobInput."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -9756,9 +9756,9 @@
           "signature": "export declare function invalidCapability(cause?: unknown): StorageContractError;",
           "declarationLine": 17,
           "source": "packages/storage-contract/dist/capability-token.d.ts",
-          "purpose": "Retains the original argument boundary and reflected cause before capability publication.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for invalidCapability.",
-          "advanced": "No additional advanced behavior is declared for invalidCapability.",
+          "purpose": "Create the standard error for an invalid capability definition or implementation input without publishing a capability or losing the original cause.",
+          "core": "cause: Optional original failure to retain as cause.\nA StorageContractError with source @migaia/storage-contract and code INVALID_ARGUMENT. The function returns the error rather than throwing it; a supplied cause remains reachable on cause.",
+          "advanced": "",
           "parameters": ["cause: unknown (optional)"],
           "parameterDetails": [
             {
@@ -9768,8 +9768,8 @@
             }
           ],
           "returns": "StorageContractError",
-          "errors": ["No documented errors are declared for invalidCapability."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for invalidCapability.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [],
           "composes": [],
@@ -9788,13 +9788,13 @@
             ]
           ],
           "overloadReturns": ["StorageContractError"],
-          "whenToUse": "Use invalidCapability when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when invalidCapability does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Retains the original argument boundary and reflected cause before capability publication."
+              "content": "Create the standard error for an invalid capability definition or implementation input without publishing a capability or losing the original cause."
             },
             {
               "id": "getting-started",
@@ -9814,12 +9814,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for invalidCapability."
+              "content": "cause: Optional original failure to retain as cause.\nA StorageContractError with source @migaia/storage-contract and code INVALID_ARGUMENT. The function returns the error rather than throwing it; a supplied cause remains reachable on cause."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for invalidCapability."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -9835,9 +9835,9 @@
           "signature": "export declare function invalidConcurrencyArgument(cause?: unknown): StorageContractError;",
           "declarationLine": 146,
           "source": "packages/storage-contract/dist/concurrency.d.ts",
-          "purpose": "Produces the existing coded argument boundary without executing policy callbacks.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for invalidConcurrencyArgument.",
-          "advanced": "No additional advanced behavior is declared for invalidConcurrencyArgument.",
+          "purpose": "Create the standard concurrency-argument error before any policy callback, lock acquisition or transaction work is started.",
+          "core": "cause: Optional original validation failure to retain as cause.\nA StorageContractError with source @migaia/storage-contract and code INVALID_ARGUMENT. The function returns the error rather than throwing it; a supplied cause remains reachable on cause.",
+          "advanced": "",
           "parameters": ["cause: unknown (optional)"],
           "parameterDetails": [
             {
@@ -9847,8 +9847,8 @@
             }
           ],
           "returns": "StorageContractError",
-          "errors": ["No documented errors are declared for invalidConcurrencyArgument."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for invalidConcurrencyArgument.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [],
           "composes": [],
@@ -9867,13 +9867,13 @@
             ]
           ],
           "overloadReturns": ["StorageContractError"],
-          "whenToUse": "Use invalidConcurrencyArgument when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when invalidConcurrencyArgument does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Produces the existing coded argument boundary without executing policy callbacks."
+              "content": "Create the standard concurrency-argument error before any policy callback, lock acquisition or transaction work is started."
             },
             {
               "id": "getting-started",
@@ -9893,12 +9893,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for invalidConcurrencyArgument."
+              "content": "cause: Optional original validation failure to retain as cause.\nA StorageContractError with source @migaia/storage-contract and code INVALID_ARGUMENT. The function returns the error rather than throwing it; a supplied cause remains reachable on cause."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for invalidConcurrencyArgument."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -9914,9 +9914,9 @@
           "signature": "export declare function invalidLockArgument(backend: IBackendKind | undefined, cause?: unknown): StorageContractError;",
           "declarationLine": 174,
           "source": "packages/storage-contract/dist/concurrency.d.ts",
-          "purpose": "Builds the existing coded lock-argument boundary with an optional actual backend diagnostic.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for invalidLockArgument.",
-          "advanced": "No additional advanced behavior is declared for invalidLockArgument.",
+          "purpose": "Create the standard malformed-lock error with the caller’s backend label and optional cause; it does not acquire or release any lock.",
+          "core": "backend: Your backend kind label for error details; undefined leaves the label unspecified.\ncause: Optional original failure to retain as cause.\nA StorageContractError with source @migaia/storage-contract and code INVALID_ARGUMENT. The function returns the error rather than throwing it; a supplied cause remains reachable on cause.",
+          "advanced": "",
           "parameters": ["backend: IBackendKind | undefined", "cause: unknown (optional)"],
           "parameterDetails": [
             {
@@ -9931,8 +9931,8 @@
             }
           ],
           "returns": "StorageContractError",
-          "errors": ["No documented errors are declared for invalidLockArgument."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for invalidLockArgument.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [],
           "composes": [],
@@ -9956,13 +9956,13 @@
             ]
           ],
           "overloadReturns": ["StorageContractError"],
-          "whenToUse": "Use invalidLockArgument when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when invalidLockArgument does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Builds the existing coded lock-argument boundary with an optional actual backend diagnostic."
+              "content": "Create the standard malformed-lock error with the caller’s backend label and optional cause; it does not acquire or release any lock."
             },
             {
               "id": "getting-started",
@@ -9982,12 +9982,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for invalidLockArgument."
+              "content": "backend: Your backend kind label for error details; undefined leaves the label unspecified.\ncause: Optional original failure to retain as cause.\nA StorageContractError with source @migaia/storage-contract and code INVALID_ARGUMENT. The function returns the error rather than throwing it; a supplied cause remains reachable on cause."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for invalidLockArgument."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -10003,9 +10003,9 @@
           "signature": "export declare function invalidRdf(backend: IBackendKind | undefined, cause?: unknown): StorageContractError;",
           "declarationLine": 65,
           "source": "packages/storage-contract/dist/capabilities/rdf.d.ts",
-          "purpose": "RDF admission uses the existing argument error and canonical diagnostic text.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for invalidRdf.",
-          "advanced": "No additional advanced behavior is declared for invalidRdf.",
+          "purpose": "Create the standard RDF-argument error for a malformed term or statement while retaining backend details and the optional original cause.",
+          "core": "backend: Your backend kind label for error details; undefined leaves the label unspecified.\ncause: Optional original failure to retain as cause.\nA StorageContractError with source @migaia/storage-contract and code INVALID_ARGUMENT. The function returns the error rather than throwing it; a supplied cause remains reachable on cause.",
+          "advanced": "",
           "parameters": ["backend: IBackendKind | undefined", "cause: unknown (optional)"],
           "parameterDetails": [
             {
@@ -10020,8 +10020,8 @@
             }
           ],
           "returns": "StorageContractError",
-          "errors": ["No documented errors are declared for invalidRdf."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for invalidRdf.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [],
           "composes": [],
@@ -10045,13 +10045,13 @@
             ]
           ],
           "overloadReturns": ["StorageContractError"],
-          "whenToUse": "Use invalidRdf when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when invalidRdf does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "RDF admission uses the existing argument error and canonical diagnostic text."
+              "content": "Create the standard RDF-argument error for a malformed term or statement while retaining backend details and the optional original cause."
             },
             {
               "id": "getting-started",
@@ -10071,12 +10071,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for invalidRdf."
+              "content": "backend: Your backend kind label for error details; undefined leaves the label unspecified.\ncause: Optional original failure to retain as cause.\nA StorageContractError with source @migaia/storage-contract and code INVALID_ARGUMENT. The function returns the error rather than throwing it; a supplied cause remains reachable on cause."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for invalidRdf."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -10090,11 +10090,11 @@
           "name": "invalidVector",
           "kind": "function",
           "signature": "export declare function invalidVector(backend: IBackendKind | undefined): never;",
-          "declarationLine": 98,
+          "declarationLine": 102,
           "source": "packages/storage-contract/dist/capabilities/vector.d.ts",
-          "purpose": "Reject malformed supported input before a backend can read or modify its collection.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for invalidVector.",
-          "advanced": "No additional advanced behavior is declared for invalidVector.",
+          "purpose": "Immediately reject malformed vector input with the standard contract error. Unlike the error factories, this helper throws instead of returning an error object.",
+          "core": "backend: Your backend kind label for error details; undefined leaves the label unspecified.\nNever returns; throws StorageContractError with source @migaia/storage-contract and code INVALID_ARGUMENT.",
+          "advanced": "",
           "parameters": ["backend: IBackendKind | undefined"],
           "parameterDetails": [
             {
@@ -10104,8 +10104,8 @@
             }
           ],
           "returns": "never",
-          "errors": ["No documented errors are declared for invalidVector."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for invalidVector.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [],
           "composes": [],
@@ -10124,13 +10124,13 @@
             ]
           ],
           "overloadReturns": ["never"],
-          "whenToUse": "Use invalidVector when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when invalidVector does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Reject malformed supported input before a backend can read or modify its collection."
+              "content": "Immediately reject malformed vector input with the standard contract error. Unlike the error factories, this helper throws instead of returning an error object."
             },
             {
               "id": "getting-started",
@@ -10150,12 +10150,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for invalidVector."
+              "content": "backend: Your backend kind label for error details; undefined leaves the label unspecified.\nNever returns; throws StorageContractError with source @migaia/storage-contract and code INVALID_ARGUMENT."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for invalidVector."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -16849,9 +16849,9 @@
           "signature": "export declare function isCapabilityToken(value: unknown): value is IAnyStorageCapability;",
           "declarationLine": 25,
           "source": "packages/storage-contract/dist/capability-token.d.ts",
-          "purpose": "Authenticity never reads user names, brands or accessors.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for isCapabilityToken.",
-          "advanced": "No additional advanced behavior is declared for isCapabilityToken.",
+          "purpose": "Check whether a value is a token created by the capability definition API. A same-name object does not become a token, and this check grants no store access.",
+          "core": "value: Unknown value selected by the application.\nBoolean; true narrows the original value to IAnyStorageCapability. Unregistered values return false without throwing.",
+          "advanced": "",
           "parameters": ["value: unknown"],
           "parameterDetails": [
             {
@@ -16861,8 +16861,8 @@
             }
           ],
           "returns": "value is IAnyStorageCapability",
-          "errors": ["No documented errors are declared for isCapabilityToken."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for isCapabilityToken.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [
             "import { defineStorageCapability, implement, isCapabilityToken } from '@migaia/storage-contract'\n\nconst status = defineStorageCapability<{ readStatus(): string }>()('status')\nconst api = { readStatus: () => 'ready' }\nconst definition = implement(status, api)\nconsole.log(isCapabilityToken(status), typeof definition) // true object"
           ],
@@ -16883,13 +16883,13 @@
             ]
           ],
           "overloadReturns": ["value is IAnyStorageCapability"],
-          "whenToUse": "Use isCapabilityToken when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when isCapabilityToken does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Authenticity never reads user names, brands or accessors."
+              "content": "Check whether a value is a token created by the capability definition API. A same-name object does not become a token, and this check grants no store access."
             },
             {
               "id": "getting-started",
@@ -16909,12 +16909,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for isCapabilityToken."
+              "content": "value: Unknown value selected by the application.\nBoolean; true narrows the original value to IAnyStorageCapability. Unregistered values return false without throwing."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for isCapabilityToken."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -18772,9 +18772,9 @@
           "signature": "export declare function isStorageBase(store: unknown, options?: { readonly asyncDisposeKey?: typeof Symbol.asyncDispose; }): store is IStorageBase;",
           "declarationLine": 28,
           "source": "packages/storage-contract/dist/store.d.ts",
-          "purpose": "Checks a specialized resource without requiring KV methods or copying its facts. The supplied cleanup symbol is authoritative; without a native symbol only explicit disposal is required.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for isStorageBase.",
-          "advanced": "No additional advanced behavior is declared for isStorageBase.",
+          "purpose": "Inspect whether a value has a backend label, capability facts and the required cleanup methods. It does not require key-value operations, clone the resource or invoke cleanup.",
+          "core": "store: Unknown backend resource supplied by the application.\noptions: Optional cleanup-symbol identity supplied by the host.\nBoolean; true narrows the original value to IStorageBase. A missing or invalid base shape returns false without opening or disposing anything.\nasyncDisposeKey: The host’s existing asynchronous cleanup symbol; no substitute symbol is created.\nOmitted: use native Symbol.asyncDispose. When the runtime has no native symbol, only explicit dispose is required.",
+          "advanced": "",
           "parameters": [
             "store: unknown",
             "options: { readonly asyncDisposeKey?: typeof Symbol.asyncDispose; } (optional)"
@@ -18792,8 +18792,8 @@
             }
           ],
           "returns": "store is IStorageBase",
-          "errors": ["No documented errors are declared for isStorageBase."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for isStorageBase.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [],
           "composes": [],
@@ -18817,13 +18817,13 @@
             ]
           ],
           "overloadReturns": ["store is IStorageBase"],
-          "whenToUse": "Use isStorageBase when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when isStorageBase does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Checks a specialized resource without requiring KV methods or copying its facts. The supplied cleanup symbol is authoritative; without a native symbol only explicit disposal is required."
+              "content": "Inspect whether a value has a backend label, capability facts and the required cleanup methods. It does not require key-value operations, clone the resource or invoke cleanup."
             },
             {
               "id": "getting-started",
@@ -18843,12 +18843,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for isStorageBase."
+              "content": "store: Unknown backend resource supplied by the application.\noptions: Optional cleanup-symbol identity supplied by the host.\nBoolean; true narrows the original value to IStorageBase. A missing or invalid base shape returns false without opening or disposing anything.\nasyncDisposeKey: The host’s existing asynchronous cleanup symbol; no substitute symbol is created.\nOmitted: use native Symbol.asyncDispose. When the runtime has no native symbol, only explicit dispose is required."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for isStorageBase."
+              "content": ""
             }
           ],
           "declaredConfiguration": [
@@ -21256,7 +21256,7 @@
         {
           "name": "IStorageVectorConfiguration",
           "kind": "type",
-          "signature": "export type IStorageVectorConfiguration = { readonly dimensions: number; readonly metric: 'cosine' | 'dot' | 'euclid'; };",
+          "signature": "export type IStorageVectorConfiguration = { /** Positive component count shared by every vector stored in this native collection. */ readonly dimensions: number; /** Native distance family; cosine additionally requires a nonzero vector direction. */ readonly metric: 'cosine' | 'dot' | 'euclid'; };",
           "declarationLine": 82,
           "source": "packages/storage-contract/dist/capabilities/vector.d.ts",
           "purpose": "Native collection dimensions and metric, without connection ownership.",
@@ -21274,7 +21274,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly dimensions: number;",
-              "description": null,
+              "description": "Positive component count shared by every vector stored in this native collection.",
               "parameterDetails": [],
               "returns": "number"
             },
@@ -21283,7 +21283,7 @@
               "kind": "property",
               "optional": false,
               "signature": "readonly metric: 'cosine' | 'dot' | 'euclid';",
-              "description": null,
+              "description": "Native distance family; cosine additionally requires a nonzero vector direction.",
               "parameterDetails": [],
               "returns": "'cosine' | 'dot' | 'euclid'"
             }
@@ -21292,7 +21292,7 @@
           "aliasOf": "IStorageVectorConfiguration",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IStorageVectorConfiguration = { readonly dimensions: number; readonly metric: 'cosine' | 'dot' | 'euclid'; };"
+            "export type IStorageVectorConfiguration = { /** Positive component count shared by every vector stored in this native collection. */ readonly dimensions: number; /** Native distance family; cosine additionally requires a nonzero vector direction. */ readonly metric: 'cosine' | 'dot' | 'euclid'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -21331,7 +21331,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-contract/dist/capabilities/vector.d.ts:IStorageVectorConfiguration:export type IStorageVectorConfiguration = { readonly dimensions: number; readonly metric: 'cosine' | 'dot' | 'euclid'; };",
+          "identity": "packages/storage-contract/dist/capabilities/vector.d.ts:IStorageVectorConfiguration:export type IStorageVectorConfiguration = { /** Positive component count shared by every vector stored in this native collection. */ readonly dimensions: number; /** Native distance family; cosine additionally requires a nonzero vector direction. */ readonly metric: 'cosine' | 'dot' | 'euclid'; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -21341,7 +21341,7 @@
           "name": "IStorageVectorPoint",
           "kind": "type",
           "signature": "export type IStorageVectorPoint<TPayload> = { readonly id: string; readonly vector: readonly number[]; readonly payload?: TPayload; };",
-          "declarationLine": 92,
+          "declarationLine": 96,
           "source": "packages/storage-contract/dist/capabilities/vector.d.ts",
           "purpose": "Declared point input with detached portable payload output.",
           "core": "id: Nonempty portable point identifier assigned by the application within its collection.\nvector: Detached finite component array, with signed zero normalized by the original owner.\npayload: Optional caller-declared portable fields.",
@@ -21433,8 +21433,8 @@
         {
           "name": "IStorageVectorValidation",
           "kind": "type",
-          "signature": "export type IStorageVectorValidation = { readonly dimensions?: number; readonly metric?: IStorageVectorConfiguration['metric']; };",
-          "declarationLine": 87,
+          "signature": "export type IStorageVectorValidation = { /** Require the collection's exact component count when its schema is already known. */ readonly dimensions?: number; /** Apply this known distance family, including cosine's nonzero-direction requirement. */ readonly metric?: IStorageVectorConfiguration['metric']; };",
+          "declarationLine": 89,
           "source": "packages/storage-contract/dist/capabilities/vector.d.ts",
           "purpose": "Optional validation facts for detached vector input.",
           "core": "dimensions: Positive safe vector dimension count validated by the original vector-input owner.\nmetric: Native cosine, dot or Euclidean metric chosen for the original collection schema.\nCosine similarity under native engine precision.\nNative finite inner product.\nNative Euclidean distance converted to the shared score order.",
@@ -21451,7 +21451,7 @@
               "kind": "property",
               "optional": true,
               "signature": "readonly dimensions?: number;",
-              "description": null,
+              "description": "Require the collection's exact component count when its schema is already known.",
               "parameterDetails": [],
               "returns": "number"
             },
@@ -21460,7 +21460,7 @@
               "kind": "property",
               "optional": true,
               "signature": "readonly metric?: IStorageVectorConfiguration['metric'];",
-              "description": null,
+              "description": "Apply this known distance family, including cosine's nonzero-direction requirement.",
               "parameterDetails": [],
               "returns": "IStorageVectorConfiguration['metric']"
             }
@@ -21469,7 +21469,7 @@
           "aliasOf": "IStorageVectorValidation",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IStorageVectorValidation = { readonly dimensions?: number; readonly metric?: IStorageVectorConfiguration['metric']; };"
+            "export type IStorageVectorValidation = { /** Require the collection's exact component count when its schema is already known. */ readonly dimensions?: number; /** Apply this known distance family, including cosine's nonzero-direction requirement. */ readonly metric?: IStorageVectorConfiguration['metric']; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -21508,7 +21508,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-contract/dist/capabilities/vector.d.ts:IStorageVectorValidation:export type IStorageVectorValidation = { readonly dimensions?: number; readonly metric?: IStorageVectorConfiguration['metric']; };",
+          "identity": "packages/storage-contract/dist/capabilities/vector.d.ts:IStorageVectorValidation:export type IStorageVectorValidation = { /** Require the collection's exact component count when its schema is already known. */ readonly dimensions?: number; /** Apply this known distance family, including cosine's nonzero-direction requirement. */ readonly metric?: IStorageVectorConfiguration['metric']; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -28067,9 +28067,9 @@
           "signature": "export declare function readCapabilityTokenFacts(token: IAnyStorageCapability): ICapabilityTokenFacts | undefined;",
           "declarationLine": 27,
           "source": "packages/storage-contract/dist/capability-token.d.ts",
-          "purpose": "Reads only the original token row; custom identities return no standard semantics.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for readCapabilityTokenFacts.",
-          "advanced": "No additional advanced behavior is declared for readCapabilityTokenFacts.",
+          "purpose": "Read validation and transaction facts attached to a standard capability token. This inspects its definition without installing it in a backend or invoking its validator.",
+          "core": "token: A capability token, such as kv, records or a token from defineStorageCapability.\nThe standard token’s ICapabilityTokenFacts, or undefined for custom tokens without standard facts. No new capability or resource is created.",
+          "advanced": "",
           "parameters": ["token: IAnyStorageCapability"],
           "parameterDetails": [
             {
@@ -28079,8 +28079,8 @@
             }
           ],
           "returns": "ICapabilityTokenFacts | undefined",
-          "errors": ["No documented errors are declared for readCapabilityTokenFacts."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for readCapabilityTokenFacts.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [],
           "composes": [],
@@ -28099,13 +28099,13 @@
             ]
           ],
           "overloadReturns": ["ICapabilityTokenFacts | undefined"],
-          "whenToUse": "Use readCapabilityTokenFacts when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when readCapabilityTokenFacts does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Reads only the original token row; custom identities return no standard semantics."
+              "content": "Read validation and transaction facts attached to a standard capability token. This inspects its definition without installing it in a backend or invoking its validator."
             },
             {
               "id": "getting-started",
@@ -28125,12 +28125,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for readCapabilityTokenFacts."
+              "content": "token: A capability token, such as kv, records or a token from defineStorageCapability.\nThe standard token’s ICapabilityTokenFacts, or undefined for custom tokens without standard facts. No new capability or resource is created."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for readCapabilityTokenFacts."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -28146,9 +28146,9 @@
           "signature": "export declare function readConcurrencyPolicy(policy: IConcurrencyPolicy): IConcurrencyDecide | undefined;",
           "declarationLine": 150,
           "source": "packages/storage-contract/dist/concurrency.d.ts",
-          "purpose": "Reads the original policy definition without invoking it or creating runtime state.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for readConcurrencyPolicy.",
-          "advanced": "No additional advanced behavior is declared for readConcurrencyPolicy.",
+          "purpose": "Read the decision callback retained for a policy created by defineConcurrencyPolicy. Reading does not execute the callback, acquire locks or start retries.",
+          "core": "policy: The original registered concurrency policy object.\nThe original callback, or undefined when the object is not registered. Invoking a returned callback yields its decision; this reader does not apply that decision.",
+          "advanced": "",
           "parameters": ["policy: IConcurrencyPolicy"],
           "parameterDetails": [
             {
@@ -28158,8 +28158,8 @@
             }
           ],
           "returns": "IConcurrencyDecide | undefined",
-          "errors": ["No documented errors are declared for readConcurrencyPolicy."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for readConcurrencyPolicy.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [],
           "composes": [],
@@ -28178,13 +28178,13 @@
             ]
           ],
           "overloadReturns": ["IConcurrencyDecide | undefined"],
-          "whenToUse": "Use readConcurrencyPolicy when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when readConcurrencyPolicy does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Reads the original policy definition without invoking it or creating runtime state."
+              "content": "Read the decision callback retained for a policy created by defineConcurrencyPolicy. Reading does not execute the callback, acquire locks or start retries."
             },
             {
               "id": "getting-started",
@@ -28204,12 +28204,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for readConcurrencyPolicy."
+              "content": "policy: The original registered concurrency policy object.\nThe original callback, or undefined when the object is not registered. Invoking a returned callback yields its decision; this reader does not apply that decision."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for readConcurrencyPolicy."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -28225,9 +28225,9 @@
           "signature": "export declare function readStorageImplementation(descriptor: unknown): IStorageImplementationRecord | undefined;",
           "declarationLine": 187,
           "source": "packages/storage-contract/dist/capability.d.ts",
-          "purpose": "Reads only the canonical implementation definition; it grants no store installation authority.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for readStorageImplementation.",
-          "advanced": "No additional advanced behavior is declared for readStorageImplementation.",
+          "purpose": "Read the definition recorded by implement while preserving its API object and optional transaction callback. Inspecting a definition does not publish it to a store.",
+          "core": "descriptor: Unknown input expected to be the original descriptor returned by implement.\nIStorageImplementationRecord for an authentic descriptor, or undefined for an unrelated value. The record retains the original implementation and any transaction callback.",
+          "advanced": "",
           "parameters": ["descriptor: unknown"],
           "parameterDetails": [
             {
@@ -28237,8 +28237,8 @@
             }
           ],
           "returns": "IStorageImplementationRecord | undefined",
-          "errors": ["No documented errors are declared for readStorageImplementation."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for readStorageImplementation.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [],
           "composes": [],
@@ -28257,13 +28257,13 @@
             ]
           ],
           "overloadReturns": ["IStorageImplementationRecord | undefined"],
-          "whenToUse": "Use readStorageImplementation when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when readStorageImplementation does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Reads only the canonical implementation definition; it grants no store installation authority."
+              "content": "Read the definition recorded by implement while preserving its API object and optional transaction callback. Inspecting a definition does not publish it to a store."
             },
             {
               "id": "getting-started",
@@ -28283,12 +28283,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for readStorageImplementation."
+              "content": "descriptor: Unknown input expected to be the original descriptor returned by implement.\nIStorageImplementationRecord for an authentic descriptor, or undefined for an unrelated value. The record retains the original implementation and any transaction callback."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for readStorageImplementation."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],

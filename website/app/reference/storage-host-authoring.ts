@@ -2,6 +2,14 @@ import type { ISymbolDoc, IText, ITypeDoc } from './contract.js'
 
 /** Backend authors use these descriptions at the same finite shared rule boundary. */
 const t = (en: string, zh: string): IText => ({ en, zh })
+/** Complete input-admission programs are shared by the task guides and their authoring API pages. */
+export const storageHostInputExamples = {
+  snapshotCodec:
+    "import { snapshotCodec } from '@migaia/storage-host/authoring/codec'\n\nconst candidateCodec = { name: 'json', output: 'text' as const, encode: async (value: unknown) => JSON.stringify(value), decode: async (text: string) => JSON.parse(text) }\nconst value = { id: 1, name: 'Ada' }\nconst stableCodec = snapshotCodec(candidateCodec)\nconst encoded = await stableCodec.encode(value)\nconsole.log(encoded)",
+  snapshotSyncWriteOptions:
+    "import { ConflictPolicy } from '@migaia/storage-contract'\nimport { snapshotSyncWriteOptions } from '@migaia/storage-host/authoring/context'\n\nconst options = snapshotSyncWriteOptions({ conflictPolicy: ConflictPolicy.replace })\nconst storage = { sync: { set: (key: string, value: string, writeOptions: unknown) => console.log(key, value, writeOptions) } }\nstorage.sync.set('theme', 'dark', options)"
+} as const
+
 /** One complete original-controller example covers this same options bag without fake resources. */
 const iteratorExample = `import {
   createStorageHost, defineFeature, memoryBackendKind, memoryBackendPlugin

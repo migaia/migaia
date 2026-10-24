@@ -42669,7 +42669,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "格式 codec 先枚举整数索引，再按字符串插入顺序输出，getter 遍历顺序相同。公开 toPortableValue 与 RPC owned 快照保持既有顺序。普通 RPC 字节 fallback 使用所选 JSON codec，因此按属性顺序输出；对象 fallback 继续使用原 portable 拥有者。"
+                  "text": "格式 codec 先枚举整数索引，再按字符串插入顺序输出，getter 遍历顺序相同。公开 toPortableValue 仍提供按键排序的中间投影。RPC owned 快照与普通对象、字节 JSON 路径均保持对象自身的 key 顺序；RPC 私有快照仍由原单遍遍历同时完成复制与字节上限计算，并跳过已经编码的二进制子树。"
                 }
               ]
             },
@@ -43469,7 +43469,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "格式 codec 先枚举整数索引，再按字符串插入顺序输出，getter 遍历顺序相同。公开 toPortableValue 与 RPC owned 快照保持既有顺序。普通 RPC 字节 fallback 使用所选 JSON codec，因此按属性顺序输出；对象 fallback 继续使用原 portable 拥有者。"
+                  "text": "格式 codec 先枚举整数索引，再按字符串插入顺序输出，getter 遍历顺序相同。公开 toPortableValue 仍提供按键排序的中间投影。RPC owned 快照与普通对象、字节 JSON 路径均保持对象自身的 key 顺序；RPC 私有快照仍由原单遍遍历同时完成复制与字节上限计算，并跳过已经编码的二进制子树。"
                 }
               ]
             },
@@ -44196,7 +44196,7 @@
                   },
                   {
                     "type": "paragraph",
-                    "text": "Format codecs keep integer-index enumeration followed by string insertion order, including getter traversal. Public toPortableValue and RPC owned snapshots keep their existing ordering. Ordinary RPC byte fallback uses its selected JSON codec and therefore uses property order; object fallback keeps its existing portable owner."
+                    "text": "Format codecs keep integer-index enumeration followed by string insertion order, including getter traversal. Public toPortableValue still supplies a sorted intermediate projection. RPC owned snapshots and ordinary object and byte JSON paths preserve each object's own key order. The existing private RPC snapshot owner still copies and computes the byte upper bound in one traversal, skipping already encoded binary subtrees."
                   }
                 ]
               },
@@ -45041,7 +45041,7 @@
                   },
                   {
                     "type": "paragraph",
-                    "text": "Format codecs keep integer-index enumeration followed by string insertion order, including getter traversal. Public toPortableValue and RPC owned snapshots keep their existing ordering. Ordinary RPC byte fallback uses its selected JSON codec and therefore uses property order; object fallback keeps its existing portable owner."
+                    "text": "Format codecs keep integer-index enumeration followed by string insertion order, including getter traversal. Public toPortableValue still supplies a sorted intermediate projection. RPC owned snapshots and ordinary object and byte JSON paths preserve each object's own key order. The existing private RPC snapshot owner still copies and computes the byte upper bound in one traversal, skipping already encoded binary subtrees."
                   }
                 ]
               },
@@ -53366,6 +53366,28 @@
                   "text": "普通 localStorage、sessionStorage 与 Cookie 声明 `capabilities.batch: false`；IndexedDB 与显式 redo/WAL 组合声明为 true。启用 commit journal 时不提供原生 IndexedDB 句柄，错误 source 为 `@migaia/storage-contract`、code 为 `UNSUPPORTED_CAPABILITY`。IndexedDB 不提供向量引擎。本仓库网站在新 host 包发布前继续使用已发布的 storage-web 0.0.8。"
                 }
               ]
+            },
+            {
+              "id": "实体编解码器与复制边界",
+              "heading": "实体编解码器与复制边界",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "实体编解码器从 `@migaia/storage-host/entity` 导入。`jsonCodec` 的 `output` 为 `text`，使用严格的可移植 JSON；`structuredCodec` 的 `output` 为 `structured`，把结构化值交给后端；`binaryCodec` 的 `output` 为 `binary`，处理 `Uint8Array`。`selectCodec` 根据后端能力决定直连、回退或拒绝。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`jsonCodec` 不接受超出可移植值范围的对象，也不能表示循环。需要保留 `Map` 与 `Set` 时，使用 `@migaia/serialize/codecs/collections-json` 的 `defineCollectionsJsonCodec`，再由 `@migaia/storage-host/authoring/codec` 的 `fromValueCodec` 适配。`structuredCodec` 可交给后端保存可 structured-clone 的内建类型与循环。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`structuredCodec` 的 `encode/decode` 原样返回值，不复制；真正复制在记录后端。IndexedDB 的字节与记录写入遵循原生结构化克隆；内存后端会复制字节，记录采用 `structuredClone`。`binaryCodec` 校验后原样返回字节视图，后端负责写入快照。它们不重建 class 业务实例，也不做 schema 校验。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`schema` 处理领域表示，`codec` 处理保存格式。读取依次执行 `codec.decode`、版本迁移（存储表示）、`schema.decode`、`validate`。结构化输出在文本后端以 `UNSUPPORTED_CAPABILITY` 拒绝，不会悄悄改成 JSON。"
+                }
+              ]
             }
           ]
         },
@@ -53859,6 +53881,28 @@
                   {
                     "type": "paragraph",
                     "text": "Ordinary localStorage, sessionStorage and Cookie stores declare `capabilities.batch: false`; IndexedDB and explicit redo/WAL stores declare it true. Native IndexedDB handles are unavailable with commit journaling and reject with source `@migaia/storage-contract`, code `UNSUPPORTED_CAPABILITY`. IndexedDB does not provide a vector engine. The repository website stays on published storage-web 0.0.8 until the new host module are published."
+                  }
+                ]
+              },
+              {
+                "id": "entity-codecs-and-copy-boundaries",
+                "heading": "Entity codecs and copy boundaries",
+                "blocks": [
+                  {
+                    "type": "paragraph",
+                    "text": "Import entity codecs from `@migaia/storage-host/entity`. `jsonCodec` has `output: text` and uses strict portable JSON. `structuredCodec` has `output: structured` and delegates storage to a record backend. `binaryCodec` has `output: binary` and accepts `Uint8Array`. `selectCodec` selects a direct channel, a supported fallback, or rejection from the backend's actual capabilities."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Portable JSON rejects unsupported objects and cycles. For `Map` and `Set`, adapt `defineCollectionsJsonCodec` from `@migaia/serialize/codecs/collections-json` with `fromValueCodec` from `@migaia/storage-host/authoring/codec`. A structured backend can instead save supported built-ins and cycles with `structuredCodec`."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "`structuredCodec.encode/decode` returns the original value; the record backend performs copying. IndexedDB uses native structured cloning. The memory backend copies byte views and uses `structuredClone` for records. `binaryCodec` validates and retains the original byte view, while the backend owns its write snapshot. These codecs neither rebuild application class instances nor validate the domain schema."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "The schema handles domain representation; the codec handles the saved format. Reads call `codec.decode`, migrate the saved representation, call `schema.decode`, and validate the domain value. A text-only backend rejects structured output with `UNSUPPORTED_CAPABILITY` rather than silently converting it to JSON."
                   }
                 ]
               }

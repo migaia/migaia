@@ -181,3 +181,13 @@ While one instance has an active draft, its root reads, writes and other transac
 Cookie `redo: true` reuses this same transaction/WAL protocol. Ordinary and redo writes share the original cookie encoding, 4096-byte limit, fixed scope and visibility checks. Batch reads still parse one native visible header and merge the current draft. Redo resolves maxAge to an absolute expiresAt image during preparation, so replay never renews it. Values outside the native Date domain reject before mutation only in this new combination; ordinary Cookie maxAge and Max-Age precedence remain unchanged. Only JS-visible cookies participate; original HttpOnly/unknown-scope limits remain.
 
 Ordinary localStorage, sessionStorage and Cookie stores declare `capabilities.batch: false`; IndexedDB and explicit redo/WAL stores declare it true. Native IndexedDB handles are unavailable with commit journaling and reject with source `@migaia/storage-contract`, code `UNSUPPORTED_CAPABILITY`. IndexedDB does not provide a vector engine. The repository website stays on published storage-web 0.0.8 until the new host packages are published.
+
+## Entity codecs and copy boundaries
+
+Import entity codecs from `@migaia/storage-host/entity`. `jsonCodec` has `output: text` and uses strict portable JSON. `structuredCodec` has `output: structured` and delegates storage to a record backend. `binaryCodec` has `output: binary` and accepts `Uint8Array`. `selectCodec` selects a direct channel, a supported fallback, or rejection from the backend's actual capabilities.
+
+Portable JSON rejects unsupported objects and cycles. For `Map` and `Set`, adapt `defineCollectionsJsonCodec` from `@migaia/serialize/codecs/collections-json` with `fromValueCodec` from `@migaia/storage-host/authoring/codec`. A structured backend can instead save supported built-ins and cycles with `structuredCodec`.
+
+`structuredCodec.encode/decode` returns the original value; the record backend performs copying. IndexedDB uses native structured cloning. The memory backend copies byte views and uses `structuredClone` for records. `binaryCodec` validates and retains the original byte view, while the backend owns its write snapshot. These codecs neither rebuild application class instances nor validate the domain schema.
+
+The schema handles domain representation; the codec handles the saved format. Reads call `codec.decode`, migrate the saved representation, call `schema.decode`, and validate the domain value. A text-only backend rejects structured output with `UNSUPPORTED_CAPABILITY` rather than silently converting it to JSON.

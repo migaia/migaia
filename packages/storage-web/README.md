@@ -181,3 +181,13 @@ localStorage/sessionStorage/Cookie 可用 `redo: true` 显式启用文本事务�
 Cookie 的 `redo: true` 复用同一原事务/WAL 协议；普通和 redo 写入共用原 cookie 编码、4096-byte 校验、固定 scope 与可见性检查。批量读取仍由同一原解析器读取一次可见 header，再合入当前 draft。redo 模式把 maxAge 在准备时转换为绝对 expiresAt 镜像，重放不续期；超过原生 Date 域的 maxAge 只在该新组合修改前拒绝，普通 Cookie maxAge 域和 Max-Age 优先级不变。该模式仅记录 JS 可见 cookie，HttpOnly/未知 scope 的原限制保持。
 
 普通 localStorage、sessionStorage 与 Cookie 声明 `capabilities.batch: false`；IndexedDB 与显式 redo/WAL 组合声明为 true。启用 commit journal 时不提供原生 IndexedDB 句柄，错误 source 为 `@migaia/storage-contract`、code 为 `UNSUPPORTED_CAPABILITY`。IndexedDB 不提供向量引擎。本仓库网站在新 host 包发布前继续使用已发布的 storage-web 0.0.8。
+
+## 实体编解码器与复制边界
+
+实体编解码器从 `@migaia/storage-host/entity` 导入。`jsonCodec` 的 `output` 为 `text`，使用严格的可移植 JSON；`structuredCodec` 的 `output` 为 `structured`，把结构化值交给后端；`binaryCodec` 的 `output` 为 `binary`，处理 `Uint8Array`。`selectCodec` 根据后端能力决定直连、回退或拒绝。
+
+`jsonCodec` 不接受超出可移植值范围的对象，也不能表示循环。需要保留 `Map` 与 `Set` 时，使用 `@migaia/serialize/codecs/collections-json` 的 `defineCollectionsJsonCodec`，再由 `@migaia/storage-host/authoring/codec` 的 `fromValueCodec` 适配。`structuredCodec` 可交给后端保存可 structured-clone 的内建类型与循环。
+
+`structuredCodec` 的 `encode/decode` 原样返回值，不复制；真正复制在记录后端。IndexedDB 的字节与记录写入遵循原生结构化克隆；内存后端会复制字节，记录采用 `structuredClone`。`binaryCodec` 校验后原样返回字节视图，后端负责写入快照。它们不重建 class 业务实例，也不做 schema 校验。
+
+`schema` 处理领域表示，`codec` 处理保存格式。读取依次执行 `codec.decode`、版本迁移（存储表示）、`schema.decode`、`validate`。结构化输出在文本后端以 `UNSUPPORTED_CAPABILITY` 拒绝，不会悄悄改成 JSON。

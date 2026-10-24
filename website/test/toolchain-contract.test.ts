@@ -275,9 +275,10 @@ test('generated projections contain no volatile metadata', () => {
   /**
    * Five RPC runtime owners replace the former single package, adding exactly four libraries; the
    * separate rpc-pool package adds one more, rpc-devtools adds the observation contracts, and
-   * micro-hub adds the shared micro-frontend contract and communication library.
+   * micro-hub adds the shared micro-frontend contract and communication library. Storage adds the
+   * host and eight backend plugins, giving 43 documentation owners.
    */
-  assert.equal(libraryManifest.libraries.length, 34)
+  assert.equal(libraryManifest.libraries.length, 43)
   assert.equal(
     libraryManifest.libraries.some((library: { readonly slug: string }) => library.slug === 'docs'),
     false
@@ -2186,10 +2187,9 @@ test('documents wire identity, policy, and traceability', () => {
   const targets = [
     ['authoring/codec', 'snapshotCodec', ['codec']],
     ['index', 'assertCodec', ['codec']],
-    ['index', 'collectionsJsonCodec', []],
-    ['index', 'COLLECTIONS_JSON_CODEC_NAME', []],
+    ['authoring/codec', 'fromValueCodec', []],
+    ['entity', 'jsonCodec', []],
     ['index', 'ConflictPolicy', []],
-    ['index', 'StorageContractConflictPolicy', []],
     ['authoring/backend', 'intrinsicConstructorName', ['value']],
     ['index', 'STORAGE_CONTRACT_SOURCE', []],
     [
@@ -2224,6 +2224,17 @@ test('documents wire identity, policy, and traceability', () => {
         assert.ok(option.example?.trim())
       }
     }
+  const contract = generatedApis.find((entry) => entry.id === 'storage-contract:index')
+  assert.ok(contract)
+  for (const retired of [
+    'collectionsJsonCodec',
+    'COLLECTIONS_JSON_CODEC_NAME',
+    'StorageContractConflictPolicy'
+  ])
+    assert.equal(
+      contract.symbols.some((symbol) => symbol.name === retired),
+      false
+    )
 })
 
 test('documents protocol constants, guards, and text transport', () => {
@@ -2391,14 +2402,49 @@ test('documents JSON configuration and native error identity', () => {
 
 test('documents durability, capability, and every constructor option', () => {
   const targets = [
-    ['memory', 'memoryStorageHost', []],
-    ['local-storage', 'localStorageHost', ['storage']],
-    ['session-storage', 'sessionStorageHost', ['storage']],
-    ['cookies', 'cookiesHost', ['namespace', 'namespaceCodec', 'scope', 'document']],
     [
-      'indexed-db',
-      'indexedDbHost',
+      'storage-host',
+      'index',
+      'memoryBackendPlugin',
+      ['namespace', 'concurrency', 'owner', 'features', 'id']
+    ],
+    [
+      'storage-web',
+      'local-storage',
+      'localStorageBackendPlugin',
+      ['features', 'id', 'namespace', 'namespaceCodec', 'storage']
+    ],
+    [
+      'storage-web',
+      'session-storage',
+      'sessionStorageBackendPlugin',
+      ['features', 'id', 'namespace', 'namespaceCodec', 'storage']
+    ],
+    [
+      'storage-web',
+      'cookies',
+      'cookieBackendPlugin',
       [
+        'features',
+        'id',
+        'namespace',
+        'scope',
+        'namespaceCodec',
+        'scope.path',
+        'scope.domain',
+        'scope.sameSite',
+        'scope.secure',
+        'scope.partitioned',
+        'document'
+      ]
+    ],
+    [
+      'storage-web',
+      'indexed-db',
+      'indexedDbBackendPlugin',
+      [
+        'features',
+        'id',
         'dbName',
         'kvStoreName',
         'bytesStoreName',
@@ -2410,10 +2456,10 @@ test('documents durability, capability, and every constructor option', () => {
     ]
   ] as const
 
-  for (const [moduleName, symbolName, expectedOptions] of targets)
+  for (const [libraryName, moduleName, symbolName, expectedOptions] of targets)
     for (const locale of ['en', 'zh'] as const) {
-      const guide = findApiGuide('storage-web', moduleName, symbolName, locale)
-      assert.ok(guide, `storage-web:${moduleName}#${symbolName} has no ${locale} backend guide`)
+      const guide = findApiGuide(libraryName, moduleName, symbolName, locale)
+      assert.ok(guide, `${libraryName}:${moduleName}#${symbolName} has no ${locale} backend guide`)
       assert.ok(guide.quickStart?.trim())
       assert.ok(guide.scenarios.length >= 3)
       assert.ok(guide.avoidWhen.length >= 3)
@@ -2433,21 +2479,20 @@ test('documents durability, capability, and every constructor option', () => {
 
 test('documents selection, validation, and migration contracts', () => {
   const targets = [
-    ['serialize', 'jsonCodec', []],
-    ['serialize', 'binaryCodec', []],
-    ['serialize', 'structuredCodec', []],
-    ['serialize', 'selectCodec', ['codec', 'capabilities', 'onDiagnostic']],
-    ['schema', 'fromStandardSchema', ['schema']],
-    ['schema', 'passthrough', []],
-    ['schema', 'runMigrations', ['value', 'fromVersion', 'toVersion', 'migrations', 'signal']]
+    ['entity', 'jsonCodec', []],
+    ['entity', 'binaryCodec', []],
+    ['entity', 'structuredCodec', []],
+    ['entity', 'selectCodec', ['codec', 'capabilities', 'onDiagnostic']],
+    ['entity', 'fromStandardSchema', ['schema']],
+    ['entity', 'passthrough', []]
   ] as const
 
   for (const [moduleName, symbolName, expectedOptions] of targets)
     for (const locale of ['en', 'zh'] as const) {
-      const guide = findApiGuide('storage-web', moduleName, symbolName, locale)
+      const guide = findApiGuide('storage-host', moduleName, symbolName, locale)
       assert.ok(
         guide,
-        `storage-web:${moduleName}#${symbolName} has no ${locale} codec/schema guide`
+        `storage-host:${moduleName}#${symbolName} has no ${locale} codec/schema guide`
       )
       assert.ok(guide.quickStart?.trim())
       assert.ok(guide.scenarios.length >= 3)
@@ -2464,6 +2509,35 @@ test('documents selection, validation, and migration contracts', () => {
         assert.ok(option.example?.trim())
       }
     }
+  const migrations = [
+    ['createMigrationPlan', ['version', 'reset', 'steps']],
+    ['migrateEnvelope', ['observe', 'signal', 'report']],
+    ['migrateEnvelopeSync', ['observe']]
+  ] as const
+  for (const [name, expectedOptions] of migrations) {
+    const reference = referenceFor('storage-host')
+    const guide = reference?.symbols[`authoring/migration:${name}`] ?? reference?.symbols[name]
+    const api = generatedApis.find((entry) => entry.id === 'storage-host:authoring/migration')
+    const symbol = api?.symbols.find((entry) => entry.name === name)
+    assert.ok(guide && api && symbol, `${name} has no migration contract`)
+    assert.deepEqual(
+      symbol.configuration.map((field) => field.name),
+      expectedOptions
+    )
+    for (const locale of ['en', 'zh'] as const) {
+      assert.ok(guide.purpose[locale].trim().length >= 30)
+      assert.ok(guide.returns?.[locale].trim())
+      assert.ok(guide.params && Object.values(guide.params).every((text) => text[locale].trim()))
+      for (const field of symbol.configuration) {
+        const description =
+          referenceOptionSummary(api, symbol, field.name, locale) ??
+          findOptionTranslation(api.library, api.module, name, field.name, locale)
+        assert.ok(description?.trim(), `${name}.${field.name} ${locale}`)
+      }
+    }
+    assert.match(JSON.stringify(guide), /version|plan/)
+    assert.match(JSON.stringify(guide), /migrateEnvelope|createMigrationPlan/)
+  }
 })
 
 test('documents repository composition and every definition option', () => {
@@ -2481,8 +2555,8 @@ test('documents repository composition and every definition option', () => {
   ]
 
   for (const locale of ['en', 'zh'] as const) {
-    const guide = findApiGuide('storage-web', 'entity', 'defineEntity', locale)
-    assert.ok(guide, `storage-web:entity#defineEntity has no ${locale} entity guide`)
+    const guide = findApiGuide('storage-host', 'entity', 'defineEntity', locale)
+    assert.ok(guide, `storage-host:entity#defineEntity has no ${locale} entity guide`)
     assert.ok(guide.quickStart?.includes('.connect('))
     assert.ok(guide.quickStart?.includes('.put('))
     assert.ok(guide.scenarios.length >= 4)
@@ -2510,8 +2584,8 @@ test('documents authority, topology, installation, and lifecycle options', () =>
 
   for (const [symbolName, expectedOptions] of targets)
     for (const locale of ['en', 'zh'] as const) {
-      const guide = findApiGuide('storage-web', 'host', symbolName, locale)
-      assert.ok(guide, `storage-web:host#${symbolName} has no ${locale} Host guide`)
+      const guide = findApiGuide('storage-host', 'index', symbolName, locale)
+      assert.ok(guide, `storage-host:index#${symbolName} has no ${locale} Host guide`)
       assert.ok(guide.quickStart?.trim())
       assert.ok(guide.scenarios.length >= 3)
       assert.ok(guide.avoidWhen.length >= 3)
@@ -2578,23 +2652,50 @@ test('documents public namespace and errors while keeping Host helpers private',
 })
 
 test('documents non-reactive factories and custom reactive adapters', () => {
-  /**
-   * Commit c8d24f68 made custom reactive features store-owned; the definition no longer takes
-   * backendKind.
-   */
+  /** Each backend keeps its native options; optional Features declare their exact target kind. */
   const targets = [
-    ['plugins-memory', 'memoryBackendPlugin', ['id']],
-    ['plugins-local-storage', 'localStorageBackendPlugin', ['storage']],
-    ['plugins-session-storage', 'sessionStorageBackendPlugin', ['storage']],
     [
-      'plugins-cookies',
-      'cookieBackendPlugin',
-      ['namespace', 'namespaceCodec', 'scope', 'document']
+      'storage-host',
+      'index',
+      'memoryBackendPlugin',
+      ['namespace', 'concurrency', 'owner', 'features', 'id']
     ],
     [
-      'plugins-indexed-db',
+      'storage-web',
+      'local-storage',
+      'localStorageBackendPlugin',
+      ['features', 'id', 'namespace', 'namespaceCodec', 'storage']
+    ],
+    [
+      'storage-web',
+      'session-storage',
+      'sessionStorageBackendPlugin',
+      ['features', 'id', 'namespace', 'namespaceCodec', 'storage']
+    ],
+    [
+      'storage-web',
+      'cookies',
+      'cookieBackendPlugin',
+      [
+        'features',
+        'id',
+        'namespace',
+        'scope',
+        'namespaceCodec',
+        'scope.path',
+        'scope.domain',
+        'scope.sameSite',
+        'scope.secure',
+        'scope.partitioned',
+        'document'
+      ]
+    ],
+    [
+      'storage-web',
+      'indexed-db',
       'indexedDbBackendPlugin',
       [
+        'features',
         'id',
         'dbName',
         'kvStoreName',
@@ -2605,17 +2706,14 @@ test('documents non-reactive factories and custom reactive adapters', () => {
         'keyRange'
       ]
     ],
-    [
-      'reactive-adapter',
-      'defineReactiveAdapterFeature',
-      ['mode', 'pollIntervalMs', 'visibility', 'subscribe']
-    ]
+    ['storage-host', 'index', 'defineFeature', []],
+    ['storage-host', 'index', 'definePlugin', []]
   ] as const
 
-  for (const [moduleName, symbolName, expectedOptions] of targets)
+  for (const [libraryName, moduleName, symbolName, expectedOptions] of targets)
     for (const locale of ['en', 'zh'] as const) {
-      const guide = findApiGuide('storage-web', moduleName, symbolName, locale)
-      assert.ok(guide, `storage-web:${moduleName}#${symbolName} has no ${locale} plugin guide`)
+      const guide = findApiGuide(libraryName, moduleName, symbolName, locale)
+      assert.ok(guide, `${libraryName}:${moduleName}#${symbolName} has no ${locale} plugin guide`)
       assert.ok(guide.quickStart?.trim())
       assert.ok(guide.scenarios.length >= 3)
       assert.ok(guide.avoidWhen.length >= 3)
@@ -2634,36 +2732,13 @@ test('documents non-reactive factories and custom reactive adapters', () => {
 })
 
 test('documents honest visibility and every factory option', () => {
-  const targets = [
-    ['plugins-reactive-memory', 'memoryReactive', ['id']],
-    ['plugins-reactive-local-storage', 'localStorageReactive', ['storage']],
-    ['plugins-reactive-session-storage', 'sessionStorageReactive', ['storage']],
-    [
-      'plugins-reactive-cookies',
-      'cookiesReactive',
-      ['namespace', 'namespaceCodec', 'scope', 'document']
-    ],
-    [
-      'plugins-reactive-indexed-db',
-      'indexedDbReactive',
-      [
-        'id',
-        'dbName',
-        'kvStoreName',
-        'bytesStoreName',
-        'recordsStoreName',
-        'cleanupLegacyRecords',
-        'factory',
-        'keyRange'
-      ]
-    ]
-  ] as const
+  const targets = [['features/reactive', 'reactiveFeature', ['target']]] as const
 
   for (const [moduleName, symbolName, expectedOptions] of targets)
     for (const locale of ['en', 'zh'] as const) {
       const guide = findApiGuide('storage-web', moduleName, symbolName, locale)
       assert.ok(guide, `storage-web:${moduleName}#${symbolName} has no ${locale} reactive guide`)
-      assert.ok(guide.quickStart?.includes('liveQuery'))
+      assert.ok(guide.quickStart?.includes('.live('))
       assert.ok(guide.scenarios.length >= 3)
       assert.ok(guide.avoidWhen.length >= 3)
       assert.deepEqual(

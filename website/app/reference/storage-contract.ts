@@ -1,8 +1,8 @@
 /**
  * Reference documentation of `@migaia/storage-contract`. Rules: `app/reference/contract.ts`.
- * Operation-context snapshots are frozen and reused by identity; key and capability snapshots are
- * detached but mutable. Codec methods retain their original function references. Concrete backends
- * own I/O, cancellation and resource cleanup; this package supplies neutral contracts.
+ * Operation-context and key snapshots are detached ordinary records, with the live signal retained.
+ * Codec methods retain their original function references. Concrete backends own I/O, cancellation
+ * and resource cleanup; this package supplies neutral contracts.
  */
 import type { ILibraryReference, IMemberDoc, IText } from './contract.js'
 import { storageContractCases } from './storage-contract-cases.ts'
@@ -1460,8 +1460,8 @@ export const storageContractReference: ILibraryReference = {
         backend: t('Actual backend diagnostic or undefined.', '真实后端诊断，或 undefined。')
       },
       returns: t(
-        'Frozen normalized IRdfTerm; malformed fields throw INVALID_ARGUMENT with the exact getter cause.',
-        '冻结规范 IRdfTerm；非法字段抛 INVALID_ARGUMENT，保留精确 getter 原因。'
+        'Normalized IRdfTerm; malformed fields throw INVALID_ARGUMENT without rewriting the input.',
+        '规范 IRdfTerm；非法字段抛 INVALID_ARGUMENT，不改写输入。'
       ),
       example: storageContractCases.snapshotStorageRdfTerm![0]!.example,
       cases: storageContractCases.snapshotStorageRdfTerm
@@ -1480,8 +1480,8 @@ export const storageContractReference: ILibraryReference = {
         backend: t('Actual backend diagnostic or undefined.', '真实后端诊断，或 undefined。')
       },
       returns: t(
-        'Frozen detached partial IQuad; blank or invalid positional terms reject INVALID_ARGUMENT.',
-        '冻结独立的部分 IQuad；blank 或非法位置项报 INVALID_ARGUMENT。'
+        'Detached partial IQuad; blank or invalid positional terms reject INVALID_ARGUMENT.',
+        '独立的部分 IQuad；blank 或非法位置项报 INVALID_ARGUMENT。'
       ),
       example: storageContractCases.snapshotStorageRdfPattern![0]!.example,
       cases: storageContractCases.snapshotStorageRdfPattern
@@ -1500,8 +1500,8 @@ export const storageContractReference: ILibraryReference = {
         backend: t('Actual backend diagnostic or undefined.', '真实后端诊断，或 undefined。')
       },
       returns: t(
-        'Frozen detached IQuad; missing or illegal positions throw INVALID_ARGUMENT before I/O.',
-        '冻结独立 IQuad；缺失或非法位置在 I/O 前抛 INVALID_ARGUMENT。'
+        'Detached IQuad; missing or illegal positions throw INVALID_ARGUMENT before I/O.',
+        '独立 IQuad；缺失或非法位置在 I/O 前抛 INVALID_ARGUMENT。'
       ),
       example: storageContractCases.snapshotStorageRdfQuad![0]!.example,
       cases: storageContractCases.snapshotStorageRdfQuad
@@ -1523,8 +1523,8 @@ export const storageContractReference: ILibraryReference = {
         )
       },
       returns: t(
-        'Independent self-delimiting Uint8Array. Native indexes concatenate components directly without the public binary-key limit; malformed terms throw INVALID_ARGUMENT with original getter cause.',
-        '独立、自定界 Uint8Array。原生索引直接拼接分量，不施加公开 binary-key 限制；无效 term 抛 INVALID_ARGUMENT 并保留原 getter cause。'
+        'Independent self-delimiting Uint8Array. Native indexes concatenate components directly without the public binary-key limit; malformed terms throw INVALID_ARGUMENT without rewriting the input.',
+        '独立、自定界 Uint8Array。原生索引直接拼接分量，不施加公开 binary-key 限制；无效 term 抛 INVALID_ARGUMENT，不改写输入。'
       ),
       example: storageContractCases.encodeStorageRdfTerm![0]!.example,
       cases: storageContractCases.encodeStorageRdfTerm
@@ -1734,7 +1734,7 @@ export const storageContractReference: ILibraryReference = {
           '为 true 时拒绝等价重复标识，缺省保留重复输入。'
         )
       },
-      returns: t('Frozen ordered string array.', '冻结的有序字符串数组。'),
+      returns: t('Ordered string array.', '独立的有序字符串数组。'),
       example: storageContractCases.snapshotStorageVectorIds![0]!.example,
       cases: storageContractCases.snapshotStorageVectorIds
     },
@@ -1805,8 +1805,8 @@ export const storageContractReference: ILibraryReference = {
         backend: t('Actual backend label or undefined.', '真实后端标签或 undefined。')
       },
       returns: t(
-        'Frozen input snapshot; malformed fields throw INVALID_ARGUMENT with the original cause.',
-        '冻结输入快照；非法字段抛 INVALID_ARGUMENT 并保留原始 cause。'
+        'Detached input snapshot; malformed fields throw INVALID_ARGUMENT with the original cause.',
+        '独立输入快照；非法字段抛 INVALID_ARGUMENT 并保留原始 cause。'
       ),
       example: storageContractCases.snapshotStorageBlobPut![0]!.example,
       cases: storageContractCases.snapshotStorageBlobPut
@@ -1826,8 +1826,8 @@ export const storageContractReference: ILibraryReference = {
         backend: t('Actual backend label or undefined.', '真实后端标签或 undefined。')
       },
       returns: t(
-        'Frozen key/options snapshot; no I/O or body reader.',
-        '冻结键与选项快照；不进行 I/O 或取得 body reader。'
+        'Detached key/options snapshot; no I/O or body reader.',
+        '独立键与选项快照；不进行 I/O 或取得 body reader。'
       ),
       example: storageContractCases.snapshotStorageBlobGet![0]!.example,
       cases: storageContractCases.snapshotStorageBlobGet
@@ -1850,8 +1850,8 @@ export const storageContractReference: ILibraryReference = {
         backend: t('Actual backend label or undefined.', '真实后端标签或 undefined。')
       },
       returns: t(
-        'Frozen prefix, after, limit and context; malformed input throws INVALID_ARGUMENT.',
-        '冻结 prefix、after、limit 与上下文；非法输入抛 INVALID_ARGUMENT。'
+        'Captured prefix, after, limit and context; malformed input throws INVALID_ARGUMENT.',
+        '捕获 prefix、after、limit 与上下文；非法输入抛 INVALID_ARGUMENT。'
       ),
       example: storageContractCases.snapshotStorageBlobList![0]!.example,
       cases: storageContractCases.snapshotStorageBlobList
@@ -2039,7 +2039,7 @@ export const storageContractReference: ILibraryReference = {
     createStorageBatchKeyCapture: {
       role: 'operation',
       purpose: t(
-        'Capture native batch keys in the backend’s existing per-entry getter and failure order.',
+        'Capture native batch keys in the backend’s existing per-entry validation and failure order.',
         '依后端原有逐项捕获次序记录规范键身份，保留重复键的首次位置供原校验点使用。'
       ),
       params: {
@@ -2111,8 +2111,8 @@ export const storageContractReference: ILibraryReference = {
         )
       },
       returns: t(
-        'Frozen pure ISparqlFragment without terminals. var/join/empty share the same identity owner.',
-        '不带终端的冻结纯 ISparqlFragment；var/join/empty 共用同一身份 owner。'
+        'Pure ISparqlFragment without terminals. var/join/empty share the same identity owner.',
+        '不带终端的纯 ISparqlFragment；var/join/empty 共用同一身份 owner。'
       ),
       example: storageContractCases.sparqlFragment![0]!.example,
       cases: storageContractCases.sparqlFragment
@@ -2226,8 +2226,8 @@ export const storageContractReference: ILibraryReference = {
         )
       },
       returns: t(
-        'Frozen ISparqlApi retaining native receiver and Promise identities; no endpoint or lifecycle is created.',
-        '保留原生 receiver 与 Promise 身份的冻结 ISparqlApi；不创建 endpoint 或生命周期。'
+        'ISparqlApi retaining native receiver and Promise identities; no endpoint or lifecycle is created.',
+        '保留原生 receiver 与 Promise 身份的 ISparqlApi；不创建 endpoint 或生命周期。'
       ),
       example: storageContractCases.createSparqlTag![0]!.example,
       cases: storageContractCases.createSparqlTag
@@ -2282,8 +2282,8 @@ export const storageContractReference: ILibraryReference = {
         backend: t('Actual backend diagnostic or undefined.', '真实后端诊断，或 undefined。')
       },
       returns: t(
-        'Detached frozen ITtlTarget, with original INVALID_KEY or INVALID_ARGUMENT failures.',
-        '独立冻结的 ITtlTarget，保留原 INVALID_KEY 或 INVALID_ARGUMENT 失败。'
+        'Detached ITtlTarget, with original INVALID_KEY or INVALID_ARGUMENT failures.',
+        '独立的 ITtlTarget，保留原 INVALID_KEY 或 INVALID_ARGUMENT 失败。'
       ),
       example: storageContractCases.snapshotStorageTtlTarget![0]!.example,
       cases: storageContractCases.snapshotStorageTtlTarget
@@ -2353,8 +2353,8 @@ export const storageContractReference: ILibraryReference = {
         }
       },
       returns: t(
-        'Frozen readonly IStorageBatchKey rows with detached key, canonical byte identity and firstIndex. Invalid lists/options or duplicate writes throw INVALID_ARGUMENT; invalid keys retain INVALID_KEY. No I/O or resource authority.',
-        '冻结的只读 IStorageBatchKey 行，包含独立 key、规范字节身份和 firstIndex。非法列表/选项或重复写键抛 INVALID_ARGUMENT；非法键保留 INVALID_KEY；不创建 I/O 或资源权限。'
+        'Readonly IStorageBatchKey rows with detached key, canonical byte identity and firstIndex. Invalid lists/options or duplicate writes throw INVALID_ARGUMENT; invalid keys retain INVALID_KEY. No I/O or resource authority.',
+        '独立的只读 IStorageBatchKey 行，包含独立 key、规范字节身份和 firstIndex。非法列表/选项或重复写键抛 INVALID_ARGUMENT；非法键保留 INVALID_KEY；不创建 I/O 或资源权限。'
       ),
       example: storageContractCases.snapshotStorageBatchKeys![0]!.example,
       cases: storageContractCases.snapshotStorageBatchKeys
@@ -2399,8 +2399,8 @@ export const storageContractReference: ILibraryReference = {
         )
       },
       returns: t(
-        'One frozen view-local projection with no binder/I/O during lookup. Data execution and complete query terminals enter the original owner; invalidation clears the cache.',
-        '一个冻结的视图局部投影；取用时不调用 binder、不 I/O；数据执行和完整查询终点进入原 owner，失效清空缓存。'
+        'One view-local projection with no binder/I/O during lookup. Data execution and complete query terminals enter the original owner; invalidation clears the cache.',
+        '一个独立的视图局部投影；取用时不调用 binder、不 I/O；数据执行和完整查询终点进入原 owner，失效清空缓存。'
       ),
       example: storageContractCases.useTransactionCapability![0]!.example,
       cases: storageContractCases.useTransactionCapability
@@ -2556,8 +2556,8 @@ export const storageContractReference: ILibraryReference = {
         )
       },
       returns: t(
-        'Frozen ISqlQuery sharing the original node; callback receiver, context and Promise identity remain exact.',
-        '共享原节点的冻结 ISqlQuery；原回调 receiver、context 与 Promise 身份保持精确。'
+        'ISqlQuery sharing the original node; callback receiver, context and Promise identity remain exact.',
+        '共享原节点的 ISqlQuery；原回调 receiver、context 与 Promise 身份保持精确。'
       ),
       example: storageContractCases.deriveStorageSqlQuery![0]!.example,
       cases: storageContractCases.deriveStorageSqlQuery
@@ -2576,8 +2576,8 @@ export const storageContractReference: ILibraryReference = {
         )
       },
       returns: t(
-        'Frozen array of original entries. Equal byte keys retain input order; selector failures retain cause.',
-        '原条目的冻结数组；相同字节键保留输入顺序，selector 失败保留 cause。'
+        'Independent array of original entries. Equal byte keys retain input order; selector failures retain cause.',
+        '原条目的独立数组；相同字节键保留输入顺序，selector 失败保留 cause。'
       ),
       example: storageContractCases.orderStorageKeysByBytes![0]!.example,
       cases: storageContractCases.orderStorageKeysByBytes
@@ -2620,8 +2620,8 @@ export const storageContractReference: ILibraryReference = {
         backend: t('Actual backend diagnostic name.', '实际后端诊断名。')
       },
       returns: t(
-        'Frozen detached sorted/deduplicated keys and matching readonly hexadecimal identities, without authority.',
-        '冻结的独立排序去重键与配对只读十六进制身份，不授予权限。'
+        'Detached sorted/deduplicated keys and matching readonly hexadecimal identities, without authority.',
+        '独立排序去重键与配对只读十六进制身份，不授予权限。'
       ),
       example: storageContractCases.snapshotConcurrencyLockKeys![0]!.example,
       cases: storageContractCases.snapshotConcurrencyLockKeys
@@ -2640,8 +2640,8 @@ export const storageContractReference: ILibraryReference = {
         backend: t('Actual backend diagnostic name.', '实际后端诊断名。')
       },
       returns: t(
-        'Frozen lower/upper hexadecimal bounds using original channel ranks and key prefix encoding. No lock authority.',
-        '冻结的 lower/upper 十六进制边界，复用原通道顺序与键前缀编码，无取锁权限。'
+        'Captured lower/upper hexadecimal bounds using original channel ranks and key prefix encoding. No lock authority.',
+        '独立的 lower/upper 十六进制边界，复用原通道顺序与键前缀编码，无取锁权限。'
       ),
       example: storageContractCases.snapshotConcurrencyLockRange![0]!.example,
       cases: storageContractCases.snapshotConcurrencyLockRange
@@ -2659,8 +2659,8 @@ export const storageContractReference: ILibraryReference = {
         )
       },
       returns: t(
-        'Frozen detached key/holder rows preserving expired, expiresAt and separate equal-key rows, without lock authority.',
-        '冻结的独立键与 holder 行，保留 expired、expiresAt 和相同键的独立行，不授予锁权限。'
+        'Detached key/holder rows preserving expired, expiresAt and separate equal-key rows, without lock authority.',
+        '独立键与 holder 行，保留 expired、expiresAt 和相同键的独立行，不授予锁权限。'
       ),
       example: storageContractCases.snapshotConcurrencyLockHoldings![0]!.example,
       cases: storageContractCases.snapshotConcurrencyLockHoldings
@@ -2668,8 +2668,8 @@ export const storageContractReference: ILibraryReference = {
     readConcurrencyLockIdentities: {
       role: 'operation',
       purpose: t(
-        'Read immutable lock identities from the original active attempt metadata without re-encoding logical keys.',
-        '从原活跃 attempt 元数据读取不可变锁身份，不重新编码逻辑键。'
+        'Read the lock identity list from the original active attempt metadata as a read-only array, without re-encoding logical keys.',
+        '从原活跃 attempt 元数据读取只读锁身份，不重新编码逻辑键。'
       ),
       params: {
         ctx: t(
@@ -2678,8 +2678,8 @@ export const storageContractReference: ILibraryReference = {
         )
       },
       returns: t(
-        'One frozen canonical channel-separated hexadecimal string list, shared across repeated reads and nested attempts. No mutable bytes, registration or control authority.',
-        '一个冻结、带规范通道隔离的十六进制字符串列表，重复读取和嵌套尝试共用；无可变字节、登记或控制权限。'
+        'One canonical channel-separated hexadecimal string list, shared across repeated reads and nested attempts. No mutable bytes, registration or control authority.',
+        '一个带规范通道隔离的十六进制字符串列表，重复读取和嵌套尝试共用；无可变字节、登记或控制权限。'
       ),
       example: storageContractCases.readConcurrencyLockIdentities![0]!.example,
       cases: storageContractCases.readConcurrencyLockIdentities
@@ -2857,8 +2857,8 @@ export const storageContractReference: ILibraryReference = {
     snapshotStorageWhere: {
       role: 'operation',
       purpose: t(
-        'Capture the original immutable canonical query AST for native translation; reuse the same single-read parser, field validation and INVALID_ARGUMENT cause.',
-        '捕获原不可变规范查询 AST 供原生翻译；复用同一单读 parser、字段校验及 INVALID_ARGUMENT 原因。'
+        'Capture the canonical query AST for native translation; reuse the same condition parser, field validation and INVALID_ARGUMENT cause.',
+        '捕获规范查询 AST 供原生翻译；复用同一条件解析器、字段校验及 INVALID_ARGUMENT 原因。'
       ),
       params: {
         where: t(
@@ -2867,8 +2867,8 @@ export const storageContractReference: ILibraryReference = {
         )
       },
       returns: t(
-        'The same frozen IQueryCondition domain supplied to native source callbacks; no I/O, compiler or owner is created.',
-        '与原生 source 回调相同的冻结 IQueryCondition 值域；不创建 I/O、compiler 或 owner。'
+        'The canonical IQueryCondition domain supplied to native source callbacks; no I/O, compiler or owner is created.',
+        '与原生 source 回调相同的规范 IQueryCondition 值域；不创建 I/O、compiler 或 owner。'
       ),
       example: storageContractCases.snapshotStorageWhere![0]!.example,
       cases: storageContractCases.snapshotStorageWhere
@@ -3059,8 +3059,8 @@ export const storageContractReference: ILibraryReference = {
         )
       },
       returns: t(
-        'Frozen IRdfNamedNode: prefix plus d for default, or n: and canonical percent-encoded exact IRI. Invalid input throws INVALID_ARGUMENT.',
-        '冻结 IRdfNamedNode：默认图为前缀加 d，命名图为前缀加 n: 与规范百分号编码的原样 IRI。无效输入抛 INVALID_ARGUMENT。'
+        'IRdfNamedNode: prefix plus d for default, or n: and canonical percent-encoded exact IRI. Invalid input throws INVALID_ARGUMENT.',
+        'IRdfNamedNode：默认图为前缀加 d，命名图为前缀加 n: 与规范百分号编码的原样 IRI。无效输入抛 INVALID_ARGUMENT。'
       ),
       example: storageContractCases.prefixStorageOrgGraph![0]!.example,
       cases: storageContractCases.prefixStorageOrgGraph
@@ -3068,8 +3068,8 @@ export const storageContractReference: ILibraryReference = {
     unprefixStorageOrgGraph: {
       role: 'operation',
       purpose: t(
-        'Restore a shared frozen RDF graph only from the exact canonical organization envelope.',
-        '仅从精确组织的规范物理图封装还原逻辑图，保留共享冻结项以及原命名图的精确拼写。'
+        'Restore a logical RDF graph only from the exact canonical organization envelope.',
+        '仅从精确组织的规范物理图封装还原逻辑图，保留逻辑项以及原命名图的精确拼写。'
       ),
       params: {
         orgId: t(
@@ -3082,8 +3082,8 @@ export const storageContractReference: ILibraryReference = {
         )
       },
       returns: t(
-        'IRdfNamedNode or IRdfDefaultGraph with exact original IRI spelling. Foreign or noncanonical graphs throw INVALID_ARGUMENT; getter and decoding failures retain their original cause.',
-        '原样 IRI 的 IRdfNamedNode 或 IRdfDefaultGraph。其它组织或非规范图抛 INVALID_ARGUMENT；getter、解码失败保留原 cause。'
+        'IRdfNamedNode or IRdfDefaultGraph with exact original IRI spelling. Foreign or noncanonical graphs throw INVALID_ARGUMENT; decoding failures retain their original cause.',
+        '原样 IRI 的 IRdfNamedNode 或 IRdfDefaultGraph。其它组织或非规范图抛 INVALID_ARGUMENT；解码失败保留原 cause。'
       ),
       example: storageContractCases.unprefixStorageOrgGraph![0]!.example,
       cases: storageContractCases.unprefixStorageOrgGraph
@@ -3384,8 +3384,8 @@ const control = owner.register(scope, { createScope, onFailure })`
         )
       },
       returns: t(
-        'The same frozen IOperationContext snapshot and original signal, or undefined when omitted at registration. Forged or expired views throw INVALID_ARGUMENT. No new budget or lifecycle authority is created.',
-        '同一冻结 IOperationContext 快照与原 signal；登记省略上下文时返回 undefined。伪造或过期视图抛 INVALID_ARGUMENT，不创建新预算或生命周期权限。'
+        'The original IOperationContext snapshot and original signal, or undefined when omitted at registration. Forged or expired views throw INVALID_ARGUMENT. No new budget or lifecycle authority is created.',
+        '原 IOperationContext 快照与原 signal；登记省略上下文时返回 undefined。伪造或过期视图抛 INVALID_ARGUMENT，不创建新预算或生命周期权限。'
       ),
       example: `const context = readTransactionOperationContext(operationScope)
 await codec.encode(value, context)`
@@ -3447,8 +3447,8 @@ await codec.encode(value, context)`
     registerTransactionFinalizer: {
       role: 'operation',
       purpose: t(
-        'Register an ordered once-only check before finalization freezes the accepted list.',
-        '在最终检查冻结接纳列表前登记按序、只运行一次的检查。'
+        'Register an ordered once-only check before finalization closes the accepted list.',
+        '在最终检查关闭接纳列表前登记按序、只运行一次的检查。'
       ),
       params: {
         scope: t('A real active view of the owning transaction.', '所属事务的真实有效视图。'),
@@ -3587,7 +3587,7 @@ await codec.encode(value, context)`
         }
       },
       purpose: t(
-        'Admit a complete implementation batch and modify the same resource-backed base, preserving its public class and hidden members.',
+        'Admit a complete implementation batch on the same resource object, preserving its public class and hidden members.',
         '准入整批实现并改装同一资源基础对象，保留类公开方法与非枚举成员。'
       ),
       params: {
@@ -3941,8 +3941,8 @@ if (snapshot) console.log(await snapshot.store.getRecord('profile'))`
     snapshotStorageKey: {
       role: 'operation',
       purpose: t(
-        'Validates and detaches one record key before asynchronous work can observe later caller mutation. Arrays, dates and binary buffers are copied recursively, then the copy is validated again.',
-        '在异步工作观察到调用方后续修改前，校验并分离一个记录键。递归复制数组、日期和二进制缓冲区，再次校验复制结果。'
+        'Validates and detaches one record key before asynchronous work can observe later caller mutation. Arrays, dates and binary buffers are copied recursively.',
+        '在异步工作观察到调用方后续修改前，校验并分离一个记录键。递归复制数组、日期和二进制缓冲区。'
       ),
       params: { ...keyValidationParams, backend: optionalKeyBackend },
       returns: t(
@@ -4084,8 +4084,8 @@ keys.sort(compareStorageKeys)`
     snapshotOperationContext: {
       role: 'operation',
       purpose: t(
-        'Reads cancellation, timeout, paging, optional conflict policy and orgId once, validates them and freezes a field snapshot. Snapshots created by this helper are recognized and returned by identity on later calls.',
-        '单次读取取消、超时、分页、可选冲突策略与 orgId，完成校验后冻结字段快照。此函数创建的快照会被识别，后续调用原样返回同一身份。'
+        'Validate and copy cancellation, timeout, paging, conflict and organization choices before queued work awaits. The signal remains live; each call returns an ordinary record without a shared-identity guarantee.',
+        '在排队工作等待前校验并保存取消、超时、分页、冲突和组织选项。信号仍保持活动；每次调用返回普通记录，不承诺共用对象身份。'
       ),
       optionDocs: {
         ...operationMembers,
@@ -4104,8 +4104,8 @@ keys.sort(compareStorageKeys)`
         )
       },
       returns: t(
-        'An `IOperationContextSnapshot`, or undefined for omitted context; malformed values throw `INVALID_ARGUMENT` retaining the original accessor cause.',
-        '一个 `IOperationContextSnapshot`，省略上下文时为空值；格式错误抛 `INVALID_ARGUMENT` 并保留原访问器原因。'
+        'An `IOperationContextSnapshot`, or undefined for omitted context; malformed values throw `INVALID_ARGUMENT` before storage I/O.',
+        '一个 `IOperationContextSnapshot`，省略上下文时为空值；格式错误抛 `INVALID_ARGUMENT`，此时尚未进行存储读写。'
       ),
       exampleIntro: storageContractCases.snapshotOperationContext![0]!.problem,
       example: storageContractCases.snapshotOperationContext![0]!.example,

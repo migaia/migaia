@@ -145,7 +145,7 @@ console.log(host.extensions.label('draft'))`
       },
       purpose: t(
         'Capture canonical continuous version steps before asynchronous execution, or a constant-space reset callback.',
-        '在异步执行前捕获规范连续版本步骤，或常数空间的重置回调。'
+        '在执行前检查并保存连续的版本升级步骤，或选择返回全新状态的重置回调。创建的计划可复用，不会读取或修改存储。'
       ),
       params: {
         options: t(
@@ -174,7 +174,7 @@ console.log(plan.baseVersion, Object.keys(plan.steps)) // 1 ['2']`
       },
       purpose: t(
         'Run synchronous steps in target-version order. Refuse newer archives and preserve original errors as cause.',
-        '按目标版本顺序执行同步步骤；拒绝未来存档，将原始错误保留在 cause。'
+        '按目标版本顺序执行同步升级步骤，返回当前状态或转换后的状态。拒绝未来版本存档；步骤失败时将原始错误保留在 cause。'
       ),
       params: {
         plan: t('Plan from createMigrationPlan.', 'createMigrationPlan 创建的计划。'),

@@ -45,15 +45,15 @@ export const LIBRARY_REFERENCE_DESCRIPTIONS_ZH = {
   'storage-plugin-sqlite':
     '用运行时内置的 SQLite 保存本地设置、离线记录和缓存，让文本、记录、过期时间与应用 SQL 可以在同一个数据库事务内提交。选择运行时对应的驱动和数据库文件或内存库，再把插件安装到 host，无需另装 npm 原生数据库扩展；连接由应用创建和关闭，根入口不自动选择或加载驱动。',
   'storage-plugin-qdrant':
-    '把应用向量及其属性保存到真实 Qdrant 服务，通过查询链完成近邻搜索、筛选和支持的重排，减少业务代码手写原生请求与组织条件的重复工作。将配置服务地址的插件安装到 host 后，再选择 vector 能力和集合；标准查询在排名前处理组织与期限条件，过期数据的物理清理由应用显式执行。',
+    '在真实 Qdrant 服务中保存向量及属性，并提供近邻搜索、筛选和支持的重排。业务代码不必在每次请求中重新拼接组织筛选条件。先配置服务地址，把插件安装到存储宿主，再选择向量能力与集合；标准查询在排名前筛选组织和期限，过期数据由应用显式删除。',
   'storage-plugin-sparql':
-    '把 RDF 数据写入远程 SPARQL 端点或本地 Oxigraph，并用查询链读取、筛选和修改四元组，也就是包含主语、谓词、对象和图的数据。选择 HTTP 或 Oxigraph 适配后安装插件，应用可用 RDF 值构造查询，并通过 expect 声明提交时必须仍存在的四元组；网络写入结果未知时不会自动重试。',
+    '为知识图谱应用提供统一的 RDF 查询与修改接口，可连接远程 SPARQL 端点或本地 Oxigraph。查询链处理四元组，也就是包含主语、谓词、对象和图的数据；选择适配器并安装插件后，应用可用 RDF 值构造查询，并通过 expect 声明提交时必须仍存在的四元组。网络写入结果未知时不会自动重试。',
   'storage-plugin-object':
     '用同一套 blob API 将附件、导出文件等二进制内容保存到专用目录或 S3，并按需读取完整字节、流或指定范围。选择文件或 S3 驱动，再把 object 插件安装到 host，即可使用组织隔离与读取资源释放；条件写入须由所选驱动和服务实际支持，本包不提供普通键值存储或事务。',
   'storage-plugin-cache':
     '把已安装的键值后端按快慢顺序组合成多级缓存，让重复查询共享回源结果，并把下层读到的数据补到上层。适合同时使用内存和持久存储、又不想逐次手写回填与失效传播的应用；可设置缓存期限、缺失值缓存和延后写入，各层之间不提供原子提交，延后写入也不是持久队列。',
   'storage-plugin-archive':
-    '把不常访问的旧记录从日常读写的热存储移到 blob 对象存储，减少热表需要保留的历史数据，同时保留按原键读取和显式恢复的入口。将插件接到已安装的热后端和对象后端后，由应用主动运行归档规则；归档按段提交，不把整个任务当成跨存储事务。',
+    '当历史数据挤占日常读写的存储空间时，把不常访问的旧记录移到 blob 对象存储，同时保留按原键读取和显式恢复的入口。将插件接到已安装的热后端和对象后端后，由应用主动运行归档规则，减少热表需要保留的数据；归档按段提交，不把整个任务当成跨存储事务。',
   'store-devtools': '查看 Store 的状态与 action 历史，通过时间旅行和依赖树定位状态变化。',
   'store-indexed': '在对象、数组、Map 和 Set 中按键或索引订阅变化，让相关计算随集合更新。',
   'store-keyed': '在独立作用域中按业务 key 管理状态，并只订阅需要的部分。',
@@ -122,13 +122,13 @@ export const LIBRARY_REFERENCE_DESCRIPTIONS_EN = {
   'storage-plugin-qdrant':
     'Store vectors and their payloads in a real Qdrant service, then use query chains for nearest-neighbor search, filtering and supported reranking instead of repeating native requests and organization filters throughout the application. Configure the service URL, install the plugin in a host, and select the vector capability and a collection. Standard queries apply organization and expiry filters before ranking; physically removing expired points is an explicit application operation.',
   'storage-plugin-sparql':
-    'Write RDF to a remote SPARQL endpoint or local Oxigraph store and use query chains to read, filter and change quads: data made of a subject, predicate, object and graph. Install the plugin with an HTTP or Oxigraph adapter, construct queries from RDF values, and use expect to require specific quads to remain present at commit. A network write with an unknown outcome is not retried automatically.',
+    'Give knowledge-graph applications one RDF query and mutation API for a remote SPARQL endpoint or local Oxigraph store. Query chains handle quads: data made of a subject, predicate, object and graph. Install the plugin with the selected adapter, construct queries from RDF values, and use expect to require specific quads to remain present at commit. A network write with an unknown outcome is not retried automatically.',
   'storage-plugin-object':
     'Save attachments, exports and other binary content in a dedicated directory or S3 through the same blob API, then read complete bytes, a stream or a selected range. Choose a file or S3 driver and install the object plugin in a host to use organization isolation and disposable reads. Conditional writes require support from the selected driver and service; this package does not provide ordinary key-value storage or transactions.',
   'storage-plugin-cache':
     'Arrange installed key-value backends from faster to slower cache tiers, share loads for repeated requests, and fill upper tiers from lower ones. Use it to combine memory and persistent storage without writing refill and invalidation logic at every call. Configure expiry, caching of missing results and optional delayed writes as needed; tiers do not commit atomically, and delayed writes are not a durable queue.',
   'storage-plugin-archive':
-    'Move rarely read records out of the storage used for everyday updates and into blob storage, while keeping reads by original key and an explicit restore operation. Connect the plugin to installed hot and object backends, then run archive rules when your application chooses. Each segment commits separately; the whole archive job is not a transaction across both stores.',
+    'When historical records crowd the storage used for everyday updates, move rarely read records into blob storage while keeping reads by original key and an explicit restore operation. Connect the plugin to installed hot and object backends, then run archive rules when your application chooses to reduce the data kept in hot tables. Each segment commits separately; the whole archive job is not a transaction across both stores.',
   'store-devtools':
     'Inspect Store state and action history and use time travel and dependency trees to investigate changes.',
   'store-indexed':

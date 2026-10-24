@@ -3,7 +3,7 @@
  * reference file and must pass `bun scripts/audit/reference.ts <lib>` with zero findings. See
  * `app/reference/contract.ts` for the rules.
  */
-import type { ILibraryReference } from './contract.js'
+import type { ICode, ILibraryReference } from './contract.js'
 import { eventSubscriberReference } from './event-subscriber.js'
 import { middlewarePipelineReference } from './middleware-pipeline.js'
 import { pluginHostReference } from './plugin-host.js'
@@ -28,6 +28,12 @@ import { rpcDevtoolsReference } from './rpc-devtools.js'
 import { rpcPoolReference } from './rpc-pool.js'
 import { storageContractReference } from './storage-contract.js'
 import { storageHostReference } from './storage-host.js'
+import { storageContractCases } from './storage-contract-cases.js'
+import { storageHostCases } from './storage-host-cases.js'
+import { storageAssertionSymbols } from './storage-assertion-examples.js'
+import { storageAuthoringExamples, storageAuthoringSymbols } from './storage-authoring-examples.js'
+import { storageHostInputExamples } from './storage-host-authoring.js'
+import { storageHostNativeAuthorTypes } from './storage-host-native-authors.js'
 import { storagePluginRedisReference } from './storage-plugin-redis.js'
 import { storagePluginPostgresReference } from './storage-plugin-postgres.js'
 import { storagePluginSqliteReference } from './storage-plugin-sqlite.js'
@@ -47,6 +53,138 @@ import { storeSsrReference } from './store-ssr.js'
 import { storeWasmReference } from './store-wasm.js'
 import { storeWorkerReference } from './store-worker.js'
 import { microHubReference } from './micro-hub.js'
+
+/** Migrated authoring pages retain their already-maintained examples at the current public owner. */
+const storageExamples: Readonly<Record<string, ICode>> = {
+  ...storageAuthoringExamples,
+  'storage-host:authoring/codec:snapshotCodec': storageHostInputExamples.snapshotCodec,
+  'storage-host:authoring/context:snapshotSyncWriteOptions':
+    storageHostInputExamples.snapshotSyncWriteOptions,
+  'storage-host:authoring/backend:createBackendJournalNamespace':
+    storageHostNativeAuthorTypes.IBackendJournalNamespaceOptions.example,
+  'storage-host:authoring/backend:collectUniqueIndexOwners':
+    storageHostNativeAuthorTypes.IUniqueIndexErrorFactory.example,
+  'storage-host:authoring/query:refineStorageVectorQuery':
+    storageContractReference.symbols.refineStorageVectorQuery!.example!
+}
+
+/** These authoring operations moved intact; their contract descriptions remain canonical. */
+const movedStorageAuthoringSymbols = Object.fromEntries(
+  [
+    'provideCapabilities',
+    'assertTransactionOwner',
+    'createTransactionOwner',
+    'deriveTransactionIterator',
+    'nextTransactionIterator',
+    'readTransactionOperationContext',
+    'registerTransactionFinalizer',
+    'resolveConcurrencyPolicy',
+    'refineStorageVectorQuery',
+    'createStorageBlobBodyReader',
+    'createStorageBlobObject',
+    'snapshotStorageBlobGet',
+    'snapshotStorageBlobList',
+    'snapshotStorageBlobPut',
+    'hasStorageCapability',
+    'useStorageCapability',
+    'snapshotCodec',
+    'readConcurrencyLockIdentities',
+    'runWithConcurrency',
+    'snapshotConcurrencyLockHoldings',
+    'snapshotConcurrencyLockKeys',
+    'snapshotConcurrencyLockRange',
+    'snapshotOperationContext',
+    'snapshotSyncWriteOptions',
+    'snapshotStorageCounterIncrement',
+    'createStorageBatchKeyCapture',
+    'decodeOrderedStorageKey',
+    'decodeStorageOrgKey',
+    'encodeOrderedStorageKey',
+    'encodeStorageOrgKey',
+    'encodeStorageOrgStringPrefix',
+    'orderStorageKeysByBytes',
+    'snapshotStorageBatchKeys',
+    'snapshotStorageKey',
+    'snapshotStorageKeyPrefix',
+    'snapshotStorageOrgKeyPrefix',
+    'compileStorageQueryCondition',
+    'compileStorageWhere',
+    'createRdfQuery',
+    'createRecordQuery',
+    'createVectorQuery',
+    'snapshotStorageWhere',
+    'encodeStorageRdfQuad',
+    'encodeStorageRdfTerm',
+    'getStorageOrgGraphPrefix',
+    'prefixStorageOrgGraph',
+    'snapshotStorageRdfPattern',
+    'snapshotStorageRdfQuad',
+    'snapshotStorageRdfTerm',
+    'unprefixStorageOrgGraph',
+    'createStorageIteratorLifetime',
+    'createSparqlTag',
+    'createSqlTag',
+    'deriveStorageSqlQuery',
+    'snapshotStorageBaseDetailed',
+    'createTransactionBuilder',
+    'runTransactionOperation',
+    'useTransactionCapability',
+    'snapshotStorageTtlTarget',
+    'snapshotStorageDeleteCountMode',
+    'snapshotStorageVector',
+    'snapshotStorageVectorCollection',
+    'snapshotStorageVectorFilter',
+    'snapshotStorageVectorIds',
+    'snapshotStorageVectorSearch',
+    'snapshotStorageVectorUpsert'
+  ].map((name) => [name, storageContractReference.symbols[name]!])
+)
+
+/** Attach existing programs and cases without changing any authored contract or option description. */
+function withStorageExamples(library: string, reference: ILibraryReference): ILibraryReference {
+  /** A re-export of one operation uses the same complete program as its owning module. */
+  const examples = Object.fromEntries(
+    Object.entries(storageExamples)
+      .filter(([key]) => key.startsWith(`${library}:`))
+      .map(([key, example]) => [key.slice(key.lastIndexOf(':') + 1), example])
+  )
+  /**
+   * Missing moved symbols reuse the original contract; newly introduced functions have explicit
+   * docs.
+   */
+  const symbols =
+    library === 'storage-host'
+      ? { ...movedStorageAuthoringSymbols, ...reference.symbols, ...storageAuthoringSymbols }
+      : library === 'storage-contract'
+        ? { ...reference.symbols, ...storageAssertionSymbols }
+        : reference.symbols
+  return {
+    ...reference,
+    symbols: Object.fromEntries(
+      Object.entries(symbols).map(([key, doc]) => {
+        /** Module-qualified reference keys retain the original operation name. */
+        const name = key.slice(key.lastIndexOf(':') + 1)
+        /** Only host authoring operations moved the contract's existing runtime examples. */
+        const cases =
+          library === 'storage-host'
+            ? (storageContractCases[name] ?? storageHostCases[name])
+            : undefined
+        return [
+          key,
+          {
+            ...doc,
+            example:
+              examples[name] ??
+              (Object.hasOwn(reference.symbols, key)
+                ? doc.example
+                : (cases?.[0]?.example ?? doc.example)),
+            cases: doc.cases ?? cases
+          }
+        ]
+      })
+    )
+  }
+}
 
 /** Audited libraries keyed by slug, in the order they were migrated. */
 export const libraryReferences: Readonly<Record<string, ILibraryReference>> = {
@@ -72,8 +210,8 @@ export const libraryReferences: Readonly<Record<string, ILibraryReference>> = {
   'rpc-core': rpcCoreReference,
   'rpc-devtools': rpcDevtoolsReference,
   'rpc-pool': rpcPoolReference,
-  'storage-contract': storageContractReference,
-  'storage-host': storageHostReference,
+  'storage-contract': withStorageExamples('storage-contract', storageContractReference),
+  'storage-host': withStorageExamples('storage-host', storageHostReference),
   'storage-plugin-redis': storagePluginRedisReference,
   'storage-plugin-postgres': storagePluginPostgresReference,
   'storage-plugin-sqlite': storagePluginSqliteReference,

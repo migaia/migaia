@@ -690,8 +690,8 @@ async function paidValues(tx: ITransactionScope<{ state: string; value: number }
         "import { lockKey, snapshotConcurrencyLockKeys } from '@migaia/storage-host/authoring/concurrency'\nconst snapshot = snapshotConcurrencyLockKeys([lockKey.text('a'), lockKey.text('a')], 'memory')\nconsole.log(snapshot.keys.length, snapshot.identities.length)"
       ),
       result: t(
-        'Both counts are 1; paired frozen identity data grants no acquisition authority.',
-        '两个计数均为 1；配对冻结身份数据不授予取锁权限。'
+        'Both counts are 1; the captured keys and paired read-only identities grant no acquisition authority.',
+        '两个计数均为 1；捕获的键和配对只读身份不授予取锁权限。'
       )
     }
   ],
@@ -724,8 +724,8 @@ async function paidValues(tx: ITransactionScope<{ state: string; value: number }
         "import { snapshotConcurrencyLockHoldings } from '@migaia/storage-host/authoring/concurrency'\nimport { type ILockHolding } from '@migaia/storage-contract'\nfunction inspect(rows: readonly ILockHolding[]) {\n  return snapshotConcurrencyLockHoldings(rows)\n}"
       ),
       result: t(
-        'Returns frozen independent key/holder rows in stable channel/key order, retaining expired and expiresAt and separate equal-key rows. No internal lock table or authority is exposed.',
-        '返回冻结的独立键与 holder 行，按通道与键稳定排序，保留 expired、expiresAt 和相同键的独立行；不暴露内部锁表或权限。'
+        'Returns independent key/holder rows in stable channel/key order, retaining expired and expiresAt and separate equal-key rows. No internal lock table or authority is exposed.',
+        '返回独立键与 holder 行，按通道与键稳定排序，保留 expired、expiresAt 和相同键的独立行；不暴露内部锁表或权限。'
       )
     }
   ],
@@ -744,8 +744,8 @@ async function paidValues(tx: ITransactionScope<{ state: string; value: number }
         "import { readConcurrencyLockIdentities } from '@migaia/storage-host/authoring/concurrency'\nimport { type IConcurrencyAttemptContext } from '@migaia/storage-contract'\nfunction lockIdentities(ctx: IConcurrencyAttemptContext) {\n  return readConcurrencyLockIdentities(ctx)\n}"
       ),
       result: t(
-        'The active original attempt supplies one frozen sorted/deduplicated hex string list, reused by nested attempts. Forged or settled contexts throw INVALID_ARGUMENT; no mutable bytes or control handles are returned.',
-        '原活跃 attempt 提供一个冻结、排序去重的十六进制字符串列表，嵌套尝试复用；伪造或已结算 context 抛 INVALID_ARGUMENT，不返回可变字节或控制句柄。'
+        'The active original attempt supplies one read-only sorted/deduplicated hex string list, reused by nested attempts. Forged or settled contexts throw INVALID_ARGUMENT; no mutable bytes or control handles are returned.',
+        '原活跃 attempt 提供一个只读、排序去重的十六进制字符串列表，嵌套尝试复用；伪造或已结算 context 抛 INVALID_ARGUMENT，不返回可变字节或控制句柄。'
       )
     }
   ],

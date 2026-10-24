@@ -1,3 +1,4 @@
+import { storageHostInputExamples } from './reference/storage-host-authoring.js'
 import { rpcApiGuides } from './rpc-api-guides.js'
 import { capabilityHostExample } from './reference/capability.js'
 import { utilsApiGuides } from './utils-api-guides.js'
@@ -65,6 +66,182 @@ const configurationOptionDescriptions: readonly {
   readonly en: string
   readonly zh: string
 }[] = [
+  {
+    keys: ['storage-host:authoring/concurrency:associateNormalizedLockKeys:signal'],
+    en: 'Original caller cancellation signal carried with the lock request; it remains live while the existing operation waits. Omit it when the caller has no cancellation source.',
+    zh: '随锁请求传入的原调用方取消信号；已有操作等待期间仍观察此信号。调用方没有取消来源时省略。'
+  },
+  {
+    keys: ['storage-host:authoring/concurrency:associateNormalizedLockKeys:timeoutMs'],
+    en: 'Optional operation timeout in milliseconds, retained on the original request. Key association starts no timer; the original operation owner applies the timeout when work begins.',
+    zh: '原请求保留的可选操作超时，单位为毫秒。关联键不会启动定时器；工作开始时由原操作管理对象应用期限。'
+  },
+  {
+    keys: ['storage-host:authoring/concurrency:associateNormalizedLockKeys:pageSize'],
+    en: 'Optional scan page size retained with the original operation context. Lock-key association does not read records or change pagination.',
+    zh: '随原操作上下文保留的可选扫描分页数量。关联锁键不会读取记录，也不会改变分页方式。'
+  },
+  {
+    keys: ['storage-host:authoring/concurrency:associateNormalizedLockKeys:orgId'],
+    en: 'Original organization identifier carried by the backend request. Pass the ID already chosen by the organization view; association does not create or switch organizations.',
+    zh: '后端请求携带的原组织标识。使用组织视图已经选定的编号；关联操作不会创建或切换组织。'
+  },
+  {
+    keys: ['storage-host:authoring/sparql:createSparqlTag:select'],
+    en: 'Backend callback for SELECT queries. Enter the existing operation before invoking prepare(), execute the prepared text and return the native row list. Failures reject the query.',
+    zh: '执行 SELECT 查询的后端回调。先进入已有操作，再调用 prepare() 取得文本，执行后返回原生查询行列表。失败会拒绝查询。'
+  },
+  {
+    keys: ['storage-host:authoring/sparql:createSparqlTag:update'],
+    en: 'Backend callback for UPDATE queries. Enter the existing operation before invoking prepare(), execute the prepared text and return the native completion without a return value. Failures reject the query.',
+    zh: '执行 UPDATE 查询的后端回调。先进入已有操作，再调用 prepare() 取得文本，执行后返回原生无返回值的完成结果。失败会拒绝查询。'
+  },
+  {
+    keys: ['storage-host:authoring/sql:createSqlTag:get'],
+    en: 'Backend callback for get(). Enter the existing operation before invoking prepare(), then execute its text and bound values and return one row or undefined when there is no match. Preserve a native failure as the query rejection.',
+    zh: 'get() 的后端回调。先进入已有操作，再调用 prepare() 取得文本与绑定值，执行后返回一行数据；没有匹配时返回 undefined。原生失败作为查询拒绝保留。'
+  },
+  {
+    keys: ['storage-host:authoring/sql:createSqlTag:run'],
+    en: 'Backend callback for run(). Enter the existing operation before invoking prepare(), then execute its text and bound values and return the native mutation result including its affected-row facts. Preserve a native failure as the query rejection.',
+    zh: 'run() 的后端回调。先进入已有操作，再调用 prepare() 取得文本与绑定值，执行后返回原生写入结果及受影响行信息。原生失败作为查询拒绝保留。'
+  },
+  {
+    keys: [
+      'storage-contract:index:isStorageBase:asyncDisposeKey',
+      'storage-host:authoring/store:snapshotStorageBaseDetailed:asyncDisposeKey',
+      'storage-host:authoring/transaction:createTransactionOwner:asyncDisposeKey'
+    ],
+    en: 'The asynchronous disposal symbol used by the resource protocol. Omit it to use Symbol.asyncDispose; supply the same symbol used by a backend when validating or registering its cleanup method.',
+    zh: '资源协议用于异步释放的符号。省略时使用 Symbol.asyncDispose；后端使用其它释放符号时，校验或登记清理方法必须传入同一个符号。'
+  },
+  {
+    keys: [
+      'storage-host:authoring/blob:createStorageBlobBodyReader:backend',
+      'storage-host:authoring/blob:createStorageBlobObject:backend'
+    ],
+    en: 'Optional backend label included in argument and cleanup diagnostics. Use the label of the backend that owns the stream; omission adds no backend label.',
+    zh: '参数或清理失败的可选后端名称。使用拥有此数据流的后端名称；省略时不附加后端名称。'
+  },
+  {
+    keys: [
+      'storage-host:authoring/blob:createStorageBlobBodyReader:report',
+      'storage-host:authoring/blob:createStorageBlobObject:report',
+      'storage-host:authoring/resource:createStorageIteratorLifetime:report'
+    ],
+    en: 'Required failure reporter for cleanup or late failures that cannot replace the primary result. Receive the original failure and return void or a Promise for reporting completion.',
+    zh: '必填的失败报告回调，用于无法替换主要结果的清理失败或迟到失败。接收原失败，可直接返回，也可返回报告完成时结算的 Promise。'
+  },
+  {
+    keys: [
+      'storage-host:authoring/blob:createStorageBlobBodyReader:normalizeFailure',
+      'storage-host:authoring/blob:createStorageBlobObject:normalizeFailure'
+    ],
+    en: 'Optional callback that attaches the owning backend’s error classification to a read or cleanup failure. Return the classified failure; omission preserves the received failure unchanged.',
+    zh: '可选回调，为读取或清理失败附加所属后端的错误分类，并返回分类后的失败。省略时原样保留收到的失败。'
+  },
+  {
+    keys: ['storage-host:authoring/blob:createStorageBlobObject:close'],
+    en: 'Required callback that releases the original download resource after its reader is released. Return a Promise when closing is asynchronous; a rejection follows the existing primary-error and reporting rules.',
+    zh: '必填回调，在释放读取器后关闭原下载资源。异步关闭时返回 Promise；拒绝按已有的主要错误与报告规则处理。'
+  },
+  {
+    keys: ['storage-host:authoring/resource:createStorageIteratorLifetime:close'],
+    en: 'Required callback that releases the iterator’s original resource after accepted advances drain. Its Promise determines cleanup completion; repeated disposal shares that cleanup result.',
+    zh: '必填回调，在已接受的推进操作结束后释放迭代器的原资源。返回的 Promise 决定清理何时完成；重复释放共享该清理结果。'
+  },
+  {
+    keys: [
+      'storage-host:authoring/blob:createStorageBlobObject:onSettled',
+      'storage-host:authoring/resource:createStorageIteratorLifetime:onSettled'
+    ],
+    en: 'Optional synchronous callback invoked when resource cleanup settles. Use it to remove the resource from its backend’s existing registry; omission requires no registry notification.',
+    zh: '资源清理结束时执行的可选同步回调。用于从后端已有登记表中移除该资源；省略时不通知登记表。'
+  },
+  {
+    keys: ['storage-host:authoring/capability:provideCapabilities:onInstaller'],
+    en: 'Optional synchronous callback receiving the installer for the capabilities just provided. Retain that port when a transaction scope must install the same definitions; omission only installs them on the supplied store.',
+    zh: '可选同步回调，接收本次能力集合的安装端口。事务作用域需要安装同一组定义时保留该端口；省略时只在传入的存储上安装。'
+  },
+  {
+    keys: ['storage-host:authoring/concurrency:associateNormalizedLockKeys:lock'],
+    en: 'The original lock request associated with already normalized lock metadata. Pass the exact options object later consumed by the transaction; this does not acquire any lock.',
+    zh: '与已规范化锁信息关联的原锁请求。传入之后交给事务使用的同一选项对象；此操作不会取得锁。'
+  },
+  {
+    keys: ['storage-host:authoring/concurrency:associateNormalizedLockKeys:concurrency'],
+    en: 'The concurrency policy carried by the original request. Keep the same policy identity when associating normalized keys; policy execution remains with the transaction owner.',
+    zh: '原请求携带的并发策略。关联规范化键时保留同一策略身份；策略仍由事务执行。'
+  },
+  {
+    keys: [
+      'storage-host:authoring/key:projectStorageBatchKeys:rejectDuplicates',
+      'storage-host:authoring/key:snapshotStorageBatchKeys:rejectDuplicates'
+    ],
+    en: 'Choose true for a write batch that must reject equivalent keys before I/O. The default false retains repeated positions, as required for ordered batch reads.',
+    zh: '写批需要在读写前拒绝等价重复键时设为 true。默认 false 保留重复位置，适合要求结果与输入逐项对应的批量读取。'
+  },
+  {
+    keys: ['storage-host:authoring/sparql:createSparqlTag:ask'],
+    en: 'Backend callback for ASK queries. Enter the backend’s existing operation or transaction before calling prepare(), then execute the returned text and return the native boolean result.',
+    zh: '执行 ASK 查询的后端回调。先进入后端已有操作或事务，再调用 prepare() 取得查询文本，执行后返回原生布尔结果。'
+  },
+  {
+    keys: ['storage-host:authoring/sparql:createSparqlTag:construct'],
+    en: 'Backend callback for CONSTRUCT queries. Enter the existing operation before calling prepare(), execute its text, and return the resulting raw RDF quads. A failure rejects the query.',
+    zh: '执行 CONSTRUCT 查询的后端回调。先进入已有操作，再调用 prepare() 取得文本，执行后返回原始 RDF 四元组。失败会拒绝查询。'
+  },
+  {
+    keys: ['storage-host:authoring/sql:createSqlTag:dialect'],
+    en: 'Required SQL dialect: sqlite uses ? placeholders; postgres uses numbered $1 placeholders and PostgreSQL quoting rules. Select the dialect of the connection used by the supplied execution callbacks.',
+    zh: '必填 SQL 方言。sqlite 使用 ? 占位符；postgres 使用 $1 递增占位符及 PostgreSQL 引号规则。选择执行回调实际连接使用的方言。'
+  },
+  {
+    keys: ['storage-host:authoring/sql:createSqlTag:all'],
+    en: 'Backend callback for all() queries. Enter the original operation or transaction before invoking prepare(), then execute its text and bound values and return all rows without replacing their value types.',
+    zh: 'all() 查询的后端回调。先进入原操作或事务，再调用 prepare() 取得文本与绑定值，执行后返回全部行，保留原值类型。'
+  },
+  {
+    keys: ['storage-host:authoring/transaction:createTransactionBuilder:lock'],
+    en: 'Not accepted in the optimistic builder options. Omit this field; ordinary builders declare keys through lock(), while optimistic mode executes without a pessimistic key lock.',
+    zh: '乐观事务构建器不接受此选项。省略该字段；普通构建器通过 lock() 声明键，乐观模式不获取悲观键锁。'
+  },
+  {
+    keys: ['storage-host:authoring/transaction:createTransactionBuilder:concurrency'],
+    en: 'Optional policy for this transaction branch. Optimistic mode accepts only a policy whose locking value is optimistic; omission inherits the original store’s default policy.',
+    zh: '本事务分支的可选策略。乐观模式只接受 locking 为 optimistic 的策略；省略时继承原存储的默认策略。'
+  },
+  {
+    keys: ['storage-host:authoring/transaction:createTransactionOwner:activityMode'],
+    en: 'Native transaction activity model. Choose native for transactions whose activity is controlled by the database, such as IndexedDB. The default managed mode uses the backend’s managed transaction lifetime.',
+    zh: '原生事务的活动模型。IndexedDB 等由数据库控制活动状态的事务使用 native；默认 managed 使用后端管理的事务生命周期。'
+  },
+  {
+    keys: ['storage-host:authoring/transaction:createTransactionOwner:defaultPolicy'],
+    en: 'Authentic concurrency policy used when an operation supplies no override. Create it with ConcurrencyPolicy and retain it on the backend’s single transaction owner.',
+    zh: '操作未覆盖策略时使用的真实并发策略。通过 ConcurrencyPolicy 创建，交给该后端唯一的事务管理对象持有。'
+  },
+  {
+    keys: ['storage-host:authoring/transaction:createTransactionOwner:concurrencyStages'],
+    en: 'Optional observer of the existing concurrency stages. Use it for diagnostics around acquisition and execution; it does not add a lock, retry loop, or another transaction.',
+    zh: '已有并发阶段的可选观察回调。用于记录获取与执行过程；不会增加锁、重试循环或另一层事务。'
+  },
+  {
+    keys: [
+      'storage-host:authoring/vector:snapshotStorageVector:dimensions',
+      'storage-host:authoring/vector:snapshotStorageVectorCollection:dimensions'
+    ],
+    en: 'Expected positive vector width when configuration is supplied. Every dense vector must match it. Collection configuration requires dimensions; vector-only validation can omit it to validate finite components without a width constraint.',
+    zh: '提供配置时使用的正整数向量宽度，每个稠密向量都必须匹配。集合配置需要 dimensions；单个向量校验可省略它，只检查有限数值而不限制宽度。'
+  },
+  {
+    keys: [
+      'storage-host:authoring/vector:snapshotStorageVector:metric',
+      'storage-host:authoring/vector:snapshotStorageVectorCollection:metric'
+    ],
+    en: 'Similarity metric: cosine compares direction, dot uses the dot product, and euclid uses Euclidean distance. Collection configuration requires a metric; vector-only validation can omit it. Use the existing collection’s metric when validating its vectors.',
+    zh: '相似度规则。cosine 比较方向，dot 使用点积，euclid 使用欧氏距离。集合配置需要 metric；单个向量校验可省略。校验既有集合的向量时使用集合已有规则。'
+  },
   {
     keys: ['lifecycle:index:boundedWait:reportCleanup'],
     en: 'Use this callback when timer cleanup failures should be logged without changing the wait result. If cancelling the timer fails, the callback receives that error synchronously. The wait still returns true for task completion or false for expiry, or rejects with the task failure. Without this callback, a timer cleanup failure also makes the wait reject.',
@@ -7047,10 +7224,15 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
       '明确不需要 reactive query。'
     ],
     avoidEn: [
+      'Two backends must commit one atomic native transaction; separate memory installations cannot provide that.',
       'Data must survive process or page lifetime.',
       'Independent installations must share the same memory data.'
     ],
-    avoidZh: ['data 必须跨 process 或 page lifetime。', '多个独立安装必须共享同一份内存数据。'],
+    avoidZh: [
+      '两个后端必须在同一个原生事务内原子提交；独立内存安装不提供该能力。',
+      'data 必须跨 process 或 page lifetime。',
+      '多个独立安装必须共享同一份内存数据。'
+    ],
     optionsEn: [
       {
         name: 'namespace',
@@ -7155,10 +7337,12 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
       '不需要 live-query invalidation。'
     ],
     avoidEn: [
+      'Large values or binary attachments belong in IndexedDB rather than synchronous text storage.',
       'Structured records or transactions are needed.',
       'The host has no Web Storage and no injected surface.'
     ],
     avoidZh: [
+      '大型值或二进制附件应交给 IndexedDB，不应放进同步文本存储。',
       '需要 structured record 或 transaction。',
       'host 没有 Web Storage 且未注入 surface。'
     ],
@@ -7265,10 +7449,15 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
       '不需要 reactive invalidation。'
     ],
     avoidEn: [
+      'Data must survive closing this tab.',
       'State must be shared across tabs.',
       'Structured records or transactions are needed.'
     ],
-    avoidZh: ['state 必须跨 tab 共享。', '需要 structured record 或 transaction。'],
+    avoidZh: [
+      '数据必须在关闭本标签页后保留。',
+      'state 必须跨 tab 共享。',
+      '需要 structured record 或 transaction。'
+    ],
     optionsEn: [
       {
         name: 'features',
@@ -7371,8 +7560,16 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
       'write 与 removal scope 必须一致。',
       '明确不需要 reactive polling。'
     ],
-    avoidEn: ['Values may exceed cookie limits.', 'Absence must account for HttpOnly cookies.'],
-    avoidZh: ['value 可能超过 cookie limit。', 'absence 必须覆盖 HttpOnly cookie。'],
+    avoidEn: [
+      'Authentication secrets need server-managed HttpOnly cookies, which document.cookie cannot create.',
+      'Values may exceed cookie limits.',
+      'Absence must account for HttpOnly cookies.'
+    ],
+    avoidZh: [
+      '认证秘密需要服务端管理的 HttpOnly Cookie，document.cookie 无法创建。',
+      'value 可能超过 cookie limit。',
+      'absence 必须覆盖 HttpOnly cookie。'
+    ],
     optionsEn: [
       {
         name: 'features',
@@ -7574,10 +7771,15 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
       '不需要 live query。'
     ],
     avoidEn: [
+      'A transaction must remain open across network requests; native IndexedDB does not provide that lifetime.',
       'Only a tiny synchronous setting is needed.',
       'The Host lacks IndexedDB and no factory is injected.'
     ],
-    avoidZh: ['只需要 tiny synchronous setting。', 'Host 缺少 IndexedDB 且未注入 factory。'],
+    avoidZh: [
+      '事务需要跨网络请求一直保持打开；原生 IndexedDB 不提供这种生命周期。',
+      '只需要 tiny synchronous setting。',
+      'Host 缺少 IndexedDB 且未注入 factory。'
+    ],
     optionsEn: [
       {
         name: 'features',
@@ -7735,15 +7937,25 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
     quickStart:
       "import { createRuntime } from '@migaia/reactive'\nimport { records } from '@migaia/storage-contract'\nimport { createStorageHost, memoryBackendKind, memoryBackendPlugin } from '@migaia/storage-host'\nimport { reactiveFeature } from '@migaia/storage-web/features/reactive'\n\ntype IUser = { id: number; name: string }\nconst runtime = createRuntime()\nconst host = await createStorageHost({ plugins: [memoryBackendPlugin(undefined, { reactive: reactiveFeature(memoryBackendKind) })] })\ntry {\n  const store = host.backend('memory')\n  await store.putRecord({ id: 1, name: 'Ada' }, 1)\n  const users = store.use(records).query<IUser>().limit(20).live({ runtime })\n  try {\n    await users.ready\n    console.log(users.state.value)\n  } finally {\n    await users.dispose()\n  }\n} finally {\n  await host.dispose()\n}",
     scenariosEn: [
+      'Several mounted views share one backend change source while keeping independent live results.',
       'Refresh a bounded record query after committed writes.',
       'Install the same Feature definition independently for matching backend registrations.'
     ],
-    scenariosZh: ['在写入提交后刷新有界记录查询。', '为匹配的后端注册分别安装同一特性定义。'],
+    scenariosZh: [
+      '多个已挂载视图共享同一后端变化来源，并保留独立的持续结果。',
+      '在写入提交后刷新有界记录查询。',
+      '为匹配的后端注册分别安装同一特性定义。'
+    ],
     avoidEn: [
+      'Changes happen through an external writer with no supported invalidation feed.',
       'The selected capability has no existing all() query terminal.',
       'Synchronous cross-context freshness is required.'
     ],
-    avoidZh: ['所选能力没有已有的 all() 查询终点。', '需要跨上下文同步刷新保证。'],
+    avoidZh: [
+      '变化来自外部写入者，且没有受支持的失效通知流。',
+      '所选能力没有已有的 all() 查询终点。',
+      '需要跨上下文同步刷新保证。'
+    ],
     optionsEn: [
       {
         name: 'target',
@@ -9929,13 +10141,14 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
       'Validates and returns the original codec instance so class-private methods retain their receiver. It performs no conversion, descriptor clone or freezing.',
     purposeZh:
       '校验后返回同一 codec 实例，使合法 class 的方法保留原 receiver；不执行转换、不复制 descriptor、不冻结。',
-    quickStart:
-      "import { snapshotCodec } from '@migaia/storage-host/authoring/codec'\n\nconst candidateCodec = { name: 'json', output: 'text' as const, encode: async (value: unknown) => JSON.stringify(value), decode: async (text: string) => JSON.parse(text) }\nconst value = { id: 1, name: 'Ada' }\nconst stableCodec = snapshotCodec(candidateCodec)\nconst encoded = await stableCodec.encode(value)\nconsole.log(encoded)",
+    quickStart: storageHostInputExamples.snapshotCodec,
     scenariosEn: [
+      'A codec class uses private fields and its original instance must remain the method receiver.',
       'A codec crosses a plugin or configuration boundary.',
       'Encoding and decoding must use one admitted descriptor.'
     ],
     scenariosZh: [
+      '编解码器类使用私有字段，需要保留原实例作为方法接收者。',
       'codec 穿过 plugin 或 configuration boundary。',
       'encode 与 decode 必须使用同一个 admitted descriptor。'
     ],
@@ -10350,10 +10563,12 @@ await records.putRecord({ id: 1 }, 'user:1', { conflictPolicy: ConflictPolicy.co
     quickStart:
       "import { snapshotOperationContext } from '@migaia/storage-host/authoring/context'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nconst host = await createStorageHost({ plugins: [memoryBackendPlugin()] })\nconst storage = host.backend('memory')\nconst ctx = snapshotOperationContext({ timeoutMs: 2_000, pageSize: 128 })\nconsole.log(await storage.keys(ctx))\nawait host.dispose()",
     scenariosEn: [
+      'A caller may change page size or timeout options while a queued operation awaits execution.',
       'An asynchronous operation crosses several internal layers.',
       'Pagination and cancellation need one validated context.'
     ],
     scenariosZh: [
+      '操作排队等待期间，调用方可能修改分页数量或超时选项。',
       'asynchronous operation 会穿过多个内部 layer。',
       'pagination 与 cancellation 需要同一个 validated context。'
     ],
@@ -10488,8 +10703,7 @@ await records.putRecord({ id: 1 }, 'user:1', { conflictPolicy: ConflictPolicy.co
       'Validates the reduced synchronous-write contract and returns only conflictPolicy. signal and timeoutMs are rejected because a synchronous channel cannot honor cancellation after execution begins.',
     purposeZh:
       '验证精简的 synchronous-write contract，并只返回 conflictPolicy。signal 与 timeoutMs 会被拒绝，因为同步通道在执行开始后无法兑现 cancellation。',
-    quickStart:
-      "import { ConflictPolicy } from '@migaia/storage-contract'\nimport { snapshotSyncWriteOptions } from '@migaia/storage-host/authoring/context'\n\nconst options = snapshotSyncWriteOptions({ conflictPolicy: ConflictPolicy.replace })\nconst storage = { sync: { set: (key: string, value: string, writeOptions: unknown) => console.log(key, value, writeOptions) } }\nstorage.sync.set('theme', 'dark', options)",
+    quickStart: storageHostInputExamples.snapshotSyncWriteOptions,
     scenariosEn: [
       'A synchronous adapter snapshots write policy.',
       'One validation path is shared by local, session, cookie, and memory stores.',
@@ -11163,14 +11377,15 @@ await records.putRecord({ id: 1 }, 'user:1', { conflictPolicy: ConflictPolicy.co
     purposeZh:
       '检查原 KV shape，保存原资源 receiver 与独立能力事实供后续宿主准入；普通无效形状返回失败记录。',
     quickStart:
-      "import { snapshotKeyValueStoreDetailed } from '@migaia/storage-host/authoring/store'\n\nexport async function closeCandidate(candidate: unknown): Promise<void> {\n  const admission = snapshotKeyValueStoreDetailed(candidate)\n  if (!admission.valid) throw new Error('Store admission failed', { cause: admission.cause })\n  await admission.dispose()\n}",
+      "import { snapshotKeyValueStoreDetailed } from '@migaia/storage-host/authoring/store'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nconst host = await createStorageHost({ plugins: [memoryBackendPlugin()] })\ntry {\n  const admission = snapshotKeyValueStoreDetailed(host.backend('memory'))\n  if (admission.valid) console.log(await admission.store.keys())\n  else console.log(admission.cause)\n} finally {\n  await host.dispose()\n}",
     scenariosEn: [
-      'A lifecycle owner must capture callable identity once.',
+      'A failed store check must return structured admission details before resource registration.',
+      'A lifecycle owner checks the original store before accepting responsibility for it.',
       'Installation must validate before registering cleanup.'
     ],
     scenariosZh: [
-      'lifecycle owner 必须一次捕获 callable identity。',
-      'hostile getter failure 必须保持可诊断。',
+      '登记资源前，需要取得存储检查失败的具体结果。',
+      '生命周期管理代码先检查原存储，再接受清理责任。',
       'installation 必须在注册 cleanup 前完成验证。'
     ],
     avoidEn: [
