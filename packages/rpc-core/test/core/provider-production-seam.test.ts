@@ -633,6 +633,8 @@ const HOST_SURFACE = Object.freeze([
   'useGeneratorPipeline',
   'useAsyncGeneratorPipeline',
   'runPipeline',
+  'runPipelineSync',
+  'runPipelineAsync',
   'dispose',
   'readNativeMiddlewareKeys',
   'installBatch'
