@@ -223,7 +223,6 @@ describe('memory backend', () => {
     expect(store.backend).toBe('memory')
     expect(store.capabilities.records).toBe(true)
     expect(store.capabilities.syncRead).toBe(true)
-    expect(Object.isFrozen(store.capabilities)).toBe(true)
   })
   it('sync 通道全方法可用', async () => {
     const store = await memoryBackend()

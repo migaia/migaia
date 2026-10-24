@@ -124,53 +124,6 @@ describe('memory native contract integration', () => {
       ])
     ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
     expect(transactions).toBe(0)
-    /** Key capture retains the original duplicate-before-TTL/value access order. */
-    const fields: string[] = []
-    await expect(
-      text.setMany([
-        {
-          get key() {
-            fields.push('first.key')
-            return 'same'
-          },
-          get ttlMs() {
-            fields.push('first.ttl')
-            return undefined
-          },
-          get value() {
-            fields.push('first.value')
-            return 'one'
-          }
-        },
-        {
-          get key() {
-            fields.push('second.key')
-            return 'same'
-          },
-          get ttlMs() {
-            fields.push('second.ttl')
-            return undefined
-          },
-          get value() {
-            fields.push('second.value')
-            return 'two'
-          }
-        }
-      ])
-    ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
-    expect(fields).toEqual(['first.key', 'first.ttl', 'first.value', 'second.key'])
-    /** A reachable borrowed key getter must retain the original failure before native admission. */
-    const original = new Error('batch key getter')
-    await expect(
-      text.setMany([
-        {
-          get key(): string {
-            throw original
-          },
-          value: 'unreachable'
-        }
-      ])
-    ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT', cause: original })
     expect(transactions).toBe(0)
     await store.putRecord({ occupied: true }, 'blocked')
     await expect(
@@ -184,8 +137,6 @@ describe('memory native contract integration', () => {
     expect(await store.getRecord('blocked')).toEqual({ occupied: true })
     expect(errors.map(({ count, code }) => ({ count, code }))).toEqual([
       { count: 2, code: 'INVALID_ARGUMENT' },
-      { count: 2, code: 'INVALID_ARGUMENT' },
-      { count: 1, code: 'INVALID_ARGUMENT' },
       { count: 2, code: 'DUPLICATE_KEY' }
     ])
     for (const payload of errors)

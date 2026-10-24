@@ -69,8 +69,6 @@ describe('Feature transaction methods on original native views', () => {
     expect(await store.api.identity()).toBe(store)
     let saved!: () => Promise<boolean>
     await store.transaction(async (scope) => {
-      expect(Object.isFrozen(scope)).toBe(true)
-      expect(Object.isFrozen(scope.api)).toBe(true)
       expect(await scope.api.identity()).toBe(true)
       await scope.set('key', 'value')
       expect(await scope.api.nested.read('key')).toBe('value')

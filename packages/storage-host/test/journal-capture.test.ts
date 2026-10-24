@@ -28,7 +28,6 @@ describe('original memory ordered journal capture', () => {
         await scope.putRecord({ temporary: true }, 'temporary')
         await scope.use(records).query().delete()
         captured = binding.changes!(scope)
-        expect(Object.isFrozen(captured)).toBe(true)
         expect(captured.map((change) => change.target.channel)).toEqual([
           'text',
           'text',

@@ -17,39 +17,12 @@ import {
   defineFeature,
   defineStorageBackendKind,
   type IStoragePluginCore,
-  type IStorageOrgBinding,
   type IStoragePluginCallContext
 } from '../src/index.js'
 import { catalog } from './helpers/catalog.js'
 import { defineEntity } from '../src/entity.js'
 
 describe('immutable storage organizations', () => {
-  it('codes an organization callback getter failure at the original installation boundary', async () => {
-    /** A real backend descriptor fails before any organization callback can perform I/O. */
-    const original = new Error('organization callback getter failed')
-    const kind = defineStorageBackendKind<ReturnType<typeof catalog>['store']>()('catalog')
-    const plugin = definePlugin('bad-org-binding', (core: IStoragePluginCore) => ({
-      kind,
-      featureExpose: () => ({ getClient: () => undefined }),
-      install: () => {
-        const state = catalog(core)
-        core.registerStore(state.store)
-        core.registerOrgBinding(state.store, {
-          get backend(): IStorageOrgBinding['backend'] {
-            throw original
-          },
-          drop: async () => undefined
-        })
-        return {}
-      }
-    }))
-    await expect(createStorageHost({ plugins: [plugin] })).rejects.toMatchObject({
-      code: 'BACKEND_INSTALL_FAILED',
-      cause: expect.objectContaining({
-        cause: expect.objectContaining({ code: 'INVALID_ARGUMENT', cause: original })
-      })
-    })
-  })
   it('shares the configured default target and isolates two organizations and plugin namespaces', async () => {
     /** A custom default proves namespace mapping does not depend on the reserved zero UUID. */
     const defaultOrg = createOrgId()

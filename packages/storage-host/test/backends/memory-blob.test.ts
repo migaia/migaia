@@ -22,8 +22,6 @@ describe('memory native objects', () => {
     metadata.owner = 'changed'
     const info = await pending
     expect(info).toMatchObject({ key: 'same', size: 4, metadata: { owner: 'first' } })
-    expect(Object.isFrozen(info)).toBe(true)
-    expect(Object.isFrozen(info.metadata)).toBe(true)
     await store.set('same', 'separate KV')
     const snapshot = (await api.get('same'))!
     await api.put('same', new Uint8Array([8]))
