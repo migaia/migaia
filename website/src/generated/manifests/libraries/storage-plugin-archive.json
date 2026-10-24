@@ -174,7 +174,7 @@
           "signature": "export declare const ArchiveErrorCode: { /** Installation options cannot describe a valid archive; fix configuration before reinstalling. */ readonly invalidOption: 'INVALID_OPTION'; /** A runtime key, rule or limit is invalid; no cold I/O has started. */ readonly invalidArgument: 'INVALID_ARGUMENT'; /** An explicit archive operation failed; retry only after inspecting its cause and progress. */ readonly operationFailed: 'ARCHIVE_OPERATION_FAILED'; /** Referenced segment or private metadata failed full validation; repair the stored archive. */ readonly segmentInvalid: 'ARCHIVE_SEGMENT_INVALID'; };",
           "declarationLine": 4,
           "source": "packages/storage-plugin-archive/dist/error-code.d.ts",
-          "purpose": "Distinct option, argument, operation and segment corruption identities.",
+          "purpose": "Distinguish installation, call argument, archive work and corrupt-segment failures so callers can choose what to correct before retrying.",
           "core": "invalidOption: Correct installation options before retrying.\ninvalidArgument: Correct the runtime key, rule or limit.\noperationFailed: Inspect the original cause and certainly committed progress before retrying.\nsegmentInvalid: Retain metadata and repair an invalid referenced segment or directory.",
           "advanced": "",
           "parameters": ["This const declaration has no parameters."],
@@ -235,7 +235,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Distinct option, argument, operation and segment corruption identities."
+              "content": "Distinguish installation, call argument, archive work and corrupt-segment failures so callers can choose what to correct before retrying."
             },
             {
               "id": "getting-started",
@@ -277,7 +277,7 @@
           "declarationLine": 9,
           "source": "packages/storage-plugin-archive/dist/plugin.d.ts",
           "purpose": "Install explicit run/get/sweep methods without claiming a backend kind or closing borrowed storage.",
-          "core": "options: Literal extension ID, earlier hot/cold backend IDs and ordered rules.\nAn ordinary typed extension handle for host.use and current-org methods.\nid: Literal extension identity and private metadata namespace.\nhot: Earlier transactional records backend permitting external I/O.\ncold: Earlier genuine blob backend retaining immutable segments.\nrules: Nonempty declaration order; overlapping candidates belong to the first matching rule.\nAdds the literal extension slot with run, get and sweep to root and org views.",
+          "core": "options: Literal extension ID, earlier hot/cold backend IDs and ordered rules.\nAn ordinary typed extension handle for host.use and current-org methods.\nid: Literal extension identity and private metadata namespace.\nhot: Earlier transactional records backend permitting external I/O.\ncold: Earlier genuine blob backend retaining immutable segments.\nrules: Nonempty declaration order; overlapping candidates belong to the first matching rule.\nAdd the literal extension slot to root and organization views; its run, get and sweep methods use each view’s current organization.",
           "advanced": "Explicit retention over published storage.",
           "parameters": ["options: IArchivePluginOptions<T> & { readonly id: N; }"],
           "parameterDetails": [
@@ -338,7 +338,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "options: Literal extension ID, earlier hot/cold backend IDs and ordered rules.\nAn ordinary typed extension handle for host.use and current-org methods.\nid: Literal extension identity and private metadata namespace.\nhot: Earlier transactional records backend permitting external I/O.\ncold: Earlier genuine blob backend retaining immutable segments.\nrules: Nonempty declaration order; overlapping candidates belong to the first matching rule.\nAdds the literal extension slot with run, get and sweep to root and org views."
+              "content": "options: Literal extension ID, earlier hot/cold backend IDs and ordered rules.\nAn ordinary typed extension handle for host.use and current-org methods.\nid: Literal extension identity and private metadata namespace.\nhot: Earlier transactional records backend permitting external I/O.\ncold: Earlier genuine blob backend retaining immutable segments.\nrules: Nonempty declaration order; overlapping candidates belong to the first matching rule.\nAdd the literal extension slot to root and organization views; its run, get and sweep methods use each view’s current organization."
             },
             {
               "id": "advanced-usage",
@@ -417,8 +417,8 @@
           "signature": "export declare const ERROR_SOURCE = \"storage.backend.archive\";",
           "declarationLine": 2,
           "source": "packages/storage-plugin-archive/dist/error-code.d.ts",
-          "purpose": "Registered error domain storage.backend.archive.",
-          "core": "Registered error domain storage.backend.archive.",
+          "purpose": "Identify archive-owned failures with the registered storage.backend.archive domain while original storage errors retain their domains.",
+          "core": "Identify archive-owned failures with the registered storage.backend.archive domain while original storage errors retain their domains.",
           "advanced": "",
           "parameters": ["This const declaration has no parameters."],
           "parameterDetails": [],
@@ -441,7 +441,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Registered error domain storage.backend.archive."
+              "content": "Identify archive-owned failures with the registered storage.backend.archive domain while original storage errors retain their domains."
             },
             {
               "id": "getting-started",
@@ -461,7 +461,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Registered error domain storage.backend.archive."
+              "content": "Identify archive-owned failures with the registered storage.backend.archive domain while original storage errors retain their domains."
             },
             {
               "id": "advanced-usage",
@@ -1128,7 +1128,7 @@
           "signature": "export type IArchiveSweepResult = { readonly scanned: number; readonly removed: number; };",
           "declarationLine": 27,
           "source": "packages/storage-plugin-archive/dist/types.d.ts",
-          "purpose": "Actual opaque-list maintenance results.",
+          "purpose": "Counts from actual opaque-list pages and confirmed native removals.",
           "core": "scanned: Native listed objects examined under the plugin prefix.\nremoved: Objects whose original native remove returned true.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
@@ -1171,7 +1171,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Actual opaque-list maintenance results."
+              "content": "Counts from actual opaque-list pages and confirmed native removals."
             },
             {
               "id": "getting-started",
