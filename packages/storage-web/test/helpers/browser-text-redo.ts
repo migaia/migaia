@@ -5,6 +5,7 @@ import { createStorageHost } from '@migaia/storage-host'
 import { storageLogStore } from '@migaia/storage-host/journal'
 import { indexedDbBackendPlugin } from '../../src/indexed-db.js'
 import { localStorageBackendPlugin } from '../../src/local-storage.js'
+import { sessionStorageBackendPlugin } from '../../src/session-storage.js'
 import { cookieBackendPlugin } from '../../src/cookies.js'
 
 /** The opener retains the actual WAL object and its sole persistent native resource. */
@@ -17,7 +18,7 @@ type ITextRedoLogger = Pick<
 type ITextRedoOwner = {
   readonly logger: ReturnType<typeof createLogger>
   readonly namespace: string
-  readonly kind: 'local' | 'cookies'
+  readonly kind: 'local' | 'session' | 'cookies'
   close(): Promise<void>
 }
 /** Durable storage remains the original IDB namespace resource, never a second page-local cache. */
@@ -31,7 +32,7 @@ const createLogger = (store: Awaited<ReturnType<typeof storageLogStore>>): IText
 async function prepareTextRedoOwner(
   namespace: string,
   dbName: string,
-  kind: 'local' | 'cookies' = 'local'
+  kind: 'local' | 'session' | 'cookies' = 'local'
 ) {
   const carrierHost = await createStorageHost({ plugins: [indexedDbBackendPlugin({ dbName })] })
   const carrier = await storageLogStore(carrierHost, 'indexed-db', { prefix: 'wal' })
@@ -55,12 +56,19 @@ const createTextParticipant = async (owner: ITextRedoOwner) => {
   const plugin =
     owner.kind === 'cookies'
       ? cookieBackendPlugin({ namespace: owner.namespace, scope: { path: '/' }, redo: true })
-      : localStorageBackendPlugin({ namespace: owner.namespace, redo: true })
+      : owner.kind === 'session'
+        ? sessionStorageBackendPlugin({ namespace: owner.namespace, redo: true })
+        : localStorageBackendPlugin({ namespace: owner.namespace, redo: true })
   const host = await createStorageHost({
     plugins: [plugin],
     journal: { logger: owner.logger, namespace: owner.namespace, redoWal: owner.logger.wal }
   })
-  return { host, store: host.backend(owner.kind === 'cookies' ? 'cookies' : 'local') }
+  return {
+    host,
+    store: host.backend(
+      owner.kind === 'cookies' ? 'cookies' : owner.kind === 'session' ? 'session' : 'local'
+    )
+  }
 }
 
 /** Fail the second real Storage assignment after the durable intent has already been appended. */
@@ -126,6 +134,20 @@ async function recoverTextRedoFromOpener() {
   }
 }
 
+/** Session Storage recovery stays in its real page-owned data universe. */
+async function recoverTextRedoHere() {
+  const owner = window.textRedoOwner!
+  const { host, store } = await createTextParticipant(owner)
+  try {
+    return {
+      values: await store.use(kv).getMany(['a', 'b']),
+      pending: (await owner.logger.wal.pending()).length
+    }
+  } finally {
+    await host.dispose()
+  }
+}
+
 /** A fresh page owner may reopen only after the original persistent resource is fully released. */
 async function closeTextRedoOwner() {
   const owner = window.textRedoOwner
@@ -139,6 +161,7 @@ declare global {
     prepareTextRedoOwner: typeof prepareTextRedoOwner
     failTextRedoAssignment: typeof failTextRedoAssignment
     recoverTextRedoFromOpener: typeof recoverTextRedoFromOpener
+    recoverTextRedoHere: typeof recoverTextRedoHere
     closeTextRedoOwner: typeof closeTextRedoOwner
   }
 }
@@ -147,3 +170,5 @@ window.prepareTextRedoOwner = prepareTextRedoOwner
 window.failTextRedoAssignment = failTextRedoAssignment
 window.recoverTextRedoFromOpener = recoverTextRedoFromOpener
 window.closeTextRedoOwner = closeTextRedoOwner
+
+window.recoverTextRedoHere = recoverTextRedoHere
