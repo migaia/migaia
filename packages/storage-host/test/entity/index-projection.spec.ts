@@ -84,18 +84,6 @@ describe('entity index projection contract', () => {
       StorageErrorCode.invalidConfig
     )
 
-    const getterFailure = new Error('index descriptor getter failed')
-    expect(() =>
-      snapshotEntityIndexes({
-        bad: Object.defineProperty({}, 'path', {
-          enumerable: true,
-          get: () => {
-            throw getterFailure
-          }
-        })
-      })
-    ).toThrow(StorageErrorCode.invalidConfig)
-
     for (const [select, errorCode] of [
       [() => 1, StorageErrorCode.invalidConfig],
       [() => ({ kind: 'multiple' }), StorageErrorCode.invalidConfig],
@@ -107,25 +95,11 @@ describe('entity index projection contract', () => {
     }
   })
 
-  it('preserves selector getter failures and rejects invalid multi-entry keys', () => {
-    const selectorError = new Error('selector projection getter failed')
-    const hostile = snapshotEntityIndexes<{ id: string }>({
-      selector: {
-        select: () =>
-          Object.defineProperty({}, 'kind', {
-            enumerable: true,
-            get: () => {
-              throw selectorError
-            }
-          }),
-        revision: 1
-      },
+  it('rejects invalid multi-entry projection shapes', () => {
+    const indexes = snapshotEntityIndexes<{ id: string }>({
       multi: { select: () => ['ok', 1], revision: 1 }
     })
-    expect(() => projectEntityIndexes(hostile, { id: 'u1' }, 'memory')).toThrow(
-      StorageErrorCode.invalidConfig
-    )
-    expect(() => projectEntityIndexes({ multi: hostile.multi! }, { id: 'u1' }, 'memory')).toThrow(
+    expect(() => projectEntityIndexes(indexes, { id: 'u1' }, 'memory')).toThrow(
       StorageErrorCode.invalidConfig
     )
   })

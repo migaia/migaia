@@ -64,14 +64,8 @@ const normalizeCustomProjection = (
       backend,
       cause: new TypeError(EntityText.entitySelectorIndexProjectionMustBeAnObject(label))
     })
-  let kind: unknown
-  let key: unknown
-  let keys: unknown
-  try {
-    ;({ kind, key, keys } = value as Record<string, unknown>)
-  } catch (cause) {
-    throw new StorageError(StorageErrorCode.invalidConfig, { backend, cause })
-  }
+  /** Ordinary projection fields are checked without accessor interception. */
+  const { kind, key, keys } = value as Record<string, unknown>
   if (kind === 'single') {
     assertStorageKey(key, backend, `entity index "${label}" projection`)
     return { kind, key }
@@ -94,7 +88,52 @@ const normalizeCustomProjection = (
   })
 }
 
-/** Snapshot and validate declarations once, including hostile property access. */
+/** One declared index owns parsed paths and its original optional projection callback. */
+class EntityIndex<TDomain> implements ISnapshotEntityIndex<TDomain> {
+  /** Backend fingerprints and projection multiplicity use the same admitted definition. */
+  readonly definition: IRecordIndexDefinition
+  /** Query planning sees only detached string path facts, never the custom callback. */
+  readonly paths: readonly (readonly string[])[] | undefined
+  /** This path belongs to the long-lived definition, independent of caller array mutation. */
+  readonly #path: IObjectPathTuple | undefined
+  /** Compound paths remain distinct from the custom selector alternative. */
+  readonly #paths: readonly IObjectPathTuple[] | undefined
+  /** Original custom selectors are callbacks; no method wrapper or extra codec is introduced. */
+  readonly #select: ((value: TDomain) => unknown) | undefined
+  /** Store canonical parsed facts after the existing declaration validator completes. */
+  constructor(
+    definition: IRecordIndexDefinition,
+    path: IObjectPathTuple | undefined,
+    paths: readonly IObjectPathTuple[] | undefined,
+    select: ((value: TDomain) => unknown) | undefined
+  ) {
+    this.definition = definition
+    this.#path = path
+    this.#paths = paths
+    this.#select = select
+    this.paths = path !== undefined ? [path.map(String)] : paths?.map((item) => item.map(String))
+  }
+  /** Preserve the original extractable projection callback while passing state through its owner. */
+  readonly project = (
+    value: TDomain,
+    backend: IStorageBackend
+  ): IRecordIndexProjectionValue | undefined => {
+    /** Callback invocation remains standalone, as in the original declared selector contract. */
+    const select = this.#select
+    /** Declarative field extraction shares the canonical object-path parser and reader. */
+    const selected =
+      this.#path !== undefined
+        ? get(value, this.#path as never)
+        : this.#paths !== undefined
+          ? this.#paths.map((item) => get(value, item as never))
+          : select!(value)
+    return select === undefined
+      ? normalizeProjection(selected, this.definition.multiEntry, backend, this.definition.name)
+      : normalizeCustomProjection(selected, backend, this.definition.name)
+  }
+}
+
+/** Retain parsed declarations because connected repositories perform future asynchronous writes. */
 export const snapshotEntityIndexes = <TDomain>(
   configured: unknown
 ): ISnapshotEntityIndexes<TDomain> => {
@@ -103,12 +142,8 @@ export const snapshotEntityIndexes = <TDomain>(
     throw new StorageError(StorageErrorCode.invalidConfig, {
       cause: new TypeError(EntityText.entityIndexesMustBeAnObject)
     })
-  let entries: [string, unknown][]
-  try {
-    entries = Object.entries(configured)
-  } catch (cause) {
-    throw new StorageError(StorageErrorCode.invalidConfig, { cause })
-  }
+  /** Declaration entries are ordinary input; the owner retains their parsed facts for future writes. */
+  const entries = Object.entries(configured)
   const indexes: Record<string, ISnapshotEntityIndex<TDomain>> = {}
   for (const [name, raw] of entries) {
     if (name.trim() === '' || name.startsWith(RESERVED_INDEX_PREFIX))
@@ -119,17 +154,8 @@ export const snapshotEntityIndexes = <TDomain>(
       throw new StorageError(StorageErrorCode.invalidConfig, {
         cause: new TypeError(EntityText.entityIndexMustBeAnObject(name))
       })
-    let path: unknown
-    let paths: unknown
-    let select: unknown
-    let unique: unknown
-    let multiEntry: unknown
-    let revision: unknown
-    try {
-      ;({ path, paths, select, unique, multiEntry, revision } = raw as Record<string, unknown>)
-    } catch (cause) {
-      throw new StorageError(StorageErrorCode.invalidConfig, { cause })
-    }
+    /** Canonical declaration alternatives share the original shape checks. */
+    const { path, paths, select, unique, multiEntry, revision } = raw as Record<string, unknown>
     const modes = [path !== undefined, paths !== undefined, select !== undefined].filter(Boolean)
     if (modes.length !== 1)
       throw new StorageError(StorageErrorCode.invalidConfig, {
@@ -174,25 +200,12 @@ export const snapshotEntityIndexes = <TDomain>(
       multiEntry: select !== undefined || multiEntry === true,
       revision: normalizedRevision as number
     }
-    indexes[name] = {
+    indexes[name] = new EntityIndex<TDomain>(
       definition,
-      ...(parsedPath !== undefined
-        ? { paths: [parsedPath.map(String)] }
-        : parsedPaths === undefined
-          ? {}
-          : { paths: parsedPaths.map((path) => path.map(String)) }),
-      project: (value: TDomain, backend: IStorageBackend) => {
-        const selected =
-          parsedPath !== undefined
-            ? get(value, parsedPath as never)
-            : parsedPaths !== undefined
-              ? parsedPaths.map((item) => get(value, item as never))
-              : (select as (input: TDomain) => unknown)(value)
-        return select === undefined
-          ? normalizeProjection(selected, definition.multiEntry, backend, name)
-          : normalizeCustomProjection(selected, backend, name)
-      }
-    }
+      parsedPath,
+      parsedPaths,
+      select as ((value: TDomain) => unknown) | undefined
+    )
   }
   return indexes
 }

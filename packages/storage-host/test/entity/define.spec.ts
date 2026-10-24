@@ -15,7 +15,7 @@ describe('defineEntity runtime contract', () => {
     ).toThrowError(expect.objectContaining({ code: StorageErrorCode.invalidConfig }))
   })
 
-  it('snapshots indexes and rejects ambiguous or hostile declarations', () => {
+  it('retains parsed indexes and rejects ambiguous declarations', () => {
     expect(() =>
       defineEntity<{ id: string; profile: { email: string } }>()({
         name: 'indexed-users',
@@ -50,18 +50,6 @@ describe('defineEntity runtime contract', () => {
             select: (value: { id: string }) => ({ kind: 'single' as const, key: value.id })
           } as never
         }
-      })
-    ).toThrowError(expect.objectContaining({ code: StorageErrorCode.invalidConfig }))
-    expect(() =>
-      defineEntity<{ id: string }>()({
-        name: 'hostile-index',
-        key: 'id',
-        indexes: Object.defineProperty({}, 'email', {
-          enumerable: true,
-          get: () => {
-            throw new Error('hostile index getter')
-          }
-        })
       })
     ).toThrowError(expect.objectContaining({ code: StorageErrorCode.invalidConfig }))
   })
@@ -188,19 +176,32 @@ describe('defineEntity runtime contract', () => {
     ).not.toThrow()
   })
 
-  it('rejects malformed custom schemas at definition time', () => {
+  it('rejects malformed custom schemas and retains the original class receiver', async () => {
     const invalidSchemas = [null, [], {}, { name: 'schema' }, { name: 'schema', validate: true }]
     for (const schema of invalidSchemas)
       expect(() => defineEntity({ name: 'schema-guard', key: 'id', schema } as never)).toThrow(
         StorageErrorCode.invalidConfig
       )
-    expect(() =>
-      defineEntity<{ id: string }>({
-        name: 'valid-schema',
-        key: 'id',
-        schema: { name: 'valid', validate: async (value) => value as { id: string } }
-      })
-    ).not.toThrow()
+    /** A legitimate private field proves definition admission borrows the original schema. */
+    class ValidSchema {
+      /** The selected domain field must be read on this original instance during validation. */
+      readonly #key = 'id'
+      /** The public schema label does not substitute for private receiver identity. */
+      readonly name = 'valid'
+      /** Return the admitted domain value through the original private-state receiver. */
+      async validate(value: unknown): Promise<{ id: string }> {
+        return { id: (value as Record<string, string>)[this.#key]! }
+      }
+    }
+    const definition = defineEntity<{ id: string }>({
+      name: 'valid-schema',
+      key: 'id',
+      schema: new ValidSchema()
+    })
+    await using store = await memoryBackend()
+    const repository = definition.connect(store)
+    await repository.put({ id: 'stable-schema' })
+    await expect(repository.get('stable-schema')).resolves.toEqual({ id: 'stable-schema' })
   })
 
   it('rejects non-boolean validateOnRead at definition time', () => {
@@ -228,33 +229,6 @@ describe('defineEntity runtime contract', () => {
           schema: { name: 'schema', validate: async (value: unknown) => value, [field]: true }
         } as never)
       ).toThrowError(expect.objectContaining({ code: StorageErrorCode.invalidConfig }))
-
-    const schemaError = new Error('schema getter failed')
-    expect(() =>
-      defineEntity({
-        name: 'hostile-schema',
-        key: 'id',
-        schema: Object.defineProperty({}, 'name', {
-          get: () => {
-            throw schemaError
-          }
-        })
-      } as never)
-    ).toThrowError(expect.objectContaining({ code: StorageErrorCode.invalidConfig }))
-    const migrationError = new Error('migration getter failed')
-    expect(() =>
-      defineEntity({
-        name: 'hostile-migrations',
-        key: 'id',
-        version: 2,
-        migrations: Object.defineProperty({}, '2', {
-          enumerable: true,
-          get: () => {
-            throw migrationError
-          }
-        })
-      } as never)
-    ).toThrowError(expect.objectContaining({ code: StorageErrorCode.invalidConfig }))
   })
 
   it('rejects malformed migration containers at definition time', () => {

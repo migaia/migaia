@@ -16,7 +16,7 @@ import type {
 } from './types.js'
 import { StorageError, StorageErrorCode } from '../errors.js'
 import { StorageErrorText } from '../error-text.js'
-import { snapshotCodec } from '../authoring/codec.js'
+import { assertCodec } from '@migaia/storage-contract'
 import { snapshotEntityIndexes } from './index-projection.js'
 
 type IEntityOptionsWithoutIndexes<TDomain, TStored> = Omit<
@@ -34,47 +34,35 @@ type IDefineEntityBuilder<TDomain, TStored> = {
   ): IEntityDefinition<TDomain, IEntityIndexMap<TDomain, TIndexes>>
 }
 
+/** Entity names cannot enter the host's reserved internal key namespace. */
 const RESERVED_ENTITY_PREFIX = '__'
-
-const invalidDefinition = (message: string): never => {
+/** Definition admission retains its existing native TypeError cause and public config code. */
+function invalidDefinition(message: string): never {
   throw new StorageError(StorageErrorCode.invalidConfig, { cause: new TypeError(message) })
 }
-
-/** Snapshot a schema descriptor once before it becomes a long-lived repository extension. */
-const snapshotSchema = <TDomain, TStored>(schema: unknown): ISchemaAdapter<TDomain, TStored> => {
+/** Validate public schema ports while borrowing the original class/object receiver. */
+function assertEntitySchema<TDomain, TStored>(
+  schema: unknown
+): asserts schema is ISchemaAdapter<TDomain, TStored> {
   if (typeof schema !== 'object' || schema === null || Array.isArray(schema))
     invalidDefinition(EntityText.entitySchemaMustBeAnObject)
+  /** Ordinary properties are admitted without hostile-accessor interception or method copies. */
   const candidate = schema as Record<string, unknown>
-  let name: unknown
-  let validate: unknown
-  let encode: unknown
-  let decode: unknown
-  let normalize: unknown
-  try {
-    name = candidate.name
-    validate = candidate.validate
-    encode = candidate.encode
-    decode = candidate.decode
-    normalize = candidate.normalize
-  } catch (cause) {
-    throw new StorageError(StorageErrorCode.invalidConfig, { cause })
-  }
   if (
-    typeof name !== 'string' ||
-    name.trim() === '' ||
-    typeof validate !== 'function' ||
-    (encode !== undefined && typeof encode !== 'function') ||
-    (decode !== undefined && typeof decode !== 'function') ||
-    (normalize !== undefined && typeof normalize !== 'function')
+    typeof candidate.name !== 'string' ||
+    candidate.name.trim() === '' ||
+    typeof candidate.validate !== 'function' ||
+    (candidate.encode !== undefined && typeof candidate.encode !== 'function') ||
+    (candidate.decode !== undefined && typeof candidate.decode !== 'function') ||
+    (candidate.normalize !== undefined && typeof candidate.normalize !== 'function')
   )
     invalidDefinition(EntityText.entitySchemaMustDeclareNameAndValidate)
-  return { name, validate, encode, decode, normalize } as ISchemaAdapter<TDomain, TStored>
 }
-
-const validateDefinition = <TDomain, TStored>(
+/** Validate scalar declaration choices before any repository is connected. */
+function validateDefinition<TDomain, TStored>(
   options: IEntityOptions<TDomain, TStored>,
   version: number
-): void => {
+): void {
   if (typeof options.name !== 'string' || options.name.trim() === '')
     invalidDefinition(EntityText.entityNameMustBeNonEmpty)
   if (options.name.startsWith(RESERVED_ENTITY_PREFIX))
@@ -83,7 +71,6 @@ const validateDefinition = <TDomain, TStored>(
     invalidDefinition(EntityText.entityVersionMustBeAPositiveSafeInteger)
   if (typeof options.key !== 'string' || options.key.length === 0)
     invalidDefinition(EntityText.entityKeyMustBeANonEmptyPropertyName)
-  if (options.schema === undefined) invalidDefinition(EntityText.entitySchemaSnapshotIsRequired)
   if (options.onDiagnostic !== undefined && typeof options.onDiagnostic !== 'function')
     invalidDefinition(EntityText.entityOnDiagnosticMustBeAFunction)
   if (options.validateOnRead !== undefined && typeof options.validateOnRead !== 'boolean')
@@ -91,10 +78,93 @@ const validateDefinition = <TDomain, TStored>(
   if (options.defaultOrderBy !== undefined && typeof options.defaultOrderBy !== 'function')
     invalidDefinition(EntityText.entityDefaultOrderByMustBeAFunction)
 }
-
-const defaultDiagnostic = (message: string): void => {
+/** Default diagnostics reuse the host's existing console channel. */
+function defaultDiagnostic(message: string): void {
+  /** Console is optional in neutral hosts and creates no extra reporting owner. */
   const runtime = globalThis as typeof globalThis & { console?: { warn(value: string): void } }
   runtime.console?.warn(message)
+}
+/** Migration graph admission uses the canonical owner and preserves the original failure cause. */
+function entityMigrationPlan(
+  version: number,
+  steps: Readonly<Record<number, IMigrationStep>> | undefined
+) {
+  try {
+    return createMigrationPlan({ version, steps })
+  } catch (cause) {
+    throw new StorageError(
+      StorageErrorCode.invalidConfig,
+      { cause },
+      StorageErrorText.entityMigrationGraphIncomplete
+    )
+  }
+}
+/** One reusable declaration owns configuration while each connected repository owns its work. */
+class EntityDefinition<TDomain, TStored> {
+  /** The original repository config type prevents a parallel declaration contract. */
+  readonly #configuration: Parameters<typeof createRepository<TDomain, TStored>>[0]
+  /** Public namespace is captured before future connections can await native work. */
+  readonly name: string
+  /** Public envelope version selects the same canonical migration plan at every connection. */
+  readonly version: number
+  /** Admit a declaration, retaining original schema/codec receivers and canonical index facts. */
+  constructor(
+    options: IEntityOptions<
+      TDomain,
+      TStored,
+      Readonly<Record<string, IEntityIndex<TDomain>>> | undefined
+    >,
+    allowIndexes: boolean
+  ) {
+    if (options === null || typeof options !== 'object' || Array.isArray(options))
+      invalidDefinition(EntityText.entityDefinitionMustBeAnObject)
+    if (options.indexes !== undefined && !allowIndexes)
+      invalidDefinition(EntityText.entityIndexesRequireCurriedDeclaration)
+    /** Omitted schema has the original domain-preserving passthrough behavior. */
+    const schema =
+      options.schema === undefined
+        ? (passthrough<TDomain>() as unknown as ISchemaAdapter<TDomain, TStored>)
+        : options.schema
+    // Explicit null must remain invalid rather than being treated as omitted.
+    if (options.schema !== undefined) assertEntitySchema<TDomain, TStored>(options.schema)
+    /** Codec admission borrows its original receiver; the native route is selected at connect. */
+    const codec = options.codec
+    if (codec !== undefined) assertCodec(codec)
+    this.version = options.version === undefined ? 1 : options.version
+    /** Index declaration errors retain their original precedence before scalar/migration admission. */
+    const indexes = snapshotEntityIndexes<TDomain>(options.indexes)
+    validateDefinition(options as IEntityOptions<TDomain, TStored>, this.version)
+    this.name = options.name
+    this.#configuration = {
+      name: this.name,
+      key: options.key,
+      version: this.version,
+      migrationPlan: entityMigrationPlan(this.version, options.migrations),
+      schema,
+      codec,
+      validateOnRead: options.validateOnRead ?? true,
+      onDiagnostic: options.onDiagnostic ?? defaultDiagnostic,
+      defaultOrderBy: options.defaultOrderBy,
+      indexes
+    }
+  }
+  /** The own arrow retains the original extractable connect method without taking store ownership. */
+  readonly connect = <S extends IEntityConnectStore>(
+    store: S,
+    connectOptions?: IEntityConnectOptions
+  ): IRepository<
+    TDomain,
+    Readonly<Record<string, import('@migaia/storage-contract').IStorageKey>>,
+    S extends { readonly capabilities: { readonly changeFeed: true } } ? true : false,
+    IEntityStoreQueryMethods<S>
+  > =>
+    createRepository<
+      TDomain,
+      TStored,
+      Readonly<Record<string, import('@migaia/storage-contract').IStorageKey>>,
+      IEntityStoreQueryMethods<S>,
+      S extends { readonly capabilities: { readonly changeFeed: true } } ? true : false
+    >(this.#configuration, store, connectOptions)
 }
 
 /**
@@ -123,125 +193,10 @@ export function defineEntity<TDomain, TStored = TDomain>(
       Readonly<Record<string, import('@migaia/storage-contract').IStorageKey>>
     >
   | IDefineEntityBuilder<TDomain, TStored> {
-  if (arguments.length === 0) {
-    const defineConfigured = defineEntity as unknown as (
-      configured: IEntityOptions<TDomain, TStored, Readonly<Record<string, IEntityIndex<TDomain>>>>,
-      allowIndexes: boolean
-    ) => IEntityDefinition<TDomain, IEntityIndexMap<TDomain>>
+  if (arguments.length === 0)
     return ((
       configured: IEntityOptions<TDomain, TStored, Readonly<Record<string, IEntityIndex<TDomain>>>>
-    ) => defineConfigured(configured, true)) as IDefineEntityBuilder<TDomain, TStored>
-  }
+    ) => new EntityDefinition(configured, true)) as IDefineEntityBuilder<TDomain, TStored>
   if (options === undefined) return invalidDefinition(EntityText.entityDefinitionMustBeAnObject)
-  if (options === null || typeof options !== 'object' || Array.isArray(options))
-    invalidDefinition(EntityText.entityDefinitionMustBeAnObject)
-  let configuredName: unknown
-  let configuredKey: unknown
-  let configuredSchema: unknown
-  let configuredCodec: unknown
-  let configuredVersion: unknown
-  let configuredMigrations: unknown
-  let configuredValidateOnRead: unknown
-  let configuredOnDiagnostic: unknown
-  let configuredDefaultOrderBy: unknown
-  let configuredIndexes: unknown
-  try {
-    configuredName = options.name
-    configuredKey = options.key
-    configuredSchema = options.schema
-    configuredCodec = options.codec
-    configuredVersion = options.version
-    configuredMigrations = options.migrations
-    configuredValidateOnRead = options.validateOnRead
-    configuredOnDiagnostic = options.onDiagnostic
-    configuredDefaultOrderBy = options.defaultOrderBy
-    configuredIndexes = options.indexes
-  } catch (cause) {
-    throw new StorageError(StorageErrorCode.invalidConfig, { cause })
-  }
-  if (configuredIndexes !== undefined && !allowCurriedIndexes)
-    invalidDefinition(EntityText.entityIndexesRequireCurriedDeclaration)
-  const name = configuredName as string
-  const key = configuredKey as Extract<keyof TDomain, string>
-  // 未提供 schema 时只有 TStored=TDomain 才合法（没有 schema 就无法在两者间转换），
-  // passthrough<TDomain>() 在这个前提下就是 ISchemaAdapter<TDomain, TStored> 的正确形状。
-  const schema: ISchemaAdapter<TDomain, TStored> =
-    configuredSchema === undefined
-      ? (passthrough<TDomain>() as unknown as ISchemaAdapter<TDomain, TStored>)
-      : snapshotSchema<TDomain, TStored>(configuredSchema)
-  // 不在这里默认成 jsonCodec：结构化后端（IndexedDB/memory）与 KV 后端的
-  // 合理默认不同，且只有 connect(store) 时才知道是哪种后端。未显式配置时
-  // 由 createRepository 按 store.capabilities 决定；显式配置的 codec 原样
-  // 传递，经 selectCodec 按后端能力选路，见 repository.ts。
-  const codec = configuredCodec === undefined ? undefined : snapshotCodec(configuredCodec)
-  const version = configuredVersion === undefined ? 1 : (configuredVersion as number)
-  const indexes = snapshotEntityIndexes<TDomain>(configuredIndexes)
-  const normalizedOptions = {
-    name,
-    key,
-    schema,
-    codec,
-    version,
-    validateOnRead: configuredValidateOnRead,
-    onDiagnostic: configuredOnDiagnostic,
-    defaultOrderBy: configuredDefaultOrderBy
-  } as IEntityOptions<TDomain, TStored, undefined>
-  validateDefinition(normalizedOptions, version)
-  /**
-   * Pass original own steps to the sole canonical plan admission without dropping symbols or
-   * aliases.
-   */
-  const migrationPlan = (() => {
-    try {
-      return createMigrationPlan({
-        version,
-        steps: configuredMigrations as Readonly<Record<number, IMigrationStep>> | undefined
-      })
-    } catch (cause) {
-      throw new StorageError(
-        StorageErrorCode.invalidConfig,
-        { cause },
-        StorageErrorText.entityMigrationGraphIncomplete
-      )
-    }
-  })()
-  const validateOnRead = (configuredValidateOnRead ?? true) as boolean
-  const onDiagnostic = (configuredOnDiagnostic ?? defaultDiagnostic) as (message: string) => void
-  const defaultOrderBy = configuredDefaultOrderBy as IEntityOptions<TDomain>['defaultOrderBy']
-
-  return {
-    name,
-    version,
-    connect: <S extends IEntityConnectStore>(
-      store: S,
-      connectOptions?: IEntityConnectOptions
-    ): IRepository<
-      TDomain,
-      Readonly<Record<string, import('@migaia/storage-contract').IStorageKey>>,
-      S extends { readonly capabilities: { readonly changeFeed: true } } ? true : false,
-      IEntityStoreQueryMethods<S>
-    > =>
-      createRepository<
-        TDomain,
-        TStored,
-        Readonly<Record<string, import('@migaia/storage-contract').IStorageKey>>,
-        IEntityStoreQueryMethods<S>,
-        S extends { readonly capabilities: { readonly changeFeed: true } } ? true : false
-      >(
-        {
-          name,
-          key,
-          version,
-          migrationPlan,
-          schema,
-          codec,
-          validateOnRead,
-          onDiagnostic,
-          defaultOrderBy,
-          indexes
-        },
-        store,
-        connectOptions
-      )
-  }
+  return new EntityDefinition(options, allowCurriedIndexes)
 }

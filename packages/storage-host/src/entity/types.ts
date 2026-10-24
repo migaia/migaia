@@ -482,8 +482,8 @@ export type IRepository<
 }
 
 /**
- * Frozen reusable entity description. Connecting creates a repository view without taking ownership
- * of its store.
+ * Reusable entity description with readonly public facts. Connecting creates a repository view
+ * without taking ownership of its store.
  */
 export type IEntityDefinition<
   TDomain,

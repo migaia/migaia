@@ -147,14 +147,10 @@ export const registerRecordIndexBackfillStore = <TValue>(
   backfillStores.set(backend, capability as IRecordIndexBackfillStore<unknown>)
 }
 
-/** Snapshot-once guard used by entity orchestration; foreign stores fail closed. */
+/** Pure private-table lookup used by entity orchestration; foreign stores remain unsupported. */
 export const asRecordIndexBackfillStore = <TValue>(
   value: unknown
 ): IRecordIndexBackfillStore<TValue> | undefined => {
   if ((typeof value !== 'object' && typeof value !== 'function') || value === null) return undefined
-  try {
-    return backfillStores.get(value as object) as IRecordIndexBackfillStore<TValue> | undefined
-  } catch {
-    return undefined
-  }
+  return backfillStores.get(value) as IRecordIndexBackfillStore<TValue> | undefined
 }
