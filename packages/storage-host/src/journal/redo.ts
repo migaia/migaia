@@ -1,6 +1,7 @@
 import {
   StorageContractError,
   StorageContractErrorCode,
+  type IOperationContext,
   type IBackendKind,
   type ILockKey
 } from '@migaia/storage-contract'
@@ -20,6 +21,7 @@ import {
 } from './wal.js'
 import { StorageError, StorageErrorCode } from '../errors.js'
 import { StorageErrorText } from '../error-text.js'
+import { createStorageOperationReporter, reportCleanupError } from '../core/operation-reporter.js'
 
 /** Redo borrows the original WAL index and text draft; it owns no queue or native terminal. */
 export async function createStorageRedoJournal(options: {
@@ -81,9 +83,15 @@ export async function createStorageRedoJournal(options: {
         if (!storageJournalTargetsMatch(readStorageJournalIntentTarget(row.payload), target))
           continue
         const pending = readStorageJournalIntent(row.payload, options.backend, true)
-        binding.replay(pending.changes!)
+        const notify = binding.replay(pending.changes!)
         await publish(pending)
         await wal.complete(row.seq)
+        if (notify !== undefined)
+          try {
+            notify()
+          } catch (error) {
+            reportCleanupError(options.report ?? createStorageOperationReporter(), error)
+          }
         count += 1
       }
       options.afterRecover?.(count, Date.now() - started)
@@ -102,11 +110,11 @@ export async function createStorageRedoJournal(options: {
     headLocks: Object.freeze([]) as readonly ILockKey[],
     undo: undefined,
     /** There is no second admission queue: native protection encloses recovery plus original work. */
-    runRedo: <R>(run: () => Promise<R>): Promise<R> =>
+    runRedo: <R>(run: () => Promise<R>, signal?: IOperationContext['signal']): Promise<R> =>
       binding.protect(async () => {
         await recover()
         return run()
-      }),
+      }, signal),
     begin: (scope: object) => {
       const info = binding.transactionInfo(scope)
       binding.changes(scope)

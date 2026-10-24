@@ -52,8 +52,8 @@ function transactionId(binding: IStorageJournalRedoBinding, scope: Omit<ITransac
 }
 console.log(typeof transactionId)`,
       result: t(
-        'Prints function. The actual binding is issued only by an original admitted text owner; this type grants no installer, store or commit handle.',
-        '输出 function。实际 binding 仅由原已准入文本拥有者提供，此类型不授 installer、store 或 commit 句柄。'
+        'Prints function. The actual binding is issued only by an original admitted text owner; this type grants no installer, store or commit handle. Native protection accepts the original attempt signal, and a replay notification runs only after successful WAL completion.',
+        '输出 function。实际 binding 仅由原已准入文本拥有者提供，此类型不授 installer、store 或 commit 句柄。原物理保护接收 attempt 取消信号，replay 通知仅在 WAL 完成后运行。'
       )
     }
   ],
