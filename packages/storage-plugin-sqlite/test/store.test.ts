@@ -14,37 +14,47 @@ import { nodeSqliteDriver } from '../src/node.js'
 
 /** Each case owns its actual file and disposes host before the borrowed native connection. */
 async function installed(
-  options: { wal?: boolean; memory?: boolean; native?: string[]; org?: string } = {}
+  options: {
+    wal?: boolean
+    memory?: boolean
+    native?: string[]
+    nativeQueries?: { readonly text: string; readonly values: readonly ISqliteValue[] }[]
+    org?: string
+  } = {}
 ) {
   const directory = mkdtempSync(join(tmpdir(), 'migaia-sqlite-'))
   const path = options.memory ? ':memory:' : join(directory, 'data.sqlite')
   const connection = nodeSqliteDriver(path)
   /** Existing injected-driver calls expose actual native execution even when prepare is cached. */
-  const driver = options.native
-    ? {
-        exec: (text: string) => {
-          options.native!.push(text)
-          connection.exec(text)
-        },
-        prepare: (text: string) => {
-          const statement = connection.prepare(text)
-          return {
-            run: (...values: readonly ISqliteValue[]) => {
-              options.native!.push(text)
-              return statement.run(...values)
-            },
-            get: (...values: readonly ISqliteValue[]) => {
-              options.native!.push(text)
-              return statement.get(...values)
-            },
-            all: (...values: readonly ISqliteValue[]) => {
-              options.native!.push(text)
-              return statement.all(...values)
+  const driver =
+    options.native || options.nativeQueries
+      ? {
+          exec: (text: string) => {
+            options.native?.push(text)
+            connection.exec(text)
+          },
+          prepare: (text: string) => {
+            const statement = connection.prepare(text)
+            return {
+              run: (...values: readonly ISqliteValue[]) => {
+                options.native?.push(text)
+                options.nativeQueries?.push({ text, values })
+                return statement.run(...values)
+              },
+              get: (...values: readonly ISqliteValue[]) => {
+                options.native?.push(text)
+                options.nativeQueries?.push({ text, values })
+                return statement.get(...values)
+              },
+              all: (...values: readonly ISqliteValue[]) => {
+                options.native?.push(text)
+                options.nativeQueries?.push({ text, values })
+                return statement.all(...values)
+              }
             }
           }
         }
-      }
-    : connection
+      : connection
   const host = await createStorageHost({
     org: options.org,
     plugins: [sqliteBackendPlugin({ driver, wal: options.wal })] as const
@@ -80,6 +90,49 @@ runConformance(
 )
 
 describe('native SQLite installation', () => {
+  it('executes indexed native batch and prefix selection through the public borrowed backend', async () => {
+    /** Capture actual executed SQL and bindings, including statements served by the native cache. */
+    const nativeQueries: { readonly text: string; readonly values: readonly ISqliteValue[] }[] = []
+    /** The same database supplies both public business results and physical planner evidence. */
+    const { store, connection } = await installed({ memory: true, nativeQueries })
+    await store.use(kv).setMany([
+      { key: ['selected', 1], value: 'first' },
+      { key: ['selected', 2], value: 'second' },
+      { key: ['other', 1], value: 'unrelated' }
+    ])
+    nativeQueries.length = 0
+    expect(
+      await store.use(kv).getMany([
+        ['selected', 2],
+        ['selected', 1]
+      ])
+    ).toEqual(['second', 'first'])
+    expect(await store.use(kv).removeByPrefix(['selected'])).toBe(2)
+    expect(
+      await store.use(kv).getMany([
+        ['other', 1],
+        ['selected', 1]
+      ])
+    ).toEqual(['unrelated', undefined])
+    /** Inspect exactly the statements produced by the two native selection owners. */
+    const batches = nativeQueries.filter(
+      (query) =>
+        query.text.startsWith('SELECT key,value,expires_at FROM') && query.text.includes('key IN (')
+    )
+    /** Prefix selection must retain its native key bounds instead of scanning every row. */
+    const prefixes = nativeQueries.filter(
+      (query) => query.text.startsWith('SELECT key FROM') && query.text.includes('key>=? AND key<?')
+    )
+    expect(batches).toHaveLength(2)
+    expect(prefixes).toHaveLength(1)
+    for (const query of [...batches, ...prefixes]) {
+      /** SQLite explains the original SQL with its original bound organization and keys. */
+      const plan = connection.prepare('EXPLAIN QUERY PLAN ' + query.text).all(...query.values)
+      expect(plan.some((row) => String(row.detail).includes('SEARCH'))).toBe(true)
+      expect(plan.some((row) => String(row.detail).includes('INDEX'))).toBe(true)
+      expect(plan.some((row) => String(row.detail).startsWith('SCAN'))).toBe(false)
+    }
+  })
   it('keeps native TTL with values, reclaims expiry, and rolls back the same three channels', async () => {
     /** This backend uses the local wall clock; no scheduler timer performs cleanup. */
     let now = Date.now()
