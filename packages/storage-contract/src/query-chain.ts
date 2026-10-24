@@ -464,6 +464,16 @@ type IQueryOperand<V, O> = O extends 'eq' | 'ne'
           : O extends 'startsWith' | 'contains'
             ? string
             : V
+/** Entity/source adapters keep an exact fluent state while reusing the original condition domains. */
+export type IQueryConditions<T, TSelf> = {
+  where(condition: IWhere<T>): TSelf
+  where<P extends IObjectPath<T>, O extends keyof IFieldOps<IObjectPathValue<T, P>>>(
+    path: P,
+    operator: O,
+    value: IQueryOperand<IObjectPathValue<T, P>, NoInfer<O>>
+  ): TSelf
+  where(predicate: (row: T) => boolean): TSelf
+}
 /** Implemented read terminals share the same source and client executor. */
 export type IQueryRead<R, TContext extends IOperationContext | undefined = IOperationContext> = {
   all(ctx?: TContext): Promise<R[]>
