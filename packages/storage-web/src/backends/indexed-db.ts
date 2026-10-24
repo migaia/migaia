@@ -3037,334 +3037,7 @@ function createIndexedDbStore<TValue>(
           throw failure
         }
       }),
-    ensureRecordIndexes: (
-      scope: string,
-      definitions: readonly IRecordIndexDefinition[],
-      _ctx?: IOperationContext
-    ) => ensureRecordIndexes(indexedDbContext, scope, definitions, _ctx),
-    getRecordIndexReadiness: (handle: IRecordIndexHandle, ctx?: IOperationContext) =>
-      withAbort(ctx, async (_signal, _context, runtime) => {
-        if (!isValidIndexGeneration(handle.generation)) throw staleIndexHandleError()
-        const database = await open(indexedDbContext, runtime)
-        const transaction = createTransaction(database, META_STORE_NAME, 'readonly')
-        const state = (await fromIdbRequest(
-          transaction.objectStore(META_STORE_NAME).get(indexMetadataKey(handle.scope)),
-          {},
-          runtime
-        )) as { handle?: IRecordIndexHandle; readiness?: IRecordIndexReadiness } | undefined
-        if (state?.handle?.generation !== handle.generation) throw staleIndexHandleError()
-        return state.readiness ?? { status: 'pending', scanned: 0, indexed: 0 }
-      }),
-    putIndexedRecord: (value, key, handle, projection, ctx) =>
-      rootMutation(
-        indexedDbContext,
-        'putIndexedRecord',
-        { value, key, handle, projection },
-        ctx,
-        { channel: 'record', kind: 'batch', displacedKind: 'batch' },
-        ({ value, key, handle, projection }, context) => {
-          const captured = snapshotStorageKey(key, StorageBackend.indexedDb)
-          const copy = snapshotWriteValue(value, captured)
-          const capturedHandle = snapshotWriteValue(handle, captured)
-          const capturedProjection = snapshotWriteValue(projection, captured)
-          return {
-            keys: rootKeys('record', captured, context),
-            run: async (scope) => {
-              return scope.putIndexedRecord!(
-                copy,
-                captured,
-                capturedHandle,
-                capturedProjection,
-                context
-              )
-            }
-          }
-        }
-      ),
-    iterateRecordIndex: (query, ctx) =>
-      withStorageIteratorResource(
-        (async function* (query: IRecordIndexQuery, _ctx?: IOperationContext) {
-          assertLive(indexedDbContext)
-          if (!isValidIndexGeneration(query.handle.generation)) throw staleIndexHandleError()
-          /** One deadline and abort subscription belong to the entire iterator, including yields. */
-          const runtime = createStorageOperationRuntime()
-          const { signal, dispose: disposeSignal, context } = mergeSignals(_ctx, runtime.reporter)
-          try {
-            throwIfAborted(signal)
-            if (!indexedDbContext.keyRange)
-              throw new StorageError(StorageErrorCode.unavailable, {
-                backend: StorageBackend.indexedDb,
-                cause: new Error('IDBKeyRange is unavailable; pass options.keyRange explicitly')
-              })
-            const range = snapshotKeyRange(query.range, StorageBackend.indexedDb)
-            const direction: IDBCursorDirection = query.direction === 'prev' ? 'prev' : 'next'
-            const prefix: IDBValidKey[] = [query.handle.scope, query.index, query.handle.generation]
-            /** Bounded per short readonly transaction; keeps pages small and predictable. */
-            const pageSize = INDEX_QUERY_PAGE_SIZE
-            /**
-             * `{global, scope}` mutation-epoch vector observed on the first page; every later page
-             * must match.
-             */
-            let expectedEpoch: { readonly global: number; readonly scope: number } | undefined
-            /**
-             * Full sidecar primary key ([scope, indexName, generation, indexValue, recordKey]) of
-             * the last cursor position visited. The `lookup` index key alone ([scope, indexName,
-             * generation, indexValue]) is not unique when an index value is shared by multiple
-             * records, so a page boundary falling inside such a tied group must resume by primary
-             * key, not by index key: the next page's range is bounded _inclusively_ at the boundary
-             * group's index key (so remaining ties are not dropped), and every cursor entry already
-             * emitted is then skipped by comparing full primary keys until this position is
-             * passed.
-             */
-            let continuation: IDBValidKey[] | undefined
-            let emitted = 0
-            let exhausted = false
-            while (!exhausted) {
-              assertLive(indexedDbContext)
-              throwIfAborted(signal)
-              if (query.limit !== undefined && emitted >= query.limit) break
-              const page: Array<[IStorageKey, TValue]> = []
-              let cursorExhausted = true
-              await withMutationLease(indexedDbContext, (lease) =>
-                runTransaction(
-                  indexedDbContext,
-                  async (scope) => {
-                    const { id } = assertTransactionOwner(
-                      indexedDbContext.construction.store,
-                      scope
-                    )
-                    const nativeState = indexedDbContext.nativeTransactions.get(id)
-                    if (nativeState === undefined)
-                      throw new StorageContractError(StorageContractErrorCode.invalidArgument)
-                    const transaction = nativeState.native
-                    const revisionsStore = transaction.objectStore(REVISIONS_STORE_NAME)
-                    const globalEpoch =
-                      ((await fromIdbRequest(
-                        revisionsStore.get(RECORD_EPOCH_KEY) as IDBRequest<number | undefined>,
-                        { signal },
-                        runtime
-                      )) as number | undefined) ?? 0
-                    const scopeEpoch =
-                      ((await fromIdbRequest(
-                        revisionsStore.get(indexScopeEpochKey(query.handle.scope)) as IDBRequest<
-                          number | undefined
-                        >,
-                        { signal },
-                        runtime
-                      )) as number | undefined) ?? 0
-                    if (expectedEpoch === undefined)
-                      expectedEpoch = { global: globalEpoch, scope: scopeEpoch }
-                    else if (
-                      expectedEpoch.global !== globalEpoch ||
-                      expectedEpoch.scope !== scopeEpoch
-                    )
-                      throw new StorageError(
-                        StorageErrorCode.indexQueryInvalidated,
-                        { backend: StorageBackend.indexedDb },
-                        StorageErrorText.indexQueryInvalidated
-                      )
-                    const state = (await fromIdbRequest(
-                      transaction
-                        .objectStore(META_STORE_NAME)
-                        .get(indexMetadataKey(query.handle.scope)),
-                      { signal },
-                      runtime
-                    )) as
-                      | { handle?: IRecordIndexHandle; readiness?: IRecordIndexReadiness }
-                      | undefined
-                    if (state?.handle?.generation !== query.handle.generation)
-                      throw staleIndexHandleError()
-                    if (state.readiness?.status !== 'complete')
-                      throw new StorageError(StorageErrorCode.unavailable, {
-                        backend: StorageBackend.indexedDb,
-                        cause: new Error(
-                          'record index is not complete; caller must use fallback scan'
-                        )
-                      })
-                    const index = transaction.objectStore(INDEX_RECORDS_STORE_NAME).index('lookup')
-                    /**
-                     * The boundary group's index key ([scope, indexName, generation, indexValue])
-                     * is bound inclusively so records tied with the last-visited entry are not
-                     * dropped; already-visited ties are skipped below by comparing full primary
-                     * keys.
-                     */
-                    const continuationIndexKey = continuation?.slice(0, 4)
-                    const cursorRange = toIdbRecordIndexRange(
-                      range,
-                      prefix,
-                      indexedDbContext.keyRange!,
-                      direction,
-                      continuation
-                    )
-                    const cursorRequest = index.openKeyCursor(cursorRange, direction)
-                    let cursor = (await fromIdbRequest(
-                      cursorRequest,
-                      { signal },
-                      runtime
-                    )) as IDBCursor | null
-                    if (
-                      cursor !== null &&
-                      continuation !== undefined &&
-                      continuationIndexKey !== undefined
-                    ) {
-                      /**
-                       * The inclusive range may land the fresh cursor before, exactly at, or
-                       * already past the last-visited entry, and each case needs different
-                       * handling: `continuePrimaryKey` throws `DataError` if asked to move to a
-                       * position at-or-before the cursor's _current_ one (per spec, even requesting
-                       * the cursor's own exact position is rejected), so an exact match must use a
-                       * plain single-step `continue()` instead, and an already-past position needs
-                       * no skip at all. When the cursor is still strictly before the previous
-                       * continuation (earlier not-yet-skipped ties in the same index-key group),
-                       * `continuePrimaryKey` jumps straight past it in one engine-side seek. Either
-                       * branch is O(1) regardless of tie-group size, unlike a JS walk over every
-                       * already-emitted tied entry, which would be `Θ(G)` per page and quadratic
-                       * across a group spanning multiple pages (paging requires `O(pageSize)` per
-                       * page to avoid resource exhaustion).
-                       */
-                      const currentPrimaryKey = cursor.primaryKey as IDBValidKey[]
-                      const comparison = compareStorageKeys(
-                        currentPrimaryKey as unknown as IStorageKey,
-                        continuation as unknown as IStorageKey
-                      )
-                      const isBeforeContinuation =
-                        direction === 'prev' ? comparison > 0 : comparison < 0
-                      if (isBeforeContinuation) {
-                        /**
-                         * `continuePrimaryKey` finds the first record whose (index key, primary
-                         * key) is _inclusive_ of the given pair — it may land exactly back on
-                         * `continuation` itself if that sidecar row still exists, not strictly past
-                         * it. The single `.continue()` correction below then steps past it
-                         * deterministically.
-                         */
-                        cursor.continuePrimaryKey(
-                          continuationIndexKey,
-                          continuation as unknown as IDBValidKey
-                        )
-                        cursor = (await fromIdbRequest(
-                          cursorRequest,
-                          { signal },
-                          runtime
-                        )) as IDBCursor | null
-                      }
-                      if (cursor !== null) {
-                        const landedPrimaryKey = cursor.primaryKey as IDBValidKey[]
-                        const stillAtContinuation =
-                          compareStorageKeys(
-                            landedPrimaryKey as unknown as IStorageKey,
-                            continuation as unknown as IStorageKey
-                          ) === 0
-                        if (stillAtContinuation) {
-                          cursor.continue()
-                          cursor = (await fromIdbRequest(
-                            cursorRequest,
-                            { signal },
-                            runtime
-                          )) as IDBCursor | null
-                        }
-                      }
-                    }
-                    let scannedInPage = 0
-                    while (cursor !== null && scannedInPage < pageSize) {
-                      assertLive(indexedDbContext)
-                      throwIfAborted(signal)
-                      scannedInPage += 1
-                      const lookupKey = cursor.key
-                      if (
-                        !Array.isArray(lookupKey) ||
-                        lookupKey.length !== 4 ||
-                        lookupKey[0] !== prefix[0] ||
-                        lookupKey[1] !== prefix[1] ||
-                        lookupKey[2] !== prefix[2]
-                      ) {
-                        cursor.continue()
-                        cursor = (await fromIdbRequest(
-                          cursorRequest,
-                          { signal },
-                          runtime
-                        )) as IDBCursor | null
-                        continue
-                      }
-                      const primaryKey = cursor.primaryKey as IDBValidKey[]
-                      continuation = primaryKey
-                      const recordKey = primaryKey[4] as IStorageKey
-                      const indexValue = primaryKey[3] as IStorageKey
-                      if (isStorageKeyInRange(indexValue, range)) {
-                        const value = await scope.getRecord(recordKey)
-                        if (value === undefined && !(await nativeState.expiredRecord(recordKey)))
-                          runtime.reporter(
-                            new StorageError(
-                              StorageErrorCode.indexOrphan,
-                              { backend: StorageBackend.indexedDb, key: recordKey },
-                              StorageErrorText.indexOrphan
-                            )
-                          )
-                        else if (value !== undefined) page.push([recordKey, value])
-                      }
-                      cursor.continue()
-                      cursor = (await fromIdbRequest(
-                        cursorRequest,
-                        { signal },
-                        runtime
-                      )) as IDBCursor | null
-                    }
-                    cursorExhausted = cursor === null
-                    // Account only this page's own TTL removals; unrelated between-page mutations still invalidate.
-                    expectedEpoch = await nativeState.recordEpoch(query.handle.scope)
-                  },
-                  { signal, ...(context?.orgId === undefined ? {} : { orgId: context.orgId }) },
-                  lease,
-                  false,
-                  {
-                    executeAttempt: (_context, proceed) => proceed(),
-                    lock: () => [],
-                    ranges: () => [
-                      {
-                        channel: 'record',
-                        ...snapshotConcurrencyLockRange(
-                          { channel: 'record' },
-                          StorageBackend.indexedDb
-                        )
-                      }
-                    ],
-                    notification: { channel: 'record', kind: 'remove' }
-                  }
-                )
-              )
-              for (const entry of page) {
-                throwIfAborted(signal)
-                if (query.limit !== undefined && emitted >= query.limit) {
-                  exhausted = true
-                  break
-                }
-                emitted += 1
-                yield entry
-              }
-              if (cursorExhausted) exhausted = true
-            }
-          } finally {
-            disposeSignal()
-          }
-        })(query, ctx),
-        {
-          execution: indexedDbContext.runtime.execution,
-          operation: StorageOperation.indexedDbCursor,
-          ctx
-        }
-      ),
-    transactionIndexed: (handle, run, ctx) =>
-      withMutationLease(indexedDbContext, (lease) =>
-        runTransaction(
-          indexedDbContext,
-          (scope) => {
-            if (!isValidIndexGeneration(handle.generation)) throw staleIndexHandleError()
-            return run(scope)
-          },
-          ctx,
-          lease
-        )
-      ),
-    /** Only the original native builder executes restored images; core journal owns undo validation. */
+    ...createIndexedDbStoreIndexes(indexedDbContext),
     ...(indexedDbContext.runtime.journal === undefined
       ? {}
       : {
@@ -3394,8 +3067,6 @@ function createIndexedDbStore<TValue>(
             ).finally(release)
           }
         }),
-    // sync 未定义：IndexedDB 无同步 API。
-
     dispose: () => {
       indexedDbContext.prepareState = 'disposed'
       for (const transaction of indexedDbContext.nativeTransactions.values()) transaction.abort()
@@ -3405,568 +3076,12 @@ function createIndexedDbStore<TValue>(
       (indexedDbContext.symbolicDispose ??= indexedDbContext.store
         .dispose()
         .catch((error) => reportCleanupError(createStorageOperationReporter(), error))),
-
-    get: (key, ctx) =>
-      indexedDbContext.runtime.journal !== undefined
-        ? rootRead(indexedDbContext, 'get', [key, ctx] as const, ctx, 'value', (scope, [key]) =>
-            scope.get(key)
-          )
-        : withAbort(ctx, async (signal, _context, runtime) => {
-            assertLive(indexedDbContext)
-            assertStringStorageKey(key, StorageBackend.indexedDb)
-            const value = await readFrom(
-              indexedDbContext,
-              indexedDbContext.kvStoreName,
-              (store) => store.get(key) as IDBRequest<unknown>,
-              signal,
-              runtime,
-              async (value, access) =>
-                (await access.ttlAccess.present('value', key)) ? value : undefined
-            )
-            return typeof value === 'string' ? value : null
-          }),
-    set: (key, value, ctx) =>
-      rootMutation(
-        indexedDbContext,
-        'set',
-        { key, value },
-        ctx,
-        { channel: 'value', kind: 'put' },
-        ({ key, value }, context) => {
-          assertStringStorageKey(key, StorageBackend.indexedDb)
-          if (typeof value !== 'string')
-            throw new StorageError(StorageErrorCode.invalidConfig, {
-              backend: StorageBackend.indexedDb,
-              key,
-              cause: new TypeError(StorageErrorText.storageValueInvalid)
-            })
-          return {
-            keys: rootKeys('value', key, context),
-            run: (scope) => scope.set(key, value, context)
-          }
-        }
-      ),
-    remove: (key, ctx) =>
-      rootMutation(
-        indexedDbContext,
-        'remove',
-        key,
-        ctx,
-        { channel: 'value', kind: 'remove' },
-        (key) => {
-          assertStringStorageKey(key, StorageBackend.indexedDb)
-          return { keys: [lockKey.text(key)], run: (scope) => scope.remove(key) }
-        }
-      ),
-    has: (key, ctx) =>
-      indexedDbContext.runtime.journal !== undefined
-        ? rootRead(indexedDbContext, 'has', [key, ctx] as const, ctx, 'value', (scope, [key]) =>
-            scope.has(key)
-          )
-        : withAbort(ctx, async (signal, _context, runtime) => {
-            assertLive(indexedDbContext)
-            assertStringStorageKey(key, StorageBackend.indexedDb)
-            const value = await readFrom(
-              indexedDbContext,
-              indexedDbContext.kvStoreName,
-              (store) => store.get(key) as IDBRequest<unknown>,
-              signal,
-              runtime,
-              async (value, access) =>
-                (await access.ttlAccess.present('value', key)) ? value : undefined
-            )
-            return value !== undefined
-          }),
-    keys: (ctx) =>
-      indexedDbContext.runtime.journal !== undefined
-        ? rootRead(indexedDbContext, 'keys', [ctx] as const, ctx, 'value', (scope) =>
-            journalNative(indexedDbContext, scope).readKeys()
-          )
-        : withAbort(ctx, async (signal, _context, runtime) => {
-            assertLive(indexedDbContext)
-            const raw = await readFrom(
-              indexedDbContext,
-              indexedDbContext.kvStoreName,
-              (store) => store.getAllKeys(),
-              signal,
-              runtime,
-              async (keys, access) => {
-                const live: IDBValidKey[] = []
-                for (const key of keys) {
-                  assertStringStorageKey(key, StorageBackend.indexedDb, 'persisted value key')
-                  if (await access.ttlAccess.present('value', key)) live.push(key)
-                }
-                return live
-              }
-            )
-            return raw.map((key) => {
-              assertStringStorageKey(key, StorageBackend.indexedDb, 'persisted value key')
-              return key
-            })
-          }),
-    clearValues: (ctx) => rootClear(indexedDbContext, 'clearValues', 'value', ctx),
-    clearAll: (ctx) => rootClear(indexedDbContext, 'clearAll', undefined, ctx),
-    /**
-     * Every mutation route is wired — `record` (`putRecord`/`deleteRecord`/
-     * `clearRecords`/`transaction`/`transactionIndexed`/`migrateLegacyRecords`), `value`/`bytes`
-     * (`set`/`remove`/`clearValues`/`setBytes`/`clearBytes`, including `writeWithConflict`'s
-     * cross-channel eviction deletes), and `all` (`clearAll`) — each proven post-commit-only
-     * against a real `IDBTransaction` (fires after `await committed`, never before, so an
-     * aborted/rolled-back transaction is silent) and no-op-suppressed (a delete of an absent key or
-     * a clear of an empty store publishes nothing). One deliberate exception, matching the memory
-     * backend's own `checkCrossChannel(..., emitEvent: false)`: `transaction()` evicting a
-     * `value`/`bytes` entry as a side effect of a `replace`-policy record write does not publish
-     * its own event, on both backends, because that eviction is folded into the transaction's
-     * single `record:batch` event rather than firing a standalone one mid-batch. That local matrix
-     * is complete; admitted cross-page coordination additionally delivers a bounded metadata-only
-     * hint to same-page handles and the realm transport, while non-admitted factories remain
-     * fail-closed through the immutable capability snapshot.
-     */
-    /** Native text invalidations borrow the original controller and iterator resource owner. */
-    watch: (key, ctx) => {
-      assertLive(indexedDbContext)
-      if (!indexedDbContext.capabilities.changeFeed)
-        throw new StorageContractError(StorageContractErrorCode.unsupported, {
-          backend: StorageBackend.indexedDb
-        })
-      assertStringStorageKey(key, StorageBackend.indexedDb, 'watch key')
-      return createBackendChangeIterator(indexedDbContext.controller, {
-        orgId: indexedDbContext.orgId,
-        channel: 'value',
-        key,
-        ctx,
-        execute: (advance, context) =>
-          indexedDbContext.runtime.execution.run(
-            {
-              operation: storageBackendOperation(StorageBackend.indexedDb, 'watch'),
-              input: key,
-              ctx: context
-            },
-            advance
-          )
-      })
-    },
-    subscribeChanges: (listener) => {
-      assertLive(indexedDbContext)
-      return indexedDbContext.controller.subscribe(listener)
-    },
-    metadata: {
-      get: (key, ctx) =>
-        withAbort(ctx, async (signal, _context, runtime) => {
-          assertLive(indexedDbContext)
-          assertStringStorageKey(key, StorageBackend.indexedDb, 'metadata key')
-          return readFrom(
-            indexedDbContext,
-            META_STORE_NAME,
-            (store) => store.get(key),
-            signal,
-            runtime
-          )
-        }),
-      set: (key, value, ctx) =>
-        withMutationLease(indexedDbContext, (lease) =>
-          withAbort(ctx, async (signal, _context, runtime) => {
-            assertLive(indexedDbContext)
-            assertStringStorageKey(key, StorageBackend.indexedDb, 'metadata key')
-            await writeTo(
-              indexedDbContext,
-              META_STORE_NAME,
-              (store) => store.put(value, key),
-              signal,
-              runtime,
-              lease
-            )
-          })
-        ),
-      delete: (key, ctx) =>
-        withMutationLease(indexedDbContext, (lease) =>
-          withAbort(ctx, async (signal, _context, runtime) => {
-            assertLive(indexedDbContext)
-            assertStringStorageKey(key, StorageBackend.indexedDb, 'metadata key')
-            await writeTo(
-              indexedDbContext,
-              META_STORE_NAME,
-              (store) => store.delete(key),
-              signal,
-              runtime,
-              lease
-            )
-          })
-        )
-    },
-
-    getBytes: (key, ctx) =>
-      indexedDbContext.runtime.journal !== undefined
-        ? rootRead(
-            indexedDbContext,
-            'getBytes',
-            [key, ctx] as const,
-            ctx,
-            'bytes',
-            (scope, [key]) => scope.getBytes(key)
-          )
-        : withAbort(ctx, async (signal, _context, runtime) => {
-            assertLive(indexedDbContext)
-            assertStringStorageKey(key, StorageBackend.indexedDb)
-            const value = await readFrom(
-              indexedDbContext,
-              indexedDbContext.bytesStoreName,
-              (store) => store.get(key) as IDBRequest<unknown>,
-              signal,
-              runtime,
-              async (value, access) =>
-                (await access.ttlAccess.present('bytes', key)) ? value : undefined
-            )
-            return readIndexedDbBytes(value)
-          }),
-    setBytes: (key, value, ctx) =>
-      rootMutation(
-        indexedDbContext,
-        'setBytes',
-        { key, value },
-        ctx,
-        { channel: 'bytes', kind: 'put' },
-        ({ key, value }, context) => {
-          assertStringStorageKey(key, StorageBackend.indexedDb)
-          if (!isUint8Array(value))
-            throw new StorageError(StorageErrorCode.invalidConfig, {
-              backend: StorageBackend.indexedDb,
-              key,
-              cause: new TypeError(StorageErrorText.storageBytesInvalid)
-            })
-          const captured = snapshotWriteValue(value, key)
-          return {
-            keys: rootKeys('bytes', key, context),
-            run: (scope) => scope.setBytes(key, captured, context)
-          }
-        }
-      ),
-    /** Root bytes removal retains the exact native owner and no-op publication suppression. */
-    removeBytes: (key, ctx) =>
-      rootMutation(
-        indexedDbContext,
-        'removeBytes',
-        key,
-        ctx,
-        { channel: 'bytes', kind: 'remove' },
-        (key) => {
-          assertStringStorageKey(key, StorageBackend.indexedDb)
-          return { keys: [lockKey.bytes(key)], run: (scope) => scope.removeBytes(key) }
-        }
-      ),
-    clearBytes: (ctx) => rootClear(indexedDbContext, 'clearBytes', 'bytes', ctx),
-
-    getRecord: (key, ctx) =>
-      indexedDbContext.runtime.journal !== undefined
-        ? rootRead(
-            indexedDbContext,
-            'getRecord',
-            [key, ctx] as const,
-            ctx,
-            'record',
-            (scope, [key]) => scope.getRecord(key)
-          )
-        : withAbort(ctx, async (signal, _context, runtime) => {
-            assertLive(indexedDbContext)
-            const keySnapshot = snapshotStorageKey(key, StorageBackend.indexedDb)
-            return readFrom(
-              indexedDbContext,
-              indexedDbContext.recordsStoreName,
-              (store) => store.get(toIdbKey(keySnapshot)) as IDBRequest<TValue | undefined>,
-              signal,
-              runtime,
-              async (value, access) =>
-                (await access.ttlAccess.present('record', keySnapshot)) ? value : undefined
-            )
-          }),
-    putRecord: (value, key, ctx) =>
-      rootMutation(
-        indexedDbContext,
-        'putRecord',
-        { value, key },
-        ctx,
-        { channel: 'record', kind: 'put' },
-        ({ value, key }, context) => {
-          const captured = snapshotStorageKey(key ?? createStorageToken(), StorageBackend.indexedDb)
-          const copy = snapshotWriteValue(value, captured)
-          return {
-            keys: rootKeys('record', captured, context),
-            run: (scope) => scope.putRecord(copy, captured, context)
-          }
-        }
-      ),
-    deleteRecord: (key, ctx) =>
-      rootMutation(
-        indexedDbContext,
-        'deleteRecord',
-        key,
-        ctx,
-        { channel: 'record', kind: 'remove' },
-        (key) => {
-          const captured = snapshotStorageKey(key, StorageBackend.indexedDb)
-          return { keys: [lockKey.record(captured)], run: (scope) => scope.deleteRecord(captured) }
-        }
-      ),
-    clearRecords: (ctx) => rootClear(indexedDbContext, 'clearRecords', 'record', ctx),
-
-    iterateRecords: (range, ctx) =>
-      withStorageIteratorResource(
-        (async function* (range?: IKeyRange, ctx?: IOperationContext) {
-          const rangeSnapshot = snapshotKeyRange(range, StorageBackend.indexedDb)
-          assertLive(indexedDbContext)
-          /** One reporter shared by every abort subscription inside this iteration operation. */
-          const runtime = createStorageOperationRuntime()
-          const { signal, dispose: disposeSignal, context } = mergeSignals(ctx, runtime.reporter)
-          const pageSize = context?.pageSize ?? 128
-          let lower = rangeSnapshot?.lower
-          let lowerOpen = rangeSnapshot?.lowerOpen
-          try {
-            while (true) {
-              throwIfAborted(signal)
-              const pageRange =
-                lower === undefined && rangeSnapshot?.upper === undefined
-                  ? undefined
-                  : {
-                      lower,
-                      lowerOpen,
-                      upper: rangeSnapshot?.upper,
-                      upperOpen: rangeSnapshot?.upperOpen
-                    }
-              const page = await withMutationLease(indexedDbContext, async (lease) => {
-                if (indexedDbContext.runtimeJournal !== undefined)
-                  return runTransaction(
-                    indexedDbContext,
-                    async (scope) => {
-                      const values: Array<[IStorageKey, TValue]> = []
-                      for await (const entry of scope.iterateRecords(pageRange)) {
-                        values.push(entry)
-                        if (values.length >= pageSize) break
-                      }
-                      return values
-                    },
-                    { ...context, signal },
-                    lease,
-                    false,
-                    {
-                      read: true,
-                      executeAttempt: (_context, proceed) => proceed(),
-                      lock: () => [],
-                      ranges: () => [],
-                      notification: { channel: 'record', kind: 'remove' }
-                    }
-                  )
-                const database = await open(indexedDbContext, runtime, lease)
-                assertLive(indexedDbContext)
-                const transaction = createTransaction(
-                  database,
-                  [
-                    indexedDbContext.kvStoreName,
-                    indexedDbContext.bytesStoreName,
-                    indexedDbContext.recordsStoreName,
-                    META_STORE_NAME,
-                    REVISIONS_STORE_NAME,
-                    INDEX_RECORDS_STORE_NAME
-                  ],
-                  'readwrite'
-                )
-                /**
-                 * The original cursor owns this native lifetime; only physical mutations are
-                 * shared.
-                 */
-                const access = createNativeDataAccess(
-                  indexedDbContext,
-                  transaction,
-                  undefined,
-                  runtime,
-                  (make) => fromIdbRequest(make(), undefined, runtime),
-                  (
-                    channel: 'value' | 'bytes' | 'record',
-                    key: IStorageKey,
-                    context?: Parameters<
-                      IIndexedDbContext<TValue>['coordination']['keyPort']['probe']
-                    >[2]
-                  ) => assertExpiryRemoval(indexedDbContext, channel, key, context)
-                )
-                const store = transaction.objectStore(indexedDbContext.recordsStoreName)
-                const idbRange = toIdbRange(pageRange, indexedDbContext.keyRange)
-                const request = idbRange ? store.openCursor(idbRange) : store.openCursor()
-                const values = await new Promise<Array<[IStorageKey, TValue]>>(
-                  (resolve, reject) => {
-                    const values: Array<[IStorageKey, TValue]> = []
-                    let cursorFinished = false
-                    let settled = false
-                    let cancelled = false
-                    let abortReason: unknown
-                    /** Owns the cursor abort subscription and is safe before registration completes. */
-                    let disposeAbort = (): void => {}
-                    const finish = (callback: () => void): void => {
-                      if (settled) return
-                      settled = true
-                      disposeAbort()
-                      callback()
-                    }
-                    /**
-                     * Normalize every non-cancellation cursor failure at its owning operation
-                     * boundary. A contract error penetrates whole (rule); only a web `StorageError`
-                     * bridge wrapper is unwrapped before the cursor boundary assigns its own
-                     * metadata.
-                     */
-                    const cursorFailure = (cause: unknown): StorageError | StorageContractError =>
-                      isStorageContractError(cause)
-                        ? cause
-                        : new StorageError(StorageErrorCode.transactionFailed, {
-                            backend: StorageBackend.indexedDb,
-                            operation: StorageOperation.indexedDbCursor,
-                            cause: cause instanceof StorageError ? (cause.cause ?? cause) : cause
-                          })
-                    const abort = (): void => {
-                      cancelled = true
-                      abortReason = readAbortReason(signal)
-                      try {
-                        transaction.abort()
-                      } catch {
-                        finish(() =>
-                          reject(
-                            new StorageContractError(StorageContractErrorCode.aborted, {
-                              cause: abortReason
-                            })
-                          )
-                        )
-                      }
-                    }
-                    try {
-                      installIdbTransactionHandlers(
-                        transaction,
-                        () => {
-                          finish(() => {
-                            if (cancelled) {
-                              reject(
-                                new StorageContractError(StorageContractErrorCode.aborted, {
-                                  cause: abortReason
-                                })
-                              )
-                              return
-                            }
-                            if (!cursorFinished) {
-                              reject(
-                                cursorFailure(
-                                  new Error(
-                                    'IndexedDB transaction completed before cursor finished'
-                                  )
-                                )
-                              )
-                              return
-                            }
-                            for (const [channel, keys] of access.changed)
-                              if (keys.size > 0)
-                                publishChange(indexedDbContext, {
-                                  channel,
-                                  kind: 'remove',
-                                  keys: [...keys.values()]
-                                })
-                            resolve(values)
-                          })
-                        },
-                        () =>
-                          finish(() => reject(cursorFailure(readIdbTransactionError(transaction)))),
-                        () =>
-                          finish(() =>
-                            reject(
-                              cancelled
-                                ? new StorageContractError(StorageContractErrorCode.aborted, {
-                                    cause: abortReason
-                                  })
-                                : cursorFailure(readIdbTransactionError(transaction))
-                            )
-                          )
-                      )
-                      installIdbRequestHandlers(
-                        request,
-                        () => {
-                          /**
-                           * Native request callbacks retain their original activity window and
-                           * error boundary.
-                           */
-                          void (async () => {
-                            const cursor = readIdbRequestResult(request)
-                            if (cursor === null || values.length >= pageSize) {
-                              await access.finishIndexes()
-                              cursorFinished = true
-                              return
-                            }
-                            /** Read the original cursor fields before any extra TTL request can run. */
-                            const key = cursor.key as IStorageKey
-                            const value = cursor.value as TValue
-                            if (await access.ttlAccess.present('record', key))
-                              values.push([key, value])
-                            if (values.length < pageSize) cursor.continue()
-                            else {
-                              await access.finishIndexes()
-                              cursorFinished = true
-                            }
-                          })().catch((cause) => {
-                            finish(() => reject(cursorFailure(cause)))
-                            try {
-                              transaction.abort()
-                            } catch {
-                              /* Native end already owns cleanup. */
-                            }
-                          })
-                        },
-                        () => finish(() => reject(cursorFailure(readIdbRequestError(request))))
-                      )
-                      disposeAbort = subscribeToAbort(signal, abort, runtime.reporter)
-                    } catch (cause) {
-                      finish(() =>
-                        reject(
-                          isStorageContractError(cause) ||
-                            (cause instanceof StorageError &&
-                              cause.code === StorageErrorCode.invalidConfig)
-                            ? cause
-                            : cursorFailure(cause)
-                        )
-                      )
-                      try {
-                        transaction.abort()
-                      } catch {
-                        /* setup failure already owns the result */
-                      }
-                    }
-                  }
-                )
-                return values
-              })
-              if (page.length === 0) return
-              for (const entry of page) {
-                throwIfAborted(signal)
-                yield entry
-              }
-              if (page.length < pageSize) return
-              lower = page[page.length - 1]![0]
-              lowerOpen = true
-            }
-          } finally {
-            disposeSignal()
-          }
-        })(range, ctx),
-        {
-          execution: indexedDbContext.runtime.execution,
-          operation: StorageOperation.indexedDbCursor,
-          ctx
-        }
-      ),
-    tx: () =>
-      createTransactionBuilder(
-        indexedDbContext.construction.store,
-        undefined,
-        indexedDbContext.runtime.getChainMethods('tx')
-      ),
-    transaction: (run, ctx) => {
-      assertLive(indexedDbContext)
-      return withMutationLease(indexedDbContext, (lease) =>
-        runTransaction(indexedDbContext, run, ctx, lease)
-      )
-    }
+    ...createIndexedDbStoreText(indexedDbContext),
+    ...createIndexedDbStoreObservation(indexedDbContext),
+    metadata: createIndexedDbMetadata(indexedDbContext),
+    ...createIndexedDbStoreBytes(indexedDbContext),
+    ...createIndexedDbStoreRecords(indexedDbContext),
+    ...createIndexedDbStoreTransactions(indexedDbContext)
   }
 }
 
@@ -4299,129 +3414,7 @@ function createIndexedDbPhysical<TValue>(
 ): IIndexedDbContext<TValue>['physical'] {
   return {
     ...indexedDbContext.construction,
-    journalBinding: {
-      requiresIndexedDbUndo: true,
-      forOrg: (orgId) =>
-        (indexedDbContext.orgBinding?.resolve(orgId) ?? indexedDbContext.physical).journalBinding,
-      lockTarget: (target) => indexedDbJournalTarget(target).lock,
-      changes: (scope) => journalNative(indexedDbContext, scope).images.changes(),
-      readImage: (scope, target) =>
-        runTransactionOperation(scope, () =>
-          journalNative(indexedDbContext, scope).images.readImage(target)
-        ),
-      writeImage: (scope, target, image) =>
-        runTransactionOperation(scope, () =>
-          journalNative(indexedDbContext, scope).images.writeImage(target, image)
-        ),
-      readRevision: (scope, target) =>
-        runTransactionOperation(scope, () =>
-          journalNative(indexedDbContext, scope).images.readRevision(target)
-        ),
-      openNamespace: async (prefix) => {
-        assertLive(indexedDbContext)
-        if (typeof prefix !== 'string' || prefix.length === 0)
-          throw new StorageContractError(StorageContractErrorCode.invalidArgument)
-        if (indexedDbContext.keyRange === undefined)
-          throw new StorageContractError(StorageContractErrorCode.unsupported)
-        /** Private methods and cached index reads retain this original physical generation. */
-        const generation = indexedDbContext.journalGeneration
-        const authenticate = (scope: Omit<ITransactionScope, 'use'>) => {
-          const info = assertTransactionOwner(indexedDbContext.construction.store, scope)
-          const current = indexedDbContext.nativeTransactions.get(info.id)
-          if (current === undefined)
-            throw new StorageContractError(StorageContractErrorCode.invalidArgument)
-          return { info, port: current.journal(scope, prefix) }
-        }
-        return createBackendJournalNamespace({
-          assertLive: () => {
-            assertLive(indexedDbContext)
-            if (generation !== indexedDbContext.journalGeneration)
-              throw new StorageContractError(StorageContractErrorCode.disposed)
-          },
-          closingSignal: indexedDbContext.controller.closingSignal,
-          backend: StorageBackend.indexedDb,
-          report: (error) => reportCleanupError(indexedDbContext.coordinationReporter, error),
-          nativeAtomic: true,
-          indexExclusive:
-            indexedDbContext.webLocks === undefined &&
-            indexedDbContext.journalFactoryIsPrivate !== true
-              ? false
-              : undefined,
-          reserve: (hold) =>
-            indexedDbContext.webLocks === undefined &&
-            indexedDbContext.journalFactoryIsPrivate !== true
-              ? hold()
-              : runWithConcurrency(
-                  {
-                    store: indexedDbContext.store,
-                    options: { lock: [storageJournalLockKey(prefix, StorageJournalLock.resource)] },
-                    policy: ConcurrencyPolicy.fail()
-                  },
-                  {
-                    attempt: (context) =>
-                      indexedDbContext.coordination.keyPort.attemptMetadata(
-                        context,
-                        {
-                          status: ConcurrencyHolderState.held,
-                          owner: indexedDbContext.controller.origin,
-                          label: indexedDbContext.ownerLabel,
-                          scope: 'local',
-                          since: Date.now()
-                        },
-                        {
-                          attempt: async () => {
-                            if (indexedDbContext.webLocks !== undefined) {
-                              /**
-                               * Native Web Locks owns lifetime exclusion; no expiring metadata
-                               * lease is substituted.
-                               */
-                              const name = encodeFlatStorageKey([
-                                IndexedDbJournalLayout.resource,
-                                indexedDbContext.dbName,
-                                prefix
-                              ])
-                              await indexedDbContext.webLocks
-                                .request(
-                                  name,
-                                  { mode: 'exclusive', ifAvailable: true },
-                                  async (lock) => {
-                                    if (lock === null)
-                                      throw new StorageContractError(
-                                        StorageContractErrorCode.lockRejected
-                                      )
-                                    await hold()
-                                  }
-                                )
-                                .catch((cause: unknown) => {
-                                  throw normalizeIndexedDbOperationError(cause)
-                                })
-                            } else await hold()
-                            return { status: 'committed', value: undefined }
-                          }
-                        },
-                        indexedDbContext.runtime.stageBindings.concurrencyStages(
-                          indexedDbContext.construction.store
-                        ),
-                        indexedDbContext.controller.closingSignal
-                      )
-                  }
-                ),
-          authenticate,
-          transaction: (work) =>
-            withMutationLease(indexedDbContext, (lease) =>
-              runTransaction(
-                indexedDbContext,
-                (scope) => work(authenticate(scope).port),
-                { lock: [storageJournalLockKey(prefix, StorageJournalLock.head)] },
-                lease,
-                false,
-                undefined,
-                false
-              )
-            )
-        })
-      }
-    },
+    journalBinding: createIndexedDbPhysicalJournal(indexedDbContext),
     dropData: () => dropData(indexedDbContext),
     getPreparedClient: () => {
       assertLive(indexedDbContext)
@@ -7025,8 +6018,8 @@ async function finishIndexedDbBackfillCommit<TValue>(
    * range with no way to advance further would wedge this generation permanently `running` — the
    * next `openBackfillSession` would see a defined checkpoint and treat it as a resume, never
    * re-snapshotting the raw-firewall epoch. Clearing the checkpoint here instead makes the _next_
-   * session a genuinely fresh start (per the raw-firewall epoch logic in `openBackfillSession`),
-   * so a later clean full re-scan can still reach `complete`.
+   * session a genuinely fresh start (per the raw-firewall epoch logic in `openBackfillSession`), so
+   * a later clean full re-scan can still reach `complete`.
    */
   const nextPhase = entersLegacyPhase ? RecordIndexBackfillPhase.legacy : commitState.batchPhase
   const nextCheckpoint =
@@ -7056,4 +6049,1299 @@ async function finishIndexedDbBackfillCommit<TValue>(
   commitState.sessionState.checkpoint = nextCheckpoint
   commitState.sessionState.currentPhase = nextPhase
   return nextReadiness
+}
+
+/**
+ * Run the original bounded native iterateRecordIndex cursor with its existing signal and resource
+ * owner.
+ */
+function iterateIndexedDbIndex<TValue>(
+  indexedDbContext: IIndexedDbContext<TValue>,
+  ...args: Parameters<NonNullable<IIndexedDbStore<TValue>['iterateRecordIndex']>>
+): ReturnType<NonNullable<IIndexedDbStore<TValue>['iterateRecordIndex']>> {
+  const [query, ctx] = args
+  return withStorageIteratorResource(indexedDbIndexRows(indexedDbContext, query, ctx), {
+    execution: indexedDbContext.runtime.execution,
+    operation: StorageOperation.indexedDbCursor,
+    ctx
+  })
+}
+/** Compose root indexes access from the existing native backend ports. */
+function createIndexedDbStoreIndexes<TValue>(
+  indexedDbContext: IIndexedDbContext<TValue>
+): Pick<
+  IIndexedDbStore<TValue>,
+  | 'ensureRecordIndexes'
+  | 'getRecordIndexReadiness'
+  | 'putIndexedRecord'
+  | 'iterateRecordIndex'
+  | 'transactionIndexed'
+> {
+  return {
+    ensureRecordIndexes: (
+      scope: string,
+      definitions: readonly IRecordIndexDefinition[],
+      _ctx?: IOperationContext
+    ) => ensureRecordIndexes(indexedDbContext, scope, definitions, _ctx),
+    getRecordIndexReadiness: (handle: IRecordIndexHandle, ctx?: IOperationContext) =>
+      withAbort(ctx, async (_signal, _context, runtime) => {
+        if (!isValidIndexGeneration(handle.generation)) throw staleIndexHandleError()
+        const database = await open(indexedDbContext, runtime)
+        const transaction = createTransaction(database, META_STORE_NAME, 'readonly')
+        const state = (await fromIdbRequest(
+          transaction.objectStore(META_STORE_NAME).get(indexMetadataKey(handle.scope)),
+          {},
+          runtime
+        )) as { handle?: IRecordIndexHandle; readiness?: IRecordIndexReadiness } | undefined
+        if (state?.handle?.generation !== handle.generation) throw staleIndexHandleError()
+        return state.readiness ?? { status: 'pending', scanned: 0, indexed: 0 }
+      }),
+    putIndexedRecord: (value, key, handle, projection, ctx) =>
+      rootMutation(
+        indexedDbContext,
+        'putIndexedRecord',
+        { value, key, handle, projection },
+        ctx,
+        { channel: 'record', kind: 'batch', displacedKind: 'batch' },
+        ({ value, key, handle, projection }, context) => {
+          const captured = snapshotStorageKey(key, StorageBackend.indexedDb)
+          const copy = snapshotWriteValue(value, captured)
+          const capturedHandle = snapshotWriteValue(handle, captured)
+          const capturedProjection = snapshotWriteValue(projection, captured)
+          return {
+            keys: rootKeys('record', captured, context),
+            run: async (scope) => {
+              return scope.putIndexedRecord!(
+                copy,
+                captured,
+                capturedHandle,
+                capturedProjection,
+                context
+              )
+            }
+          }
+        }
+      ),
+    iterateRecordIndex: (...args) => iterateIndexedDbIndex(indexedDbContext, ...args),
+    transactionIndexed: (handle, run, ctx) =>
+      withMutationLease(indexedDbContext, (lease) =>
+        runTransaction(
+          indexedDbContext,
+          (scope) => {
+            if (!isValidIndexGeneration(handle.generation)) throw staleIndexHandleError()
+            return run(scope)
+          },
+          ctx,
+          lease
+        )
+      )
+  }
+}
+/** Compose root text access from the existing native backend ports. */
+function createIndexedDbStoreText<TValue>(
+  indexedDbContext: IIndexedDbContext<TValue>
+): Pick<
+  IIndexedDbStore<TValue>,
+  'get' | 'set' | 'remove' | 'has' | 'keys' | 'clearValues' | 'clearAll'
+> {
+  return {
+    get: (key, ctx) =>
+      indexedDbContext.runtime.journal !== undefined
+        ? rootRead(indexedDbContext, 'get', [key, ctx] as const, ctx, 'value', (scope, [key]) =>
+            scope.get(key)
+          )
+        : withAbort(ctx, async (signal, _context, runtime) => {
+            assertLive(indexedDbContext)
+            assertStringStorageKey(key, StorageBackend.indexedDb)
+            const value = await readFrom(
+              indexedDbContext,
+              indexedDbContext.kvStoreName,
+              (store) => store.get(key) as IDBRequest<unknown>,
+              signal,
+              runtime,
+              async (value, access) =>
+                (await access.ttlAccess.present('value', key)) ? value : undefined
+            )
+            return typeof value === 'string' ? value : null
+          }),
+    set: (key, value, ctx) =>
+      rootMutation(
+        indexedDbContext,
+        'set',
+        { key, value },
+        ctx,
+        { channel: 'value', kind: 'put' },
+        ({ key, value }, context) => {
+          assertStringStorageKey(key, StorageBackend.indexedDb)
+          if (typeof value !== 'string')
+            throw new StorageError(StorageErrorCode.invalidConfig, {
+              backend: StorageBackend.indexedDb,
+              key,
+              cause: new TypeError(StorageErrorText.storageValueInvalid)
+            })
+          return {
+            keys: rootKeys('value', key, context),
+            run: (scope) => scope.set(key, value, context)
+          }
+        }
+      ),
+    remove: (key, ctx) =>
+      rootMutation(
+        indexedDbContext,
+        'remove',
+        key,
+        ctx,
+        { channel: 'value', kind: 'remove' },
+        (key) => {
+          assertStringStorageKey(key, StorageBackend.indexedDb)
+          return { keys: [lockKey.text(key)], run: (scope) => scope.remove(key) }
+        }
+      ),
+    has: (key, ctx) =>
+      indexedDbContext.runtime.journal !== undefined
+        ? rootRead(indexedDbContext, 'has', [key, ctx] as const, ctx, 'value', (scope, [key]) =>
+            scope.has(key)
+          )
+        : withAbort(ctx, async (signal, _context, runtime) => {
+            assertLive(indexedDbContext)
+            assertStringStorageKey(key, StorageBackend.indexedDb)
+            const value = await readFrom(
+              indexedDbContext,
+              indexedDbContext.kvStoreName,
+              (store) => store.get(key) as IDBRequest<unknown>,
+              signal,
+              runtime,
+              async (value, access) =>
+                (await access.ttlAccess.present('value', key)) ? value : undefined
+            )
+            return value !== undefined
+          }),
+    keys: (ctx) =>
+      indexedDbContext.runtime.journal !== undefined
+        ? rootRead(indexedDbContext, 'keys', [ctx] as const, ctx, 'value', (scope) =>
+            journalNative(indexedDbContext, scope).readKeys()
+          )
+        : withAbort(ctx, async (signal, _context, runtime) => {
+            assertLive(indexedDbContext)
+            const raw = await readFrom(
+              indexedDbContext,
+              indexedDbContext.kvStoreName,
+              (store) => store.getAllKeys(),
+              signal,
+              runtime,
+              async (keys, access) => {
+                const live: IDBValidKey[] = []
+                for (const key of keys) {
+                  assertStringStorageKey(key, StorageBackend.indexedDb, 'persisted value key')
+                  if (await access.ttlAccess.present('value', key)) live.push(key)
+                }
+                return live
+              }
+            )
+            return raw.map((key) => {
+              assertStringStorageKey(key, StorageBackend.indexedDb, 'persisted value key')
+              return key
+            })
+          }),
+    clearValues: (ctx) => rootClear(indexedDbContext, 'clearValues', 'value', ctx),
+    clearAll: (ctx) => rootClear(indexedDbContext, 'clearAll', undefined, ctx)
+  }
+}
+/** Compose root observation access from the existing native backend ports. */
+function createIndexedDbStoreObservation<TValue>(
+  indexedDbContext: IIndexedDbContext<TValue>
+): Pick<IIndexedDbStore<TValue>, 'watch' | 'subscribeChanges'> {
+  return {
+    watch: (key, ctx) => {
+      assertLive(indexedDbContext)
+      if (!indexedDbContext.capabilities.changeFeed)
+        throw new StorageContractError(StorageContractErrorCode.unsupported, {
+          backend: StorageBackend.indexedDb
+        })
+      assertStringStorageKey(key, StorageBackend.indexedDb, 'watch key')
+      return createBackendChangeIterator(indexedDbContext.controller, {
+        orgId: indexedDbContext.orgId,
+        channel: 'value',
+        key,
+        ctx,
+        execute: (advance, context) =>
+          indexedDbContext.runtime.execution.run(
+            {
+              operation: storageBackendOperation(StorageBackend.indexedDb, 'watch'),
+              input: key,
+              ctx: context
+            },
+            advance
+          )
+      })
+    },
+    subscribeChanges: (listener) => {
+      assertLive(indexedDbContext)
+      return indexedDbContext.controller.subscribe(listener)
+    }
+  }
+}
+/** Metadata operations borrow the original physical store and mutation lease paths. */
+function createIndexedDbMetadata<TValue>(
+  indexedDbContext: IIndexedDbContext<TValue>
+): NonNullable<IIndexedDbStore<TValue>['metadata']> {
+  return {
+    get: (key, ctx) =>
+      withAbort(ctx, async (signal, _context, runtime) => {
+        assertLive(indexedDbContext)
+        assertStringStorageKey(key, StorageBackend.indexedDb, 'metadata key')
+        return readFrom(
+          indexedDbContext,
+          META_STORE_NAME,
+          (store) => store.get(key),
+          signal,
+          runtime
+        )
+      }),
+    set: (key, value, ctx) =>
+      withMutationLease(indexedDbContext, (lease) =>
+        withAbort(ctx, async (signal, _context, runtime) => {
+          assertLive(indexedDbContext)
+          assertStringStorageKey(key, StorageBackend.indexedDb, 'metadata key')
+          await writeTo(
+            indexedDbContext,
+            META_STORE_NAME,
+            (store) => store.put(value, key),
+            signal,
+            runtime,
+            lease
+          )
+        })
+      ),
+    delete: (key, ctx) =>
+      withMutationLease(indexedDbContext, (lease) =>
+        withAbort(ctx, async (signal, _context, runtime) => {
+          assertLive(indexedDbContext)
+          assertStringStorageKey(key, StorageBackend.indexedDb, 'metadata key')
+          await writeTo(
+            indexedDbContext,
+            META_STORE_NAME,
+            (store) => store.delete(key),
+            signal,
+            runtime,
+            lease
+          )
+        })
+      )
+  }
+}
+/** Compose root bytes access from the existing native backend ports. */
+function createIndexedDbStoreBytes<TValue>(
+  indexedDbContext: IIndexedDbContext<TValue>
+): Pick<IIndexedDbStore<TValue>, 'getBytes' | 'setBytes' | 'removeBytes' | 'clearBytes'> {
+  return {
+    getBytes: (key, ctx) =>
+      indexedDbContext.runtime.journal !== undefined
+        ? rootRead(
+            indexedDbContext,
+            'getBytes',
+            [key, ctx] as const,
+            ctx,
+            'bytes',
+            (scope, [key]) => scope.getBytes(key)
+          )
+        : withAbort(ctx, async (signal, _context, runtime) => {
+            assertLive(indexedDbContext)
+            assertStringStorageKey(key, StorageBackend.indexedDb)
+            const value = await readFrom(
+              indexedDbContext,
+              indexedDbContext.bytesStoreName,
+              (store) => store.get(key) as IDBRequest<unknown>,
+              signal,
+              runtime,
+              async (value, access) =>
+                (await access.ttlAccess.present('bytes', key)) ? value : undefined
+            )
+            return readIndexedDbBytes(value)
+          }),
+    setBytes: (key, value, ctx) =>
+      rootMutation(
+        indexedDbContext,
+        'setBytes',
+        { key, value },
+        ctx,
+        { channel: 'bytes', kind: 'put' },
+        ({ key, value }, context) => {
+          assertStringStorageKey(key, StorageBackend.indexedDb)
+          if (!isUint8Array(value))
+            throw new StorageError(StorageErrorCode.invalidConfig, {
+              backend: StorageBackend.indexedDb,
+              key,
+              cause: new TypeError(StorageErrorText.storageBytesInvalid)
+            })
+          const captured = snapshotWriteValue(value, key)
+          return {
+            keys: rootKeys('bytes', key, context),
+            run: (scope) => scope.setBytes(key, captured, context)
+          }
+        }
+      ),
+    removeBytes: (key, ctx) =>
+      rootMutation(
+        indexedDbContext,
+        'removeBytes',
+        key,
+        ctx,
+        { channel: 'bytes', kind: 'remove' },
+        (key) => {
+          assertStringStorageKey(key, StorageBackend.indexedDb)
+          return { keys: [lockKey.bytes(key)], run: (scope) => scope.removeBytes(key) }
+        }
+      ),
+    clearBytes: (ctx) => rootClear(indexedDbContext, 'clearBytes', 'bytes', ctx)
+  }
+}
+/**
+ * Run the original bounded native iterateRecords cursor with its existing signal and resource
+ * owner.
+ */
+function iterateIndexedDbRecords<TValue>(
+  indexedDbContext: IIndexedDbContext<TValue>,
+  ...args: Parameters<NonNullable<IIndexedDbStore<TValue>['iterateRecords']>>
+): ReturnType<NonNullable<IIndexedDbStore<TValue>['iterateRecords']>> {
+  const [range, ctx] = args
+  return withStorageIteratorResource(indexedDbRecordRows(indexedDbContext, range, ctx), {
+    execution: indexedDbContext.runtime.execution,
+    operation: StorageOperation.indexedDbCursor,
+    ctx
+  })
+}
+/** Compose root records access from the existing native backend ports. */
+function createIndexedDbStoreRecords<TValue>(
+  indexedDbContext: IIndexedDbContext<TValue>
+): Pick<
+  IIndexedDbStore<TValue>,
+  'getRecord' | 'putRecord' | 'deleteRecord' | 'clearRecords' | 'iterateRecords'
+> {
+  return {
+    getRecord: (key, ctx) =>
+      indexedDbContext.runtime.journal !== undefined
+        ? rootRead(
+            indexedDbContext,
+            'getRecord',
+            [key, ctx] as const,
+            ctx,
+            'record',
+            (scope, [key]) => scope.getRecord(key)
+          )
+        : withAbort(ctx, async (signal, _context, runtime) => {
+            assertLive(indexedDbContext)
+            const keySnapshot = snapshotStorageKey(key, StorageBackend.indexedDb)
+            return readFrom(
+              indexedDbContext,
+              indexedDbContext.recordsStoreName,
+              (store) => store.get(toIdbKey(keySnapshot)) as IDBRequest<TValue | undefined>,
+              signal,
+              runtime,
+              async (value, access) =>
+                (await access.ttlAccess.present('record', keySnapshot)) ? value : undefined
+            )
+          }),
+    putRecord: (value, key, ctx) =>
+      rootMutation(
+        indexedDbContext,
+        'putRecord',
+        { value, key },
+        ctx,
+        { channel: 'record', kind: 'put' },
+        ({ value, key }, context) => {
+          const captured = snapshotStorageKey(key ?? createStorageToken(), StorageBackend.indexedDb)
+          const copy = snapshotWriteValue(value, captured)
+          return {
+            keys: rootKeys('record', captured, context),
+            run: (scope) => scope.putRecord(copy, captured, context)
+          }
+        }
+      ),
+    deleteRecord: (key, ctx) =>
+      rootMutation(
+        indexedDbContext,
+        'deleteRecord',
+        key,
+        ctx,
+        { channel: 'record', kind: 'remove' },
+        (key) => {
+          const captured = snapshotStorageKey(key, StorageBackend.indexedDb)
+          return { keys: [lockKey.record(captured)], run: (scope) => scope.deleteRecord(captured) }
+        }
+      ),
+    clearRecords: (ctx) => rootClear(indexedDbContext, 'clearRecords', 'record', ctx),
+    iterateRecords: (...args) => iterateIndexedDbRecords(indexedDbContext, ...args)
+  }
+}
+/** Compose root transactions access from the existing native backend ports. */
+function createIndexedDbStoreTransactions<TValue>(
+  indexedDbContext: IIndexedDbContext<TValue>
+): Pick<IIndexedDbStore<TValue>, 'tx' | 'transaction'> {
+  return {
+    tx: () =>
+      createTransactionBuilder(
+        indexedDbContext.construction.store,
+        undefined,
+        indexedDbContext.runtime.getChainMethods('tx')
+      ),
+    transaction: (run, ctx) => {
+      assertLive(indexedDbContext)
+      return withMutationLease(indexedDbContext, (lease) =>
+        runTransaction(indexedDbContext, run, ctx, lease)
+      )
+    }
+  }
+}
+
+/** Advance the original bounded native cursor while retaining its signal and page ownership. */
+/** One bounded index iterator owns continuation, epoch observations and its existing signal. */
+type IIndexedDbIndexIterator<TValue> = {
+  /** Original indexedDbContext belongs to this bounded native iterator. */
+  readonly indexedDbContext: IIndexedDbContext<TValue>
+  /** Original query belongs to this bounded native iterator. */
+  readonly query: IRecordIndexQuery
+  /** Original _ctx belongs to this bounded native iterator. */
+  readonly _ctx?: IOperationContext
+
+  /** Range belongs to this original bounded index cursor. */
+  range: ReturnType<typeof snapshotKeyRange>
+
+  /** Direction belongs to this original bounded index cursor. */
+  direction: IDBCursorDirection
+
+  /** Prefix belongs to this original bounded index cursor. */
+  prefix: IDBValidKey[]
+
+  /** PageSize belongs to this original bounded index cursor. */
+  pageSize: number
+
+  /** ExpectedEpoch belongs to this original bounded index cursor. */
+  expectedEpoch: { readonly global: number; readonly scope: number } | undefined
+
+  /** Continuation belongs to this original bounded index cursor. */
+  continuation: IDBValidKey[] | undefined
+
+  /** Emitted belongs to this original bounded index cursor. */
+  emitted: number
+
+  /** Exhausted belongs to this original bounded index cursor. */
+  exhausted: boolean
+
+  /** One deadline and abort subscription belong to the entire iterator, including yields. */
+  runtime: IStorageOperationRuntime
+  /** The same merged signal owns cancellation and cleanup for the full iterator. */
+  merged: ReturnType<typeof mergeSignals>
+  /** The original merged signal port belongs to this iterator only. */
+  signal: ReturnType<typeof mergeSignals>['signal']
+  /** The original merged dispose port belongs to this iterator only. */
+  disposeSignal: ReturnType<typeof mergeSignals>['dispose']
+  /** The original merged context port belongs to this iterator only. */
+  context: ReturnType<typeof mergeSignals>['context']
+}
+/** Advance the original native index pages without adding a cursor or transaction lifecycle. */
+async function* indexedDbIndexRows<TValue>(
+  indexedDbContext: IIndexedDbContext<TValue>,
+  query: IRecordIndexQuery,
+  _ctx?: IOperationContext
+): AsyncGenerator<[IStorageKey, TValue], void, unknown> {
+  /** State initializes on the first native advance, preserving the original lazy input boundary. */
+  const iteratorState = { indexedDbContext, query, _ctx } as IIndexedDbIndexIterator<TValue>
+
+  assertLive(iteratorState.indexedDbContext)
+
+  if (!isValidIndexGeneration(iteratorState.query.handle.generation)) throw staleIndexHandleError()
+
+  /** One deadline and abort subscription belong to the entire iterator, including yields. */
+  iteratorState.runtime = createStorageOperationRuntime()
+  iteratorState.merged = mergeSignals(iteratorState._ctx, iteratorState.runtime.reporter)
+  iteratorState.signal = iteratorState.merged.signal
+  iteratorState.disposeSignal = iteratorState.merged.dispose
+  iteratorState.context = iteratorState.merged.context
+
+  try {
+    throwIfAborted(iteratorState.signal)
+    if (!iteratorState.indexedDbContext.keyRange)
+      throw new StorageError(StorageErrorCode.unavailable, {
+        backend: StorageBackend.indexedDb,
+        cause: new Error('IDBKeyRange is unavailable; pass options.keyRange explicitly')
+      })
+    iteratorState.range = snapshotKeyRange(iteratorState.query.range, StorageBackend.indexedDb)
+    iteratorState.direction = iteratorState.query.direction === 'prev' ? 'prev' : 'next'
+    iteratorState.prefix = [
+      iteratorState.query.handle.scope,
+      iteratorState.query.index,
+      iteratorState.query.handle.generation
+    ]
+    /** Bounded per short readonly transaction; keeps pages small and predictable. */
+    iteratorState.pageSize = INDEX_QUERY_PAGE_SIZE
+    /**
+     * `{global, scope}` mutation-epoch vector observed on the first page; every later page must
+     * match.
+     */
+
+    /**
+     * Full sidecar primary key ([scope, indexName, generation, indexValue, recordKey]) of the last
+     * cursor position visited. The `lookup` index key alone ([scope, indexName, generation,
+     * indexValue]) is not unique when an index value is shared by multiple records, so a page
+     * boundary falling inside such a tied group must resume by primary key, not by index key: the
+     * next page's range is bounded _inclusively_ at the boundary group's index key (so remaining
+     * ties are not dropped), and every cursor entry already emitted is then skipped by comparing
+     * full primary keys until this position is passed.
+     */
+
+    iteratorState.emitted = 0
+    iteratorState.exhausted = false
+    while (!iteratorState.exhausted) {
+      assertLive(iteratorState.indexedDbContext)
+      throwIfAborted(iteratorState.signal)
+      if (
+        iteratorState.query.limit !== undefined &&
+        iteratorState.emitted >= iteratorState.query.limit
+      )
+        break
+
+      /** One bounded native page shares continuation and epoch observations with its iterator. */
+      const pageState: IIndexedDbIndexPage<TValue> = {
+        iteratorState,
+        page: [],
+        cursorExhausted: true
+      }
+      await readIndexedDbIndexPage(pageState)
+      for (const entry of pageState.page) {
+        throwIfAborted(pageState.iteratorState.signal)
+        if (
+          pageState.iteratorState.query.limit !== undefined &&
+          pageState.iteratorState.emitted >= pageState.iteratorState.query.limit
+        ) {
+          pageState.iteratorState.exhausted = true
+          break
+        }
+        pageState.iteratorState.emitted += 1
+        yield entry
+      }
+      if (pageState.cursorExhausted) pageState.iteratorState.exhausted = true
+    }
+  } finally {
+    iteratorState.disposeSignal()
+  }
+}
+/** Advance the original bounded native cursor while retaining its signal and page ownership. */
+/** One bounded record iterator owns continuation and its original signal across native pages. */
+type IIndexedDbRecordIterator<TValue> = {
+  /** Original indexedDbContext belongs to this bounded native iterator. */
+  readonly indexedDbContext: IIndexedDbContext<TValue>
+  /** Original range belongs to this bounded native iterator. */
+  readonly range?: IKeyRange
+  /** Original ctx belongs to this bounded native iterator. */
+  readonly ctx?: IOperationContext
+
+  rangeSnapshot: ReturnType<typeof snapshotKeyRange>
+
+  /** One reporter shared by every abort subscription inside this iteration operation. */
+  runtime: IStorageOperationRuntime
+  /** The same merged signal owns cancellation and cleanup for the full iterator. */
+  merged: ReturnType<typeof mergeSignals>
+  /** The original merged signal port belongs to this iterator only. */
+  signal: ReturnType<typeof mergeSignals>['signal']
+  /** The original merged dispose port belongs to this iterator only. */
+  disposeSignal: ReturnType<typeof mergeSignals>['dispose']
+  /** The original merged context port belongs to this iterator only. */
+  context: ReturnType<typeof mergeSignals>['context']
+
+  pageSize: number
+
+  lower: IStorageKey | undefined
+
+  lowerOpen: boolean | undefined
+}
+/** Advance the original native index pages without adding a cursor or transaction lifecycle. */
+async function* indexedDbRecordRows<TValue>(
+  indexedDbContext: IIndexedDbContext<TValue>,
+  range?: IKeyRange,
+  ctx?: IOperationContext
+): AsyncGenerator<[IStorageKey, TValue], void, unknown> {
+  /** State initializes on the first native advance, preserving the original lazy input boundary. */
+  const iteratorState = { indexedDbContext, range, ctx } as IIndexedDbRecordIterator<TValue>
+
+  iteratorState.rangeSnapshot = snapshotKeyRange(iteratorState.range, StorageBackend.indexedDb)
+
+  assertLive(iteratorState.indexedDbContext)
+
+  /** One reporter shared by every abort subscription inside this iteration operation. */
+  iteratorState.runtime = createStorageOperationRuntime()
+  iteratorState.merged = mergeSignals(iteratorState.ctx, iteratorState.runtime.reporter)
+  iteratorState.signal = iteratorState.merged.signal
+  iteratorState.disposeSignal = iteratorState.merged.dispose
+  iteratorState.context = iteratorState.merged.context
+
+  iteratorState.pageSize = iteratorState.context?.pageSize ?? 128
+
+  iteratorState.lower = iteratorState.rangeSnapshot?.lower
+
+  iteratorState.lowerOpen = iteratorState.rangeSnapshot?.lowerOpen
+
+  try {
+    while (true) {
+      throwIfAborted(iteratorState.signal)
+      const pageRange =
+        iteratorState.lower === undefined && iteratorState.rangeSnapshot?.upper === undefined
+          ? undefined
+          : {
+              lower: iteratorState.lower,
+              lowerOpen: iteratorState.lowerOpen,
+              upper: iteratorState.rangeSnapshot?.upper,
+              upperOpen: iteratorState.rangeSnapshot?.upperOpen
+            }
+      const page = await withMutationLease(iteratorState.indexedDbContext, (lease) =>
+        readIndexedDbRecordPage(iteratorState, pageRange, lease)
+      )
+      if (page.length === 0) return
+      for (const entry of page) {
+        throwIfAborted(iteratorState.signal)
+        yield entry
+      }
+      if (page.length < iteratorState.pageSize) return
+      iteratorState.lower = page[page.length - 1]![0]
+      iteratorState.lowerOpen = true
+    }
+  } finally {
+    iteratorState.disposeSignal()
+  }
+}
+/** Bind private journal operations to the original physical database and generation. */
+function createIndexedDbPhysicalJournal<TValue>(
+  indexedDbContext: IIndexedDbContext<TValue>
+): IStorageJournalBackendBinding {
+  return {
+    requiresIndexedDbUndo: true,
+    forOrg: (orgId) =>
+      (indexedDbContext.orgBinding?.resolve(orgId) ?? indexedDbContext.physical).journalBinding,
+    lockTarget: (target) => indexedDbJournalTarget(target).lock,
+    changes: (scope) => journalNative(indexedDbContext, scope).images.changes(),
+    readImage: (scope, target) =>
+      runTransactionOperation(scope, () =>
+        journalNative(indexedDbContext, scope).images.readImage(target)
+      ),
+    writeImage: (scope, target, image) =>
+      runTransactionOperation(scope, () =>
+        journalNative(indexedDbContext, scope).images.writeImage(target, image)
+      ),
+    readRevision: (scope, target) =>
+      runTransactionOperation(scope, () =>
+        journalNative(indexedDbContext, scope).images.readRevision(target)
+      ),
+    openNamespace: async (prefix) => {
+      assertLive(indexedDbContext)
+      if (typeof prefix !== 'string' || prefix.length === 0)
+        throw new StorageContractError(StorageContractErrorCode.invalidArgument)
+      if (indexedDbContext.keyRange === undefined)
+        throw new StorageContractError(StorageContractErrorCode.unsupported)
+      /** Private methods and cached index reads retain this original physical generation. */
+      const generation = indexedDbContext.journalGeneration
+      const authenticate = (scope: Omit<ITransactionScope, 'use'>) => {
+        const info = assertTransactionOwner(indexedDbContext.construction.store, scope)
+        const current = indexedDbContext.nativeTransactions.get(info.id)
+        if (current === undefined)
+          throw new StorageContractError(StorageContractErrorCode.invalidArgument)
+        return { info, port: current.journal(scope, prefix) }
+      }
+      return createBackendJournalNamespace({
+        assertLive: () => {
+          assertLive(indexedDbContext)
+          if (generation !== indexedDbContext.journalGeneration)
+            throw new StorageContractError(StorageContractErrorCode.disposed)
+        },
+        closingSignal: indexedDbContext.controller.closingSignal,
+        backend: StorageBackend.indexedDb,
+        report: (error) => reportCleanupError(indexedDbContext.coordinationReporter, error),
+        nativeAtomic: true,
+        indexExclusive:
+          indexedDbContext.webLocks === undefined &&
+          indexedDbContext.journalFactoryIsPrivate !== true
+            ? false
+            : undefined,
+        reserve: (hold) =>
+          indexedDbContext.webLocks === undefined &&
+          indexedDbContext.journalFactoryIsPrivate !== true
+            ? hold()
+            : runWithConcurrency(
+                {
+                  store: indexedDbContext.store,
+                  options: { lock: [storageJournalLockKey(prefix, StorageJournalLock.resource)] },
+                  policy: ConcurrencyPolicy.fail()
+                },
+                {
+                  attempt: (context) =>
+                    indexedDbContext.coordination.keyPort.attemptMetadata(
+                      context,
+                      {
+                        status: ConcurrencyHolderState.held,
+                        owner: indexedDbContext.controller.origin,
+                        label: indexedDbContext.ownerLabel,
+                        scope: 'local',
+                        since: Date.now()
+                      },
+                      {
+                        attempt: async () => {
+                          if (indexedDbContext.webLocks !== undefined) {
+                            /**
+                             * Native Web Locks owns lifetime exclusion; no expiring metadata lease
+                             * is substituted.
+                             */
+                            const name = encodeFlatStorageKey([
+                              IndexedDbJournalLayout.resource,
+                              indexedDbContext.dbName,
+                              prefix
+                            ])
+                            await indexedDbContext.webLocks
+                              .request(
+                                name,
+                                { mode: 'exclusive', ifAvailable: true },
+                                async (lock) => {
+                                  if (lock === null)
+                                    throw new StorageContractError(
+                                      StorageContractErrorCode.lockRejected
+                                    )
+                                  await hold()
+                                }
+                              )
+                              .catch((cause: unknown) => {
+                                throw normalizeIndexedDbOperationError(cause)
+                              })
+                          } else await hold()
+                          return { status: 'committed', value: undefined }
+                        }
+                      },
+                      indexedDbContext.runtime.stageBindings.concurrencyStages(
+                        indexedDbContext.construction.store
+                      ),
+                      indexedDbContext.controller.closingSignal
+                    )
+                }
+              ),
+        authenticate,
+        transaction: (work) =>
+          withMutationLease(indexedDbContext, (lease) =>
+            runTransaction(
+              indexedDbContext,
+              (scope) => work(authenticate(scope).port),
+              { lock: [storageJournalLockKey(prefix, StorageJournalLock.head)] },
+              lease,
+              false,
+              undefined,
+              false
+            )
+          )
+      })
+    }
+  }
+}
+
+/** A native page owns only its selected rows and exhaustion result. */
+type IIndexedDbIndexPage<TValue> = {
+  /** Continuation, cancellation and epochs remain with the original iterator. */
+  readonly iteratorState: IIndexedDbIndexIterator<TValue>
+  /** At most the original page bound of selected native values is retained. */
+  readonly page: Array<[IStorageKey, TValue]>
+  /** The original native cursor reports whether another page can exist. */
+  cursorExhausted: boolean
+}
+/** Read one original native index page through the same mutation lease and canonical transaction. */
+function readIndexedDbIndexPage<TValue>(pageState: IIndexedDbIndexPage<TValue>): Promise<void> {
+  return withMutationLease(pageState.iteratorState.indexedDbContext, (lease) =>
+    runTransaction(
+      pageState.iteratorState.indexedDbContext,
+      (scope) => readIndexedDbIndexNativePage(pageState, scope),
+      {
+        signal: pageState.iteratorState.signal,
+        ...(pageState.iteratorState.context?.orgId === undefined
+          ? {}
+          : { orgId: pageState.iteratorState.context.orgId })
+      },
+      lease,
+      false,
+      {
+        executeAttempt: (_context, proceed) => proceed(),
+        lock: () => [],
+        ranges: () => [
+          {
+            channel: 'record',
+            ...snapshotConcurrencyLockRange({ channel: 'record' }, StorageBackend.indexedDb)
+          }
+        ],
+        notification: { channel: 'record', kind: 'remove' }
+      }
+    )
+  )
+}
+
+/** Scan one authenticated native index page in its original transaction. */
+async function readIndexedDbIndexNativePage<TValue>(
+  pageState: IIndexedDbIndexPage<TValue>,
+  scope: IIndexedDbTransactionScope<TValue>
+): Promise<void> {
+  const { id } = assertTransactionOwner(
+    pageState.iteratorState.indexedDbContext.construction.store,
+    scope
+  )
+  const nativeState = pageState.iteratorState.indexedDbContext.nativeTransactions.get(id)
+  if (nativeState === undefined)
+    throw new StorageContractError(StorageContractErrorCode.invalidArgument)
+  const transaction = nativeState.native
+  await assertIndexedDbIndexPage(pageState, transaction)
+  const index = transaction.objectStore(INDEX_RECORDS_STORE_NAME).index('lookup')
+  /**
+   * The boundary group's index key ([scope, indexName, generation, indexValue]) is bound
+   * inclusively so records tied with the last-visited entry are not dropped; already-visited ties
+   * are skipped below by comparing full primary keys.
+   */
+  const continuationIndexKey = pageState.iteratorState.continuation?.slice(0, 4)
+  const cursorRange = toIdbRecordIndexRange(
+    pageState.iteratorState.range,
+    pageState.iteratorState.prefix,
+    pageState.iteratorState.indexedDbContext.keyRange!,
+    pageState.iteratorState.direction,
+    pageState.iteratorState.continuation
+  )
+  const cursorRequest = index.openKeyCursor(cursorRange, pageState.iteratorState.direction)
+  let cursor = (await fromIdbRequest(
+    cursorRequest,
+    { signal: pageState.iteratorState.signal },
+    pageState.iteratorState.runtime
+  )) as IDBCursor | null
+  cursor = await seekIndexedDbIndexCursor(pageState, cursorRequest, cursor, continuationIndexKey)
+  let scannedInPage = 0
+  while (cursor !== null && scannedInPage < pageState.iteratorState.pageSize) {
+    assertLive(pageState.iteratorState.indexedDbContext)
+    throwIfAborted(pageState.iteratorState.signal)
+    scannedInPage += 1
+    const lookupKey = cursor.key
+    if (
+      !Array.isArray(lookupKey) ||
+      lookupKey.length !== 4 ||
+      lookupKey[0] !== pageState.iteratorState.prefix[0] ||
+      lookupKey[1] !== pageState.iteratorState.prefix[1] ||
+      lookupKey[2] !== pageState.iteratorState.prefix[2]
+    ) {
+      cursor.continue()
+      cursor = (await fromIdbRequest(
+        cursorRequest,
+        { signal: pageState.iteratorState.signal },
+        pageState.iteratorState.runtime
+      )) as IDBCursor | null
+      continue
+    }
+    const primaryKey = cursor.primaryKey as IDBValidKey[]
+    pageState.iteratorState.continuation = primaryKey
+    const recordKey = primaryKey[4] as IStorageKey
+    const indexValue = primaryKey[3] as IStorageKey
+    if (isStorageKeyInRange(indexValue, pageState.iteratorState.range)) {
+      const value = await scope.getRecord(recordKey)
+      if (value === undefined && !(await nativeState.expiredRecord(recordKey)))
+        pageState.iteratorState.runtime.reporter(
+          new StorageError(
+            StorageErrorCode.indexOrphan,
+            { backend: StorageBackend.indexedDb, key: recordKey },
+            StorageErrorText.indexOrphan
+          )
+        )
+      else if (value !== undefined) pageState.page.push([recordKey, value])
+    }
+    cursor.continue()
+    cursor = (await fromIdbRequest(
+      cursorRequest,
+      { signal: pageState.iteratorState.signal },
+      pageState.iteratorState.runtime
+    )) as IDBCursor | null
+  }
+  pageState.cursorExhausted = cursor === null
+  // Account only this page's own TTL removals; unrelated between-page mutations still invalidate.
+  pageState.iteratorState.expectedEpoch = await nativeState.recordEpoch(
+    pageState.iteratorState.query.handle.scope
+  )
+}
+
+/** Reject epoch, generation or readiness changes before this page opens its original cursor. */
+async function assertIndexedDbIndexPage<TValue>(
+  pageState: IIndexedDbIndexPage<TValue>,
+  transaction: IDBTransaction
+): Promise<void> {
+  const revisionsStore = transaction.objectStore(REVISIONS_STORE_NAME)
+  const globalEpoch =
+    ((await fromIdbRequest(
+      revisionsStore.get(RECORD_EPOCH_KEY) as IDBRequest<number | undefined>,
+      { signal: pageState.iteratorState.signal },
+      pageState.iteratorState.runtime
+    )) as number | undefined) ?? 0
+  const scopeEpoch =
+    ((await fromIdbRequest(
+      revisionsStore.get(
+        indexScopeEpochKey(pageState.iteratorState.query.handle.scope)
+      ) as IDBRequest<number | undefined>,
+      { signal: pageState.iteratorState.signal },
+      pageState.iteratorState.runtime
+    )) as number | undefined) ?? 0
+  if (pageState.iteratorState.expectedEpoch === undefined)
+    pageState.iteratorState.expectedEpoch = { global: globalEpoch, scope: scopeEpoch }
+  else if (
+    pageState.iteratorState.expectedEpoch.global !== globalEpoch ||
+    pageState.iteratorState.expectedEpoch.scope !== scopeEpoch
+  )
+    throw new StorageError(
+      StorageErrorCode.indexQueryInvalidated,
+      { backend: StorageBackend.indexedDb },
+      StorageErrorText.indexQueryInvalidated
+    )
+  const state = (await fromIdbRequest(
+    transaction
+      .objectStore(META_STORE_NAME)
+      .get(indexMetadataKey(pageState.iteratorState.query.handle.scope)),
+    { signal: pageState.iteratorState.signal },
+    pageState.iteratorState.runtime
+  )) as { handle?: IRecordIndexHandle; readiness?: IRecordIndexReadiness } | undefined
+  if (state?.handle?.generation !== pageState.iteratorState.query.handle.generation)
+    throw staleIndexHandleError()
+  if (state.readiness?.status !== 'complete')
+    throw new StorageError(StorageErrorCode.unavailable, {
+      backend: StorageBackend.indexedDb,
+      cause: new Error('record index is not complete; caller must use fallback scan')
+    })
+}
+/** Seek past the prior physical continuation with the original inclusive native-key rules. */
+async function seekIndexedDbIndexCursor<TValue>(
+  pageState: IIndexedDbIndexPage<TValue>,
+  cursorRequest: IDBRequest<IDBCursor | null>,
+  cursor: IDBCursor | null,
+  continuationIndexKey: IDBValidKey[] | undefined
+): Promise<IDBCursor | null> {
+  if (
+    cursor !== null &&
+    pageState.iteratorState.continuation !== undefined &&
+    continuationIndexKey !== undefined
+  ) {
+    /**
+     * The inclusive range may land the fresh cursor before, exactly at, or already past the
+     * last-visited entry, and each case needs different handling: `continuePrimaryKey` throws
+     * `DataError` if asked to move to a position at-or-before the cursor's _current_ one (per spec,
+     * even requesting the cursor's own exact position is rejected), so an exact match must use a
+     * plain single-step `continue()` instead, and an already-past position needs no skip at all.
+     * When the cursor is still strictly before the previous continuation (earlier not-yet-skipped
+     * ties in the same index-key group), `continuePrimaryKey` jumps straight past it in one
+     * engine-side seek. Either branch is O(1) regardless of tie-group size, unlike a JS walk over
+     * every already-emitted tied entry, which would be `Θ(G)` per page and quadratic across a group
+     * spanning multiple pages (paging requires `O(pageSize)` per page to avoid resource
+     * exhaustion).
+     */
+    const currentPrimaryKey = cursor.primaryKey as IDBValidKey[]
+    const comparison = compareStorageKeys(
+      currentPrimaryKey as unknown as IStorageKey,
+      pageState.iteratorState.continuation as unknown as IStorageKey
+    )
+    const isBeforeContinuation =
+      pageState.iteratorState.direction === 'prev' ? comparison > 0 : comparison < 0
+    if (isBeforeContinuation) {
+      /**
+       * `continuePrimaryKey` finds the first record whose (index key, primary key) is _inclusive_
+       * of the given pair — it may land exactly back on `continuation` itself if that sidecar row
+       * still exists, not strictly past it. The single `.continue()` correction below then steps
+       * past it deterministically.
+       */
+      cursor.continuePrimaryKey(
+        continuationIndexKey,
+        pageState.iteratorState.continuation as unknown as IDBValidKey
+      )
+      cursor = (await fromIdbRequest(
+        cursorRequest,
+        { signal: pageState.iteratorState.signal },
+        pageState.iteratorState.runtime
+      )) as IDBCursor | null
+    }
+    if (cursor !== null) {
+      const landedPrimaryKey = cursor.primaryKey as IDBValidKey[]
+      const stillAtContinuation =
+        compareStorageKeys(
+          landedPrimaryKey as unknown as IStorageKey,
+          pageState.iteratorState.continuation as unknown as IStorageKey
+        ) === 0
+      if (stillAtContinuation) {
+        cursor.continue()
+        cursor = (await fromIdbRequest(
+          cursorRequest,
+          { signal: pageState.iteratorState.signal },
+          pageState.iteratorState.runtime
+        )) as IDBCursor | null
+      }
+    }
+  }
+  return cursor
+}
+
+/** Native record-cursor inputs borrow the original transaction, deadline access and reporter. */
+type IIndexedDbRecordCursorOptions<TValue> = {
+  readonly indexedDbContext: IIndexedDbContext<TValue>
+  readonly transaction: IDBTransaction
+  readonly request: IDBRequest<IDBCursorWithValue | null>
+  readonly access: ReturnType<typeof createNativeDataAccess<TValue>>
+  readonly signal: ReturnType<typeof mergeSignals>['signal']
+  readonly runtime: IStorageOperationRuntime
+  readonly pageSize: number
+}
+
+/** Own one original cursor terminal without adding another native transaction or resource scope. */
+class IndexedDbRecordCursor<TValue> {
+  /** Native ports retain exactly the page transaction and request already opened by the iterator. */
+  #options: IIndexedDbRecordCursorOptions<TValue>
+  /** Selected live records remain bounded by the original native page size. */
+  #values: Array<[IStorageKey, TValue]> = []
+  /** Native completion succeeds only after cursor exhaustion or the original page boundary. */
+  #cursorFinished = false
+  /** Exactly one native outcome releases the abort subscription and settles this page. */
+  #settled = false
+  /** Cancellation retains its original reason until the native abort event chooses the result. */
+  #cancelled = false
+  /** The original abort reason remains reachable on the contract error. */
+  #abortReason: unknown
+  /** Native setup may settle before abort subscription registration completes. */
+  #disposeAbort: () => void = () => {}
+  /** The sole page promise resolves after physical completion and commit-only notifications. */
+  #resolve!: (values: Array<[IStorageKey, TValue]>) => void
+  /** The sole page promise rejects with the original cursor error policy. */
+  #reject!: (cause: unknown) => void
+
+  /** Borrow existing native ports; no handlers or subscriptions are installed until run. */
+  constructor(options: IIndexedDbRecordCursorOptions<TValue>) {
+    this.#options = options
+  }
+
+  /** Install handlers synchronously inside the original page promise executor. */
+  run(): Promise<Array<[IStorageKey, TValue]>> {
+    return new Promise((resolve, reject) => {
+      this.#resolve = resolve
+      this.#reject = reject
+      this.#install()
+    })
+  }
+
+  /** Settle the original terminal once and release its exact abort subscription first. */
+  #finish(callback: () => void): void {
+    if (this.#settled) return
+    this.#settled = true
+    this.#disposeAbort()
+    callback()
+  }
+
+  /** Preserve contract errors and the existing native cursor normalization boundary. */
+  #failure(cause: unknown): StorageError | StorageContractError {
+    return isStorageContractError(cause)
+      ? cause
+      : new StorageError(StorageErrorCode.transactionFailed, {
+          backend: StorageBackend.indexedDb,
+          operation: StorageOperation.indexedDbCursor,
+          cause: cause instanceof StorageError ? (cause.cause ?? cause) : cause
+        })
+  }
+
+  /** Request original native rollback while retaining cancellation as the primary outcome. */
+  #abort(): void {
+    this.#cancelled = true
+    this.#abortReason = readAbortReason(this.#options.signal)
+    try {
+      this.#options.transaction.abort()
+    } catch {
+      this.#finish(() =>
+        this.#reject(
+          new StorageContractError(StorageContractErrorCode.aborted, { cause: this.#abortReason })
+        )
+      )
+    }
+  }
+
+  /** Publish original expiry removals only after the page transaction physically completes. */
+  #complete(): void {
+    this.#finish(() => {
+      if (this.#cancelled) {
+        this.#reject(
+          new StorageContractError(StorageContractErrorCode.aborted, { cause: this.#abortReason })
+        )
+        return
+      }
+      if (!this.#cursorFinished) {
+        this.#reject(
+          this.#failure(new Error('IndexedDB transaction completed before cursor finished'))
+        )
+        return
+      }
+      for (const [channel, keys] of this.#options.access.changed)
+        if (keys.size > 0)
+          publishChange(this.#options.indexedDbContext, {
+            channel,
+            kind: 'remove',
+            keys: [...keys.values()]
+          })
+      this.#resolve(this.#values)
+    })
+  }
+
+  /** Preserve the original native error event and its cursor-owned failure metadata. */
+  #nativeError(): void {
+    this.#finish(() =>
+      this.#reject(this.#failure(readIdbTransactionError(this.#options.transaction)))
+    )
+  }
+
+  /** Native abort selects cancellation only when the original signal requested it. */
+  #nativeAbort(): void {
+    this.#finish(() =>
+      this.#reject(
+        this.#cancelled
+          ? new StorageContractError(StorageContractErrorCode.aborted, { cause: this.#abortReason })
+          : this.#failure(readIdbTransactionError(this.#options.transaction))
+      )
+    )
+  }
+
+  /** Keep native request activity and asynchronous TTL removal on the original callback path. */
+  #requestSuccess(): void {
+    void this.#advance().catch((cause) => {
+      this.#finish(() => this.#reject(this.#failure(cause)))
+      try {
+        this.#options.transaction.abort()
+      } catch {
+        /* Native end already owns cleanup. */
+      }
+    })
+  }
+
+  /** Read cursor fields before TTL work and finish indexes at the original page boundary. */
+  async #advance(): Promise<void> {
+    /** Native cursor identity belongs to the current request activity window. */
+    const cursor = readIdbRequestResult(this.#options.request)
+    if (cursor === null || this.#values.length >= this.#options.pageSize) {
+      await this.#options.access.finishIndexes()
+      this.#cursorFinished = true
+      return
+    }
+    /** Original key and value detach from cursor movement before any TTL request can run. */
+    const key = cursor.key as IStorageKey
+    /** Native structured-clone output remains the row yielded by this page. */
+    const value = cursor.value as TValue
+    if (await this.#options.access.ttlAccess.present('record', key)) this.#values.push([key, value])
+    if (this.#values.length < this.#options.pageSize) cursor.continue()
+    else {
+      await this.#options.access.finishIndexes()
+      this.#cursorFinished = true
+    }
+  }
+
+  /** Request errors settle through the same original cursor normalization path. */
+  #requestFailure(): void {
+    this.#finish(() => this.#reject(this.#failure(readIdbRequestError(this.#options.request))))
+  }
+
+  /** Native setup keeps its original handler order, subscription point and rollback behavior. */
+  #install(): void {
+    try {
+      installIdbTransactionHandlers(
+        this.#options.transaction,
+        () => this.#complete(),
+        () => this.#nativeError(),
+        () => this.#nativeAbort()
+      )
+      installIdbRequestHandlers(
+        this.#options.request,
+        () => this.#requestSuccess(),
+        () => this.#requestFailure()
+      )
+      this.#disposeAbort = subscribeToAbort(
+        this.#options.signal,
+        () => this.#abort(),
+        this.#options.runtime.reporter
+      )
+    } catch (cause) {
+      this.#finish(() =>
+        this.#reject(
+          isStorageContractError(cause) ||
+            (cause instanceof StorageError && cause.code === StorageErrorCode.invalidConfig)
+            ? cause
+            : this.#failure(cause)
+        )
+      )
+      try {
+        this.#options.transaction.abort()
+      } catch {
+        /* Setup failure already owns the result. */
+      }
+    }
+  }
+}
+
+/** Read one native record page on the original journal or direct cursor path. */
+async function readIndexedDbRecordPage<TValue>(
+  iteratorState: IIndexedDbRecordIterator<TValue>,
+  pageRange: IKeyRange | undefined,
+  lease: IMutationLeaseContext
+): Promise<Array<[IStorageKey, TValue]>> {
+  if (iteratorState.indexedDbContext.runtimeJournal !== undefined)
+    return runTransaction(
+      iteratorState.indexedDbContext,
+      async (scope) => {
+        const values: Array<[IStorageKey, TValue]> = []
+        for await (const entry of scope.iterateRecords(pageRange)) {
+          values.push(entry)
+          if (values.length >= iteratorState.pageSize) break
+        }
+        return values
+      },
+      { ...iteratorState.context, signal: iteratorState.signal },
+      lease,
+      false,
+      {
+        read: true,
+        executeAttempt: (_context, proceed) => proceed(),
+        lock: () => [],
+        ranges: () => [],
+        notification: { channel: 'record', kind: 'remove' }
+      }
+    )
+  const database = await open(iteratorState.indexedDbContext, iteratorState.runtime, lease)
+  assertLive(iteratorState.indexedDbContext)
+  const transaction = createTransaction(
+    database,
+    [
+      iteratorState.indexedDbContext.kvStoreName,
+      iteratorState.indexedDbContext.bytesStoreName,
+      iteratorState.indexedDbContext.recordsStoreName,
+      META_STORE_NAME,
+      REVISIONS_STORE_NAME,
+      INDEX_RECORDS_STORE_NAME
+    ],
+    'readwrite'
+  )
+  /** The original cursor owns this native lifetime; only physical mutations are shared. */
+  const access = createNativeDataAccess(
+    iteratorState.indexedDbContext,
+    transaction,
+    undefined,
+    iteratorState.runtime,
+    (make) => fromIdbRequest(make(), undefined, iteratorState.runtime),
+    (
+      channel: 'value' | 'bytes' | 'record',
+      key: IStorageKey,
+      context?: Parameters<IIndexedDbContext<TValue>['coordination']['keyPort']['probe']>[2]
+    ) => assertExpiryRemoval(iteratorState.indexedDbContext, channel, key, context)
+  )
+  const store = transaction.objectStore(iteratorState.indexedDbContext.recordsStoreName)
+  const idbRange = toIdbRange(pageRange, iteratorState.indexedDbContext.keyRange)
+  const request = idbRange ? store.openCursor(idbRange) : store.openCursor()
+  const values = await new IndexedDbRecordCursor<TValue>({
+    indexedDbContext: iteratorState.indexedDbContext,
+    transaction,
+    request,
+    access,
+    signal: iteratorState.signal,
+    runtime: iteratorState.runtime,
+    pageSize: iteratorState.pageSize
+  }).run()
+  return values
 }
