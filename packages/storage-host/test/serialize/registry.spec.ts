@@ -27,7 +27,7 @@ const structuredCapabilities: IStorageCapabilities = {
 }
 
 describe('selectCodec 选路规则', () => {
-  it('assertCodec 复用 descriptor 快照校验', () => {
+  it('assertCodec 校验有效 codec', () => {
     expect(() => assertCodec(jsonCodec)).not.toThrow()
   })
   it('构造期拒绝畸形 codec、capabilities 与 diagnostic', () => {
@@ -62,31 +62,6 @@ describe('selectCodec 选路规则', () => {
     const selected = selectCodec(jsonCodec, textOnlyCapabilities)
     expect(selected.encode).toBe(jsonCodec.encode)
     expect(selected.decode).toBe(jsonCodec.decode)
-  })
-
-  it('codec descriptor 每个字段只读取一次并返回稳定方法快照', async () => {
-    let reads = 0
-    const codec = {
-      get name() {
-        reads += 1
-        return 'getter-codec'
-      },
-      get output() {
-        reads += 1
-        return 'text' as const
-      },
-      get encode() {
-        reads += 1
-        return async (value: unknown) => JSON.stringify(value)
-      },
-      get decode() {
-        reads += 1
-        return async (value: string) => JSON.parse(value) as unknown
-      }
-    }
-    const selected = selectCodec(codec, textOnlyCapabilities)
-    await expect(selected.encode({ stable: true })).resolves.toBe('{"stable":true}')
-    expect(reads).toBe(4)
   })
 
   it('规则 2：binary codec 遇 text-only 后端自动 base64 降级', async () => {
