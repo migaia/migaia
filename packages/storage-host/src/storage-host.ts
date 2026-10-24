@@ -1533,6 +1533,11 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
           return Promise.reject(new StorageContractError(StorageContractErrorCode.unsupported))
         return value.runRedo(run)
       },
+      beginRedo: (scope) => {
+        const value = prepared()
+        if (value === undefined || !('runRedo' in value)) return undefined
+        return value.begin(scope)
+      },
       active: () => prepared() !== undefined,
       headLocks: () => prepared()?.headLocks ?? [],
       begin: (scope: Omit<import('@migaia/storage-contract').ITransactionScope, 'use'>) =>

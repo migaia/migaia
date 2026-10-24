@@ -64,6 +64,8 @@ export type IStorageJournalExecutionPort = {
   prepare(): Promise<void>
   /** Original text owners hold native protection across recovery and the complete operation. */
   runRedo?<R>(run: () => Promise<R>): Promise<R>
+  /** The original owner authenticates an exact text-only scope without fake record methods. */
+  beginRedo?(scope: object): IStorageJournalRedoAttempt | undefined
   headLocks(): readonly ILockKey[]
   active(): boolean
   begin(scope: Omit<ITransactionScope, 'use'>): IStorageJournalAttempt | undefined
@@ -119,11 +121,17 @@ export type IStorageJournalChange = Readonly<{
   after: IStorageJournalImage
   afterRevision: ILogPayload
 }>
+/** Exact text-only scopes retain the same original transaction authentication and finalizer. */
+export type IStorageJournalRedoAttempt = {
+  readonly txId: string
+  record(scope: object): Promise<void>
+}
 /** A text owner applies only a prepared draft and keeps native protection/lifetime ownership. */
 export type IStorageJournalRedoBinding = {
-  transactionInfo(scope: Omit<ITransactionScope, 'use'>): ITransactionInfo
+  transactionInfo(scope: object): ITransactionInfo
+  changes(scope: object): readonly IStorageJournalChange[]
   protect<R>(run: () => Promise<R>): Promise<R>
-  apply(scope: Omit<ITransactionScope, 'use'>): void
+  apply(scope: object): void
   replay(changes: readonly IStorageJournalChange[]): void
   seal(cause: unknown): void
 }

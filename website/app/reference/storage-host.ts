@@ -447,6 +447,14 @@ console.log(host.extensions.label('draft'))`,
     }
   },
   types: {
+    IStorageJournalRedoAttempt: {
+      summary: t(
+        'Exact text-only txId and record(scope), authenticated by the original transaction owner without record/bytes placeholders.',
+        '精确 text-only txId 与 record(scope)，由原事务拥有者认证，不伪造 record/bytes 方法。'
+      ),
+      example: storageHostCases.IStorageJournalRedoAttempt![0]!.example,
+      members: {}
+    },
     IStorageJournalRedoBinding: {
       summary: t(
         'Original text scope authentication, native protect/apply/replay/seal callbacks. No new queue, raw store, native transaction or close authority is returned.',

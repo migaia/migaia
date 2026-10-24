@@ -20,6 +20,24 @@ console.log(decodeStorageJournalImage(image).value)`,
 ]
 /** Application extensions retain their exact inputs while the host owns installation and cleanup. */
 export const storageHostCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  IStorageJournalRedoAttempt: [
+    {
+      title: t('Record only an authentic text scope', '只记录真实文本 scope'),
+      problem: t(
+        'A text transaction must not pretend to implement bytes and records.',
+        '文本事务不能伪装成字节与记录事务。'
+      ),
+      example: `import type { IStorageJournalRedoAttempt } from '@migaia/storage-host'
+function record(attempt: IStorageJournalRedoAttempt, scope: object): Promise<void> {
+  return attempt.record(scope)
+}
+console.log(typeof record)`,
+      result: t(
+        'Prints function. The original owner authenticates the supplied scope at runtime; object shape alone grants no authority.',
+        '输出 function；原拥有者在运行时认证 scope，单凭对象形状不授予权限。'
+      )
+    }
+  ],
   IStorageJournalRedoBinding: [
     {
       title: t('Keep redo scope authority bounded', '限制 redo 的 scope 权限'),
