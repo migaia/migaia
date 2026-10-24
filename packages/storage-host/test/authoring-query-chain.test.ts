@@ -2,7 +2,8 @@ import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import {
   compileStorageWhere,
   compileStorageQueryCondition,
-  createRecordQuery
+  createRecordQuery,
+  createRecordQueryWithoutKeyset
 } from '../src/authoring/query.js'
 import {
   assertStorageKey,
@@ -48,6 +49,24 @@ type IOrder = {
 }
 
 describe('canonical declarative conditions', () => {
+  it('omits keyset execution while retaining ordinary queries and the caller missing-unit error', async () => {
+    const execute = vi.fn(() => ownedRows([{ total: 12 }, { total: 9 }]))
+    const failure = new StorageContractError(StorageContractErrorCode.unsupported)
+    const missing = vi.fn((): never => {
+      throw failure
+    })
+    const query = createRecordQueryWithoutKeyset<{ total: number }>(
+      { pushdown: { source: 'without-keyset', operations: [], operators: [] }, execute },
+      undefined,
+      missing
+    )
+    expect(await query.where('total', 'gte', 10).select('total').all()).toEqual([{ total: 12 }])
+    expect(() => query.after({} as never)).toThrow(failure)
+    await expect(query.select('total').page(1)).rejects.toBe(failure)
+    expect(missing).toHaveBeenCalledTimes(2)
+    expect(execute).toHaveBeenCalledTimes(1)
+  })
+
   it('compiles source-supplied canonical AST with the original condition compiler', async () => {
     const candidates: IOrder[] = [
       { status: 'paid', total: 12, created: new Date(10) },

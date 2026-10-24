@@ -1,3 +1,4 @@
+import { missingEntityFeature } from './assembly.js'
 import { EntityFeatureName } from './constants.js'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { asyncDisposeKey } from '@migaia/plugin-host'
@@ -12,7 +13,7 @@ import {
   type IRecordQueryBase
 } from '@migaia/storage-contract'
 import { snapshotStorageKey, encodeOrderedStorageKey } from '../authoring/key.js'
-import { createRecordQuery, compileStorageQueryCondition } from '../authoring/query.js'
+import { createRecordQueryWithoutKeyset, compileStorageQueryCondition } from '../authoring/query.js'
 import {
   deriveTransactionIterator,
   nextTransactionIterator,
@@ -33,7 +34,7 @@ import {
   repositoryEntityRange
 } from './key.js'
 import { decodeFlatStorageKey, encodeFlatStorageKey, snapshotKeyRange } from '../core/key-domain.js'
-import { isStorageKeyInRange } from '../core/query.js'
+import { isStorageKeyInRange } from '../core/query-state.js'
 
 import { createStorageOperationRuntime } from '../core/operation-reporter.js'
 import { EntityText } from './text.js'
@@ -107,6 +108,12 @@ export class EntityQueryOwner<
     this.#context = context
   }
 
+  /** Select only the explicitly installed keyset constructor while sharing this query owner. */
+  createQuery: typeof createRecordQueryWithoutKeyset = (source, methods) => {
+    /** Presence selects the real owner; no optional implementation is imported on this path. */
+    const query = this.#context.keysetQuery ?? createRecordQueryWithoutKeyset
+    return query(source, methods, () => missingEntityFeature(EntityFeatureName.keyset))
+  }
   /** Reuse the original repository operation through its explicit owner context. */
   invalidAction = (
     issue: IInvalidRecordIssue<TDomain>,
@@ -293,7 +300,7 @@ export class EntityQueryOwner<
         backend: this.#context.store.backend,
         cause: new TypeError(EntityText.comparatorLimit)
       })
-    const source = createRecordQuery<TDomain>({
+    const source = this.createQuery<TDomain>({
       asyncDisposeKey,
       pushdown: { source: EntityState.querySource, operations: [], operators: [] },
       execute: () =>
@@ -476,6 +483,7 @@ export class EntityQueryOwner<
     return createEntityQuery<TDomain, TIndexes, C, TAugmentMethods>({
       predicate: this.queryPredicate,
       keyset: (invoke) => this.#context.runKeyset(invoke),
+      query: this.createQuery,
       selector: this.querySelector,
       mapper: this.queryMapper,
       comparator: this.queryComparator,

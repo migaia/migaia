@@ -974,6 +974,10 @@ export class EntityRepositoryOwner<
   get runKeyset(): IEntityKeysetOwner['run'] {
     return this.#feature<IEntityKeysetOwner>(EntityFeatureName.keyset).run
   }
+  /** An absent keyset unit never imports or constructs its query implementation. */
+  get keysetQuery(): IEntityKeysetOwner['query'] | undefined {
+    return (this.#features.get(EntityFeatureName.keyset) as IEntityKeysetOwner | undefined)?.query
+  }
   /** Read only assembly presence; this never constructs another capability. */
   hasFeature(name: string): boolean {
     return this.#features.has(name)
