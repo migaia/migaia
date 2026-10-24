@@ -161,6 +161,12 @@ export class EntityQueryOwner<
     handler: IInvalidRecordAction | IInvalidRecordHandler<TDomain> | undefined,
     issue: IInvalidRecordIssue<TDomain>
   ): IInvalidRecordAction => {
+    /** Missing assembly is an operation failure, never corrupt data eligible for skipping. */
+    if (
+      isStorageErrorFamily(issue.cause) &&
+      issue.cause.code === StorageErrorCode.entityFeatureRequired
+    )
+      throw issue.cause
     if (handler === undefined || handler === 'skip' || handler === 'throw') return handler ?? 'skip'
     if (typeof handler !== 'function')
       throw new StorageError(StorageErrorCode.invalidConfig, {

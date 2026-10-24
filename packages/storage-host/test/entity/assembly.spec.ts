@@ -49,6 +49,18 @@ describe('explicit entity assembly', () => {
     await expect(repository.query().page(1)).rejects.toMatchObject(missing('keyset'))
   })
 
+  it('never hides a missing migration assembly behind the invalid-record skip policy', async () => {
+    const store = await memoryBackend()
+    await store.putRecord({ version: 2, state: { id: 'a', group: 'one' } }, ['query-version', 'a'])
+    const repository = defineEntity<IRow>({
+      name: 'query-version',
+      key: 'id',
+      features: [entityQueryFeature()]
+    }).connect(store)
+    await expect(repository.query().all()).rejects.toMatchObject(missing('migration'))
+    await expect(repository.list({ onInvalid: 'skip' })).rejects.toMatchObject(missing('migration'))
+  })
+
   it('admits keyset only through its independent assembly and keeps the original cursor path', async () => {
     const repository = defineEntity<IRow>({
       name: 'keyset',
