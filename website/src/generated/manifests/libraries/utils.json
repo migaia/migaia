@@ -6969,7 +6969,7 @@
           "source": "packages/utils/dist/maybe.d.ts",
           "purpose": "Presence union that distinguishes absent values from a present undefined.",
           "core": "some: True for presence, false for absence; narrow before reading value.\nvalue: Exact T payload, available only on the some:true variant.",
-          "advanced": "",
+          "advanced": "Preserve the distinction between an absent result and a present undefined payload.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -7015,7 +7015,7 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Preserve the distinction between an absent result and a present undefined payload.",
           "notUse": "",
           "sections": [
             {
@@ -7046,7 +7046,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Preserve the distinction between an absent result and a present undefined payload."
             }
           ],
           "declaredConfiguration": [],

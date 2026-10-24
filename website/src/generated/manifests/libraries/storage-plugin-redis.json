@@ -837,8 +837,8 @@
           "signature": "export declare const ERROR_SOURCE: 'storage.backend.redis';",
           "declarationLine": 2,
           "source": "packages/storage-plugin-redis/dist/error-code.d.ts",
-          "purpose": "Registered domain storage.backend.redis.",
-          "core": "Registered domain storage.backend.redis.",
+          "purpose": "Identify the registered storage.backend.redis domain on errors crossing this package boundary.",
+          "core": "Identify the registered storage.backend.redis domain on errors crossing this package boundary.",
           "advanced": "",
           "parameters": ["This const declaration has no parameters."],
           "parameterDetails": [],
@@ -859,7 +859,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Registered domain storage.backend.redis."
+              "content": "Identify the registered storage.backend.redis domain on errors crossing this package boundary."
             },
             {
               "id": "getting-started",
@@ -879,7 +879,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Registered domain storage.backend.redis."
+              "content": "Identify the registered storage.backend.redis domain on errors crossing this package boundary."
             },
             {
               "id": "advanced-usage",
@@ -965,8 +965,8 @@
           "signature": "export type IRedisCapabilities = typeof kv | typeof records | typeof ttl | typeof counter;",
           "declarationLine": 4,
           "source": "packages/storage-plugin-redis/dist/types.d.ts",
-          "purpose": "The original KV, records, TTL and counter tokens.",
-          "core": "The original KV, records, TTL and counter tokens.",
+          "purpose": "Native KV, records, TTL and counter tokens supplied before any selected Feature.",
+          "core": "Native KV, records, TTL and counter tokens supplied before any selected Feature.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -989,7 +989,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "The original KV, records, TTL and counter tokens."
+              "content": "Native KV, records, TTL and counter tokens supplied before any selected Feature."
             },
             {
               "id": "getting-started",
@@ -1009,7 +1009,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The original KV, records, TTL and counter tokens."
+              "content": "Native KV, records, TTL and counter tokens supplied before any selected Feature."
             },
             {
               "id": "advanced-usage",
@@ -1031,7 +1031,7 @@
           "declarationLine": 3,
           "source": "packages/storage-plugin-redis/dist/hooks.d.ts",
           "purpose": "Command name and elapsed time without arguments or payloads.",
-          "core": "Command name and elapsed time without arguments or payloads.",
+          "core": "command: Native command name only; arguments and business payloads are omitted.\nelapsedMs: Observed native command settlement time in milliseconds.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -1093,7 +1093,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Command name and elapsed time without arguments or payloads."
+              "content": "command: Native command name only; arguments and business payloads are omitted.\nelapsedMs: Observed native command settlement time in milliseconds."
             },
             {
               "id": "advanced-usage",
@@ -1230,7 +1230,7 @@
           "source": "packages/storage-plugin-redis/dist/driver.d.ts",
           "purpose": "Native commands, complete connection callbacks and original subscription resources.",
           "core": "command: Borrow a native connection for one string-argument command.\ncommand.args: Command name and string arguments.\nThe validated consumer receives the original unknown native reply.\nwithConnection: Keep the real lease or duplicate until the complete callback settles.\nwithConnection.run: Callback borrowing the genuine connection and its native methods.\nThe original callback value; unknown business failures use TRANSACTION_FAILED.\nsubscribe: Subscribe on a dedicated genuine connection without closing the injected root.\nsubscribe.channel: Native channel string.\nsubscribe.listener: Text-message observer; thrown or rejected failures are reported.\nAn original resource with cached primary and symbolic disposal Promises.",
-          "advanced": "",
+          "advanced": "Share one caller-owned connection pool between storage installation and native commands.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -1297,7 +1297,7 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Share one caller-owned connection pool between storage installation and native commands.",
           "notUse": "",
           "sections": [
             {
@@ -1328,7 +1328,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Share one caller-owned connection pool between storage installation and native commands."
             }
           ],
           "declaredConfiguration": [],
@@ -1344,8 +1344,8 @@
           "signature": "export type IRedisErrorCode = (typeof RedisErrorCode)[keyof typeof RedisErrorCode];",
           "declarationLine": 15,
           "source": "packages/storage-plugin-redis/dist/error-code.d.ts",
-          "purpose": "Registered Redis error code values.",
-          "core": "Registered Redis error code values.",
+          "purpose": "Registered values from the Redis-owned semantic error table.",
+          "core": "Registered values from the Redis-owned semantic error table.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -1368,7 +1368,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Registered Redis error code values."
+              "content": "Registered values from the Redis-owned semantic error table."
             },
             {
               "id": "getting-started",
@@ -1388,7 +1388,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Registered Redis error code values."
+              "content": "Registered values from the Redis-owned semantic error table."
             },
             {
               "id": "advanced-usage",
@@ -1512,7 +1512,7 @@
           "declarationLine": 38,
           "source": "packages/storage-plugin-redis/dist/types.d.ts",
           "purpose": "Borrowed driver and namespace, original concurrency policy and native lock lease.",
-          "core": "Borrowed driver and namespace, original concurrency policy and native lock lease.",
+          "core": "id: Application-assigned backend identifier used by host.backend.\nredis, the default installed backend identifier.\ndriver: Caller-owned native driver from a public adapter or custom implementation.\nprefix: Physical namespace prefix; all owned channels retain the same Redis hash tag.\nmigaia isolates the default managed namespace.\nconcurrency: Authentic shared concurrency policy applied by the original operation owner.\nUse the shared owner default policy.\nowner: Optional diagnostic owner identity without exposing business values.\nNo application owner label is attached.\nowner.label: Application-assigned label displayed by original lock diagnostics.\nNo application label is attached.\nmaxLockMs: Positive native lock lease bound measured with Redis server time.\n30000 milliseconds for each native lock lease.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -1601,7 +1601,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Borrowed driver and namespace, original concurrency policy and native lock lease."
+              "content": "id: Application-assigned backend identifier used by host.backend.\nredis, the default installed backend identifier.\ndriver: Caller-owned native driver from a public adapter or custom implementation.\nprefix: Physical namespace prefix; all owned channels retain the same Redis hash tag.\nmigaia isolates the default managed namespace.\nconcurrency: Authentic shared concurrency policy applied by the original operation owner.\nUse the shared owner default policy.\nowner: Optional diagnostic owner identity without exposing business values.\nNo application owner label is attached.\nowner.label: Application-assigned label displayed by original lock diagnostics.\nNo application label is attached.\nmaxLockMs: Positive native lock lease bound measured with Redis server time.\n30000 milliseconds for each native lock lease."
             },
             {
               "id": "advanced-usage",
@@ -1816,7 +1816,7 @@
           "declarationLine": 8,
           "source": "packages/storage-plugin-redis/dist/hooks.d.ts",
           "purpose": "Logical native WATCH key count without business key copies.",
-          "core": "Logical native WATCH key count without business key copies.",
+          "core": "keyCount: Number of canonical logical identities involved in the original WATCH attempt.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -1869,7 +1869,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Logical native WATCH key count without business key copies."
+              "content": "keyCount: Number of canonical logical identities involved in the original WATCH attempt."
             },
             {
               "id": "advanced-usage",
@@ -1890,8 +1890,8 @@
           "signature": "export declare const redisBackendKind: import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", IRedisStore, IRedisDriver, {}>;",
           "declarationLine": 5,
           "source": "packages/storage-plugin-redis/dist/plugin.d.ts",
-          "purpose": "Exact native Redis backend kind.",
-          "core": "Exact native Redis backend kind.",
+          "purpose": "Identify the exact Redis backend when authenticating native Feature installation.",
+          "core": "Identify the exact Redis backend when authenticating native Feature installation.",
           "advanced": "",
           "parameters": ["This const declaration has no parameters."],
           "parameterDetails": [],
@@ -1914,7 +1914,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Exact native Redis backend kind."
+              "content": "Identify the exact Redis backend when authenticating native Feature installation."
             },
             {
               "id": "getting-started",
@@ -1934,7 +1934,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Exact native Redis backend kind."
+              "content": "Identify the exact Redis backend when authenticating native Feature installation."
             },
             {
               "id": "advanced-usage",
@@ -1956,7 +1956,7 @@
           "declarationLine": 7,
           "source": "packages/storage-plugin-redis/dist/plugin.d.ts",
           "purpose": "Install native storage and WATCH transactions. Private storageLogStore operations read current native state on each call; strong journal composition remains unavailable.",
-          "core": "Install native storage and WATCH transactions. Private storageLogStore operations read current native state on each call; strong journal composition remains unavailable.",
+          "core": "options: Caller configuration selecting the original driver and namespace.\nfeatures: Explicit native Feature factories for this exact backend kind.\nA lazy exact-id plugin descriptor; the caller retains driver and connection ownership.\nid: Application-assigned backend identifier used by host.backend.\nredis, the default installed backend identifier.\ndriver: Caller-owned native driver from a public adapter or custom implementation.\nprefix: Physical namespace prefix; all owned channels retain the same Redis hash tag.\nmigaia isolates the default managed namespace.\nconcurrency: Authentic shared concurrency policy applied by the original operation owner.\nUse the shared owner default policy.\nowner: Optional diagnostic owner identity without exposing business values.\nNo application owner label is attached.\nowner.label: Application-assigned label displayed by original lock diagnostics.\nNo application label is attached.\nmaxLockMs: Positive native lock lease bound measured with Redis server time.\n30000 milliseconds for each native lock lease.",
           "advanced": "",
           "parameters": [
             "options: IRedisOptions & { readonly id?: TId; }",
@@ -2032,7 +2032,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Install native storage and WATCH transactions. Private storageLogStore operations read current native state on each call; strong journal composition remains unavailable."
+              "content": "options: Caller configuration selecting the original driver and namespace.\nfeatures: Explicit native Feature factories for this exact backend kind.\nA lazy exact-id plugin descriptor; the caller retains driver and connection ownership.\nid: Application-assigned backend identifier used by host.backend.\nredis, the default installed backend identifier.\ndriver: Caller-owned native driver from a public adapter or custom implementation.\nprefix: Physical namespace prefix; all owned channels retain the same Redis hash tag.\nmigaia isolates the default managed namespace.\nconcurrency: Authentic shared concurrency policy applied by the original operation owner.\nUse the shared owner default policy.\nowner: Optional diagnostic owner identity without exposing business values.\nNo application owner label is attached.\nowner.label: Application-assigned label displayed by original lock diagnostics.\nNo application label is attached.\nmaxLockMs: Positive native lock lease bound measured with Redis server time.\n30000 milliseconds for each native lock lease."
             },
             {
               "id": "advanced-usage",
@@ -2153,8 +2153,8 @@
           "signature": "export declare const RedisErrorCode: { /** Native command, connection or EXEC failure; unknown writes must never be replayed. */ readonly failed: 'REDIS_FAILED'; /** Fixed protocol replies or persisted values cannot be decoded; inspect the original cause. */ readonly decodeFailed: 'DECODE_FAILED'; /** * User callback, draft or finalizer failed without a native protocol failure; inspect the * original error. */ readonly transactionFailed: 'TRANSACTION_FAILED'; };",
           "declarationLine": 4,
           "source": "packages/storage-plugin-redis/dist/error-code.d.ts",
-          "purpose": "Distinguish native, decode and business callback failures.",
-          "core": "failed: Native command, connection or EXEC failure; unknown writes are never replayed.\ndecodeFailed: A fixed reply or persisted value cannot be decoded.\ntransactionFailed: Unknown callback, draft or finalizer business failure.",
+          "purpose": "Distinguish native protocol failures, invalid persisted data and unknown business callback failures.",
+          "core": "failed: Native command, connection or EXEC failure; unknown writes are never replayed.\ndecodeFailed: A fixed reply or persisted value cannot be decoded.\ntransactionFailed: Unknown callback, draft or finalizer business failure retains its original cause.",
           "advanced": "",
           "parameters": ["This const declaration has no parameters."],
           "parameterDetails": [],
@@ -2205,7 +2205,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Distinguish native, decode and business callback failures."
+              "content": "Distinguish native protocol failures, invalid persisted data and unknown business callback failures."
             },
             {
               "id": "getting-started",
@@ -2225,7 +2225,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "failed: Native command, connection or EXEC failure; unknown writes are never replayed.\ndecodeFailed: A fixed reply or persisted value cannot be decoded.\ntransactionFailed: Unknown callback, draft or finalizer business failure."
+              "content": "failed: Native command, connection or EXEC failure; unknown writes are never replayed.\ndecodeFailed: A fixed reply or persisted value cannot be decoded.\ntransactionFailed: Unknown callback, draft or finalizer business failure retains its original cause."
             },
             {
               "id": "advanced-usage",
@@ -2396,8 +2396,8 @@
           "signature": "export declare function bunRedisDriver(client: IBunRedisClient): IRedisDriver<IBunRedisClient>;",
           "declarationLine": 4,
           "source": "packages/storage-plugin-redis/dist/adapters/bun.d.ts",
-          "purpose": "Use native duplicate/send/subscribe without a binary port.",
-          "core": "Use native duplicate/send/subscribe without a binary port.",
+          "purpose": "Use the built-in duplicate, send and subscribe APIs without fabricating arbitrary-byte support.",
+          "core": "client: Connected native pool or client created and owned by the calling application.\nA borrowed driver that preserves original command replies and native resource settlement.",
           "advanced": "",
           "parameters": ["client: IBunRedisClient"],
           "parameterDetails": [
@@ -2433,7 +2433,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Use native duplicate/send/subscribe without a binary port."
+              "content": "Use the built-in duplicate, send and subscribe APIs without fabricating arbitrary-byte support."
             },
             {
               "id": "getting-started",
@@ -2453,7 +2453,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Use native duplicate/send/subscribe without a binary port."
+              "content": "client: Connected native pool or client created and owned by the calling application.\nA borrowed driver that preserves original command replies and native resource settlement."
             },
             {
               "id": "advanced-usage",
@@ -2493,8 +2493,8 @@
           "signature": "export type IRedisChangeStreamOutput = IStorageFeatureOutput<readonly [ICapabilityImpl<typeof durableChangeFeed, IDurableChangeFeedApi>], {}, { readonly store: {}; readonly transaction: {}; }>;",
           "declarationLine": 4,
           "source": "packages/storage-plugin-redis/dist/features/change-stream.d.ts",
-          "purpose": "Exact native Feature declaration.",
-          "core": "Exact native Feature declaration.",
+          "purpose": "Feature output publishes the reliable native stream feed through the original capability map.",
+          "core": "Feature output publishes the reliable native stream feed through the original capability map.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -2516,7 +2516,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Exact native Feature declaration."
+              "content": "Feature output publishes the reliable native stream feed through the original capability map."
             },
             {
               "id": "getting-started",
@@ -2536,7 +2536,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Exact native Feature declaration."
+              "content": "Feature output publishes the reliable native stream feed through the original capability map."
             },
             {
               "id": "advanced-usage",
@@ -2557,8 +2557,8 @@
           "signature": "export declare function redisChangeStreamFeature(options: { readonly maxLen: number; }): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", import(\"../types.js\").IRedisStore, import(\"../driver.js\").IRedisDriver, {}>, IRedisChangeStreamOutput, {}>;",
           "declarationLine": 12,
           "source": "packages/storage-plugin-redis/dist/features/change-stream.d.ts",
-          "purpose": "Install durableChangeFeed using the original native commit owner.",
-          "core": "Install durableChangeFeed using the original native commit owner.",
+          "purpose": "Publish durableChangeFeed from the original committed EXEC and native stream cursor owner.",
+          "core": "options: Native retention bound for the committed change stream.\nAn exact-kind Feature selected by redisBackendPlugin; no transaction-specific native API is added.\nmaxLen: Approximate native MAXLEN retention; older cursors may expire.",
           "advanced": "",
           "parameters": ["options: { readonly maxLen: number; }"],
           "parameterDetails": [
@@ -2598,7 +2598,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Install durableChangeFeed using the original native commit owner."
+              "content": "Publish durableChangeFeed from the original committed EXEC and native stream cursor owner."
             },
             {
               "id": "getting-started",
@@ -2618,7 +2618,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Install durableChangeFeed using the original native commit owner."
+              "content": "options: Native retention bound for the committed change stream.\nAn exact-kind Feature selected by redisBackendPlugin; no transaction-specific native API is added.\nmaxLen: Approximate native MAXLEN retention; older cursors may expire."
             },
             {
               "id": "advanced-usage",
@@ -2674,8 +2674,8 @@
           "signature": "export type IRedisPubSubApi = { readonly pubsub: { publish(channel: string, payload: Uint8Array, ctx?: IOperationContext): Promise<number>; subscribe(channel: string, listener: (payload: Uint8Array) => void, ctx?: IOperationContext): Promise<IStorageResource>; keyspace(database: number, event: 'expired' | 'del' | 'set', listener: (key: Uint8Array) => void, ctx?: IOperationContext): Promise<IStorageResource>; }; };",
           "declarationLine": 4,
           "source": "packages/storage-plugin-redis/dist/features/pubsub.d.ts",
-          "purpose": "Exact native Feature declaration.",
-          "core": "Exact native Feature declaration.",
+          "purpose": "Root Pub/Sub publishing and owned subscriptions with best-effort delivery semantics.",
+          "core": "pubsub: Root message publishing and independently disposable subscriptions.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -2707,7 +2707,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Exact native Feature declaration."
+              "content": "Root Pub/Sub publishing and owned subscriptions with best-effort delivery semantics."
             },
             {
               "id": "getting-started",
@@ -2727,7 +2727,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Exact native Feature declaration."
+              "content": "pubsub: Root message publishing and independently disposable subscriptions."
             },
             {
               "id": "advanced-usage",
@@ -2748,8 +2748,8 @@
           "signature": "export type IRedisPubSubOutput = IStorageFeatureOutput<readonly [], {}, { readonly store: IRedisPubSubApi; readonly transaction: {}; }>;",
           "declarationLine": 12,
           "source": "packages/storage-plugin-redis/dist/features/pubsub.d.ts",
-          "purpose": "Exact native Feature declaration.",
-          "core": "Exact native Feature declaration.",
+          "purpose": "Feature output exposes root Pub/Sub and preserves an empty transaction API.",
+          "core": "Feature output exposes root Pub/Sub and preserves an empty transaction API.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -2771,7 +2771,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Exact native Feature declaration."
+              "content": "Feature output exposes root Pub/Sub and preserves an empty transaction API."
             },
             {
               "id": "getting-started",
@@ -2791,7 +2791,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Exact native Feature declaration."
+              "content": "Feature output exposes root Pub/Sub and preserves an empty transaction API."
             },
             {
               "id": "advanced-usage",
@@ -2812,8 +2812,8 @@
           "signature": "export declare function redisPubSubFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", import(\"../types.js\").IRedisStore, import(\"../driver.js\").IRedisDriver, {}>, IRedisPubSubOutput, {}>;",
           "declarationLine": 17,
           "source": "packages/storage-plugin-redis/dist/features/pubsub.d.ts",
-          "purpose": "Add owned Pub/Sub resources without reconnect replay.",
-          "core": "Add owned Pub/Sub resources without reconnect replay.",
+          "purpose": "Expose native Pub/Sub with owned subscription resources and no automatic reconnect replay.",
+          "core": "An exact-kind Feature selected by redisBackendPlugin; no transaction-specific native API is added.",
           "advanced": "",
           "parameters": ["This function declaration has no parameters."],
           "parameterDetails": [],
@@ -2839,7 +2839,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Add owned Pub/Sub resources without reconnect replay."
+              "content": "Expose native Pub/Sub with owned subscription resources and no automatic reconnect replay."
             },
             {
               "id": "getting-started",
@@ -2859,7 +2859,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Add owned Pub/Sub resources without reconnect replay."
+              "content": "An exact-kind Feature selected by redisBackendPlugin; no transaction-specific native API is added."
             },
             {
               "id": "advanced-usage",
@@ -2899,8 +2899,8 @@
           "signature": "export type IRedisRateLimitApi = { readonly rateLimit: { consume(key: string, cost?: number, ctx?: IOperationContext): Promise<IRedisRateLimitResult>; }; };",
           "declarationLine": 15,
           "source": "packages/storage-plugin-redis/dist/features/rate-limit.d.ts",
-          "purpose": "Exact native Feature declaration.",
-          "core": "Exact native Feature declaration.",
+          "purpose": "Root fixed-window consumption returns original native admission and remaining capacity.",
+          "core": "rateLimit: Root consume method for one atomic fixed-window decision.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -2932,7 +2932,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Exact native Feature declaration."
+              "content": "Root fixed-window consumption returns original native admission and remaining capacity."
             },
             {
               "id": "getting-started",
@@ -2952,7 +2952,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Exact native Feature declaration."
+              "content": "rateLimit: Root consume method for one atomic fixed-window decision."
             },
             {
               "id": "advanced-usage",
@@ -2973,8 +2973,8 @@
           "signature": "export type IRedisRateLimitOptions = { readonly limit: number; readonly windowMs: number; };",
           "declarationLine": 4,
           "source": "packages/storage-plugin-redis/dist/features/rate-limit.d.ts",
-          "purpose": "Exact native Feature declaration.",
-          "core": "Exact native Feature declaration.",
+          "purpose": "Positive accepted-count and duration bounds defining one native fixed-window policy.",
+          "core": "limit: Positive integer maximum number of accepted requests in a window.\nwindowMs: Positive integer duration of the native fixed window in milliseconds.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -3015,7 +3015,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Exact native Feature declaration."
+              "content": "Positive accepted-count and duration bounds defining one native fixed-window policy."
             },
             {
               "id": "getting-started",
@@ -3035,7 +3035,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Exact native Feature declaration."
+              "content": "limit: Positive integer maximum number of accepted requests in a window.\nwindowMs: Positive integer duration of the native fixed window in milliseconds."
             },
             {
               "id": "advanced-usage",
@@ -3056,8 +3056,8 @@
           "signature": "export type IRedisRateLimitOutput = IStorageFeatureOutput<readonly [], {}, { readonly store: IRedisRateLimitApi; readonly transaction: {}; }>;",
           "declarationLine": 21,
           "source": "packages/storage-plugin-redis/dist/features/rate-limit.d.ts",
-          "purpose": "Exact native Feature declaration.",
-          "core": "Exact native Feature declaration.",
+          "purpose": "Feature output adds root rateLimit consumption while keeping native transaction extensions empty.",
+          "core": "Feature output adds root rateLimit consumption while keeping native transaction extensions empty.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -3079,7 +3079,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Exact native Feature declaration."
+              "content": "Feature output adds root rateLimit consumption while keeping native transaction extensions empty."
             },
             {
               "id": "getting-started",
@@ -3099,7 +3099,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Exact native Feature declaration."
+              "content": "Feature output adds root rateLimit consumption while keeping native transaction extensions empty."
             },
             {
               "id": "advanced-usage",
@@ -3120,8 +3120,8 @@
           "signature": "export type IRedisRateLimitResult = { readonly allowed: boolean; readonly remaining: number; readonly resetAfterMs: number; };",
           "declarationLine": 9,
           "source": "packages/storage-plugin-redis/dist/features/rate-limit.d.ts",
-          "purpose": "Exact native Feature declaration.",
-          "core": "Exact native Feature declaration.",
+          "purpose": "One atomic native admission result reports capacity and the remaining window lifetime.",
+          "core": "allowed: True only when the native fixed-window counter accepted this request.\nremaining: Number of additional requests still accepted by the current window.\nresetAfterMs: Remaining milliseconds until the current server-clock window expires.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -3171,7 +3171,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Exact native Feature declaration."
+              "content": "One atomic native admission result reports capacity and the remaining window lifetime."
             },
             {
               "id": "getting-started",
@@ -3191,7 +3191,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Exact native Feature declaration."
+              "content": "allowed: True only when the native fixed-window counter accepted this request.\nremaining: Number of additional requests still accepted by the current window.\nresetAfterMs: Remaining milliseconds until the current server-clock window expires."
             },
             {
               "id": "advanced-usage",
@@ -3212,8 +3212,8 @@
           "signature": "export declare function redisRateLimitFeature(options: IRedisRateLimitOptions): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", import(\"../types.js\").IRedisStore, import(\"../driver.js\").IRedisDriver, {}>, IRedisRateLimitOutput, {}>;",
           "declarationLine": 26,
           "source": "packages/storage-plugin-redis/dist/features/rate-limit.d.ts",
-          "purpose": "Reject exhausted requests without incrementing counters.",
-          "core": "Reject exhausted requests without incrementing counters.",
+          "purpose": "Expose native fixed-window admission; rejected requests leave the accepted counter unchanged.",
+          "core": "options: Positive integer accepted count and fixed-window duration.\nAn exact-kind Feature selected by redisBackendPlugin; no transaction-specific native API is added.\nlimit: Positive integer maximum number of accepted requests in a window.\nwindowMs: Positive integer duration of the native fixed window in milliseconds.",
           "advanced": "",
           "parameters": ["options: IRedisRateLimitOptions"],
           "parameterDetails": [
@@ -3253,7 +3253,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Reject exhausted requests without incrementing counters."
+              "content": "Expose native fixed-window admission; rejected requests leave the accepted counter unchanged."
             },
             {
               "id": "getting-started",
@@ -3273,7 +3273,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Reject exhausted requests without incrementing counters."
+              "content": "options: Positive integer accepted count and fixed-window duration.\nAn exact-kind Feature selected by redisBackendPlugin; no transaction-specific native API is added.\nlimit: Positive integer maximum number of accepted requests in a window.\nwindowMs: Positive integer duration of the native fixed window in milliseconds."
             },
             {
               "id": "advanced-usage",
@@ -3407,8 +3407,8 @@
           "signature": "export declare function rediSearchVectorFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", IRedisStore, import(\"../driver.js\").IRedisDriver, {}>, IRedisVectorFeatureOutput, {}>;",
           "declarationLine": 13,
           "source": "packages/storage-plugin-redis/dist/features/search.d.ts",
-          "purpose": "Install standard vector with native module and binary-port detection.",
-          "core": "Install standard vector with native module and binary-port detection.",
+          "purpose": "Publish standard vectors only after detecting the actual Search module and byte-preserving driver port.",
+          "core": "An exact-kind Feature selected by redisBackendPlugin; no transaction-specific native API is added.",
           "advanced": "",
           "parameters": ["This function declaration has no parameters."],
           "parameterDetails": [],
@@ -3434,7 +3434,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Install standard vector with native module and binary-port detection."
+              "content": "Publish standard vectors only after detecting the actual Search module and byte-preserving driver port."
             },
             {
               "id": "getting-started",
@@ -3454,7 +3454,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Install standard vector with native module and binary-port detection."
+              "content": "An exact-kind Feature selected by redisBackendPlugin; no transaction-specific native API is added."
             },
             {
               "id": "advanced-usage",
@@ -3494,8 +3494,8 @@
           "signature": "export type IRedisSortedSetsApi = { readonly sortedSets: { add(key: string, entries: readonly { readonly member: string; readonly score: number; }[], ctx?: IOperationContext): Promise<number>; rank(key: string, member: string, ctx?: IOperationContext): Promise<number | undefined>; top(key: string, options?: { readonly count?: number; }, ctx?: IOperationContext): Promise<readonly { readonly member: string; readonly score: number; }[]>; }; };",
           "declarationLine": 4,
           "source": "packages/storage-plugin-redis/dist/features/sorted-sets.d.ts",
-          "purpose": "Exact native Feature declaration.",
-          "core": "Exact native Feature declaration.",
+          "purpose": "Root native sorted-set operations preserve finite scores and canonical member ordering.",
+          "core": "sortedSets: Root native score-set writes, ranges and rank lookups.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -3527,7 +3527,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Exact native Feature declaration."
+              "content": "Root native sorted-set operations preserve finite scores and canonical member ordering."
             },
             {
               "id": "getting-started",
@@ -3547,7 +3547,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Exact native Feature declaration."
+              "content": "sortedSets: Root native score-set writes, ranges and rank lookups."
             },
             {
               "id": "advanced-usage",
@@ -3568,8 +3568,8 @@
           "signature": "export type IRedisSortedSetsOutput = IStorageFeatureOutput<readonly [], {}, { readonly store: IRedisSortedSetsApi; readonly transaction: {}; }>;",
           "declarationLine": 20,
           "source": "packages/storage-plugin-redis/dist/features/sorted-sets.d.ts",
-          "purpose": "Exact native Feature declaration.",
-          "core": "Exact native Feature declaration.",
+          "purpose": "Feature output exposes the native root sortedSets API without new standard tokens.",
+          "core": "Feature output exposes the native root sortedSets API without new standard tokens.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -3591,7 +3591,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Exact native Feature declaration."
+              "content": "Feature output exposes the native root sortedSets API without new standard tokens."
             },
             {
               "id": "getting-started",
@@ -3611,7 +3611,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Exact native Feature declaration."
+              "content": "Feature output exposes the native root sortedSets API without new standard tokens."
             },
             {
               "id": "advanced-usage",
@@ -3632,8 +3632,8 @@
           "signature": "export declare function redisSortedSetsFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", import(\"../types.js\").IRedisStore, import(\"../driver.js\").IRedisDriver, {}>, IRedisSortedSetsOutput, {}>;",
           "declarationLine": 25,
           "source": "packages/storage-plugin-redis/dist/features/sorted-sets.d.ts",
-          "purpose": "Add ascending finite-score native sorted sets.",
-          "core": "Add ascending finite-score native sorted sets.",
+          "purpose": "Expose ascending native sorted sets with finite scores and deterministic equal-score members.",
+          "core": "An exact-kind Feature selected by redisBackendPlugin; no transaction-specific native API is added.",
           "advanced": "",
           "parameters": ["This function declaration has no parameters."],
           "parameterDetails": [],
@@ -3659,7 +3659,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Add ascending finite-score native sorted sets."
+              "content": "Expose ascending native sorted sets with finite scores and deterministic equal-score members."
             },
             {
               "id": "getting-started",
@@ -3679,7 +3679,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Add ascending finite-score native sorted sets."
+              "content": "An exact-kind Feature selected by redisBackendPlugin; no transaction-specific native API is added."
             },
             {
               "id": "advanced-usage",
@@ -3719,8 +3719,8 @@
           "signature": "export type IRedisStreamEntry = { readonly id: string; readonly fields: Readonly<Record<string, Uint8Array>>; };",
           "declarationLine": 4,
           "source": "packages/storage-plugin-redis/dist/features/streams.d.ts",
-          "purpose": "Exact native Feature declaration.",
-          "core": "Exact native Feature declaration.",
+          "purpose": "One native stream entry retains its original ID and decoded byte-valued fields.",
+          "core": "id: Original stream ID returned by Redis XADD or stream reads.\nfields: Decoded field bytes detached from the native wire reply.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -3761,7 +3761,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Exact native Feature declaration."
+              "content": "One native stream entry retains its original ID and decoded byte-valued fields."
             },
             {
               "id": "getting-started",
@@ -3781,7 +3781,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Exact native Feature declaration."
+              "content": "id: Original stream ID returned by Redis XADD or stream reads.\nfields: Decoded field bytes detached from the native wire reply."
             },
             {
               "id": "advanced-usage",
@@ -3802,8 +3802,8 @@
           "signature": "export type IRedisStreamsApi = { readonly streams: { add(stream: string, fields: Readonly<Record<string, Uint8Array>>, ctx?: IOperationContext): Promise<string>; range(stream: string, options?: { readonly start?: string; readonly end?: string; readonly count?: number; }, ctx?: IOperationContext): Promise<readonly IRedisStreamEntry[]>; createGroup(stream: string, group: string, options?: { readonly start?: string; readonly createStream?: boolean; }, ctx?: IOperationContext): Promise<void>; readGroup(stream: string, options: { readonly group: string; readonly consumer: string; readonly count?: number; readonly blockMs?: number; }, ctx?: IOperationContext): Promise<readonly IRedisStreamEntry[]>; ack(stream: string, group: string, ids: readonly string[], ctx?: IOperationContext): Promise<number>; autoClaim(stream: string, options: { readonly group: string; readonly consumer: string; readonly minIdleMs: number; readonly start?: string; readonly count?: number; }, ctx?: IOperationContext): Promise<{ readonly next: string; readonly entries: readonly IRedisStreamEntry[]; readonly deletedIds: readonly string[]; }>; }; };",
           "declarationLine": 9,
           "source": "packages/storage-plugin-redis/dist/features/streams.d.ts",
-          "purpose": "Exact native Feature declaration.",
-          "core": "Exact native Feature declaration.",
+          "purpose": "Root stream entry and consumer-group methods, absent from generic transaction views.",
+          "core": "streams: Root-only native stream and consumer-group method group.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -3835,7 +3835,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Exact native Feature declaration."
+              "content": "Root stream entry and consumer-group methods, absent from generic transaction views."
             },
             {
               "id": "getting-started",
@@ -3855,7 +3855,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Exact native Feature declaration."
+              "content": "streams: Root-only native stream and consumer-group method group."
             },
             {
               "id": "advanced-usage",
@@ -3876,8 +3876,8 @@
           "signature": "export type IRedisStreamsOutput = IStorageFeatureOutput<readonly [], {}, { readonly store: IRedisStreamsApi; readonly transaction: {}; }>;",
           "declarationLine": 42,
           "source": "packages/storage-plugin-redis/dist/features/streams.d.ts",
-          "purpose": "Exact native Feature declaration.",
-          "core": "Exact native Feature declaration.",
+          "purpose": "Feature output publishes the root streams API with no capability or transaction additions.",
+          "core": "Feature output publishes the root streams API with no capability or transaction additions.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -3899,7 +3899,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Exact native Feature declaration."
+              "content": "Feature output publishes the root streams API with no capability or transaction additions."
             },
             {
               "id": "getting-started",
@@ -3919,7 +3919,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Exact native Feature declaration."
+              "content": "Feature output publishes the root streams API with no capability or transaction additions."
             },
             {
               "id": "advanced-usage",
@@ -3940,8 +3940,8 @@
           "signature": "export declare function redisStreamsFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"redis\", import(\"../types.js\").IRedisStore, import(\"../driver.js\").IRedisDriver, {}>, IRedisStreamsOutput, {}>;",
           "declarationLine": 47,
           "source": "packages/storage-plugin-redis/dist/features/streams.d.ts",
-          "purpose": "Add native Streams root APIs; no transaction API.",
-          "core": "Add native Streams root APIs; no transaction API.",
+          "purpose": "Expose native Streams and consumer groups on the root store without fabricating transaction APIs.",
+          "core": "An exact-kind Feature selected by redisBackendPlugin; no transaction-specific native API is added.",
           "advanced": "",
           "parameters": ["This function declaration has no parameters."],
           "parameterDetails": [],
@@ -3967,7 +3967,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Add native Streams root APIs; no transaction API."
+              "content": "Expose native Streams and consumer groups on the root store without fabricating transaction APIs."
             },
             {
               "id": "getting-started",
@@ -3987,7 +3987,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Add native Streams root APIs; no transaction API."
+              "content": "An exact-kind Feature selected by redisBackendPlugin; no transaction-specific native API is added."
             },
             {
               "id": "advanced-usage",
@@ -4027,8 +4027,8 @@
           "signature": "export declare function ioredisDriver<M extends 'legacy' | 'resp3'>(client: Redis<M>): IRedisDriver<Redis<M>>;",
           "declarationLine": 4,
           "source": "packages/storage-plugin-redis/dist/adapters/ioredis.d.ts",
-          "purpose": "Own duplicates without closing or reconfiguring the caller’s client.",
-          "core": "Own duplicates without closing or reconfiguring the caller’s client.",
+          "purpose": "Retain original duplicates through callbacks and subscriptions while leaving the injected root client unchanged.",
+          "core": "client: Connected native pool or client created and owned by the calling application.\nA borrowed driver that preserves original command replies and native resource settlement.",
           "advanced": "",
           "parameters": ["client: Redis<M>"],
           "parameterDetails": [
@@ -4064,7 +4064,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Own duplicates without closing or reconfiguring the caller’s client."
+              "content": "Retain original duplicates through callbacks and subscriptions while leaving the injected root client unchanged."
             },
             {
               "id": "getting-started",
@@ -4084,7 +4084,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Own duplicates without closing or reconfiguring the caller’s client."
+              "content": "client: Connected native pool or client created and owned by the calling application.\nA borrowed driver that preserves original command replies and native resource settlement."
             },
             {
               "id": "advanced-usage",
@@ -4124,8 +4124,8 @@
           "signature": "export declare function nodeRedisDriver<M extends RedisModules, F extends RedisFunctions, S extends RedisScripts, RESP extends RespVersions, TM extends TypeMapping>(pool: RedisClientPoolType<M, F, S, RESP, TM>): IRedisDriver<RedisClientType<M, F, S, RESP, TM>>;",
           "declarationLine": 4,
           "source": "packages/storage-plugin-redis/dist/adapters/node-redis.d.ts",
-          "purpose": "Hold the original pool lease for each full callback or subscription.",
-          "core": "Hold the original pool lease for each full callback or subscription.",
+          "purpose": "Hold the original pool lease until every callback or subscription operation has truly settled.",
+          "core": "pool: Connected native pool or client created and owned by the calling application.\nA borrowed driver that preserves original command replies and native resource settlement.",
           "advanced": "",
           "parameters": ["pool: RedisClientPoolType<M, F, S, RESP, TM>"],
           "parameterDetails": [
@@ -4165,7 +4165,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Hold the original pool lease for each full callback or subscription."
+              "content": "Hold the original pool lease until every callback or subscription operation has truly settled."
             },
             {
               "id": "getting-started",
@@ -4185,7 +4185,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Hold the original pool lease for each full callback or subscription."
+              "content": "pool: Connected native pool or client created and owned by the calling application.\nA borrowed driver that preserves original command replies and native resource settlement."
             },
             {
               "id": "advanced-usage",

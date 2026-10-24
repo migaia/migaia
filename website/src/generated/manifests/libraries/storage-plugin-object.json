@@ -338,7 +338,7 @@
           "declarationLine": 21,
           "source": "packages/storage-plugin-object/dist/types.d.ts",
           "purpose": "Already-organized native address supplied only to an installed S3 Feature.",
-          "core": "bucket: Configured native bucket.\nkey: Configuration prefix plus canonical ordered organization key.",
+          "core": "bucket: Native bucket selected by the driver configuration.\nkey: Configuration prefix plus canonical ordered organization key.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -400,7 +400,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "bucket: Configured native bucket.\nkey: Configuration prefix plus canonical ordered organization key."
+              "content": "bucket: Native bucket selected by the driver configuration.\nkey: Configuration prefix plus canonical ordered organization key."
             },
             {
               "id": "advanced-usage",
@@ -423,7 +423,7 @@
           "source": "packages/storage-plugin-object/dist/types.d.ts",
           "purpose": "Authentic immutable descriptor issued by a native driver factory.",
           "core": "kind: fs or s3 selects the real native family.",
-          "advanced": "",
+          "advanced": "Keep a lazy driver descriptor and pass it to objectBackendPlugin for host-owned installation.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -449,7 +449,7 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Keep a lazy driver descriptor and pass it to objectBackendPlugin for host-owned installation.",
           "notUse": "",
           "sections": [
             {
@@ -480,7 +480,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Keep a lazy driver descriptor and pass it to objectBackendPlugin for host-owned installation."
             }
           ],
           "declaredConfiguration": [],
@@ -496,14 +496,14 @@
           "signature": "export type IObjectErrorCode = (typeof ObjectErrorCode)[keyof typeof ObjectErrorCode];",
           "declarationLine": 13,
           "source": "packages/storage-plugin-object/dist/error-code.d.ts",
-          "purpose": "Stable union used by every native error constructor.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IObjectErrorCode.",
-          "advanced": "No additional advanced behavior is declared for IObjectErrorCode.",
+          "purpose": "Registered union for native I/O, invalid persisted data and unknown commit outcomes.",
+          "core": "Registered union for native I/O, invalid persisted data and unknown commit outcomes.",
+          "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IObjectErrorCode."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IObjectErrorCode.",
+          "errors": [],
+          "lifecycleConcurrency": "",
           "examples": [],
           "members": [],
           "composes": [],
@@ -514,13 +514,13 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use IObjectErrorCode when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IObjectErrorCode does not match the required inputs or return contract.",
+          "whenToUse": "",
+          "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Stable union used by every native error constructor."
+              "content": "Registered union for native I/O, invalid persisted data and unknown commit outcomes."
             },
             {
               "id": "getting-started",
@@ -540,12 +540,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IObjectErrorCode."
+              "content": "Registered union for native I/O, invalid persisted data and unknown commit outcomes."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IObjectErrorCode."
+              "content": ""
             }
           ],
           "declaredConfiguration": [],
@@ -767,7 +767,7 @@
           "declarationLine": 13,
           "source": "packages/storage-plugin-object/dist/plugin.d.ts",
           "purpose": "Define one lazy object backend and its selected Features. Native resources open only during host installation.",
-          "core": "features: Optional Features targeted at the exact objectBackendKind.\nAn exact-id storage backend plugin; no connection or directory is opened by the factory.\nid: Backend id used by host.backend.\nobject selects the default object backend name.\ndriver: Authentic fsObjectDriver or s3ObjectDriver descriptor.",
+          "core": "features: Optional Features targeted at the exact objectBackendKind.\nAn exact-id storage backend plugin; no connection or directory is opened by the factory.\nid: Backend ID declared here and later passed to host.backend.\nobject selects the default object backend name.\ndriver: Authentic fsObjectDriver or s3ObjectDriver descriptor.",
           "advanced": "",
           "parameters": [
             "options: { readonly id?: TId; readonly driver: IObjectDriver; }",
@@ -840,7 +840,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "features: Optional Features targeted at the exact objectBackendKind.\nAn exact-id storage backend plugin; no connection or directory is opened by the factory.\nid: Backend id used by host.backend.\nobject selects the default object backend name.\ndriver: Authentic fsObjectDriver or s3ObjectDriver descriptor."
+              "content": "features: Optional Features targeted at the exact objectBackendKind.\nAn exact-id storage backend plugin; no connection or directory is opened by the factory.\nid: Backend ID declared here and later passed to host.backend.\nobject selects the default object backend name.\ndriver: Authentic fsObjectDriver or s3ObjectDriver descriptor."
             },
             {
               "id": "advanced-usage",
@@ -1194,7 +1194,7 @@
           "declarationLine": 20,
           "source": "packages/storage-plugin-object/dist/features/presign.d.ts",
           "purpose": "Native signed-download expiry and inclusive range.",
-          "core": "expiresInSeconds: Integer seconds from 1 through 604800.\n900 seconds, capped by credential expiry.\nrange: Nonnegative safe-integer start and optional inclusive end at least start.\nFull object download.\nctx: Original storage operation context.\nNo caller cancellation or deadline.",
+          "core": "expiresInSeconds: Integer seconds from 1 through 604800.\n900 seconds, capped by credential expiry.\nrange: Nonnegative safe-integer start and optional inclusive end at least start.\nFull object download.\nctx: Original caller cancellation and deadline context.\nNo caller cancellation or deadline.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -1264,7 +1264,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "expiresInSeconds: Integer seconds from 1 through 604800.\n900 seconds, capped by credential expiry.\nrange: Nonnegative safe-integer start and optional inclusive end at least start.\nFull object download.\nctx: Original storage operation context.\nNo caller cancellation or deadline."
+              "content": "expiresInSeconds: Integer seconds from 1 through 604800.\n900 seconds, capped by credential expiry.\nrange: Nonnegative safe-integer start and optional inclusive end at least start.\nFull object download.\nctx: Original caller cancellation and deadline context.\nNo caller cancellation or deadline."
             },
             {
               "id": "advanced-usage",
@@ -1286,7 +1286,7 @@
           "declarationLine": 11,
           "source": "packages/storage-plugin-object/dist/features/presign.d.ts",
           "purpose": "Native signed-upload content and condition inputs.",
-          "core": "expiresInSeconds: Integer seconds from 1 through 604800.\n900 seconds, capped by credential expiry.\ncontentType: Native content type included in the signature.\nNo content type header.\nmetadata: Lowercase HTTP-token names with ASCII header values; frozen at admission.\nEmpty metadata.\nifMatch: Opaque native etag required at commit; excludes ifNoneMatch.\nNo etag condition.\nifNoneMatch: Only true is valid: require absence at native commit.\nNo absence condition.\nctx: Original storage operation context.\nNo caller cancellation or deadline.",
+          "core": "expiresInSeconds: Integer seconds from 1 through 604800.\n900 seconds, capped by credential expiry.\ncontentType: Native content type included in the signature.\nNo content type header.\nmetadata: Lowercase HTTP-token names with ASCII header values; frozen at admission.\nEmpty metadata.\nifMatch: Opaque native etag required at commit; excludes ifNoneMatch.\nNo etag condition.\nifNoneMatch: Only true is valid: require absence at native commit.\nNo absence condition.\nctx: Original caller cancellation and deadline context.\nNo caller cancellation or deadline.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -1383,7 +1383,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "expiresInSeconds: Integer seconds from 1 through 604800.\n900 seconds, capped by credential expiry.\ncontentType: Native content type included in the signature.\nNo content type header.\nmetadata: Lowercase HTTP-token names with ASCII header values; frozen at admission.\nEmpty metadata.\nifMatch: Opaque native etag required at commit; excludes ifNoneMatch.\nNo etag condition.\nifNoneMatch: Only true is valid: require absence at native commit.\nNo absence condition.\nctx: Original storage operation context.\nNo caller cancellation or deadline."
+              "content": "expiresInSeconds: Integer seconds from 1 through 604800.\n900 seconds, capped by credential expiry.\ncontentType: Native content type included in the signature.\nNo content type header.\nmetadata: Lowercase HTTP-token names with ASCII header values; frozen at admission.\nEmpty metadata.\nifMatch: Opaque native etag required at commit; excludes ifNoneMatch.\nNo etag condition.\nifNoneMatch: Only true is valid: require absence at native commit.\nNo absence condition.\nctx: Original caller cancellation and deadline context.\nNo caller cancellation or deadline."
             },
             {
               "id": "advanced-usage",
@@ -1773,7 +1773,7 @@
           "declarationLine": 4,
           "source": "packages/storage-plugin-object/dist/s3.d.ts",
           "purpose": "Exactly one borrowed client or owned-client config and one native bucket.",
-          "core": "client: Borrowed official S3Client; never copied, reconfigured or destroyed.\nOmitted requires config.\nconfig: Official SDK configuration used to create one owned client at installation.\nOmitted requires client.\nbucket: Nonempty existing native bucket; the backend does not create buckets.\nprefix: Native prefix outside the organization segment.\nEmpty string adds no configuration prefix.\nmultipartThresholdBytes: Positive safe integer byte threshold for known-size input; streams always use multipart except empty streams.\n16 MiB.\npartBytes: Positive safe integer part size at least 5 MiB; the final part may be smaller.\n8 MiB.\npartConcurrency: Positive safe integer bound on outstanding native part requests.\n4 outstanding parts.",
+          "core": "client: Borrowed official S3Client; never copied, reconfigured or destroyed.\nOmitted requires config.\nconfig: Official SDK configuration used to create one owned client at installation.\nOmitted requires client.\nbucket: Nonempty existing native bucket; the backend does not create buckets.\nprefix: Native prefix outside the organization segment.\nEmpty string adds no configuration prefix.\nmultipartThresholdBytes: Positive safe integer byte threshold for known-size input; streams always use multipart except empty streams.\n16 MiB triggers multipart for known-size content.\npartBytes: Positive safe integer part size at least 5 MiB; the final part may be smaller.\n8 MiB per nonfinal part.\npartConcurrency: Positive safe integer bound on outstanding native part requests.\n4 outstanding parts.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -1897,7 +1897,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "client: Borrowed official S3Client; never copied, reconfigured or destroyed.\nOmitted requires config.\nconfig: Official SDK configuration used to create one owned client at installation.\nOmitted requires client.\nbucket: Nonempty existing native bucket; the backend does not create buckets.\nprefix: Native prefix outside the organization segment.\nEmpty string adds no configuration prefix.\nmultipartThresholdBytes: Positive safe integer byte threshold for known-size input; streams always use multipart except empty streams.\n16 MiB.\npartBytes: Positive safe integer part size at least 5 MiB; the final part may be smaller.\n8 MiB.\npartConcurrency: Positive safe integer bound on outstanding native part requests.\n4 outstanding parts."
+              "content": "client: Borrowed official S3Client; never copied, reconfigured or destroyed.\nOmitted requires config.\nconfig: Official SDK configuration used to create one owned client at installation.\nOmitted requires client.\nbucket: Nonempty existing native bucket; the backend does not create buckets.\nprefix: Native prefix outside the organization segment.\nEmpty string adds no configuration prefix.\nmultipartThresholdBytes: Positive safe integer byte threshold for known-size input; streams always use multipart except empty streams.\n16 MiB triggers multipart for known-size content.\npartBytes: Positive safe integer part size at least 5 MiB; the final part may be smaller.\n8 MiB per nonfinal part.\npartConcurrency: Positive safe integer bound on outstanding native part requests.\n4 outstanding parts."
             },
             {
               "id": "advanced-usage",
@@ -1919,7 +1919,7 @@
           "declarationLine": 18,
           "source": "packages/storage-plugin-object/dist/s3.d.ts",
           "purpose": "Capture one borrowed SDK client or owned-client configuration. Detect conditional writes through the original host detection window.",
-          "core": "Authentic lazy S3 descriptor. Modification requests send once; unknown commit acknowledgment is never replayed automatically.\nclient: Borrowed official S3Client; never copied, reconfigured or destroyed.\nOmitted requires config.\nconfig: Official SDK configuration used to create one owned client at installation.\nOmitted requires client.\nbucket: Nonempty existing native bucket; the backend does not create buckets.\nprefix: Native prefix outside the organization segment.\nEmpty string adds no configuration prefix.\nmultipartThresholdBytes: Positive safe integer byte threshold for known-size input; streams always use multipart except empty streams.\n16 MiB.\npartBytes: Positive safe integer part size at least 5 MiB; the final part may be smaller.\n8 MiB.\npartConcurrency: Positive safe integer bound on outstanding native part requests.\n4 outstanding parts.",
+          "core": "Authentic lazy S3 descriptor. Modification requests send once; unknown commit acknowledgment is never replayed automatically.\nclient: Borrowed official S3Client; never copied, reconfigured or destroyed.\nOmitted requires config.\nconfig: Official SDK configuration used to create one owned client at installation.\nOmitted requires client.\nbucket: Nonempty existing native bucket; the backend does not create buckets.\nprefix: Native prefix outside the organization segment.\nEmpty string adds no configuration prefix.\nmultipartThresholdBytes: Positive safe integer byte threshold for known-size input; streams always use multipart except empty streams.\n16 MiB triggers multipart for known-size content.\npartBytes: Positive safe integer part size at least 5 MiB; the final part may be smaller.\n8 MiB per nonfinal part.\npartConcurrency: Positive safe integer bound on outstanding native part requests.\n4 outstanding parts.",
           "advanced": "",
           "parameters": ["options: IS3ObjectDriverOptions"],
           "parameterDetails": [
@@ -1977,7 +1977,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Authentic lazy S3 descriptor. Modification requests send once; unknown commit acknowledgment is never replayed automatically.\nclient: Borrowed official S3Client; never copied, reconfigured or destroyed.\nOmitted requires config.\nconfig: Official SDK configuration used to create one owned client at installation.\nOmitted requires client.\nbucket: Nonempty existing native bucket; the backend does not create buckets.\nprefix: Native prefix outside the organization segment.\nEmpty string adds no configuration prefix.\nmultipartThresholdBytes: Positive safe integer byte threshold for known-size input; streams always use multipart except empty streams.\n16 MiB.\npartBytes: Positive safe integer part size at least 5 MiB; the final part may be smaller.\n8 MiB.\npartConcurrency: Positive safe integer bound on outstanding native part requests.\n4 outstanding parts."
+              "content": "Authentic lazy S3 descriptor. Modification requests send once; unknown commit acknowledgment is never replayed automatically.\nclient: Borrowed official S3Client; never copied, reconfigured or destroyed.\nOmitted requires config.\nconfig: Official SDK configuration used to create one owned client at installation.\nOmitted requires client.\nbucket: Nonempty existing native bucket; the backend does not create buckets.\nprefix: Native prefix outside the organization segment.\nEmpty string adds no configuration prefix.\nmultipartThresholdBytes: Positive safe integer byte threshold for known-size input; streams always use multipart except empty streams.\n16 MiB triggers multipart for known-size content.\npartBytes: Positive safe integer part size at least 5 MiB; the final part may be smaller.\n8 MiB per nonfinal part.\npartConcurrency: Positive safe integer bound on outstanding native part requests.\n4 outstanding parts."
             },
             {
               "id": "advanced-usage",

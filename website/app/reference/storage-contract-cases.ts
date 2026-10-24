@@ -1021,7 +1021,7 @@ async function pages(source: IRecordQuerySource) {
       ),
       result: t(
         'With canonical keys a,b,c,d, returns pages a,b and c,d. A different source, condition or ordering rejects before new I/O.',
-        '规范键为 a,b,c,d 时返回 a,b 与 c,d 两页；源、条件或排序不匹配在新 I/O 前拒绝。'
+        '规范键为 `a,b,c,d` 时返回 `a,b` 与 `c,d` 两页；源、条件或排序不匹配在新 I/O 前拒绝。'
       )
     }
   ],

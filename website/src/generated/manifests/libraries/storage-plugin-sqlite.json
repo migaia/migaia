@@ -654,8 +654,8 @@
           "signature": "export type ISqliteCapabilities = typeof kv | typeof records | typeof sql | typeof ttl | typeof counter;",
           "declarationLine": 27,
           "source": "packages/storage-plugin-sqlite/dist/types.d.ts",
-          "purpose": "The current exact capability token union, kv and records.",
-          "core": "The current exact capability token union, kv and records.",
+          "purpose": "The exact built-in capability token union: kv, records, sql, ttl and counter.",
+          "core": "The exact built-in capability token union: kv, records, sql, ttl and counter.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -678,7 +678,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "The current exact capability token union, kv and records."
+              "content": "The exact built-in capability token union: kv, records, sql, ttl and counter."
             },
             {
               "id": "getting-started",
@@ -698,7 +698,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The current exact capability token union, kv and records."
+              "content": "The exact built-in capability token union: kv, records, sql, ttl and counter."
             },
             {
               "id": "advanced-usage",
@@ -721,7 +721,7 @@
           "source": "packages/storage-plugin-sqlite/dist/types.d.ts",
           "purpose": "The creating caller owns this driver and storage resource. Dispose the host before the connection; backend disposal never closes it.",
           "core": "dispose: Seal the driver and close the native connection once.\nThe same explicit disposal Promise on repeated calls; native close failure rejects with its cause.",
-          "advanced": "",
+          "advanced": "Give the host a borrowed connection and keep disposal in the creating application.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -737,7 +737,7 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Give the host a borrowed connection and keep disposal in the creating application.",
           "notUse": "",
           "sections": [
             {
@@ -768,7 +768,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Give the host a borrowed connection and keep disposal in the creating application."
             }
           ],
           "declaredConfiguration": [],
@@ -1112,7 +1112,7 @@
           "declarationLine": 46,
           "source": "packages/storage-plugin-sqlite/dist/types.d.ts",
           "purpose": "Installation settings captured by sqliteBackendPlugin before native work begins.",
-          "core": "driver: Caller-owned native connection, exclusive to one installed store until that store drains.\ntable: Physical table prefix, quoted as complete SQL identifiers.\nmigaia, with separate channel and control tables.\nconcurrency: Default policy resolved by the shared concurrency owner.\nThe shared default concurrency policy.\nowner: Optional diagnostic owner label; it grants no authority.\nNo custom owner label.\nmaxLockMs: Maximum native WAL lock lease; expiration rejects continued transaction use.\n30000 milliseconds.\nwal: Select native cross-connection WAL locks or the original in-process shared lock port.\ntrue for file databases; false for memory databases. A requested WAL mode must be confirmed by SQLite.",
+          "core": "driver: Caller-owned native connection, exclusive to one installed store until that store drains.\ntable: Physical table prefix, quoted as complete SQL identifiers.\nmigaia, with separate channel and control tables.\nconcurrency: Default policy resolved by the shared concurrency owner.\nThe shared default concurrency policy.\nChoose a logical acquisition budget instead of changing native SQLite timeouts.\nowner: Optional diagnostic owner label; it grants no authority.\nNo custom owner label.\nmaxLockMs: Maximum native WAL lock lease; expiration rejects continued transaction use.\n30000 milliseconds.\nwal: Select native cross-connection WAL locks or the original in-process shared lock port.\ntrue for file databases; false for memory databases. A requested WAL mode must be confirmed by SQLite.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -1210,7 +1210,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "driver: Caller-owned native connection, exclusive to one installed store until that store drains.\ntable: Physical table prefix, quoted as complete SQL identifiers.\nmigaia, with separate channel and control tables.\nconcurrency: Default policy resolved by the shared concurrency owner.\nThe shared default concurrency policy.\nowner: Optional diagnostic owner label; it grants no authority.\nNo custom owner label.\nmaxLockMs: Maximum native WAL lock lease; expiration rejects continued transaction use.\n30000 milliseconds.\nwal: Select native cross-connection WAL locks or the original in-process shared lock port.\ntrue for file databases; false for memory databases. A requested WAL mode must be confirmed by SQLite."
+              "content": "driver: Caller-owned native connection, exclusive to one installed store until that store drains.\ntable: Physical table prefix, quoted as complete SQL identifiers.\nmigaia, with separate channel and control tables.\nconcurrency: Default policy resolved by the shared concurrency owner.\nThe shared default concurrency policy.\nChoose a logical acquisition budget instead of changing native SQLite timeouts.\nowner: Optional diagnostic owner label; it grants no authority.\nNo custom owner label.\nmaxLockMs: Maximum native WAL lock lease; expiration rejects continued transaction use.\n30000 milliseconds.\nwal: Select native cross-connection WAL locks or the original in-process shared lock port.\ntrue for file databases; false for memory databases. A requested WAL mode must be confirmed by SQLite."
             },
             {
               "id": "advanced-usage",
@@ -1373,7 +1373,7 @@
           "source": "packages/storage-plugin-sqlite/dist/types.d.ts",
           "purpose": "A synchronous prepared native statement borrowed from its connection. Disposal of that connection seals captured statements too.",
           "core": "run: Execute a mutation with positional bindings.\nrun.values: Native column values in placeholder order.\nNative changes and insertion identity; native failures retain their cause.\nget: Read the first row with copied native column values.\nget.values: Native positional bindings.\nThe first row, or undefined when no row matches.\nall: Read all rows without leaving a native cursor open.\nall.values: Native positional bindings.\nA detached array of rows, empty when no row matches.",
-          "advanced": "",
+          "advanced": "Bind values through a caller-owned prepared statement and read exact native integers.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -1435,7 +1435,7 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Bind values through a caller-owned prepared statement and read exact native integers.",
           "notUse": "",
           "sections": [
             {
@@ -1466,7 +1466,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Bind values through a caller-owned prepared statement and read exact native integers."
             }
           ],
           "declaredConfiguration": [],
@@ -1482,8 +1482,8 @@
           "signature": "export type ISqliteStore<TValue = unknown> = ICapabilityStore<ISqliteNativeStore<TValue>, ISqliteCapabilities, readonly [ ICapabilityImpl<typeof kv>, ICapabilityImpl<typeof records, IRecordsApi<TValue>>, ICapabilityImpl<typeof sql, ISqliteExecutor>, ICapabilityImpl<typeof ttl, ITtlApi>, ICapabilityImpl<typeof counter, ICounterApi> ]>;",
           "declarationLine": 38,
           "source": "packages/storage-plugin-sqlite/dist/types.d.ts",
-          "purpose": "The installed native store combines text, bytes, typed records, sync access, private metadata, SQL and kv/records capabilities. Root access rejects while a transaction owns its connection.",
-          "core": "The installed native store combines text, bytes, typed records, sync access, private metadata, SQL and kv/records capabilities. Root access rejects while a transaction owns its connection.",
+          "purpose": "The installed native store combines text, bytes, typed records, sync access, private metadata, SQL and kv/records/sql/ttl/counter capabilities. Root access rejects while a transaction owns its connection.",
+          "core": "The installed native store combines text, bytes, typed records, sync access, private metadata, SQL and kv/records/sql/ttl/counter capabilities. Root access rejects while a transaction owns its connection.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -1506,7 +1506,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "The installed native store combines text, bytes, typed records, sync access, private metadata, SQL and kv/records capabilities. Root access rejects while a transaction owns its connection."
+              "content": "The installed native store combines text, bytes, typed records, sync access, private metadata, SQL and kv/records/sql/ttl/counter capabilities. Root access rejects while a transaction owns its connection."
             },
             {
               "id": "getting-started",
@@ -1526,7 +1526,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The installed native store combines text, bytes, typed records, sync access, private metadata, SQL and kv/records capabilities. Root access rejects while a transaction owns its connection."
+              "content": "The installed native store combines text, bytes, typed records, sync access, private metadata, SQL and kv/records/sql/ttl/counter capabilities. Root access rejects while a transaction owns its connection."
             },
             {
               "id": "advanced-usage",
@@ -1741,7 +1741,7 @@
           "declarationLine": 8,
           "source": "packages/storage-plugin-sqlite/dist/plugin.d.ts",
           "purpose": "Define one caller-owned driver backend for the storage host.",
-          "core": "An exact-id backend plugin. File databases verify WAL by default; memory defaults to wal:false and can reserve private native log namespaces.",
+          "core": "options: Captured driver and backend configuration.\nfeatures: Optional exact-kind Feature definitions keyed by installed API name.\nAn exact-id backend plugin. File databases verify WAL by default; memory defaults to wal:false and can reserve private native log namespaces.\ndriver: Caller-owned native connection, exclusive to one installed store until that store drains.\ntable: Physical table prefix, quoted as complete SQL identifiers.\nmigaia, with separate channel and control tables.\nconcurrency: Default policy resolved by the shared concurrency owner.\nThe shared default concurrency policy.\nChoose a logical acquisition budget instead of changing native SQLite timeouts.\nowner: Optional diagnostic owner label; it grants no authority.\nNo custom owner label.\nmaxLockMs: Maximum native WAL lock lease; expiration rejects continued transaction use.\n30000 milliseconds.\nwal: Select native cross-connection WAL locks or the original in-process shared lock port.\ntrue for file databases; false for memory databases. A requested WAL mode must be confirmed by SQLite.\nid: Literal backend id selected by host.backend.\nsqlite.\nowner.label: Diagnostic text for the existing concurrency owner.\nNo custom label.",
           "advanced": "",
           "parameters": [
             "options: ISqliteOptions & { readonly id?: TId; }",
@@ -1815,7 +1815,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "An exact-id backend plugin. File databases verify WAL by default; memory defaults to wal:false and can reserve private native log namespaces."
+              "content": "options: Captured driver and backend configuration.\nfeatures: Optional exact-kind Feature definitions keyed by installed API name.\nAn exact-id backend plugin. File databases verify WAL by default; memory defaults to wal:false and can reserve private native log namespaces.\ndriver: Caller-owned native connection, exclusive to one installed store until that store drains.\ntable: Physical table prefix, quoted as complete SQL identifiers.\nmigaia, with separate channel and control tables.\nconcurrency: Default policy resolved by the shared concurrency owner.\nThe shared default concurrency policy.\nChoose a logical acquisition budget instead of changing native SQLite timeouts.\nowner: Optional diagnostic owner label; it grants no authority.\nNo custom owner label.\nmaxLockMs: Maximum native WAL lock lease; expiration rejects continued transaction use.\n30000 milliseconds.\nwal: Select native cross-connection WAL locks or the original in-process shared lock port.\ntrue for file databases; false for memory databases. A requested WAL mode must be confirmed by SQLite.\nid: Literal backend id selected by host.backend.\nsqlite.\nowner.label: Diagnostic text for the existing concurrency owner.\nNo custom label."
             },
             {
               "id": "advanced-usage",
@@ -2072,7 +2072,7 @@
           "declarationLine": 3,
           "source": "packages/storage-plugin-sqlite/dist/bun.d.ts",
           "purpose": "Open bun:sqlite with safeIntegers enabled before statements run.",
-          "core": "A caller-owned connection; disposal uses native close(true).",
+          "core": "path: Native database filename or :memory: for a private memory database.\nA caller-owned connection; disposal uses native close(true).",
           "advanced": "",
           "parameters": ["path: string"],
           "parameterDetails": [
@@ -2128,7 +2128,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "A caller-owned connection; disposal uses native close(true)."
+              "content": "path: Native database filename or :memory: for a private memory database.\nA caller-owned connection; disposal uses native close(true)."
             },
             {
               "id": "advanced-usage",
@@ -2297,7 +2297,7 @@
           "declarationLine": 3,
           "source": "packages/storage-plugin-sqlite/dist/node.d.ts",
           "purpose": "Open the native Node/Deno SQLite connection with exact integers.",
-          "core": "A caller-owned synchronous driver and storage resource, without a public native Database or close method.",
+          "core": "path: Native database filename or :memory: for a private memory database.\nA caller-owned synchronous driver and storage resource, without a public native Database or close method.",
           "advanced": "",
           "parameters": ["path: string"],
           "parameterDetails": [
@@ -2355,7 +2355,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "A caller-owned synchronous driver and storage resource, without a public native Database or close method."
+              "content": "path: Native database filename or :memory: for a private memory database.\nA caller-owned synchronous driver and storage resource, without a public native Database or close method."
             },
             {
               "id": "advanced-usage",

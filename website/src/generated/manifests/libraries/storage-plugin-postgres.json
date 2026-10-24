@@ -585,7 +585,7 @@
           "declarationLine": 4,
           "source": "packages/storage-plugin-postgres/dist/hooks.d.ts",
           "purpose": "Read-only actual version/isolation/capability facts and optional max_slot_wal_keep_size.",
-          "core": "Read-only actual version/isolation/capability facts and optional max_slot_wal_keep_size.",
+          "core": "version: Actual native server version observed by capability detection.\nisolationLevel: Actual native transaction isolation level observed by detection.\ncapabilities: Detected supported capability facts without business values.\nmaxSlotWalKeepSize: Optional observed native WAL retention configuration for replication.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -665,7 +665,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Read-only actual version/isolation/capability facts and optional max_slot_wal_keep_size."
+              "content": "version: Actual native server version observed by capability detection.\nisolationLevel: Actual native transaction isolation level observed by detection.\ncapabilities: Detected supported capability facts without business values.\nmaxSlotWalKeepSize: Optional observed native WAL retention configuration for replication."
             },
             {
               "id": "advanced-usage",
@@ -687,8 +687,8 @@
           "declarationLine": 33,
           "source": "packages/storage-plugin-postgres/dist/types.d.ts",
           "purpose": "Borrowed native query/COPY connection and original two-promise resource release.",
-          "core": "Borrowed native query/COPY connection and original two-promise resource release.",
-          "advanced": "",
+          "core": "query: Execute native SQL once on the selected original connection.\nquery.text: Complete native SQL statement using positional parameters.\nquery.params: Native scalar values or supported one-dimensional array carriers.\nquery.ctx: Original optional operation signal and timeout budget, without an additional retry loop.\nNative scalar rows and command rowCount; native errors retain their cause.\ncopyFrom: Stream client STDIN through the same native connection with backpressure.\ncopyFrom.target: Structured caller-owned table path and column names.\ncopyFrom.source: One byte iterable consumed with native backpressure on this reserved connection.\ncopyFrom.options: Native operation settings for the selected COPY or replication request.\ncopyFrom.ctx: Original optional operation signal and timeout budget, without an additional retry loop.\nResolves after all input settles; a failed COPY follows original rollback.",
+          "advanced": "Borrow native SQL operations while keeping all client ownership in the application.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -760,7 +760,7 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Borrow native SQL operations while keeping all client ownership in the application.",
           "notUse": "",
           "sections": [
             {
@@ -786,12 +786,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Borrowed native query/COPY connection and original two-promise resource release."
+              "content": "query: Execute native SQL once on the selected original connection.\nquery.text: Complete native SQL statement using positional parameters.\nquery.params: Native scalar values or supported one-dimensional array carriers.\nquery.ctx: Original optional operation signal and timeout budget, without an additional retry loop.\nNative scalar rows and command rowCount; native errors retain their cause.\ncopyFrom: Stream client STDIN through the same native connection with backpressure.\ncopyFrom.target: Structured caller-owned table path and column names.\ncopyFrom.source: One byte iterable consumed with native backpressure on this reserved connection.\ncopyFrom.options: Native operation settings for the selected COPY or replication request.\ncopyFrom.ctx: Original optional operation signal and timeout budget, without an additional retry loop.\nResolves after all input settles; a failed COPY follows original rollback."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Borrow native SQL operations while keeping all client ownership in the application."
             }
           ],
           "declaredConfiguration": [],
@@ -808,7 +808,7 @@
           "declarationLine": 134,
           "source": "packages/storage-plugin-postgres/dist/types.d.ts",
           "purpose": "Root/transaction from(target,source,options?,ctx?) streams native COPY and returns void.",
-          "core": "Root/transaction from(target,source,options?,ctx?) streams native COPY and returns void.",
+          "core": "from: Stream client STDIN through the same native connection with backpressure.\nfrom.target: Structured caller-owned table path and column names.\nfrom.source: Factory returning a fresh byte iterable for each actual attempt.\nfrom.options: Native operation settings for the selected COPY or replication request.\nfrom.ctx: Original optional operation signal and timeout budget, without an additional retry loop.\nResolves after all input settles; a failed COPY follows original rollback.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -882,7 +882,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Root/transaction from(target,source,options?,ctx?) streams native COPY and returns void."
+              "content": "from: Stream client STDIN through the same native connection with backpressure.\nfrom.target: Structured caller-owned table path and column names.\nfrom.source: Factory returning a fresh byte iterable for each actual attempt.\nfrom.options: Native operation settings for the selected COPY or replication request.\nfrom.ctx: Original optional operation signal and timeout budget, without an additional retry loop.\nResolves after all input settles; a failed COPY follows original rollback."
             },
             {
               "id": "advanced-usage",
@@ -903,8 +903,8 @@
           "signature": "export type IPgCopyOptions = { readonly format?: 'csv' | 'text'; readonly header?: boolean; readonly delimiter?: string; readonly null?: string; };",
           "declarationLine": 14,
           "source": "packages/storage-plugin-postgres/dist/types.d.ts",
-          "purpose": "CSV defaults to comma/header:false; text defaults to TAB and rejects header.",
-          "core": "CSV defaults to comma/header:false; text defaults to TAB and rejects header.",
+          "purpose": "Restricted native client COPY formatting without server files or programs.",
+          "core": "format: Native client COPY format, restricted to CSV or text.\ncsv format.\nCSV quoting and comma separators.\nNative text fields separated by TAB.\nheader: Whether CSV begins with a header row; text rejects true.\nfalse omits the CSV header.\ndelimiter: One native delimiter character, without unsafe control separators.\nComma for CSV and TAB for text.\nnull: Native marker distinguishing a null field from text.\nNative COPY format default marker.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -964,7 +964,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "CSV defaults to comma/header:false; text defaults to TAB and rejects header."
+              "content": "Restricted native client COPY formatting without server files or programs."
             },
             {
               "id": "getting-started",
@@ -984,7 +984,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "CSV defaults to comma/header:false; text defaults to TAB and rejects header."
+              "content": "format: Native client COPY format, restricted to CSV or text.\ncsv format.\nCSV quoting and comma separators.\nNative text fields separated by TAB.\nheader: Whether CSV begins with a header row; text rejects true.\nfalse omits the CSV header.\ndelimiter: One native delimiter character, without unsafe control separators.\nComma for CSV and TAB for text.\nnull: Native marker distinguishing a null field from text.\nNative COPY format default marker."
             },
             {
               "id": "advanced-usage",
@@ -1069,7 +1069,7 @@
           "declarationLine": 9,
           "source": "packages/storage-plugin-postgres/dist/types.d.ts",
           "purpose": "Structured nonempty table identifier path and nonempty column names for client STDIN.",
-          "core": "Structured nonempty table identifier path and nonempty column names for client STDIN.",
+          "core": "table: Nonempty identifier path to the caller-owned destination table.\ncolumns: Nonempty destination column identifiers in incoming field order.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -1131,7 +1131,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Structured nonempty table identifier path and nonempty column names for client STDIN."
+              "content": "table: Nonempty identifier path to the caller-owned destination table.\ncolumns: Nonempty destination column identifiers in incoming field order."
             },
             {
               "id": "advanced-usage",
@@ -1153,8 +1153,8 @@
           "declarationLine": 70,
           "source": "packages/storage-plugin-postgres/dist/types.d.ts",
           "purpose": "Caller-owned query/connect and optional listen/replication ports; no close authority.",
-          "core": "Caller-owned query/connect and optional listen/replication ports; no close authority.",
-          "advanced": "",
+          "core": "query: Execute native SQL once on the selected original connection.\nquery.text: Complete native SQL statement using positional parameters.\nquery.params: Native scalar values or supported one-dimensional array carriers.\nquery.ctx: Original optional operation signal and timeout budget, without an additional retry loop.\nNative scalar rows and command rowCount; native errors retain their cause.\nconnect: Reserve one original native connection until its resource settles.\nconnect.ctx: Original optional operation signal and timeout budget, without an additional retry loop.\nA borrowed connection with original idempotent disposal.\nlisten: Create one dedicated native channel subscription.\nlisten.channel: Application-assigned native notification channel.\nlisten.listener: Receives the original string payload; thrown or rejected observer errors are reported.\nlisten.ctx: Original optional operation signal and timeout budget, without an additional retry loop.\nAn independently disposable listener resource; the root client remains open.\nlogicalReplication: Optional pg-only native slot and pgoutput port; other adapters omit it.",
+          "advanced": "Borrow native SQL operations while keeping all client ownership in the application.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -1245,7 +1245,7 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Borrow native SQL operations while keeping all client ownership in the application.",
           "notUse": "",
           "sections": [
             {
@@ -1271,12 +1271,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Caller-owned query/connect and optional listen/replication ports; no close authority."
+              "content": "query: Execute native SQL once on the selected original connection.\nquery.text: Complete native SQL statement using positional parameters.\nquery.params: Native scalar values or supported one-dimensional array carriers.\nquery.ctx: Original optional operation signal and timeout budget, without an additional retry loop.\nNative scalar rows and command rowCount; native errors retain their cause.\nconnect: Reserve one original native connection until its resource settles.\nconnect.ctx: Original optional operation signal and timeout budget, without an additional retry loop.\nA borrowed connection with original idempotent disposal.\nlisten: Create one dedicated native channel subscription.\nlisten.channel: Application-assigned native notification channel.\nlisten.listener: Receives the original string payload; thrown or rejected observer errors are reported.\nlisten.ctx: Original optional operation signal and timeout budget, without an additional retry loop.\nAn independently disposable listener resource; the root client remains open.\nlogicalReplication: Optional pg-only native slot and pgoutput port; other adapters omit it."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Borrow native SQL operations while keeping all client ownership in the application."
             }
           ],
           "declaredConfiguration": [],
@@ -1293,7 +1293,7 @@
           "declarationLine": 125,
           "source": "packages/storage-plugin-postgres/dist/types.d.ts",
           "purpose": "Root listen(channel,listener,ctx?) returns an owned subscription; notify settles on commit.",
-          "core": "Root listen(channel,listener,ctx?) returns an owned subscription; notify settles on commit.",
+          "core": "listen: Own a dedicated root notification listener until disposal.\nlisten.channel: Application-assigned native notification channel.\nlisten.listener: Receives the original string payload; thrown or rejected observer errors are reported.\nlisten.ctx: Original optional operation signal and timeout budget, without an additional retry loop.\nA native listener resource; disposal leaves the injected pool open.\nnotify: Send native notification on the original root or transaction connection.\nnotify.channel: Application-assigned native notification channel.\nnotify.payload: Application notification string delivered after commit.\nnotify.ctx: Original optional operation signal and timeout budget, without an additional retry loop.\nResolves with native execution; transaction delivery occurs only after COMMIT.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -1387,7 +1387,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Root listen(channel,listener,ctx?) returns an owned subscription; notify settles on commit."
+              "content": "listen: Own a dedicated root notification listener until disposal.\nlisten.channel: Application-assigned native notification channel.\nlisten.listener: Receives the original string payload; thrown or rejected observer errors are reported.\nlisten.ctx: Original optional operation signal and timeout budget, without an additional retry loop.\nA native listener resource; disposal leaves the injected pool open.\nnotify: Send native notification on the original root or transaction connection.\nnotify.channel: Application-assigned native notification channel.\nnotify.payload: Application notification string delivered after commit.\nnotify.ctx: Original optional operation signal and timeout budget, without an additional retry loop.\nResolves with native execution; transaction delivery occurs only after COMMIT."
             },
             {
               "id": "advanced-usage",
@@ -1408,8 +1408,8 @@
           "signature": "export type IPgLogicalReplicationOptions = { readonly slot: string; readonly publication: string; };",
           "declarationLine": 65,
           "source": "packages/storage-plugin-postgres/dist/types.d.ts",
-          "purpose": "Deployment-owned persistent slot and FOR ALL TABLES publication names.",
-          "core": "Deployment-owned persistent slot and FOR ALL TABLES publication names.",
+          "purpose": "Deployment-created persistent slot and publication covering all managed tables.",
+          "core": "slot: Persistent slot name created and assigned by deployment.\npublication: Deployment-created publication covering every managed table.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -1451,7 +1451,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Deployment-owned persistent slot and FOR ALL TABLES publication names."
+              "content": "Deployment-created persistent slot and publication covering all managed tables."
             },
             {
               "id": "getting-started",
@@ -1471,7 +1471,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Deployment-owned persistent slot and FOR ALL TABLES publication names."
+              "content": "slot: Persistent slot name created and assigned by deployment.\npublication: Deployment-created publication covering every managed table."
             },
             {
               "id": "advanced-usage",
@@ -1492,8 +1492,8 @@
           "signature": "export type IPgLogicalReplicationPort = { detect(options: IPgLogicalReplicationOptions & IPgLogicalReplicationRoute, ctx?: IOperationContext): Promise<{ readonly maxSlotWalKeepSize: string; }>; read(options: IPgLogicalReplicationOptions & IPgLogicalReplicationRoute & { readonly after?: string; readonly limit?: number; }, ctx?: IOperationContext): Promise<{ readonly changes: readonly IDurableStorageChange[]; readonly cursor: string; }>; open(options: IPgLogicalReplicationOptions & IPgLogicalReplicationRoute & { readonly from?: string; readonly onChange: (change: IDurableStorageChange) => Promise<void>; readonly onError?: (error: unknown) => void; }, ctx?: IOperationContext): Promise<IStorageResource & { acknowledge(commitEndLsn: string): Promise<void>; }>; dropSlot(slot: string, ctx?: IOperationContext): Promise<void>; };",
           "declarationLine": 44,
           "source": "packages/storage-plugin-postgres/dist/types.d.ts",
-          "purpose": "pg-only detect/read/open/dropSlot backed by the original slot and pgoutput peer.",
-          "core": "pg-only detect/read/open/dropSlot backed by the original slot and pgoutput peer.",
+          "purpose": "Native pgoutput detection, bounded replay and owned replication resources for the pg adapter.",
+          "core": "detect: Check the original slot and publication prerequisites without creating them.\ndetect.options: Native operation settings for the selected COPY or replication request.\ndetect.ctx: Original optional operation signal and timeout budget, without an additional retry loop.\nObserved native WAL retention facts.\nread: Read bounded changes from the original slot and native decoder.\nread.options: Native operation settings for the selected COPY or replication request.\nread.ctx: Original optional operation signal and timeout budget, without an additional retry loop.\nA change page and original resume cursor.\nopen: Own one native replication session until its resource is disposed.\nopen.options: Native operation settings for the selected COPY or replication request.\nopen.ctx: Original optional operation signal and timeout budget, without an additional retry loop.\nA subscription resource with explicit acknowledgement.\ndropSlot: Explicitly remove a deployment-selected native slot.\ndropSlot.slot: Persistent slot name created and assigned by deployment.\ndropSlot.ctx: Original optional operation signal and timeout budget, without an additional retry loop.\nResolves after native slot deletion; disposal alone never deletes it.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -1597,7 +1597,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "pg-only detect/read/open/dropSlot backed by the original slot and pgoutput peer."
+              "content": "Native pgoutput detection, bounded replay and owned replication resources for the pg adapter."
             },
             {
               "id": "getting-started",
@@ -1617,7 +1617,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "pg-only detect/read/open/dropSlot backed by the original slot and pgoutput peer."
+              "content": "detect: Check the original slot and publication prerequisites without creating them.\ndetect.options: Native operation settings for the selected COPY or replication request.\ndetect.ctx: Original optional operation signal and timeout budget, without an additional retry loop.\nObserved native WAL retention facts.\nread: Read bounded changes from the original slot and native decoder.\nread.options: Native operation settings for the selected COPY or replication request.\nread.ctx: Original optional operation signal and timeout budget, without an additional retry loop.\nA change page and original resume cursor.\nopen: Own one native replication session until its resource is disposed.\nopen.options: Native operation settings for the selected COPY or replication request.\nopen.ctx: Original optional operation signal and timeout budget, without an additional retry loop.\nA subscription resource with explicit acknowledgement.\ndropSlot: Explicitly remove a deployment-selected native slot.\ndropSlot.slot: Persistent slot name created and assigned by deployment.\ndropSlot.ctx: Original optional operation signal and timeout budget, without an additional retry loop.\nResolves after native slot deletion; disposal alone never deletes it."
             },
             {
               "id": "advanced-usage",
@@ -1639,7 +1639,7 @@
           "declarationLine": 38,
           "source": "packages/storage-plugin-postgres/dist/types.d.ts",
           "purpose": "Read-only schema/prefix and optional immutable org route for the original native decoder.",
-          "core": "Read-only schema/prefix and optional immutable org route for the original native decoder.",
+          "core": "schema: Read-only configured schema containing the managed tables.\nprefix: Read-only configured table prefix used by the native decoder.\norgId: Immutable organization identifier assigned by the original host view.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -1710,7 +1710,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Read-only schema/prefix and optional immutable org route for the original native decoder."
+              "content": "schema: Read-only configured schema containing the managed tables.\nprefix: Read-only configured table prefix used by the native decoder.\norgId: Immutable organization identifier assigned by the original host view."
             },
             {
               "id": "advanced-usage",
@@ -1732,7 +1732,7 @@
           "declarationLine": 23,
           "source": "packages/storage-plugin-postgres/dist/types.d.ts",
           "purpose": "text/float8 arrays are encoded once and bound as one parameter, never SQL text.",
-          "core": "text/float8 arrays are encoded once and bound as one parameter, never SQL text.",
+          "core": "arrayType: Discriminator selecting text or finite float8 array encoding.\nvalues: One-dimensional native scalar elements, including explicit null items.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -1812,7 +1812,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "text/float8 arrays are encoded once and bound as one parameter, never SQL text."
+              "content": "arrayType: Discriminator selecting text or finite float8 array encoding.\nvalues: One-dimensional native scalar elements, including explicit null items."
             },
             {
               "id": "advanced-usage",
@@ -1899,7 +1899,7 @@
           "declarationLine": 31,
           "source": "packages/storage-plugin-postgres/dist/types.d.ts",
           "purpose": "Shared SQL scalars or this package's finite one-dimensional array carrier.",
-          "core": "Shared SQL scalars or this package's finite one-dimensional array carrier.",
+          "core": "arrayType: Array-carrier discriminator; scalar parameters have no such field.\nvalues: Native one-dimensional elements on the explicit array carrier only.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -1942,7 +1942,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Shared SQL scalars or this package's finite one-dimensional array carrier."
+              "content": "arrayType: Array-carrier discriminator; scalar parameters have no such field.\nvalues: Native one-dimensional elements on the explicit array carrier only."
             },
             {
               "id": "advanced-usage",
@@ -1964,7 +1964,7 @@
           "declarationLine": 160,
           "source": "packages/storage-plugin-postgres/dist/types.d.ts",
           "purpose": "search(target,query,options?,ctx?) uses native operators and caller table semantics.",
-          "core": "search(target,query,options?,ctx?) uses native operators and caller table semantics.",
+          "core": "search: Rank the caller-owned table using the requested native pgvector operator.\nsearch.target: Structured caller-owned table path and column names.\nsearch.query: Finite vector with the dimension declared by the caller-owned table.\nsearch.options: Native operation settings for the selected COPY or replication request.\nsearch.ctx: Original optional operation signal and timeout budget, without an additional retry loop.\nOriginal SQL identifiers, finite scores and selected payload values.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -2038,7 +2038,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "search(target,query,options?,ctx?) uses native operators and caller table semantics."
+              "content": "search: Rank the caller-owned table using the requested native pgvector operator.\nsearch.target: Structured caller-owned table path and column names.\nsearch.query: Finite vector with the dimension declared by the caller-owned table.\nsearch.options: Native operation settings for the selected COPY or replication request.\nsearch.ctx: Original optional operation signal and timeout budget, without an additional retry loop.\nOriginal SQL identifiers, finite scores and selected payload values."
             },
             {
               "id": "advanced-usage",
@@ -2059,8 +2059,8 @@
           "signature": "export type IPgNativeVectorHit = { readonly id: ISqlValue; readonly score: number; readonly payload?: ISqlValue; };",
           "declarationLine": 154,
           "source": "packages/storage-plugin-postgres/dist/types.d.ts",
-          "purpose": "Original native SQL id, finite score and optional native payload.",
-          "core": "Original native SQL id, finite score and optional native payload.",
+          "purpose": "Native SQL identifier, finite similarity score and optional original table payload.",
+          "core": "id: Original native SQL identifier read from the caller-selected id column.\nscore: Finite native similarity score in the requested metric.\npayload: Original optional value from the caller-selected payload column.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -2111,7 +2111,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Original native SQL id, finite score and optional native payload."
+              "content": "Native SQL identifier, finite similarity score and optional original table payload."
             },
             {
               "id": "getting-started",
@@ -2131,7 +2131,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Original native SQL id, finite score and optional native payload."
+              "content": "id: Original native SQL identifier read from the caller-selected id column.\nscore: Finite native similarity score in the requested metric.\npayload: Original optional value from the caller-selected payload column."
             },
             {
               "id": "advanced-usage",
@@ -2152,8 +2152,8 @@
           "signature": "export type IPgNativeVectorSearchOptions = { readonly metric?: 'cosine' | 'dot' | 'euclid'; readonly limit?: number; readonly minScore?: number; readonly filter?: import('@migaia/storage-contract').IVectorFilter; readonly efSearch?: number; readonly probes?: number; };",
           "declarationLine": 145,
           "source": "packages/storage-plugin-postgres/dist/types.d.ts",
-          "purpose": "metric=cosine, limit=10; finite minScore/filter and transaction-local efSearch/probes.",
-          "core": "metric=cosine, limit=10; finite minScore/filter and transaction-local efSearch/probes.",
+          "purpose": "Native metric, result bound and transaction-local vector index search settings.",
+          "core": "metric: Native cosine, dot or Euclidean operator selection.\ncosine metric.\nNative cosine similarity.\nNative inner product.\nNative Euclidean distance converted to a score.\nlimit: Maximum native ranked hits returned by this query.\n10 hits.\nminScore: Optional finite score bound applied by the native query.\nfilter: Caller-provided native SQL payload condition for this table.\nefSearch: Optional transaction-local HNSW search effort setting.\nprobes: Optional transaction-local IVFFlat probe count.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -2231,7 +2231,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "metric=cosine, limit=10; finite minScore/filter and transaction-local efSearch/probes."
+              "content": "Native metric, result bound and transaction-local vector index search settings."
             },
             {
               "id": "getting-started",
@@ -2251,7 +2251,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "metric=cosine, limit=10; finite minScore/filter and transaction-local efSearch/probes."
+              "content": "metric: Native cosine, dot or Euclidean operator selection.\ncosine metric.\nNative cosine similarity.\nNative inner product.\nNative Euclidean distance converted to a score.\nlimit: Maximum native ranked hits returned by this query.\n10 hits.\nminScore: Optional finite score bound applied by the native query.\nfilter: Caller-provided native SQL payload condition for this table.\nefSearch: Optional transaction-local HNSW search effort setting.\nprobes: Optional transaction-local IVFFlat probe count."
             },
             {
               "id": "advanced-usage",
@@ -2273,7 +2273,7 @@
           "declarationLine": 138,
           "source": "packages/storage-plugin-postgres/dist/types.d.ts",
           "purpose": "Caller-owned table path and id/vector/payload columns, separate from managed collections.",
-          "core": "Caller-owned table path and id/vector/payload columns, separate from managed collections.",
+          "core": "table: Structured identifier path to the caller-owned vector table.\nidColumn: Column preserving original native SQL point identifiers.\nvectorColumn: Native vector(d) column used by pgvector operators.\npayloadColumn: Optional native payload column retained in each returned hit.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -2353,7 +2353,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Caller-owned table path and id/vector/payload columns, separate from managed collections."
+              "content": "table: Structured identifier path to the caller-owned vector table.\nidColumn: Column preserving original native SQL point identifiers.\nvectorColumn: Native vector(d) column used by pgvector operators.\npayloadColumn: Optional native payload column retained in each returned hit."
             },
             {
               "id": "advanced-usage",
@@ -2375,7 +2375,7 @@
           "declarationLine": 11,
           "source": "packages/storage-plugin-postgres/dist/hooks.d.ts",
           "purpose": "Native channel identity and original backend/org hook context, without payload values.",
-          "core": "Native channel identity and original backend/org hook context, without payload values.",
+          "core": "channel: Original native notification channel, excluding message payload.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -2428,7 +2428,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Native channel identity and original backend/org hook context, without payload values."
+              "content": "channel: Original native notification channel, excluding message payload."
             },
             {
               "id": "advanced-usage",
@@ -2450,7 +2450,7 @@
           "declarationLine": 4,
           "source": "packages/storage-plugin-postgres/dist/types.d.ts",
           "purpose": "Validated native scalar rows and actual command rowCount, with null count normalized to zero.",
-          "core": "Validated native scalar rows and actual command rowCount, with null count normalized to zero.",
+          "core": "rows: Original validated rows containing supported SQL scalar values.\nrowCount: Actual command row count; native null counts normalize to zero.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -2512,7 +2512,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Validated native scalar rows and actual command rowCount, with null count normalized to zero."
+              "content": "rows: Original validated rows containing supported SQL scalar values.\nrowCount: Actual command row count; native null counts normalize to zero."
             },
             {
               "id": "advanced-usage",
@@ -2533,8 +2533,8 @@
           "signature": "export type IPgServer = 'postgres' | 'cockroach' | 'yugabyte';",
           "declarationLine": 77,
           "source": "packages/storage-plugin-postgres/dist/types.d.ts",
-          "purpose": "Actual postgres, cockroach or yugabyte server preset; only postgres declares native changeFeed.",
-          "core": "Actual postgres, cockroach or yugabyte server preset; only postgres declares native changeFeed.",
+          "purpose": "Actual deployed server preset; only PostgreSQL promises the native change feed.",
+          "core": "Actual deployed server preset; only PostgreSQL promises the native change feed.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -2555,7 +2555,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Actual postgres, cockroach or yugabyte server preset; only postgres declares native changeFeed."
+              "content": "Actual deployed server preset; only PostgreSQL promises the native change feed."
             },
             {
               "id": "getting-started",
@@ -2575,7 +2575,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Actual postgres, cockroach or yugabyte server preset; only postgres declares native changeFeed."
+              "content": "Actual deployed server preset; only PostgreSQL promises the native change feed."
             },
             {
               "id": "advanced-usage",
@@ -2597,7 +2597,7 @@
           "declarationLine": 130,
           "source": "packages/storage-plugin-postgres/dist/types.d.ts",
           "purpose": "Transaction notify only; no nested listen subscription escapes the original scope.",
-          "core": "Transaction notify only; no nested listen subscription escapes the original scope.",
+          "core": "notify: Stage native notification on the current transaction connection.\nnotify.channel: Application-assigned native notification channel.\nnotify.payload: Application notification string delivered after commit.\nnotify.ctx: Original optional operation signal and timeout budget, without an additional retry loop.\nDelivery follows the real COMMIT; rollback sends nothing.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -2666,7 +2666,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Transaction notify only; no nested listen subscription escapes the original scope."
+              "content": "notify: Stage native notification on the current transaction connection.\nnotify.channel: Application-assigned native notification channel.\nnotify.payload: Application notification string delivered after commit.\nnotify.ctx: Original optional operation signal and timeout budget, without an additional retry loop.\nDelivery follows the real COMMIT; rollback sends nothing."
             },
             {
               "id": "advanced-usage",
@@ -2687,8 +2687,8 @@
           "signature": "export type IPostgresErrorCode = (typeof PostgresErrorCode)[keyof typeof PostgresErrorCode];",
           "declarationLine": 15,
           "source": "packages/storage-plugin-postgres/dist/error-code.d.ts",
-          "purpose": "Value union of the package-owned PostgresErrorCode table.",
-          "core": "Value union of the package-owned PostgresErrorCode table.",
+          "purpose": "Value union from the single package-owned PostgreSQL semantic error table.",
+          "core": "Value union from the single package-owned PostgreSQL semantic error table.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -2711,7 +2711,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Value union of the package-owned PostgresErrorCode table."
+              "content": "Value union from the single package-owned PostgreSQL semantic error table."
             },
             {
               "id": "getting-started",
@@ -2731,7 +2731,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Value union of the package-owned PostgresErrorCode table."
+              "content": "Value union from the single package-owned PostgreSQL semantic error table."
             },
             {
               "id": "advanced-usage",
@@ -2752,8 +2752,8 @@
           "signature": "export type IPostgresOptions<TServer extends IPgServer = 'postgres'> = { readonly driver: IPgDriver; readonly server?: TServer; readonly schema?: string; readonly prefix?: string; readonly concurrency?: IConcurrencyPolicy; readonly owner?: { readonly label?: string; }; readonly maxLockMs?: number; };",
           "declarationLine": 111,
           "source": "packages/storage-plugin-postgres/dist/types.d.ts",
-          "purpose": "Injected driver and physical store configuration; schema=public, prefix=migaia, server=postgres.",
-          "core": "Injected driver and physical store configuration; schema=public, prefix=migaia, server=postgres.",
+          "purpose": "Native driver, table layout and original concurrency configuration for one backend.",
+          "core": "id: Application-assigned backend identifier selected by host.backend.\npostgres, the default backend identifier.\ndriver: Borrowed native driver from pgDriver, postgresJsDriver or bunSqlDriver.\nserver: Actual deployed server preset used for native capability admission.\npostgres enables PostgreSQL semantics.\nPostgreSQL with native change notifications.\nCockroachDB without PostgreSQL changeFeed promises.\nYugabyteDB without PostgreSQL changeFeed promises.\nChoose the actual deployed server, since capability admission depends on its native guarantees.\nschema: Existing SQL schema containing managed tables.\npublic schema.\nprefix: Prefix for fixed managed tables, shared by every organization.\nmigaia table prefix.\nconcurrency: Authentic shared policy governing the original native operation.\nOriginal shared owner default policy.\nowner: Optional application diagnostic identity without value payloads.\nNo application owner label.\nowner.label: Application-assigned label for native lock diagnostics.\nNo diagnostic application label.\nmaxLockMs: Positive native logical-key lock lease bound measured against database time.\n60000 milliseconds.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -2840,7 +2840,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Injected driver and physical store configuration; schema=public, prefix=migaia, server=postgres."
+              "content": "Native driver, table layout and original concurrency configuration for one backend."
             },
             {
               "id": "getting-started",
@@ -2860,7 +2860,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Injected driver and physical store configuration; schema=public, prefix=migaia, server=postgres."
+              "content": "id: Application-assigned backend identifier selected by host.backend.\npostgres, the default backend identifier.\ndriver: Borrowed native driver from pgDriver, postgresJsDriver or bunSqlDriver.\nserver: Actual deployed server preset used for native capability admission.\npostgres enables PostgreSQL semantics.\nPostgreSQL with native change notifications.\nCockroachDB without PostgreSQL changeFeed promises.\nYugabyteDB without PostgreSQL changeFeed promises.\nChoose the actual deployed server, since capability admission depends on its native guarantees.\nschema: Existing SQL schema containing managed tables.\npublic schema.\nprefix: Prefix for fixed managed tables, shared by every organization.\nmigaia table prefix.\nconcurrency: Authentic shared policy governing the original native operation.\nOriginal shared owner default policy.\nowner: Optional application diagnostic identity without value payloads.\nNo application owner label.\nowner.label: Application-assigned label for native lock diagnostics.\nNo diagnostic application label.\nmaxLockMs: Positive native logical-key lock lease bound measured against database time.\n60000 milliseconds."
             },
             {
               "id": "advanced-usage",
@@ -3011,8 +3011,8 @@
           "signature": "export declare const postgresBackendKind: import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", IPostgresStore<IPgServer>, IPgDriver, { getTransactionClient(scope: IPostgresTransactionScope): IPgConnection; readonly runNative: IPgNativeOperation; selectVector(): void; selectReplication(options: IPgReplicationSelection): void; getReplicationRoute(): import('./types.js').IPgLogicalReplicationRoute; getServer(): IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(maxSlotWalKeepSize: string): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>;",
           "declarationLine": 5,
           "source": "packages/storage-plugin-postgres/dist/plugin.d.ts",
-          "purpose": "Authenticate selected Features by exact kind.",
-          "core": "Authenticate selected Features by exact kind.",
+          "purpose": "Authenticate selected native Features against the exact PostgreSQL backend kind.",
+          "core": "Authenticate selected native Features against the exact PostgreSQL backend kind.",
           "advanced": "",
           "parameters": ["This const declaration has no parameters."],
           "parameterDetails": [],
@@ -3035,7 +3035,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Authenticate selected Features by exact kind."
+              "content": "Authenticate selected native Features against the exact PostgreSQL backend kind."
             },
             {
               "id": "getting-started",
@@ -3055,7 +3055,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Authenticate selected Features by exact kind."
+              "content": "Authenticate selected native Features against the exact PostgreSQL backend kind."
             },
             {
               "id": "advanced-usage",
@@ -3076,8 +3076,8 @@
           "signature": "export declare function postgresBackendPlugin<TValue = unknown, const TServer extends IPgServer = 'postgres', const TId extends string = 'postgres', const F extends IStorageFeatureRecord = {}>(options: IPostgresOptions<TServer> & { readonly id?: TId; }, features?: F & IStorageFeatureStoreCompatibility<typeof postgresBackendKind, NoInfer<F>, IPostgresStore<NoInfer<TServer>, TValue>>): IStorageBackendPlugin<typeof postgresBackendKind, NoInfer<TId>, F, IPostgresStore<NoInfer<TServer>, TValue>>;",
           "declarationLine": 18,
           "source": "packages/storage-plugin-postgres/dist/plugin.d.ts",
-          "purpose": "Install an injected-driver backend without taking client ownership.",
-          "core": "An exact-id plugin; defaults public/migaia/postgres.",
+          "purpose": "Install an injected native driver with standard transactions, SQL and independently selected native Features.",
+          "core": "options: Caller-supplied native driver, physical layout and original concurrency policy.\nfeatures: Exact-kind native Feature selections attached during installation.\nAn exact-id plugin; defaults public/migaia/postgres.\nid: Application-assigned backend identifier selected by host.backend.\npostgres, the default backend identifier.\ndriver: Borrowed native driver from pgDriver, postgresJsDriver or bunSqlDriver.\nserver: Actual deployed server preset used for native capability admission.\npostgres enables PostgreSQL semantics.\nPostgreSQL with native change notifications.\nCockroachDB without PostgreSQL changeFeed promises.\nYugabyteDB without PostgreSQL changeFeed promises.\nChoose the actual deployed server, since capability admission depends on its native guarantees.\nschema: Existing SQL schema containing managed tables.\npublic schema.\nprefix: Prefix for fixed managed tables, shared by every organization.\nmigaia table prefix.\nconcurrency: Authentic shared policy governing the original native operation.\nOriginal shared owner default policy.\nowner: Optional application diagnostic identity without value payloads.\nNo application owner label.\nowner.label: Application-assigned label for native lock diagnostics.\nNo diagnostic application label.\nmaxLockMs: Positive native logical-key lock lease bound measured against database time.\n60000 milliseconds.",
           "advanced": "",
           "parameters": [
             "options: IPostgresOptions<TServer> & { readonly id?: TId; }",
@@ -3133,7 +3133,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Install an injected-driver backend without taking client ownership."
+              "content": "Install an injected native driver with standard transactions, SQL and independently selected native Features."
             },
             {
               "id": "getting-started",
@@ -3153,7 +3153,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "An exact-id plugin; defaults public/migaia/postgres."
+              "content": "options: Caller-supplied native driver, physical layout and original concurrency policy.\nfeatures: Exact-kind native Feature selections attached during installation.\nAn exact-id plugin; defaults public/migaia/postgres.\nid: Application-assigned backend identifier selected by host.backend.\npostgres, the default backend identifier.\ndriver: Borrowed native driver from pgDriver, postgresJsDriver or bunSqlDriver.\nserver: Actual deployed server preset used for native capability admission.\npostgres enables PostgreSQL semantics.\nPostgreSQL with native change notifications.\nCockroachDB without PostgreSQL changeFeed promises.\nYugabyteDB without PostgreSQL changeFeed promises.\nChoose the actual deployed server, since capability admission depends on its native guarantees.\nschema: Existing SQL schema containing managed tables.\npublic schema.\nprefix: Prefix for fixed managed tables, shared by every organization.\nmigaia table prefix.\nconcurrency: Authentic shared policy governing the original native operation.\nOriginal shared owner default policy.\nowner: Optional application diagnostic identity without value payloads.\nNo application owner label.\nowner.label: Application-assigned label for native lock diagnostics.\nNo diagnostic application label.\nmaxLockMs: Positive native logical-key lock lease bound measured against database time.\n60000 milliseconds."
             },
             {
               "id": "advanced-usage",
@@ -3302,7 +3302,7 @@
           "signature": "export declare const PostgresErrorCode: { /** An uncategorized native query or connection failed; inspect its original cause. */ readonly sqlFailed: 'SQL_FAILED'; /** A persisted canonical key, value or metadata row could not be decoded. */ readonly decodeFailed: 'DECODE_FAILED'; /** A callback, accepted operation or transaction lifecycle failed and rolled back. */ readonly transactionFailed: 'TRANSACTION_FAILED'; /** A known standard-channel write found the same key in an incompatible channel. */ readonly duplicateKey: 'DUPLICATE_KEY'; };",
           "declarationLine": 4,
           "source": "packages/storage-plugin-postgres/dist/error-code.d.ts",
-          "purpose": "Owned semantic codes use storage.backend.postgres.",
+          "purpose": "Classify native SQL, persisted-data decoding and original transaction failures under the PostgreSQL error domain.",
           "core": "sqlFailed: Native query, stream or connection failure; inspect cause.\ndecodeFailed: Persisted key/value/native metadata decoding failed.\ntransactionFailed: Original transaction failed, preserving the primary and cleanup causes.\nduplicateKey: A rejected write collides with another public channel.",
           "advanced": "",
           "parameters": ["This const declaration has no parameters."],
@@ -3363,7 +3363,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Owned semantic codes use storage.backend.postgres."
+              "content": "Classify native SQL, persisted-data decoding and original transaction failures under the PostgreSQL error domain."
             },
             {
               "id": "getting-started",
@@ -3423,8 +3423,8 @@
           "signature": "export declare function bunSqlDriver(client: SQL): IPgDriver;",
           "declarationLine": 4,
           "source": "packages/storage-plugin-postgres/dist/bun.d.ts",
-          "purpose": "Admit Bun 1.4.4+ prepare:false before I/O.",
-          "core": "Admit Bun 1.4.4+ prepare:false before I/O.",
+          "purpose": "Admit a caller-owned Bun SQL client with prepare:false and the required runtime version before native I/O.",
+          "core": "client: Native pool or SQL client created and owned by the application.\nA borrowed native driver; only resources it creates are released, never the injected root client.",
           "advanced": "",
           "parameters": ["client: SQL"],
           "parameterDetails": [
@@ -3460,7 +3460,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Admit Bun 1.4.4+ prepare:false before I/O."
+              "content": "Admit a caller-owned Bun SQL client with prepare:false and the required runtime version before native I/O."
             },
             {
               "id": "getting-started",
@@ -3480,7 +3480,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Admit Bun 1.4.4+ prepare:false before I/O."
+              "content": "client: Native pool or SQL client created and owned by the application.\nA borrowed native driver; only resources it creates are released, never the injected root client."
             },
             {
               "id": "advanced-usage",
@@ -3520,8 +3520,8 @@
           "signature": "export declare function pgCopyFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.js\").IPostgresStore<import(\"../types.js\").IPgServer>, import(\"../types.js\").IPgDriver, { getTransactionClient(scope: import(\"../types.js\").IPostgresTransactionScope): import(\"../types.js\").IPgConnection; readonly runNative: import(\"../types.js\").IPgNativeOperation; selectVector(): void; selectReplication(options: import(\"../logical-replication.js\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.js\").IPgLogicalReplicationRoute; getServer(): import(\"../types.js\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(maxSlotWalKeepSize: string): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly copy: IPgCopyApi; }; readonly transaction: { readonly copy: IPgCopyApi; }; }>, {}>;",
           "declarationLine": 4,
           "source": "packages/storage-plugin-postgres/dist/features/copy.d.ts",
-          "purpose": "Add atomic STDIN COPY from a fresh iterable per attempt.",
-          "core": "Add atomic STDIN COPY from a fresh iterable per attempt.",
+          "purpose": "Add streaming client STDIN COPY with a fresh iterable for every actual native transaction attempt.",
+          "core": "An exact-kind Feature installed by postgresBackendPlugin, retaining its original native scope.",
           "advanced": "",
           "parameters": ["This function declaration has no parameters."],
           "parameterDetails": [],
@@ -3545,7 +3545,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Add atomic STDIN COPY from a fresh iterable per attempt."
+              "content": "Add streaming client STDIN COPY with a fresh iterable for every actual native transaction attempt."
             },
             {
               "id": "getting-started",
@@ -3565,7 +3565,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Add atomic STDIN COPY from a fresh iterable per attempt."
+              "content": "An exact-kind Feature installed by postgresBackendPlugin, retaining its original native scope."
             },
             {
               "id": "advanced-usage",
@@ -3605,8 +3605,8 @@
           "signature": "export declare function pgListenFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.js\").IPostgresStore<import(\"../types.js\").IPgServer>, import(\"../types.js\").IPgDriver, { getTransactionClient(scope: import(\"../types.js\").IPostgresTransactionScope): import(\"../types.js\").IPgConnection; readonly runNative: import(\"../types.js\").IPgNativeOperation; selectVector(): void; selectReplication(options: import(\"../logical-replication.js\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.js\").IPgLogicalReplicationRoute; getServer(): import(\"../types.js\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(maxSlotWalKeepSize: string): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly notifications: IPgListenApi; }; readonly transaction: { readonly notifications: IPgTransactionNotifyApi; }; }>, {}>;",
           "declarationLine": 4,
           "source": "packages/storage-plugin-postgres/dist/features/listen.d.ts",
-          "purpose": "Add root notifications.listen/notify and transaction notify.",
-          "core": "Add root notifications.listen/notify and transaction notify.",
+          "purpose": "Add dedicated root LISTEN resources and transaction-bound native NOTIFY calls without polling.",
+          "core": "An exact-kind Feature installed by postgresBackendPlugin, retaining its original native scope.",
           "advanced": "",
           "parameters": ["This function declaration has no parameters."],
           "parameterDetails": [],
@@ -3630,7 +3630,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Add root notifications.listen/notify and transaction notify."
+              "content": "Add dedicated root LISTEN resources and transaction-bound native NOTIFY calls without polling."
             },
             {
               "id": "getting-started",
@@ -3650,7 +3650,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Add root notifications.listen/notify and transaction notify."
+              "content": "An exact-kind Feature installed by postgresBackendPlugin, retaining its original native scope."
             },
             {
               "id": "advanced-usage",
@@ -3690,8 +3690,8 @@
           "signature": "export declare function pgLogicalReplicationFeature(options: IPgLogicalReplicationOptions): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.js\").IPostgresStore<import(\"../types.js\").IPgServer>, import(\"../types.js\").IPgDriver, { getTransactionClient(scope: import(\"../types.js\").IPostgresTransactionScope): import(\"../types.js\").IPgConnection; readonly runNative: import(\"../types.js\").IPgNativeOperation; selectVector(): void; selectReplication(options: import(\"../logical-replication.js\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.js\").IPgLogicalReplicationRoute; getServer(): import(\"../types.js\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(maxSlotWalKeepSize: string): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [ICapabilityImpl<import(\"@migaia/storage-contract\").IStorageCapability<\"durableChangeFeed\", IDurableChangeFeedApi>, IDurableChangeFeedApi>], {}, { readonly store: { readonly logicalReplication: { dropSlot(ctx?: IOperationContext): Promise<void>; }; }; readonly transaction: {}; }>, {}>;",
           "declarationLine": 8,
           "source": "packages/storage-plugin-postgres/dist/features/logical-replication.d.ts",
-          "purpose": "Publish durableChangeFeed using deployment-owned slot/publication.",
-          "core": "Publish durableChangeFeed using deployment-owned slot/publication.",
+          "purpose": "Publish a durable feed backed by deployment-owned slots and publications without creating them implicitly.",
+          "core": "options: Deployment-created persistent slot and publication names.\nAn exact-kind Feature installed by postgresBackendPlugin, retaining its original native scope.\nslot: Persistent slot name created and assigned by deployment.\npublication: Deployment-created publication covering every managed table.",
           "advanced": "",
           "parameters": ["options: IPgLogicalReplicationOptions"],
           "parameterDetails": [
@@ -3731,7 +3731,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Publish durableChangeFeed using deployment-owned slot/publication."
+              "content": "Publish a durable feed backed by deployment-owned slots and publications without creating them implicitly."
             },
             {
               "id": "getting-started",
@@ -3751,7 +3751,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Publish durableChangeFeed using deployment-owned slot/publication."
+              "content": "options: Deployment-created persistent slot and publication names.\nAn exact-kind Feature installed by postgresBackendPlugin, retaining its original native scope.\nslot: Persistent slot name created and assigned by deployment.\npublication: Deployment-created publication covering every managed table."
             },
             {
               "id": "advanced-usage",
@@ -3821,8 +3821,8 @@
           "signature": "export declare function pgvectorFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.js\").IPostgresStore<import(\"../types.js\").IPgServer>, import(\"../types.js\").IPgDriver, { getTransactionClient(scope: import(\"../types.js\").IPostgresTransactionScope): import(\"../types.js\").IPgConnection; readonly runNative: import(\"../types.js\").IPgNativeOperation; selectVector(): void; selectReplication(options: import(\"../logical-replication.js\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.js\").IPgLogicalReplicationRoute; getServer(): import(\"../types.js\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(maxSlotWalKeepSize: string): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [ICapabilityImpl<import(\"@migaia/storage-contract\").IStorageCapability<\"vector\", IVectorApi<false, false, Record<never, never>>>, IVectorApi<true>>], {}, { readonly store: { readonly pgvector: IPgNativeVectorApi; }; readonly transaction: { readonly pgvector: IPgNativeVectorApi; }; }>, {}>;",
           "declarationLine": 8,
           "source": "packages/storage-plugin-postgres/dist/features/pgvector.d.ts",
-          "purpose": "Publish standard vector and separate caller-table search.",
-          "core": "Publish standard vector and separate caller-table search.",
+          "purpose": "Publish native standard vector ranking and a separate search API for caller-owned SQL vector tables.",
+          "core": "An exact-kind Feature installed by postgresBackendPlugin, retaining its original native scope.",
           "advanced": "",
           "parameters": ["This function declaration has no parameters."],
           "parameterDetails": [],
@@ -3848,7 +3848,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Publish standard vector and separate caller-table search."
+              "content": "Publish native standard vector ranking and a separate search API for caller-owned SQL vector tables."
             },
             {
               "id": "getting-started",
@@ -3868,7 +3868,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Publish standard vector and separate caller-table search."
+              "content": "An exact-kind Feature installed by postgresBackendPlugin, retaining its original native scope."
             },
             {
               "id": "advanced-usage",
@@ -3908,8 +3908,8 @@
           "signature": "export declare function pgDriver(pool: Pool): IPgDriver;",
           "declarationLine": 4,
           "source": "packages/storage-plugin-postgres/dist/pg.d.ts",
-          "purpose": "Borrow real pg.Pool connections and pg-only replication.",
-          "core": "Borrow real pg.Pool connections and pg-only replication.",
+          "purpose": "Borrow pg.Pool connections and dedicated native listeners; only this adapter supplies logical replication.",
+          "core": "pool: Native pool or SQL client created and owned by the application.\nA borrowed native driver; only resources it creates are released, never the injected root client.",
           "advanced": "",
           "parameters": ["pool: Pool"],
           "parameterDetails": [
@@ -3946,7 +3946,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Borrow real pg.Pool connections and pg-only replication."
+              "content": "Borrow pg.Pool connections and dedicated native listeners; only this adapter supplies logical replication."
             },
             {
               "id": "getting-started",
@@ -3966,7 +3966,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Borrow real pg.Pool connections and pg-only replication."
+              "content": "pool: Native pool or SQL client created and owned by the application.\nA borrowed native driver; only resources it creates are released, never the injected root client."
             },
             {
               "id": "advanced-usage",
@@ -4006,8 +4006,8 @@
           "signature": "export declare function postgresJsDriver(client: Sql): IPgDriver;",
           "declarationLine": 4,
           "source": "packages/storage-plugin-postgres/dist/postgres-js.d.ts",
-          "purpose": "Borrow postgres.Sql reservations, native COPY and listeners.",
-          "core": "Borrow postgres.Sql reservations, native COPY and listeners.",
+          "purpose": "Borrow genuine postgres.Sql reservations, streaming COPY and original native subscription resources.",
+          "core": "client: Native pool or SQL client created and owned by the application.\nA borrowed native driver; only resources it creates are released, never the injected root client.",
           "advanced": "",
           "parameters": ["client: Sql"],
           "parameterDetails": [
@@ -4045,7 +4045,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Borrow postgres.Sql reservations, native COPY and listeners."
+              "content": "Borrow genuine postgres.Sql reservations, streaming COPY and original native subscription resources."
             },
             {
               "id": "getting-started",
@@ -4065,7 +4065,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Borrow postgres.Sql reservations, native COPY and listeners."
+              "content": "client: Native pool or SQL client created and owned by the application.\nA borrowed native driver; only resources it creates are released, never the injected root client."
             },
             {
               "id": "advanced-usage",

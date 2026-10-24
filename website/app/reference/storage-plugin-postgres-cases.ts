@@ -36,11 +36,18 @@ try {
         'Organization, expiry and faithful filters must precede topK.',
         '组织、期限与忠实条件必须先于 topK。'
       ),
-      example: `import { vector } from '@migaia/storage-contract'
+      example: t(
+        `import { vector } from '@migaia/storage-contract'
 // Select pgvectorFeature() on postgresBackendPlugin first.
 const collection = store.use(vector).collection('docs', { dimensions: 3, metric: 'cosine' })
 await collection.upsert([{ id: 'a', vector: [1, 0, 0], payload: { ready: true } }])
 const hits = await collection.near([1, 0, 0], { exact: true }).where('ready', 'eq', true).topK(5).all()`,
+        `import { vector } from '@migaia/storage-contract'
+// 先在 postgresBackendPlugin 中选择 pgvectorFeature()。
+const collection = store.use(vector).collection('docs', { dimensions: 3, metric: 'cosine' })
+await collection.upsert([{ id: 'a', vector: [1, 0, 0], payload: { ready: true } }])
+const hits = await collection.near([1, 0, 0], { exact: true }).where('ready', 'eq', true).topK(5).all()`
+      ),
       result: t(
         'Native vector(d) computes distances; client predicates never refill missing hits.',
         '原生 vector(d) 计算距离；客户端谓词不补搜。'
