@@ -3,6 +3,39 @@ import type { ICaseDoc, IText } from './contract.js'
 const t = (en: string, zh: string): IText => ({ en, zh })
 /** Only delivered native driver entries appear in this package's current examples. */
 export const storagePluginRedisCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  rediSearchVectorFeature: [
+    {
+      title: t('Rank with native FLOAT32 indices', '以原生 FLOAT32 索引排名'),
+      problem: t(
+        'A selected vector capability needs native ranking and pre-KNN filters.',
+        '所选向量能力需要原生排名和 KNN 前过滤。'
+      ),
+      example: `import { createClientPool } from 'redis'
+import { createStorageHost } from '@migaia/storage-host'
+import { vector, ttl } from '@migaia/storage-contract'
+import { redisBackendPlugin } from '@migaia/storage-plugin-redis'
+import { nodeRedisDriver } from '@migaia/storage-plugin-redis/node-redis'
+import { rediSearchVectorFeature } from '@migaia/storage-plugin-redis/features/search'
+const pool = createClientPool({ url: process.env.MIGAIA_REDIS_STACK_URL! }, { maximum: 8 })
+await pool.connect()
+const host = await createStorageHost({ plugins: [redisBackendPlugin({ driver: nodeRedisDriver(pool), prefix: crypto.randomUUID() }, { search: rediSearchVectorFeature() })] as const })
+const store = host.backend('redis')
+try {
+  const items = store.use(vector).collection<{ group: string }>('items', { dimensions: 2, metric: 'cosine' })
+  await items.upsert([{ id: 'one', vector: [1, 0], payload: { group: 'docs' } }])
+  console.log((await items.near([1, 0], { exact: true }).where({ group: 'docs' }).topK(1).all())[0]?.id)
+  await store.use(ttl).expire({ channel: 'vector', collection: 'items', id: 'one' }, 60000)
+} finally {
+  await store.clearAll()
+  await host.dispose()
+  await pool.close()
+}`,
+      result: t(
+        'Prints one. The native exact FLAT path filters the organization and payload before ranking.',
+        '输出 one，原生 exact FLAT 路径在排名前过滤组织与 payload。'
+      )
+    }
+  ],
   nativeFeatures: [
     {
       title: t('Compose independent native Features', '组合独立原生 Feature'),

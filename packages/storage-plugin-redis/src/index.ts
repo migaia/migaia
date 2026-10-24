@@ -30,3 +30,5 @@ export type {
   IRedisRateLimitOutput
 } from './features/rate-limit.js'
 export type { IRedisChangeStreamOutput } from './features/change-stream.js'
+
+export type { IRedisVectorFeatureOutput } from './features/search.js'

@@ -1838,7 +1838,8 @@
       "./features/pubsub": ["redisPubSubFeature"],
       "./features/sorted-sets": ["redisSortedSetsFeature"],
       "./features/rate-limit": ["redisRateLimitFeature"],
-      "./features/change-stream": ["redisChangeStreamFeature"]
+      "./features/change-stream": ["redisChangeStreamFeature"],
+      "./features/search": ["rediSearchVectorFeature"]
     },
     "@migaia/storage-plugin-sparql": {
       ".": ["ERROR_SOURCE", "SparqlErrorCode", "sparqlBackendKind", "sparqlBackendPlugin"],

@@ -13,7 +13,8 @@ export default defineConfig({
         'features/pubsub': 'src/features/pubsub.ts',
         'features/sorted-sets': 'src/features/sorted-sets.ts',
         'features/rate-limit': 'src/features/rate-limit.ts',
-        'features/change-stream': 'src/features/change-stream.ts'
+        'features/change-stream': 'src/features/change-stream.ts',
+        'features/search': 'src/features/search.ts'
       },
       formats: ['es'],
       fileName: (_format, name) => `${name}.js`
