@@ -6,7 +6,11 @@ import {
   type IStorageFeatureStoreCompatibility,
   type IStoragePluginCore
 } from '@migaia/storage-host'
-import type { ICapabilityInstallPort } from '@migaia/storage-contract'
+import {
+  StorageContractError,
+  StorageContractErrorCode,
+  type ICapabilityInstallPort
+} from '@migaia/storage-contract'
 import { createSqliteStore, type ISqliteConstruction } from './store.js'
 import { SqliteNames } from './constants.js'
 import type {
@@ -51,6 +55,48 @@ export function sqliteBackendPlugin<
         construction = createSqliteStore<TValue>(captured, { core, orgId: core.defaultOrgId })
         core.registerStore(construction.store)
         core.registerChangeController(construction.store, construction.controller)
+        /** Capture late construction authority after the root resource so children drain first. */
+        const author = core.createOrgAuthoringPort()
+        /**
+         * Root remains the ordinary native endpoint; every explicit org receives its own scope
+         * owner.
+         */
+        const organizations = new Map<string, ISqliteConstruction<TValue>>()
+        /** Reuse the one physical connection, original limiter and already-created schema. */
+        const forOrg = (orgId: string): ISqliteConstruction<TValue> => {
+          construction.controller.assertLive()
+          const existing = organizations.get(orgId)
+          if (existing !== undefined) return existing
+          const ports = core.getOrgContext(orgId)
+          const child = construction.createOrg(orgId, { ...core, ...author, ...ports })
+          author.registerChangeController(child.store, child.controller)
+          organizations.set(orgId, child)
+          return child
+        }
+        core.registerOrgBinding(construction.store, {
+          backend: (orgId) => forOrg(orgId).store,
+          drop: (orgId) => forOrg(orgId).dropOrg()
+        })
+        core.registerFeatureClientResolver(construction.store, {
+          getClient: (orgId) =>
+            orgId === core.defaultOrgId ? construction.client : forOrg(orgId).client,
+          getTransactionClient: (scope, orgId) => {
+            /** Ordinary and explicit default-org scopes have distinct owners on the same client. */
+            if (orgId === core.defaultOrgId) {
+              try {
+                return construction.getTransactionClient(scope as ISqliteTransactionScope)
+              } catch (error) {
+                /** Only an ownership mismatch can try the explicit default-org owner. */
+                if (
+                  !(error instanceof StorageContractError) ||
+                  error.code !== StorageContractErrorCode.invalidArgument
+                )
+                  throw error
+              }
+            }
+            return forOrg(orgId).getTransactionClient(scope as ISqliteTransactionScope)
+          }
+        })
         core.registerDetect(async (signal) => {
           if (signal.aborted) return
           captured.driver.prepare('SELECT 1').get()

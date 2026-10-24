@@ -76,6 +76,18 @@ async function assertQueryResource(stream) {
 }
 try {
   await handle.ready
+  /** Explicit organizations reopen the same physical tables through the runtime's original driver. */
+  const organization = host.org('00000000-0000-0000-0000-000000000001').backend('sqlite')
+  if (mode === 'write') {
+    await organization.transaction(async (tx) => {
+      await tx.set('runtime-org', 'isolated')
+      await tx.putRecord({ count: 1 }, 'runtime-org-record')
+    })
+  } else {
+    assert.equal(await organization.get('runtime-org'), 'isolated')
+    assert.deepEqual(await organization.getRecord('runtime-org-record'), { count: 1 })
+  }
+  assert.equal(await storage.get('runtime-org'), null)
   if (mode === 'write') {
     /** Native deadlines and canonical counter text survive each builtin driver's real reopen. */
     await storage.set('runtime-ttl', 'retained')
