@@ -5,8 +5,8 @@ export const storagePluginArchiveReference: ILibraryReference = {
   modules: {
     index: {
       summary: {
-        en: 'Start with archivePlugin after publishing transactional records and blob storage.',
-        zh: '发布事务记录与 blob 存储后，从 archivePlugin 开始。'
+        en: 'Install archivePlugin after publishing transactional records and blob storage to archive, retrieve and sweep one organization’s history.',
+        zh: '先发布事务记录与对象存储，再安装归档插件，归档、读取和清扫当前组织的历史。'
       }
     }
   },
@@ -33,15 +33,15 @@ export const storagePluginArchiveReference: ILibraryReference = {
     ERROR_SOURCE: {
       role: 'constant',
       purpose: {
-        en: 'Registered error domain storage.backend.archive.',
-        zh: '登记的错误领域 storage.backend.archive。'
+        en: 'Identify archive-owned failures with the registered storage.backend.archive domain while original storage errors retain their domains.',
+        zh: '以登记的 storage.backend.archive 领域识别归档自有失败，原存储错误继续保留各自领域。'
       }
     },
     ArchiveErrorCode: {
       role: 'constant',
       purpose: {
-        en: 'Distinct option, argument, operation and segment corruption identities.',
-        zh: '区分选项、参数、操作和段损坏身份。'
+        en: 'Distinguish installation, call argument, archive work and corrupt-segment failures so callers can choose what to correct before retrying.',
+        zh: '区分安装选项、调用参数、归档工作与段损坏失败，帮助调用方确定重试前应修正的内容。'
       }
     }
   },
@@ -271,8 +271,8 @@ export const storagePluginArchiveReference: ILibraryReference = {
     },
     IArchiveSweepResult: {
       summary: {
-        en: 'Actual opaque-list maintenance results.',
-        zh: '真实 opaque 分页维护结果。'
+        en: 'Counts from actual opaque-list pages and confirmed native removals.',
+        zh: '来自真实不透明分页与已确认原生删除的维护数量。'
       },
       members: {
         scanned: {
@@ -380,7 +380,7 @@ export const storagePluginArchiveReference: ILibraryReference = {
       values: {
         invalidOption: {
           en: 'Correct installation options before retrying.',
-          zh: '重试前修正安装选项。'
+          zh: '重新安装插件前修正无效的安装选项。'
         },
         invalidArgument: {
           en: 'Correct the runtime key, rule or limit.',
@@ -415,8 +415,8 @@ export const storagePluginArchiveReference: ILibraryReference = {
         }
       ],
       summary: {
-        en: 'Adds the literal extension slot with run, get and sweep to root and org views.',
-        zh: '向根及组织视图添加含 run、get、sweep 的字面量扩展槽。'
+        en: 'Add the literal extension slot to root and organization views; its run, get and sweep methods use each view’s current organization.',
+        zh: '向根及组织视图添加字面量扩展槽，其中归档、读取和清扫方法始终使用对应视图的当前组织。'
       },
       example:
         "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { archivePlugin } from '@migaia/storage-plugin-archive'\n\nconst base = await createStorageHost({\n  plugins: [memoryBackendPlugin({ id: 'hot' }), memoryBackendPlugin({ id: 'cold' })]\n})\nconst host = await base.use(\n  archivePlugin({\n    id: 'history',\n    hot: 'hot',\n    cold: 'cold',\n    rules: [{ name: 'old', prefix: 'event:', olderThanMs: 0, where: () => ({ old: true }) }]\n  })\n)\nawait host.detect()\ntry {\n  await host.backend('hot').putRecord({ old: true, answer: 42 }, 'event:one')\n  await host.extensions.history.run()\n  console.log(await host.extensions.history.get('event:one', { restore: true }))\n  await host.extensions.history.sweep()\n} finally {\n  await host.dispose()\n}\n"
