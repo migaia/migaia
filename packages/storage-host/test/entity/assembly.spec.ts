@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { defineEntity } from '../../src/entity.js'
+import { entityUniqueFeature } from '../../src/entity/unique-feature.js'
 import { entityQueryFeature } from '../../src/entity/query-feature.js'
 import { entityIndexesFeature } from '../../src/entity/indexes-feature.js'
 import { entityKeysetFeature } from '../../src/entity/keyset.js'
@@ -59,6 +60,22 @@ describe('explicit entity assembly', () => {
     const first = await repository.query().page(1)
     expect(first.items).toEqual([{ id: 'a', group: 'one' }])
     expect(await repository.query().after(first.next!).all()).toEqual([{ id: 'b', group: 'two' }])
+  })
+
+  it('enforces unique writes without installing index planning', async () => {
+    const repository = defineEntity<IRow>()({
+      name: 'unique-only',
+      key: 'id',
+      features: [entityQueryFeature(), entityUniqueFeature()],
+      indexes: { group: { path: 'group', unique: true } }
+    }).connect(await memoryBackend())
+    await repository.put({ id: 'a', group: 'one' })
+    await expect(repository.put({ id: 'b', group: 'one' })).rejects.toMatchObject({
+      code: StorageErrorCode.indexUniqueConflict
+    })
+    expect(() => repository.query().index('group')).toThrow(
+      expect.objectContaining(missing('indexes'))
+    )
   })
 
   it('rejects missing declaration assemblies before store connection', () => {
