@@ -322,18 +322,6 @@ console.log(host.extensions.label('draft'))`
         '已有阶段词汇，不新增后端状态。'
       )
     },
-    defineEntity: {
-      role: 'factory',
-      purpose: t(
-        'Define one immutable entity schema and migration plan, then connect it to an admitted native backend.',
-        '定义冻结实体schema与迁移计划，再连接合法原生后端。'
-      ),
-      returns: t(
-        'A typed repository with same-owner transaction binding, final-draft unique checks and bounded list/stream queries.',
-        '带同owner事务绑定、最终草稿唯一检查与有界list/stream的类型化仓储。'
-      ),
-      cases: storageHostCases.defineEntity
-    },
     memoryBackendPlugin: {
       params: {
         options: t(
@@ -412,33 +400,6 @@ console.log(host.extensions.label('draft'))`
 
 console.log(createOrgId())`,
       cases: storageHostCases.createOrgId
-    },
-    repositoryMigrationKey: {
-      role: 'operation',
-      purpose: t(
-        'Read the existing entity metadata layout identity shared by repositories and backend raw-record firewalls.',
-        '读取repository与后端raw-record firewall共用的既有实体metadata布局身份。'
-      ),
-      returns: t(
-        'The unchanged repository:<entityName>:migration metadata key.',
-        '保持原格式的repository:<entityName>:migration metadata key。'
-      ),
-      example: `import { repositoryMigrationKey } from '@migaia/storage-host/entity'
-
-console.log(repositoryMigrationKey('users'))`,
-      cases: storageHostCases.repositoryMigrationKey
-    },
-    jsonCodec: {
-      role: 'operation',
-      purpose: t(
-        'Encode portable values with the original version-one JSON codec. Unsupported values reject before backend I/O.',
-        '使用原version-one JSON codec编码portable值。不支持的值在后端I/O前拒绝。'
-      ),
-      returns: t(
-        'An asynchronous json@1 text codec whose errors retain the contract and original codec causes.',
-        '异步json@1文本codec，错误cause保留contract与原codec错误。'
-      ),
-      cases: storageHostCases.jsonCodec
     },
     createStorageHost: {
       params: {
@@ -803,47 +764,6 @@ console.log(host.extensions.label('draft'))`,
       summary: t(
         'Captured native provider owning preparation, index readiness and backfill sessions.',
         '拥有准备、索引就绪与补录会话的捕获原生 provider。'
-      ),
-      members: {}
-    },
-    IEntityQuery: {
-      summary: t(
-        'Immutable entity source selection over the original query core, retaining installed Feature methods.',
-        '原查询核心上的不可变实体源选择，保留已安装的Feature方法。'
-      ),
-      members: {
-        index: {
-          summary: t(
-            'Choose a declared index and optional key or range before filtering.',
-            '在过滤前选择声明索引及可选键或范围。'
-          )
-        },
-        all: {
-          summary: t(
-            'Materialize the shared query result; transaction queries inherit the original operation context.',
-            '收集原查询结果；事务查询继承原操作上下文。'
-          )
-        },
-        stream: {
-          summary: t(
-            'Advance the actual disposable iterator; each scoped next borrows the original transaction owner.',
-            '推进实际可释放迭代器；每次事务next借用原transaction owner。'
-          )
-        }
-      }
-    },
-    IEntityConnectStore: {
-      summary: t(
-        'Entity input accepts a complete raw KV store or an exact host-authenticated business view. Raw inputs retain full resource admission; borrowed views reuse private method facts without exposing close authority.',
-        '实体输入接受完整raw KV或原宿主认证的精确业务视图。raw输入保留完整资源准入；借用视图复用私有方法事实，不暴露关闭权。'
-      ),
-      example: storageHostCases.entityOrganizations?.[0]?.example,
-      members: {}
-    },
-    IEntityConnectOptions: {
-      summary: t(
-        'Explicit original codec/query observer ports; failures only report.',
-        '显式原codec/query观察接点；失败只报告。'
       ),
       members: {}
     },
