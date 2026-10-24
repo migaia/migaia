@@ -95,7 +95,7 @@ const orgAuthorMembers: Readonly<Record<string, IMemberDoc>> = {
       'No result; the existing registry row and release order are retained.',
       '无返回值，继续使用既有登记行与释放顺序。'
     ),
-    `import { createBackendChangeController } from '@migaia/storage-host/authoring/change-controller'\nimport type { IStorageOrgAuthoringPort } from '@migaia/storage-host'\nimport type { IStorageBase } from '@migaia/storage-contract'\nfunction register(port: IStorageOrgAuthoringPort, store: IStorageBase) {\n  const controller = port.createChangeController({ backend: 'memory' }, createBackendChangeController)\n  port.registerChangeController(store, controller)\n}\nconsole.log(typeof register)`
+    "import { createBackendChangeController } from '@migaia/storage-host/authoring/change-controller'\nimport type { IStorageOrgAuthoringPort } from '@migaia/storage-host'\nimport type { IStorageBase } from '@migaia/storage-contract'\nfunction register(port: IStorageOrgAuthoringPort, store: IStorageBase) {\n  const controller = port.createChangeController(\n    { backend: 'memory' },\n    createBackendChangeController,\n  )\n  port.registerChangeController(store, controller)\n}\nconsole.log(typeof register)"
   ),
   registerValueCommit: method(
     t(
@@ -113,7 +113,7 @@ const orgAuthorMembers: Readonly<Record<string, IMemberDoc>> = {
       'No result; no fake transaction or close handle is introduced.',
       '无返回值，不引入伪事务或关闭句柄。'
     ),
-    `import { createBackendChangeController } from '@migaia/storage-host/authoring/change-controller'\nimport type { IStorageOrgAuthoringPort } from '@migaia/storage-host'\nimport type { IBackendValueCommit } from '@migaia/storage-host/authoring/backend'\nimport type { IStorageBase } from '@migaia/storage-contract'\nfunction register(port: IStorageOrgAuthoringPort, store: IStorageBase, commit: IBackendValueCommit) {\n  port.registerValueCommit(store, commit)\n}\nconsole.log(typeof register)`
+    "import { createBackendChangeController } from '@migaia/storage-host/authoring/change-controller'\nimport type { IStorageOrgAuthoringPort } from '@migaia/storage-host'\nimport type { IBackendValueCommit } from '@migaia/storage-host/authoring/backend'\nimport type { IStorageBase } from '@migaia/storage-contract'\nfunction register(\n  port: IStorageOrgAuthoringPort,\n  store: IStorageBase,\n  commit: IBackendValueCommit,\n) {\n  port.registerValueCommit(store, commit)\n}\nconsole.log(typeof register)"
   )
 }
 /** An exact borrowed business view omits resource ownership and preserves original token lookup. */

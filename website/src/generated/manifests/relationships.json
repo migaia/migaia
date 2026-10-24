@@ -119793,36 +119793,6 @@
     },
     {
       "from": "/en/docs/storage-host/api/authoring/backend",
-      "to": "/en/docs/storage-host/api/authoring/backend#storage-host-authoring/backend--createBackendChangeIterator",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/storage-host/api/authoring/backend#storage-host-authoring/backend--createBackendChangeIterator",
-      "to": "/en/docs/storage-host/api/authoring/backend",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/storage-host/api/authoring/backend#storage-host-authoring/backend--createBackendChangeIterator",
-      "to": "/en/docs/storage-host/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/docs/storage-host/getting-started",
-      "to": "/en/docs/storage-host/api/authoring/backend#storage-host-authoring/backend--createBackendChangeIterator",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/storage-host/api/authoring/backend#storage-host-authoring/backend--createBackendChangeIterator",
-      "to": "/en/docs/storage-host",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/docs/storage-host",
-      "to": "/en/docs/storage-host/api/authoring/backend#storage-host-authoring/backend--createBackendChangeIterator",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/storage-host/api/authoring/backend",
       "to": "/en/docs/storage-host/api/authoring/backend#storage-host-authoring/backend--createBackendJournalNamespace",
       "type": "api-symbol"
     },
@@ -121189,36 +121159,6 @@
     {
       "from": "/zh/docs/storage-host",
       "to": "/zh/docs/storage-host/api/authoring/backend#storage-host-authoring/backend--collectUniqueIndexOwners",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/storage-host/api/authoring/backend",
-      "to": "/zh/docs/storage-host/api/authoring/backend#storage-host-authoring/backend--createBackendChangeIterator",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/storage-host/api/authoring/backend#storage-host-authoring/backend--createBackendChangeIterator",
-      "to": "/zh/docs/storage-host/api/authoring/backend",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/storage-host/api/authoring/backend#storage-host-authoring/backend--createBackendChangeIterator",
-      "to": "/zh/docs/storage-host/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/docs/storage-host/getting-started",
-      "to": "/zh/docs/storage-host/api/authoring/backend#storage-host-authoring/backend--createBackendChangeIterator",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/storage-host/api/authoring/backend#storage-host-authoring/backend--createBackendChangeIterator",
-      "to": "/zh/docs/storage-host",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/docs/storage-host",
-      "to": "/zh/docs/storage-host/api/authoring/backend#storage-host-authoring/backend--createBackendChangeIterator",
       "type": "architecture-symbol"
     },
     {
@@ -123099,6 +123039,506 @@
     {
       "from": "/zh/docs/storage-host",
       "to": "/zh/docs/storage-host/api/authoring/capability#storage-host-authoring/capability--useStorageCapability",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/authoring/change-controller",
+      "to": "/en/docs/storage-host/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/en/docs/storage-host/getting-started",
+      "to": "/en/docs/storage-host/api/authoring/change-controller",
+      "type": "guide-api"
+    },
+    {
+      "from": "/en/docs/storage-host/api/authoring/change-controller",
+      "to": "/en/docs/storage-host",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/en/docs/storage-host",
+      "to": "/en/docs/storage-host/api/authoring/change-controller",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/en/docs/storage-host/api/authoring/change-controller",
+      "to": "/en/docs/storage-host/api/authoring/change-controller#storage-host-authoring/change-controller--createBackendChangeController",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/authoring/change-controller#storage-host-authoring/change-controller--createBackendChangeController",
+      "to": "/en/docs/storage-host/api/authoring/change-controller",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/storage-host/api/authoring/change-controller#storage-host-authoring/change-controller--createBackendChangeController",
+      "to": "/en/docs/storage-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/storage-host/getting-started",
+      "to": "/en/docs/storage-host/api/authoring/change-controller#storage-host-authoring/change-controller--createBackendChangeController",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/authoring/change-controller#storage-host-authoring/change-controller--createBackendChangeController",
+      "to": "/en/docs/storage-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/storage-host",
+      "to": "/en/docs/storage-host/api/authoring/change-controller#storage-host-authoring/change-controller--createBackendChangeController",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/authoring/change-controller",
+      "to": "/en/docs/storage-host/api/authoring/change-controller#storage-host-authoring/change-controller--createBackendLifecycleController",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/authoring/change-controller#storage-host-authoring/change-controller--createBackendLifecycleController",
+      "to": "/en/docs/storage-host/api/authoring/change-controller",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/storage-host/api/authoring/change-controller#storage-host-authoring/change-controller--createBackendLifecycleController",
+      "to": "/en/docs/storage-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/storage-host/getting-started",
+      "to": "/en/docs/storage-host/api/authoring/change-controller#storage-host-authoring/change-controller--createBackendLifecycleController",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/authoring/change-controller#storage-host-authoring/change-controller--createBackendLifecycleController",
+      "to": "/en/docs/storage-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/storage-host",
+      "to": "/en/docs/storage-host/api/authoring/change-controller#storage-host-authoring/change-controller--createBackendLifecycleController",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/authoring/change-controller",
+      "to": "/en/docs/storage-host/api/authoring/change-controller#storage-host-authoring/change-controller--IBackendChangeControllerFactory",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/authoring/change-controller#storage-host-authoring/change-controller--IBackendChangeControllerFactory",
+      "to": "/en/docs/storage-host/api/authoring/change-controller",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/storage-host/api/authoring/change-controller#storage-host-authoring/change-controller--IBackendChangeControllerFactory",
+      "to": "/en/docs/storage-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/storage-host/getting-started",
+      "to": "/en/docs/storage-host/api/authoring/change-controller#storage-host-authoring/change-controller--IBackendChangeControllerFactory",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/authoring/change-controller#storage-host-authoring/change-controller--IBackendChangeControllerFactory",
+      "to": "/en/docs/storage-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/storage-host",
+      "to": "/en/docs/storage-host/api/authoring/change-controller#storage-host-authoring/change-controller--IBackendChangeControllerFactory",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/authoring/change-controller",
+      "to": "/en/docs/storage-host/api/authoring/change-controller#storage-host-authoring/change-controller--IBackendLifecycleController",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/authoring/change-controller#storage-host-authoring/change-controller--IBackendLifecycleController",
+      "to": "/en/docs/storage-host/api/authoring/change-controller",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/storage-host/api/authoring/change-controller#storage-host-authoring/change-controller--IBackendLifecycleController",
+      "to": "/en/docs/storage-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/storage-host/getting-started",
+      "to": "/en/docs/storage-host/api/authoring/change-controller#storage-host-authoring/change-controller--IBackendLifecycleController",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/authoring/change-controller#storage-host-authoring/change-controller--IBackendLifecycleController",
+      "to": "/en/docs/storage-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/storage-host",
+      "to": "/en/docs/storage-host/api/authoring/change-controller#storage-host-authoring/change-controller--IBackendLifecycleController",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/authoring/change-controller#IBackendChangeController",
+      "to": "/en/docs/storage-host/api/authoring/backend#storage-host-authoring/backend--IBackendChangeController",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/en/docs/storage-host/api/authoring/backend#storage-host-authoring/backend--IBackendChangeController",
+      "to": "/en/docs/storage-host/api/authoring/change-controller#IBackendChangeController",
+      "type": "alias-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/authoring/change-controller#IBackendChangeControllerOptions",
+      "to": "/en/docs/storage-host/api/authoring/backend#storage-host-authoring/backend--IBackendChangeControllerOptions",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/en/docs/storage-host/api/authoring/backend#storage-host-authoring/backend--IBackendChangeControllerOptions",
+      "to": "/en/docs/storage-host/api/authoring/change-controller#IBackendChangeControllerOptions",
+      "type": "alias-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/authoring/change-controller#IBackendChangeSnapshot",
+      "to": "/en/docs/storage-host/api/authoring/backend#storage-host-authoring/backend--IBackendChangeSnapshot",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/en/docs/storage-host/api/authoring/backend#storage-host-authoring/backend--IBackendChangeSnapshot",
+      "to": "/en/docs/storage-host/api/authoring/change-controller#IBackendChangeSnapshot",
+      "type": "alias-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/authoring/change-controller",
+      "to": "/zh/docs/storage-host/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/zh/docs/storage-host/getting-started",
+      "to": "/zh/docs/storage-host/api/authoring/change-controller",
+      "type": "guide-api"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/authoring/change-controller",
+      "to": "/zh/docs/storage-host",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/zh/docs/storage-host",
+      "to": "/zh/docs/storage-host/api/authoring/change-controller",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/authoring/change-controller",
+      "to": "/zh/docs/storage-host/api/authoring/change-controller#storage-host-authoring/change-controller--createBackendChangeController",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/authoring/change-controller#storage-host-authoring/change-controller--createBackendChangeController",
+      "to": "/zh/docs/storage-host/api/authoring/change-controller",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/authoring/change-controller#storage-host-authoring/change-controller--createBackendChangeController",
+      "to": "/zh/docs/storage-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/storage-host/getting-started",
+      "to": "/zh/docs/storage-host/api/authoring/change-controller#storage-host-authoring/change-controller--createBackendChangeController",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/authoring/change-controller#storage-host-authoring/change-controller--createBackendChangeController",
+      "to": "/zh/docs/storage-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/storage-host",
+      "to": "/zh/docs/storage-host/api/authoring/change-controller#storage-host-authoring/change-controller--createBackendChangeController",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/authoring/change-controller",
+      "to": "/zh/docs/storage-host/api/authoring/change-controller#storage-host-authoring/change-controller--createBackendLifecycleController",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/authoring/change-controller#storage-host-authoring/change-controller--createBackendLifecycleController",
+      "to": "/zh/docs/storage-host/api/authoring/change-controller",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/authoring/change-controller#storage-host-authoring/change-controller--createBackendLifecycleController",
+      "to": "/zh/docs/storage-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/storage-host/getting-started",
+      "to": "/zh/docs/storage-host/api/authoring/change-controller#storage-host-authoring/change-controller--createBackendLifecycleController",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/authoring/change-controller#storage-host-authoring/change-controller--createBackendLifecycleController",
+      "to": "/zh/docs/storage-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/storage-host",
+      "to": "/zh/docs/storage-host/api/authoring/change-controller#storage-host-authoring/change-controller--createBackendLifecycleController",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/authoring/change-controller",
+      "to": "/zh/docs/storage-host/api/authoring/change-controller#storage-host-authoring/change-controller--IBackendChangeControllerFactory",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/authoring/change-controller#storage-host-authoring/change-controller--IBackendChangeControllerFactory",
+      "to": "/zh/docs/storage-host/api/authoring/change-controller",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/authoring/change-controller#storage-host-authoring/change-controller--IBackendChangeControllerFactory",
+      "to": "/zh/docs/storage-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/storage-host/getting-started",
+      "to": "/zh/docs/storage-host/api/authoring/change-controller#storage-host-authoring/change-controller--IBackendChangeControllerFactory",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/authoring/change-controller#storage-host-authoring/change-controller--IBackendChangeControllerFactory",
+      "to": "/zh/docs/storage-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/storage-host",
+      "to": "/zh/docs/storage-host/api/authoring/change-controller#storage-host-authoring/change-controller--IBackendChangeControllerFactory",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/authoring/change-controller",
+      "to": "/zh/docs/storage-host/api/authoring/change-controller#storage-host-authoring/change-controller--IBackendLifecycleController",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/authoring/change-controller#storage-host-authoring/change-controller--IBackendLifecycleController",
+      "to": "/zh/docs/storage-host/api/authoring/change-controller",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/authoring/change-controller#storage-host-authoring/change-controller--IBackendLifecycleController",
+      "to": "/zh/docs/storage-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/storage-host/getting-started",
+      "to": "/zh/docs/storage-host/api/authoring/change-controller#storage-host-authoring/change-controller--IBackendLifecycleController",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/authoring/change-controller#storage-host-authoring/change-controller--IBackendLifecycleController",
+      "to": "/zh/docs/storage-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/storage-host",
+      "to": "/zh/docs/storage-host/api/authoring/change-controller#storage-host-authoring/change-controller--IBackendLifecycleController",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/authoring/change-controller#IBackendChangeController",
+      "to": "/zh/docs/storage-host/api/authoring/backend#storage-host-authoring/backend--IBackendChangeController",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/authoring/backend#storage-host-authoring/backend--IBackendChangeController",
+      "to": "/zh/docs/storage-host/api/authoring/change-controller#IBackendChangeController",
+      "type": "alias-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/authoring/change-controller#IBackendChangeControllerOptions",
+      "to": "/zh/docs/storage-host/api/authoring/backend#storage-host-authoring/backend--IBackendChangeControllerOptions",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/authoring/backend#storage-host-authoring/backend--IBackendChangeControllerOptions",
+      "to": "/zh/docs/storage-host/api/authoring/change-controller#IBackendChangeControllerOptions",
+      "type": "alias-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/authoring/change-controller#IBackendChangeSnapshot",
+      "to": "/zh/docs/storage-host/api/authoring/backend#storage-host-authoring/backend--IBackendChangeSnapshot",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/authoring/backend#storage-host-authoring/backend--IBackendChangeSnapshot",
+      "to": "/zh/docs/storage-host/api/authoring/change-controller#IBackendChangeSnapshot",
+      "type": "alias-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/authoring/change-iterator",
+      "to": "/en/docs/storage-host/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/en/docs/storage-host/getting-started",
+      "to": "/en/docs/storage-host/api/authoring/change-iterator",
+      "type": "guide-api"
+    },
+    {
+      "from": "/en/docs/storage-host/api/authoring/change-iterator",
+      "to": "/en/docs/storage-host",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/en/docs/storage-host",
+      "to": "/en/docs/storage-host/api/authoring/change-iterator",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/en/docs/storage-host/api/authoring/change-iterator",
+      "to": "/en/docs/storage-host/api/authoring/change-iterator#storage-host-authoring/change-iterator--createBackendChangeIterator",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/authoring/change-iterator#storage-host-authoring/change-iterator--createBackendChangeIterator",
+      "to": "/en/docs/storage-host/api/authoring/change-iterator",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/storage-host/api/authoring/change-iterator#storage-host-authoring/change-iterator--createBackendChangeIterator",
+      "to": "/en/docs/storage-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/storage-host/getting-started",
+      "to": "/en/docs/storage-host/api/authoring/change-iterator#storage-host-authoring/change-iterator--createBackendChangeIterator",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/authoring/change-iterator#storage-host-authoring/change-iterator--createBackendChangeIterator",
+      "to": "/en/docs/storage-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/storage-host",
+      "to": "/en/docs/storage-host/api/authoring/change-iterator#storage-host-authoring/change-iterator--createBackendChangeIterator",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/authoring/change-iterator",
+      "to": "/en/docs/storage-host/api/authoring/change-iterator#storage-host-authoring/change-iterator--IBackendChangeIteratorOptions",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/authoring/change-iterator#storage-host-authoring/change-iterator--IBackendChangeIteratorOptions",
+      "to": "/en/docs/storage-host/api/authoring/change-iterator",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/storage-host/api/authoring/change-iterator#storage-host-authoring/change-iterator--IBackendChangeIteratorOptions",
+      "to": "/en/docs/storage-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/storage-host/getting-started",
+      "to": "/en/docs/storage-host/api/authoring/change-iterator#storage-host-authoring/change-iterator--IBackendChangeIteratorOptions",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/authoring/change-iterator#storage-host-authoring/change-iterator--IBackendChangeIteratorOptions",
+      "to": "/en/docs/storage-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/storage-host",
+      "to": "/en/docs/storage-host/api/authoring/change-iterator#storage-host-authoring/change-iterator--IBackendChangeIteratorOptions",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/authoring/change-iterator",
+      "to": "/zh/docs/storage-host/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/zh/docs/storage-host/getting-started",
+      "to": "/zh/docs/storage-host/api/authoring/change-iterator",
+      "type": "guide-api"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/authoring/change-iterator",
+      "to": "/zh/docs/storage-host",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/zh/docs/storage-host",
+      "to": "/zh/docs/storage-host/api/authoring/change-iterator",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/authoring/change-iterator",
+      "to": "/zh/docs/storage-host/api/authoring/change-iterator#storage-host-authoring/change-iterator--createBackendChangeIterator",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/authoring/change-iterator#storage-host-authoring/change-iterator--createBackendChangeIterator",
+      "to": "/zh/docs/storage-host/api/authoring/change-iterator",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/authoring/change-iterator#storage-host-authoring/change-iterator--createBackendChangeIterator",
+      "to": "/zh/docs/storage-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/storage-host/getting-started",
+      "to": "/zh/docs/storage-host/api/authoring/change-iterator#storage-host-authoring/change-iterator--createBackendChangeIterator",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/authoring/change-iterator#storage-host-authoring/change-iterator--createBackendChangeIterator",
+      "to": "/zh/docs/storage-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/storage-host",
+      "to": "/zh/docs/storage-host/api/authoring/change-iterator#storage-host-authoring/change-iterator--createBackendChangeIterator",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/authoring/change-iterator",
+      "to": "/zh/docs/storage-host/api/authoring/change-iterator#storage-host-authoring/change-iterator--IBackendChangeIteratorOptions",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/authoring/change-iterator#storage-host-authoring/change-iterator--IBackendChangeIteratorOptions",
+      "to": "/zh/docs/storage-host/api/authoring/change-iterator",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/authoring/change-iterator#storage-host-authoring/change-iterator--IBackendChangeIteratorOptions",
+      "to": "/zh/docs/storage-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/storage-host/getting-started",
+      "to": "/zh/docs/storage-host/api/authoring/change-iterator#storage-host-authoring/change-iterator--IBackendChangeIteratorOptions",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/authoring/change-iterator#storage-host-authoring/change-iterator--IBackendChangeIteratorOptions",
+      "to": "/zh/docs/storage-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/storage-host",
+      "to": "/zh/docs/storage-host/api/authoring/change-iterator#storage-host-authoring/change-iterator--IBackendChangeIteratorOptions",
       "type": "architecture-symbol"
     },
     {
@@ -129123,6 +129563,36 @@
     },
     {
       "from": "/en/docs/storage-host/api/entity",
+      "to": "/en/docs/storage-host/api/entity#storage-host-entity--IEntityFeature",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/entity#storage-host-entity--IEntityFeature",
+      "to": "/en/docs/storage-host/api/entity",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/storage-host/api/entity#storage-host-entity--IEntityFeature",
+      "to": "/en/docs/storage-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/storage-host/getting-started",
+      "to": "/en/docs/storage-host/api/entity#storage-host-entity--IEntityFeature",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/entity#storage-host-entity--IEntityFeature",
+      "to": "/en/docs/storage-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/storage-host",
+      "to": "/en/docs/storage-host/api/entity#storage-host-entity--IEntityFeature",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/entity",
       "to": "/en/docs/storage-host/api/entity#storage-host-entity--IEntityIndex",
       "type": "api-symbol"
     },
@@ -130793,6 +131263,36 @@
     },
     {
       "from": "/zh/docs/storage-host/api/entity",
+      "to": "/zh/docs/storage-host/api/entity#storage-host-entity--IEntityFeature",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity#storage-host-entity--IEntityFeature",
+      "to": "/zh/docs/storage-host/api/entity",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity#storage-host-entity--IEntityFeature",
+      "to": "/zh/docs/storage-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/storage-host/getting-started",
+      "to": "/zh/docs/storage-host/api/entity#storage-host-entity--IEntityFeature",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity#storage-host-entity--IEntityFeature",
+      "to": "/zh/docs/storage-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/storage-host",
+      "to": "/zh/docs/storage-host/api/entity#storage-host-entity--IEntityFeature",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity",
       "to": "/zh/docs/storage-host/api/entity#storage-host-entity--IEntityIndex",
       "type": "api-symbol"
     },
@@ -131959,506 +132459,6 @@
     {
       "from": "/zh/docs/storage-host",
       "to": "/zh/docs/storage-host/api/entity#storage-host-entity--jsonCodec",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/storage-host/api/entity",
-      "to": "/zh/docs/storage-host/api/entity#storage-host-entity--markRecordIndexBackfillContentionFailure",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/storage-host/api/entity#storage-host-entity--markRecordIndexBackfillContentionFailure",
-      "to": "/zh/docs/storage-host/api/entity",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/storage-host/api/entity#storage-host-entity--markRecordIndexBackfillContentionFailure",
-      "to": "/zh/docs/storage-host/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/docs/storage-host/getting-started",
-      "to": "/zh/docs/storage-host/api/entity#storage-host-entity--markRecordIndexBackfillContentionFailure",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/storage-host/api/entity#storage-host-entity--markRecordIndexBackfillContentionFailure",
-      "to": "/zh/docs/storage-host",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/docs/storage-host",
-      "to": "/zh/docs/storage-host/api/entity#storage-host-entity--markRecordIndexBackfillContentionFailure",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/storage-host/api/entity",
-      "to": "/zh/docs/storage-host/api/entity#storage-host-entity--passthrough",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/storage-host/api/entity#storage-host-entity--passthrough",
-      "to": "/zh/docs/storage-host/api/entity",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/storage-host/api/entity#storage-host-entity--passthrough",
-      "to": "/zh/docs/storage-host/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/docs/storage-host/getting-started",
-      "to": "/zh/docs/storage-host/api/entity#storage-host-entity--passthrough",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/storage-host/api/entity#storage-host-entity--passthrough",
-      "to": "/zh/docs/storage-host",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/docs/storage-host",
-      "to": "/zh/docs/storage-host/api/entity#storage-host-entity--passthrough",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/storage-host/api/entity",
-      "to": "/zh/docs/storage-host/api/entity#storage-host-entity--RecordIndexBackfillPhase",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/storage-host/api/entity#storage-host-entity--RecordIndexBackfillPhase",
-      "to": "/zh/docs/storage-host/api/entity",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/storage-host/api/entity#storage-host-entity--RecordIndexBackfillPhase",
-      "to": "/zh/docs/storage-host/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/docs/storage-host/getting-started",
-      "to": "/zh/docs/storage-host/api/entity#storage-host-entity--RecordIndexBackfillPhase",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/storage-host/api/entity#storage-host-entity--RecordIndexBackfillPhase",
-      "to": "/zh/docs/storage-host",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/docs/storage-host",
-      "to": "/zh/docs/storage-host/api/entity#storage-host-entity--RecordIndexBackfillPhase",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/storage-host/api/entity",
-      "to": "/zh/docs/storage-host/api/entity#storage-host-entity--registerRecordIndexBackfillStore",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/storage-host/api/entity#storage-host-entity--registerRecordIndexBackfillStore",
-      "to": "/zh/docs/storage-host/api/entity",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/storage-host/api/entity#storage-host-entity--registerRecordIndexBackfillStore",
-      "to": "/zh/docs/storage-host/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/docs/storage-host/getting-started",
-      "to": "/zh/docs/storage-host/api/entity#storage-host-entity--registerRecordIndexBackfillStore",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/storage-host/api/entity#storage-host-entity--registerRecordIndexBackfillStore",
-      "to": "/zh/docs/storage-host",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/docs/storage-host",
-      "to": "/zh/docs/storage-host/api/entity#storage-host-entity--registerRecordIndexBackfillStore",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/storage-host/api/entity",
-      "to": "/zh/docs/storage-host/api/entity#storage-host-entity--REPOSITORY_KEY_PREFIX",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/storage-host/api/entity#storage-host-entity--REPOSITORY_KEY_PREFIX",
-      "to": "/zh/docs/storage-host/api/entity",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/storage-host/api/entity#storage-host-entity--REPOSITORY_KEY_PREFIX",
-      "to": "/zh/docs/storage-host/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/docs/storage-host/getting-started",
-      "to": "/zh/docs/storage-host/api/entity#storage-host-entity--REPOSITORY_KEY_PREFIX",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/storage-host/api/entity#storage-host-entity--REPOSITORY_KEY_PREFIX",
-      "to": "/zh/docs/storage-host",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/docs/storage-host",
-      "to": "/zh/docs/storage-host/api/entity#storage-host-entity--REPOSITORY_KEY_PREFIX",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/storage-host/api/entity",
-      "to": "/zh/docs/storage-host/api/entity#storage-host-entity--repositoryMigrationKey",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/storage-host/api/entity#storage-host-entity--repositoryMigrationKey",
-      "to": "/zh/docs/storage-host/api/entity",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/storage-host/api/entity#storage-host-entity--repositoryMigrationKey",
-      "to": "/zh/docs/storage-host/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/docs/storage-host/getting-started",
-      "to": "/zh/docs/storage-host/api/entity#storage-host-entity--repositoryMigrationKey",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/storage-host/api/entity#storage-host-entity--repositoryMigrationKey",
-      "to": "/zh/docs/storage-host",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/docs/storage-host",
-      "to": "/zh/docs/storage-host/api/entity#storage-host-entity--repositoryMigrationKey",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/storage-host/api/entity",
-      "to": "/zh/docs/storage-host/api/entity#storage-host-entity--selectCodec",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/storage-host/api/entity#storage-host-entity--selectCodec",
-      "to": "/zh/docs/storage-host/api/entity",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/storage-host/api/entity#storage-host-entity--selectCodec",
-      "to": "/zh/docs/storage-host/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/docs/storage-host/getting-started",
-      "to": "/zh/docs/storage-host/api/entity#storage-host-entity--selectCodec",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/storage-host/api/entity#storage-host-entity--selectCodec",
-      "to": "/zh/docs/storage-host",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/docs/storage-host",
-      "to": "/zh/docs/storage-host/api/entity#storage-host-entity--selectCodec",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/storage-host/api/entity",
-      "to": "/zh/docs/storage-host/api/entity#storage-host-entity--structuredCodec",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/storage-host/api/entity#storage-host-entity--structuredCodec",
-      "to": "/zh/docs/storage-host/api/entity",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/storage-host/api/entity#storage-host-entity--structuredCodec",
-      "to": "/zh/docs/storage-host/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/docs/storage-host/getting-started",
-      "to": "/zh/docs/storage-host/api/entity#storage-host-entity--structuredCodec",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/storage-host/api/entity#storage-host-entity--structuredCodec",
-      "to": "/zh/docs/storage-host",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/docs/storage-host",
-      "to": "/zh/docs/storage-host/api/entity#storage-host-entity--structuredCodec",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/storage-host/api/journal",
-      "to": "/en/docs/storage-host/getting-started",
-      "type": "api-guide"
-    },
-    {
-      "from": "/en/docs/storage-host/getting-started",
-      "to": "/en/docs/storage-host/api/journal",
-      "type": "guide-api"
-    },
-    {
-      "from": "/en/docs/storage-host/api/journal",
-      "to": "/en/docs/storage-host",
-      "type": "api-architecture"
-    },
-    {
-      "from": "/en/docs/storage-host",
-      "to": "/en/docs/storage-host/api/journal",
-      "type": "architecture-api"
-    },
-    {
-      "from": "/en/docs/storage-host/api/journal",
-      "to": "/en/docs/storage-host/api/journal#storage-host-journal--storageLogStore",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/storage-host/api/journal#storage-host-journal--storageLogStore",
-      "to": "/en/docs/storage-host/api/journal",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/storage-host/api/journal#storage-host-journal--storageLogStore",
-      "to": "/en/docs/storage-host/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/docs/storage-host/getting-started",
-      "to": "/en/docs/storage-host/api/journal#storage-host-journal--storageLogStore",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/storage-host/api/journal#storage-host-journal--storageLogStore",
-      "to": "/en/docs/storage-host",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/docs/storage-host",
-      "to": "/en/docs/storage-host/api/journal#storage-host-journal--storageLogStore",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/storage-host/api/journal",
-      "to": "/zh/docs/storage-host/getting-started",
-      "type": "api-guide"
-    },
-    {
-      "from": "/zh/docs/storage-host/getting-started",
-      "to": "/zh/docs/storage-host/api/journal",
-      "type": "guide-api"
-    },
-    {
-      "from": "/zh/docs/storage-host/api/journal",
-      "to": "/zh/docs/storage-host",
-      "type": "api-architecture"
-    },
-    {
-      "from": "/zh/docs/storage-host",
-      "to": "/zh/docs/storage-host/api/journal",
-      "type": "architecture-api"
-    },
-    {
-      "from": "/zh/docs/storage-host/api/journal",
-      "to": "/zh/docs/storage-host/api/journal#storage-host-journal--storageLogStore",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/storage-host/api/journal#storage-host-journal--storageLogStore",
-      "to": "/zh/docs/storage-host/api/journal",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/storage-host/api/journal#storage-host-journal--storageLogStore",
-      "to": "/zh/docs/storage-host/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/docs/storage-host/getting-started",
-      "to": "/zh/docs/storage-host/api/journal#storage-host-journal--storageLogStore",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/storage-host/api/journal#storage-host-journal--storageLogStore",
-      "to": "/zh/docs/storage-host",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/docs/storage-host",
-      "to": "/zh/docs/storage-host/api/journal#storage-host-journal--storageLogStore",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/storage-host/api/vector/mmr",
-      "to": "/en/docs/storage-host/getting-started",
-      "type": "api-guide"
-    },
-    {
-      "from": "/en/docs/storage-host/getting-started",
-      "to": "/en/docs/storage-host/api/vector/mmr",
-      "type": "guide-api"
-    },
-    {
-      "from": "/en/docs/storage-host/api/vector/mmr",
-      "to": "/en/docs/storage-host",
-      "type": "api-architecture"
-    },
-    {
-      "from": "/en/docs/storage-host",
-      "to": "/en/docs/storage-host/api/vector/mmr",
-      "type": "architecture-api"
-    },
-    {
-      "from": "/en/docs/storage-host/api/vector/mmr",
-      "to": "/en/docs/storage-host/api/vector/mmr#storage-host-vector/mmr--IStorageMmrOptions",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/storage-host/api/vector/mmr#storage-host-vector/mmr--IStorageMmrOptions",
-      "to": "/en/docs/storage-host/api/vector/mmr",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/storage-host/api/vector/mmr#storage-host-vector/mmr--IStorageMmrOptions",
-      "to": "/en/docs/storage-host/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/docs/storage-host/getting-started",
-      "to": "/en/docs/storage-host/api/vector/mmr#storage-host-vector/mmr--IStorageMmrOptions",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/storage-host/api/vector/mmr#storage-host-vector/mmr--IStorageMmrOptions",
-      "to": "/en/docs/storage-host",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/docs/storage-host",
-      "to": "/en/docs/storage-host/api/vector/mmr#storage-host-vector/mmr--IStorageMmrOptions",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/storage-host/api/vector/mmr",
-      "to": "/en/docs/storage-host/api/vector/mmr#storage-host-vector/mmr--mmr",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/storage-host/api/vector/mmr#storage-host-vector/mmr--mmr",
-      "to": "/en/docs/storage-host/api/vector/mmr",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/storage-host/api/vector/mmr#storage-host-vector/mmr--mmr",
-      "to": "/en/docs/storage-host/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/docs/storage-host/getting-started",
-      "to": "/en/docs/storage-host/api/vector/mmr#storage-host-vector/mmr--mmr",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/storage-host/api/vector/mmr#storage-host-vector/mmr--mmr",
-      "to": "/en/docs/storage-host",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/docs/storage-host",
-      "to": "/en/docs/storage-host/api/vector/mmr#storage-host-vector/mmr--mmr",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/storage-host/api/vector/mmr",
-      "to": "/zh/docs/storage-host/getting-started",
-      "type": "api-guide"
-    },
-    {
-      "from": "/zh/docs/storage-host/getting-started",
-      "to": "/zh/docs/storage-host/api/vector/mmr",
-      "type": "guide-api"
-    },
-    {
-      "from": "/zh/docs/storage-host/api/vector/mmr",
-      "to": "/zh/docs/storage-host",
-      "type": "api-architecture"
-    },
-    {
-      "from": "/zh/docs/storage-host",
-      "to": "/zh/docs/storage-host/api/vector/mmr",
-      "type": "architecture-api"
-    },
-    {
-      "from": "/zh/docs/storage-host/api/vector/mmr",
-      "to": "/zh/docs/storage-host/api/vector/mmr#storage-host-vector/mmr--IStorageMmrOptions",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/storage-host/api/vector/mmr#storage-host-vector/mmr--IStorageMmrOptions",
-      "to": "/zh/docs/storage-host/api/vector/mmr",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/storage-host/api/vector/mmr#storage-host-vector/mmr--IStorageMmrOptions",
-      "to": "/zh/docs/storage-host/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/docs/storage-host/getting-started",
-      "to": "/zh/docs/storage-host/api/vector/mmr#storage-host-vector/mmr--IStorageMmrOptions",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/storage-host/api/vector/mmr#storage-host-vector/mmr--IStorageMmrOptions",
-      "to": "/zh/docs/storage-host",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/docs/storage-host",
-      "to": "/zh/docs/storage-host/api/vector/mmr#storage-host-vector/mmr--IStorageMmrOptions",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/storage-host/api/vector/mmr",
-      "to": "/zh/docs/storage-host/api/vector/mmr#storage-host-vector/mmr--mmr",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/storage-host/api/vector/mmr#storage-host-vector/mmr--mmr",
-      "to": "/zh/docs/storage-host/api/vector/mmr",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/storage-host/api/vector/mmr#storage-host-vector/mmr--mmr",
-      "to": "/zh/docs/storage-host/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/docs/storage-host/getting-started",
-      "to": "/zh/docs/storage-host/api/vector/mmr#storage-host-vector/mmr--mmr",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/storage-host/api/vector/mmr#storage-host-vector/mmr--mmr",
-      "to": "/zh/docs/storage-host",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/docs/storage-host",
-      "to": "/zh/docs/storage-host/api/vector/mmr#storage-host-vector/mmr--mmr",
       "type": "architecture-symbol"
     },
     {
@@ -202419,6 +202419,1326 @@
     {
       "from": "/zh/docs/wasm",
       "to": "/zh/docs/wasm/api#wasm-index--SyncInitInput",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity",
+      "to": "/zh/docs/storage-host/api/entity#storage-host-entity--markRecordIndexBackfillContentionFailure",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity#storage-host-entity--markRecordIndexBackfillContentionFailure",
+      "to": "/zh/docs/storage-host/api/entity",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity#storage-host-entity--markRecordIndexBackfillContentionFailure",
+      "to": "/zh/docs/storage-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/storage-host/getting-started",
+      "to": "/zh/docs/storage-host/api/entity#storage-host-entity--markRecordIndexBackfillContentionFailure",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity#storage-host-entity--markRecordIndexBackfillContentionFailure",
+      "to": "/zh/docs/storage-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/storage-host",
+      "to": "/zh/docs/storage-host/api/entity#storage-host-entity--markRecordIndexBackfillContentionFailure",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity",
+      "to": "/zh/docs/storage-host/api/entity#storage-host-entity--passthrough",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity#storage-host-entity--passthrough",
+      "to": "/zh/docs/storage-host/api/entity",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity#storage-host-entity--passthrough",
+      "to": "/zh/docs/storage-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/storage-host/getting-started",
+      "to": "/zh/docs/storage-host/api/entity#storage-host-entity--passthrough",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity#storage-host-entity--passthrough",
+      "to": "/zh/docs/storage-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/storage-host",
+      "to": "/zh/docs/storage-host/api/entity#storage-host-entity--passthrough",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity",
+      "to": "/zh/docs/storage-host/api/entity#storage-host-entity--RecordIndexBackfillPhase",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity#storage-host-entity--RecordIndexBackfillPhase",
+      "to": "/zh/docs/storage-host/api/entity",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity#storage-host-entity--RecordIndexBackfillPhase",
+      "to": "/zh/docs/storage-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/storage-host/getting-started",
+      "to": "/zh/docs/storage-host/api/entity#storage-host-entity--RecordIndexBackfillPhase",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity#storage-host-entity--RecordIndexBackfillPhase",
+      "to": "/zh/docs/storage-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/storage-host",
+      "to": "/zh/docs/storage-host/api/entity#storage-host-entity--RecordIndexBackfillPhase",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity",
+      "to": "/zh/docs/storage-host/api/entity#storage-host-entity--registerRecordIndexBackfillStore",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity#storage-host-entity--registerRecordIndexBackfillStore",
+      "to": "/zh/docs/storage-host/api/entity",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity#storage-host-entity--registerRecordIndexBackfillStore",
+      "to": "/zh/docs/storage-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/storage-host/getting-started",
+      "to": "/zh/docs/storage-host/api/entity#storage-host-entity--registerRecordIndexBackfillStore",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity#storage-host-entity--registerRecordIndexBackfillStore",
+      "to": "/zh/docs/storage-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/storage-host",
+      "to": "/zh/docs/storage-host/api/entity#storage-host-entity--registerRecordIndexBackfillStore",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity",
+      "to": "/zh/docs/storage-host/api/entity#storage-host-entity--REPOSITORY_KEY_PREFIX",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity#storage-host-entity--REPOSITORY_KEY_PREFIX",
+      "to": "/zh/docs/storage-host/api/entity",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity#storage-host-entity--REPOSITORY_KEY_PREFIX",
+      "to": "/zh/docs/storage-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/storage-host/getting-started",
+      "to": "/zh/docs/storage-host/api/entity#storage-host-entity--REPOSITORY_KEY_PREFIX",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity#storage-host-entity--REPOSITORY_KEY_PREFIX",
+      "to": "/zh/docs/storage-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/storage-host",
+      "to": "/zh/docs/storage-host/api/entity#storage-host-entity--REPOSITORY_KEY_PREFIX",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity",
+      "to": "/zh/docs/storage-host/api/entity#storage-host-entity--repositoryMigrationKey",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity#storage-host-entity--repositoryMigrationKey",
+      "to": "/zh/docs/storage-host/api/entity",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity#storage-host-entity--repositoryMigrationKey",
+      "to": "/zh/docs/storage-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/storage-host/getting-started",
+      "to": "/zh/docs/storage-host/api/entity#storage-host-entity--repositoryMigrationKey",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity#storage-host-entity--repositoryMigrationKey",
+      "to": "/zh/docs/storage-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/storage-host",
+      "to": "/zh/docs/storage-host/api/entity#storage-host-entity--repositoryMigrationKey",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity",
+      "to": "/zh/docs/storage-host/api/entity#storage-host-entity--selectCodec",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity#storage-host-entity--selectCodec",
+      "to": "/zh/docs/storage-host/api/entity",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity#storage-host-entity--selectCodec",
+      "to": "/zh/docs/storage-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/storage-host/getting-started",
+      "to": "/zh/docs/storage-host/api/entity#storage-host-entity--selectCodec",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity#storage-host-entity--selectCodec",
+      "to": "/zh/docs/storage-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/storage-host",
+      "to": "/zh/docs/storage-host/api/entity#storage-host-entity--selectCodec",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity",
+      "to": "/zh/docs/storage-host/api/entity#storage-host-entity--structuredCodec",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity#storage-host-entity--structuredCodec",
+      "to": "/zh/docs/storage-host/api/entity",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity#storage-host-entity--structuredCodec",
+      "to": "/zh/docs/storage-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/storage-host/getting-started",
+      "to": "/zh/docs/storage-host/api/entity#storage-host-entity--structuredCodec",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity#storage-host-entity--structuredCodec",
+      "to": "/zh/docs/storage-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/storage-host",
+      "to": "/zh/docs/storage-host/api/entity#storage-host-entity--structuredCodec",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/entity/indexes",
+      "to": "/en/docs/storage-host/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/en/docs/storage-host/getting-started",
+      "to": "/en/docs/storage-host/api/entity/indexes",
+      "type": "guide-api"
+    },
+    {
+      "from": "/en/docs/storage-host/api/entity/indexes",
+      "to": "/en/docs/storage-host",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/en/docs/storage-host",
+      "to": "/en/docs/storage-host/api/entity/indexes",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/en/docs/storage-host/api/entity/indexes",
+      "to": "/en/docs/storage-host/api/entity/indexes#storage-host-entity/indexes--entityIndexesFeature",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/entity/indexes#storage-host-entity/indexes--entityIndexesFeature",
+      "to": "/en/docs/storage-host/api/entity/indexes",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/storage-host/api/entity/indexes#storage-host-entity/indexes--entityIndexesFeature",
+      "to": "/en/docs/storage-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/storage-host/getting-started",
+      "to": "/en/docs/storage-host/api/entity/indexes#storage-host-entity/indexes--entityIndexesFeature",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/entity/indexes#storage-host-entity/indexes--entityIndexesFeature",
+      "to": "/en/docs/storage-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/storage-host",
+      "to": "/en/docs/storage-host/api/entity/indexes#storage-host-entity/indexes--entityIndexesFeature",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity/indexes",
+      "to": "/zh/docs/storage-host/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/zh/docs/storage-host/getting-started",
+      "to": "/zh/docs/storage-host/api/entity/indexes",
+      "type": "guide-api"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity/indexes",
+      "to": "/zh/docs/storage-host",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/zh/docs/storage-host",
+      "to": "/zh/docs/storage-host/api/entity/indexes",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity/indexes",
+      "to": "/zh/docs/storage-host/api/entity/indexes#storage-host-entity/indexes--entityIndexesFeature",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity/indexes#storage-host-entity/indexes--entityIndexesFeature",
+      "to": "/zh/docs/storage-host/api/entity/indexes",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity/indexes#storage-host-entity/indexes--entityIndexesFeature",
+      "to": "/zh/docs/storage-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/storage-host/getting-started",
+      "to": "/zh/docs/storage-host/api/entity/indexes#storage-host-entity/indexes--entityIndexesFeature",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity/indexes#storage-host-entity/indexes--entityIndexesFeature",
+      "to": "/zh/docs/storage-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/storage-host",
+      "to": "/zh/docs/storage-host/api/entity/indexes#storage-host-entity/indexes--entityIndexesFeature",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/entity/keyset",
+      "to": "/en/docs/storage-host/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/en/docs/storage-host/getting-started",
+      "to": "/en/docs/storage-host/api/entity/keyset",
+      "type": "guide-api"
+    },
+    {
+      "from": "/en/docs/storage-host/api/entity/keyset",
+      "to": "/en/docs/storage-host",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/en/docs/storage-host",
+      "to": "/en/docs/storage-host/api/entity/keyset",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/en/docs/storage-host/api/entity/keyset",
+      "to": "/en/docs/storage-host/api/entity/keyset#storage-host-entity/keyset--entityKeysetFeature",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/entity/keyset#storage-host-entity/keyset--entityKeysetFeature",
+      "to": "/en/docs/storage-host/api/entity/keyset",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/storage-host/api/entity/keyset#storage-host-entity/keyset--entityKeysetFeature",
+      "to": "/en/docs/storage-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/storage-host/getting-started",
+      "to": "/en/docs/storage-host/api/entity/keyset#storage-host-entity/keyset--entityKeysetFeature",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/entity/keyset#storage-host-entity/keyset--entityKeysetFeature",
+      "to": "/en/docs/storage-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/storage-host",
+      "to": "/en/docs/storage-host/api/entity/keyset#storage-host-entity/keyset--entityKeysetFeature",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/entity/keyset",
+      "to": "/en/docs/storage-host/api/entity/keyset#storage-host-entity/keyset--IEntityKeysetOwner",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/entity/keyset#storage-host-entity/keyset--IEntityKeysetOwner",
+      "to": "/en/docs/storage-host/api/entity/keyset",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/storage-host/api/entity/keyset#storage-host-entity/keyset--IEntityKeysetOwner",
+      "to": "/en/docs/storage-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/storage-host/getting-started",
+      "to": "/en/docs/storage-host/api/entity/keyset#storage-host-entity/keyset--IEntityKeysetOwner",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/entity/keyset#storage-host-entity/keyset--IEntityKeysetOwner",
+      "to": "/en/docs/storage-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/storage-host",
+      "to": "/en/docs/storage-host/api/entity/keyset#storage-host-entity/keyset--IEntityKeysetOwner",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity/keyset",
+      "to": "/zh/docs/storage-host/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/zh/docs/storage-host/getting-started",
+      "to": "/zh/docs/storage-host/api/entity/keyset",
+      "type": "guide-api"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity/keyset",
+      "to": "/zh/docs/storage-host",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/zh/docs/storage-host",
+      "to": "/zh/docs/storage-host/api/entity/keyset",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity/keyset",
+      "to": "/zh/docs/storage-host/api/entity/keyset#storage-host-entity/keyset--entityKeysetFeature",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity/keyset#storage-host-entity/keyset--entityKeysetFeature",
+      "to": "/zh/docs/storage-host/api/entity/keyset",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity/keyset#storage-host-entity/keyset--entityKeysetFeature",
+      "to": "/zh/docs/storage-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/storage-host/getting-started",
+      "to": "/zh/docs/storage-host/api/entity/keyset#storage-host-entity/keyset--entityKeysetFeature",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity/keyset#storage-host-entity/keyset--entityKeysetFeature",
+      "to": "/zh/docs/storage-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/storage-host",
+      "to": "/zh/docs/storage-host/api/entity/keyset#storage-host-entity/keyset--entityKeysetFeature",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity/keyset",
+      "to": "/zh/docs/storage-host/api/entity/keyset#storage-host-entity/keyset--IEntityKeysetOwner",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity/keyset#storage-host-entity/keyset--IEntityKeysetOwner",
+      "to": "/zh/docs/storage-host/api/entity/keyset",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity/keyset#storage-host-entity/keyset--IEntityKeysetOwner",
+      "to": "/zh/docs/storage-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/storage-host/getting-started",
+      "to": "/zh/docs/storage-host/api/entity/keyset#storage-host-entity/keyset--IEntityKeysetOwner",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity/keyset#storage-host-entity/keyset--IEntityKeysetOwner",
+      "to": "/zh/docs/storage-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/storage-host",
+      "to": "/zh/docs/storage-host/api/entity/keyset#storage-host-entity/keyset--IEntityKeysetOwner",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/entity/migration",
+      "to": "/en/docs/storage-host/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/en/docs/storage-host/getting-started",
+      "to": "/en/docs/storage-host/api/entity/migration",
+      "type": "guide-api"
+    },
+    {
+      "from": "/en/docs/storage-host/api/entity/migration",
+      "to": "/en/docs/storage-host",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/en/docs/storage-host",
+      "to": "/en/docs/storage-host/api/entity/migration",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/en/docs/storage-host/api/entity/migration",
+      "to": "/en/docs/storage-host/api/entity/migration#storage-host-entity/migration--entityMigrationFeature",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/entity/migration#storage-host-entity/migration--entityMigrationFeature",
+      "to": "/en/docs/storage-host/api/entity/migration",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/storage-host/api/entity/migration#storage-host-entity/migration--entityMigrationFeature",
+      "to": "/en/docs/storage-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/storage-host/getting-started",
+      "to": "/en/docs/storage-host/api/entity/migration#storage-host-entity/migration--entityMigrationFeature",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/entity/migration#storage-host-entity/migration--entityMigrationFeature",
+      "to": "/en/docs/storage-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/storage-host",
+      "to": "/en/docs/storage-host/api/entity/migration#storage-host-entity/migration--entityMigrationFeature",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity/migration",
+      "to": "/zh/docs/storage-host/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/zh/docs/storage-host/getting-started",
+      "to": "/zh/docs/storage-host/api/entity/migration",
+      "type": "guide-api"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity/migration",
+      "to": "/zh/docs/storage-host",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/zh/docs/storage-host",
+      "to": "/zh/docs/storage-host/api/entity/migration",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity/migration",
+      "to": "/zh/docs/storage-host/api/entity/migration#storage-host-entity/migration--entityMigrationFeature",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity/migration#storage-host-entity/migration--entityMigrationFeature",
+      "to": "/zh/docs/storage-host/api/entity/migration",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity/migration#storage-host-entity/migration--entityMigrationFeature",
+      "to": "/zh/docs/storage-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/storage-host/getting-started",
+      "to": "/zh/docs/storage-host/api/entity/migration#storage-host-entity/migration--entityMigrationFeature",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity/migration#storage-host-entity/migration--entityMigrationFeature",
+      "to": "/zh/docs/storage-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/storage-host",
+      "to": "/zh/docs/storage-host/api/entity/migration#storage-host-entity/migration--entityMigrationFeature",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/entity/query",
+      "to": "/en/docs/storage-host/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/en/docs/storage-host/getting-started",
+      "to": "/en/docs/storage-host/api/entity/query",
+      "type": "guide-api"
+    },
+    {
+      "from": "/en/docs/storage-host/api/entity/query",
+      "to": "/en/docs/storage-host",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/en/docs/storage-host",
+      "to": "/en/docs/storage-host/api/entity/query",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/en/docs/storage-host/api/entity/query",
+      "to": "/en/docs/storage-host/api/entity/query#storage-host-entity/query--entityQueryFeature",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/entity/query#storage-host-entity/query--entityQueryFeature",
+      "to": "/en/docs/storage-host/api/entity/query",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/storage-host/api/entity/query#storage-host-entity/query--entityQueryFeature",
+      "to": "/en/docs/storage-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/storage-host/getting-started",
+      "to": "/en/docs/storage-host/api/entity/query#storage-host-entity/query--entityQueryFeature",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/entity/query#storage-host-entity/query--entityQueryFeature",
+      "to": "/en/docs/storage-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/storage-host",
+      "to": "/en/docs/storage-host/api/entity/query#storage-host-entity/query--entityQueryFeature",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity/query",
+      "to": "/zh/docs/storage-host/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/zh/docs/storage-host/getting-started",
+      "to": "/zh/docs/storage-host/api/entity/query",
+      "type": "guide-api"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity/query",
+      "to": "/zh/docs/storage-host",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/zh/docs/storage-host",
+      "to": "/zh/docs/storage-host/api/entity/query",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity/query",
+      "to": "/zh/docs/storage-host/api/entity/query#storage-host-entity/query--entityQueryFeature",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity/query#storage-host-entity/query--entityQueryFeature",
+      "to": "/zh/docs/storage-host/api/entity/query",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity/query#storage-host-entity/query--entityQueryFeature",
+      "to": "/zh/docs/storage-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/storage-host/getting-started",
+      "to": "/zh/docs/storage-host/api/entity/query#storage-host-entity/query--entityQueryFeature",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity/query#storage-host-entity/query--entityQueryFeature",
+      "to": "/zh/docs/storage-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/storage-host",
+      "to": "/zh/docs/storage-host/api/entity/query#storage-host-entity/query--entityQueryFeature",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/entity/unique",
+      "to": "/en/docs/storage-host/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/en/docs/storage-host/getting-started",
+      "to": "/en/docs/storage-host/api/entity/unique",
+      "type": "guide-api"
+    },
+    {
+      "from": "/en/docs/storage-host/api/entity/unique",
+      "to": "/en/docs/storage-host",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/en/docs/storage-host",
+      "to": "/en/docs/storage-host/api/entity/unique",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/en/docs/storage-host/api/entity/unique",
+      "to": "/en/docs/storage-host/api/entity/unique#storage-host-entity/unique--entityUniqueFeature",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/entity/unique#storage-host-entity/unique--entityUniqueFeature",
+      "to": "/en/docs/storage-host/api/entity/unique",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/storage-host/api/entity/unique#storage-host-entity/unique--entityUniqueFeature",
+      "to": "/en/docs/storage-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/storage-host/getting-started",
+      "to": "/en/docs/storage-host/api/entity/unique#storage-host-entity/unique--entityUniqueFeature",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/entity/unique#storage-host-entity/unique--entityUniqueFeature",
+      "to": "/en/docs/storage-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/storage-host",
+      "to": "/en/docs/storage-host/api/entity/unique#storage-host-entity/unique--entityUniqueFeature",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity/unique",
+      "to": "/zh/docs/storage-host/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/zh/docs/storage-host/getting-started",
+      "to": "/zh/docs/storage-host/api/entity/unique",
+      "type": "guide-api"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity/unique",
+      "to": "/zh/docs/storage-host",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/zh/docs/storage-host",
+      "to": "/zh/docs/storage-host/api/entity/unique",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity/unique",
+      "to": "/zh/docs/storage-host/api/entity/unique#storage-host-entity/unique--entityUniqueFeature",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity/unique#storage-host-entity/unique--entityUniqueFeature",
+      "to": "/zh/docs/storage-host/api/entity/unique",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity/unique#storage-host-entity/unique--entityUniqueFeature",
+      "to": "/zh/docs/storage-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/storage-host/getting-started",
+      "to": "/zh/docs/storage-host/api/entity/unique#storage-host-entity/unique--entityUniqueFeature",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/entity/unique#storage-host-entity/unique--entityUniqueFeature",
+      "to": "/zh/docs/storage-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/storage-host",
+      "to": "/zh/docs/storage-host/api/entity/unique#storage-host-entity/unique--entityUniqueFeature",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/features/memory-change-feed",
+      "to": "/en/docs/storage-host/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/en/docs/storage-host/getting-started",
+      "to": "/en/docs/storage-host/api/features/memory-change-feed",
+      "type": "guide-api"
+    },
+    {
+      "from": "/en/docs/storage-host/api/features/memory-change-feed",
+      "to": "/en/docs/storage-host",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/en/docs/storage-host",
+      "to": "/en/docs/storage-host/api/features/memory-change-feed",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/en/docs/storage-host/api/features/memory-change-feed",
+      "to": "/en/docs/storage-host/api/features/memory-change-feed#storage-host-features/memory-change-feed--memoryChangeFeedFeature",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/features/memory-change-feed#storage-host-features/memory-change-feed--memoryChangeFeedFeature",
+      "to": "/en/docs/storage-host/api/features/memory-change-feed",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/storage-host/api/features/memory-change-feed#storage-host-features/memory-change-feed--memoryChangeFeedFeature",
+      "to": "/en/docs/storage-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/storage-host/getting-started",
+      "to": "/en/docs/storage-host/api/features/memory-change-feed#storage-host-features/memory-change-feed--memoryChangeFeedFeature",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/features/memory-change-feed#storage-host-features/memory-change-feed--memoryChangeFeedFeature",
+      "to": "/en/docs/storage-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/storage-host",
+      "to": "/en/docs/storage-host/api/features/memory-change-feed#storage-host-features/memory-change-feed--memoryChangeFeedFeature",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/features/memory-change-feed",
+      "to": "/zh/docs/storage-host/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/zh/docs/storage-host/getting-started",
+      "to": "/zh/docs/storage-host/api/features/memory-change-feed",
+      "type": "guide-api"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/features/memory-change-feed",
+      "to": "/zh/docs/storage-host",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/zh/docs/storage-host",
+      "to": "/zh/docs/storage-host/api/features/memory-change-feed",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/features/memory-change-feed",
+      "to": "/zh/docs/storage-host/api/features/memory-change-feed#storage-host-features/memory-change-feed--memoryChangeFeedFeature",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/features/memory-change-feed#storage-host-features/memory-change-feed--memoryChangeFeedFeature",
+      "to": "/zh/docs/storage-host/api/features/memory-change-feed",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/features/memory-change-feed#storage-host-features/memory-change-feed--memoryChangeFeedFeature",
+      "to": "/zh/docs/storage-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/storage-host/getting-started",
+      "to": "/zh/docs/storage-host/api/features/memory-change-feed#storage-host-features/memory-change-feed--memoryChangeFeedFeature",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/features/memory-change-feed#storage-host-features/memory-change-feed--memoryChangeFeedFeature",
+      "to": "/zh/docs/storage-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/storage-host",
+      "to": "/zh/docs/storage-host/api/features/memory-change-feed#storage-host-features/memory-change-feed--memoryChangeFeedFeature",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/features/memory-notifications",
+      "to": "/en/docs/storage-host/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/en/docs/storage-host/getting-started",
+      "to": "/en/docs/storage-host/api/features/memory-notifications",
+      "type": "guide-api"
+    },
+    {
+      "from": "/en/docs/storage-host/api/features/memory-notifications",
+      "to": "/en/docs/storage-host",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/en/docs/storage-host",
+      "to": "/en/docs/storage-host/api/features/memory-notifications",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/en/docs/storage-host/api/features/memory-notifications",
+      "to": "/en/docs/storage-host/api/features/memory-notifications#storage-host-features/memory-notifications--memoryNotificationsFeature",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/features/memory-notifications#storage-host-features/memory-notifications--memoryNotificationsFeature",
+      "to": "/en/docs/storage-host/api/features/memory-notifications",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/storage-host/api/features/memory-notifications#storage-host-features/memory-notifications--memoryNotificationsFeature",
+      "to": "/en/docs/storage-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/storage-host/getting-started",
+      "to": "/en/docs/storage-host/api/features/memory-notifications#storage-host-features/memory-notifications--memoryNotificationsFeature",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/features/memory-notifications#storage-host-features/memory-notifications--memoryNotificationsFeature",
+      "to": "/en/docs/storage-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/storage-host",
+      "to": "/en/docs/storage-host/api/features/memory-notifications#storage-host-features/memory-notifications--memoryNotificationsFeature",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/features/memory-notifications",
+      "to": "/zh/docs/storage-host/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/zh/docs/storage-host/getting-started",
+      "to": "/zh/docs/storage-host/api/features/memory-notifications",
+      "type": "guide-api"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/features/memory-notifications",
+      "to": "/zh/docs/storage-host",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/zh/docs/storage-host",
+      "to": "/zh/docs/storage-host/api/features/memory-notifications",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/features/memory-notifications",
+      "to": "/zh/docs/storage-host/api/features/memory-notifications#storage-host-features/memory-notifications--memoryNotificationsFeature",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/features/memory-notifications#storage-host-features/memory-notifications--memoryNotificationsFeature",
+      "to": "/zh/docs/storage-host/api/features/memory-notifications",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/features/memory-notifications#storage-host-features/memory-notifications--memoryNotificationsFeature",
+      "to": "/zh/docs/storage-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/storage-host/getting-started",
+      "to": "/zh/docs/storage-host/api/features/memory-notifications#storage-host-features/memory-notifications--memoryNotificationsFeature",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/features/memory-notifications#storage-host-features/memory-notifications--memoryNotificationsFeature",
+      "to": "/zh/docs/storage-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/storage-host",
+      "to": "/zh/docs/storage-host/api/features/memory-notifications#storage-host-features/memory-notifications--memoryNotificationsFeature",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/journal",
+      "to": "/en/docs/storage-host/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/en/docs/storage-host/getting-started",
+      "to": "/en/docs/storage-host/api/journal",
+      "type": "guide-api"
+    },
+    {
+      "from": "/en/docs/storage-host/api/journal",
+      "to": "/en/docs/storage-host",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/en/docs/storage-host",
+      "to": "/en/docs/storage-host/api/journal",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/en/docs/storage-host/api/journal",
+      "to": "/en/docs/storage-host/api/journal#storage-host-journal--storageJournalPlugin",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/journal#storage-host-journal--storageJournalPlugin",
+      "to": "/en/docs/storage-host/api/journal",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/storage-host/api/journal#storage-host-journal--storageJournalPlugin",
+      "to": "/en/docs/storage-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/storage-host/getting-started",
+      "to": "/en/docs/storage-host/api/journal#storage-host-journal--storageJournalPlugin",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/journal#storage-host-journal--storageJournalPlugin",
+      "to": "/en/docs/storage-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/storage-host",
+      "to": "/en/docs/storage-host/api/journal#storage-host-journal--storageJournalPlugin",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/journal",
+      "to": "/en/docs/storage-host/api/journal#storage-host-journal--storageLogStore",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/journal#storage-host-journal--storageLogStore",
+      "to": "/en/docs/storage-host/api/journal",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/storage-host/api/journal#storage-host-journal--storageLogStore",
+      "to": "/en/docs/storage-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/storage-host/getting-started",
+      "to": "/en/docs/storage-host/api/journal#storage-host-journal--storageLogStore",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/journal#storage-host-journal--storageLogStore",
+      "to": "/en/docs/storage-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/storage-host",
+      "to": "/en/docs/storage-host/api/journal#storage-host-journal--storageLogStore",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/journal",
+      "to": "/zh/docs/storage-host/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/zh/docs/storage-host/getting-started",
+      "to": "/zh/docs/storage-host/api/journal",
+      "type": "guide-api"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/journal",
+      "to": "/zh/docs/storage-host",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/zh/docs/storage-host",
+      "to": "/zh/docs/storage-host/api/journal",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/journal",
+      "to": "/zh/docs/storage-host/api/journal#storage-host-journal--storageJournalPlugin",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/journal#storage-host-journal--storageJournalPlugin",
+      "to": "/zh/docs/storage-host/api/journal",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/journal#storage-host-journal--storageJournalPlugin",
+      "to": "/zh/docs/storage-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/storage-host/getting-started",
+      "to": "/zh/docs/storage-host/api/journal#storage-host-journal--storageJournalPlugin",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/journal#storage-host-journal--storageJournalPlugin",
+      "to": "/zh/docs/storage-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/storage-host",
+      "to": "/zh/docs/storage-host/api/journal#storage-host-journal--storageJournalPlugin",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/journal",
+      "to": "/zh/docs/storage-host/api/journal#storage-host-journal--storageLogStore",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/journal#storage-host-journal--storageLogStore",
+      "to": "/zh/docs/storage-host/api/journal",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/journal#storage-host-journal--storageLogStore",
+      "to": "/zh/docs/storage-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/storage-host/getting-started",
+      "to": "/zh/docs/storage-host/api/journal#storage-host-journal--storageLogStore",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/journal#storage-host-journal--storageLogStore",
+      "to": "/zh/docs/storage-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/storage-host",
+      "to": "/zh/docs/storage-host/api/journal#storage-host-journal--storageLogStore",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/vector/mmr",
+      "to": "/en/docs/storage-host/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/en/docs/storage-host/getting-started",
+      "to": "/en/docs/storage-host/api/vector/mmr",
+      "type": "guide-api"
+    },
+    {
+      "from": "/en/docs/storage-host/api/vector/mmr",
+      "to": "/en/docs/storage-host",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/en/docs/storage-host",
+      "to": "/en/docs/storage-host/api/vector/mmr",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/en/docs/storage-host/api/vector/mmr",
+      "to": "/en/docs/storage-host/api/vector/mmr#storage-host-vector/mmr--IStorageMmrOptions",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/vector/mmr#storage-host-vector/mmr--IStorageMmrOptions",
+      "to": "/en/docs/storage-host/api/vector/mmr",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/storage-host/api/vector/mmr#storage-host-vector/mmr--IStorageMmrOptions",
+      "to": "/en/docs/storage-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/storage-host/getting-started",
+      "to": "/en/docs/storage-host/api/vector/mmr#storage-host-vector/mmr--IStorageMmrOptions",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/vector/mmr#storage-host-vector/mmr--IStorageMmrOptions",
+      "to": "/en/docs/storage-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/storage-host",
+      "to": "/en/docs/storage-host/api/vector/mmr#storage-host-vector/mmr--IStorageMmrOptions",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/vector/mmr",
+      "to": "/en/docs/storage-host/api/vector/mmr#storage-host-vector/mmr--mmr",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/vector/mmr#storage-host-vector/mmr--mmr",
+      "to": "/en/docs/storage-host/api/vector/mmr",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/storage-host/api/vector/mmr#storage-host-vector/mmr--mmr",
+      "to": "/en/docs/storage-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/storage-host/getting-started",
+      "to": "/en/docs/storage-host/api/vector/mmr#storage-host-vector/mmr--mmr",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/storage-host/api/vector/mmr#storage-host-vector/mmr--mmr",
+      "to": "/en/docs/storage-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/storage-host",
+      "to": "/en/docs/storage-host/api/vector/mmr#storage-host-vector/mmr--mmr",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/vector/mmr",
+      "to": "/zh/docs/storage-host/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/zh/docs/storage-host/getting-started",
+      "to": "/zh/docs/storage-host/api/vector/mmr",
+      "type": "guide-api"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/vector/mmr",
+      "to": "/zh/docs/storage-host",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/zh/docs/storage-host",
+      "to": "/zh/docs/storage-host/api/vector/mmr",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/vector/mmr",
+      "to": "/zh/docs/storage-host/api/vector/mmr#storage-host-vector/mmr--IStorageMmrOptions",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/vector/mmr#storage-host-vector/mmr--IStorageMmrOptions",
+      "to": "/zh/docs/storage-host/api/vector/mmr",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/vector/mmr#storage-host-vector/mmr--IStorageMmrOptions",
+      "to": "/zh/docs/storage-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/storage-host/getting-started",
+      "to": "/zh/docs/storage-host/api/vector/mmr#storage-host-vector/mmr--IStorageMmrOptions",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/vector/mmr#storage-host-vector/mmr--IStorageMmrOptions",
+      "to": "/zh/docs/storage-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/storage-host",
+      "to": "/zh/docs/storage-host/api/vector/mmr#storage-host-vector/mmr--IStorageMmrOptions",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/vector/mmr",
+      "to": "/zh/docs/storage-host/api/vector/mmr#storage-host-vector/mmr--mmr",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/vector/mmr#storage-host-vector/mmr--mmr",
+      "to": "/zh/docs/storage-host/api/vector/mmr",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/vector/mmr#storage-host-vector/mmr--mmr",
+      "to": "/zh/docs/storage-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/storage-host/getting-started",
+      "to": "/zh/docs/storage-host/api/vector/mmr#storage-host-vector/mmr--mmr",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-host/api/vector/mmr#storage-host-vector/mmr--mmr",
+      "to": "/zh/docs/storage-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/storage-host",
+      "to": "/zh/docs/storage-host/api/vector/mmr#storage-host-vector/mmr--mmr",
       "type": "architecture-symbol"
     }
   ]

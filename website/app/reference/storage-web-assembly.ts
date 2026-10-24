@@ -46,81 +46,17 @@ const units = [
 ] as const
 /** Every Feature has a complete program exercising the capability it installs. */
 const examples: Readonly<Record<string, string>> = {
-  ttl: `import { createStorageHost } from '@migaia/storage-host'
-import { ttl } from '@migaia/storage-contract'
-import { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'
-import { indexedDbTtlFeature } from '@migaia/storage-web/features/indexed-db-ttl'
-
-await using host = await createStorageHost({ plugins: [indexedDbBackendPlugin(
-  { dbName: 'expiring-drafts' }, { ttl: indexedDbTtlFeature() }
-)] })
-const drafts = host.backend('indexed-db')
-await drafts.set('one', 'temporary')
-await drafts.use(ttl).expire({ channel: 'text', key: 'one' }, 0)
-console.log(await drafts.get('one'))`,
-  batch: `import { createStorageHost } from '@migaia/storage-host'
-import { kv } from '@migaia/storage-contract'
-import { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'
-import { indexedDbBatchFeature } from '@migaia/storage-web/features/indexed-db-batch'
-
-await using host = await createStorageHost({ plugins: [indexedDbBackendPlugin(
-  { dbName: 'draft-batches' }, { batch: indexedDbBatchFeature() }
-)] })
-const drafts = host.backend('indexed-db').use(kv)
-await drafts.setMany([{ key: 'one', value: 'first' }, { key: 'two', value: 'second' }])
-console.log(await drafts.getMany(['one', 'two']))`,
-  journal: `import { createStorageHost } from '@migaia/storage-host'
-import { storageJournalPlugin, storageLogStore } from '@migaia/storage-host/journal'
-import { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'
-import { indexedDbJournalFeature } from '@migaia/storage-web/features/indexed-db-journal'
-
-await using host = await createStorageHost({ plugins: [
-  storageJournalPlugin(), indexedDbBackendPlugin(
-    { dbName: 'draft-history' }, { journal: indexedDbJournalFeature() }
-  )
-] })
-await using history = await storageLogStore(host, 'indexed-db', { prefix: 'drafts' })
-await history.append([{ kind: 'draft.saved', payload: { id: 'one' } }])
-console.log(await history.lastSeq())`,
-  notifications: `import { createStorageHost } from '@migaia/storage-host'
-import { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'
-import { indexedDbNotificationsFeature } from '@migaia/storage-web/features/indexed-db-notifications'
-
-await using host = await createStorageHost({ plugins: [indexedDbBackendPlugin(
-  { dbName: 'draft-notifications' }, { notifications: indexedDbNotificationsFeature() }
-)] })
-const drafts = host.backend('indexed-db')
-const release = drafts.subscribeChanges(change => console.log(change.kind))
-await drafts.set('one', 'saved')
-release()`,
-  'change-feed': `import { createStorageHost } from '@migaia/storage-host'
-import { asChangeFeedStore } from '@migaia/storage-contract'
-import { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'
-import { indexedDbNotificationsFeature } from '@migaia/storage-web/features/indexed-db-notifications'
-import { indexedDbChangeFeedFeature } from '@migaia/storage-web/features/indexed-db-change-feed'
-
-await using host = await createStorageHost({ plugins: [indexedDbBackendPlugin(
-  { dbName: 'draft-changes' }, {
-    notifications: indexedDbNotificationsFeature(), changeFeed: indexedDbChangeFeedFeature()
-  }
-)] })
-const drafts = asChangeFeedStore(host.backend('indexed-db'))
-await using changes = drafts.watch('one')
-const next = changes.next()
-await drafts.set('one', 'saved')
-console.log((await next).value?.kind)`,
-  indexes: `import { createStorageHost } from '@migaia/storage-host'
-import { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'
-import { indexedDbIndexesFeature } from '@migaia/storage-web/features/indexed-db-indexes'
-
-await using host = await createStorageHost({ plugins: [indexedDbBackendPlugin(
-  { dbName: 'indexed-orders' }, { indexes: indexedDbIndexesFeature() }
-)] })
-const orders = host.backend('indexed-db')
-const handle = await orders.ensureRecordIndexes('orders', [
-  { name: 'status', unique: false, multiEntry: false, revision: 1 }
-])
-console.log((await orders.getRecordIndexReadiness(handle)).status)`
+  ttl: "import { createStorageHost } from '@migaia/storage-host'\nimport { ttl } from '@migaia/storage-contract'\nimport { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'\nimport { indexedDbTtlFeature } from '@migaia/storage-web/features/indexed-db-ttl'\n\nawait using host = await createStorageHost({\n  plugins: [\n    indexedDbBackendPlugin(\n      { dbName: 'expiring-drafts' },\n      { ttl: indexedDbTtlFeature() },\n    ),\n  ],\n})\nconst drafts = host.backend('indexed-db')\nawait drafts.set('one', 'temporary')\nawait drafts.use(ttl).expire({ channel: 'text', key: 'one' }, 0)\nconsole.log(await drafts.get('one'))",
+  batch:
+    "import { createStorageHost } from '@migaia/storage-host'\nimport { kv } from '@migaia/storage-contract'\nimport { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'\nimport { indexedDbBatchFeature } from '@migaia/storage-web/features/indexed-db-batch'\n\nawait using host = await createStorageHost({\n  plugins: [\n    indexedDbBackendPlugin(\n      { dbName: 'draft-batches' },\n      { batch: indexedDbBatchFeature() },\n    ),\n  ],\n})\nconst drafts = host.backend('indexed-db').use(kv)\nawait drafts.setMany([\n  { key: 'one', value: 'first' },\n  { key: 'two', value: 'second' },\n])\nconsole.log(await drafts.getMany(['one', 'two']))",
+  journal:
+    "import { createStorageHost } from '@migaia/storage-host'\nimport { storageJournalPlugin, storageLogStore } from '@migaia/storage-host/journal'\nimport { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'\nimport { indexedDbJournalFeature } from '@migaia/storage-web/features/indexed-db-journal'\n\nawait using host = await createStorageHost({\n  plugins: [\n    storageJournalPlugin(),\n    indexedDbBackendPlugin(\n      { dbName: 'draft-history' },\n      { journal: indexedDbJournalFeature() },\n    ),\n  ],\n})\nawait using history = await storageLogStore(host, 'indexed-db', { prefix: 'drafts' })\nawait history.append([{ kind: 'draft.saved', payload: { id: 'one' } }])\nconsole.log(await history.lastSeq())",
+  notifications:
+    "import { createStorageHost } from '@migaia/storage-host'\nimport { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'\nimport { indexedDbNotificationsFeature } from '@migaia/storage-web/features/indexed-db-notifications'\n\nawait using host = await createStorageHost({\n  plugins: [\n    indexedDbBackendPlugin(\n      { dbName: 'draft-notifications' },\n      { notifications: indexedDbNotificationsFeature() },\n    ),\n  ],\n})\nconst drafts = host.backend('indexed-db')\nconst release = drafts.subscribeChanges((change) => console.log(change.kind))\nawait drafts.set('one', 'saved')\nrelease()",
+  'change-feed':
+    "import { createStorageHost } from '@migaia/storage-host'\nimport { asChangeFeedStore } from '@migaia/storage-contract'\nimport { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'\nimport { indexedDbNotificationsFeature } from '@migaia/storage-web/features/indexed-db-notifications'\nimport { indexedDbChangeFeedFeature } from '@migaia/storage-web/features/indexed-db-change-feed'\n\nawait using host = await createStorageHost({\n  plugins: [\n    indexedDbBackendPlugin(\n      { dbName: 'draft-changes' },\n      {\n        notifications: indexedDbNotificationsFeature(),\n        changeFeed: indexedDbChangeFeedFeature(),\n      },\n    ),\n  ],\n})\nconst drafts = asChangeFeedStore(host.backend('indexed-db'))\nawait using changes = drafts.watch('one')\nconst next = changes.next()\nawait drafts.set('one', 'saved')\nconsole.log((await next).value?.kind)",
+  indexes:
+    "import { createStorageHost } from '@migaia/storage-host'\nimport { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'\nimport { indexedDbIndexesFeature } from '@migaia/storage-web/features/indexed-db-indexes'\n\nawait using host = await createStorageHost({\n  plugins: [\n    indexedDbBackendPlugin(\n      { dbName: 'indexed-orders' },\n      { indexes: indexedDbIndexesFeature() },\n    ),\n  ],\n})\nconst orders = host.backend('indexed-db')\nconst handle = await orders.ensureRecordIndexes('orders', [\n  { name: 'status', unique: false, multiEntry: false, revision: 1 },\n])\nconsole.log((await orders.getRecordIndexReadiness(handle)).status)"
 }
 /** Module descriptions identify the exact first factory imported by application code. */
 export const storageWebAssemblyModules: Readonly<Record<string, IModuleDoc>> = Object.fromEntries(

@@ -5,129 +5,32 @@ import { storageHostChangeIteratorOptions } from './storage-host-authoring.js'
 /** Keep each optional boundary's reader explanation beside its working assembly program. */
 const t = (en: string, zh: string): IText => ({ en, zh })
 /** Private logs need explicit runtime admission before an original backend opens a namespace. */
-export const explicitJournalExample = `import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
-import { storageJournalPlugin, storageLogStore } from '@migaia/storage-host/journal'
-
-await using host = await createStorageHost({
-  plugins: [storageJournalPlugin(), memoryBackendPlugin()]
-})
-await using history = await storageLogStore(host, 'memory', { prefix: 'orders' })
-await history.append([{ kind: 'order.saved', payload: { id: 'one' } }])
-console.log(await history.lastSeq())`
+export const explicitJournalExample =
+  "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { storageJournalPlugin, storageLogStore } from '@migaia/storage-host/journal'\n\nawait using host = await createStorageHost({\n  plugins: [storageJournalPlugin(), memoryBackendPlugin()],\n})\nawait using history = await storageLogStore(host, 'memory', { prefix: 'orders' })\nawait history.append([{ kind: 'order.saved', payload: { id: 'one' } }])\nconsole.log(await history.lastSeq())"
 /** A notification-only memory backend exposes subscriptions without allocating feed iterators. */
-const memoryNotificationsExample = `import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
-import { memoryNotificationsFeature } from '@migaia/storage-host/features/memory-notifications'
-
-await using host = await createStorageHost({ plugins: [memoryBackendPlugin(undefined, {
-  notifications: memoryNotificationsFeature()
-})] })
-const memory = host.backend('memory')
-const release = memory.subscribeChanges(change => console.log(change.kind))
-await memory.set('draft', 'saved')
-release()`
+const memoryNotificationsExample =
+  "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { memoryNotificationsFeature } from '@migaia/storage-host/features/memory-notifications'\n\nawait using host = await createStorageHost({\n  plugins: [\n    memoryBackendPlugin(undefined, {\n      notifications: memoryNotificationsFeature(),\n    }),\n  ],\n})\nconst memory = host.backend('memory')\nconst release = memory.subscribeChanges((change) => console.log(change.kind))\nawait memory.set('draft', 'saved')\nrelease()"
 /** Iterator ownership remains independent from the notification producer it consumes. */
-const memoryFeedExample = `import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
-import { memoryNotificationsFeature } from '@migaia/storage-host/features/memory-notifications'
-import { memoryChangeFeedFeature } from '@migaia/storage-host/features/memory-change-feed'
-
-await using host = await createStorageHost({ plugins: [memoryBackendPlugin(undefined, {
-  notifications: memoryNotificationsFeature(), changeFeed: memoryChangeFeedFeature()
-})] })
-const memory = host.backend('memory')
-await using changes = memory.watch('draft')
-const next = changes.next()
-await memory.set('draft', 'saved')
-console.log((await next).value?.kind)`
+const memoryFeedExample =
+  "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { memoryNotificationsFeature } from '@migaia/storage-host/features/memory-notifications'\nimport { memoryChangeFeedFeature } from '@migaia/storage-host/features/memory-change-feed'\n\nawait using host = await createStorageHost({\n  plugins: [\n    memoryBackendPlugin(undefined, {\n      notifications: memoryNotificationsFeature(),\n      changeFeed: memoryChangeFeedFeature(),\n    }),\n  ],\n})\nconst memory = host.backend('memory')\nawait using changes = memory.watch('draft')\nconst next = changes.next()\nawait memory.set('draft', 'saved')\nconsole.log((await next).value?.kind)"
 /** Backend authors can choose physical admission and cleanup without notification allocation. */
-const lifecycleExample = `import { createBackendLifecycleController } from '@migaia/storage-host/authoring/change-controller'
-
-const lifecycle = createBackendLifecycleController({ backend: 'application-cache' })
-const release = lifecycle.beginMutation()
-const closed = lifecycle.dispose()
-release()
-await closed`
+const lifecycleExample =
+  "import { createBackendLifecycleController } from '@migaia/storage-host/authoring/change-controller'\n\nconst lifecycle = createBackendLifecycleController({\n  backend: 'application-cache',\n  platform: { label: 'local' },\n  options: { namespace: 'drafts' },\n  origin: 'application-cache:one',\n  finalize: () => console.log('closed'),\n})\nconst release = lifecycle.beginMutation()\nconst closed = lifecycle.dispose()\nrelease()\nawait closed"
 /** The explicit notification factory composes the same physical lifecycle with one event channel. */
-const controllerExample = `import { createBackendChangeController } from '@migaia/storage-host/authoring/change-controller'
-
-const controller = createBackendChangeController({ backend: 'application-cache' })
-const release = controller.subscribe(change => console.log(change.kind))
-controller.publish({
-  orgId: '00000000-0000-0000-0000-000000000000',
-  channel: 'value', kind: 'put', keys: ['draft']
-})
-release()
-await controller.dispose()`
+const controllerExample =
+  "import { createBackendChangeController } from '@migaia/storage-host/authoring/change-controller'\n\nconst controller = createBackendChangeController({\n  backend: 'application-cache',\n  platform: { label: 'local' },\n  options: { namespace: 'drafts' },\n  origin: 'application-cache:one',\n  finalize: () => console.log('closed'),\n})\nconst release = controller.subscribe((change) => console.log(change.kind))\ncontroller.publish({\n  orgId: '00000000-0000-0000-0000-000000000000',\n  channel: 'value',\n  kind: 'put',\n  keys: ['draft'],\n})\nrelease()\nawait controller.dispose()"
 /** Entity examples assemble only operations exercised by their own business scenario. */
 const entityExamples: Readonly<Record<string, string>> = {
-  query: `import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
-import { defineEntity } from '@migaia/storage-host/entity'
-import { entityQueryFeature } from '@migaia/storage-host/entity/query'
-
-const orders = defineEntity<{ id: string; status: string }>()({
-  name: 'orders', key: 'id', features: [entityQueryFeature()]
-})
-await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
-const repository = orders.connect(host.backend('memory'))
-await repository.put({ id: 'one', status: 'paid' })
-console.log(await repository.query().where({ status: 'paid' }).all())`,
-  indexes: `import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
-import { defineEntity } from '@migaia/storage-host/entity'
-import { entityQueryFeature } from '@migaia/storage-host/entity/query'
-import { entityIndexesFeature } from '@migaia/storage-host/entity/indexes'
-
-type IOrder = { id: string; status: string }
-const orders = defineEntity<IOrder>()({
-  name: 'orders', key: 'id', features: [entityQueryFeature(), entityIndexesFeature()],
-  indexes: { status: { path: 'status' } }
-})
-await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
-const repository = orders.connect(host.backend('memory'))
-await repository.put({ id: 'one', status: 'paid' })
-console.log(await repository.query().index('status', 'paid').all())`,
-  unique: `import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
-import { defineEntity } from '@migaia/storage-host/entity'
-import { entityIndexesFeature } from '@migaia/storage-host/entity/indexes'
-import { entityUniqueFeature } from '@migaia/storage-host/entity/unique'
-
-type IUser = { id: string; email: string }
-const users = defineEntity<IUser>()({
-  name: 'users', key: 'id', features: [entityIndexesFeature(), entityUniqueFeature()],
-  indexes: { email: { path: 'email', unique: true } }
-})
-await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
-const repository = users.connect(host.backend('memory'))
-await repository.put({ id: 'ada', email: 'ada@example.com' })
-console.log(await repository.get('ada'))`,
-  migration: `import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
-import { defineEntity } from '@migaia/storage-host/entity'
-import { entityMigrationFeature } from '@migaia/storage-host/entity/migration'
-
-type IUser = { id: string; name: string }
-await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
-const store = host.backend('memory')
-await defineEntity<IUser>({ name: 'users', key: 'id' }).connect(store)
-  .put({ id: 'ada', name: 'Ada' })
-const users = defineEntity<IUser>()({
-  name: 'users', key: 'id', version: 2,
-  features: [entityMigrationFeature()], migrations: { 2: previous => previous }
-}).connect(store)
-await users.migrate()
-console.log(await users.get('ada'))`,
-  keyset: `import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
-import { defineEntity } from '@migaia/storage-host/entity'
-import { entityQueryFeature } from '@migaia/storage-host/entity/query'
-import { entityKeysetFeature } from '@migaia/storage-host/entity/keyset'
-
-const orders = defineEntity<{ id: string }>()({
-  name: 'orders', key: 'id', features: [entityQueryFeature(), entityKeysetFeature()]
-})
-await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
-const repository = orders.connect(host.backend('memory'))
-await repository.put({ id: 'one' })
-await repository.put({ id: 'two' })
-const first = await repository.query().page(1)
-console.log(first.items)
-if (first.next) console.log((await repository.query().after(first.next).page(1)).items)`
+  query:
+    "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { defineEntity } from '@migaia/storage-host/entity'\nimport { entityQueryFeature } from '@migaia/storage-host/entity/query'\n\nconst orders = defineEntity<{ id: string; status: string }>()({\n  name: 'orders',\n  key: 'id',\n  features: [entityQueryFeature()],\n})\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })\nconst repository = orders.connect(host.backend('memory'))\nawait repository.put({ id: 'one', status: 'paid' })\nconsole.log(await repository.query().where({ status: 'paid' }).all())",
+  indexes:
+    "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { defineEntity } from '@migaia/storage-host/entity'\nimport { entityQueryFeature } from '@migaia/storage-host/entity/query'\nimport { entityIndexesFeature } from '@migaia/storage-host/entity/indexes'\n\ntype IOrder = { id: string; status: string }\nconst orders = defineEntity<IOrder>()({\n  name: 'orders',\n  key: 'id',\n  features: [entityQueryFeature(), entityIndexesFeature()],\n  indexes: { status: { path: 'status' } },\n})\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })\nconst repository = orders.connect(host.backend('memory'))\nawait repository.put({ id: 'one', status: 'paid' })\nconsole.log(await repository.query().index('status', 'paid').all())",
+  unique:
+    "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { defineEntity } from '@migaia/storage-host/entity'\nimport { entityUniqueFeature } from '@migaia/storage-host/entity/unique'\n\ntype IUser = { id: string; email: string }\nconst users = defineEntity<IUser>()({\n  name: 'users',\n  key: 'id',\n  features: [entityUniqueFeature()],\n  indexes: { email: { path: 'email', unique: true } },\n})\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })\nconst repository = users.connect(host.backend('memory'))\nawait repository.put({ id: 'ada', email: 'ada@example.com' })\nconsole.log(await repository.get('ada'))",
+  migration:
+    "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { defineEntity } from '@migaia/storage-host/entity'\nimport { entityMigrationFeature } from '@migaia/storage-host/entity/migration'\n\ntype IUser = { id: string; name: string }\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })\nconst store = host.backend('memory')\nawait defineEntity<IUser>({ name: 'users', key: 'id' })\n  .connect(store)\n  .put({ id: 'ada', name: 'Ada' })\nconst users = defineEntity<IUser>()({\n  name: 'users',\n  key: 'id',\n  version: 2,\n  features: [entityMigrationFeature()],\n  migrations: { 2: (previous) => previous },\n}).connect(store)\nawait users.migrate()\nconsole.log(await users.get('ada'))",
+  keyset:
+    "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { defineEntity } from '@migaia/storage-host/entity'\nimport { entityQueryFeature } from '@migaia/storage-host/entity/query'\nimport { entityKeysetFeature } from '@migaia/storage-host/entity/keyset'\n\nconst orders = defineEntity<{ id: string }>()({\n  name: 'orders',\n  key: 'id',\n  features: [entityQueryFeature(), entityKeysetFeature()],\n})\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })\nconst repository = orders.connect(host.backend('memory'))\nawait repository.put({ id: 'one' })\nawait repository.put({ id: 'two' })\nconst first = await repository.query().page(1)\nconsole.log(first.items)\nif (first.next) console.log((await repository.query().after(first.next).page(1)).items)"
 }
 /** Each optional entity entry describes its own concrete work and omitted-call failure. */
 const entityUnits = [
@@ -203,7 +106,7 @@ export const storageHostAssemblyModules: Readonly<Record<string, IModuleDoc>> = 
   'authoring/change-controller': {
     summary: t(
       'Choose createBackendLifecycleController for physical lifetime alone, or explicitly import createBackendChangeController for notifications.',
-      '物理生命周期使用 `createBackendLifecycleController`，通知使用显式导入的 `createBackendChangeController`。'
+      '物理资源的准入、排空与清理使用 `createBackendLifecycleController`，需要发布已提交变更时才显式导入 `createBackendChangeController`。'
     ),
     example: lifecycleExample
   },
@@ -217,7 +120,7 @@ export const storageHostAssemblyModules: Readonly<Record<string, IModuleDoc>> = 
   'features/memory-notifications': {
     summary: t(
       'Select memoryNotificationsFeature before backend construction to publish committed changes without enabling watch.',
-      '在后端构造前选择 `memoryNotificationsFeature`，发布已提交变更但不启用 `watch`。'
+      '在内存后端构造前选择 `memoryNotificationsFeature`，让订阅者接收已提交变更；此选择本身不启用监听迭代器。'
     ),
     example: memoryNotificationsExample
   },
@@ -271,6 +174,27 @@ export const storageHostAssemblySymbols: Readonly<Record<string, ISymbolDoc>> = 
       '构造物理存活检查、修改排空与幂等终结，不分配通知通道。'
     ),
     options: 'IBackendChangeControllerOptions',
+    params: {
+      input: t(
+        'Backend construction facts supplied by the physical owner, including its original finalizer.',
+        '由物理拥有者提供的后端构造事实，包括原清理回调。'
+      )
+    },
+    optionCases: [
+      {
+        title: t('Retain physical lifetime and identity', '保留物理生命周期与身份'),
+        problem: t(
+          'Drain accepted mutations while retaining the caller-selected native snapshot.',
+          '排空已接受修改，并保留调用方选择的原生构造快照。'
+        ),
+        covers: ['backend', 'platform', 'options', 'origin', 'finalize'],
+        example: lifecycleExample,
+        result: t(
+          'The original finalizer runs once after accepted work drains.',
+          '已接受工作排空后，原清理回调只执行一次。'
+        )
+      }
+    ],
     returns: t(
       'The original physical lifecycle controller with stable origin and construction snapshot.',
       '返回带稳定来源与构造快照的物理生命周期控制器。'
@@ -284,6 +208,27 @@ export const storageHostAssemblySymbols: Readonly<Record<string, ISymbolDoc>> = 
       '在同一物理生命周期拥有者上显式构造已提交变更发布与订阅；后端作者将此工厂传给 `core.createChangeController`。'
     ),
     options: 'IBackendChangeControllerOptions',
+    params: {
+      input: t(
+        'Backend construction facts supplied by the physical owner, including its original finalizer.',
+        '由物理拥有者提供的后端构造事实，包括原清理回调。'
+      )
+    },
+    optionCases: [
+      {
+        title: t('Retain notification origin and cleanup', '保留通知来源与清理语义'),
+        problem: t(
+          'Publish committed changes while retaining the caller-selected native snapshot.',
+          '发布已提交变更，并保留调用方选择的原生构造快照。'
+        ),
+        covers: ['backend', 'platform', 'options', 'origin', 'finalize'],
+        example: controllerExample,
+        result: t(
+          'Publications retain the selected origin and cleanup runs once.',
+          '发布保留所选来源，原生清理只执行一次。'
+        )
+      }
+    ],
     returns: t(
       'A controller with the original event channel, physical admission and shared disposal completion.',
       '返回保留原事件通道、物理准入及共享关闭完成结果的控制器。'
@@ -341,7 +286,39 @@ export const storageHostAssemblyTypes: Readonly<Record<string, ITypeDoc>> = {
     ),
     members: storageHostChangeIteratorOptions
   },
+  IEntityKeysetOwner: {
+    summary: t(
+      'The selected keyset assembly delegates bounded page work to the original query owner.',
+      '所选分页装配将有界页面工作交给原查询拥有者执行。'
+    ),
+    scenarios: [
+      t('Continue an entity page using its existing cursor.', '使用已有游标继续读取实体分页。')
+    ],
+    example: entityExamples.keyset,
+    members: {
+      run: {
+        summary: t(
+          'Invoke the admitted page operation without replacing its cursor or failure.',
+          '调用已准入的原分页操作，不替换其游标或失败。'
+        ),
+        params: {
+          invoke: t(
+            'Original query operation supplied by the connected repository.',
+            '已连接仓储提供的原查询操作。'
+          )
+        },
+        returns: t('The exact result of the original operation.', '返回该原操作的准确结果。'),
+        example: entityExamples.keyset
+      }
+    }
+  },
   IEntityFeature: {
+    scenarios: [
+      t(
+        'Select optional operations before connecting a reusable entity definition.',
+        '连接可复用实体定义之前，选择实际需要的可选操作。'
+      )
+    ],
     summary: t(
       'A selected entity assembly definition returned by a public feature factory; each connection receives its own capability owner.',
       '由公开特性工厂返回的实体装配定义；每次连接获得自己的能力拥有者。'

@@ -52,7 +52,7 @@ try {
 
 /** Native Blob requests share the same actual record transaction and original host cleanup. */
 const blobExample =
-  "import { createStorageHost } from '@migaia/storage-host'\nimport { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'\nimport { indexedDbBlobFeature } from '@migaia/storage-web/features/blobs'\n\nconst host = await createStorageHost({\n  plugins: [indexedDbBackendPlugin(\n    { dbName: 'attachments' }, { blobs: indexedDbBlobFeature() }\n  )]\n})\ntry {\n  const store = host.backend('indexed-db')\n  await store.transaction(async (scope) => {\n    await scope.api.blobs.put('avatar', new Blob(['avatar bytes'], { type: 'text/plain' }))\n    await scope.putRecord({ attachment: 'avatar' }, 'profile')\n  })\n  console.log(await (await store.api.blobs.get('avatar'))?.text())\n} finally {\n  await host.dispose()\n}"
+  "import { createStorageHost } from '@migaia/storage-host'\nimport { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'\nimport { indexedDbBlobFeature } from '@migaia/storage-web/features/blobs'\n\nconst host = await createStorageHost({\n  plugins: [\n    indexedDbBackendPlugin(\n      { dbName: 'attachments' },\n      { blobs: indexedDbBlobFeature() },\n    ),\n  ],\n})\ntry {\n  const store = host.backend('indexed-db')\n  await store.transaction(async (scope) => {\n    await scope.api.blobs.put(\n      'avatar',\n      new Blob(['avatar bytes'], { type: 'text/plain' }),\n    )\n    await scope.putRecord({ attachment: 'avatar' }, 'profile')\n  })\n  console.log(await (await store.api.blobs.get('avatar'))?.text())\n} finally {\n  await host.dispose()\n}"
 
 /** Backend definitions provide installation recipes rather than independently owned stores. */
 const backends = [
@@ -139,7 +139,7 @@ try {
 
 /** Live queries add no host facade and retain the caller's Runtime ownership. */
 const liveExample =
-  "import { indexedDbNotificationsFeature } from '@migaia/storage-web/features/indexed-db-notifications'\nimport { indexedDbChangeFeedFeature } from '@migaia/storage-web/features/indexed-db-change-feed'\nimport { createRuntime } from '@migaia/reactive'\nimport { records } from '@migaia/storage-contract'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { indexedDbBackendPlugin, indexedDbBackendKind } from '@migaia/storage-web/indexed-db'\nimport { reactiveFeature } from '@migaia/storage-web/features/reactive'\n\nconst runtime = createRuntime()\nconst host = await createStorageHost({ plugins: [indexedDbBackendPlugin(\n  { dbName: 'users' }, {notifications: indexedDbNotificationsFeature(), changeFeed: indexedDbChangeFeedFeature(),  reactive: reactiveFeature(indexedDbBackendKind) }\n)] })\ntry {\n  const query = host.backend('indexed-db').use(records).query().live({ runtime })\n  try {\n    await query.ready\n    console.log(query.state.value)\n  } finally {\n    await query.dispose()\n  }\n} finally {\n  await host.dispose()\n}"
+  "import { indexedDbNotificationsFeature } from '@migaia/storage-web/features/indexed-db-notifications'\nimport { createRuntime } from '@migaia/reactive'\nimport { records } from '@migaia/storage-contract'\nimport { createStorageHost } from '@migaia/storage-host'\nimport {\n  indexedDbBackendPlugin,\n  indexedDbBackendKind,\n} from '@migaia/storage-web/indexed-db'\nimport { reactiveFeature } from '@migaia/storage-web/features/reactive'\n\nconst runtime = createRuntime()\nconst host = await createStorageHost({\n  plugins: [\n    indexedDbBackendPlugin(\n      { dbName: 'users' },\n      {\n        notifications: indexedDbNotificationsFeature(),\n        reactive: reactiveFeature(indexedDbBackendKind),\n      },\n    ),\n  ],\n})\ntry {\n  const query = host.backend('indexed-db').use(records).query().live({ runtime })\n  try {\n    await query.ready\n    console.log(query.state.value)\n  } finally {\n    await query.dispose()\n  }\n} finally {\n  await host.dispose()\n}"
 
 /** Explain browser-specific options, leaving native host/context contracts with their owners. */
 const webStorageFields = (storage: string): Readonly<Record<string, IMemberDoc>> => ({
@@ -1466,10 +1466,6 @@ console.error(error.source, error.code)`,
         liveQueryFailed: t(
           'A live-query extension callback failed and its original cause is retained.',
           '实时查询扩展回调失败，并保留对应原始原因。'
-        ),
-        indexedDbFeatureNotInstalled: t(
-          'Install the IndexedDB Feature named in the diagnostic before using the optional operation; base reads and writes remain available.',
-          '调用可选操作之前安装诊断指出的索引数据库特性，基础读写仍可用。'
         ),
         backendDisposeFailed: t(
           'Direct backend cleanup failed and is reported through the storage boundary.',
