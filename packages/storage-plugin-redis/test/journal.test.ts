@@ -13,7 +13,7 @@ import {
 import { walkErrorCauses } from '@migaia/utils/error'
 import { deferred } from '@migaia/utils/promise'
 import { createStorageHost, createOrgId } from '@migaia/storage-host'
-import { storageLogStore } from '@migaia/storage-host/journal'
+import { storageJournalPlugin, storageLogStore } from '@migaia/storage-host/journal'
 import { encodeFlatStorageKey } from '@migaia/storage-host/authoring/backend'
 import { ConcurrencyPolicy, lockKey } from '@migaia/storage-host/authoring/concurrency'
 import { kv, ttl, vector } from '@migaia/storage-contract'
@@ -57,8 +57,14 @@ for (const service of [
       const prefix = crypto.randomUUID(),
         org = createOrgId()
       namespaces.push(prefix)
-      const first = await createStorageHost({ org, plugins: [backend({ driver, prefix })] }),
-        second = await createStorageHost({ org, plugins: [backend({ driver, prefix })] })
+      const first = await createStorageHost({
+          org,
+          plugins: [storageJournalPlugin(), backend({ driver, prefix })]
+        }),
+        second = await createStorageHost({
+          org,
+          plugins: [storageJournalPlugin(), backend({ driver, prefix })]
+        })
       await Promise.all([first.detect(), second.detect()])
       const opened: ILogStore[] = []
       try {
@@ -166,6 +172,7 @@ for (const service of [
       })
       const host = await createStorageHost({
         plugins: [
+          storageJournalPlugin(),
           redisBackendPlugin(
             { driver, prefix },
             {
@@ -275,7 +282,7 @@ for (const service of [
         logger = createJournalLogger()
       namespaces.push(prefix)
       const host = await createStorageHost({
-        plugins: [redisBackendPlugin({ driver, prefix })] as const,
+        plugins: [storageJournalPlugin(), redisBackendPlugin({ driver, prefix })] as const,
         journal: { logger, namespace: 'ordered', binlogValues: true }
       })
       try {
@@ -346,7 +353,7 @@ for (const service of [
       namespaces.push(prefix)
       let pause = false
       const host = await createStorageHost({
-        plugins: [redisBackendPlugin({ driver, prefix })] as const,
+        plugins: [storageJournalPlugin(), redisBackendPlugin({ driver, prefix })] as const,
         journal: ({ orgId }) => {
           const logger = new Logger({
             ...loggerOptions,
@@ -468,6 +475,7 @@ for (const service of [
         const options = { logger, namespace: 'vector', binlogValues: true }
         const host = await createStorageHost({
           plugins: [
+            storageJournalPlugin(),
             redisBackendPlugin({ driver, prefix }, { search: rediSearchVectorFeature() })
           ] as const,
           journal: options
@@ -496,7 +504,7 @@ for (const service of [
           await host.dispose()
         }
         const reopened = await createStorageHost({
-          plugins: [redisBackendPlugin({ driver, prefix })] as const,
+          plugins: [storageJournalPlugin(), redisBackendPlugin({ driver, prefix })] as const,
           journal: options
         })
         try {
@@ -556,7 +564,10 @@ for (const service of [
         }
         const host = await createStorageHost({
           org,
-          plugins: [redisBackendPlugin({ driver: injected, prefix })] as const,
+          plugins: [
+            storageJournalPlugin(),
+            redisBackendPlugin({ driver: injected, prefix })
+          ] as const,
           journal: { logger, namespace: 'application' }
         })
         try {
@@ -602,6 +613,7 @@ for (const service of [
         try {
           const failure = await createStorageHost({
             plugins: [
+              storageJournalPlugin(),
               redisBackendPlugin({ driver: observed, prefix: crypto.randomUUID() })
             ] as const,
             journal: {
