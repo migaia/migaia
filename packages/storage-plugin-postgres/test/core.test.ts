@@ -185,3 +185,65 @@ it('uses pipeline input for the original scoped text get', async () => {
   expect(await store.get('original')).toBe('old')
   expect(await store.transaction((scope) => scope.get('original'))).toBe('new')
 })
+
+/** Native statement boundaries prove expiry both before result selection and before commit. */
+for (const mode of ['between-statements', 'before-commit'] as const) {
+  it('respects record query expiry ' + mode, async () => {
+    const pool = new Pool({ connectionString })
+    const native = pgDriver(pool)
+    const prefix = 'pg_record_expiry_' + randomUUID().slice(0, 8),
+      org = randomUUID()
+    let armed = false
+    const driver = {
+      ...native,
+      connect: async (...args: Parameters<typeof native.connect>) => {
+        const client = await native.connect(...args)
+        return {
+          ...client,
+          query: async (...query: Parameters<typeof client.query>) => {
+            const boundary =
+              armed &&
+              query[0].startsWith('DELETE FROM') &&
+              query[0].includes('_records') &&
+              query[0].includes('expires_at')
+            if (boundary) {
+              armed = false
+              await client.query(
+                'UPDATE ' +
+                  prefix +
+                  "_records SET expires_at=clock_timestamp()+interval '50 millisecond' WHERE org_id=$1",
+                [org]
+              )
+            }
+            const result = await client.query(...query)
+            if (boundary && mode === 'between-statements')
+              await client.query('SELECT pg_sleep(0.075)', [])
+            return result
+          }
+        }
+      }
+    }
+    const host = await createStorageHost({
+      org,
+      plugins: [postgresBackendPlugin({ driver, prefix })] as const
+    })
+    onTestFinished(async () => {
+      await host.dispose()
+      await pool.end()
+    })
+    const store = host.backend('postgres')
+    await store.putRecord({ live: true }, 'point')
+    armed = true
+    if (mode === 'between-statements') expect(await store.use(records).query().all()).toEqual([])
+    else
+      await expect(
+        store.transaction(
+          async (scope) => {
+            expect(await scope.use(records).query().all()).toEqual([{ live: true }])
+            await scope.sql`SELECT pg_sleep(0.075)`.get()
+          },
+          { concurrency: ConcurrencyPolicy.optimistic({ retries: 0 }) }
+        )
+      ).rejects.toMatchObject({ code: 'WRITE_CONFLICT' })
+  })
+}

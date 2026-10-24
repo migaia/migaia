@@ -345,10 +345,11 @@ export async function scanPgRecords<T>(
   }
   const rows = (
     await state.client.query(
-      'SELECT key,value FROM ' +
+      'SELECT key,value,extract(epoch FROM expires_at)*1000 AS deadline FROM ' +
         tables.record +
         ' WHERE ' +
         filter.text +
+        ' AND (expires_at IS NULL OR expires_at>clock_timestamp())' +
         ' ORDER BY key LIMIT $' +
         (filter.params.length + 1),
       [...filter.params, size],
@@ -359,6 +360,8 @@ export async function scanPgRecords<T>(
   for (const row of rows) {
     const key = pgRecordKey(row.key)
     await observePgRevision(state, tables, 'record', key)
+    if (row.deadline !== null && row.deadline !== undefined)
+      state.expirations.set(pgIdentity('record', key), Number(row.deadline))
     result.push({ key, bytes: pgKey(key).bytes, value: state.codecs.decodeRecord<T>(row.value) })
   }
   return result
