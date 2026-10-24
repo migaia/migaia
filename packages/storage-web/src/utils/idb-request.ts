@@ -78,17 +78,6 @@ export const installIdbTransactionHandlers = (
   transaction.onabort = onAbort
 }
 
-/** Observe physical rollback when a transaction's property-handler installation failed. */
-export function afterIdbTransactionAbort(transaction: IDBTransaction): Promise<void> {
-  return new Promise<void>((resolve, reject) => {
-    try {
-      transaction.addEventListener('abort', () => resolve(), { once: true })
-    } catch (cause) {
-      reject(normalizeIdbRequestFailure(cause))
-    }
-  })
-}
-
 /** Connect the native database-open lifecycle before its first asynchronous event. */
 export const installIdbOpenRequestHandlers = (
   request: IDBOpenDBRequest,

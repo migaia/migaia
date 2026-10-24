@@ -91,10 +91,65 @@ export function isIndexedDbJournalRevision(key: IDBValidKey, namespace: string):
   return Array.isArray(key) && key.length === 4 && key[0] === namespace && key[1] === revisionTag
 }
 
+/** Image ports reuse one native attempt's ordered revisions and journal history. */
+type IIndexedDbImageAccess = {
+  mutate<R>(
+    channel: IIndexedDbImageChannel,
+    key: IStorageKey,
+    present: boolean,
+    value: unknown,
+    run: () => Promise<R>
+  ): Promise<R>
+  clear<R>(
+    channel: IIndexedDbImageChannel,
+    keys: readonly IStorageKey[],
+    run: () => Promise<R>
+  ): Promise<R>
+  deadline<R>(
+    channel: IIndexedDbImageChannel,
+    key: IStorageKey,
+    before: number | undefined,
+    after: number | undefined,
+    run: () => Promise<R>
+  ): Promise<R>
+  revision(channel: IIndexedDbImageChannel, key: IStorageKey): Promise<IIndexedDbImageRevision>
+  changes(): readonly IStorageJournalChange[]
+}
+
 /**
  * Ordered images and complete revisions borrow one original native transaction. Every contract
  * mutation advances its point revision; only explicitly selected attempts allocate image history.
  */
+
+/** One native images snapshot owns its existing observations and original transaction ports. */
+type IIndexedDbImageContext = {
+  /** Original input is captured before native construction begins. */
+  readonly input: {
+    readonly namespace: string
+    readonly revisions: IDBObjectStore
+    readonly request: <R>(make: () => IDBRequest<R>) => Promise<R>
+    readonly read: (
+      channel: IIndexedDbImageChannel,
+      key: IStorageKey
+    ) => Promise<{ present: boolean; value?: unknown }>
+  }
+
+  /** Pending first observations are shared without serializing unrelated native requests. */
+  entries: Map<string, Promise<IIndexedDbImageEntry>>
+
+  /** Captured immutable steps preserve the actual native enqueue order, including repeated keys. */
+  steps:
+    | Array<{
+        readonly entry: IIndexedDbImageEntry
+        readonly target: IStorageJournalTarget
+        readonly before: IStorageJournalImage
+        readonly after: IStorageJournalImage
+      }>
+    | undefined
+
+  /** Late capture cannot manufacture a before image after an accepted business mutation. */
+  mutated: boolean
+}
 export function createIndexedDbJournalImages(input: {
   readonly namespace: string
   readonly revisions: IDBObjectStore
@@ -103,166 +158,138 @@ export function createIndexedDbJournalImages(input: {
     channel: IIndexedDbImageChannel,
     key: IStorageKey
   ) => Promise<{ present: boolean; value?: unknown }>
-}) {
+}): IIndexedDbImageAccess {
+  /** Initialize native facts in original construction order before publishing any port. */
+  const nativeState = { input } as IIndexedDbImageContext
+
   /** Pending first observations are shared without serializing unrelated native requests. */
-  const entries = new Map<string, Promise<IIndexedDbImageEntry>>()
-  /** Captured immutable steps preserve the actual native enqueue order, including repeated keys. */
-  let steps:
-    | Array<{
-        readonly entry: IIndexedDbImageEntry
-        readonly target: IStorageJournalTarget
-        readonly before: IStorageJournalImage
-        readonly after: IStorageJournalImage
-      }>
-    | undefined
+  nativeState.entries = new Map<string, Promise<IIndexedDbImageEntry>>()
+
   /** Late capture cannot manufacture a before image after an accepted business mutation. */
-  let mutated = false
-  const observe = (
-    channel: IIndexedDbImageChannel,
-    key: IStorageKey
-  ): Promise<IIndexedDbImageEntry> => {
-    const lock = snapshotConcurrencyLockKeys(
-      [{ channel: channel === 'value' ? 'text' : channel, key } as ILockKey],
-      StorageBackend.indexedDb
-    ).keys[0]!
-    const id = encodeFlatStorageKey([lock.channel, encodeFlatStorageKey(key)])
-    let pending = entries.get(id)
-    if (pending === undefined) {
-      pending = (async () => {
-        const revisionKey: IDBValidKey = [
-          input.namespace,
-          revisionTag,
-          lock.channel,
-          encodeFlatStorageKey(key)
-        ]
-        const raw: unknown = await input.request(() => input.revisions.get(revisionKey))
-        const revision =
-          raw === undefined ? { birth: null, version: 0 } : (raw as IIndexedDbImageRevision)
-        if (
-          typeof revision !== 'object' ||
-          revision === null ||
-          typeof revision.birth !== 'string' ||
-          !Number.isSafeInteger(revision.version) ||
-          revision.version < 0
-        ) {
-          if (raw !== undefined) throw invalid()
-        }
-        const stored = steps === undefined ? undefined : await input.read(channel, key)
-        return {
-          channel,
-          key,
-          lock,
-          revisionKey,
-          revision: revision,
-          current:
-            stored === undefined
-              ? undefined
-              : encodeStorageJournalImage(stored.present, stored.value, channel === 'bytes'),
-          writing: undefined
-        }
-      })()
-      entries.set(id, pending)
-    }
-    return pending
+  nativeState.mutated = false
+  return createNativeMethods(nativeState)
+}
+
+function observe(
+  nativeState: IIndexedDbImageContext,
+  channel: IIndexedDbImageChannel,
+  key: IStorageKey
+): Promise<IIndexedDbImageEntry> {
+  const lock = snapshotConcurrencyLockKeys(
+    [{ channel: channel === 'value' ? 'text' : channel, key } as ILockKey],
+    StorageBackend.indexedDb
+  ).keys[0]!
+  const id = encodeFlatStorageKey([lock.channel, encodeFlatStorageKey(key)])
+  let pending = nativeState.entries.get(id)
+  if (pending === undefined) {
+    pending = (async () => {
+      const revisionKey: IDBValidKey = [
+        nativeState.input.namespace,
+        revisionTag,
+        lock.channel,
+        encodeFlatStorageKey(key)
+      ]
+      const raw: unknown = await nativeState.input.request(() =>
+        nativeState.input.revisions.get(revisionKey)
+      )
+      const revision =
+        raw === undefined ? { birth: null, version: 0 } : (raw as IIndexedDbImageRevision)
+      if (
+        typeof revision !== 'object' ||
+        revision === null ||
+        typeof revision.birth !== 'string' ||
+        !Number.isSafeInteger(revision.version) ||
+        revision.version < 0
+      ) {
+        if (raw !== undefined) throw invalid()
+      }
+      const stored =
+        nativeState.steps === undefined ? undefined : await nativeState.input.read(channel, key)
+      return {
+        channel,
+        key,
+        lock,
+        revisionKey,
+        revision: revision,
+        current:
+          stored === undefined
+            ? undefined
+            : encodeStorageJournalImage(stored.present, stored.value, channel === 'bytes'),
+        writing: undefined
+      }
+    })()
+    nativeState.entries.set(id, pending)
   }
-  /** One point advances once per native attempt; all later operations share the staged revision. */
-  const revise = (entry: IIndexedDbImageEntry): Promise<void> => {
-    if (entry.writing !== undefined) return entry.writing
-    const revision = {
-      birth: entry.revision.birth ?? createStorageToken(),
-      version: entry.revision.version + 1
-    }
-    if (!Number.isSafeInteger(revision.version)) throw invalid()
-    entry.revision = revision
-    return (entry.writing = input
-      .request(() => input.revisions.put(revision, entry.revisionKey))
-      .then(() => undefined))
+  return pending
+}
+
+/** One point advances once per native attempt; all later operations share the staged revision. */
+function revise(nativeState: IIndexedDbImageContext, entry: IIndexedDbImageEntry): Promise<void> {
+  if (entry.writing !== undefined) return entry.writing
+  const revision = {
+    birth: entry.revision.birth ?? createStorageToken(),
+    version: entry.revision.version + 1
   }
-  /**
-   * The same turn records an image and issues its original business request, without user
-   * callbacks.
-   */
-  const mutate = async <R>(
-    channel: IIndexedDbImageChannel,
-    key: IStorageKey,
-    present: boolean,
-    value: unknown,
-    run: () => Promise<R>
-  ): Promise<R> => {
-    const entry = await observe(channel, key)
-    if (steps !== undefined && entry.current === undefined) {
-      const stored = await input.read(channel, key)
-      entry.current = encodeStorageJournalImage(stored.present, stored.value, channel === 'bytes')
-    }
-    const after =
-      steps === undefined
-        ? undefined
-        : encodeStorageJournalImage(present, value, channel === 'bytes')
-    await revise(entry)
-    mutated = true
-    if (steps !== undefined) {
-      steps.push({ entry, target: entry.lock, before: entry.current!, after: after! })
-      entry.current = after
-    }
-    return run()
+  if (!Number.isSafeInteger(revision.version)) throw invalid()
+  entry.revision = revision
+  return (entry.writing = nativeState.input
+    .request(() => nativeState.input.revisions.put(revision, entry.revisionKey))
+    .then(() => undefined))
+}
+
+/** The same turn records an image and issues its original business request, without user callbacks. */
+async function mutate<R>(
+  nativeState: IIndexedDbImageContext,
+  channel: IIndexedDbImageChannel,
+  key: IStorageKey,
+  present: boolean,
+  value: unknown,
+  run: () => Promise<R>
+): Promise<R> {
+  const entry = await observe(nativeState, channel, key)
+  if (nativeState.steps !== undefined && entry.current === undefined) {
+    const stored = await nativeState.input.read(channel, key)
+    entry.current = encodeStorageJournalImage(stored.present, stored.value, channel === 'bytes')
   }
+  const after =
+    nativeState.steps === undefined
+      ? undefined
+      : encodeStorageJournalImage(present, value, channel === 'bytes')
+  await revise(nativeState, entry)
+  nativeState.mutated = true
+  if (nativeState.steps !== undefined) {
+    nativeState.steps.push({ entry, target: entry.lock, before: entry.current!, after: after! })
+    entry.current = after
+  }
+  return run()
+}
+/** Publish native images ports on their original transaction state. */
+function createNativeMethods(nativeState: IIndexedDbImageContext): IIndexedDbImageAccess {
   return {
-    mutate,
+    mutate: <R>(
+      channel: IIndexedDbImageChannel,
+      key: IStorageKey,
+      present: boolean,
+      value: unknown,
+      run: () => Promise<R>
+    ) => nativeImageMutate(nativeState, channel, key, present, value, run),
     /** Original one-shot native clear retains ordered per-key images and revision tombstones. */
-    clear: async <R>(
+    clear: <R>(
       channel: IIndexedDbImageChannel,
       keys: readonly IStorageKey[],
       run: () => Promise<R>
-    ): Promise<R> => {
-      const captured = await Promise.all(keys.map((key) => observe(channel, key)))
-      await Promise.all(captured.map(revise))
-      if (captured.length !== 0) mutated = true
-      for (const entry of captured) {
-        if (steps !== undefined)
-          steps.push({
-            entry,
-            target: entry.lock,
-            before: entry.current!,
-            after: { present: false }
-          })
-        entry.current = { present: false }
-      }
-      return run()
-    },
+    ) => nativeImageClear(nativeState, channel, keys, run),
     /** Deadline changes retain their own images and the original point's complete revision. */
-    deadline: async <R>(
+    deadline: <R>(
       channel: IIndexedDbImageChannel,
       key: IStorageKey,
       before: number | undefined,
       after: number | undefined,
       run: () => Promise<R>
-    ): Promise<R> => {
-      if (before === after) return run()
-      const entry = await observe(channel, key)
-      const previous =
-        steps === undefined ? undefined : encodeStorageJournalImage(before !== undefined, before)
-      const next =
-        steps === undefined ? undefined : encodeStorageJournalImage(after !== undefined, after)
-      await revise(entry)
-      mutated = true
-      if (steps !== undefined)
-        steps.push({
-          entry,
-          target: indexedDbDeadlineTarget(entry.lock),
-          before: previous!,
-          after: next!
-        })
-      return run()
-    },
-    revision: async (channel: IIndexedDbImageChannel, key: IStorageKey) =>
-      (await observe(channel, key)).revision,
-    changes: (): readonly IStorageJournalChange[] => {
-      if (steps === undefined) {
-        if (mutated) throw new StorageContractError(StorageContractErrorCode.unsupported)
-        steps = []
-      }
-      return steps.map(({ entry, ...step }) => ({ ...step, afterRevision: entry.revision }))
-    }
+    ) => nativeImageDeadline(nativeState, channel, key, before, after, run),
+    revision: (channel: IIndexedDbImageChannel, key: IStorageKey) =>
+      nativeImageRevision(nativeState, channel, key),
+    changes: () => nativeImageChanges(nativeState)
   }
 }
 
@@ -273,4 +300,87 @@ function invalid(cause?: unknown): JournalError {
     { cause },
     JournalErrorText.journalRecordInvalid
   )
+}
+
+/** Perform native mutate through this snapshot's original images owner. */
+function nativeImageMutate<R>(
+  nativeState: IIndexedDbImageContext,
+  channel: IIndexedDbImageChannel,
+  key: IStorageKey,
+  present: boolean,
+  value: unknown,
+  run: () => Promise<R>
+) {
+  return mutate(nativeState, channel, key, present, value, run)
+}
+/** Perform native clear through this snapshot's original images owner. */
+async function nativeImageClear<R>(
+  nativeState: IIndexedDbImageContext,
+  channel: IIndexedDbImageChannel,
+  keys: readonly IStorageKey[],
+  run: () => Promise<R>
+): Promise<R> {
+  const captured = await Promise.all(keys.map((key) => observe(nativeState, channel, key)))
+  await Promise.all(captured.map((entry: IIndexedDbImageEntry) => revise(nativeState, entry)))
+  if (captured.length !== 0) nativeState.mutated = true
+  for (const entry of captured) {
+    if (nativeState.steps !== undefined)
+      nativeState.steps.push({
+        entry,
+        target: entry.lock,
+        before: entry.current!,
+        after: { present: false }
+      })
+    entry.current = { present: false }
+  }
+  return run()
+}
+/** Perform native deadline through this snapshot's original images owner. */
+async function nativeImageDeadline<R>(
+  nativeState: IIndexedDbImageContext,
+  channel: IIndexedDbImageChannel,
+  key: IStorageKey,
+  before: number | undefined,
+  after: number | undefined,
+  run: () => Promise<R>
+): Promise<R> {
+  if (before === after) return run()
+  const entry = await observe(nativeState, channel, key)
+  const previous =
+    nativeState.steps === undefined
+      ? undefined
+      : encodeStorageJournalImage(before !== undefined, before)
+  const next =
+    nativeState.steps === undefined
+      ? undefined
+      : encodeStorageJournalImage(after !== undefined, after)
+  await revise(nativeState, entry)
+  nativeState.mutated = true
+  if (nativeState.steps !== undefined)
+    nativeState.steps.push({
+      entry,
+      target: indexedDbDeadlineTarget(entry.lock),
+      before: previous!,
+      after: next!
+    })
+  return run()
+}
+/** Perform native revision through this snapshot's original images owner. */
+async function nativeImageRevision(
+  nativeState: IIndexedDbImageContext,
+  channel: IIndexedDbImageChannel,
+  key: IStorageKey
+) {
+  return (await observe(nativeState, channel, key)).revision
+}
+/** Perform native changes through this snapshot's original images owner. */
+function nativeImageChanges(nativeState: IIndexedDbImageContext): readonly IStorageJournalChange[] {
+  if (nativeState.steps === undefined) {
+    if (nativeState.mutated) throw new StorageContractError(StorageContractErrorCode.unsupported)
+    nativeState.steps = []
+  }
+  return nativeState.steps.map(({ entry, ...step }) => ({
+    ...step,
+    afterRevision: entry.revision
+  }))
 }
