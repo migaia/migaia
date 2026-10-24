@@ -120,10 +120,11 @@ export function snapshotBackendEntityRecordWatcher(
 ): IBackendEntityAccess['watchRecords'] {
   if (native.capabilities.changeFeed !== true || !hasStorageCapability(native, records)) return
   /** Query construction is pure; every invocation below still returns its original fresh iterator. */
-  const query = useStorageCapability(native, records).query()
-  const watch = Reflect.get(query, 'watch')
-  if (typeof watch !== 'function') return
-  return (ctx) => Reflect.apply(watch, query, [ctx]) as IStorageIterator<IStorageChange>
+  const query = useStorageCapability(native, records).query() as {
+    readonly watch?: (ctx?: IOperationContext) => IStorageIterator<IStorageChange>
+  }
+  if (typeof query.watch !== 'function') return
+  return (ctx) => query.watch!(ctx)
 }
 
 /** Bind only an original host-authenticated alias, keeping its native owner private in a closure. */
@@ -199,170 +200,173 @@ const controllerRegistry = new WeakMap<object, IBackendRegistration>()
 /** Monotonic fallback for unique same-realm event origins. */
 let controllerOriginSequence = 0
 
-/** Construct a controller without exposing its event channel or lifecycle state publicly. */
-export const createBackendChangeController = (
-  input: IBackendChangeControllerOptions
-): IBackendChangeController => {
-  /** Capture author fields once while retaining the original callback receiver. */
-  let options: IBackendChangeControllerOptions
-  try {
-    options = {
-      backend: input.backend,
-      platform: input.platform,
-      options: input.options,
-      origin: input.origin,
-      finalize: input.finalize
-    }
-  } catch (cause) {
-    throw new StorageContractError(StorageContractErrorCode.invalidArgument, { cause })
-  }
-  if (
-    typeof options.backend !== 'string' ||
-    (options.origin !== undefined && typeof options.origin !== 'string') ||
-    (options.finalize !== undefined && typeof options.finalize !== 'function')
-  )
-    throw new StorageContractError(StorageContractErrorCode.invalidArgument)
-  /** Native platform and captured construction options remain original borrowed references. */
-  const snapshot: IBackendChangeSnapshot = {
-    backend: options.backend,
-    platform: options.platform,
-    options: options.options
-  }
-  /** Existing origins preserve native transport identity or a unique same-realm fallback. */
-  const origin =
-    options.origin ?? `${options.backend}:${(controllerOriginSequence += 1).toString(36)}`
-  /** Only committed local publications advance this controller's original sequence. */
-  let sequence = 0
-  /** Physical disposal clears the original channel after all mutation leases drain. */
-  let disposed = false
-  /** The original logical closure signal seals new work and cancels only pending admissions. */
-  const closing = createAbortController()
-  /** All callers await the same original controller cleanup Promise. */
-  let disposePromise: Promise<void> | undefined
-  /** Existing lifecycle leases own admitted mutations; no backend queue is introduced. */
-  const mutationLeases = createStringLeaseRegistry()
-  /** One local lease lane groups this controller's actual mutation work. */
-  const mutationLeaseKey = 'backend-mutation'
-  /** Observer errors reach the original final diagnostic adapter. */
-  const reporter = createStorageOperationReporter()
-  /** The original event channel preserves queued reentrant delivery. */
-  const channel = createEventChannel<IStorageChange>({
-    report: ({ error }) => reportCleanupError(reporter, error),
-    dispatchPolicy: EventDispatchPolicy.queued
-  })
-  /** Large commits keep coarse invalidation instead of retaining more than the original bound. */
-  const maxEventKeys = 128
+/** Large commits preserve the original coarse-invalidation bound. */
+const maxEventKeys = 128
+/** All mutation leases for one physical controller share its one canonical lifecycle lane. */
+const mutationLeaseKey = 'backend-mutation'
 
-  /** Read the canonical entity scope used by coarse record invalidations. */
-  const canonicalScopeOf = (key: IStorageKey): string | undefined =>
-    Array.isArray(key) &&
+/** Read the canonical entity scope used by coarse record invalidations. */
+function canonicalScopeOf(key: IStorageKey): string | undefined {
+  return Array.isArray(key) &&
     key.length === 3 &&
     key[0] === REPOSITORY_KEY_PREFIX &&
     typeof key[1] === 'string' &&
     typeof key[2] === 'string'
-      ? key[1]
-      : undefined
-
-  /** Derive a scope only when every retained record key belongs to that same scope. */
-  const deriveScope = (keys: readonly IStorageKey[] | undefined): string | undefined => {
-    if (keys === undefined || keys.length === 0) return undefined
-    /** All retained keys must agree with the original canonical entity scope. */
-    const first = canonicalScopeOf(keys[0]!)
-    if (first === undefined) return undefined
-    return keys.every((key) => canonicalScopeOf(key) === first) ? first : undefined
-  }
-
-  /** Finish controller disposal once lifecycle-owned commit, publication, and transport work drains. */
-  const finishDispose = (): void => {
-    if (disposed) return
-    disposed = true
-    channel.clear()
-  }
-
-  /** Fan out one already validated local or transport event without changing its metadata identity. */
-  const emit = (event: IStorageChange): void => {
-    if (disposed) return
-    try {
-      channel.publish(event)
-    } catch (cause) {
-      reportCleanupError(reporter, cause)
-    }
-  }
-
-  /** One controller object retains its original native resource and notification identity. */
-  const controller: IBackendChangeController = {
-    snapshot,
-    origin,
-    closingSignal: closing.signal,
-    assertLive: () => {
-      if (closing.signal.aborted || disposed)
-        throw new StorageContractError(StorageContractErrorCode.disposed, {
-          backend: options.backend
-        })
-    },
-    beginMutation: () => {
-      controller.assertLive()
-      return mutationLeases.retain(mutationLeaseKey)
-    },
-    publish: (change) => {
-      if (disposed) return
-      sequence += 1
-      /** Omit oversized key sets while retaining the original coarse scope derivation. */
-      const keys =
-        change.keys !== undefined && change.keys.length > maxEventKeys ? undefined : change.keys
-      /** Local publication retains all caller metadata and adds only original sequence/origin. */
-      const event: IStorageChange = {
-        ...change,
-        keys,
-        scope: change.channel === 'record' ? deriveScope(change.keys) : undefined,
-        sequence,
-        origin
-      }
-      emit(event)
-      return event
-    },
-    publishExternal: (change) => {
-      if (disposed) return
-      /** External publication retains its source sequence rather than advancing the local counter. */
-      const keys =
-        change.keys !== undefined && change.keys.length > maxEventKeys ? undefined : change.keys
-      emit({
-        ...change,
-        keys,
-        scope: change.channel === 'record' ? deriveScope(keys) : undefined
-      })
-    },
-    subscribe: (listener) => channel.subscribe((event) => listener(event.value)),
-    dispose: () => {
-      if (disposePromise !== undefined) return disposePromise
-      mutationLeases.seal(mutationLeaseKey)
-      disposePromise = mutationLeases.whenZero(mutationLeaseKey).then(async () => {
-        try {
-          if (options.finalize !== undefined) await Reflect.apply(options.finalize, input, [])
-        } catch (cause) {
-          // Preserve an existing backend failure; raw callbacks gain the host cleanup boundary.
-          if (isNativeErrorValue(cause) && IdentifyError.identityOf(cause) !== undefined)
-            throw cause
-          throw new StorageError(
-            StorageErrorCode.storageHostDisposeFailed,
-            { backend: options.backend, cause },
-            StorageErrorText.storageHostDisposeFailed
-          )
-        } finally {
-          finishDispose()
-        }
-      })
-      /** Cache the original primary before notifying listeners, which may reenter disposal. */
-      closing.abort(
-        new StorageContractError(StorageContractErrorCode.disposed, {
-          backend: options.backend
-        })
-      )
-      return disposePromise
-    }
-  }
-  return controller
+    ? key[1]
+    : undefined
 }
+
+/** Derive a scope only when every retained record key belongs to that same scope. */
+function deriveScope(keys: readonly IStorageKey[] | undefined): string | undefined {
+  if (keys === undefined || keys.length === 0) return undefined
+  /** Every key must agree with the first canonical scope. */
+  const first = canonicalScopeOf(keys[0]!)
+  return first !== undefined && keys.every((key) => canonicalScopeOf(key) === first)
+    ? first
+    : undefined
+}
+
+/** The original channel and lifecycle owners remain private to one physical backend. */
+class BackendChangeController implements IBackendChangeController {
+  /** Native platform and configured options remain borrowed references in this captured boundary. */
+  readonly snapshot: IBackendChangeSnapshot
+  /** Same-realm origins retain the existing unique sequence fallback. */
+  readonly origin: string
+  /** Backend admission observes this original controller's closure. */
+  readonly closingSignal: INativeAbortSignal
+  /** The original options object supplies its finalizer with the correct receiver. */
+  readonly #input: IBackendChangeControllerOptions
+  /** Actual committed local publications alone advance this counter. */
+  #sequence = 0
+  /** Physical closure follows mutation drain and native finalization. */
+  #disposed = false
+  /** This signal closes new admissions without cancelling admitted mutation leases. */
+  readonly #closing: ReturnType<typeof createAbortController>
+  /** The canonical lifecycle registry owns all admitted mutation drain. */
+  readonly #mutationLeases: ReturnType<typeof createStringLeaseRegistry>
+  /** All cleanup callers receive the same original completion promise. */
+  #disposePromise: Promise<void> | undefined
+  /** Observer failures terminate at the existing diagnostic boundary. */
+  readonly #reporter: ReturnType<typeof createStorageOperationReporter>
+  /** The original event channel preserves queued reentrant delivery. */
+  readonly #channel: ReturnType<typeof createEventChannel<IStorageChange>>
+
+  /** Admit synchronous configuration before acquiring a channel or lifecycle resource. */
+  constructor(input: IBackendChangeControllerOptions) {
+    if (
+      typeof input.backend !== 'string' ||
+      (input.origin !== undefined && typeof input.origin !== 'string') ||
+      (input.finalize !== undefined && typeof input.finalize !== 'function')
+    )
+      throw new StorageContractError(StorageContractErrorCode.invalidArgument)
+    this.#input = input
+    this.snapshot = { backend: input.backend, platform: input.platform, options: input.options }
+    this.origin = input.origin ?? `${input.backend}:${(controllerOriginSequence += 1).toString(36)}`
+    this.#closing = createAbortController()
+    this.closingSignal = this.#closing.signal
+    this.#mutationLeases = createStringLeaseRegistry()
+    this.#reporter = createStorageOperationReporter()
+    this.#channel = createEventChannel<IStorageChange>({
+      report: ({ error }) => reportCleanupError(this.#reporter, error),
+      dispatchPolicy: EventDispatchPolicy.queued
+    })
+  }
+
+  /** Reject only new work after logical or physical closure. */
+  readonly assertLive = (): void => {
+    if (this.#closing.signal.aborted || this.#disposed)
+      throw new StorageContractError(StorageContractErrorCode.disposed, {
+        backend: this.snapshot.backend
+      })
+  }
+
+  /** Retain one actual mutation through the canonical lease registry. */
+  readonly beginMutation = (): (() => void) => {
+    this.assertLive()
+    return this.#mutationLeases.retain(mutationLeaseKey)
+  }
+
+  /** Add local sequence/origin only after an actual backend commit. */
+  readonly publish = (
+    change: Omit<IStorageChange, 'sequence' | 'origin' | 'scope'>
+  ): IStorageChange | undefined => {
+    if (this.#disposed) return
+    this.#sequence += 1
+    /** Oversized commits retain scope while omitting unbounded key lists. */
+    const keys =
+      change.keys !== undefined && change.keys.length > maxEventKeys ? undefined : change.keys
+    /** Caller metadata is retained unchanged alongside this controller's actual commit facts. */
+    const event: IStorageChange = {
+      ...change,
+      keys,
+      scope: change.channel === 'record' ? deriveScope(change.keys) : undefined,
+      sequence: this.#sequence,
+      origin: this.origin
+    }
+    this.#emit(event)
+    return event
+  }
+
+  /** Preserve transport sequence and origin without advancing local publication history. */
+  readonly publishExternal = (change: IStorageChange): void => {
+    if (this.#disposed) return
+    /** Coarse external invalidations follow the original bounded event policy. */
+    const keys =
+      change.keys !== undefined && change.keys.length > maxEventKeys ? undefined : change.keys
+    this.#emit({
+      ...change,
+      keys,
+      scope: change.channel === 'record' ? deriveScope(keys) : undefined
+    })
+  }
+
+  /** Event subscription retains the original event channel's listener lifetime. */
+  readonly subscribe = (listener: (change: IStorageChange) => void): (() => void) =>
+    this.#channel.subscribe((event) => listener(event.value))
+
+  /** Drain accepted mutations before invoking the original native finalizer exactly once. */
+  readonly dispose = (): Promise<void> => {
+    if (this.#disposePromise !== undefined) return this.#disposePromise
+    this.#mutationLeases.seal(mutationLeaseKey)
+    this.#disposePromise = this.#mutationLeases.whenZero(mutationLeaseKey).then(async () => {
+      try {
+        await this.#input.finalize?.()
+      } catch (cause) {
+        if (isNativeErrorValue(cause) && IdentifyError.identityOf(cause) !== undefined) throw cause
+        throw new StorageError(
+          StorageErrorCode.storageHostDisposeFailed,
+          { backend: this.snapshot.backend, cause },
+          StorageErrorText.storageHostDisposeFailed
+        )
+      } finally {
+        this.#disposed = true
+        this.#channel.clear()
+      }
+    })
+    /** Cache completion before closure observers can reenter disposal. */
+    this.#closing.abort(
+      new StorageContractError(StorageContractErrorCode.disposed, {
+        backend: this.snapshot.backend
+      })
+    )
+    return this.#disposePromise
+  }
+
+  /** Report observer failure without changing a committed native outcome. */
+  #emit(event: IStorageChange): void {
+    if (this.#disposed) return
+    try {
+      this.#channel.publish(event)
+    } catch (cause) {
+      reportCleanupError(this.#reporter, cause)
+    }
+  }
+}
+
+/** Construct one controller without exposing event-channel or lifecycle state. */
+export const createBackendChangeController = (
+  input: IBackendChangeControllerOptions
+): IBackendChangeController => new BackendChangeController(input)
 
 /** Register one exact store instance and reject accidental duplicate ownership. */
 export const registerBackendChangeController = (

@@ -197,7 +197,7 @@ describe('controlled backend change authoring', () => {
     expect(cleanup).toHaveBeenCalledTimes(1)
   })
 
-  it('returns undefined for a registration without a controller and contains option reflection failures', async () => {
+  it('returns undefined for a registration without a controller', async () => {
     /** Lazy absence never creates a fallback registry or controller. */
     const feature = defineFeature(kind, ({ featureExpose }) => ({
       capabilities: [],
@@ -211,8 +211,6 @@ describe('controlled backend change authoring', () => {
         transaction: {}
       }
     }))
-    /** The original accessor failure must remain on the package-coded cause chain. */
-    const original = new Error('controller options getter failed')
     /** Valid store construction can continue after the author observes invalid controller input. */
     const descriptor = (core: IStoragePluginCore) => {
       let state!: ReturnType<typeof catalog>
@@ -221,13 +219,6 @@ describe('controlled backend change authoring', () => {
         featureExpose: () => ({ getClient: () => state.client }),
         capabilityInstaller: (_store: ReturnType<typeof catalog>['store']) => state.installer,
         install: () => {
-          expect(() =>
-            core.createChangeController({
-              get backend(): string {
-                throw original
-              }
-            })
-          ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT', cause: original }))
           state = catalog(core)
           core.registerStore(state.store)
           return {}

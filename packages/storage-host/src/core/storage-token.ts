@@ -12,12 +12,10 @@ export const createStorageToken = (): string => {
     const tokenHost = globalThis as unknown as { crypto?: { randomUUID?: () => string } }
     /** Retain the actual crypto receiver without repeating its public getter. */
     const crypto = tokenHost.crypto
-    /** Capture the native UUID function once before invoking it with its original receiver. */
-    const randomUUID = crypto?.randomUUID
     /** The monotonic suffix and fallback entropy format remain unchanged. */
     const entropy =
-      typeof randomUUID === 'function'
-        ? Reflect.apply(randomUUID, crypto, [])
+      typeof crypto?.randomUUID === 'function'
+        ? crypto.randomUUID()
         : `${Date.now()}-${Math.random().toString(36).slice(2)}`
     storageTokenSequence += 1
     return `${entropy}-${storageTokenSequence.toString(36)}`

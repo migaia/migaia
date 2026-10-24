@@ -1,5 +1,4 @@
 import type { IOperationContext } from '@migaia/storage-contract'
-import { tryReadProperty } from '@migaia/utils/error'
 import {
   createAbortTimeoutSignal,
   type IAbortSignal,
@@ -23,61 +22,83 @@ type IOperationValidationContext = IOperationContext & {
   readonly conflictPolicy?: unknown
 }
 
-/** Read mutable abort state without allowing a hostile getter to escape the storage protocol. */
-const readSignalAborted = (signal: IAbortSignal | undefined): boolean => {
-  if (signal === undefined) return false
-  try {
-    return signal.aborted
-  } catch (cause) {
-    throw new StorageContractError(StorageContractErrorCode.invalidArgument, { cause })
+/** Read the supported signal's current cancellation state. */
+const readSignalAborted = (signal: IAbortSignal | undefined): boolean => signal?.aborted ?? false
+
+/** Preserve the original native cancellation reason as the operation cause. */
+export const readAbortReason = (signal: IAbortSignal | undefined): unknown => signal?.reason
+
+/** One native abort subscription retains its stable listener and reports cleanup failure. */
+class StorageAbortSubscription {
+  /** Native signal identity must be shared by installation and removal. */
+  readonly #signal: IAbortSignal
+  /** The existing operation owner chooses the cancellation outcome. */
+  readonly #onAbort: () => void
+  /** Listener-removal failures retain the original cleanup reporting boundary. */
+  readonly #reporter: IStorageOperationReporter
+  /** Backend coded failures remain exact when listener installation fails. */
+  readonly #isBackendError: ((value: unknown) => value is Error) | undefined
+  /** Native abort and explicit cleanup can detach this listener only once. */
+  #disposed = false
+
+  /** Retain the original signal, callback and diagnostics without acquiring a new lifetime. */
+  constructor(
+    signal: IAbortSignal,
+    onAbort: () => void,
+    reporter: IStorageOperationReporter,
+    isBackendError?: (value: unknown) => value is Error
+  ) {
+    this.#signal = signal
+    this.#onAbort = onAbort
+    this.#reporter = reporter
+    this.#isBackendError = isBackendError
+  }
+
+  /** Close the initial-abort race using the same stable native listener on both sides. */
+  start(): () => void {
+    if (this.#signal.aborted) {
+      this.#handleAbort()
+      return this.dispose
+    }
+    try {
+      this.#signal.addEventListener('abort', this.#handleAbort, { once: true })
+      if (this.#signal.aborted) this.#handleAbort()
+    } catch (cause) {
+      this.dispose()
+      if (isStorageErrorFamily(cause, this.#isBackendError)) throw cause
+      throw new StorageContractError(StorageContractErrorCode.invalidArgument, { cause })
+    }
+    return this.dispose
+  }
+
+  /** Listener cleanup cannot replace the existing operation result. */
+  readonly dispose = (): void => {
+    if (this.#disposed) return
+    this.#disposed = true
+    try {
+      this.#signal.removeEventListener('abort', this.#handleAbort)
+    } catch (cause) {
+      reportCleanupError(this.#reporter, cause)
+    }
+  }
+
+  /** Detach before delivering cancellation so reentrant cleanup remains idempotent. */
+  readonly #handleAbort = (): void => {
+    this.dispose()
+    this.#onAbort()
   }
 }
 
-/** Treat an inaccessible abort reason as the cancellation cause instead of leaking its getter. */
-export const readAbortReason = (signal: IAbortSignal | undefined): unknown => {
-  if (signal === undefined) return undefined
-  /** Storage operations use an inaccessible reason as the cancellation cause. */
-  const read = tryReadProperty(signal, 'reason')
-  return read.threw ? read.error : read.value
-}
-
-/** Subscribe once with race closure and return cleanup that cannot mask an operation result. */
+/** Subscribe once and return the original subscription's idempotent cleanup port. */
 export const subscribeToAbort = (
   signal: IAbortSignal | undefined,
   onAbort: () => void,
   reporter: IStorageOperationReporter,
   isBackendError?: (value: unknown) => value is Error
-): (() => void) => {
-  if (signal === undefined) return () => {}
-  /** Prevents host cleanup from being re-entered by racing IDB and abort events. */
-  let disposed = false
-  const dispose = (): void => {
-    if (disposed) return
-    disposed = true
-    try {
-      signal.removeEventListener('abort', handleAbort)
-    } catch (cause) {
-      reportCleanupError(reporter, cause)
-    }
-  }
-  const handleAbort = (): void => {
-    dispose()
-    onAbort()
-  }
-  if (readSignalAborted(signal)) {
-    handleAbort()
-    return dispose
-  }
-  try {
-    signal.addEventListener('abort', handleAbort, { once: true })
-    if (readSignalAborted(signal)) handleAbort()
-  } catch (cause) {
-    dispose()
-    if (isStorageErrorFamily(cause, isBackendError)) throw cause
-    throw new StorageContractError(StorageContractErrorCode.invalidArgument, { cause })
-  }
-  return dispose
-}
+): (() => void) =>
+  signal === undefined
+    ? () => {}
+    : new StorageAbortSubscription(signal, onAbort, reporter, isBackendError).start()
 
 /** Throw the stable storage error when an operation signal has already been cancelled. */
 export const throwIfAborted = (signal: IAbortSignal | undefined): void => {

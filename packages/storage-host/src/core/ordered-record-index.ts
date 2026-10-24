@@ -116,187 +116,234 @@ function refresh<T>(current: INode<T>, root: INode<T>): void {
   if (current !== root && current.first) current.key = current.first.key
 }
 /** Build the single package-private compressed radix implementation for one mutable data owner. */
-export function createOrderedRecordIndex<T>(): IOrderedRecordIndex<T> {
+
+/** One compressed record index owns only its original root and live leaf count. */
+type IOrderedRecordContext<T> = {
   /** The root has no edge and cannot retain a deleted descendant key as a representative. */
-  const root = node<T>(new Uint8Array(), 0, 0)
+  root: INode<T>
+
   /** Live leaf count changes independently from overwrite of an existing entry reference. */
-  let size = 0
-  /** Locate an exact leaf while retaining only its actual compressed ancestor path. */
-  const locate = (key: Uint8Array): { current: INode<T>; path: INode<T>[] } | undefined => {
-    /** A single path also supplies bounded deletion repair. */
-    const path = [root]
-    /** Current depth is the matched prefix length in the independently held key. */
-    let current = root
-    let depth = 0
-    while (depth < key.length) {
-      /** The first unmatched byte selects one direct child slot. */
-      const child = current.children?.[key[depth]!]
-      if (!child) return undefined
-      for (let index = child.start; index < child.end; index++) {
-        if (depth >= key.length || key[depth] !== child.key[index]) return undefined
-        depth++
-      }
-      current = child
-      path.push(current)
+  size: number
+}
+export function createOrderedRecordIndex<T>(): IOrderedRecordIndex<T> {
+  /** Initialize native facts in original construction order before publishing any port. */
+  const indexState = {} as IOrderedRecordContext<T>
+
+  /** The root has no edge and cannot retain a deleted descendant key as a representative. */
+  indexState.root = node<T>(new Uint8Array(), 0, 0)
+
+  /** Live leaf count changes independently from overwrite of an existing entry reference. */
+  indexState.size = 0
+  return createOrderedRecordMethods(indexState)
+}
+
+/** Locate an exact leaf while retaining only its actual compressed ancestor path. */
+function locate<T>(
+  indexState: IOrderedRecordContext<T>,
+  key: Uint8Array
+): { current: INode<T>; path: INode<T>[] } | undefined {
+  /** A single path also supplies bounded deletion repair. */
+  const path = [indexState.root]
+  /** Current depth is the matched prefix length in the independently held key. */
+  let current = indexState.root
+  let depth = 0
+  while (depth < key.length) {
+    /** The first unmatched byte selects one direct child slot. */
+    const child = current.children?.[key[depth]!]
+    if (!child) return undefined
+    for (let index = child.start; index < child.end; index++) {
+      if (depth >= key.length || key[depth] !== child.key[index]) return undefined
+      depth++
     }
-    return { current, path }
+    current = child
+    path.push(current)
   }
-  /** Seek only the boundary path; the closest higher sibling supplies its already known first leaf. */
-  const seek = (key: Uint8Array): ILeaf<T> | undefined => {
-    /** A candidate is the first leaf outside the current subtree and above the bound. */
-    let candidate: ILeaf<T> | undefined
-    /** Matched prefix depth advances through compressed edges without copying their bytes. */
-    let depth = 0
-    let current = root
-    while (depth < key.length) {
-      /** A nearer higher sibling always precedes any previously captured ancestor sibling. */
-      const higher = nextChild(current, key[depth]! + 1)
-      if (higher) candidate = higher.first
-      /** Exact byte slot may still diverge inside its compressed edge. */
-      const child = current.children?.[key[depth]!]
-      if (!child) return candidate
-      for (let index = child.start; index < child.end; index++) {
-        if (depth === key.length) return child.first
-        if (child.key[index] !== key[depth])
-          return child.key[index]! > key[depth]! ? child.first : candidate
-        depth++
-      }
-      current = child
+  return { current, path }
+}
+
+/** Seek only the boundary path; the closest higher sibling supplies its already known first leaf. */
+function seek<T>(indexState: IOrderedRecordContext<T>, key: Uint8Array): ILeaf<T> | undefined {
+  /** A candidate is the first leaf outside the current subtree and above the bound. */
+  let candidate: ILeaf<T> | undefined
+  /** Matched prefix depth advances through compressed edges without copying their bytes. */
+  let depth = 0
+  let current = indexState.root
+  while (depth < key.length) {
+    /** A nearer higher sibling always precedes any previously captured ancestor sibling. */
+    const higher = nextChild(current, key[depth]! + 1)
+    if (higher) candidate = higher.first
+    /** Exact byte slot may still diverge inside its compressed edge. */
+    const child = current.children?.[key[depth]!]
+    if (!child) return candidate
+    for (let index = child.start; index < child.end; index++) {
+      if (depth === key.length) return child.first
+      if (child.key[index] !== key[depth])
+        return child.key[index]! > key[depth]! ? child.first : candidate
+      depth++
     }
-    return current.first
+    current = child
   }
-  /** The same seek path serves inclusive and exclusive native lower bounds. */
-  const lowerBound = (key: Uint8Array, inclusive = true): ILeaf<T> | undefined => {
-    /** An exclusive exact hit advances through the leaf's constant-time adjacency link. */
-    const result = seek(key)
-    return !inclusive && result && compareRecordIndexKeys(result.key, key) === 0
-      ? result.next
-      : result
-  }
+  return current.first
+}
+
+/** The same seek path serves inclusive and exclusive native lower bounds. */
+function lowerBound<T>(
+  indexState: IOrderedRecordContext<T>,
+  key: Uint8Array,
+  inclusive = true
+): ILeaf<T> | undefined {
+  /** An exclusive exact hit advances through the leaf's constant-time adjacency link. */
+  const result = seek(indexState, key)
+  return !inclusive && result && compareRecordIndexKeys(result.key, key) === 0
+    ? result.next
+    : result
+}
+/** Publish index ports over the same explicit radix state. */
+function createOrderedRecordMethods<T>(
+  indexState: IOrderedRecordContext<T>
+): IOrderedRecordIndex<T> {
   return {
     get size() {
-      return size
+      return indexState.size
     },
     get first() {
-      return root.first
+      return indexState.root.first
     },
     get last() {
-      return root.last
+      return indexState.root.last
     },
-    get: (key: Uint8Array) => locate(key)?.current.leaf,
-    set: (key: Uint8Array, value: T): ILeaf<T> => {
-      /** Overwriting one entry never changes structure, adjacency or its already held key bytes. */
-      const existing = locate(key)?.current.leaf
-      if (existing) {
-        existing.value = value
-        return existing
-      }
-      /** Neighbors are captured before adding the new leaf to the tree. */
-      const after = seek(key)
-      const before = after?.previous ?? (after ? undefined : root.last)
-      /** One real live leaf retains one canonical key and one entry reference. */
-      const leaf: ILeaf<T> = { key, value, previous: before, next: after }
-      if (before) before.next = leaf
-      if (after) after.previous = leaf
-      /** The changed path is repaired in reverse after at most one compressed edge split. */
-      const path = [root]
-      let current = root
-      let depth = 0
-      while (depth < key.length) {
-        /** Direct slot selection needs no sibling enumeration. */
-        const slot = key[depth]!
-        const child = current.children?.[slot]
-        if (!child) {
-          putChild(current, slot, node(key, depth, key.length, leaf))
-          break
-        }
-        /** Compare each matched edge byte once before locating its first difference. */
-        let index = child.start
-        while (index < child.end && depth < key.length && child.key[index] === key[depth]) {
-          index++
-          depth++
-        }
-        if (index !== child.end) {
-          /**
-           * The branch edge shares its live representative until reverse-path repair chooses its
-           * first leaf.
-           */
-          const branch = node<T>(child.key, child.start, index)
-          putChild(current, slot, branch)
-          child.start = index
-          putChild(branch, child.key[index]!, child)
-          if (depth === key.length) branch.leaf = leaf
-          else putChild(branch, key[depth]!, node(key, depth, key.length, leaf))
-          path.push(branch)
-          break
-        }
-        current = child
-        path.push(current)
-      }
-      if (depth === key.length && !path[path.length - 1]!.leaf) path[path.length - 1]!.leaf = leaf
-      size++
-      for (let index = path.length - 1; index >= 0; index--) refresh(path[index]!, root)
-      return leaf
-    },
-    delete: (key: Uint8Array): boolean => {
-      /** Only exact membership may unlink a native entry. */
-      const found = locate(key)
-      const leaf = found?.current.leaf
-      if (!found || !leaf) return false
-      if (leaf.previous) leaf.previous.next = leaf.next
-      if (leaf.next) leaf.next.previous = leaf.previous
-      leaf.previous = undefined
-      leaf.next = undefined
-      found.current.leaf = undefined
-      size--
-      for (let index = found.path.length - 1; index > 0; index--) {
-        /** Every potential representative of the deleted leaf lies on this one ancestor path. */
-        const current = found.path[index]!
-        const parent = found.path[index - 1]!
-        const slot = current.key[current.start]!
-        if (!current.leaf && current.count === 0) removeChild(parent, slot)
-        else if (!current.leaf && current.count === 1) {
-          /** Merge adjacent single-branch edges by widening the live child's referenced interval. */
-          const child = nextChild(current, 0)!
-          child.start = current.start
-          putChild(parent, slot, child)
-          refresh(child, root)
-        } else refresh(current, root)
-      }
-      refresh(root, root)
-      return true
-    },
-    lowerBound,
-    range: function* (bounds?: IOrderedRecordRange): IterableIterator<ILeaf<T>> {
-      /** Range localization never walks leaves preceding its lower byte boundary. */
-      let current =
-        bounds?.lower === undefined ? root.first : lowerBound(bounds.lower, !bounds.lowerOpen)
-      while (current) {
-        if (bounds?.upper !== undefined) {
-          /** Each candidate contributes at most its own actual key bytes to the upper-bound check. */
-          const comparison = compareRecordIndexKeys(current.key, bounds.upper)
-          if (comparison > 0 || (comparison === 0 && bounds.upperOpen)) return
-        }
-        yield current
-        current = current.next
-      }
-    },
-    clear: (): void => {
-      /** Detach existing leaf links before releasing all edge and entry references at the root. */
-      let current = root.first
-      while (current) {
-        const next = current.next
-        current.previous = undefined
-        current.next = undefined
-        current = next
-      }
-      root.leaf = undefined
-      root.first = undefined
-      root.last = undefined
-      root.children = undefined
-      root.bitmap = undefined
-      root.count = 0
-      size = 0
-    }
+    get: (key: Uint8Array) => locate(indexState, key)?.current.leaf,
+    set: (key: Uint8Array, value: T) => orderedRecordSet(indexState, key, value),
+    delete: (key: Uint8Array) => orderedRecordDelete(indexState, key),
+    lowerBound: (key: Uint8Array, inclusive = true) => lowerBound(indexState, key, inclusive),
+    range: (bounds?: IOrderedRecordRange) => orderedRecordRange(indexState, bounds),
+    clear: () => orderedRecordClear(indexState)
   }
+}
+
+/** Perform set on this owner's original compressed radix state. */
+function orderedRecordSet<T>(
+  indexState: IOrderedRecordContext<T>,
+  key: Uint8Array,
+  value: T
+): ILeaf<T> {
+  /** Overwriting one entry never changes structure, adjacency or its already held key bytes. */
+  const existing = locate(indexState, key)?.current.leaf
+  if (existing) {
+    existing.value = value
+    return existing
+  }
+  /** Neighbors are captured before adding the new leaf to the tree. */
+  const after = seek(indexState, key)
+  const before = after?.previous ?? (after ? undefined : indexState.root.last)
+  /** One real live leaf retains one canonical key and one entry reference. */
+  const leaf: ILeaf<T> = { key, value, previous: before, next: after }
+  if (before) before.next = leaf
+  if (after) after.previous = leaf
+  /** The changed path is repaired in reverse after at most one compressed edge split. */
+  const path = [indexState.root]
+  let current = indexState.root
+  let depth = 0
+  while (depth < key.length) {
+    /** Direct slot selection needs no sibling enumeration. */
+    const slot = key[depth]!
+    const child = current.children?.[slot]
+    if (!child) {
+      putChild(current, slot, node(key, depth, key.length, leaf))
+      break
+    }
+    /** Compare each matched edge byte once before locating its first difference. */
+    let index = child.start
+    while (index < child.end && depth < key.length && child.key[index] === key[depth]) {
+      index++
+      depth++
+    }
+    if (index !== child.end) {
+      /**
+       * The branch edge shares its live representative until reverse-path repair chooses its first
+       * leaf.
+       */
+      const branch = node<T>(child.key, child.start, index)
+      putChild(current, slot, branch)
+      child.start = index
+      putChild(branch, child.key[index]!, child)
+      if (depth === key.length) branch.leaf = leaf
+      else putChild(branch, key[depth]!, node(key, depth, key.length, leaf))
+      path.push(branch)
+      break
+    }
+    current = child
+    path.push(current)
+  }
+  if (depth === key.length && !path[path.length - 1]!.leaf) path[path.length - 1]!.leaf = leaf
+  indexState.size++
+  for (let index = path.length - 1; index >= 0; index--) refresh(path[index]!, indexState.root)
+  return leaf
+}
+/** Perform delete on this owner's original compressed radix state. */
+function orderedRecordDelete<T>(indexState: IOrderedRecordContext<T>, key: Uint8Array): boolean {
+  /** Only exact membership may unlink a native entry. */
+  const found = locate(indexState, key)
+  const leaf = found?.current.leaf
+  if (!found || !leaf) return false
+  if (leaf.previous) leaf.previous.next = leaf.next
+  if (leaf.next) leaf.next.previous = leaf.previous
+  leaf.previous = undefined
+  leaf.next = undefined
+  found.current.leaf = undefined
+  indexState.size--
+  for (let index = found.path.length - 1; index > 0; index--) {
+    /** Every potential representative of the deleted leaf lies on this one ancestor path. */
+    const current = found.path[index]!
+    const parent = found.path[index - 1]!
+    const slot = current.key[current.start]!
+    if (!current.leaf && current.count === 0) removeChild(parent, slot)
+    else if (!current.leaf && current.count === 1) {
+      /** Merge adjacent single-branch edges by widening the live child's referenced interval. */
+      const child = nextChild(current, 0)!
+      child.start = current.start
+      putChild(parent, slot, child)
+      refresh(child, indexState.root)
+    } else refresh(current, indexState.root)
+  }
+  refresh(indexState.root, indexState.root)
+  return true
+}
+/** Perform range on this owner's original compressed radix state. */
+function* orderedRecordRange<T>(
+  indexState: IOrderedRecordContext<T>,
+  bounds?: IOrderedRecordRange
+): IterableIterator<ILeaf<T>> {
+  /** Range localization never walks leaves preceding its lower byte boundary. */
+  let current =
+    bounds?.lower === undefined
+      ? indexState.root.first
+      : lowerBound(indexState, bounds.lower, !bounds.lowerOpen)
+  while (current) {
+    if (bounds?.upper !== undefined) {
+      /** Each candidate contributes at most its own actual key bytes to the upper-bound check. */
+      const comparison = compareRecordIndexKeys(current.key, bounds.upper)
+      if (comparison > 0 || (comparison === 0 && bounds.upperOpen)) return
+    }
+    yield current
+    current = current.next
+  }
+}
+/** Perform clear on this owner's original compressed radix state. */
+function orderedRecordClear<T>(indexState: IOrderedRecordContext<T>): void {
+  /** Detach existing leaf links before releasing all edge and entry references at the root. */
+  let current = indexState.root.first
+  while (current) {
+    const next = current.next
+    current.previous = undefined
+    current.next = undefined
+    current = next
+  }
+  indexState.root.leaf = undefined
+  indexState.root.first = undefined
+  indexState.root.last = undefined
+  indexState.root.children = undefined
+  indexState.root.bitmap = undefined
+  indexState.root.count = 0
+  indexState.size = 0
 }

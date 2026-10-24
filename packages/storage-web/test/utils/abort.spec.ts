@@ -51,24 +51,7 @@ describe('throwIfAborted', () => {
       expect.objectContaining({ code: 'ABORTED' })
     )
   })
-  it('已 abort signal 的 hostile reason getter 仍归一为 ABORTED', () => {
-    const cause = new Error('hostile reason getter')
-    const signal = {
-      aborted: true,
-      get reason(): never {
-        throw cause
-      },
-      addEventListener: () => {},
-      removeEventListener: () => {}
-    } as never
-    expect(() => throwIfAborted(signal)).toThrow(
-      expect.objectContaining({ code: 'ABORTED', cause })
-    )
-    const merged = mergeSignals({ signal, timeoutMs: 1000 }, noopReporter)
-    expect(merged.signal?.aborted).toBe(true)
-    expect(merged.signal?.reason).toBe(cause)
-    merged.dispose()
-  })
+
   it('signal 为 undefined 时不抛错', () => {
     expect(() => throwIfAborted(undefined)).not.toThrow()
   })
