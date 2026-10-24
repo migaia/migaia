@@ -726,6 +726,8 @@ export type IStorageDefinePlugin = {
         | 'emit'
         | 'registerDetect'
         | 'getPublishedBackend'
+        | 'createChangeController'
+        | 'getOrgContext'
       > & { readonly features: IFeatureOutputs<F> }
     ) => IStorageNativePluginDescriptor & { readonly kind?: never },
     const F extends IFeatureRecord = {}

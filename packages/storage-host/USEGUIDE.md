@@ -267,3 +267,5 @@ PENDING-USER-REVIEW：dropOrg 遇到存活的全局 journal 时，原私有 name
 原生作者的 `core.emit` 在宿主 closing 期间跳过可选诊断，且不执行延迟 payload 工厂，避免用 HOST_DISPOSING 替换已准入原生操作的结算结果。open 期间仍复用原 registration 检查和原事件通道；完全 closed 或失效 registration 的旧句柄继续拒绝。宿主关闭事件本身仍由原宿主拥有者发布。
 
 普通插件返回嵌套API对象时，可在descriptor声明contextualExtensions: ['archive']，只让这些顶层键的一层自有方法取得原IStoragePluginCallContext。方法保原receiver和Promise身份并复用原registration guard；未选择的数据对象保持原身份。列表在安装前单次复制，所选API只接受自有数据属性，不递归投影或授予关闭权。
+
+普通组合插件的安装窗同样可用原createChangeController，并在运行时读取原getOrgContext的execution。controller由原onDispose释放；真实工作settle后才释放beginMutation，取消不把外部未完成I/O伪装成已排空。
