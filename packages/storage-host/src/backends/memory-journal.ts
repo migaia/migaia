@@ -211,6 +211,8 @@ export function createMemoryJournalData(options: {
     })
     void reservation.then(undefined, acquired.reject)
     await acquired.promise
+    /** Drop replaces this original private Map; an old log cannot reuse cached deleted history. */
+    const generation = namespaces
     const lifetime = createQuiescenceTracker<object>()
     const resource = Object.freeze({})
     const attempts = new Map<string, () => void>()
@@ -221,7 +223,7 @@ export function createMemoryJournalData(options: {
     /** Closing this handle never closes its original backend or another namespace handle. */
     const assertOpen = (): void => {
       options.assertLive()
-      if (lifetime.isSealed(resource))
+      if (lifetime.isSealed(resource) || generation !== namespaces)
         throw new StorageContractError(StorageContractErrorCode.disposed)
     }
     /** A current native transaction retains the handle until its actual commit or rollback. */
@@ -292,7 +294,11 @@ export function createMemoryJournalData(options: {
     }
     return Object.freeze({
       nativeAtomic: true,
-      transactionInfo: (scope: Omit<ITransactionScope, 'use'>) => options.scope(scope).info,
+      assertLive: assertOpen,
+      transactionInfo: (scope: Omit<ITransactionScope, 'use'>) => {
+        assertOpen()
+        return options.scope(scope).info
+      },
       run,
       runCommitted: <R>(
         work: (view: IStorageJournalNamespaceView) => Promise<R>,

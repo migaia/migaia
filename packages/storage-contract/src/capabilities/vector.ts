@@ -413,3 +413,45 @@ export function snapshotStorageVectorSearch(
     })
   })
 }
+
+/**
+ * Capture dense string IDs once before native work. The default preserves order and duplicates;
+ * callers selecting recommendation uniqueness reject duplicates without changing delete semantics.
+ */
+export function snapshotStorageVectorIds(
+  ids: readonly string[],
+  backend?: IBackendKind,
+  rejectDuplicates = false
+): readonly string[] {
+  return vectorInput(backend, () => {
+    if (!Array.isArray(ids) || typeof rejectDuplicates !== 'boolean') invalidVector(backend)
+    /** Read the borrowed bound once, then each own ID once. */
+    const length = ids.length
+    assertVectorArrayLength(length, 0, backend)
+    /** The immutable result owns its values and does not impose a key-domain limit on vector IDs. */
+    const result: string[] = []
+    /** Uniqueness is only a selected admission constraint, never a hidden deletion policy. */
+    const seen = rejectDuplicates ? new Set<string>() : undefined
+    for (let index = 0; index < length; index++) {
+      if (!Object.hasOwn(ids, index)) invalidVector(backend)
+      /** Capture each accessor value before validating or copying it. */
+      const id = ids[index]
+      if (typeof id !== 'string' || seen?.has(id)) invalidVector(backend)
+      seen?.add(id)
+      result.push(id)
+    }
+    return Object.freeze(result)
+  })
+}
+/** Resolve only the declared deletion strategy; engines retain ownership of actual count behavior. */
+export function snapshotStorageDeleteCountMode(
+  value: DeleteCountMode | undefined,
+  backend?: IBackendKind
+): DeleteCountMode {
+  return vectorInput(backend, () => {
+    if (value === undefined) return DeleteCountMode.precount
+    if (value !== DeleteCountMode.precount && value !== DeleteCountMode.scroll)
+      invalidVector(backend)
+    return value
+  })
+}

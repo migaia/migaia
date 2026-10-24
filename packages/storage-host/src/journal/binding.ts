@@ -22,8 +22,16 @@ export function snapshotStorageJournalBinding(
 ): IStorageJournalBackendBinding {
   try {
     const result = Object.create(null) as Record<string, unknown>
+    /** This fact belongs to the original factory, not the backend name or nativeAtomic flag. */
+    const externalWal = input?.externalWal
+    if (externalWal !== undefined) {
+      if (externalWal !== true)
+        throw new StorageContractError(StorageContractErrorCode.invalidArgument)
+      result.externalWal = true
+    }
     for (const key of [
       'forOrg',
+      'lockTarget',
       'openNamespace',
       'changes',
       'readImage',

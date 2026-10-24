@@ -270,7 +270,8 @@ export function standardConformance(
       await conformanceCleanup(tail, () => {
         expect(typeof tail.dispose).toBe('function')
       })
-      const next = await api.readChanges({ after: initial.cursor, limit: 1 })
+      // A successfully confirmed native tail may retire cursors older than its current slot.
+      const next = await api.readChanges({ limit: 1 })
       expect(typeof next.cursor).toBe('string')
     })
   }

@@ -34,6 +34,8 @@ export const SqliteOperation = {
   keys: 'keys',
   clearValues: 'clearValues',
   clearAll: 'clearAll',
+  /** Physical organization deletion stays under the native guarded mutation owner. */
+  dropOrg: 'dropOrg',
   getBytes: 'getBytes',
   setBytes: 'setBytes',
   removeBytes: 'removeBytes',

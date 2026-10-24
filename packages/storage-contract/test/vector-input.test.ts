@@ -261,3 +261,45 @@ describe('vector native input snapshots', () => {
     ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT' }))
   })
 })
+
+it('captures dense ID batches and deletion modes without changing backend policies', () => {
+  let reads = 0
+  const ids = ['a', 'a', '\ud800']
+  Object.defineProperty(ids, 0, {
+    get: () => {
+      reads++
+      return 'a'
+    }
+  })
+  const captured = contract.snapshotStorageVectorIds(ids)
+  expect(reads).toBe(1)
+  expect(captured).toEqual(['a', 'a', '\ud800'])
+  expect(Object.isFrozen(captured)).toBe(true)
+  expect(contract.snapshotStorageVectorIds(['a', 'b'], undefined, true)).toEqual(['a', 'b'])
+  const sparse: string[] = []
+  sparse.length = 1
+  for (const input of [sparse, ['a', 1], {}])
+    expect(() => contract.snapshotStorageVectorIds(input as never)).toThrowError(
+      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+    )
+  expect(() => contract.snapshotStorageVectorIds(['a', 'a'], undefined, true)).toThrowError(
+    expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+  )
+  const failure = new RangeError('ID getter failed'),
+    broken = ['a']
+  Object.defineProperty(broken, 0, {
+    get: () => {
+      throw failure
+    }
+  })
+  expect(() => contract.snapshotStorageVectorIds(broken)).toThrowError(
+    expect.objectContaining({ code: 'INVALID_ARGUMENT', cause: failure })
+  )
+  expect(contract.snapshotStorageDeleteCountMode(undefined)).toBe(contract.DeleteCountMode.precount)
+  for (const value of [contract.DeleteCountMode.precount, contract.DeleteCountMode.scroll])
+    expect(contract.snapshotStorageDeleteCountMode(value)).toBe(value)
+  for (const value of ['', 'count', null, 0])
+    expect(() => contract.snapshotStorageDeleteCountMode(value as never)).toThrowError(
+      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+    )
+})

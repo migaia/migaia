@@ -7,8 +7,8 @@ export const storagePluginSqliteReference: ILibraryReference = {
   modules: {
     index: {
       summary: t(
-        'Install native SQLite storage with complete transactions and shared SQL composition.',
-        '安装具备完整事务及共同 SQL 组合的原生 SQLite 存储。'
+        'Install native SQLite storage with complete transactions, shared SQL and isolated organization rows.',
+        '安装具备完整事务、共同 SQL 及组织行隔离的原生 SQLite 存储。'
       )
     },
     node: {

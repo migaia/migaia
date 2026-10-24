@@ -365,7 +365,9 @@ export {
   snapshotStorageVector,
   snapshotStorageVectorUpsert,
   snapshotStorageVectorFilter,
-  snapshotStorageVectorSearch
+  snapshotStorageVectorSearch,
+  snapshotStorageVectorIds,
+  snapshotStorageDeleteCountMode
 } from './capabilities/vector.js'
 export type {
   IVectorApi,

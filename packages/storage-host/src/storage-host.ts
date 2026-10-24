@@ -1,3 +1,4 @@
+import { isStorageErrorFamily } from './core/error-family.js'
 import {
   createStorageHooks,
   readStorageHookFailureCode,
@@ -19,10 +20,11 @@ import {
 import { StorageHookName as Hook } from './hook-names.js'
 import { borrowStorageBackend } from './borrow.js'
 import { createBackendKeyLockPort } from './backends/key-locks.js'
-import { STORAGE_DEFAULT_ORG } from './state-constants.js'
+import { STORAGE_DEFAULT_ORG, STORAGE_JOURNAL_BOOTSTRAP_PREFIX } from './state-constants.js'
 import type { IBackendStageBindings } from '@migaia/storage-contract'
 import {
   defineHost,
+  definePlugin as defineNativePlugin,
   asyncDisposeKey,
   PluginHostErrorCode,
   getPluginRuntimeIntegration,
@@ -71,6 +73,13 @@ import type {
   IStorageOrgBinding
 } from './types.js'
 import { storageJournalAccess, type IStorageJournalBackendAccess } from './journal/binding.js'
+import { openStorageLogStore, snapshotStorageLogPrefix } from './journal/log-store.js'
+import {
+  prepareStorageJournalConfiguration,
+  snapshotStorageJournalConfiguration,
+  type IStorageJournalConfigurationSnapshot
+} from './journal/configuration.js'
+import type { IStorageJournalConfiguration, IStorageJournalExecutionPort } from './journal/types.js'
 
 /** Minimal PluginHost domain core; storage materializers do not expose host mutation to plugins. */
 type IStorageHostCore = object
@@ -89,6 +98,7 @@ type IStorageDetectCheck = {
 
 /** One native registration's single-assignment store bridge into its PluginHost core. */
 type IStorageNativeRegistrationContext = {
+  readonly getJournal: (orgId: string) => IStorageJournalExecutionPort | undefined
   readonly id: string
   readonly defaultOrgId: string
   readonly assertCurrent: () => void
@@ -155,6 +165,7 @@ export function createStoragePluginHost(options: IPluginHostOptions): IStoragePl
           context.setRegistrationCore(core)
         },
         getStore: context.storeCell.get,
+        journal: context.getJournal(context.defaultOrgId),
         setStorageFeatureProjection: context.storeCell.setFeatureProjection,
         getStorageFeatureClientResolver: context.storeCell.getFeatureClientResolver,
         setStorageJournalBinding: (
@@ -198,6 +209,10 @@ export function createStoragePluginHost(options: IPluginHostOptions): IStoragePl
             createKeyLockPort: () => {
               context.assertExecution()
               return createBackendKeyLockPort()
+            },
+            createRevisionPort: () => {
+              context.assertExecution()
+              return createBackendRevisionPort()
             },
             registerChangeController: (store, controller) => {
               context.assertExecution()
@@ -388,6 +403,7 @@ type IStorageBatchToken = {
 }
 
 type IStorageHostOptionsSnapshot = {
+  readonly journal: IStorageHostOptions['journal']
   readonly org: IStorageHostOptions['org']
   readonly autoDetect: IStorageHostOptions['autoDetect']
   readonly installTimeoutMs: number | undefined
@@ -412,6 +428,7 @@ const snapshotStorageHostCreateOptions = (
   try {
     return {
       hostOptions: {
+        journal: options?.journal,
         org: options?.org,
         autoDetect: options?.autoDetect,
         installTimeoutMs: options?.installTimeoutMs,
@@ -432,6 +449,33 @@ const snapshotStorageHostCreateOptions = (
 
 /** Storage facade over the canonical PluginHost lifecycle owner and its batch transaction. */
 export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] = readonly []> {
+  /** One original facade owns immutable org preparation data, never another backend registry. */
+  readonly #journal:
+    | IStorageJournalConfigurationSnapshot
+    | Extract<IStorageJournalConfiguration, Function>
+    | undefined
+  /**
+   * Concurrent first endpoints share one exact initializer and per-registration preparation
+   * Promise.
+   */
+  #journalOrgs:
+    | Map<
+        string,
+        {
+          readonly options: Promise<IStorageJournalConfigurationSnapshot>
+          readonly backends: Map<
+            IStorageStoreCell,
+            {
+              readonly promise: Promise<void>
+              value?: Awaited<ReturnType<typeof prepareStorageJournalConfiguration>>
+              complete: boolean
+            }
+          >
+        }
+      >
+    | undefined
+  /** The original successful bootstrap owns one async stage and its canonical sync-entry guard. */
+  #journalPipelineInstalled = false
   /** Canonical PluginHost owns lifecycle and eventual mutation queue semantics. */
   readonly #inner: IStoragePluginHost
   /** Registry is swapped only after the complete inner batch has committed. */
@@ -486,8 +530,13 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
       report,
       hooks,
       org,
-      autoDetect
+      autoDetect,
+      journal
     } = optionsSnapshot.hostOptions
+    this.#journal =
+      typeof journal === 'function' || journal === undefined
+        ? journal
+        : snapshotStorageJournalConfiguration(journal)
     this.#orgId = org === undefined ? STORAGE_DEFAULT_ORG : org
     assertOperationContext({ orgId: this.#orgId })
     if (autoDetect !== undefined && typeof autoDetect !== 'boolean')
@@ -637,6 +686,8 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
         admittedBackendIds.add(backendId)
       }
       assertBatchOwner()
+      /** Only the final original batch preparation admits already completed candidate reads. */
+      let preparingJournal = false
       /** Each batch entry retains exactly one original store handoff. */
       const nativeContexts = new Map<number, IStorageNativeRegistrationContext>()
       /** Materialize original definitions in the same order as native registration. */
@@ -668,7 +719,9 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
            * Original config admission accepts the actual candidate in its current install
            * operation.
            */
-          void registrationCore!.config.get()
+          if (preparingJournal)
+            getPluginRuntimeIntegration(registrationCore).assertPreparedRegistration()
+          else void registrationCore!.config.get()
           if (!batchToken.active) getPluginRuntimeIntegration(registrationCore).assertCurrent()
         }
         /** Immutable identity does not retain a shared current-store or current-organization slot. */
@@ -706,6 +759,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
           })
         /** Bind the next domain core to its matching entry in this install batch. */
         const context: IStorageNativeRegistrationContext = {
+          getJournal: (orgId) => this.#journalPort(context, orgId),
           id: native.id,
           defaultOrgId: this.#orgId,
           getOrgContext: (orgId) => {
@@ -723,6 +777,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
             const contextForOrg = callContext(orgId)
             const observe = (store: IStorageBase) => createStorageObservers(binding, () => store)
             return Object.freeze({
+              journal: context.getJournal(orgId),
               orgId,
               execution,
               callContext: contextForOrg,
@@ -907,13 +962,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
             )
             try {
               /** The complete original install hook includes selected Feature publication. */
-              const installed = await withTimeout(() => pending, {
-                timeoutMs: Math.max(0, this.#installTimeoutMs - elapsed),
-                signals: [batchToken.controller.signal],
-                scheduler: this.#scheduler,
-                report: (error) => this.#report(error),
-                zeroTimeoutBehavior: 'skip'
-              })
+              const installed = await this.#awaitInstall(pending, batchToken, elapsed)
               /**
                * Register last in the original install window so accepted checks drain before any
                * resource they may inspect, even when a Feature registered them before the store.
@@ -1012,15 +1061,56 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
       })
       /** Pass only the original definitions to the canonical install batch. */
       const materialized = entries.map((entry) => entry.plugin)
+      /** A final original registration prepares candidates before the atomic public registry swap. */
+      let installedJournalPipeline = false
+      const candidates = [...nativeContexts.values()]
+      if (
+        this.#journal !== undefined &&
+        (candidates.length !== 0 || !this.#journalOrgs?.has(this.#orgId))
+      ) {
+        materialized.push(
+          defineNativePlugin(
+            STORAGE_JOURNAL_BOOTSTRAP_PREFIX + (nativeMetadata[0]?.id ?? this.#orgId),
+            (core) => ({
+              install: async () => {
+                const elapsed = Math.max(0, this.#scheduler.now() - batchToken.startedAt)
+                await this.#awaitInstall(
+                  (async () => {
+                    preparingJournal = true
+                    try {
+                      await this.#journalOptions(this.#orgId, candidates)
+                      for (const context of candidates)
+                        if (context.getKind() !== undefined)
+                          await this.#prepareJournalBackend(context, this.#orgId, candidates)
+                            .promise
+                    } finally {
+                      preparingJournal = false
+                    }
+                  })(),
+                  batchToken,
+                  elapsed
+                )
+                if (!this.#journalPipelineInstalled) {
+                  /** Selected asynchronous journal completion uses the original shared stage owner. */
+                  core.useAsyncPipeline(async (input, next) => next(input))
+                  installedJournalPipeline = true
+                }
+                return {}
+              }
+            })
+          ) as (typeof materialized)[number]
+        )
+      }
       this.#inner.setNativeContexts(
-        entries.map((_, index) => nativeContexts.get(index)),
-        entries.length
+        materialized.map((_, index) => nativeContexts.get(index)),
+        materialized.length
       )
       /** Committed native handles retain their original guarded extension methods. */
       const innerHandles = await this.#inner.use(
         ...(materialized as IPluginConstraint<IStorageHostCore>[])
       )
       assertBatchOwner()
+      if (installedJournalPipeline) this.#journalPipelineInstalled = true
       /** Prepare the next store registry before its atomic public swap. */
       const nextRegistry = new Map(this.#registry)
       /** Merge original guarded descriptors without rebuilding extension methods. */
@@ -1216,6 +1306,15 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
         StorageErrorText.backendNotInstalled
       )
     const context = this.#storeContexts.get(store)!.context
+    return this.#journalContextAccess(context, orgId)
+  }
+
+  /** Candidate bootstrap and published lookups consume the same exact original registration facts. */
+  #journalContextAccess(
+    context: IStorageNativeRegistrationContext,
+    orgId: string
+  ): IStorageJournalBackendAccess {
+    this.#assertOpen()
     context.assertExecution()
     const binding = context.storeCell.journalForOrg(orgId)
     return Object.freeze({
@@ -1227,6 +1326,169 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
         this.#assertOpen()
         context.assertExecution()
         return context.storeCell.retainJournalResource(resource)
+      }
+    })
+  }
+
+  /** Both native installs and the final bootstrap consume the same original batch deadline. */
+  #awaitInstall<T>(pending: Promise<T>, token: IStorageBatchToken, elapsed: number): Promise<T> {
+    return withTimeout(() => pending, {
+      timeoutMs: Math.max(0, this.#installTimeoutMs - elapsed),
+      signals: [token.controller.signal],
+      scheduler: this.#scheduler,
+      report: (error) => this.#report(error),
+      zeroTimeoutBehavior: 'skip'
+    })
+  }
+
+  /** One original org cell shares the initializer Promise without opening stores in org(). */
+  #journalOptions(orgId: string, candidates?: readonly IStorageNativeRegistrationContext[]) {
+    this.#assertOpen()
+    const existing = this.#journalOrgs?.get(orgId)
+    if (existing !== undefined) return existing.options
+    const source = this.#journal!
+    const options = Promise.resolve().then(async () => {
+      this.#assertOpen()
+      if (typeof source !== 'function') return source
+      const configured = await source(
+        Object.freeze({
+          orgId,
+          storageLogStore: (id: string, options: { readonly prefix: string }) => {
+            this.#assertOpen()
+            const candidate = candidates?.find(
+              (context) => context.id === id && context.getKind() !== undefined
+            )
+            const published = this.#registry.get(id)
+            const context =
+              candidate ??
+              (published === undefined ? undefined : this.#storeContexts.get(published)?.context)
+            if (context === undefined)
+              throw new StorageError(
+                StorageErrorCode.backendNotInstalled,
+                {},
+                StorageErrorText.backendNotInstalled
+              )
+            return openStorageLogStore(
+              this.#journalContextAccess(context, orgId),
+              snapshotStorageLogPrefix(options)
+            )
+          }
+        })
+      )
+      this.#assertOpen()
+      return snapshotStorageJournalConfiguration(configured)
+    })
+    ;(this.#journalOrgs ??= new Map()).set(orgId, { options, backends: new Map() })
+    return options
+  }
+
+  /** Each original backend cell prepares once under its org's already fixed configuration. */
+  #prepareJournalBackend(
+    context: IStorageNativeRegistrationContext,
+    orgId: string,
+    candidates?: readonly IStorageNativeRegistrationContext[]
+  ) {
+    context.assertExecution()
+    const options = this.#journalOptions(orgId, candidates)
+    const backends = this.#journalOrgs!.get(orgId)!.backends
+    const existing = backends.get(context.storeCell)
+    if (existing !== undefined) return existing
+    let entry!: {
+      readonly promise: Promise<void>
+      value?: Awaited<ReturnType<typeof prepareStorageJournalConfiguration>>
+      complete: boolean
+    }
+    const promise = options.then(async (configured) => {
+      context.assertExecution()
+      if (configured.logger.undo !== undefined) {
+        /** Only the original physical backend may publish its undo endpoint; frozen bases stay raw. */
+        let undo: unknown
+        try {
+          undo = Reflect.get(context.storeCell.forOrg(orgId, this.#orgId), 'undo')
+        } catch (cause) {
+          if (isStorageErrorFamily(cause)) throw cause
+          throw new StorageContractError(StorageContractErrorCode.invalidArgument, { cause })
+        }
+        if (typeof undo !== 'function')
+          throw new StorageContractError(StorageContractErrorCode.unsupported)
+      }
+      entry.value = await prepareStorageJournalConfiguration(
+        configured,
+        this.#journalContextAccess(context, orgId),
+        context.storeCell.get().backend,
+        {
+          report: this.#report,
+          onBinlogAppendError: (txId, error) => {
+            this.#report(error)
+            this.#events.emit(Hook.onBinlogAppendError, () => ({
+              backendId: context.id,
+              backend: context.storeCell.get().backend,
+              orgId,
+              namespace: configured.namespace,
+              backendInstanceId: context.id,
+              txId,
+              code: readStorageHookFailureCode(error, this.#report)
+            }))
+          },
+          beforeRecover: () =>
+            this.#events.emit(Hook.beforeJournalRecover, () => ({
+              backendId: context.id,
+              backend: context.storeCell.get().backend,
+              orgId,
+              namespace: configured.namespace,
+              backendInstanceId: context.id
+            })),
+          afterRecover: (count, elapsedMs) =>
+            this.#events.emit(Hook.afterJournalRecover, () => ({
+              backendId: context.id,
+              backend: context.storeCell.get().backend,
+              orgId,
+              namespace: configured.namespace,
+              backendInstanceId: context.id,
+              count,
+              elapsedMs
+            })),
+          onRecoverError: (error) =>
+            this.#events.emit(Hook.onJournalRecoverError, () => ({
+              backendId: context.id,
+              backend: context.storeCell.get().backend,
+              orgId,
+              namespace: configured.namespace,
+              backendInstanceId: context.id,
+              code: readStorageHookFailureCode(error, this.#report)
+            }))
+        }
+      )
+      entry.complete = true
+    })
+    entry = { promise, complete: false }
+    backends.set(context.storeCell, entry)
+    return entry
+  }
+
+  /** Backend authors receive only fixed-org preparation, initial locks and original-scope recording. */
+  #journalPort(
+    context: IStorageNativeRegistrationContext,
+    orgId: string
+  ): IStorageJournalExecutionPort | undefined {
+    if (this.#journal === undefined) return undefined
+    const prepared = () => {
+      context.assertExecution()
+      const entry = this.#journalOrgs?.get(orgId)?.backends.get(context.storeCell)
+      if (!entry?.complete) throw new StorageContractError(StorageContractErrorCode.unsupported)
+      return entry.value
+    }
+    return Object.freeze({
+      prepare: () => this.#prepareJournalBackend(context, orgId).promise,
+      active: () => prepared() !== undefined,
+      headLocks: () => prepared()?.headLocks ?? [],
+      begin: (scope: Omit<import('@migaia/storage-contract').ITransactionScope, 'use'>) =>
+        prepared()?.begin(scope),
+      undo: (txId, run) => {
+        const undo = prepared()?.undo
+        if (undo === undefined)
+          return Promise.reject(new StorageContractError(StorageContractErrorCode.unsupported))
+        return undo(txId, run)
       }
     })
   }
@@ -1480,6 +1742,8 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
       })
       .finally(() => {
         this.#state = 'closed'
+        this.#journalOrgs?.clear()
+        this.#journalOrgs = undefined
         this.#events.clear()
       })
       .then(completion.resolve, completion.reject)
@@ -1521,11 +1785,44 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
  * and a 30000 ms install budget. Browser storage is acquired only by selected backend plugins;
  * failed initial installation disposes its newly created facade before rejecting.
  */
-export const createStorageHost = async <
-  const TPlugins extends readonly IStorageBackendPluginHandle[] = readonly []
+export function createStorageHost<
+  const TPlugins extends readonly IStorageBackendPluginHandle[] = readonly [],
+  const TOptions extends Exclude<
+    import('./journal/types.js').IStorageJournalConfiguration,
+    Function
+  > = Exclude<import('./journal/types.js').IStorageJournalConfiguration, Function>
 >(
-  options?: IStorageHostCreateOptions<TPlugins>
-): Promise<IStorageHost<TPlugins>> => {
+  options: Omit<IStorageHostCreateOptions<TPlugins>, 'journal'> & {
+    readonly journal: (
+      context: import('./journal/types.js').IStorageJournalInitializerContext
+    ) => TOptions | PromiseLike<TOptions>
+  }
+): Promise<
+  IStorageHost<
+    TPlugins,
+    (
+      context: import('./journal/types.js').IStorageJournalInitializerContext
+    ) => TOptions | PromiseLike<TOptions>
+  >
+>
+/** Direct options retain the actual selected logger extension instead of widening it. */
+export function createStorageHost<
+  const TPlugins extends readonly IStorageBackendPluginHandle[] = readonly [],
+  const TOptions extends Exclude<
+    import('./journal/types.js').IStorageJournalConfiguration,
+    Function
+  > = Exclude<import('./journal/types.js').IStorageJournalConfiguration, Function>
+>(
+  options: Omit<IStorageHostCreateOptions<TPlugins>, 'journal'> & { readonly journal: TOptions }
+): Promise<IStorageHost<TPlugins, TOptions>>
+/** Broad named options and existing one-parameter callers retain their prior inference. */
+export function createStorageHost<
+  const TPlugins extends readonly IStorageBackendPluginHandle[] = readonly []
+>(options?: IStorageHostCreateOptions<TPlugins>): Promise<IStorageHost<TPlugins>>
+/** Original runtime factory remains the only implementation of every type overload. */
+export async function createStorageHost<
+  const TPlugins extends readonly IStorageBackendPluginHandle[] = readonly []
+>(options?: IStorageHostCreateOptions<TPlugins>): Promise<IStorageHost<TPlugins>> {
   /** Read constructor options once before any plugin can execute. */
   const optionsSnapshot = snapshotStorageHostCreateOptions(options)
   /** The storage facade retains the one canonical native lifecycle owner. */

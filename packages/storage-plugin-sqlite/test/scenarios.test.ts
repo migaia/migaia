@@ -2,10 +2,11 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { it, expect, onTestFinished, vi } from 'vitest'
-import { createStorageHost, defineFeature, definePlugin } from '@migaia/storage-host'
+import { createStorageHost, createOrgId, defineFeature, definePlugin } from '@migaia/storage-host'
 import { deferred, sleep } from '@migaia/utils/promise'
 import {
   lockKey,
+  sql,
   readTransactionOperationContext,
   runTransactionOperation,
   type IOperationContext,
@@ -300,4 +301,83 @@ it('shares the original attempt context with cancellable transaction composition
   expect(() => readTransactionOperationContext(expired)).toThrowError(
     expect.objectContaining({ code: 'INVALID_ARGUMENT' })
   )
+})
+
+/** Native Feature resolution authenticates each original root or explicit-org transaction owner. */
+it('uses genuine organization scopes without exposing caller SQL or rerunning Feature factories', async () => {
+  await using connection = nodeSqliteDriver(':memory:')
+  let factories = 0
+  const clients: ISqliteDriver[] = []
+  const eventOrganizations: (string | undefined)[] = []
+  const native = defineFeature(sqliteBackendKind, (core) => {
+    factories++
+    return {
+      capabilities: [] as const,
+      chain: {},
+      api: {
+        store: {
+          native: {
+            async client() {
+              return this.client
+            },
+            async observe() {
+              return core.featureExpose.getChangeController()!.subscribe((change) => {
+                eventOrganizations.push(change.orgId)
+              })
+            }
+          }
+        },
+        transaction: {
+          native: {
+            async client() {
+              clients.push(this.client)
+              return this.client
+            }
+          }
+        }
+      }
+    }
+  })
+  const org = createOrgId()
+  await using host = await createStorageHost({
+    org,
+    plugins: [
+      sqliteBackendPlugin(
+        { driver: connection },
+        { native, maintenance: sqliteMaintenanceFeature() }
+      )
+    ]
+  })
+  const root = host.backend('sqlite')
+  const same = host.org(org).backend('sqlite')
+  const otherOrg = createOrgId()
+  const other = host.org(otherOrg).backend('sqlite')
+  const unsubscribe = await root.api.native.observe()
+  const rootClient = await root.api.native.client()
+  expect(await same.api.native.client()).toBe(rootClient)
+  for (const store of [root, same, other]) {
+    await store.transaction(async (scope) => {
+      expect(await scope.api.native.client()).toBe(await store.api.native.client())
+      await scope.set('native-scope', 'kept')
+    })
+  }
+  await root.set('routed-context', 'other', { orgId: otherOrg })
+  expect(eventOrganizations.at(-1)).toBe(otherOrg)
+  expect(await other.get('routed-context')).toBe('other')
+  expect(await root.get('routed-context')).toBeNull()
+  unsubscribe()
+  expect(factories).toBe(1)
+  expect(clients).toHaveLength(3)
+  expect(await root.get('native-scope')).toBe('kept')
+  await expect(same.api.maintenance.vacuum()).rejects.toMatchObject({
+    code: 'UNSUPPORTED_CAPABILITY'
+  })
+  await expect(other.api.maintenance.vacuum()).rejects.toMatchObject({
+    code: 'UNSUPPORTED_CAPABILITY'
+  })
+  expect(same.has(sql)).toBe(false)
+  await expect(same.transaction((scope) => scope.sql`SELECT 1`.all())).rejects.toMatchObject({
+    code: 'TRANSACTION_FAILED',
+    cause: expect.objectContaining({ code: 'UNSUPPORTED_CAPABILITY' })
+  })
 })

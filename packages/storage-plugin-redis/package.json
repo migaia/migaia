@@ -28,6 +28,30 @@
     "./bun": {
       "types": "./dist/adapters/bun.d.ts",
       "default": "./dist/bun.js"
+    },
+    "./features/streams": {
+      "types": "./dist/features/streams.d.ts",
+      "default": "./dist/features/streams.js"
+    },
+    "./features/pubsub": {
+      "types": "./dist/features/pubsub.d.ts",
+      "default": "./dist/features/pubsub.js"
+    },
+    "./features/sorted-sets": {
+      "types": "./dist/features/sorted-sets.d.ts",
+      "default": "./dist/features/sorted-sets.js"
+    },
+    "./features/rate-limit": {
+      "types": "./dist/features/rate-limit.d.ts",
+      "default": "./dist/features/rate-limit.js"
+    },
+    "./features/change-stream": {
+      "types": "./dist/features/change-stream.d.ts",
+      "default": "./dist/features/change-stream.js"
+    },
+    "./features/search": {
+      "types": "./dist/features/search.d.ts",
+      "default": "./dist/features/search.js"
     }
   },
   "scripts": {

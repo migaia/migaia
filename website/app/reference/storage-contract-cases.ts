@@ -84,6 +84,24 @@ const vectorInputCase: ICaseDoc = {
   )
 }
 
+/** Native ID and count admission stays in the original vector input owner. */
+const vectorBatchInputCase: ICaseDoc = {
+  title: t('Capture IDs and deletion strategy', '捕获 ID 与删除策略'),
+  problem: t(
+    'Native operations need detached IDs and one declared count strategy.',
+    '原生操作需要已脱离的 ID 与明确计数策略。'
+  ),
+  example: `import { snapshotStorageVectorIds, snapshotStorageDeleteCountMode } from '@migaia/storage-contract'
+const ids = snapshotStorageVectorIds(['a', 'a'])
+const mode = snapshotStorageDeleteCountMode(undefined)
+console.log(ids.join(','), mode)
+// a,a precount`,
+  result: t(
+    'Preserves duplicate IDs and defaults to precount without native I/O.',
+    '保留重复 ID，缺省 precount，不做原生 I/O。'
+  )
+}
+
 /** TTL callers use their actual provided backend; the helper owns only target/duration admission. */
 const ttlCase: ICaseDoc = {
   title: t('Expire an existing physical entry', '为已有物理条目设置期限'),
@@ -421,6 +439,8 @@ export function verifyKvBackend(
   snapshotStorageVectorUpsert: [vectorInputCase],
   snapshotStorageVectorFilter: [vectorInputCase],
   snapshotStorageVectorSearch: [vectorInputCase],
+  snapshotStorageVectorIds: [vectorBatchInputCase],
+  snapshotStorageDeleteCountMode: [vectorBatchInputCase],
   snapshotStorageBlobPut: [
     {
       title: t('snapshotStorageBlobPut', 'snapshotStorageBlobPut'),

@@ -2,8 +2,10 @@ import {
   encodeOrderedStorageKey,
   encodeStorageOrgKey,
   decodeStorageOrgKey,
+  snapshotStorageOrgKeyPrefix,
   type IStorageKey
 } from '@migaia/storage-contract'
+import { asCodecValue, type ICodecValue } from '@migaia/serialize/codec'
 import { bytesToBase64, base64ToBytes } from '@migaia/serialize/core'
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
 import {
@@ -36,15 +38,33 @@ export const RedisSuffix = {
   record: 'r',
   revisions: 'rev',
   changes: 'changes',
+  durableChanges: 'durable-changes',
+  changeField: 'change',
   locks: 'lock',
-  sequence: '$sequence'
+  sequence: '$sequence',
+  /** Managed vector metadata remains readable for org cleanup without selecting Search. */
+  vectorId: 'id',
+  vectorCollection: 'collection',
+  vectorOrg: 'org',
+  vector: 'v',
+  vectorIndex: 'vi'
 } as const
+/**
+ * Original portable JSON bytes have one physical presentation for collection, ID and scalar path
+ * names.
+ */
+export function redisPortableIdentity(value: ICodecValue): string {
+  return redisHex(new TextEncoder().encode(textCodec.encode(asCodecValue(value))))
+}
 /** Same-slot namespace and original logical key codec are the only physical key mapping. */
 export function createRedisLayout(prefix: string, orgId: string) {
   if (typeof prefix !== 'string') throw invalidArgument()
   const tag = '{' + redisHex(encodeOrderedStorageKey(prefix, RedisText.backend)) + '}',
     encode = (key: IStorageKey): string =>
       redisHex(encodeStorageOrgKey(orgId, key, RedisText.backend)),
+    span = snapshotStorageOrgKeyPrefix(orgId, undefined, RedisText.backend),
+    lower = redisHex(span.lower),
+    upper = redisHex(span.upper),
     decode = (encoded: string): IStorageKey => {
       try {
         return decodeStorageOrgKey(orgId, redisUnhex(encoded), RedisText.backend)
@@ -55,8 +75,32 @@ export function createRedisLayout(prefix: string, orgId: string) {
   return Object.freeze({
     tag,
     orgId,
+    owns: (physical: string): boolean => {
+      if (physical.startsWith(tag + ':' + RedisSuffix.locks + ':' + orgId + ':')) return true
+      if (!physical.startsWith(tag + ':')) return false
+      if (physical.startsWith(tag + ':' + RedisSuffix.vector + ':'))
+        return physical.split(':')[3] === orgId
+      const encoded = physical.slice(physical.lastIndexOf(':') + 1)
+      return encoded >= lower && encoded < upper
+    },
+    vectorPrefix: (collection: string): string =>
+      tag + ':' + RedisSuffix.vector + ':' + redisPortableIdentity(collection) + ':',
+    vectorPoint: (collection: string, id: string): string =>
+      tag +
+      ':' +
+      RedisSuffix.vector +
+      ':' +
+      redisPortableIdentity(collection) +
+      ':' +
+      orgId +
+      ':' +
+      redisPortableIdentity(id),
+    vectorIndex: (collection: string): string =>
+      tag + ':' + RedisSuffix.vectorIndex + ':' + redisPortableIdentity(collection),
+    vectorPattern: tag + ':' + RedisSuffix.vector + ':*:' + orgId + ':*',
     revisions: tag + ':' + RedisSuffix.revisions,
     changes: tag + ':' + RedisSuffix.changes,
+    durableChanges: tag + ':' + RedisSuffix.durableChanges,
     encode,
     decode,
     value: (channel: IRedisChannel, key: IStorageKey): string =>
