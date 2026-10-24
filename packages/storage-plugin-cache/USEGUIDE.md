@@ -67,3 +67,92 @@ try {
 `cache.api.semantic.set(prompt, value, { payload: { model: 'one' } })` 按 prompt 与模型元数据独立存储。`get` 可设置 `where`、`minScore`、一至十个 `candidates` 和异步 `accept`。`getOrLoad` 按组织、prompt 与规范 payload 合并回源，单调用取消不影响共享任务，并支持缩短 TTL 与 `cacheIf`。关闭时排空任务，不关闭借用的向量后端。`$cache.*` 为保留字段。
 
 `invalidate(where, { count: 'scroll' })` 返回原 `deleteWhere` 数字，缺省保留 `precount`。删除包含物理仍存在的过期匹配点；Qdrant 两策略继承原并发边界，不强制切换、不重新计数、不承诺全局快照。原 context 与 count 由该原生删除拥有者单次校验；向量 TTL 由原 `upsert` 设置。
+
+## 四层原生组合
+
+```ts
+import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'
+import { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'
+import { redisBackendPlugin } from '@migaia/storage-plugin-redis'
+import { nodeRedisDriver } from '@migaia/storage-plugin-redis/node-redis'
+import { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'
+import { pgDriver } from '@migaia/storage-plugin-postgres/pg'
+import { createClientPool } from 'redis'
+import { Pool } from 'pg'
+import { cachePlugin } from '@migaia/storage-plugin-cache'
+
+const redis = createClientPool({ url: process.env.MIGAIA_REDIS_URL })
+const postgres = new Pool({ connectionString: process.env.MIGAIA_PG_URL })
+await redis.connect()
+const prefix = 'cache_guide_' + crypto.randomUUID().replaceAll('-', '')
+const base = await createStorageHost({
+  plugins: [
+    memoryBackendPlugin({ id: 'l1' }),
+    sqliteBackendPlugin({ id: 'l2', driver: nodeSqliteDriver(':memory:') }),
+    redisBackendPlugin({ id: 'l3', driver: nodeRedisDriver(redis), prefix }),
+    postgresBackendPlugin({ id: 'l4', driver: pgDriver(postgres), prefix })
+  ]
+})
+const host = await base.use(
+  cachePlugin({
+    propagate: false,
+    tiers: [
+      { backend: 'l1', ttlMs: 10000 },
+      { backend: 'l2', ttlMs: 20000 },
+      { backend: 'l3', ttlMs: 30000 },
+      { backend: 'l4', ttlMs: 60000 }
+    ],
+    stampedeLock: { backend: 'l3', timeoutMs: 1000 }
+  })
+)
+await host.detect()
+try {
+  const answer = await host.backend('cache').getOrLoad('answer', async () => ({ text: 'Hello' }))
+  console.log(answer)
+  await host.backend('cache').clearAll()
+} finally {
+  await host.dispose()
+  await redis.close()
+  await postgres.end()
+}
+```
+
+## 原生语义示例
+
+```ts
+import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { cachePlugin } from '@migaia/storage-plugin-cache'
+import { semanticCacheFeature } from '@migaia/storage-plugin-cache/features/semantic'
+
+const base = await createStorageHost({
+  plugins: [memoryBackendPlugin({ id: 'values' }), memoryBackendPlugin({ id: 'vectors' })]
+})
+const host = await base.use(
+  cachePlugin(
+    {
+      tiers: [{ backend: 'values', ttlMs: 30000 }]
+    },
+    {
+      semantic: semanticCacheFeature({
+        backend: 'vectors',
+        collection: 'answers',
+        dimensions: 2,
+        minScore: 0.8,
+        ttlMs: 30000,
+        embed: async () => [1, 0]
+      })
+    }
+  )
+)
+await host.detect()
+try {
+  const semantic = host.backend('cache').api.semantic
+  await semantic.set('Question', { text: 'Answer' }, { payload: { model: 'one' } })
+  const hit = await semantic.get('Question', { where: { model: 'one' }, candidates: 3 })
+  console.log(hit?.value)
+  await semantic.invalidate({ model: 'one' }, { count: 'scroll' })
+} finally {
+  await host.dispose()
+}
+```

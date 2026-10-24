@@ -67,3 +67,92 @@ Import `semanticCacheFeature` from `@migaia/storage-plugin-cache/features/semant
 `cache.api.semantic.set(prompt, value, { payload: { model: 'one' } })` stores independent prompt/model identities. `get` accepts `where`, `minScore`, one to ten `candidates`, and optional asynchronous `accept`. `getOrLoad` shares a loader by organization, prompt and canonical payload, retains caller-only cancellation, and supports shortened TTL and `cacheIf`. Closing drains shared work without closing the vector backend. `$cache.*` payload fields are reserved.
 
 `invalidate(where, { count: 'scroll' })` returns the native `deleteWhere` number; omission retains `precount`. Physical expired matches are included. Qdrant's two modes retain their documented concurrent-write boundaries; the Feature does not switch mode, recount, or claim a global snapshot. Original context and count are validated once by that native deletion owner. Native `upsert` owns vector TTL.
+
+## Four native tiers
+
+```ts
+import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'
+import { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'
+import { redisBackendPlugin } from '@migaia/storage-plugin-redis'
+import { nodeRedisDriver } from '@migaia/storage-plugin-redis/node-redis'
+import { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'
+import { pgDriver } from '@migaia/storage-plugin-postgres/pg'
+import { createClientPool } from 'redis'
+import { Pool } from 'pg'
+import { cachePlugin } from '@migaia/storage-plugin-cache'
+
+const redis = createClientPool({ url: process.env.MIGAIA_REDIS_URL })
+const postgres = new Pool({ connectionString: process.env.MIGAIA_PG_URL })
+await redis.connect()
+const prefix = 'cache_guide_' + crypto.randomUUID().replaceAll('-', '')
+const base = await createStorageHost({
+  plugins: [
+    memoryBackendPlugin({ id: 'l1' }),
+    sqliteBackendPlugin({ id: 'l2', driver: nodeSqliteDriver(':memory:') }),
+    redisBackendPlugin({ id: 'l3', driver: nodeRedisDriver(redis), prefix }),
+    postgresBackendPlugin({ id: 'l4', driver: pgDriver(postgres), prefix })
+  ]
+})
+const host = await base.use(
+  cachePlugin({
+    propagate: false,
+    tiers: [
+      { backend: 'l1', ttlMs: 10000 },
+      { backend: 'l2', ttlMs: 20000 },
+      { backend: 'l3', ttlMs: 30000 },
+      { backend: 'l4', ttlMs: 60000 }
+    ],
+    stampedeLock: { backend: 'l3', timeoutMs: 1000 }
+  })
+)
+await host.detect()
+try {
+  const answer = await host.backend('cache').getOrLoad('answer', async () => ({ text: 'Hello' }))
+  console.log(answer)
+  await host.backend('cache').clearAll()
+} finally {
+  await host.dispose()
+  await redis.close()
+  await postgres.end()
+}
+```
+
+## Native semantic example
+
+```ts
+import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { cachePlugin } from '@migaia/storage-plugin-cache'
+import { semanticCacheFeature } from '@migaia/storage-plugin-cache/features/semantic'
+
+const base = await createStorageHost({
+  plugins: [memoryBackendPlugin({ id: 'values' }), memoryBackendPlugin({ id: 'vectors' })]
+})
+const host = await base.use(
+  cachePlugin(
+    {
+      tiers: [{ backend: 'values', ttlMs: 30000 }]
+    },
+    {
+      semantic: semanticCacheFeature({
+        backend: 'vectors',
+        collection: 'answers',
+        dimensions: 2,
+        minScore: 0.8,
+        ttlMs: 30000,
+        embed: async () => [1, 0]
+      })
+    }
+  )
+)
+await host.detect()
+try {
+  const semantic = host.backend('cache').api.semantic
+  await semantic.set('Question', { text: 'Answer' }, { payload: { model: 'one' } })
+  const hit = await semantic.get('Question', { where: { model: 'one' }, candidates: 3 })
+  console.log(hit?.value)
+  await semantic.invalidate({ model: 'one' }, { count: 'scroll' })
+} finally {
+  await host.dispose()
+}
+```
