@@ -6,6 +6,7 @@ import { memoryLogStore, wal } from '@migaia/logger/plugins/durable'
 import { kv } from '@migaia/storage-contract'
 import { createStorageHost, createOrgId } from '@migaia/storage-host'
 import { decodeStorageJournalImage } from '@migaia/storage-host/authoring/backend'
+import { storageJournalPlugin } from '@migaia/storage-host/journal'
 import { cookieBackendPlugin } from '../../src/cookies.js'
 import { fakeCookieDocument } from '../../src/testing/fake-cookie-document.js'
 
@@ -30,7 +31,10 @@ describe('visible-cookie redo', () => {
       scope: { path: '/cookies' }
     }
     const journal = { logger, namespace: 'cookies', redoWal: logger.wal }
-    const host = await createStorageHost({ plugins: [cookieBackendPlugin(options)], journal })
+    const host = await createStorageHost({
+      plugins: [storageJournalPlugin(), cookieBackendPlugin(options)],
+      journal
+    })
     const original = Object.getOwnPropertyDescriptor(document, 'cookie')!.set!
     let writes = 0
     const failure = vi.spyOn(document, 'cookie', 'set').mockImplementation((value) => {
@@ -51,7 +55,7 @@ describe('visible-cookie redo', () => {
       failure.mockRestore()
       await host.dispose()
       await using reopened = await createStorageHost({
-        plugins: [cookieBackendPlugin(options)],
+        plugins: [storageJournalPlugin(), cookieBackendPlugin(options)],
         journal
       })
       const reads = vi.spyOn(document, 'cookie', 'get')
@@ -88,7 +92,10 @@ describe('visible-cookie redo', () => {
     const document = fakeCookieDocument()
     const options = { document, namespace: 'cookie-expiry', redo: true as const }
     const journal = { logger, namespace: 'cookies', redoWal: logger.wal }
-    const host = await createStorageHost({ plugins: [cookieBackendPlugin(options)], journal })
+    const host = await createStorageHost({
+      plugins: [storageJournalPlugin(), cookieBackendPlugin(options)],
+      journal
+    })
     const fail = vi
       .spyOn(carrier, 'setState')
       .mockRejectedValueOnce(new RangeError('keep expiry intent pending'))
@@ -111,7 +118,7 @@ describe('visible-cookie redo', () => {
       await host.dispose()
       clock = vi.spyOn(Date, 'now').mockReturnValue(image.expiresAt + 1000)
       await using reopened = await createStorageHost({
-        plugins: [cookieBackendPlugin(options)],
+        plugins: [storageJournalPlugin(), cookieBackendPlugin(options)],
         journal
       })
       expect(await reopened.backend('cookies').get('expiring')).toBeNull()
