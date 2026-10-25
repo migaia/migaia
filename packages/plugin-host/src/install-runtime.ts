@@ -16,6 +16,7 @@ import ERROR_TEXT, {
   identifyPluginHostCallbackFailure,
   PluginHostError,
   createPluginHostTypeError,
+  tagPluginHostError,
   PluginHostInternalText
 } from './error-text.js'
 import { PluginHostErrorCode } from './error-code.js'
@@ -606,13 +607,23 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
     cause: unknown,
     detail: IPluginInstallFailureDetail
   ): PluginHostError<IPluginInstallFailureDetail> {
-    const error = this.#port.decorateError(
-      new PluginHostError(
-        PluginHostErrorCode.pluginInstallFailed,
-        PluginHostInternalText.PLUGIN_INSTALL_FAILURE_DETAIL(failedName, cause),
-        { cause, detail }
-      )
+    /** Establishes the primary cause before optional display conversion can invoke user code. */
+    const error = new PluginHostError(
+      PluginHostErrorCode.pluginInstallFailed,
+      ERROR_TEXT.PLUGIN_INSTALL_FAILED(failedName),
+      { cause, detail }
     )
+    try {
+      /** Ordinary failures keep their original message; hostile conversions remain secondary. */
+      const reason = cause instanceof Error ? cause.message : String(cause)
+      error.message = PluginHostInternalText.PLUGIN_INSTALL_FAILURE_DETAIL(failedName, reason)
+    } catch (conversionFailure) {
+      error.cause = tagPluginHostError(
+        new AggregateError([cause, conversionFailure], error.message),
+        PluginHostErrorCode.pluginInstallFailed
+      )
+    }
+    this.#port.decorateError(error)
     Object.freeze(detail)
     return error
   }

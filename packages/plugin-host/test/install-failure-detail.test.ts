@@ -26,6 +26,45 @@ const installable = (name: string, install: (core: IInstallCore) => Record<strin
 })
 
 describe('PluginHost install failure detail', () => {
+  it('preserves the primary install failure before a message conversion failure', async () => {
+    /** The conversion is observational and must never replace the failed installer. */
+    const conversion = new Error('install message conversion')
+    /** Native errors can expose a message value whose display conversion invokes user code. */
+    const primary = new Error('install-primary')
+    Object.defineProperty(primary, 'message', {
+      value: {
+        toString() {
+          throw conversion
+        }
+      }
+    })
+    /** Exercise the actual asynchronous registration transaction and its original rollback owner. */
+    const host = new Host()
+    /** Retains the actual package boundary error for exact-reference cause assertions. */
+    let caught: unknown
+    try {
+      await host.use(
+        installable('failed', () => {
+          throw primary
+        })
+      )
+    } catch (error) {
+      caught = error
+    }
+    expect(caught).toBeInstanceOf(PluginHostError)
+    expect(caught).toMatchObject({
+      source: 'plugin.host',
+      code: 'PLUGIN_INSTALL_FAILED',
+      message: '[plugin-host] plugin "failed" failed to install'
+    })
+    /** The original registration failure remains first and the failed display conversion second. */
+    const cause = (caught as Error).cause as AggregateError
+    expect(cause).toBeInstanceOf(AggregateError)
+    expect(cause.errors).toHaveLength(2)
+    expect(cause.errors[0]).toBe(primary)
+    expect(cause.errors[1]).toBe(conversion)
+  })
+
   it('preserves async primary and two rollback identities in reverse order when diagnostic throws', async () => {
     const primary = new Error('install-primary')
     const firstRollback = new Error('first-rollback')
@@ -61,6 +100,7 @@ describe('PluginHost install failure detail', () => {
 
     expect(caught).toBeInstanceOf(PluginHostError)
     const failure = caught as PluginHostError<IPluginInstallFailureDetail>
+    expect(failure.message).toBe('[plugin-host] plugin "failed" failed to install: install-primary')
     expect(failure.cause).toBe(primary)
     expect(failure.detail?.failedName).toBe('failed')
     expect(failure.detail?.rollbackErrors).toEqual([secondRollback, firstRollback])

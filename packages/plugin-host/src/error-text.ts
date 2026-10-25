@@ -465,9 +465,9 @@ export const PluginHostInternalText = {
   EXTENSION_PLAIN_OBJECT: 'plugin install() must return a plain object',
   /** Captured extension descriptors must support the publication overlay transaction. */
   EXTENSION_DATA: 'extension property must be a configurable data property',
-  /** Adds the original install failure text while the caller preserves the raw cause object. */
-  PLUGIN_INSTALL_FAILURE_DETAIL: (name: string, cause: unknown): string =>
-    `${ERROR_TEXT.PLUGIN_INSTALL_FAILED(name)}: ${cause instanceof Error ? cause.message : String(cause)}`,
+  /** Formats a captured install reason after the installation owner has preserved its raw cause. */
+  PLUGIN_INSTALL_FAILURE_DETAIL: (name: string, reason: string): string =>
+    `${ERROR_TEXT.PLUGIN_INSTALL_FAILED(name)}: ${reason}`,
   /** Secondary messages preserve rollback order; raw failures remain in the diagnostic aggregate. */
   PLUGIN_ROLLBACK_FAILURE_DETAIL: (name: string, errors: readonly unknown[]): string => {
     /** Display-only collation never changes the original error list or its identities. */
