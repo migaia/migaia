@@ -11,7 +11,11 @@ import {
   SupervisorEventType as E,
   type ISupervisorEvent
 } from '@migaia/supervision'
-import type { IRpcSessionHandle, IRpcSessionView } from '@migaia/rpc-contract/interfaces'
+import type {
+  IRpcConnectionContext,
+  IRpcSessionHandle,
+  IRpcSessionView
+} from '@migaia/rpc-contract/interfaces'
 import { RpcRemoteLayerErrorCode } from '@migaia/rpc-contract/error-code'
 import { createRemoteLayerError } from '../host/remote-error-owner.js'
 import { resolveAbortReason } from '../host/abort-reason.js'
@@ -46,7 +50,7 @@ type IMemberGeneration = Readonly<{
  */
 class MemberCandidate {
   /** The original carrier and physical-retirement hook are borrowed without a Peer facade. */
-  readonly source: IRpcMemberSource
+  #source: IRpcMemberSource
   /** The actual transport context alone attaches and detaches SessionTable resources. */
   readonly #context: IRpcMemberGenerationOptions<unknown, unknown>['context']
   /** Synchronous attach ownership is retained before its ready Promise can reject. */
@@ -61,12 +65,19 @@ class MemberCandidate {
     source: IRpcMemberSource,
     context: IRpcMemberGenerationOptions<unknown, unknown>['context']
   ) {
-    this.source = source
+    this.#source = source
     this.#context = context
   }
   /** The candidate owns this actual native remover independently from Session's single receiver. */
   observe(listener: (reason: unknown) => void): void {
-    this.#stop = this.source.onRetire?.(listener)
+    this.#stop = this.#source.onRetire?.(listener)
+  }
+  /** Transfer secrets only after cleanup is owned, retaining only physical source collaborators. */
+  takeConnection(): readonly [IRpcMemberSource, IRpcConnectionContext | undefined] {
+    /** A throwing native source getter still leaves the original acquired carrier rollback-owned. */
+    const { connectionContext, ...source } = this.#source
+    this.#source = source
+    return [source, connectionContext]
   }
   /** Native departure lends physical loss first; explicit release keeps Session-first cleanup. */
   readonly close = (reason?: unknown, nativeDeparture = false): Promise<void> => {
@@ -83,14 +94,14 @@ class MemberCandidate {
     const errors: unknown[] = []
     if (nativeDeparture) {
       try {
-        await this.source.carrier.close(reason)
+        await this.#source.carrier.close(reason)
       } catch (error) {
         errors.push(error)
       }
     }
     try {
       if (this.session) await this.#context.detach(this.session, reason)
-      else if (!nativeDeparture) await this.source.carrier.close(reason)
+      else if (!nativeDeparture) await this.#source.carrier.close(reason)
     } catch (error) {
       /** Session may return the same original carrier failure already collected by native close. */
       if (errors.length === 0 || errors[0] !== error) errors.push(error)
@@ -235,10 +246,10 @@ export class RpcMemberGeneration<TUnit, TSpec> {
       throw createRemoteLayerError(RpcRemoteLayerErrorCode.startFailed, cause)
     }
     /** This exact cleanup callback is registered before attach/handshake can fail. */
-    /** The candidate owns physical cleanup without retaining a second copy of connection secrets. */
-    const { connectionContext, ...physicalSource } = source
-    const candidate = new MemberCandidate(physicalSource, this.#options.context)
+    const candidate = new MemberCandidate(source, this.#options.context)
     own(candidate.close)
+    /** The registered physical cleanup remains authoritative if private context acquisition fails. */
+    const [physicalSource, connectionContext] = candidate.takeConnection()
     this.#assertPreparing(signal, outcome.generation)
     candidate.observe((reason) => this.#leave(outcome.generation, reason, true))
     /** Pending native departure settles this same Session before another handshake failure can win. */
@@ -250,8 +261,8 @@ export class RpcMemberGeneration<TUnit, TSpec> {
     let view: IRpcSessionView
     try {
       candidate.session = this.#options.context.attach(
-        source.carrier,
-        { ...source.localSourceFacts, nativeGeneration: this },
+        physicalSource.carrier,
+        { ...physicalSource.localSourceFacts, nativeGeneration: this },
         connectionContext
       )
       view = await candidate.session.ready
