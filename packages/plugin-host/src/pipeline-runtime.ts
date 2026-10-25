@@ -65,6 +65,8 @@ type IPluginHostStageRegistrationOptions<TDomainCore extends object, TValue> = R
   readonly lanes: StageLanes<TValue>
   readonly stageSlots: Map<string, IDataOrderSlotState>
   readonly allocateSlot: () => bigint
+  /** Every declared lane reserves this one shared ordinal before later registrations can append. */
+  readonly ensureSlot: (slot: IDataOrderSlotState) => void
 }>
 
 /** Registers one already-lifted stage while preserving definition order and disposal ownership. */
@@ -94,6 +96,7 @@ export const registerPluginHostStage = <TDomainCore extends object, TValue>(
       retired: false
     }
     options.stageSlots.set(owner.name, slotState)
+    options.ensureSlot(slotState)
   }
   options.lanes.registerOwner(owner, slotState, stage, options.forms)
 }

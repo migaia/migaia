@@ -1,18 +1,18 @@
 import { describe, expect, it } from 'vitest'
-import { createPendingTracker } from '@migaia/lifecycle'
+import { createPendingTracker, createQuiescenceTracker } from '@migaia/lifecycle'
 import {
   createPipeline,
   MiddlewarePipelineMode,
   type IMiddlewarePipelineMode
 } from '@migaia/middleware-pipeline'
 import { executePluginHostPipeline } from '../../src/pipeline-runtime.js'
-import { StageLanes } from '../../src/stage-lanes.js'
+import { DEFAULT_PIPELINE_KEY, StageLanes } from '../../src/stage-lanes.js'
 
 /** Runs one lifted sync stage while mutating the live lane it came from. */
 const verifySnapshot = async (mode: IMiddlewarePipelineMode): Promise<void> => {
   const seen: string[] = []
   const runner = createPipeline<number, IMiddlewarePipelineMode>({ mode })
-  const lanes = new StageLanes<number>()
+  const lanes = new StageLanes<number>(DEFAULT_PIPELINE_KEY, createQuiescenceTracker<object>())
   lanes.appendHost(
     runner.lift((value, next) => {
       seen.push('first')
@@ -44,7 +44,7 @@ const verifySnapshot = async (mode: IMiddlewarePipelineMode): Promise<void> => {
 
 describe('pipeline lane snapshot', () => {
   it('reuses one frozen snapshot until the lane mutates', () => {
-    const lanes = new StageLanes<number>()
+    const lanes = new StageLanes<number>(DEFAULT_PIPELINE_KEY, createQuiescenceTracker<object>())
     const first = lanes.snapshot()
     const second = lanes.snapshot()
     expect(first).toBe(second)

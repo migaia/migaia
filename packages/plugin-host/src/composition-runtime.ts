@@ -175,7 +175,9 @@ export class PluginHostCompositionRuntime<TDomainCore extends object, TValue> {
     // stages; a retired slot is therefore drift for the prepared batch that captured it.
     if (
       this.#port.state.revision !== state.baseRevision ||
-      state.installed.some((registration) => registration.segment?.retired === true)
+      state.installed.some((registration) =>
+        [...registration.segments.values()].some((segment) => segment.retired)
+      )
     )
       throw new PluginHostError(
         PluginHostErrorCode.pluginInstallFailed,

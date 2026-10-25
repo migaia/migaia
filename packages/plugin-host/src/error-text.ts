@@ -168,6 +168,11 @@ const ERROR_TEXT = {
   COMPOSITION_TARGET_UNMANAGED: prefixed('target is not a managed host of this package'),
   /** 构造参数的 runner 模式不属于公开四种模式时使用。 */
   INVALID_PIPELINE_MODE: prefixed('invalid pipeline mode'),
+  /** Named construction descriptions must originate from pipelineSpec and use a valid order. */
+  INVALID_PIPELINE_OPTION: prefixed('invalid named pipeline option'),
+  /** Only construction-time declared names can be used by plugins or their owning Host. */
+  PIPELINE_UNKNOWN: prefixed('named pipeline is not declared'),
+
   /** Stable text distinguishing a temporarily disabled Feature prerequisite owner. */
   PREREQUISITE_DISABLED: (key: PropertyKey, owner: string) =>
     prefixed(`feature prerequisite ${String(key)} is disabled with owner ${owner}`),

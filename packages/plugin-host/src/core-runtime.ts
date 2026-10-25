@@ -36,6 +36,8 @@ type IPluginHostCoreRuntimePort<TDomainCore extends object, TValue> = Readonly<{
     registration: IRegistration<TDomainCore, TValue>,
     kind: IMiddlewarePipelineMode
   ) => void
+  /** Named registration remains scoped to the genuine native install generation. */
+  readonly pipeline: (name: string, registration: IRegistration<TDomainCore, TValue>) => object
   readonly cleanupRuntime: PluginHostCleanupRuntime
   /** The original Host constructs install-scoped authority without exposing its mutable runtime. */
   readonly runtimeIntegration: (
@@ -82,6 +84,7 @@ export class PluginHostCoreRuntime<TDomainCore extends object, TValue> {
       }),
       registerResource: (resource) => this.#registerResource(registration, resource),
       registerStage: (stage, kind) => this.#port.registerStage(stage, registration, kind),
+      pipeline: (name) => this.#port.pipeline(name, registration),
       runtimeIntegration: () => this.#port.runtimeIntegration(registration, batch)
     })
     return registration.core

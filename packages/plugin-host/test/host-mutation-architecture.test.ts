@@ -74,7 +74,7 @@ describe('host mutation architecture', () => {
       const previous = committed.registrations.get('A')
       const extensionOwner = committed.extensionOwners.get('old')
       /** Frozen stage snapshot must remain the same object after the failed candidate. */
-      const snapshot = committed.lanes.snapshot()
+      const snapshot = committed.lanes.default.snapshot()
       expect(host.run()).toBe('old')
 
       await expect(
@@ -92,7 +92,7 @@ describe('host mutation architecture', () => {
       expect(committed.registrations.get('A')).toBe(previous)
       expect(committed.extensionOwners.get('old')).toBe(extensionOwner)
       expect(committed.extensionOwners.has('candidate')).toBe(false)
-      const after = committed.lanes.snapshot()
+      const after = committed.lanes.default.snapshot()
       expect(after).toBe(snapshot)
       expect(after.stages).toHaveLength(snapshot.stages.length)
       for (let index = 0; index < after.stages.length; index += 1)
@@ -113,7 +113,7 @@ describe('host mutation architecture', () => {
       expect(committed.registrations.has('B')).toBe(false)
       expect(committed.extensionOwners.get('old')).toBe(extensionOwner)
       expect(committed.extensionOwners.has('temporary')).toBe(false)
-      expect(committed.lanes.snapshot()).toBe(snapshot)
+      expect(committed.lanes.default.snapshot()).toBe(snapshot)
       expect(host.run()).toBe('old')
       await host.dispose()
     } finally {

@@ -219,7 +219,7 @@ export class PluginHostRemovalRuntime<TDomainCore extends object, TValue> {
       }
     }
     registration.pipelineDisposers = []
-    registration.stageEntries = []
+    registration.stageEntries.clear()
   }
 
   /** Captures the already-admitted plugin disposer without re-reading hostile owner properties. */

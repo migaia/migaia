@@ -68,7 +68,7 @@ export type IDataOrderSlotState = {
   readonly name: string
   readonly ordinal: bigint
   /** Stable lane segment allocated with the slot, before a plugin binds to it. */
-  segment?: import('./stage-lanes.js').IStageOwnerSegment
+  segments?: Map<PropertyKey, import('./stage-lanes.js').IStageOwnerSegment>
   retired: boolean
 }
 

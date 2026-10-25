@@ -187,6 +187,7 @@
         "MiddlewarePipelineErrorCode",
         "MiddlewarePipelineGeneratorSignals",
         "MiddlewarePipelineMode",
+        "MiddlewarePipelineNext",
         "MiddlewarePipelineViolation",
         "createPipeline"
       ]
@@ -208,6 +209,7 @@
         "getPluginRuntimeIntegration",
         "isDefinedPlugin",
         "isPluginHandleCurrent",
+        "pipelineSpec",
         "readPluginDependencies",
         "readPluginHostDisposalProvenance"
       ],

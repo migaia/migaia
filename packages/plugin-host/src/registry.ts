@@ -61,9 +61,9 @@ export type IRegistration<TDomainCore extends object, TValue> = {
   sharedSlots?: ISharedExtensionReservation<TDomainCore, TValue>[]
   pipelineDisposers: IPluginDisposer[]
   /** Stages registered by this exact generation, not keyed by function identity. */
-  stageEntries: IStageEntry<TValue>[]
+  stageEntries: Map<PropertyKey, IStageEntry<any>[]>
   /** Stable name slot shared by committed generations, if this owner registered a stage. */
-  segment?: IStageOwnerSegment
+  segments: Map<PropertyKey, IStageOwnerSegment>
   /** Exact generation lease key; replacement generations never share a physical drain fence. */
   readonly pipelineOwnerKey: object
   /** Selected once physical cleanup starts; scope descriptors read it at release admission. */

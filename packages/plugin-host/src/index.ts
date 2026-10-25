@@ -1,3 +1,4 @@
+import type { IPipelineDefinitions } from './pipeline-spec.js'
 import { readDefinedPluginDefinition } from './define-plugin.js'
 import { PluginHost as RuntimePluginHost } from './host-runtime.js'
 import type {
@@ -10,11 +11,13 @@ import type {
 type IRuntimeHostConstructor = new <
   TDomainCore extends object,
   TValue = never,
-  TInstalled extends readonly IPluginConstraint<any>[] = readonly []
+  TInstalled extends readonly IPluginConstraint<any>[] = readonly [],
+  TPipelines extends IPipelineDefinitions = Record<never, never>
 >(
-  options: IPluginHostOptions,
+  options: IPluginHostOptions<TPipelines>,
   trustedDefinitionReader?: ConstructorParameters<typeof RuntimePluginHost>[1]
-) => RuntimePluginHost<TDomainCore, TValue, TInstalled> & IPluginHostRuntimeExtensions<TInstalled>
+) => RuntimePluginHost<TDomainCore, TValue, TInstalled, TPipelines> &
+  IPluginHostRuntimeExtensions<TInstalled>
 
 /** The value is the same runtime constructor; this type adds no wrapper or phantom instance state. */
 const RuntimeHost: IRuntimeHostConstructor = RuntimePluginHost
@@ -27,14 +30,15 @@ const RuntimeHost: IRuntimeHostConstructor = RuntimePluginHost
 export class PluginHost<
   TDomainCore extends object,
   TValue = never,
-  TInstalled extends readonly import('./typing.js').IPluginConstraint<any>[] = readonly []
-> extends RuntimeHost<TDomainCore, TValue, TInstalled> {
+  TInstalled extends readonly import('./typing.js').IPluginConstraint<any>[] = readonly [],
+  TPipelines extends IPipelineDefinitions = Record<never, never>
+> extends RuntimeHost<TDomainCore, TValue, TInstalled, TPipelines> {
   /**
    * Creates an empty Host with explicit mutation and pipeline-drain budgets in options.execution.
    * Invalid budgets/options fail before plugin hooks run; no plugin is installed by construction.
    * Own the resulting Host until its shared dispose() completion has been observed.
    */
-  constructor(options: import('./typing.js').IPluginHostOptions) {
+  constructor(options: import('./typing.js').IPluginHostOptions<TPipelines>) {
     super(options, readDefinedPluginDefinition)
   }
 }
@@ -150,3 +154,16 @@ export { isPluginHandleCurrent } from './plugin-handle.js'
 
 /** Public domain identity for errors emitted by plugin host lifecycle operations. */
 export { PLUGIN_HOST_SOURCE } from './error-code.js'
+
+export { pipelineSpec } from './pipeline-spec.js'
+export type {
+  IPipelineDefinitions,
+  IPipelineSpecOptions,
+  IPipelineSpec,
+  IPipelinePayload,
+  IPipelineMode,
+  IPipelineStage,
+  IPipelineRegistration,
+  IPipelineOwner,
+  IPipelineRunResult
+} from './pipeline-spec.js'

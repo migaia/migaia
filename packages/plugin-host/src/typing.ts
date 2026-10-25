@@ -1,3 +1,4 @@
+import type { IPipelineDefinitions, IPipelineRegistration } from './pipeline-spec.js'
 import type { INativeAbortSignal } from '@migaia/utils/promise'
 import { asyncDisposeKey } from './symbols.js'
 import type { IScheduler } from '@migaia/utils/scheduler'
@@ -53,29 +54,41 @@ export type IPluginConfig = Record<string, unknown>
 export declare const pluginHostCoreTypes: unique symbol
 
 /** Keeps the domain and pipeline axes explicit for both class and functional Host entries. */
-export type IPluginHostCoreTypeInfo<TCore extends object, TValue> = Readonly<{
+export type IPluginHostCoreTypeInfo<
+  TCore extends object,
+  TValue,
+  TPipelines extends IPipelineDefinitions = Record<never, never>
+> = Readonly<{
   /** Declaration-only domain/pipeline axes; no corresponding runtime property is installed. */
   readonly [pluginHostCoreTypes]: Readonly<{
     /** Domain capabilities required by a plugin installed on this Host. */
     readonly core: TCore
     /** Payload accepted by this Host's middleware pipeline. */
     readonly value: TValue
+    /** Named payload and mode axes are inferred from construction-time declarations. */
+    readonly pipelines: TPipelines
   }>
 }>
 
 /** Canonical plugin-facing capability contract supplied by one concrete Host. */
-export type IPluginHostCoreFor<THost extends IPluginHostCoreTypeInfo<any, any>> =
+export type IPluginHostCoreFor<THost extends IPluginHostCoreTypeInfo<any, any, any>> =
   THost[typeof pluginHostCoreTypes]['core'] &
-    IPluginHostCore<THost[typeof pluginHostCoreTypes]['value']>
+    IPluginHostCore<
+      THost[typeof pluginHostCoreTypes]['value'],
+      Record<PropertyKey, unknown>,
+      IPluginConfig,
+      THost[typeof pluginHostCoreTypes]['pipelines']
+    >
 
 /** Functional installer signature carrying the Host pipeline payload axis. */
 export type IPluginInstaller<
   TCore extends object,
   TExtension extends Record<string, unknown>,
   TValue = never,
-  TConfig extends IPluginConfig = IPluginConfig
+  TConfig extends IPluginConfig = IPluginConfig,
+  TPipelines extends IPipelineDefinitions = Record<never, never>
 > = (
-  core: TCore & IPluginHostCore<TValue, Record<PropertyKey, unknown>, TConfig>
+  core: TCore & IPluginHostCore<TValue, Record<PropertyKey, unknown>, TConfig, TPipelines>
 ) => IPluginAwaitable<TExtension>
 
 /** Recursive readonly view exposed by the lazy configuration proxy. */
@@ -745,8 +758,13 @@ export type IMergePluginExts<TPlugins extends readonly unknown[]> = IUnionToInte
 export interface IPluginHostCore<
   TValue = never,
   _TLegacyShared extends object = Record<PropertyKey, unknown>,
-  TConfig extends IPluginConfig = IPluginConfig
+  TConfig extends IPluginConfig = IPluginConfig,
+  TPipelines extends IPipelineDefinitions = Record<never, never>
 > {
+  /** Registration-only authority for a name declared by this Host. */
+  pipeline<TName extends keyof TPipelines & string>(
+    name: TName
+  ): IPipelineRegistration<TPipelines[TName]>
   /** Reads this registration's current immutable config; no mutation capability is exposed here. */
   readonly config: IPluginLifecycleConfig<TConfig>
   /** Current operation signal/deadline, separate from the registration lifetime. */
@@ -769,7 +787,7 @@ export interface IPluginHostCore<
 }
 
 /** Host execution, scheduling and diagnostics admitted once by the canonical runtime constructor. */
-export type IPluginHostOptions = {
+export type IPluginHostOptions<TPipelines extends IPipelineDefinitions = Record<never, never>> = {
   /** Optional human-readable Host identity label; uniqueness is supplied by the runtime id. */
   readonly identity?: Readonly<{
     /** Defaults to DEFAULT; a supplied label must be a nonempty string and need not be unique. */
@@ -792,6 +810,8 @@ export type IPluginHostOptions = {
   }
   /** Optional runner configuration; omission selects mode sync. */
   pipeline?: IPipelineConfig
+  /** Optional immutable named declarations; absence creates no additional execution resources. */
+  readonly pipelines?: TPipelines
   /** Defaults to a no-op; contains cleanup, late rejection and queue-wait observations. */
   diagnostic?: IPluginHostDiagnostic
   /**
@@ -948,3 +968,16 @@ export type IPluginHostCompositionIntegration<_THost> = Readonly<{
     options: IPluginBatchRemovalOptions
   ): Promise<IPluginBatchRemovalResult<TView>>
 }>
+
+/** Public named-pipeline declaration and authority types share one canonical owner. */
+export type {
+  IPipelineDefinitions,
+  IPipelineSpecOptions,
+  IPipelineSpec,
+  IPipelinePayload,
+  IPipelineMode,
+  IPipelineStage,
+  IPipelineRegistration,
+  IPipelineOwner,
+  IPipelineRunResult
+} from './pipeline-spec.js'

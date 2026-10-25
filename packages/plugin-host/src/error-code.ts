@@ -203,6 +203,12 @@ export const PluginHostErrorCode = {
    */
   invalidPipelineMode: 'INVALID_PIPELINE_MODE',
 
+  /** Construction rejected an invalid named map, spec, name or order; correct the declaration. */
+  invalidPipelineOption: 'INVALID_PIPELINE_OPTION',
+
+  /** Lookup named no declared pipeline; declare the name at construction instead of adding it later. */
+  pipelineUnknown: 'PIPELINE_UNKNOWN',
+
   /**
    * Thrown when a registered stage is incompatible with the host's pipeline mode.
    *

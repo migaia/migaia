@@ -115,6 +115,8 @@ type IPluginCoreContext<TDomainCore extends object, TValue> = {
   readonly assertRegistrationValid: () => void
   readonly registerResource: (resource: IPluginResource) => void
   readonly registerStage: (stage: Function, kind: IMiddlewarePipelineMode) => void
+  /** This install core can register named stages but never receives execution authority. */
+  readonly pipeline: (name: string) => object
   readonly operation: () => IPluginOperationContext
   readonly lifecycle: () => IPluginRegistrationContext
   readonly runtimeIntegration: () => IPluginRuntimeIntegration
@@ -135,7 +137,8 @@ export const createPluginCore = <TDomainCore extends object, TValue>(
     'usePipeline',
     'useAsyncPipeline',
     'useGeneratorPipeline',
-    'useAsyncGeneratorPipeline'
+    'useAsyncGeneratorPipeline',
+    'pipeline'
   ])
   const facade: Record<PropertyKey, unknown> = {}
   for (const key of Reflect.ownKeys(domainCore)) {
@@ -187,6 +190,7 @@ export const createPluginCore = <TDomainCore extends object, TValue>(
     context.registerStage(stage, MiddlewarePipelineMode.asyncGenerator)
     return facade
   })
+  define('pipeline', (name: string) => context.pipeline(name))
   runtimeIntegrations.set(facade, context.runtimeIntegration())
   return facade as TDomainCore & IPluginHostCore<TValue>
 }

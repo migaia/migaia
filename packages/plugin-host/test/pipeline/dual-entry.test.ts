@@ -25,6 +25,16 @@ describe('dual pipeline entries', () => {
     expect(host.runPipelineAsync(1, () => promise)).toBe(promise)
   })
 
+  it('preserves terminal Promise subclass identity with no stages', () => {
+    /** Backend-owned Promise subclasses must keep the same empty-lane return identity. */
+    class P<T> extends Promise<T> {}
+    /** Static resolve constructs a real subclass instance rather than a structural thenable. */
+    const terminal = P.resolve(1)
+    /** The default async entry must return the backend operation without assimilating it. */
+    const host = createHost()
+    expect(host.runPipelineAsync(1, () => terminal)).toBe(terminal)
+  })
+
   it('runs the same synchronous stages in both entries and preserves halt', async () => {
     /** Stage order stays identical in the two canonical runner projections. */
     const seen: string[] = []

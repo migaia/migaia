@@ -1,6 +1,6 @@
 import { createTopologyIndex, type ITopologyIndex } from '@migaia/capability/graph/topology'
 import type { IDependencyNodeState } from '@migaia/capability/graph/dependency'
-import { StageLanes } from './stage-lanes.js'
+import { StageLaneCollection } from './stage-lanes.js'
 import ERROR_TEXT, { PluginHostError } from './error-text.js'
 import { PluginHostErrorCode } from './error-code.js'
 import { PluginHostRegistrationLifecycle } from './state-constants.js'
@@ -63,7 +63,7 @@ export class PluginHostState<TDomainCore extends object, TValue> {
   /** Live definition lanes, written only through the composition entry. */
   readonly stageSlots = new Map<string, IDataOrderSlotState>()
   /** The four pipeline lanes and the snapshot rule that governs reading them. */
-  readonly lanes = new StageLanes<TValue>()
+  readonly lanes = new StageLaneCollection<TValue>()
   /**
    * Names whose registration left through removal (not replacement) and has not been reinstalled.
    * It lets dependency validation tell `PREREQUISITE_REMOVED` apart from `PREREQUISITE_MISSING`.
@@ -294,8 +294,9 @@ export class PluginHostState<TDomainCore extends object, TValue> {
     for (const registration of installed) {
       /** Registration currently owning this name before candidate publication, if any. */
       const previous = this.registrations.get(registration.name)
-      if (previous && previous !== registration && !registration.segment)
-        registration.segment = previous.segment
+      if (previous && previous !== registration)
+        for (const [key, segment] of previous.segments)
+          if (!registration.segments.has(key)) registration.segments.set(key, segment)
       /** Canonical dependency node derived from the admitted plugin snapshot. */
       const node = toIndexNode(registration.name, registration.plugin)
       if (!previous) this.#index.add(node)
