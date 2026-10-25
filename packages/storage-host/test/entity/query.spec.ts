@@ -1,3 +1,4 @@
+import { STORAGE_CONTRACT_SOURCE, StorageContractErrorCode } from '@migaia/storage-contract'
 import { entityQueryFeature } from '../../src/entity/query-feature.js'
 import { entityUniqueFeature } from '../../src/entity/unique-feature.js'
 import { entityMigrationFeature } from '../../src/entity/migration-feature.js'
@@ -523,4 +524,24 @@ it('applies one invalid-record policy to index projection failures in root and t
     )
     .catch((cause) => cause)
   expect(walkErrorCauses(terminalFailure)).toContain(original)
+})
+
+it('rejects an explicit index full scan under strict intent before opening the fallback source', async () => {
+  /** Memory records support authoritative entity scans, without a native secondary index. */
+  const store = await memoryBackend()
+  /** The same public definition keeps ordinary indexed filtering available. */
+  const repository = rows.connect(store)
+  await repository.put({ id: 'a', group: 'one', score: 1 })
+  /** This public source observes whether strict admission leaks into physical scan work. */
+  const scan = vi.spyOn(store, 'iterateRecords')
+  await expect(
+    repository.query().index('group', 'one').requirePushdown().all()
+  ).rejects.toMatchObject({
+    source: STORAGE_CONTRACT_SOURCE,
+    code: StorageContractErrorCode.queryNotPushable
+  })
+  expect(scan).not.toHaveBeenCalled()
+  expect(await repository.query().index('group', 'one').all()).toEqual([
+    { id: 'a', group: 'one', score: 1 }
+  ])
 })

@@ -3,6 +3,7 @@ import { isPlainObject } from '@migaia/utils/object'
 import { asyncDisposeKey } from '@migaia/plugin-host'
 import { repositoryMigrationKey } from '../core/record-layout.js'
 import {
+  StorageContractError,
   StorageContractErrorCode,
   assertStorageKey,
   QueryOperation,
@@ -261,7 +262,8 @@ export class EntityIndexesOwner<
     ctx: IOperationContext | undefined,
     readView?: IRepositoryReadView,
     orderedSource = true,
-    onRead?: () => void
+    onRead?: () => void,
+    requireNative = false
   ): IStorageIterator<readonly [IStorageKey, IMatch<TDomain>]> => {
     const index = this.#context.config.indexes[snapshot.index]
     if (index === undefined)
@@ -302,6 +304,8 @@ export class EntityIndexesOwner<
           if (readView === undefined) {
             const capability = asRecordIndexBackfillStore<unknown>(repositoryOwner.store)
             if (capability !== undefined) {
+              /** Only current native readiness can admit a cursor after preparation or a failure. */
+              repositoryOwner.readyHandle = undefined
               try {
                 await repositoryOwner.backfillIndexes(ctx)
                 const handle = await capability.ensureRecordIndexes(
@@ -369,6 +373,8 @@ export class EntityIndexesOwner<
               }
             }
           } else {
+            if (requireNative)
+              throw new StorageContractError(StorageContractErrorCode.queryNotPushable)
             repositoryOwner.emitDiagnostic(
               EntityText.indexFallback(repositoryOwner.name, snapshot.index)
             )
@@ -497,8 +503,14 @@ export class EntityIndexesOwner<
     const selection = { ...(automatic?.selection ?? sourceContext.selection) }
     const index =
       selection.index === undefined ? undefined : this.#context.config.indexes[selection.index]
+    /** Physical native admission and private preparation share the same resolved backend owner. */
+    const native =
+      index !== undefined &&
+      this.#context.backend.secondaryStore() !== undefined &&
+      asRecordIndexBackfillStore(this.#context.store) !== undefined &&
+      (sourceContext.execution.scope === undefined || this.#context.readyHandle !== undefined)
     return {
-      fullScan: true,
+      ...(native ? {} : { fullScan: true }),
       selection,
       pushdown: {
         source: EntityState.querySource,

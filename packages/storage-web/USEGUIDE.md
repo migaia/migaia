@@ -288,3 +288,7 @@ localStorage/sessionStorage/Cookie 可用 `redo: true` 显式启用文本事务�
 同一实例的 draft 活跃时，该实例根入口的读取、写入与另一事务立即报 `WRITE_CONFLICT`；独立调用方显式指定 `ConcurrencyPolicy.wait()` 也不会排队。回调内使用已提供的 scope。该隔离避免回调重入等待自身持有的 Web Lock；同实例排队 wait 尚未兑现。其它实例仍沿原 Web Locks 等待或取消，未选 redo 的原有行为保持。
 
 Cookie 的 `redo: true` 复用同一原事务/WAL 协议；普通和 redo 写入共用原 cookie 编码、4096-byte 校验、固定 scope 与可见性检查。批量读取仍由同一原解析器读取一次可见 header，再合入当前 draft。redo 模式把 maxAge 在准备时转换为绝对 expiresAt 镜像，重放不续期；超过原生 Date 域的 maxAge 只在该新组合修改前拒绝，普通 Cookie maxAge 域和 Max-Age 优先级不变。该模式仅记录 JS 可见 cookie，HttpOnly/未知 scope 的原限制保持。
+
+### 严格索引查询迁移
+
+旧版 `.index(...).requirePushdown()` 在没有客户端步骤时允许全表扫描。现在显式索引来源若为 `fullScan`，或原生索引准备遇到竞争而只能扫描，终端读取会拒绝 `@migaia/storage-contract / QUERY_NOT_PUSHABLE`。需要原生索引时同时装配 `entityIndexesFeature()` 和后端索引 Feature；允许权威扫描时移除 `requirePushdown()`。普通查询继续保留扫描回退。IndexedDB 的借用视图与原生 store 共用能力身份；未迁移的旧格式记录使 readiness 保持 running；查询继续全表扫描并发出回退诊断，直到迁移状态完成且与当前定义一致。

@@ -294,3 +294,11 @@ Portable JSON rejects unsupported objects and cycles. For `Map` and `Set`, adapt
 `structuredCodec.encode/decode` returns the original value; the record backend performs copying. IndexedDB uses native structured cloning. The memory backend copies byte views and uses `structuredClone` for records. `binaryCodec` validates and retains the original byte view, while the backend owns its write snapshot. These codecs neither rebuild application class instances nor validate the domain schema.
 
 The schema handles domain representation; the codec handles the saved format. Reads call `codec.decode`, migrate the saved representation, call `schema.decode`, and validate the domain value. A text-only backend rejects structured output with `UNSUPPORTED_CAPABILITY` rather than silently converting it to JSON.
+
+### Strict index query migration
+
+Previously, `.index(...).requirePushdown()` allowed a full scan when no client steps remained. Terminal reads now reject `@migaia/storage-contract / QUERY_NOT_PUSHABLE` when an explicit index source plans `fullScan`, or native preparation contention leaves only a scan.
+
+Install `entityIndexesFeature()` and the backend index Feature when native execution is required. Remove `requirePushdown()` when an authoritative scan is acceptable. Ordinary queries retain their scan fallback.
+
+IndexedDB borrowed views resolve the same private capabilities as their native store. Legacy records keep readiness running until migration completes with the matching schema fingerprint. Queries continue to scan and report fallback while readiness is not complete.

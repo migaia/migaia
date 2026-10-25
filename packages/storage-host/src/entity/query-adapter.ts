@@ -25,10 +25,18 @@ export type IEntityQuerySourceSelection<T> = Readonly<{
   index?: string
   range?: IKeyRange
   onInvalid?: IInvalidRecordAction | IInvalidRecordHandler<T>
+  /** The original query branch requires its selected physical index instead of a scan fallback. */
+  requireNative?: boolean
 }>
 
 /** These three observer flags describe only the current immutable shared-core branch. */
-export type IEntityQueryPlan = Readonly<{ hasWhere: boolean; hasOrder: boolean; hasLimit: boolean }>
+export type IEntityQueryPlan = Readonly<{
+  hasWhere: boolean
+  hasOrder: boolean
+  hasLimit: boolean
+  /** Native source requirements survive entity adaptation, including late preparation contention. */
+  requirePushdown?: true
+}>
 
 /** Adapt source selection to the original record-query creator; all AST and execution stay there. */
 /** Shared entity adapter ports; the canonical query owner retains AST and resource execution. */
@@ -352,7 +360,7 @@ class EntityQueryResult<
         wrapEntityQueryResult(
           this.#context,
           this.#query.requirePushdown(),
-          this.#plan,
+          { ...this.#plan, requirePushdown: true },
           this.#invalid,
           (first) => this.#prepareResult(first).requirePushdown()
         )
@@ -716,7 +724,7 @@ class EntityQueryBranch<
         this.#state.query.requirePushdown(),
         this.#state.limit,
         this.#state.explicit,
-        this.#state.plan,
+        { ...this.#state.plan, requirePushdown: true },
         this.#state.invalid,
         this.#state.skip,
         this.#state.compared

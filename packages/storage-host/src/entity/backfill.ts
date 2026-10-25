@@ -7,6 +7,7 @@ import type {
 } from '@migaia/storage-contract'
 import { StorageError, StorageErrorCode } from '../errors.js'
 import { StorageErrorText } from '../error-text.js'
+import { resolveBackendCapabilityOwner } from '../core/backend-registry.js'
 
 /** The original neutral registry keeps backend-private provider state out of public objects. */
 const backfillStores = new WeakMap<object, IRecordIndexBackfillStore<unknown>>()
@@ -144,7 +145,10 @@ export const registerRecordIndexBackfillStore = <TValue>(
     throw new StorageError(StorageErrorCode.invalidConfig, {
       cause: new TypeError(StorageErrorText.backfillBackendObject)
     })
-  backfillStores.set(backend, capability as IRecordIndexBackfillStore<unknown>)
+  backfillStores.set(
+    resolveBackendCapabilityOwner(backend),
+    capability as IRecordIndexBackfillStore<unknown>
+  )
 }
 
 /** Pure private-table lookup used by entity orchestration; foreign stores remain unsupported. */
@@ -152,5 +156,7 @@ export const asRecordIndexBackfillStore = <TValue>(
   value: unknown
 ): IRecordIndexBackfillStore<TValue> | undefined => {
   if ((typeof value !== 'object' && typeof value !== 'function') || value === null) return undefined
-  return backfillStores.get(value) as IRecordIndexBackfillStore<TValue> | undefined
+  return backfillStores.get(resolveBackendCapabilityOwner(value)) as
+    | IRecordIndexBackfillStore<TValue>
+    | undefined
 }

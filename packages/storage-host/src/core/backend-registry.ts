@@ -42,6 +42,8 @@ type IBackendEntityBinding = {
 
 /** Original exact-store row shares optional controller, entity observation and native endpoints. */
 type IBackendRegistration = {
+  /** Authenticated borrowed aliases resolve private capabilities through this original owner. */
+  capabilityOwner?: object
   controller?: IBackendLifecycleController
   valueCommit?: IBackendValueCommit
   envelopes?: IBackendEntityBinding[]
@@ -132,10 +134,12 @@ export function registerBackendEntityAccess(
   if (row.entity !== undefined)
     throw new StorageContractError(StorageContractErrorCode.invalidArgument)
   row.entity = access
+  row.capabilityOwner = resolveBackendCapabilityOwner(native)
   controllerRegistry.set(view, row)
   return () => {
     if (controllerRegistry.get(view) !== row || row.entity !== access) return
     delete row.entity
+    delete row.capabilityOwner
     if (
       row.controller === undefined &&
       row.envelopes === undefined &&
@@ -154,6 +158,14 @@ export function getBackendEntityAccess(view: object): IBackendEntityAccess | und
 
 /** One private exact-store registry; observation also supports admitted stores without a controller. */
 const controllerRegistry = new WeakMap<object, IBackendRegistration>()
+
+/** Resolve private capability identity once; borrowed aliases retain their original lifecycle gate. */
+export function resolveBackendCapabilityOwner(store: object): object {
+  /** Host context remains on the alias; only backend-owned capability tables use native identity. */
+  const row = controllerRegistry.get(store)
+  row?.entity?.assertCurrent()
+  return row?.capabilityOwner ?? store
+}
 
 /** Register one exact store instance and reject accidental duplicate ownership. */
 export const registerBackendChangeController = (
@@ -182,7 +194,7 @@ export const getBackendChangeController = (
 ): IBackendChangeController | undefined => {
   if (typeof store !== 'object' || store === null) return undefined
   /** Physical lifecycle-only backends have no notification subscription owner. */
-  const controller = controllerRegistry.get(store as IStorageBase)?.controller
+  const controller = controllerRegistry.get(resolveBackendCapabilityOwner(store))?.controller
   return controller !== undefined && 'subscribe' in controller
     ? (controller as IBackendChangeController)
     : undefined

@@ -639,7 +639,12 @@ export class EntityQueryOwner<
         backend: this.#context.store.backend
       })
     /** Capture the same observer/source facts before the original transaction can suspend. */
-    const policy = sourceContext.execution.openingSelection ?? sourceContext.selection
+    const policy = {
+      ...(sourceContext.execution.openingSelection ?? sourceContext.selection),
+      requireNative:
+        sourceContext.execution.openingPlan?.requirePushdown === true &&
+        sourceContext.selection.index !== undefined
+    }
     const orderedSource = sourceContext.execution.openingPlan?.hasOrder !== true
     const counter = this.#context.queryStages === undefined ? undefined : { readCount: 0 }
     sourceContext.execution.opened = counter
@@ -680,7 +685,10 @@ export class EntityQueryOwner<
   ): ReturnType<NonNullable<IRecordQuerySource['execute']>> => {
     const selection = {
       ...((planned as IEntityQuerySourceSelection<TDomain> | undefined) ?? sourceContext.selection),
-      onInvalid: (sourceContext.execution.openingSelection ?? sourceContext.selection).onInvalid
+      onInvalid: (sourceContext.execution.openingSelection ?? sourceContext.selection).onInvalid,
+      requireNative:
+        sourceContext.execution.openingPlan?.requirePushdown === true &&
+        sourceContext.selection.index !== undefined
     }
     const predicates = conditions.map((condition) =>
       compileStorageQueryCondition<TDomain>(condition)
@@ -729,7 +737,8 @@ export class EntityQueryOwner<
             context,
             undefined,
             orderedSource,
-            onRead
+            onRead,
+            selection.requireNative
           ))
             if (accepts(row.value)) yield [[row.key, id], row.value] as const
         } else {
@@ -981,6 +990,8 @@ export class EntityQueryOwner<
           index: sourceContext.selection.index!,
           range: sourceContext.selection.range
         })
+      else if (index !== undefined && sourceContext.selection.requireNative === true)
+        throw new StorageContractError(StorageContractErrorCode.queryNotPushable)
     }
     if (!sourceContext.prepared) {
       while (true) {
@@ -1141,7 +1152,8 @@ export class EntityQueryOwner<
     const selection = {
       ...((planned as IEntityQuerySourceSelection<TDomain> | undefined) ??
         mutation.source.selection),
-      onInvalid: mutation.policy.onInvalid
+      onInvalid: mutation.policy.onInvalid,
+      requireNative: mutation.policy.requireNative
     }
     const predicates = conditions.map((condition) =>
       compileStorageQueryCondition<TDomain>(condition)
