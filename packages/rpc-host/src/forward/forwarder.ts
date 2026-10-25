@@ -93,6 +93,7 @@ function forwardRoute(
 /** Only peer-name spelling is indexed here; SessionTable remains the accepted target owner. */
 type IForwardPrefix = {
   children: Map<string, IForwardPrefix>
+  /** Live exact-name contributions exclude longer names sharing this character prefix. */
   references: number
   namespaces: Map<string, number>
   name?: string
@@ -130,7 +131,7 @@ export class Forwarder {
     /** The established automatic prefix grammar is checked only at cold directory admission. */
     const name = selection.view.name
     if (!name.split('.').every((part) => namespaceSegment.test(part))) return
-    /** Shared character nodes count physical contributions so retirement can prune exact paths. */
+    /** Character edges retain known spellings; only the exact terminal counts live sources. */
     let node = this.#prefix
     for (const character of name) {
       /** Each key lookup is constant time; no peer collection is searched or copied. */
@@ -139,9 +140,9 @@ export class Forwarder {
         child = { children: new Map(), references: 0, namespaces: new Map() }
         node.children.set(character, child)
       }
-      child.references++
       node = child
     }
+    node.references++
     node.name = name
     node.namespaces.set(
       selection.view.namespace,
@@ -193,9 +194,9 @@ export class Forwarder {
     for (const character of contribution.name) {
       /** The same original trie retains no Session or provider objects after its live count drops. */
       const child = node.children.get(character)!
-      child.references--
       node = child
     }
+    node.references--
     /** A zero count retains only historical name membership, not a selectable direct source. */
     const remaining = node.namespaces.get(contribution.namespace)! - 1
     node.namespaces.set(contribution.namespace, remaining)
@@ -255,16 +256,22 @@ export class Forwarder {
     let local: string | undefined
     /** Global resolution stays under SessionTable's canonical same-name ambiguity decision. */
     let global: string | undefined
+    /** Historical membership is used only when no live prefix can route this method. */
+    let knownLocal: string | undefined
+    /** An offline global spelling still differs from a method that was never a peer route. */
+    let knownGlobal: string | undefined
     for (const character of method) {
       if (character === '.') {
         if (node?.namespaces.size) {
-          global = node.name
-          if (node.namespaces.has(namespace)) local = node.name
+          knownGlobal = node.name
+          if (node.namespaces.has(namespace)) knownLocal = node.name
+          if (node.references > 0) global = node.name
+          if ((node.namespaces.get(namespace) ?? 0) > 0) local = node.name
         }
       }
       node = node?.children.get(character)
     }
-    return local ?? global
+    return local ?? global ?? knownLocal ?? knownGlobal
   }
 
   /** Compact metadata has no callable/provider object and no mutable accepted Session view. */
