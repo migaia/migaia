@@ -1,11 +1,19 @@
 import { entityTestFeatures } from '../helpers/entity-features.js'
 import {
   kv,
+  records,
   isChangeFeedStore,
   type IStorageChange,
   type IStorageKey
 } from '@migaia/storage-contract'
-import { IDBCursor, IDBDatabase, IDBFactory, IDBKeyRange, IDBObjectStore } from 'fake-indexeddb'
+import {
+  forceCloseDatabase,
+  IDBCursor,
+  IDBDatabase,
+  IDBFactory,
+  IDBKeyRange,
+  IDBObjectStore
+} from 'fake-indexeddb'
 import { describe, expect, it, vi } from 'vitest'
 import {
   defineEntity,
@@ -14,8 +22,9 @@ import {
   type IRecordIndexBackfillStore
 } from '@migaia/storage-host/entity'
 import type { IKeyValueStore } from '@migaia/storage-contract'
-import { STORAGE_HOST_SOURCE } from '@migaia/storage-host'
+import { createOrgId, createStorageHost, STORAGE_HOST_SOURCE } from '@migaia/storage-host'
 import { STORAGE_WEB_SOURCE } from '../../src/index.js'
+import { indexedDbBackendPlugin } from '../../src/indexed-db.js'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { encodeFlatStorageKey } from '@migaia/storage-host/authoring/backend'
 import { captureOperationCleanup } from '../helpers/operation-reporter.js'
@@ -132,6 +141,240 @@ class TestBroadcastChannel {
 }
 
 describe('indexedDbHost backend', () => {
+  it('seeks prefixes without IDBKeyRange while preserving earlier and later native keys', async () => {
+    /** Missing range support uses the same native cursor rather than a different backend. */
+    const store = await createIndexedDbTestStore({
+      factory: freshFactory(),
+      dbName: 'prefix-without-keyrange'
+    })
+    for (const key of ['a', 'team:1', 'team:2', 'z']) await store.set(key, key)
+    await expect(store.use(kv).removeByPrefix('team:')).resolves.toBe(2)
+    expect(await store.keys()).toEqual(['a', 'z'])
+    await expect(store.use(kv).removeByPrefix('missing:')).resolves.toBe(0)
+    for (const key of [['a'], ['team', '1'], ['team', '2'], ['z']] as const)
+      await store.putRecord({ key }, key)
+    await expect(store.use(records).removeByPrefix(['team'])).resolves.toBe(2)
+    expect(await store.getRecord(['a'])).toEqual({ key: ['a'] })
+    expect(await store.getRecord(['z'])).toEqual({ key: ['z'] })
+    expect(await store.getRecord(['team', '1'])).toBeUndefined()
+    await store.clearAll()
+    await expect(store.use(records).removeByPrefix(['team'])).resolves.toBe(0)
+  })
+
+  it('keeps inclusive upper-only and empty record ranges in native order', async () => {
+    /** The public iterator snapshots each caller range before opening its native page. */
+    const store = await freshDb()
+    for (const key of ['a', 'b', 'c']) await store.putRecord({ key }, key)
+    /** An omitted upperOpen includes the boundary row. */
+    const bounded: IStorageKey[] = []
+    for await (const [key] of store.iterateRecords({ upper: 'b' })) bounded.push(key)
+    expect(bounded).toEqual(['a', 'b'])
+    /** An explicitly empty range retains the same full source as an omitted range. */
+    const all: IStorageKey[] = []
+    for await (const [key] of store.iterateRecords({})) all.push(key)
+    expect(all).toEqual(['a', 'b', 'c'])
+  })
+
+  it('keeps transaction record queries usable without keyset and rejects paging at its terminal', async () => {
+    /** No optional assembly is selected, so the missing keyset belongs to this registration. */
+    await using host = await createStorageHost({
+      plugins: [indexedDbBackendPlugin({ factory: freshFactory(), keyRange: IDBKeyRange })]
+    })
+    /** The ordinary backend retains native transactions without granting optional pagination. */
+    const store = host.backend('indexed-db')
+    await store.putRecord({ value: 'kept' }, 'row')
+    await expect(
+      store.transaction(async (scope) => {
+        expect(await scope.use(records).query().all()).toEqual([{ value: 'kept' }])
+        await scope.use(records).query().page(1)
+      })
+    ).rejects.toMatchObject({
+      source: STORAGE_WEB_SOURCE,
+      code: 'INDEXED_DB_FEATURE_NOT_INSTALLED',
+      message: expect.stringContaining('indexedDbKeysetFeature')
+    })
+    expect(await store.getRecord('row')).toEqual({ value: 'kept' })
+  })
+
+  it('rejects a non-string transaction value without committing its earlier write', async () => {
+    /** Runtime inputs still pass through the original transaction validation boundary. */
+    const store = await freshDb()
+    await expect(
+      store.transaction(async (scope) => {
+        await scope.set('first', 'rolled back')
+        await scope.set('invalid', 42 as never)
+      })
+    ).rejects.toMatchObject({ source: STORAGE_WEB_SOURCE, code: 'INVALID_CONFIG' })
+    expect(await store.get('first')).toBeNull()
+    expect(await store.get('invalid')).toBeNull()
+  })
+
+  it('reopens after a native forced close without losing committed text or records', async () => {
+    /** Observing the injected native factory obtains the actual owned connection. */
+    const factory = freshFactory()
+    /** The public port observer forwards every real open and upgrade. */
+    const opening = vi.spyOn(factory, 'open')
+    /** Installation owns this connection until native storage reports its close event. */
+    const store = await createIndexedDbTestStore({
+      factory,
+      keyRange: IDBKeyRange,
+      dbName: 'native-close-recovery'
+    })
+    await store.set('text', 'committed')
+    await store.putRecord({ value: 'record' }, 'row')
+    /** The last successful native open is the active installed connection, not a replacement. */
+    const database = opening.mock.results.at(-1)!.value.result as IDBDatabase
+    /** Await the actual native close event before exercising automatic reopening. */
+    const closed = new Promise<void>((resolve) => {
+      database.addEventListener('close', () => resolve(), { once: true })
+    })
+    opening.mockClear()
+    // fake-indexeddb's declaration mistakenly takes a constructor; its runtime takes the database.
+    forceCloseDatabase(database as unknown as typeof IDBDatabase)
+    await closed
+    expect(await store.get('text')).toBe('committed')
+    expect(await store.getRecord('row')).toEqual({ value: 'record' })
+    expect(opening).toHaveBeenCalledExactlyOnceWith('native-close-recovery')
+  })
+
+  it.each(['request', 'throw'] as const)(
+    'retains a native delete %s failure and allows the organization to reopen unchanged',
+    async (failureMode) => {
+      /** Each organization deletion owns a real installed database and committed sentinel. */
+      const factory = freshFactory()
+      /** An explicit default organization targets the configured physical database. */
+      const org = createOrgId()
+      await using host = await createStorageHost({
+        org,
+        plugins: [
+          indexedDbBackendPlugin({ factory, keyRange: IDBKeyRange, dbName: 'failed-delete' })
+        ]
+      })
+      /** The borrowed view remains usable after the failed maintenance operation settles. */
+      const store = host.backend('indexed-db')
+      await store.set('sentinel', 'preserved')
+      /** The injected native port reports its original failure without deleting storage. */
+      const cause = new DOMException('native deletion denied', 'SecurityError')
+      /** This fault replaces only the one native request; normal reads and opens remain real. */
+      const deletion = vi.spyOn(factory, 'deleteDatabase').mockImplementationOnce(() => {
+        if (failureMode === 'throw') throw cause
+        return {
+          error: cause,
+          set onblocked(_handler: unknown) {},
+          set onupgradeneeded(_handler: unknown) {},
+          set onsuccess(_handler: unknown) {},
+          set onerror(handler: () => void) {
+            queueMicrotask(handler)
+          }
+        } as unknown as IDBOpenDBRequest
+      })
+      /** Capture the public failure chain before checking native identity and recovery. */
+      const failure: unknown = await host.dropOrg(org).catch((error: unknown) => error)
+      expect(walkErrorCauses(failure)).toContainEqual(
+        expect.objectContaining({
+          source: STORAGE_WEB_SOURCE,
+          code: 'BACKEND_UNAVAILABLE',
+          operation: 'indexeddb.delete',
+          cause
+        })
+      )
+      expect(walkErrorCauses(failure)).toContain(cause)
+      expect(deletion).toHaveBeenCalledExactlyOnceWith('failed-delete')
+      expect(await store.get('sentinel')).toBe('preserved')
+    }
+  )
+
+  it('rejects a future schema checkpoint without overwriting metadata or committed data', async () => {
+    /** The original public backend creates the supported layout before a newer writer takes over. */
+    const factory = freshFactory()
+    /** Native request observation exposes the same physical database used by ordinary writes. */
+    const opening = vi.spyOn(factory, 'open')
+    /** Installation and the raw metadata edit share this existing database name. */
+    const options = { factory, keyRange: IDBKeyRange, dbName: 'future-schema-preserved' }
+    /** A real supported write provides data that the rejected older reader must leave intact. */
+    const store = await createIndexedDbTestStore(options)
+    await store.set('sentinel', 'preserved')
+    /** A future producer updates the actual durable schema checkpoint through the native port. */
+    const database = opening.mock.results.at(-1)!.value.result as IDBDatabase
+    await new Promise<void>((resolve, reject) => {
+      /** Both writes belong to the existing physical metadata store's native transaction. */
+      const transaction = database.transaction('storage-web:meta', 'readwrite')
+      transaction
+        .objectStore('storage-web:meta')
+        .put({ version: 4 }, ['__storage_web_internal__', 'schema'])
+      transaction.oncomplete = () => resolve()
+      transaction.onabort = () => reject(transaction.error)
+    })
+    await store.dispose()
+    await expectNativeInstallationFailure(createIndexedDbTestStore(options), {
+      source: STORAGE_WEB_SOURCE,
+      code: 'VERSION_UNSUPPORTED',
+      operation: 'indexeddb.schema'
+    })
+    /** Independent native reading verifies that failed installation does not downgrade data. */
+    const preserved = await new Promise<IDBDatabase>((resolve, reject) => {
+      /** This connection is read-only inspection after the rejected host released its handle. */
+      const request = factory.open(options.dbName)
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+    try {
+      for (const [storeName, key, expected] of [
+        ['kv', 'sentinel', 'preserved'],
+        ['storage-web:meta', ['__storage_web_internal__', 'schema'], { version: 4 }]
+      ] as const) {
+        await expect(
+          new Promise<unknown>((resolve, reject) => {
+            /** Each assertion reads the independently opened native transaction directly. */
+            const request = preserved
+              .transaction(storeName, 'readonly')
+              .objectStore(storeName)
+              .get(typeof key === 'string' ? key : [...key])
+            request.onsuccess = () => resolve(request.result)
+            request.onerror = () => reject(request.error)
+          })
+        ).resolves.toEqual(expected)
+      }
+    } finally {
+      preserved.close()
+    }
+  })
+
+  it.each(['kv', 'storage-web:meta', '__storage_web_revisions__'])(
+    'rejects an existing keyPath on %s without deleting the database',
+    async (keyPathStore) => {
+      /** A physical database created by another producer can conflict with this declared layout. */
+      const factory = freshFactory()
+      /** The native schema conflict remains stable until the caller repairs or replaces storage. */
+      const dbName = 'foreign-keypath-' + keyPathStore
+      /** Seed only a real native schema, with one unsupported keyPath among otherwise valid stores. */
+      const database = await new Promise<IDBDatabase>((resolve, reject) => {
+        /** The supplied schema is accepted by IndexedDB but incompatible with this backend. */
+        const request = factory.open(dbName, 1)
+        request.onupgradeneeded = () => {
+          for (const name of [
+            'kv',
+            'bytes',
+            'records',
+            'storage-web:meta',
+            '__storage_web_revisions__'
+          ])
+            request.result.createObjectStore(name, name === keyPathStore ? { keyPath: 'id' } : {})
+        }
+        request.onsuccess = () => resolve(request.result)
+        request.onerror = () => reject(request.error)
+      })
+      database.close()
+      await expectNativeInstallationFailure(
+        createStorageHost({
+          plugins: [indexedDbBackendPlugin({ factory, keyRange: IDBKeyRange, dbName })]
+        }),
+        { source: STORAGE_WEB_SOURCE, code: 'INVALID_CONFIG', operation: 'indexeddb.schema' }
+      )
+      expect(await factory.databases()).toContainEqual({ name: dbName, version: 1 })
+    }
+  )
+
   it('serializes overlapping native record updates without losing a write', async () => {
     const store = await freshDb()
     await store.putRecord({ value: 0 }, 'counter')
