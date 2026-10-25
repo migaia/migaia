@@ -460,14 +460,24 @@ export class Forwarder {
         this.#maxHops,
         this.#ports.sourceNodeId(target.carrierId)
       )
+      /** Only an active observer retains these actual hop facts until physical handoff. */
+      const observation = observing && envelope ? { source, envelope, route: nextRoute } : undefined
       return {
         ...options,
         signal: context.signal,
         ...(context.trace === undefined ? {} : { trace: context.trace }),
         remainingMs: context.timeoutMs,
         forwardRoute: nextRoute,
-        ...(observing && envelope
-          ? { onWriteStart: () => this.#observe(source, envelope, nextRoute, RpcProbeOutcome.sent) }
+        ...(observation
+          ? {
+              onWriteStart: () =>
+                this.#observe(
+                  observation.source,
+                  observation.envelope,
+                  observation.route,
+                  RpcProbeOutcome.sent
+                )
+            }
           : {}),
         origin: false
       }

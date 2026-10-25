@@ -650,15 +650,17 @@ export class RpcHost {
     const slot = integration.acquireSharedSlot(definition.namespace, namespaceFamily, () =>
       this.#sharedSurface(registration.surface!)
     )
+    /** One original commit receipt retains the native publication's existing ownership inputs. */
+    const commit = { registration, slot, provider, commitFeatures, gate }
     slot.register(namespace, () => {
-      this.#namespaces.set(definition.namespace, registration)
+      this.#namespaces.set(definition.namespace, commit.registration)
       this.#pendingNamespaces.delete(definition.namespace)
-      this.#publications.get(slot.facade)!.surface = registration.surface!
-      provider.commit()
-      commitFeatures()
-      this.#sessions.commit(registration.sessionScope)
+      this.#publications.get(commit.slot.facade)!.surface = commit.registration.surface!
+      commit.provider.commit()
+      commit.commitFeatures()
+      this.#sessions.commit(commit.registration.sessionScope)
       this.#everCommittedTransport = true
-      gate.open()
+      commit.gate.open()
     })
   }
 

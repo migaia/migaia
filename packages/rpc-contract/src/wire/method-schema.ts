@@ -185,9 +185,11 @@ export function normalizeMethodSchema(
   metadata?: IRpcErrorWireMetadata,
   embeddingDepth = 0
 ): IRpcMethodSchema {
+  /** One explicit read context keeps caller inputs out of nested inspection captures. */
+  const operation = { input, metadata, embeddingDepth }
   /** A prior returned diagnostic thrown by input remains the original cause, never a local exit. */
   const result = inspectShape((inspection) =>
-    readMethodSchema(input, inspection, metadata, embeddingDepth)
+    readMethodSchema(operation.input, inspection, operation.metadata, operation.embeddingDepth)
   )
   if (!result.ok)
     throw createContractError(
