@@ -3,6 +3,7 @@
  * flow-admission owner. Queued cancellation and close do not create a second RPC execution queue.
  */
 import { createConcurrencyLimiter } from '@migaia/utils/promise'
+import type { IRpcWriteAdmission } from '@migaia/rpc-contract/interfaces'
 import { RpcCoreErrorText, RpcLifecycleError, tagRpcError } from '@migaia/rpc-contract/errors'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import {
@@ -50,6 +51,17 @@ export class IpcSendQueue {
       concurrency: 1,
       report: (error) => this.flow.reportFailure(error)
     })
+  }
+  /** Reserve one logical message while lending the original queue's pending-member close guard. */
+  reserveWrite(facts: IIpcSendFacts): IRpcWriteAdmission {
+    if (this.#closed) throw new RpcLifecycleError(RpcCoreErrorText.endpointDisposed)
+    /** A borrowed shared flow can remain open while its synchronous observer closes this queue. */
+    const admission = this.flow.reserveWrite(facts, this.#guard)
+    if (this.#closed) {
+      admission.release()
+      throw this.#closeReason
+    }
+    return admission
   }
   /** Count each logical envelope once, then lend actual FIFO execution to its one shared flow. */
   readonly run = (

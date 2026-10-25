@@ -17,7 +17,8 @@ import {
   RpcCarrierEncoding,
   RpcProbeDirection,
   type IRpcCarrier,
-  type IRpcCarrierWriteOptions
+  type IRpcCarrierWriteOptions,
+  type IRpcWriteAdmission
 } from '@migaia/rpc-contract/interfaces'
 import { type IpcFlowControl } from '../features/flow-control.js'
 import type { IpcSendQueue } from '../features/send-queue.js'
@@ -127,14 +128,21 @@ class ProcessCarrierFeatures {
       throw error
     }
   }
+  /** The actual selected native feature reserves capacity before frame transformations begin. */
+  readonly reserveWrite = (options?: IRpcCarrierWriteOptions): IRpcWriteAdmission | undefined => {
+    if (!this.#flow || options?.sendClass === undefined) return undefined
+    /** Header-derived facts remain local rather than being recovered from an opaque codec frame. */
+    const facts = { sendClass: options.sendClass, trace: options.trace }
+    return this.#queue ? this.#queue.reserveWrite(facts) : this.#flow.reserveWrite(facts)
+  }
   /** Gate only trusted Session-supplied facts; native bootstrap writes retain their original path. */
   run(write: () => void | Promise<void>, options?: IRpcCarrierWriteOptions): Promise<void> {
     if (!this.#flow || options?.sendClass === undefined) return Promise.resolve(write())
     /** Original write facts and signal are borrowed directly from the actual physical handoff. */
     const facts = { sendClass: options.sendClass, trace: options.trace }
     return this.#queue
-      ? this.#queue.run(facts, write, { signal: options.signal })
-      : this.#flow.run(facts, write, { signal: options.signal })
+      ? this.#queue.run(facts, write, { signal: options.signal, admission: options.admission })
+      : this.#flow.run(facts, write, { signal: options.signal, admission: options.admission })
   }
   /** Dispose observers and close queue admission before native physical cleanup settles writes. */
   #dispose(): void {
@@ -263,6 +271,7 @@ export function createProcessCarrier(
       return createRpcByteCarrier({
         id: options.id,
         report: context.report,
+        reserveWrite: features.reserveWrite,
         observation: raw.observation,
         io: {
           kind: raw.kind,
@@ -286,6 +295,7 @@ export function createProcessCarrier(
     return createRpcMessageCarrier({
       id: options.id,
       report: context.report,
+      reserveWrite: features.reserveWrite,
       nativeBinary: false,
       observation,
       io: {

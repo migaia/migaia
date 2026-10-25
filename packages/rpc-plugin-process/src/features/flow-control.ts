@@ -13,7 +13,11 @@ import {
   tagRpcError
 } from '@migaia/rpc-contract/errors'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
-import { IpcSendClass } from '@migaia/rpc-contract/interfaces'
+import {
+  IpcSendClass,
+  type IRpcWriteAdmission,
+  type IRpcWriteQueueGuard
+} from '@migaia/rpc-contract/interfaces'
 import { IpcCapacity, IpcReporterContext, ProcessFeatureName, ProcessFeatureText } from './text.js'
 import type {
   IProcessFeatureContext,
@@ -64,6 +68,41 @@ type IIpcListener = Readonly<{ invoke(event: IIpcBacklogEvent): void }>
 /** The concrete FIFO lends execution only; flow owns admission and logical settlement. */
 export type IIpcSchedule = (write: () => Promise<void>) => Promise<void>
 
+/** One genuine logical reservation owns only its original capacity release and queue guard. */
+class IpcWriteAdmission implements IRpcWriteAdmission {
+  /** Issuing flow identity prevents another connection from borrowing this capacity. */
+  #owner: IpcFlowControl | undefined
+  /** One callback returns the counted lane without retaining a message or physical frame. */
+  #release: (() => void) | undefined
+  /** The original queue lends its existing queued-member cancellation registration. */
+  #guard: IRpcWriteQueueGuard | undefined
+
+  /** Captures one already-counted reservation with its concrete native owner. */
+  constructor(owner: IpcFlowControl, release: () => void, guard?: IRpcWriteQueueGuard) {
+    this.#owner = owner
+    this.#release = release
+    this.#guard = guard
+  }
+  /** Queue guard remains the existing callback and disappears with the returned credit. */
+  get guard(): IRpcWriteQueueGuard | undefined {
+    return this.#guard
+  }
+  /** Only a live credit issued by this exact flow can replace ordinary physical admission. */
+  belongsTo(owner: IpcFlowControl): boolean {
+    return this.#owner === owner
+  }
+  /** Revokes the reservation before watermark callbacks can synchronously reenter release. */
+  readonly release = (): void => {
+    /** Publish idempotent return before invoking the original flow's release callback. */
+    const release = this.#release
+    if (!release) return
+    this.#release = undefined
+    this.#owner = undefined
+    this.#guard = undefined
+    release()
+  }
+}
+
 /** One installed flow owns the original two capacities, watermarks, listeners and pending writes. */
 export class IpcFlowControl {
   /** Native diagnostic identity is held without keeping a carrier/host facade. */
@@ -96,6 +135,7 @@ export class IpcFlowControl {
       data: options.maxPendingData ?? IpcCapacity.data,
       control: options.maxPendingControl ?? IpcCapacity.control
     }
+    // The canonical IpcSendClass constant fixes this validation loop to two lanes.
     for (const capacity of Object.values(this.#capacity))
       if (!Number.isSafeInteger(capacity) || capacity < 1)
         throw tagRpcError(
@@ -103,7 +143,45 @@ export class IpcFlowControl {
           RpcCoreErrorCode.invalidConfig
         )
   }
-  /** Select only admitted lane facts and preserve the exact physical write's failure identity. */
+  /** Reserve one original logical message before its frame pipeline can batch or fragment it. */
+  reserveWrite(facts: IIpcSendFacts, guard?: IRpcWriteQueueGuard): IRpcWriteAdmission {
+    if (this.#closed) throw new RpcLifecycleError(RpcCoreErrorText.endpointDisposed)
+    /** This immutable lane fact cannot change while this logical message holds capacity. */
+    const lane = facts.sendClass
+    if (this.#pending[lane] >= this.#capacity[lane]) {
+      /** Overload keeps the original error identity in diagnostics and the synchronous admission. */
+      const error = markRpcCarrierAdmissionFailure(
+        new RpcError(RpcCoreErrorCode.overloaded, ProcessFeatureText.overloaded)
+      )
+      this.#emit(this.#snapshot(IpcLogEventName['ipc.backlog.rejected'], facts, error))
+      throw error
+    }
+    this.#pending[lane] += 1
+    this.#watermark(lane)
+    // Synchronous observers can close admission before a new frame pipeline has received its loan.
+    if (this.#closed) {
+      this.#release(lane)
+      throw this.#closeReason
+    }
+    return Object.freeze(new IpcWriteAdmission(this, () => this.#release(lane), guard))
+  }
+
+  /** Return a logical reservation once; physical operations retain their independent drain fence. */
+  #release(lane: IpcSendClass): void {
+    this.#pending[lane] -= 1
+    this.#watermark(lane)
+    this.#resolveWhenIdle()
+  }
+
+  /** Resolve the shared drain only after every logical credit and physical write has left. */
+  #resolveWhenIdle(): void {
+    if (this.#pending.data !== 0 || this.#pending.control !== 0 || this.#writes.size !== 0) return
+    this.#resolveIdle?.()
+    this.#idle = undefined
+    this.#resolveIdle = undefined
+  }
+
+  /** Select original lane facts, borrowing genuine logical credit without counting each fragment. */
   run(
     facts: IIpcSendFacts,
     write: IIpcWrite,
@@ -112,21 +190,20 @@ export class IpcFlowControl {
   ): Promise<void> {
     if (this.#closed)
       return Promise.reject(new RpcLifecycleError(RpcCoreErrorText.endpointDisposed))
-    /** This immutable lane fact cannot change while capacity is held. */
-    const lane = facts.sendClass
-    if (this.#pending[lane] >= this.#capacity[lane]) {
-      /** The original overload identity is emitted and returned as the same native Error. */
-      const error = markRpcCarrierAdmissionFailure(
-        new RpcError(RpcCoreErrorCode.overloaded, ProcessFeatureText.overloaded)
-      )
-      this.#emit(this.#snapshot(IpcLogEventName['ipc.backlog.rejected'], facts, error))
-      return Promise.reject(error)
+    /** Legacy physical callers own a fresh credit; the Session returns explicitly borrowed ones. */
+    let owned: IRpcWriteAdmission | undefined
+    if (
+      !(admission?.admission instanceof IpcWriteAdmission && admission.admission.belongsTo(this))
+    ) {
+      try {
+        owned = this.reserveWrite(facts)
+      } catch (error) {
+        return Promise.reject(error)
+      }
     }
-    this.#pending[lane]++
-    this.#watermark(lane)
-    /** The physical scheduler cannot release logical capacity before its returned write completes. */
+    /** Original scheduler controls physical entry only, never the lifetime of borrowed credit. */
     let sending: Promise<void>
-    /** Only the queued sender retains preparation inputs until its original physical turn. */
+    /** Queued send inputs are retained only until their original native turn begins. */
     const scheduling = { facts, write, admission }
     try {
       sending = schedule
@@ -135,23 +212,18 @@ export class IpcFlowControl {
     } catch (error) {
       sending = Promise.reject(error)
     }
-    /** Settlement retains only the lane and original completion, never preparation inputs. */
-    const receipt = { lane } as { lane: IpcSendClass; settled: Promise<void> }
-    /** Both drain and watermarks consume the original operation's settlement exactly once. */
+    /** Physical settlement remains indexed by its original returned completion. */
+    const receipt = { owned } as { owned?: IRpcWriteAdmission; settled: Promise<void> }
+    /** Native failures are reported once here, before Session applies its existing IO wrapper. */
     const settled = sending
       .catch((error: unknown) => {
         this.#emit(this.#snapshot(IpcLogEventName['ipc.send.failed'], facts, error))
         throw error
       })
       .finally(() => {
-        this.#pending[receipt.lane]--
-        this.#watermark(receipt.lane)
+        receipt.owned?.release()
         this.#writes.delete(receipt.settled)
-        if (this.#writes.size === 0) {
-          this.#resolveIdle?.()
-          this.#idle = undefined
-          this.#resolveIdle = undefined
-        }
+        this.#resolveWhenIdle()
       })
     receipt.settled = settled
     this.#writes.add(settled)
@@ -244,7 +316,8 @@ export class IpcFlowControl {
   }
   /** Snapshot accepted operations after close; this never fabricates remote acknowledgement. */
   readonly whenIdle = (): Promise<void> => {
-    if (this.#writes.size === 0) return Promise.resolve()
+    if (this.#writes.size === 0 && this.#pending.data === 0 && this.#pending.control === 0)
+      return Promise.resolve()
     this.#idle ??= new Promise<void>((resolve) => {
       this.#resolveIdle = resolve
     })
