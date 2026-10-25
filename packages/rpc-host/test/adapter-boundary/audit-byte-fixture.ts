@@ -1,24 +1,4 @@
-import * as contract from '@migaia/rpc-contract'
-import type { IRuntimeByteDiagnostics } from '../../dist/runtime-adapter/byte/types.js'
-/** Core owns these generic byte-adapter failure identities. */
-export const diagnostics: IRuntimeByteDiagnostics = {
-  closed: { source: 'rpc.endpoint', code: 'TRANSPORT', message: 'audit byte closed' },
-  timeout: {
-    source: 'rpc.endpoint',
-    code: 'DEADLINE_EXCEEDED',
-    message: 'audit handshake timeout'
-  },
-  authenticationRejected: {
-    source: 'rpc.endpoint',
-    code: 'AUTHENTICATION_FAILED',
-    message: 'audit authentication rejected'
-  },
-  duplicateBinding: 'audit duplicate reader',
-  optionsInvalid: 'audit invalid options',
-  jsonCodecRequired: 'audit JSON required',
-  negotiatedCodecUnsupported: 'audit unsupported codec',
-  handshakeTimeoutInvalid: 'audit invalid timeout'
-}
+import type { IRpcCarrierWriteOptions } from '@migaia/rpc-contract/interfaces'
 /** A complete supported byte port delivers the original bytes and owns its actual close callbacks. */
 export function duplex() {
   /** Each side has one physical stream and an independent release counter. */
@@ -32,7 +12,8 @@ export function duplex() {
   /** Writes remain ordered and retain bytes until the opposite side installs its reader. */
   const ports = states.map((state, index) => ({
     kind: 'byte' as const,
-    async write(bytes: Uint8Array) {
+    async write(bytes: Uint8Array, options?: IRpcCarrierWriteOptions) {
+      options?.onWriteStart?.()
       const other = states[1 - index]!
       other.queued.push(bytes.slice())
       await Promise.resolve()
@@ -55,7 +36,7 @@ export function duplex() {
         state.close.delete(listener)
       }
     },
-    close() {
+    async close() {
       if (state.closed) return
       state.closes++
       state.closed = true
@@ -70,26 +51,6 @@ export function duplex() {
     }
   }
 }
-/** Both control offers are genuine independently submitted public handshake configurations. */
-export const offer = (id: string) => ({
-  versions: [{ major: contract.RpcProtocol.major, minor: contract.RpcProtocol.minor }],
-  codecs: [contract.RpcCodecId.json],
-  capabilities: [contract.RpcCapability.runtimeApi, contract.RpcCapability.batch],
-  peer: { id, runtime: 'node' as const }
-})
-/** No timing or synthetic marker establishes a connection; both sides exchange real control frames. */
-export const connectionOptions = (
-  id: string,
-  peerId: string,
-  report = (_error: unknown) => {}
-) => ({
-  platform: 'Process' as const,
-  expectedStringText: 'audit expected string',
-  peerId,
-  report,
-  offer: offer(id),
-  ipc: { connectionId: id, sessionId: id, log: () => {} }
-})
 /** Check the actual cause/errors graph without reading or printing its message or credentials. */
 export function reaches(value: unknown, target: unknown, seen = new Set<unknown>()): boolean {
   if (value === target) return true

@@ -315,6 +315,8 @@ export class RpcHost {
       this.#reason =
         reason === undefined ? createRpcLifecycleError(RpcCoreErrorText.endpointDisposed) : reason
       this.#closing = Promise.resolve().then(() => this.#release())
+      /** Pending acquisition has no accepted grace and observes the original cancellation now. */
+      for (const entry of this.#pendingNamespaces.values()) entry.controller.abort(this.#reason)
       this.#calls.seal(this.#reason)
       this.#streams.seal()
       this.#providers.seal()

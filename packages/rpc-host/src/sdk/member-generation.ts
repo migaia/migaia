@@ -239,6 +239,11 @@ export class RpcMemberGeneration<TUnit, TSpec> {
     own(candidate.close)
     this.#assertPreparing(signal, outcome.generation)
     candidate.observe((reason) => this.#leave(outcome.generation, reason, true))
+    /** Pending native departure settles this same Session before another handshake failure can win. */
+    const stopPreparing = this.onLeave(outcome.generation, (reason) => {
+      // The original holder already owns and joins this exact close Promise during rollback.
+      void candidate.close(signal.aborted ? resolveAbortReason(signal) : reason, true)
+    })
     /** Attach and readiness share the same original native startup error boundary as acquisition. */
     let view: IRpcSessionView
     try {
@@ -252,6 +257,8 @@ export class RpcMemberGeneration<TUnit, TSpec> {
       const failure = candidate.session?.handshakeFailure
       if (failure && cause === failure.error) throw cause
       throw createRemoteLayerError(RpcRemoteLayerErrorCode.startFailed, cause)
+    } finally {
+      stopPreparing()
     }
     this.#assertPreparing(signal, outcome.generation)
     /** Physical closure without a separate native receipt still revokes this exact accepted member. */

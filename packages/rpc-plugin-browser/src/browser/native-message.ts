@@ -71,7 +71,9 @@ class BrowserMessageIO implements IRpcMessageIO {
   ) {
     this.#source = source
     this.#report = report
-    this.observation = new RpcCarrierObservation(facts, report)
+    this.observation = new RpcCarrierObservation(facts, (cause) =>
+      report(createBrowserTransportError(BrowserRpcErrorText.carrierObservationFailed, cause))
+    )
   }
   /** Handoff metadata remains local and is invoked immediately before the actual native send. */
   readonly send = (

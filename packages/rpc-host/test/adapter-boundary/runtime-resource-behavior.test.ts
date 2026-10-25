@@ -1,508 +1,369 @@
+/** Native carrier lifecycle receivers replace the removed bootstrap/ACK resource shapes. */
 import { EventEmitter } from 'node:events'
-import { describe, expect, it, vi } from 'vitest'
-import { createManualScheduler } from '@migaia/utils/testing'
-import * as promiseTools from '@migaia/utils/promise'
-import { RpcCapability } from '@migaia/rpc-contract'
-import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'
-import {
-  createEventEmitterMessageResource,
-  createEventTargetMessageResource
-} from '../../dist/runtime-adapter/message/resource.js'
-import { type IAdapterEventEmitterMessagePort } from '../../dist/runtime-adapter/message/types.js'
-import type { IAdapterLaunchHandle } from '../../dist/runtime-adapter/message/types.js'
-import { readAdapterMessagePreparation } from '../../dist/runtime-adapter/message/resource.js'
-import {
-  createMessageReceiveHandoff,
-  createEventTargetMessageHandoff
-} from '../../dist/runtime-adapter/message/handoff.js'
+import { expect, it, vi } from 'vitest'
+import { createRpcMessageCarrier, type IRpcMessageIO } from '@migaia/rpc-host/sdk'
+import { createRpcHost } from '@migaia/rpc-host'
+import { createUnitBudget } from '@migaia/supervision'
+import { createCoroutineSupervisor } from '@migaia/supervision/coroutine'
+import { deferred } from '@migaia/utils/promise'
+import { managedMemoryTransport } from '../host/managed-memory-fixture.js'
+import { createSharedWorkerCarrier } from '../../../rpc-plugin-browser/dist/browser/adapters/shared-worker.js'
+import { createDedicatedWorkerCarrier } from '../../../rpc-plugin-browser/dist/browser/adapters/dedicated-worker.js'
+import { reaches } from './audit-byte-fixture.js'
+import type { IRpcCarrierFrame } from '@migaia/rpc-contract/interfaces'
 
-/** Reuse real EventEmitter subscription semantics while observing only held raw port operations. */
-function messaging() {
-  /** Physical callbacks arrive synchronously through this original native event owner. */
-  const events = new EventEmitter()
-  /** ACK writes are ordinary observed output, never accepted agreement inputs. */
-  const postMessage = vi.fn((_message: unknown, _transfer?: readonly unknown[]) => undefined)
-  /** This supported structural port deliberately omits optional native reader-count operations. */
-  const port: IAdapterEventEmitterMessagePort = {
-    postMessage,
-    on: (event, listener) => {
-      events.on(event, listener)
-    },
-    off: (event, listener) => {
-      events.off(event, listener)
+/** Only native callback registration and physical close belong to this fixture. */
+class NativeMessageIO implements IRpcMessageIO {
+  /** Native registrations remain observable independently from the carrier's receiver. */
+  readonly events = new EventEmitter()
+  /** Physical sends are counted without parsing or manufacturing accepted protocol data. */
+  readonly send = vi.fn()
+  /** The native termination receipt is distinct from the carrier's shared close Promise. */
+  readonly close = vi.fn()
+
+  /** Install the original native message callback and retain its exact remover. */
+  onMessage(listener: (value: unknown) => void): () => void {
+    this.events.on('message', listener)
+    return () => {
+      this.events.off('message', listener)
     }
   }
-  return { events, postMessage, port }
-}
-
-/** Initial data is raw received control; only the actual resource parser admits its parent address. */
-function initial() {
-  return {
-    kind: rpcMessageCapabilityControl.data,
-    peerId: 'child-1',
-    runtimeApi: {
-      version: rpcMessageCapabilityControl.version,
-      self: { name: 'child', instanceId: 'child-1' },
-      parent: { name: 'parent', instanceId: 'parent-1' },
-      capabilities: [RpcCapability.stream, RpcCapability.batch]
+  /** Native EOF uses the same callback/remover boundary as ordinary acquisition. */
+  onClose(listener: (reason?: unknown) => void): () => void {
+    this.events.on('close', listener)
+    return () => {
+      this.events.off('close', listener)
+    }
+  }
+  /** Failure identity belongs to the native source rather than a bootstrap wrapper. */
+  onError(listener: (error: unknown) => void): () => void {
+    this.events.on('error', listener)
+    return () => {
+      this.events.off('error', listener)
     }
   }
 }
 
-/** Retain an unfinished launch so individual cases can deliver actual exit/failure outcomes. */
-function launch() {
-  /** The test controls actual completion independently from requesting termination. */
-  const exited = promiseTools.deferred<unknown>()
-  /** The launcher can report an original failure independently from its later exit completion. */
-  const failed = promiseTools.deferred<unknown>()
-  /** Termination is requested once while actual native completion remains independently owned. */
-  const terminate = vi.fn()
-  /** Core consumes these ordinary launcher-owned operations rather than caller qualification flags. */
-  const handle: IAdapterLaunchHandle = { exited: exited.promise, failed: failed.promise, terminate }
-  return { handle, exited, failed, terminate }
-}
-
-describe('runtime message resource control and cleanup', () => {
-  it.each(['outbound', 'malformed'] as const)(
-    'rejects %s initial input without installing a receiver',
-    async (kind) => {
-      /** Initial admission precedes cold subscription and any capability write. */
-      const physical = messaging()
-      /**
-       * Only this Core-created held resource owns capture, control admission and channel
-       * retirement.
-       */
-      const resource = createEventEmitterMessageResource(physical.port)
-      expect(() =>
-        resource.receiveInitial({
-          direction: kind === 'outbound' ? 'outbound' : 'inbound',
-          read: () => (kind === 'malformed' ? {} : initial())
-        })
-      ).toThrow(expect.objectContaining({ source: 'rpc.endpoint', code: 'INVALID_CONFIG' }))
-      expect(physical.events.listenerCount('message')).toBe(0)
-      expect(physical.postMessage).not.toHaveBeenCalled()
-      await resource.close()
-    }
-  )
-
-  it('captures a genuine initial message once and retains control/open/close Promise identity', async () => {
-    /** A received bootstrap creates the existing principal association through actual admission. */
-    const physical = messaging()
-    /** Only this Core-created held resource owns capture, control admission and channel retirement. */
-    const resource = createEventEmitterMessageResource(physical.port)
-    /** The actual received initial record is admitted once and retained without caller substitution. */
-    const raw = initial()
-    /** The original initial-read Promise retains admission result and native failure identity. */
-    const receiving = resource.receiveInitial({ direction: 'inbound', read: () => raw })
-    expect(resource.receiveInitial({ direction: 'inbound', read: () => raw })).toBe(receiving)
-    await expect(receiving).resolves.toBe(raw)
-    /** Repeated preparation consumes the same raw initial and emits only one local ACK. */
-    const controlled = resource.prepareControl([RpcCapability.batch], {
-      direction: 'inbound',
-      read: () => raw
-    })
-    expect(resource.prepareControl([RpcCapability.batch])).toBe(controlled)
-    await expect(controlled).resolves.toEqual([RpcCapability.batch])
-    expect(physical.postMessage).toHaveBeenCalledExactlyOnceWith(
-      rpcMessageCapabilityControl.acknowledgement([RpcCapability.batch]),
-      undefined
-    )
-    /** Local configuration supplies source policy without asserting accepted resource provenance. */
-    const options = {
-      peerId: 'parent-1',
-      scheduler: createManualScheduler(),
-      offer: [RpcCapability.batch],
-      control: rpcMessageCapabilityControl
-    }
-    /** Expanded opening joins one startup attempt rather than installing another ACK receiver. */
-    const opening = resource.open(options)
-    expect(resource.open(options)).toBe(opening)
-    /**
-     * This exact channel comes from admitted raw control and retains its physical resource
-     * identity.
-     */
-    const channel = await opening
-    expect(channel.agreement.capabilities).toEqual([RpcCapability.batch])
-    /** Retirement must preserve the original owner Promise rather than allocate another close. */
-    const closing = resource.close()
-    expect(resource.close()).toBe(closing)
-    await closing
-    expect(physical.events.listenerCount('message')).toBe(0)
-  })
-
-  it('refuses ordinary traffic while waiting for initial control and removes cold hooks', async () => {
-    /** Raw event operations observe startup output and listener cleanup on the original port. */
-    const physical = messaging()
-    /** Only this Core-created held resource owns capture, control admission and channel retirement. */
-    const resource = createEventEmitterMessageResource(physical.port)
-    /** The original initial-read Promise retains admission result and native failure identity. */
-    const receiving = resource.receiveInitial()
-    physical.events.emit('message', { business: true })
-    await expect(receiving).rejects.toBeInstanceOf(TypeError)
-    await expect(receiving).rejects.toMatchObject({
-      code: 'INVALID_CONFIG',
-      cause: expect.objectContaining({ detail: { field: 'bootstrap' } })
-    })
-    expect(physical.events.listenerCount('message')).toBe(0)
-    expect(physical.events.listenerCount('messageerror')).toBe(0)
-    await resource.close()
-  })
-
-  it('consumes actual initial control received by a waiting resource', async () => {
-    /** Raw event operations observe startup output and listener cleanup on the original port. */
-    const physical = messaging()
-    /** Only this Core-created held resource owns capture, control admission and channel retirement. */
-    const resource = createEventEmitterMessageResource(physical.port)
-    /** The actual received initial record is admitted once and retained without caller substitution. */
-    const raw = initial()
-    /** The original initial-read Promise retains admission result and native failure identity. */
-    const receiving = resource.receiveInitial()
-    physical.events.emit('message', raw)
-    await expect(receiving).resolves.toBe(raw)
-    expect(readAdapterMessagePreparation(resource)?.initial?.parent.instanceId).toBe('parent-1')
-    await resource.close()
-  })
-
-  it('ignores readiness control but rejects a duplicate ACK with the original native cause', async () => {
-    /** Raw event operations observe startup output and listener cleanup on the original port. */
-    const physical = messaging()
-    /** Only this Core-created held resource owns capture, control admission and channel retirement. */
-    const resource = createEventEmitterMessageResource(physical.port)
-    /** Concurrent preparation consumers must join this original endpoint construction Promise. */
-    const preparing = resource.prepareControl([RpcCapability.batch])
-    physical.events.emit('message', { kind: rpcMessageCapabilityControl.ready })
-    physical.events.emit(
-      'message',
-      rpcMessageCapabilityControl.acknowledgement([RpcCapability.batch])
-    )
-    physical.events.emit(
-      'message',
-      rpcMessageCapabilityControl.acknowledgement([RpcCapability.batch])
-    )
-    await expect(preparing).resolves.toEqual([RpcCapability.batch])
-    await expect(readAdapterMessagePreparation(resource)!.readyBootstrap).rejects.toMatchObject({
-      code: 'INVALID_CONFIG',
-      cause: expect.objectContaining({ detail: { field: 'runtimeApi.ack' } })
-    })
-    expect(physical.events.listenerCount('message')).toBe(0)
-    await resource.close()
-  })
-
-  it.each(['static', 'prepare', 'open', 'descriptor'] as const)(
-    'rejects invalid %s capability configuration before physical output',
-    async (kind) => {
-      /** Raw event operations observe startup output and listener cleanup on the original port. */
-      const physical = messaging()
-      /**
-       * Only this Core-created held resource owns capture, control admission and channel
-       * retirement.
-       */
-      const resource = createEventEmitterMessageResource(physical.port)
-      /** Monotonic fixture time belongs to the existing resource deadlines and idle policy. */
-      const scheduler = createManualScheduler()
-      if (kind === 'static')
-        expect(() =>
-          resource.openStatic({ peerId: 'peer', scheduler, enabled: [RpcCapability.transfer] })
-        ).toThrow(TypeError)
-      else if (kind === 'prepare')
-        expect(() => resource.prepareControl(['duplicated', 'duplicated'])).toThrow(TypeError)
-      else
-        await expect(
-          resource.open({
-            peerId: 'peer',
-            scheduler,
-            offer: kind === 'open' ? ['duplicated', 'duplicated'] : [],
-            control:
-              kind === 'descriptor'
-                ? { ...rpcMessageCapabilityControl }
-                : rpcMessageCapabilityControl
-          })
-        ).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
-      expect(physical.postMessage).not.toHaveBeenCalled()
-      expect(physical.events.listenerCount('message')).toBe(0)
-      await resource.close()
-    }
-  )
-
-  it('preserves an already aborted opening reason without sending control', async () => {
-    /** Raw event operations observe startup output and listener cleanup on the original port. */
-    const physical = messaging()
-    /** Only this Core-created held resource owns capture, control admission and channel retirement. */
-    const resource = createEventEmitterMessageResource(physical.port)
-    /** The original abort source owns cancellation before or during control preparation. */
-    const controller = new AbortController()
-    /** Cancellation must retain this exact original reason through startup rejection. */
-    const reason = { cancelled: true }
-    controller.abort(reason)
-    await expect(
-      resource.open({
-        peerId: 'peer',
-        scheduler: createManualScheduler(),
-        offer: [],
-        control: rpcMessageCapabilityControl,
-        signal: controller.signal
-      })
-    ).rejects.toBe(reason)
-    expect(physical.postMessage).not.toHaveBeenCalled()
-    await resource.close()
-  })
-
-  it('removes the active abort listener and terminates its held launch exactly once', async () => {
-    /** Raw event operations observe startup output and listener cleanup on the original port. */
-    const physical = messaging()
-    /** Actual launch completion and termination stay on this one held launcher resource. */
-    const native = launch()
-    /** Only this Core-created held resource owns capture, control admission and channel retirement. */
-    const resource = createEventEmitterMessageResource(physical.port, native.handle)
-    /** The original abort source owns cancellation before or during control preparation. */
-    const controller = new AbortController()
-    /** Observe removal of the original native subscription rather than a replacement callback. */
-    const remove = vi.spyOn(controller.signal, 'removeEventListener')
-    /** Cancellation must retain this exact original reason through startup rejection. */
-    const reason = { cancelled: 'during-control' }
-    /** Expanded opening joins one startup attempt rather than installing another ACK receiver. */
-    const opening = resource.open({
-      peerId: 'peer',
-      scheduler: createManualScheduler(),
-      offer: [],
-      control: rpcMessageCapabilityControl,
-      signal: controller.signal
-    })
-    controller.abort(reason)
-    await expect(opening).rejects.toBe(reason)
-    expect(remove).toHaveBeenCalledWith('abort', expect.any(Function))
-    expect(native.terminate).toHaveBeenCalledOnce()
-    expect(physical.events.listenerCount('message')).toBe(0)
-    await resource.close()
-    expect(native.terminate).toHaveBeenCalledOnce()
-  })
-
-  it('uses an outbound launch proposal without echoing an ACK', async () => {
-    /** Raw event operations observe startup output and listener cleanup on the original port. */
-    const physical = messaging()
-    /** Only this Core-created held resource owns capture, control admission and channel retirement. */
-    const resource = createEventEmitterMessageResource(physical.port)
-    /** Concurrent preparation consumers must join this original endpoint construction Promise. */
-    const preparing = resource.prepareControl([RpcCapability.batch], {
-      direction: 'outbound',
-      read: () => initial()
-    })
-    expect(physical.postMessage).not.toHaveBeenCalled()
-    physical.events.emit(
-      'message',
-      rpcMessageCapabilityControl.acknowledgement([RpcCapability.batch])
-    )
-    await expect(preparing).resolves.toEqual([RpcCapability.batch])
-    await resource.close()
-  })
-
-  it.each(['exit', 'exitRejection', 'failure', 'failureRejection'] as const)(
-    'reports early %s through startup failure and requests one termination',
-    async (kind) => {
-      /** Raw event operations observe startup output and listener cleanup on the original port. */
-      const physical = messaging()
-      /** Actual launch completion and termination stay on this one held launcher resource. */
-      const native = launch()
-      /**
-       * Only this Core-created held resource owns capture, control admission and channel
-       * retirement.
-       */
-      const resource = createEventEmitterMessageResource(physical.port, native.handle)
-      /** The original native cause remains reachable through the startup failure object. */
-      const cause = { native: kind }
-      if (kind === 'exit') native.exited.resolve({ error: cause })
-      else if (kind === 'exitRejection') native.exited.reject(cause)
-      else if (kind === 'failure') native.failed.resolve(cause)
-      else native.failed.reject(cause)
-      await expect(readAdapterMessagePreparation(resource)!.readyBootstrap).rejects.toMatchObject({
-        code: 'INVALID_CONFIG',
-        cause
-      })
-      await expect(resource.prepareControl([])).rejects.toMatchObject({
-        code: 'INVALID_CONFIG',
-        cause
-      })
-      expect(native.terminate).toHaveBeenCalledOnce()
-      expect(physical.events.listenerCount('message')).toBe(0)
-      await resource.close()
-    }
-  )
-
-  it('constructs an EventTarget borrowed static channel and closes it without native termination', async () => {
-    /** The original raw event owner exposes subscription retirement without another message queue. */
-    const events = new EventEmitter()
-    /** Observe resource retirement separately from facade construction and ownership selection. */
-    const close = vi.fn()
-    /** Only this Core-created held resource owns capture, control admission and channel retirement. */
-    const resource = createEventTargetMessageResource({
-      postMessage: vi.fn(),
-      addEventListener: (event, listener) => {
-        events.on(event, listener)
-      },
-      removeEventListener: (event, listener) => {
-        events.off(event, listener)
-      },
-      close
-    } as Parameters<typeof createEventTargetMessageResource>[0])
-    /**
-     * This exact channel comes from admitted raw control and retains its physical resource
-     * identity.
-     */
-    const channel = resource.openStatic({
-      peerId: 'peer',
-      scheduler: createManualScheduler(),
-      enabled: []
-    })
-    expect(channel.agreement.capabilities).toEqual([])
-    await resource.close()
-    expect(close).not.toHaveBeenCalled()
-    expect(events.listenerCount('message')).toBe(0)
-  })
+it('preserves the original close Promise and removes every original native listener once', async () => {
+  /** Only the SDK acquires subscriptions from this actual raw IO owner. */
+  const io = new NativeMessageIO()
+  /** Reports cannot replace the original successful native cleanup. */
+  const report = vi.fn()
+  /** No initial, capability offer, ACK or preparation DTO participates in construction. */
+  const carrier = createRpcMessageCarrier({ id: 'shared-close', io, report })
+  /** One native close joins all concurrent and repeated callers. */
+  const closed = carrier.close()
+  expect(carrier.close()).toBe(closed)
+  await closed
+  expect(io.events.listenerCount('message')).toBe(0)
+  expect(io.events.listenerCount('close')).toBe(0)
+  expect(io.events.listenerCount('error')).toBe(0)
+  expect(io.close).toHaveBeenCalledTimes(1)
+  expect(report).not.toHaveBeenCalled()
 })
 
-describe('message receive handoff errors and subscription cleanup', () => {
-  it('removes a synchronous failure registration and retains its cause for activation', () => {
-    /** The original native cause remains reachable through the startup failure object. */
-    const cause = { failed: 'during-subscribe' }
-    /** The native failure registration supplies the remover even when it fails synchronously. */
-    const removeFailure = vi.fn()
-    /** Retain the original failure for cause, reporting and subscriber-cleanup assertions. */
-    const failure = vi.fn()
-    /** Observe which exact callback the cold capture owner installs on native message input. */
-    const add = vi.fn()
-    /** Observe removal of the original native subscription rather than a replacement callback. */
-    const remove = vi.fn()
-    /**
-     * This sole cold receiver retains one frame and transfers the original subscription on
-     * activation.
-     */
-    const handoff = createMessageReceiveHandoff(
-      {
-        add,
-        remove,
-        /** Native failure may arrive before subscription returns its cleanup operation. */
-        observeFailure: (fail) => {
-          fail(cause)
-          return removeFailure
+it('hands off one cold frame exactly once and removes only the current native receiver', async () => {
+  /** The held source delivers before the Session-style receiver is admitted. */
+  const io = new NativeMessageIO()
+  /** The genuine SDK owns the sole cold slot rather than a test-side handoff queue. */
+  const carrier = createRpcMessageCarrier({ id: 'cold-slot', io, report: () => undefined })
+  /** Current frames keep their original native object identity through this raw boundary. */
+  const initial: IRpcCarrierFrame = { kind: 'message', data: 'buffered' }
+  io.events.emit('message', initial)
+  /** A receiver is removed before the next physical frame is delivered. */
+  const first = vi.fn()
+  /** Admission consumes the cold slot synchronously and clears it before callback reentrancy. */
+  const removeFirst = carrier.subscribe({
+    frame: first,
+    close: () => undefined,
+    error: () => undefined
+  })
+  expect(first).toHaveBeenCalledExactlyOnceWith(initial)
+  await removeFirst()
+  /** Replacing the previous receiver never replays an already consumed cold frame. */
+  const second = vi.fn()
+  /** Only this registration owns the current receiver. */
+  const removeSecond = carrier.subscribe({
+    frame: second,
+    close: () => undefined,
+    error: () => undefined
+  })
+  expect(second).not.toHaveBeenCalled()
+  /** Live data bypasses the now empty cold slot. */
+  const live: IRpcCarrierFrame = { kind: 'message', data: 'live' }
+  io.events.emit('message', live)
+  expect(second).toHaveBeenCalledExactlyOnceWith(live)
+  await removeSecond()
+  io.events.emit('message', { kind: 'message', data: 'after-remove' })
+  expect(second).toHaveBeenCalledTimes(1)
+  await carrier.close()
+  expect(io.events.listenerCount('message')).toBe(0)
+})
+
+it('releases a synchronously failed native registration after its exact remover is returned', async () => {
+  /** The native failure object must reach late receiver replay without replacement. */
+  const original = new Error('synchronous native failure')
+  /** The registration itself owns this precise release operation. */
+  const removeFailure = vi.fn()
+  /** Original message subscription cleanup remains independently observable. */
+  const removeMessage = vi.fn()
+  /** The native message callback identity remains visible at the original registration boundary. */
+  const add = vi.fn<(listener: (value: unknown) => void) => void>()
+  /** The native remover receives exactly the callback that registration acquired. */
+  const remove = vi.fn<(listener: (value: unknown) => void) => void>()
+  /** The same acquired resource owns physical retirement. */
+  const terminate = vi.fn()
+  /** Construction may receive failure synchronously before onError returns its remover. */
+  const carrier = createRpcMessageCarrier({
+    id: 'synchronous-failure',
+    report: () => undefined,
+    io: {
+      send() {},
+      onMessage(listener) {
+        add(listener)
+        return () => {
+          removeMessage()
+          remove(listener)
         }
       },
-      { onFailure: failure }
-    )
-    expect(removeFailure).toHaveBeenCalledOnce()
-    expect(failure).toHaveBeenCalledExactlyOnceWith(
-      expect.objectContaining({ cause, code: 'INVALID_CONFIG' })
-    )
-    expect(() => handoff.activateReceive()).toThrow(failure.mock.calls[0]![0])
-    expect(remove).toHaveBeenCalledWith(add.mock.calls[0]![0])
-    handoff.close()
+      onClose: () => () => undefined,
+      onError(listener) {
+        listener(original)
+        return removeFailure
+      },
+      close: terminate
+    }
   })
+  /** A late subscriber sees exactly the original native terminal reason. */
+  const closed = vi.fn()
+  carrier.subscribe({ frame: () => undefined, close: closed, error: () => undefined })
+  await carrier.close()
+  expect(removeFailure).toHaveBeenCalledTimes(1)
+  expect(removeMessage).toHaveBeenCalledTimes(1)
+  expect(remove).toHaveBeenCalledWith(add.mock.calls[0]![0])
+  expect(terminate).toHaveBeenCalledTimes(1)
+  expect(closed).toHaveBeenCalledExactlyOnceWith(original)
+})
 
-  it('unsubscribes the cold receiver and transfers later subscriptions without redelivery', () => {
-    /** The original raw event owner exposes subscription retirement without another message queue. */
-    const events = new EventEmitter()
-    /**
-     * This sole cold receiver retains one frame and transfers the original subscription on
-     * activation.
-     */
-    const handoff = createMessageReceiveHandoff<unknown>({
-      add: (listener) => {
-        events.on('message', listener)
-      },
-      remove: (listener) => {
-        events.off('message', listener)
-      },
-      observeFailure: () => () => undefined
+it('keeps the native failure identity and one termination across failure and repeated close', async () => {
+  /** This original resource owns message, terminal and diagnostic subscriptions. */
+  const io = new NativeMessageIO()
+  /** The SDK is the single lifetime owner for this acquisition. */
+  const carrier = createRpcMessageCarrier({ id: 'native-failure', io, report: () => undefined })
+  /** Original error and close notifications are counted separately. */
+  const failed = vi.fn(),
+    closed = vi.fn()
+  carrier.subscribe({ frame: () => undefined, error: failed, close: closed })
+  /** Failure is a native callback input rather than an invalid bootstrap envelope. */
+  const original = 'native-cause'
+  io.events.emit('error', original)
+  await carrier.close()
+  await carrier.close()
+  expect(failed).toHaveBeenCalledExactlyOnceWith(original)
+  expect(closed).toHaveBeenCalledExactlyOnceWith(original)
+  expect(io.close).toHaveBeenCalledExactlyOnceWith(original)
+  expect(io.events.listenerCount('message')).toBe(0)
+})
+
+it.each([
+  'exit',
+  'exit-rejection',
+  'exit-close-failure',
+  'carrier-error-first',
+  'caller-abort-first',
+  'native-first-abort'
+] as const)(
+  'retains an early native %s cause and closes its original carrier once',
+  async (mode) => {
+    /** The original native cause must survive every real candidate/installation wrapper. */
+    const cause = { startup: mode }
+    /** The earlier supported failure must remain primary when native departure follows it. */
+    const primary = new Error('before native departure')
+    /** Public construction cancellation is a real competing input, not a test-side error selector. */
+    const controller = new AbortController()
+    /** Only this original launcher receipt reports native execution completion. */
+    const execution = deferred<void>()
+    /** An actual first native send proves the failed unit owns an acquired Session candidate. */
+    const written = deferred<void>()
+    /** A later caller abort waits only for the actual native close boundary, never a timer. */
+    const physicallyClosed = deferred<void>()
+    /** The original native cleanup error stays secondary to the selected startup failure. */
+    const cleanup = new Error('native candidate close failed')
+    /** Count the original physical close; only its selected failure branch rejects cleanup. */
+    const close = vi.fn(() => {
+      physicallyClosed.resolve()
+      if (mode === 'exit-close-failure') throw cleanup
     })
-    /** The first cold receiver must receive no buffered or live frames after unsubscribe. */
-    const first = vi.fn()
-    /** The active receiver handles later native input after the cold subscription is removed. */
-    const second = vi.fn()
-    handoff.subscribe(first)
-    handoff.unsubscribe(first)
-    events.emit('message', 'buffered')
-    handoff.activateReceive()
-    expect(first).not.toHaveBeenCalled()
-    handoff.subscribe(second)
-    events.emit('message', 'live')
-    expect(second).toHaveBeenCalledExactlyOnceWith('live')
-    handoff.unsubscribe(second)
-    events.emit('message', 'ignored')
-    handoff.activateReceive()
-    expect(second).toHaveBeenCalledOnce()
-    handoff.close()
-    expect(events.listenerCount('message')).toBe(0)
-  })
-
-  it('delegates a failure reporter exception without replacing the retained startup error', () => {
-    /** A reporter exception is secondary and must not replace the retained startup failure. */
-    const reporterFailure = { report: 'failed' }
-    /**
-     * Observe delegation of reporter failure to the existing host reporter without process
-     * termination.
-     */
-    const rethrow = vi
-      .spyOn(promiseTools, 'hostRethrowReporter')
-      .mockImplementation(() => undefined)
-    /**
-     * This sole cold receiver retains one frame and transfers the original subscription on
-     * activation.
-     */
-    const handoff = createMessageReceiveHandoff(
-      { add: () => undefined, remove: () => undefined, observeFailure: () => () => undefined },
-      {
-        /** Reporter exceptions remain secondary to the failure already retained by the handoff. */
-        onFailure: () => {
-          throw reporterFailure
-        }
-      }
+    /** Native registrations remain observable after actual candidate rollback. */
+    const events = new EventEmitter()
+    /** The same actual budget remains empty after native candidate retirement. */
+    const budget = createUnitBudget({ kind: 'coroutine', maxUnits: 1, launchRate: false })
+    /** Reports retain raw native values without inventing another error normalization boundary. */
+    const reports: unknown[] = []
+    /** The canonical launcher turns task throw/reject into fulfilled native exit data. */
+    const supervisor = createCoroutineSupervisor({
+      id: 'early-native',
+      budget,
+      spec: {
+        name: 'early-native',
+        task:
+          mode !== 'exit-rejection'
+            ? async () => {
+                await execution.promise
+                throw cause
+              }
+            : () => execution.promise
+      },
+      report: (error) => reports.push(error),
+      restart: { mode: 'never' }
+    })
+    /** The genuine native generation is installed by the public transport SDK. */
+    const transport = managedMemoryTransport({
+      name: 'early-native',
+      handshakeTimeoutMs: 1000,
+      binding: {
+        ownership: 'owned',
+        supervisor,
+        openCarrier: async () => ({
+          carrier: createRpcMessageCarrier({
+            id: 'early-native',
+            report: (error) => reports.push(error),
+            io: {
+              send() {
+                written.resolve()
+              },
+              onMessage(listener) {
+                events.on('message', listener)
+                return () => {
+                  events.off('message', listener)
+                }
+              },
+              onClose() {
+                return () => undefined
+              },
+              onError(listener) {
+                events.on('error', listener)
+                return () => {
+                  events.off('error', listener)
+                }
+              },
+              close
+            }
+          })
+        })
+      },
+      report: (error) => reports.push(error)
+    })
+    /** Public installation owns candidate rollback and the final native rejection. */
+    const opening = createRpcHost({
+      self: { name: 'local', instanceId: 'local' },
+      signal: controller.signal,
+      plugins: [transport],
+      report: (error) => reports.push(error)
+    })
+    /** Observe rejection before triggering the actual native execution receipt. */
+    const failure = opening.then(
+      () => undefined,
+      (error: unknown) => error
     )
     try {
-      handoff.fail('native-cause')
-      expect(rethrow).toHaveBeenCalledWith(reporterFailure, expect.anything())
-      expect(() => handoff.activateReceive()).toThrow(
-        expect.objectContaining({ code: 'INVALID_CONFIG', cause: 'native-cause' })
-      )
+      await written.promise
+      if (mode === 'carrier-error-first') events.emit('error', primary)
+      if (mode === 'caller-abort-first') controller.abort(primary)
+      if (mode === 'exit' || mode === 'exit-close-failure') execution.resolve()
+      else execution.reject(cause)
+      if (mode === 'native-first-abort') {
+        await physicallyClosed.promise
+        controller.abort(primary)
+      }
+      /** Exact original native cause remains reachable; no old INVALID_CONFIG wrapper is recreated. */
+      const error = await failure
+      expect
+        .soft(
+          reaches(
+            error,
+            mode === 'carrier-error-first' || mode === 'caller-abort-first' ? primary : cause
+          )
+        )
+        .toBe(true)
+      expect(close).toHaveBeenCalledTimes(1)
+      expect(events.listenerCount('message')).toBe(0)
+      if (mode === 'exit-close-failure') {
+        expect(reports.some((value) => reaches(value, cleanup))).toBe(true)
+      }
     } finally {
-      handoff.close()
-      rethrow.mockRestore()
+      execution.resolve()
+      const result = await Promise.allSettled([opening])
+      if (result[0]?.status === 'fulfilled') await result[0].value.close()
+      await supervisor.dispose()
+      budget.close()
     }
-  })
+    expect(budget.inUse).toBe(0)
+  }
+)
 
-  it.each([undefined, 42, {}, { error: undefined }, { error: null }, { error: 'native-error' }])(
-    'preserves EventTarget failure cause for %j and removes original listeners',
-    (event) => {
-      /** The original raw event owner exposes subscription retirement without another message queue. */
-      const events = new EventEmitter()
-      /** Retain the original failure for cause, reporting and subscriber-cleanup assertions. */
-      const failure = vi.fn()
-      /**
-       * This sole cold receiver retains one frame and transfers the original subscription on
-       * activation.
-       */
-      const handoff = createEventTargetMessageHandoff(
-        {
-          postMessage: () => undefined,
-          addEventListener: (type, listener) => {
-            events.on(type, listener)
-          },
-          removeEventListener: (type, listener) => {
-            events.off(type, listener)
-          }
-        },
-        { onFailure: failure }
-      )
-      events.emit('error', event)
-      expect(failure).toHaveBeenCalledExactlyOnceWith(
-        expect.objectContaining({
-          code: 'INVALID_CONFIG',
-          cause:
-            event && typeof event === 'object' && 'error' in event ? (event.error ?? event) : event
-        })
-      )
-      expect(events.listenerCount('error')).toBe(0)
-      expect(events.listenerCount('messageerror')).toBe(0)
-      expect(() => handoff.activateReceive()).toThrow(failure.mock.calls[0]![0])
-      handoff.close()
+it('releases a borrowed EventTarget source without invoking its native close', async () => {
+  /** The actual browser acquisition uses only the original native callback surface. */
+  const events = new EventEmitter()
+  /** Borrowed physical close remains owned by the caller rather than the SDK carrier. */
+  const close = vi.fn()
+  /** The real SharedWorker source delegates callback custody to its original native object. */
+  const port = {
+    postMessage() {},
+    start() {},
+    close,
+    addEventListener(type: string, listener: (event: unknown) => void) {
+      events.on(type, listener)
+    },
+    removeEventListener(type: string, listener: (event: unknown) => void) {
+      events.off(type, listener)
     }
-  )
+  }
+  /** No initial or static-capability DTO is minted. */
+  const carrier = createSharedWorkerCarrier(port, { report: () => undefined })
+  await carrier.close()
+  expect(close).not.toHaveBeenCalled()
+  expect(events.listenerCount('message')).toBe(0)
 })
+
+it.each([undefined, 42, {}, { error: undefined }, { error: null }, { error: 'native-error' }])(
+  'preserves the original EventTarget failure cause for %j and releases native hooks',
+  async (event) => {
+    /** Original native error inputs are delivered by this held source without preprocessing. */
+    const events = new EventEmitter()
+    /** Current concrete Worker acquisition owns the original EventTarget error mapping. */
+    const port = {
+      postMessage() {},
+      addEventListener(type: string, listener: (event: unknown) => void) {
+        events.on(type, listener)
+      },
+      removeEventListener(type: string, listener: (event: unknown) => void) {
+        events.off(type, listener)
+      }
+    }
+    /** SDK receiver and physical cleanup remain the sole terminal owner. */
+    const carrier = createDedicatedWorkerCarrier(port, { report: () => undefined })
+    /** Actual failure delivery and late replay are observed independently. */
+    const failure = vi.fn()
+    carrier.subscribe({ frame() {}, error: failure, close() {} })
+    events.emit('error', event)
+    /**
+     * The current native error code differs from the removed bootstrap failure; raw cause is
+     * unchanged.
+     */
+    expect.soft(failure).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        code: 'TRANSPORT',
+        cause:
+          event && typeof event === 'object' && 'error' in event ? (event.error ?? event) : event
+      })
+    )
+    await carrier.close()
+    expect(events.listenerCount('error')).toBe(0)
+    expect(events.listenerCount('messageerror')).toBe(0)
+    /** The same actual failure object remains the canonical closed-source replay value. */
+    const late = vi.fn()
+    carrier.subscribe({ frame() {}, error() {}, close: late })
+    expect(late).toHaveBeenCalledExactlyOnceWith(failure.mock.calls[0]![0])
+  }
+)

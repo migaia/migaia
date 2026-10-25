@@ -12,8 +12,8 @@ import { BrowserRpcErrorText } from '../error-text.js'
 import { BrowserPeerEvent } from '../peer-text.js'
 
 /** Preserve native Error/name/stack and the original browser script/deserialization cause. */
-function failure(message: string, cause?: unknown): Error {
-  return attachErrorIdentity(new Error(message, cause === undefined ? undefined : { cause }), {
+function failure(message: string, cause: unknown): Error {
+  return attachErrorIdentity(new Error(message, { cause }), {
     source: RPC_ENDPOINT_ERROR_SOURCE,
     code: RpcCoreErrorCode.transport
   })
@@ -40,7 +40,7 @@ function reportWorkerFailure(
   /** The original fallback is used when a native message is absent or conversion fails. */
   let detail: string
   try {
-    cause = (event as { error?: unknown } | undefined)?.error
+    cause = (event as { error?: unknown } | undefined)?.error ?? event
     detail = safeString(
       (event as { message?: unknown } | undefined)?.message || reason,
       reason,
