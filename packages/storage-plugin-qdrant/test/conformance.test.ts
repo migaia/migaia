@@ -737,9 +737,28 @@ describe('real native vector backend', () => {
           { id: 'live', vector: [1, 0], payload: { tag: 'match' } },
           { id: 'expired', vector: [1, 0], payload: { tag: 'match' } }
         ])
+        /** Observe the actual point TTL read/write requests, not only filtered business hits. */
+        const ttlBefore = fixture.requests.length
         expect(await store.use(ttl).expire(lockKey.vector('ttl', 'expired'), 0)).toBe(true)
+        expect(fixture.requests.slice(ttlBefore).map((request) => request.operation)).toEqual([
+          'retrieve',
+          'setPayload'
+        ])
+        expect(fixture.requests.at(-1)?.args[1]).toMatchObject({
+          points: [expect.any(String)],
+          payload: { $expiresAt: expect.any(String) },
+          wait: true
+        })
         expect(await store.use(ttl).remaining(lockKey.vector('ttl', 'expired'))).toBeUndefined()
         expect(await store.use(ttl).persist(lockKey.vector('ttl', 'expired'))).toBe(false)
+        expect(fixture.requests.at(-1)?.operation).toBe('retrieve')
+        expect(await store.use(ttl).persist(lockKey.vector('ttl', 'live'))).toBe(true)
+        expect(fixture.requests.at(-1)?.operation).toBe('deletePayload')
+        expect(fixture.requests.at(-1)?.args[1]).toMatchObject({
+          points: [expect.any(String)],
+          keys: ['"$expiresAt"'],
+          wait: true
+        })
         expect(await collection.near([1, 0]).topK(10).all()).toHaveLength(1)
         const borrowed = host.org(other).backend('qdrant'),
           otherCollection = borrowed.use(vector).collection<{ tag: string }>('ttl')
@@ -822,6 +841,10 @@ describe('real native vector backend', () => {
             quantization_config: { scalar: { type: 'int8', always_ram: true } }
           })
         ).toBe(true)
+        expect(fixture.requests.at(-1)).toMatchObject({
+          operation: 'createCollection',
+          args: [name, { vectors: { dense: { size: 2, distance: 'Cosine' } } }]
+        })
         expect((await fixture.http.getCollection(name)).config.quantization_config).toMatchObject({
           scalar: { type: 'int8', always_ram: true }
         })
@@ -831,6 +854,10 @@ describe('real native vector backend', () => {
             actions: [{ create_alias: { collection_name: name, alias_name: alias } }]
           })
         ).toBe(true)
+        expect(fixture.requests.at(-1)).toMatchObject({
+          operation: 'updateCollectionAliases',
+          args: [{ actions: [{ create_alias: { collection_name: name, alias_name: alias } }] }]
+        })
         expect((await fixture.http.getCollection(alias)).config.params.vectors).toMatchObject({
           dense: { size: 2, distance: 'Cosine' }
         })
@@ -838,6 +865,10 @@ describe('real native vector backend', () => {
           actions: [{ delete_alias: { alias_name: alias } }]
         })
         expect(await store.api.qdrantManagement!.createSnapshot(name, { wait: false })).toBeNull()
+        expect(fixture.requests.at(-1)).toMatchObject({
+          operation: 'createSnapshot',
+          args: [name, { wait: false }]
+        })
         await fixture.http.upsert(name, {
           points: [
             {
@@ -865,9 +896,33 @@ describe('real native vector backend', () => {
             })
           ).points
         ).toHaveLength(2)
+        expect(fixture.requests.at(-1)).toMatchObject({
+          operation: 'query',
+          args: [
+            name,
+            {
+              query: { fusion: 'rrf' },
+              limit: 2,
+              prefetch: [
+                { query: [1, 0], using: 'dense', limit: 2 },
+                { query: { indices: [1], values: [1] }, using: 'sparse', limit: 2 }
+              ]
+            }
+          ]
+        })
         await store.api.qdrantHybrid!.updateSparseVectors(name, {
           points: [{ id: 1, vector: { sparse: { indices: [1, 3], values: [2, 3] } } }],
           wait: true
+        })
+        expect(fixture.requests.at(-1)).toMatchObject({
+          operation: 'updateVectors',
+          args: [
+            name,
+            {
+              points: [{ id: 1, vector: { sparse: { indices: [1, 3], values: [2, 3] } } }],
+              wait: true
+            }
+          ]
         })
         expect(
           (await fixture.http.retrieve(name, { ids: [1], with_vector: true }))[0]!.vector
@@ -880,6 +935,10 @@ describe('real native vector backend', () => {
             limit: 1
           })
         ).toHaveLength(1)
+        expect(fixture.requests.at(-1)).toMatchObject({
+          operation: 'recommend',
+          args: [name, { positive: [1], using: 'dense', strategy: 'best_score', limit: 1 }]
+        })
         expect(
           (
             await store.api.qdrantGroupBy!.search(name, {
@@ -890,6 +949,18 @@ describe('real native vector backend', () => {
             })
           ).groups
         ).toHaveLength(2)
+        expect(fixture.requests.at(-1)).toMatchObject({
+          operation: 'searchPointGroups',
+          args: [
+            name,
+            {
+              vector: { name: 'dense', vector: [1, 0] },
+              group_by: 'category',
+              group_size: 2,
+              limit: 2
+            }
+          ]
+        })
         const before = fixture.calls.length
         await expect(
           store.api.qdrantHybrid!.updateSparseVectors(name, {
