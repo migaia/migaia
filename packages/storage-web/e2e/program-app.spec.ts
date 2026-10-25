@@ -10,7 +10,7 @@ test('reads six native IndexedDB candidates through the automatic entity equalit
     readsAfterExplain: [],
     readsAfterQuery: [6],
     selectedIndex: 'byGroup',
-    fullScan: true,
+    fullScan: false,
     secondaryIndexes: true
   })
 })
