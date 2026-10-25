@@ -1,3 +1,8 @@
+/**
+ * Serialize, validate and restore bounded error graphs with caller-owned presentation and data
+ * policies. Generic traversal preserves native errors and diagnostics without granting package or
+ * RPC authority.
+ */
 import { attachErrorIdentity, tryReadProperty } from './error.js'
 import { ERROR_SOURCE, UtilsErrorCode } from './error-code.js'
 import { UtilsErrorText } from './error-text.js'
@@ -484,8 +489,8 @@ export function sanitizeErrorText(
   maxBytes: number = ErrorChainLimit.maxStringBytes,
   truncate = true
 ): IErrorChainText {
-  /** Build the longest scalar prefix whose UTF-8 bytes fit the caller-selected limit. */
-  let output = ''
+  /** Collect the admitted scalar prefix once; one final join avoids copying a growing string. */
+  const chunks: string[] = []
   /** Count UTF-8 text units only; structural field names do not consume the error text budget. */
   let bytes = 0
   /** Any replacement or truncation must surface through the returned diagnostic flag. */
@@ -515,10 +520,10 @@ export function sanitizeErrorText(
       changed = true
       break
     }
-    output += scalar
+    chunks.push(scalar)
     bytes += size
   }
-  return { value: output, bytes, changed }
+  return { value: chunks.join(''), bytes, changed }
 }
 
 /** Sanitize portable data and count only its text units, excluding error-node field names. */
@@ -807,10 +812,12 @@ class ErrorChainNormalizer {
         this.#invalid(pointer, ErrorChainViolation.unknownField)
       this.#options.onUnknownField?.(pointer, key)
     }
+    /** Membership borrows the same original enumeration without rescanning it per strategy field. */
+    const present = new Set(keys)
     /** Read each present property once, including optional properties. */
     const fields: Record<string, unknown> = Object.create(null) as Record<string, unknown>
     for (const [index, key] of this.#fieldOrder.entries()) {
-      if (!keys.includes(key)) {
+      if (!present.has(key)) {
         if (index < 5) this.#invalid(`${pointer}/${key}`, ErrorChainViolation.required)
         continue
       }
