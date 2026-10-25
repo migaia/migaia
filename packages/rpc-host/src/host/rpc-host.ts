@@ -778,7 +778,7 @@ export class RpcHost {
    * error.
    */
   async #release(): Promise<void> {
-    await this.#sessions.quiesceOrigins(this.#reason)
+    await this.#sessions.quiesce(this.#reason)
     this.#controller.abort(this.#reason)
     this.#calls.close(this.#reason)
     this.#providers.close(this.#reason)

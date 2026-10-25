@@ -4,9 +4,10 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { deferred } from '@migaia/utils/promise'
 import { describe, expect, it, vi } from 'vitest'
-import * as drainOwner from '../../../rpc-host/dist/remote/internal/binding-drain.js'
+import * as serveOwner from '../../dist/process/plugin/serve.js'
 import { createRpcHost } from '@migaia/rpc-host'
 import { processPlugin } from '@migaia/rpc-plugin-process'
+import type { IRpcTransportSetupContext } from '@migaia/rpc-host/sdk'
 
 import { socketProcess, command, stopProcess } from './plugin-control.js'
 
@@ -14,8 +15,17 @@ describe('native process transport plugin', () => {
   it.skipIf(process.platform === 'win32')(
     'drains scalar and both stream directions on their actual native session before listener retirement',
     async () => {
-      /** The spy observes the original drain owners; every counter and settlement stays canonical. */
-      const drains = vi.spyOn(drainOwner, 'createRemoteBindingDrain')
+      /** Native acquisition still invokes the complete original Process session owner. */
+      const serve = serveOwner.serveProcessSessions
+      /** Native setup lends its original SDK context, including exact session lookup and drain. */
+      let transport: IRpcTransportSetupContext | undefined
+      /** Observe the real SDK return without replacing a handle, drain or business completion. */
+      const serving = vi
+        .spyOn(serveOwner, 'serveProcessSessions')
+        .mockImplementation((ingress, context, options) => {
+          transport = context
+          return serve(ingress, context, options)
+        })
       /** Independent business barriers make each native lifetime observable without a test timer. */
       const scalarStarted = deferred<void>()
       const scalarReleased = deferred<void>()
@@ -52,9 +62,11 @@ describe('native process transport plugin', () => {
         children.push(first)
         const second = await socketProcess('connect', address, token, 'drain-b')
         children.push(second)
-        expect(drains).toHaveBeenCalledTimes(2)
-        const firstDrain = drains.mock.results[0]!.value
-        const secondDrain = drains.mock.results[1]!.value
+        /** The canonical address index selects the two original physical generation handles. */
+        const firstDrain = transport!.lookup('drain-a')!.handle
+        /** A second native source retains its own independent completion barrier. */
+        const secondDrain = transport!.lookup('drain-b')!.handle
+        expect(new Set([firstDrain, secondDrain]).size).toBe(2)
         scalar = command(first, 'request', 'held')
         void scalar.catch(() => undefined)
         await scalarStarted.promise
@@ -70,11 +82,11 @@ describe('native process transport plugin', () => {
         void returned.catch(() => undefined)
         let firstFinished = false
         let secondFinished = false
-        const firstClosing = firstDrain.drainCurrent()
+        const firstClosing = transport!.drain(firstDrain, 10_000)
         void firstClosing.then(() => {
           firstFinished = true
         })
-        void secondDrain.drainCurrent().then(() => {
+        void transport!.drain(secondDrain, 10_000).then(() => {
           secondFinished = true
         })
         await vi.waitFor(() => expect(secondFinished).toBe(true))
@@ -112,7 +124,7 @@ describe('native process transport plugin', () => {
         await closing?.catch(() => undefined)
         for (const child of children) await stopProcess(child)
         await server.close()
-        drains.mockRestore()
+        serving.mockRestore()
       }
     },
     15_000

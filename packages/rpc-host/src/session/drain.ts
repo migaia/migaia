@@ -79,6 +79,14 @@ export class SessionDrain {
     this.#complete(record)
   }
 
+  /** Join only drains that already selected a grace budget; ordinary close creates no new drain. */
+  async quiesce(): Promise<void> {
+    /** These are the existing generation-owned barriers, never a second business tracker. */
+    const draining: Promise<void>[] = []
+    for (const record of this.#records.values()) if (record.promise) draining.push(record.promise)
+    await Promise.all(draining)
+  }
+
   /** Global close clears every held deadline and resolves every original drain exactly once. */
   close(): void {
     for (const carrierId of this.#records.keys()) this.retire(carrierId)

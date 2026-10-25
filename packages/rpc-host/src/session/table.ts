@@ -509,13 +509,14 @@ export class SessionTable {
     return typeof handle === 'string' ? this.#session(handle).close(reason) : handle.close(reason)
   }
 
-  /** Logical origins withdraw admission and join their existing native drain before global abort. */
-  async quiesceOrigins(reason?: unknown): Promise<void> {
+  /** Join logical origins and already-started physical drains before aborting accepted business. */
+  async quiesce(reason?: unknown): Promise<void> {
     /** Native registration cleanup later joins these same close Promises and owns their errors. */
     const closing: Promise<void>[] = []
     for (const { selection } of this.#accepted.values())
       if (selection.origin)
         closing.push((this.#session(selection.carrierId) as OriginSession).quiesce(reason))
+    closing.push(this.#draining.quiesce())
     await Promise.allSettled(closing)
   }
 
