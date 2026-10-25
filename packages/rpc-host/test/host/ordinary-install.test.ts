@@ -2,17 +2,20 @@
 import { defineHost, definePlugin, defineFeature } from '@migaia/plugin-host'
 import {
   defineTransportPlugin,
-  defineFlowPlugin,
+  defineFlowFeature,
+  rpcFlowPlugin,
   rpcHostPipelines,
+  RpcFlowLayer,
   type IRpcFlowStage
 } from '@migaia/rpc-host/sdk'
 import type { IRpcNamespace } from '@migaia/rpc-host'
 import type { IRpcDispatchContext } from '@migaia/rpc-contract/interfaces'
 import { typegen } from '@migaia/rpc-host/plugins/typegen'
-import { limits } from '@migaia/rpc-host/plugins/limits'
+import { limits } from '@migaia/rpc-host/features/limits'
 import { deferred, type IDeferred } from '@migaia/utils/promise'
 import { describe, expect, it, vi, type MockInstance as IMockInstance } from 'vitest'
 import { readRpcDefinition } from '../../dist/sdk/metadata.js'
+import { LimitsGovernor } from '../../dist/features/limits/governor.js'
 import { coreMemoryServer } from './core-fixture.js'
 
 /** Native Host defaults remain the same as tray's receiving plugin-host runtime. */
@@ -20,7 +23,8 @@ function ordinaryHost() {
   /** The single SDK function lends execution lazily while supplying the fixed declarations. */
   const rpc = rpcHostPipelines(
     () => host,
-    (name) => host.pipeline(name)
+    (name) => host.pipeline(name),
+    ['worker']
   )
   /** Native execution authority refers to this actual owner after construction completes. */
   const host = defineHost({
@@ -58,9 +62,11 @@ function heldDispatch(
     await input.resume
     await next(payload)
   }
-  return defineFlowPlugin({
+  return defineFlowFeature({
     name: 'held-limits-dispatch',
-    setup: () => ({ stages: { dispatchInbound: inbound } })
+    setup: () => ({
+      stages: { dispatchInbound: { layer: RpcFlowLayer.wire, stage: inbound } }
+    })
   })
 }
 
@@ -102,7 +108,8 @@ describe('ordinary native Host RPC installation', () => {
     /** JavaScript may accidentally keep only domainCore while omitting the returned declarations. */
     const rpc = rpcHostPipelines(
       () => host,
-      (name) => host.pipeline(name as never) as never
+      (name) => host.pipeline(name as never) as never,
+      ['worker']
     )
     /** This is a real native owner and callback; only its required construction declarations lack. */
     const host = defineHost({
@@ -249,27 +256,34 @@ describe('ordinary native Host RPC installation', () => {
     const resume = deferred<void>()
     /** Observation begins at this same real dispatch seam, after provider lifetime setup. */
     let additions: IMockInstance | undefined
-    await host.use(
-      limitsService,
+    /** The actual governor cleanup proves the native Feature instance has retired before reuse. */
+    let retirements: IMockInstance | undefined
+    /** The common native bridge owns both real Features in this cold worker group. */
+    const transport = namedTransport(server)
+    /** Removing this generation retires its actual limits instance and original borrowed stages. */
+    const flows = rpcFlowPlugin([
       limits(),
       heldDispatch({ entered, resume: resume.promise, admitted: () => additions?.mockClear() }),
-      namedTransport(server)
-    )
+      transport
+    ])
+    await host.use(limitsService, flows)
+    await host.use(transport)
     /** This is a genuine connected public client, not a constructed flow context or fake signal. */
     const client = await server.connect('limits-client')
     /** The actual inbound chain captures its original suffix before optional unUse occurs. */
     const pending = namespace(client.host).request('limits-service.value')
     void pending.catch(() => undefined)
-    /** The spy borrows the original Session signal without replacing any native listener method. */
+    /** Observe limits' own source subscription owner; native invocation parent leases stay separate. */
     try {
       /** Holding the outer hook proves limits has not yet attached an operation/source observer. */
       const context = await entered.promise
       expect(context.connectionSignal).toBeDefined()
-      additions = vi.spyOn(context.connectionSignal!, 'addEventListener')
+      additions = vi.spyOn(LimitsGovernor.prototype, 'bind')
+      retirements = vi.spyOn(LimitsGovernor.prototype, 'close')
       /** Native R5 withdrawal waits for this already borrowed snapshot before completing removal. */
       let removed = false
       /** Observe the actual public completion rather than reconstructing private lease state. */
-      const removing = host.unUse('limits').then((value) => {
+      const removing = host.unUse(flows.name).then((value) => {
         removed = true
         return value
       })
@@ -278,6 +292,7 @@ describe('ordinary native Host RPC installation', () => {
       resume.resolve()
       expect(await pending).toBe(42)
       await removing
+      expect(retirements).toHaveBeenCalled()
       additions.mockClear()
       expect(await namespace(client.host).request('limits-service.value')).toBe(42)
       expect(additions).not.toHaveBeenCalled()
@@ -285,6 +300,7 @@ describe('ordinary native Host RPC installation', () => {
       resume.resolve()
       await Promise.allSettled([pending])
       additions?.mockRestore()
+      retirements?.mockRestore()
       await client.host.close()
       await host.dispose()
     }
