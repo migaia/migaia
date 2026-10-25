@@ -93,9 +93,9 @@ describe('handshake redaction', () => {
     const malformed = [
       [{ ...HELLO, kind: 'request' }, 'HANDSHAKE_INVALID'],
       [{ ...HELLO, step: 'resume' }, 'HANDSHAKE_INVALID'],
-      [{ auth: TOKEN }, 'INVALID_ENVELOPE'],
-      [[TOKEN], 'INVALID_ENVELOPE'],
-      [{ ...HELLO, auth: { $rpc: 'x', v: TOKEN } }, 'INVALID_ENVELOPE']
+      [{ auth: TOKEN }, 'HANDSHAKE_INVALID'],
+      [[TOKEN], 'HANDSHAKE_INVALID'],
+      [{ ...HELLO, auth: { $rpc: 'x', v: TOKEN } }, 'HANDSHAKE_INVALID']
     ] as const
     for (const [input, code] of malformed) {
       const error = invalid(() => normalizeRpcHandshake(input), code)
@@ -106,11 +106,11 @@ describe('handshake redaction', () => {
   })
 
   it('redacts initiator replies and describes the normalized message', () => {
-    const helloError = invalid(() => completeRpcHandshake(OFFER, HELLO), 'HANDSHAKE_REJECTED')
+    const helloError = invalid(() => completeRpcHandshake(OFFER, HELLO), 'HANDSHAKE_INVALID')
     expect(leaks(helloError, TOKEN)).toBe(false)
     const mismatch = invalid(
       () => completeRpcHandshake(OFFER, accepted({ major: 9, minor: 0 })),
-      'HANDSHAKE_INCOMPATIBLE'
+      'HANDSHAKE_INVALID'
     )
     expect(leaks(mismatch, TOKEN)).toBe(false)
     expect(mismatch.cause ?? {}).not.toHaveProperty('auth')
@@ -162,9 +162,17 @@ describe('handshake redaction', () => {
             ]
           }
         }),
-      'INVALID_WIRE_ERROR'
+      'HANDSHAKE_INVALID'
     )
-    expect(invalidData).toMatchObject({ code: 'INVALID_WIRE_ERROR', violation: 'dataPortable' })
+    expect(invalidData).toMatchObject({
+      code: 'HANDSHAKE_INVALID',
+      violation: 'type',
+      cause: expect.objectContaining({
+        code: 'INVALID_WIRE_ERROR',
+        violation: 'dataPortable',
+        cause: expect.objectContaining({ code: 'INVALID_ENVELOPE' })
+      })
+    })
     expect(leaks(invalidData, TOKEN)).toBe(false)
     const incompatible = invalid(
       () => acceptRpcHandshake(OFFER, { ...OFFER, versions: [{ major: 3, minor: 0 }] }),
@@ -184,7 +192,7 @@ describe('handshake redaction', () => {
       code: 'HANDSHAKE_REJECTED',
       cause: expect.objectContaining({ code: 'HANDSHAKE_INCOMPATIBLE' })
     })
-    invalidHello({ auth: { $rpc: 'x', v: TOKEN } }, 'INVALID_ENVELOPE')
+    invalidHello({ auth: { $rpc: 'x', v: TOKEN } }, 'HANDSHAKE_INVALID')
   })
 
   it('bounds and freezes the summary without changing the top-level error', () => {
@@ -205,7 +213,7 @@ describe('handshake redaction', () => {
     })
     for (const field of ['cause', 'data', 'errors']) expect(wire).not.toHaveProperty(field)
     expect(report).not.toHaveBeenCalled()
-    const empty = invalid(() => normalizeRpcHandshake({}), 'INVALID_ENVELOPE')
+    const empty = invalid(() => normalizeRpcHandshake({}), 'HANDSHAKE_INVALID')
     expect(leaks(empty, TOKEN)).toBe(false)
   })
 
@@ -243,10 +251,7 @@ describe('handshake redaction', () => {
       'codec'
     )
     redacted(
-      invalid(
-        () => completeRpcHandshake(OFFER, accepted({ codec: token })),
-        'HANDSHAKE_INCOMPATIBLE'
-      ),
+      invalid(() => completeRpcHandshake(OFFER, accepted({ codec: token })), 'HANDSHAKE_INVALID'),
       token,
       'codec'
     )
@@ -254,10 +259,7 @@ describe('handshake redaction', () => {
   it('codec-complete uses the local offer as its allowed codec set', () => {
     const token = 'toksecret9f8e'
     redacted(
-      invalid(
-        () => completeRpcHandshake(OFFER, accepted({ codec: token })),
-        'HANDSHAKE_INCOMPATIBLE'
-      ),
+      invalid(() => completeRpcHandshake(OFFER, accepted({ codec: token })), 'HANDSHAKE_INVALID'),
       token,
       'codec-complete'
     )
@@ -272,19 +274,19 @@ describe('handshake redaction', () => {
           { ...OFFER, codecs: ['json', 'cbor'] },
           accepted({ major: 9, minor: 0, codec: 'cbor' })
         ),
-      'HANDSHAKE_INCOMPATIBLE'
+      'HANDSHAKE_INVALID'
     )
     expect(leaks(known, TOKEN)).toBe(false)
   })
   it('peer hides scalar, known value and unknown key', () => {
     const token = 'toksecret9f8e'
     for (const [peer, code] of [
-      [token, 'INVALID_ENVELOPE'],
+      [token, 'HANDSHAKE_INVALID'],
       [{ id: token, runtime: 'BAD', [token]: 1 }, 'HANDSHAKE_INVALID'],
       [{ id: 'caller', runtime: token.toUpperCase() }, 'HANDSHAKE_INVALID'],
-      [null, 'INVALID_ENVELOPE'],
-      [5, 'INVALID_ENVELOPE'],
-      [false, 'INVALID_ENVELOPE']
+      [null, 'HANDSHAKE_INVALID'],
+      [5, 'HANDSHAKE_INVALID'],
+      [false, 'HANDSHAKE_INVALID']
     ] as const)
       redacted(invalidHello({ peer }, code), token, 'peer')
     redacted(
@@ -304,7 +306,7 @@ describe('handshake redaction', () => {
   it('implementation hides scalar and nested values', () => {
     const token = 'toksecret9f8e'
     for (const [implementation, code] of [
-      [token, 'INVALID_ENVELOPE'],
+      [token, 'HANDSHAKE_INVALID'],
       [{ name: 1, version: token, [token]: 1 }, 'HANDSHAKE_INVALID']
     ] as const)
       redacted(
@@ -321,16 +323,7 @@ describe('handshake redaction', () => {
       [{ major: 0, minor: 0, [token]: 1 }],
       { major: 1, minor: 0, [token]: 1 }
     ])
-      redacted(
-        invalidHello(
-          { versions },
-          Array.isArray(versions) && typeof versions[0] === 'object'
-            ? 'HANDSHAKE_INVALID'
-            : 'INVALID_ENVELOPE'
-        ),
-        token,
-        'versions'
-      )
+      redacted(invalidHello({ versions }, 'HANDSHAKE_INVALID'), token, 'versions')
   })
   it('versions-duplicate hides repeated entries', () => {
     const token = 'toksecret9f8e'
@@ -346,8 +339,8 @@ describe('handshake redaction', () => {
   it('codecs hides scalar, invalid label and missing baseline', () => {
     const token = 'toksecret9f8e'
     for (const [codecs, code] of [
-      [token, 'INVALID_ENVELOPE'],
-      [{ [token]: 1 }, 'INVALID_ENVELOPE'],
+      [token, 'HANDSHAKE_INVALID'],
+      [{ [token]: 1 }, 'HANDSHAKE_INVALID'],
       [['json', token.toUpperCase()], 'HANDSHAKE_INVALID'],
       [[token], 'HANDSHAKE_INVALID']
     ] as const)
@@ -388,7 +381,7 @@ describe('handshake redaction', () => {
             step: 'reject',
             error: wireError
           }),
-        'INVALID_WIRE_ERROR'
+        'HANDSHAKE_INVALID'
       )
       redacted(error, token, 'reject')
     }

@@ -1,6 +1,9 @@
 /** Fixed replacement for a secret-bearing or oversize handshake value in an error chain. */
 export const RpcHandshakeRedactionText = { marker: '[redacted]' } as const
 
+/** A valid proposal with no shared protocol major retains its established negotiation reason. */
+export const RpcHandshakeReason = { version: 'version' } as const
+
 /** Names the source of a redacted handshake summary without retaining its value. */
 export const RpcHandshakeInputForm = {
   text: 'text',

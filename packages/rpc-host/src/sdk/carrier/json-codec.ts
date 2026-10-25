@@ -110,7 +110,8 @@ export class RpcJsonCarrierCodec implements IRpcCarrierCodec {
             frame.data,
             this.#json,
             context.errorMetadata,
-            this.#options.projectDecodeFailure
+            this.#options.projectDecodeFailure,
+            context.maxFrameBytes
           )
         : frame.data
     return splitRpcPreparedMetadata(value, frame.sidecars ?? [])

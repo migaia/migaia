@@ -399,9 +399,8 @@ const records: IRecordCase[] = [
     field: 'peer',
     wrong: 1,
     validate: normalizeRpcHandshake,
-    pointer: '/handshake/peer',
-    missingCode: 'INVALID_ENVELOPE',
-    wrongPointer: '/handshake'
+    pointer: '/peer',
+    code: 'HANDSHAKE_INVALID'
   },
   {
     name: 'pending peer',
@@ -415,10 +414,8 @@ const records: IRecordCase[] = [
     field: 'peer',
     wrong: 1,
     validate: normalizeRpcHandshake,
-    pointer: '/handshake/peer',
-    code: 'INVALID_ENVELOPE',
-    missingCode: 'INVALID_ENVELOPE',
-    wrongPointer: '/handshake'
+    pointer: '/peer',
+    code: 'HANDSHAKE_INVALID'
   },
   {
     name: 'pending deadline',
@@ -432,10 +429,8 @@ const records: IRecordCase[] = [
     field: 'remainingMs',
     wrong: -1,
     validate: normalizeRpcHandshake,
-    pointer: '/handshake/remainingMs',
-    code: 'HANDSHAKE_INVALID',
-    missingCode: 'INVALID_ENVELOPE',
-    wrongPointer: '/remainingMs'
+    pointer: '/remainingMs',
+    code: 'HANDSHAKE_INVALID'
   },
   {
     name: 'peer',
@@ -466,8 +461,7 @@ const records: IRecordCase[] = [
     wrong: -1,
     validate: (value) => normalizeRpcHandshake({ ...hello('caller'), versions: [value] }),
     pointer: '/versions/0/major',
-    code: 'HANDSHAKE_INVALID',
-    missingCode: 'INVALID_ENVELOPE'
+    code: 'HANDSHAKE_INVALID'
   },
   {
     name: 'directory',

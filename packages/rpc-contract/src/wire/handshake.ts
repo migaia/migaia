@@ -4,14 +4,16 @@ import {
   readHandshakeVersions,
   readHandshakeLabels,
   validateHandshakeVersion,
-  invalidHandshakeField
+  invalidHandshakeField,
+  readHandshakeProperty
 } from './handshake-fields.js'
 import type { IRpcErrorWireMetadata } from '../contract/types.js'
 import { createContractError } from '../contract/contract-error.js'
 import { redactRpcHandshakeFailure } from '../errors/handshake-privacy.js'
 import { RpcContractErrorCode } from '../error-code.js'
 import { RpcWireLimit, RpcHandshakeViolation } from './limits.js'
-import { array, identifier, invalid } from './record.js'
+import { array } from './record.js'
+import { RpcHandshakeReason } from './handshake-text.js'
 import { normalizeRpcPortable } from '../portable/normalize.js'
 import { normalizeRpcDirectory } from './directory.js'
 import { normalizeRpcWireError, restoreRpcWireError } from './errors.js'
@@ -29,6 +31,8 @@ import type { IRpcHandshake, IRpcHello, IRpcAccept } from './types.js'
 
 /** Validate required extension labels using the existing suffix grammar and duplicate limit. */
 function extensions(value: unknown, metadata?: IRpcErrorWireMetadata): readonly string[] {
+  if (!Array.isArray(value))
+    invalidHandshakeField(RpcHandshakeViolation.type, P.requiredExtensions, metadata)
   /** This local cold set checks only duplicate proposals and holds no installed handler state. */
   const seen = new Set<string>()
   /** Element validation retains the original identifier-first failure order. */
@@ -36,20 +40,57 @@ function extensions(value: unknown, metadata?: IRpcErrorWireMetadata): readonly 
     value,
     (entry, pointer) => {
       /** Only this actual extension identifier is admitted into proposal membership. */
-      const name = identifier(entry, pointer, metadata)
+      if (
+        typeof entry !== 'string' ||
+        entry.length < 1 ||
+        entry.length > RpcWireLimit.maxIdentifierChars
+      )
+        invalidHandshakeField(RpcHandshakeViolation.type, pointer, metadata)
+      const name = entry
       if (!RpcWireExtensionPattern.test(name) || seen.has(name))
-        invalid(P.extensions, undefined, metadata)
+        invalidHandshakeField(RpcHandshakeViolation.type, P.extensions, metadata)
       seen.add(name)
       return name
     },
     P.extensions,
     metadata
   )
-  if (result.length > RpcWireLimit.maxCapabilities) invalid(P.extensions, undefined, metadata)
+  if (result.length > RpcWireLimit.maxCapabilities)
+    invalidHandshakeField(RpcHandshakeViolation.type, P.extensions, metadata)
   return result
 }
 
-/** Validate the selected variant's version and codec fields without constructing another record. */
+/** Required presence is checked at the original known-field read, without a record scan. */
+function required(
+  input: Record<string, unknown>,
+  key: string,
+  metadata?: IRpcErrorWireMetadata
+): unknown {
+  /** This captured value also serves later field validation instead of rereading its getter. */
+  const value = readHandshakeProperty(input, key, metadata)
+  if (value === undefined)
+    invalidHandshakeField(RpcHandshakeViolation.required, `/${key}`, metadata)
+  return value
+}
+
+/** Authentication stays with the sole portable validator and the existing safe-cause policy. */
+function validateAuth(input: Record<string, unknown>, metadata?: IRpcErrorWireMetadata): void {
+  if (!Object.hasOwn(input, F.auth)) return
+  /** A getter failure is classified before the delegated portable validation starts. */
+  const auth = readHandshakeProperty(input, F.auth, metadata)
+  try {
+    normalizeRpcPortable(auth, metadata)
+  } catch (cause) {
+    invalidHandshakeField(
+      RpcHandshakeViolation.type,
+      '/auth',
+      metadata,
+      redactRpcHandshakeFailure(cause)
+    )
+  }
+}
+
+/** Validate the captured variant fields without rereading any application-owned getter. */
 function validateVersionCodec(
   input: Record<string, unknown>,
   metadata?: IRpcErrorWireMetadata
@@ -70,52 +111,77 @@ export function normalizeRpcHandshakeRecord(
   metadata?: IRpcErrorWireMetadata
 ): IRpcHandshake {
   if (!value || typeof value !== 'object' || Array.isArray(value))
-    invalid(P.handshake, undefined, metadata)
+    invalidHandshakeField(RpcHandshakeViolation.type, P.handshake, metadata)
   /** Unknown record properties are ignored, including properties owned by another step variant. */
   const input = value as Record<string, unknown>
-  if (input.profile === undefined) invalid(`${P.handshake}/profile`, undefined, metadata)
-  if (input.kind === undefined) invalid(`${P.handshake}/kind`, undefined, metadata)
-  if (input.profile !== RpcWireProfile)
+  /** Profile and discriminator retain their original required-field read order. */
+  const profile = required(input, F.profile, metadata)
+  /** Only a known discriminator is read; additive metadata is never visited. */
+  const kind = required(input, F.kind, metadata)
+  if (typeof profile !== 'string')
     invalidHandshakeField(RpcHandshakeViolation.type, '/profile', metadata)
-  if (input.kind !== RpcWireKind.handshake)
-    invalidHandshakeField(RpcHandshakeViolation.type, '/kind', metadata)
-  if (input.step === S.reject) {
-    if (input.error === undefined) invalid(`${P.handshake}/error`, undefined, metadata)
-    normalizeRpcWireError(input.error, metadata, redactRpcHandshakeFailure)
+  if (profile !== RpcWireProfile)
+    invalidHandshakeField(RpcHandshakeViolation.mismatch, '/profile', metadata)
+  if (kind !== RpcWireKind.handshake)
+    invalidHandshakeField(RpcHandshakeViolation.required, '/kind', metadata)
+  /** The selected step is shared by all following admission branches without another read. */
+  const step = readHandshakeProperty(input, F.step, metadata)
+  if (step === S.reject) {
+    /** Wire-error admission executes once and its safe diagnostic remains handshake-owned. */
+    const error = required(input, F.error, metadata)
+    try {
+      normalizeRpcWireError(error, metadata, redactRpcHandshakeFailure)
+    } catch (cause) {
+      invalidHandshakeField(
+        RpcHandshakeViolation.type,
+        '/error',
+        metadata,
+        redactRpcHandshakeFailure(cause)
+      )
+    }
     return value as IRpcHandshake
   }
-  if (input.step === S.pending) {
-    if (input.peer === undefined) invalid(`${P.handshake}/peer`, undefined, metadata)
-    readHandshakePeer(input.peer, metadata)
-    if (input.remainingMs === undefined) invalid(`${P.handshake}/remainingMs`, undefined, metadata)
+  if (step === S.pending) {
+    readHandshakePeer(required(input, F.peer, metadata), metadata)
+    /** Relative admission budget is captured once after peer validation. */
+    const remainingMs = required(input, F.remainingMs, metadata)
     if (
-      typeof input.remainingMs !== 'number' ||
-      !Number.isFinite(input.remainingMs) ||
-      input.remainingMs < 0 ||
-      input.remainingMs > RpcWireLimit.maxDurationMs
+      typeof remainingMs !== 'number' ||
+      !Number.isFinite(remainingMs) ||
+      remainingMs < 0 ||
+      remainingMs > RpcWireLimit.maxDurationMs
     )
       invalidHandshakeField(RpcHandshakeViolation.type, '/remainingMs', metadata)
-    if (Object.hasOwn(input, F.auth)) normalizeRpcPortable(input.auth, metadata)
+    validateAuth(input, metadata)
     return value as IRpcHandshake
   }
-  if (input.step !== S.hello && input.step !== S.accept)
-    invalidHandshakeField(RpcHandshakeViolation.type, '/step', metadata)
-  if (input.step === S.hello) {
-    if (input.versions === undefined) invalid(`${P.handshake}/versions`, undefined, metadata)
-    if (input.codecs === undefined) invalid(`${P.handshake}/codecs`, undefined, metadata)
-  } else {
-    if (input.major === undefined) invalid(`${P.handshake}/major`, undefined, metadata)
-    if (input.minor === undefined) invalid(`${P.handshake}/minor`, undefined, metadata)
-    if (input.codec === undefined) invalid(`${P.handshake}/codec`, undefined, metadata)
-  }
-  if (input.extensions === undefined) invalid(`${P.handshake}/extensions`, undefined, metadata)
-  if (input.peer === undefined) invalid(`${P.handshake}/peer`, undefined, metadata)
-  if (input.directory === undefined) invalid(`${P.handshake}/directory`, undefined, metadata)
+  if (step !== S.hello && step !== S.accept)
+    invalidHandshakeField(RpcHandshakeViolation.step, '/step', metadata)
+  /** Only this selected variant's known fields are lent to its later scalar validators. */
+  const versionCodec =
+    step === S.hello
+      ? {
+          step,
+          versions: required(input, F.versions, metadata),
+          codecs: required(input, F.codecs, metadata)
+        }
+      : {
+          step,
+          major: required(input, F.major, metadata),
+          minor: required(input, F.minor, metadata),
+          codec: required(input, F.codec, metadata)
+        }
+  /** Presence checks retain their established order before peer/directory admission. */
+  const selectedExtensions = required(input, F.extensions, metadata)
+  /** The peer record is borrowed rather than snapshotted or enumerated. */
+  const peerValue = required(input, F.peer, metadata)
+  /** Directory's existing owner performs its only semantic traversal below. */
+  const directoryValue = required(input, F.directory, metadata)
   /** Peer and directory identify the same actual remote instance. */
-  const peer = readHandshakePeer(input.peer, metadata)
+  const peerId = readHandshakePeer(peerValue, metadata)
   /** These offered extensions are descriptive until the session negotiates installed handlers. */
   const selected = readHandshakeLabels(
-    input.extensions,
+    selectedExtensions,
     RpcWireLimit.maxCapabilities,
     RpcWireExtensionPattern,
     false,
@@ -123,14 +189,17 @@ export function normalizeRpcHandshakeRecord(
     '/extensions'
   )
   /** Directory admission delegates method/schema semantics without rereading unknown metadata. */
-  const directory = normalizeRpcDirectory(input.directory, metadata, redactRpcHandshakeFailure)
-  if (directory.self.instanceId !== peer.id)
+  const directory = normalizeRpcDirectory(directoryValue, metadata, redactRpcHandshakeFailure)
+  if (directory.self.instanceId !== peerId)
     invalidHandshakeField(RpcHandshakeViolation.type, '/directory/self/instanceId', metadata)
-  validateVersionCodec(input, metadata)
-  if (Object.hasOwn(input, F.auth)) normalizeRpcPortable(input.auth, metadata)
-  if (input.step === S.hello && Object.hasOwn(input, F.requiredExtensions)) {
+  validateVersionCodec(versionCodec, metadata)
+  validateAuth(input, metadata)
+  if (step === S.hello && Object.hasOwn(input, F.requiredExtensions)) {
     /** Requirements must belong to the actual offered handler set. */
-    const required = extensions(input.requiredExtensions, metadata)
+    const required = extensions(
+      readHandshakeProperty(input, F.requiredExtensions, metadata),
+      metadata
+    )
     /** One cold membership index avoids repeated proposal scans. */
     const offered = new Set(selected)
     for (const name of required)
@@ -188,13 +257,21 @@ export function acceptRpcHandshake(
   /** The responder offer is validated independently and cannot claim an uninstalled handler. */
   const own = normalizeRpcHandshake(local, metadata)
   if (remote.step !== S.hello || own.step !== S.hello)
-    throw createContractError(RpcContractErrorCode.handshakeInvalid, undefined, metadata)
+    invalidHandshakeField(RpcHandshakeViolation.step, '/step', metadata)
   /** This protocol has one supported major; alternate v1/runtime profiles are never selected. */
   const remoteVersion = remote.versions.find((version) => version.major === RpcWireVersion.major)
   /** Version lists are bounded cold input, but indexing still avoids a nested version scan. */
   const ownVersion = own.versions.find((version) => version.major === RpcWireVersion.major)
-  if (!remoteVersion || !ownVersion)
-    throw createContractError(RpcContractErrorCode.handshakeIncompatible, undefined, metadata)
+  if (!remoteVersion || !ownVersion) {
+    /** The original public reason distinguishes incompatible majors from codec requirements. */
+    const error = createContractError(
+      RpcContractErrorCode.handshakeIncompatible,
+      undefined,
+      metadata
+    )
+    Object.defineProperty(error, F.reason, { value: RpcHandshakeReason.version, enumerable: true })
+    throw error
+  }
   /** A codec membership index preserves initiator priority in one pass. */
   const codecs = new Set(own.codecs)
   /** At most one linear pass selects the first actual shared codec. */
@@ -226,7 +303,7 @@ export function completeRpcHandshake(
   /** The reply is independently shape checked before it can change session readiness. */
   const accepted = normalizeRpcHandshake(value, metadata)
   if (original.step !== S.hello)
-    throw createContractError(RpcContractErrorCode.handshakeRejected, undefined, metadata)
+    invalidHandshakeField(RpcHandshakeViolation.step, '/step', metadata)
   if (accepted.step === S.reject)
     throw createContractError(
       RpcContractErrorCode.handshakeRejected,
@@ -234,7 +311,7 @@ export function completeRpcHandshake(
       metadata
     )
   if (accepted.step !== S.accept)
-    throw createContractError(RpcContractErrorCode.handshakeRejected, undefined, metadata)
+    invalidHandshakeField(RpcHandshakeViolation.step, '/step', metadata)
   /** Cold offer indexes avoid nested lookup over runtime-sized proposal arrays. */
   const codecs = new Set(original.codecs)
   /** Only the one supported major can become this profile's accepted agreement. */
@@ -246,18 +323,14 @@ export function completeRpcHandshake(
     accepted.minor > version.minor ||
     !codecs.has(accepted.codec)
   )
-    throw createContractError(RpcContractErrorCode.handshakeIncompatible, undefined, metadata)
+    invalidHandshakeField(RpcHandshakeViolation.mismatch, '/handshake', metadata)
   /** Accepted extension ids can only be a subset of this actual initiating offer. */
   const offered = new Set(original.extensions)
   /** Required membership is checked against the complete actual accepted set. */
   const selected = new Set(accepted.extensions)
   for (const name of accepted.extensions)
     if (!offered.has(name))
-      throw createContractError(
-        RpcContractErrorCode.extensionNegotiationFailed,
-        undefined,
-        metadata
-      )
+      invalidHandshakeField(RpcHandshakeViolation.mismatch, '/extensions', metadata)
   for (const name of original.requiredExtensions ?? [])
     if (!selected.has(name))
       throw createContractError(
