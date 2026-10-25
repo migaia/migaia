@@ -72,7 +72,7 @@ function quad(value: string, graph: IQuad['graph'] = term.defaultGraph): IQuad {
 
 describe('native RDF storage and atomic transactions', () => {
   it('round-trips default/named graphs, safe values and native queries through the host', async () => {
-    const { store, native } = await installed(),
+    const { store, native, updates, queries } = await installed(),
       named = term.iri('https://example/g?x=é')
     const input = [
       quad('"} ; DROP ALL ; {"'),
@@ -83,6 +83,7 @@ describe('native RDF storage and atomic transactions', () => {
       }
     ]
     await store.use(rdf).add(input)
+    expect(updates[0]).toContain('INSERT {')
     expect(await store.use(rdf).match({}).count()).toBe(3)
     expect(await store.use(rdf).match({ graph: term.defaultGraph }).all()).toEqual([input[0]])
     expect(await store.use(rdf).match({ graph: named }).count()).toBe(2)
@@ -90,6 +91,8 @@ describe('native RDF storage and atomic transactions', () => {
       sparql
     )`SELECT ?o WHERE {GRAPH ?g {${subject} ${predicate} ?o}}`.select()
     expect(rows).toHaveLength(3)
+    expect(queries).toContainEqual(expect.stringContaining('SELECT ?o WHERE'))
+    expect(queries).toContainEqual(expect.stringContaining('https://example/alice'))
     expect('endpoint' in store).toBe(false)
     expect(native.size).toBe(3)
     expect(store.use(rdf).match({}).nativeLabel()).toBe('native')
@@ -183,6 +186,9 @@ describe('native RDF storage and atomic transactions', () => {
     expect(updates[0]!.match(/FILTER NOT EXISTS/g)).toHaveLength(2)
     expect(updates[0]).toContain('DELETE {')
     expect(updates[0]).toContain('INSERT {')
+    expect(queries[0]).toMatch(/^ASK /)
+    expect(queries[0]).toContain('urn:migaia:commit')
+    expect(updates[1]).toMatch(/^DELETE DATA /)
     expect(native.query('ASK {GRAPH <urn:migaia:commit> {?s ?p ?o}}')).toBe(false)
     await expect(
       store.transaction(

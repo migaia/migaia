@@ -1,4 +1,4 @@
-import { describe, it, expect, onTestFinished } from 'vitest'
+import { describe, it, expect, onTestFinished, vi } from 'vitest'
 import { Store } from 'oxigraph'
 import { createStorageHost, createOrgId } from '@migaia/storage-host'
 import { rdf, sparql, type IOperationContext } from '@migaia/storage-contract'
@@ -12,10 +12,16 @@ import { parseRdfDocument } from '../src/ntriples.js'
 describe('native Graph Store and ontology Features', () => {
   it('executes all graph operations on physical default/named targets and leaves the borrowed engine open', async () => {
     const native = new Store(),
+      endpoint = oxigraphEndpoint(native),
+      put = vi.spyOn(endpoint.graphStore!, 'put'),
+      get = vi.spyOn(endpoint.graphStore!, 'get'),
+      post = vi.spyOn(endpoint.graphStore!, 'post'),
+      has = vi.spyOn(endpoint.graphStore!, 'has'),
+      remove = vi.spyOn(endpoint.graphStore!, 'remove'),
       host = await createStorageHost({
         plugins: [
           sparqlBackendPlugin(
-            { endpoint: oxigraphEndpoint(native) },
+            { endpoint },
             { graphs: graphStoreFeature(), ontology: ontologyFeature() }
           )
         ] as const
@@ -55,6 +61,12 @@ describe('native Graph Store and ontology Features', () => {
       expect(await graphs.hasGraph(target)).toBe(false)
       await expect(graphs.getGraph(target)).rejects.toMatchObject({ code: 'SPARQL_REQUEST_FAILED' })
     }
+    expect(put).toHaveBeenCalledTimes(4)
+    expect(get).toHaveBeenCalledTimes(8)
+    expect(post).toHaveBeenCalledTimes(2)
+    expect(has).toHaveBeenCalledTimes(4)
+    expect(remove).toHaveBeenCalledTimes(2)
+    expect(post.mock.calls[0]![1].text).toContain('https://example/b')
     const savedQuery = store.use(rdf).match({})
     const primary = store.dispose(),
       symbolic = store[Symbol.asyncDispose]()
@@ -79,10 +91,15 @@ describe('native Graph Store and ontology Features', () => {
     )
   })
   it('preserves full RDF/OWL blanks within one document, separates documents and keeps standard RDF ground', async () => {
+    /** Ontology import/export must use the selected endpoint's actual graph document ports. */
+    const endpoint = oxigraphEndpoint(new Store())
+    const post = vi.spyOn(endpoint.graphStore!, 'post')
+    const put = vi.spyOn(endpoint.graphStore!, 'put')
+    const get = vi.spyOn(endpoint.graphStore!, 'get')
     const host = await createStorageHost({
       plugins: [
         sparqlBackendPlugin(
-          { endpoint: oxigraphEndpoint(new Store()) },
+          { endpoint },
           { graphs: graphStoreFeature(), ontology: ontologyFeature() }
         )
       ] as const
@@ -106,6 +123,10 @@ describe('native Graph Store and ontology Features', () => {
     ).toHaveLength(4)
     expect(await ontology.importOntology(target, document, { mode: 'replace' })).toBe(2)
     expect(parseRdfDocument(await ontology.exportOntology(target))).toHaveLength(2)
+    expect(post).toHaveBeenCalledTimes(2)
+    expect(put).toHaveBeenCalledTimes(1)
+    expect(get).toHaveBeenCalledTimes(2)
+    expect(post.mock.calls[0]![1].text).toContain('http://www.w3.org/2002/07/owl#someValuesFrom')
     await expect(
       ontology.importOntology({ graph: term.iri('urn:migaia:commit') }, document)
     ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
