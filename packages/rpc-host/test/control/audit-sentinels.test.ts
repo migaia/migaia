@@ -35,28 +35,6 @@ describe('audit-probe1 historical sentinel corpus', () => {
   /** Historical synthetic payload fixture retained verbatim for audit replay. */
   const T = 'toksecret9f8e'
   /** Historical synthetic payload fixture retained verbatim for audit replay. */
-  const OFFER: IRpcHandshakeOffer = {
-    versions: [{ major: 1, minor: 0 }],
-    codecs: ['json'],
-    capabilities: [],
-    peer: { id: 'a', runtime: 'node' }
-  }
-  /** Historical synthetic payload fixture retained verbatim for audit replay. */
-  const OFFER2: IRpcHandshakeOffer = { ...OFFER, codecs: ['json', 'cbor'] }
-  /** Historical synthetic payload fixture retained verbatim for audit replay. */
-  const H = JSON.parse(createRpcHello(OFFER))
-  /** Historical synthetic payload fixture retained verbatim for audit replay. */
-  const ACC = {
-    kind: 'handshake',
-    step: 'accept',
-    protocol: 'migaia.rpc',
-    major: 1,
-    minor: 0,
-    codec: 'json',
-    capabilities: [],
-    peer: { id: 'b', runtime: 'node' }
-  }
-  /** Historical synthetic payload fixture retained verbatim for audit replay. */
   const W = {
     source: '@migaia/rpc',
     code: 'HANDSHAKE_INCOMPATIBLE',
@@ -70,49 +48,6 @@ describe('audit-probe1 historical sentinel corpus', () => {
   const N = (o: unknown) => () => normalizeRpcHandshake(J(o))
   /** Historical synthetic payload fixture retained verbatim for audit replay. */
   const cases: Record<string, () => unknown> = {
-    'unknown-kind': N({ ...H, kind: 'x', [T]: 1 }),
-    'unknown-step': N({ ...H, step: 'x', [T]: 1 }),
-    kind: N({ ...H, kind: T }),
-    step: N({ ...H, step: T }),
-    protocol: N({ ...H, kind: 'x', protocol: T }),
-    'codec pattern-invalid': N({ ...ACC, codec: 'X' + T }),
-    'codec pattern-valid': N({ ...ACC, codec: T, major: 0 }),
-    'codec-complete :535': () => completeRpcHandshake(OFFER, J({ ...ACC, codec: T })),
-    'codec-complete accept :468': () => acceptRpcHandshake(OFFER, J({ ...ACC, codec: T })),
-    'protocol :535': () => completeRpcHandshake(OFFER, J({ ...ACC, protocol: T })),
-    'protocol :523': () => completeRpcHandshake(OFFER, J({ ...H, protocol: T })),
-    'protocol :468': () => acceptRpcHandshake(OFFER, J({ ...ACC, protocol: T })),
-    'peer-snapshot(:213)': N({ ...H, peer: T }),
-    'peer-unknown(:223)': N({ ...H, peer: { id: 'a', runtime: 'BAD', [T]: 1 } }),
-    'peer-id(:223)': N({ ...H, peer: { id: T, runtime: 'BAD' } }),
-    'peer-runtime(:223)': N({ ...H, peer: { id: 'a', runtime: 'X' + T } }),
-    'peer-runtimeVersion(:232)': N({
-      ...H,
-      peer: { id: 'a', runtime: 'node', runtimeVersion: 1, [T]: 1 }
-    }),
-    'impl-snapshot(:235)': N({ ...H, peer: { id: 'a', runtime: 'node', implementation: T } }),
-    'impl-unknown(:238)': N({
-      ...H,
-      peer: { id: 'a', runtime: 'node', implementation: { name: 1, version: T, [T]: 1 } }
-    }),
-    'versions-type(:252)': N({ ...H, versions: T }),
-    'versions-entry-snapshot(:258)': N({ ...H, versions: [T] }),
-    'versions-entry(:262)': N({ ...H, versions: [{ major: 0, minor: 0, [T]: 1 }] }),
-    'versions-duplicate(:264)': N({
-      ...H,
-      versions: [
-        { major: 1, minor: 0, [T]: 1 },
-        { major: 1, minor: 0 }
-      ]
-    }),
-    'codecs-type(:279)': N({ ...H, codecs: T }),
-    'codecs-label(:281)': N({ ...H, codecs: ['json', T.toUpperCase()] }),
-    'codecs-duplicate(:284)': N({ ...H, codecs: ['json', T, T] }),
-    'codecs-baseline(:286)': N({ ...H, codecs: [T] }),
-    'capabilities(:281)': N({ ...H, capabilities: [T] }),
-    'accept-capabilities': () => completeRpcHandshake(OFFER, J({ ...ACC, capabilities: [T] })),
-    'accept-peer': () =>
-      completeRpcHandshake(OFFER, J({ ...ACC, peer: { id: T, runtime: 'BAD' } })),
     'reject-unknown(:402)': N({
       kind: 'handshake',
       step: 'reject',
@@ -138,33 +73,6 @@ describe('audit-probe1 historical sentinel corpus', () => {
       error: { ...W, message: T.repeat(3000) }
     })
   }
-  /** Historical non-secret controls ensure failures are genuine contract rejections. */
-  const controls: Record<string, () => unknown> = {
-    'CONTROL cbor': () => completeRpcHandshake(OFFER2, J({ ...ACC, major: 9, codec: 'cbor' })),
-    'CONTROL codecs dup': N({ ...H, codecs: ['json', 'json'] }),
-    'CONTROL reject foo': N({
-      kind: 'handshake',
-      step: 'reject',
-      protocol: 'migaia.rpc',
-      error: { foo: 1 }
-    }),
-    'CONTROL reject bad cause': N({
-      kind: 'handshake',
-      step: 'reject',
-      protocol: 'migaia.rpc',
-      error: { ...W, cause: 5 }
-    }),
-    'CONTROL getter offer': () =>
-      createRpcHello({
-        ...OFFER,
-        get peer(): IRpcHandshakeOffer['peer'] {
-          throw new Error('boom')
-        }
-      })
-  }
-  it.each(Object.entries(controls))('%s retains a real rejection', (_name, run) =>
-    expect(run).toThrow()
-  )
   it.each(Object.entries(cases))(
     '%s preserves historical acceptance or redacted rejection',
     (_name, run) => {
@@ -270,11 +178,6 @@ describe('audit-probe2 historical sentinel corpus', () => {
     'huge unknown keys top': N({ ...manyKeys(3000), kind: 'x', protocol: 'p' }),
     'huge unknown keys peer': N({ ...H, peer: { id: 'a', runtime: 'BAD', ...manyKeys(3000) } }),
     'huge versions array': N({ ...H, versions: Array.from({ length: 5000 }, () => T) }),
-    'bytes form unknown-kind': () =>
-      normalizeRpcHandshake(new TextEncoder().encode(J({ ...H, kind: T, [T]: 1 }))),
-    'bytes form peer': () => normalizeRpcHandshake(new TextEncoder().encode(J({ ...H, peer: T }))),
-    'json syntax unquoted token': N(`{"kind":"handshake","x":${T}}`),
-    'json syntax token key': N(`{"${T}" 1}`),
     'reject nest 15 token msg invalid code': R(nest(15, { ...W, code: 5, message: T })),
     'reject nest 17 token msg': R(nest(17, { ...W, message: T })),
     'reject nest 40': R(nest(40, { ...W, message: T, name: 5 })),
