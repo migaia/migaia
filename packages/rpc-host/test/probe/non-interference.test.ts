@@ -477,6 +477,12 @@ async function nativeTransferProbeCase(protection: IProbeProtection, mode: IProb
       expect(backing.byteLength).toBe(3)
       expect(Array.from(bytes)).toEqual([4, 5, 6])
       expect(executions).toBe(0)
+      /** Media restriction keeps ordinary encrypted binary calls on the existing inline codec path. */
+      expect(await client.send('transfer-right', 'echo', { bytes })).toMatchObject({
+        bytes: new Uint8Array([4, 5, 6])
+      })
+      expect(backing.byteLength).toBe(3)
+      expect(executions).toBe(1)
     }
     expect(businessReports).toEqual([])
     if (mode === 'throw' || mode === 'reject') expect(reports.length).toBeGreaterThan(0)
