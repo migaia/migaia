@@ -388,6 +388,10 @@ export class StreamConsumer {
   async #return(value?: unknown, thrown = false): Promise<IteratorResult<IRpcPortableValue>> {
     if (!this.#started) {
       this.#terminal = { done: true }
+      /** An unopened terminal owns no work and must not retain its original lazy inputs. */
+      this.#payload = undefined
+      this.#options = undefined
+      this.#admission = undefined
       if (thrown) throw value
       return { done: true, value: value as IRpcPortableValue }
     }
