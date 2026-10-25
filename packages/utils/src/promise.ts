@@ -652,6 +652,7 @@ class TimeoutOperation<T> {
         // A failed registration may still have installed the listener.
         this.#admitted.push(candidate)
         candidate.addEventListener('abort', this.#onAbort, { once: true })
+        if (this.#settled) return
       }
     } catch (error) {
       this.#finish(() => this.#reject(error), error)
@@ -869,6 +870,7 @@ class AbortRaceOperation<T> {
         // A failed registration may still have installed the listener.
         this.#admitted.push(candidate)
         candidate.addEventListener('abort', this.#onAbort, { once: true })
+        if (this.#settled) return
       }
     } catch (error) {
       const admissionError = attachErrorIdentity(

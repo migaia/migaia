@@ -39,6 +39,48 @@ const createHostileReasonSignal = (cause: Error) => {
 }
 
 describe('promise primitives', () => {
+  it.each(['withTimeout', 'raceWithAbort'] as const)(
+    'stops signal admission after synchronous cancellation in %s',
+    async (operation) => {
+      /** Original RPC cancellation oracles require no later listener or business start. */
+      const started = vi.fn(() => 'late')
+      /** The first structural signal cancels synchronously during its real registration call. */
+      const active = new Set<() => void>()
+      /** A later signal must not acquire a listener after the result has already settled. */
+      const laterAdded = vi.fn()
+      /** Structural abort callbacks remain authoritative even when aborted stays false. */
+      const first = {
+        aborted: false,
+        addEventListener: (_type: 'abort', listener: () => void) => {
+          active.add(listener)
+          listener()
+        },
+        removeEventListener: (_type: 'abort', listener: () => void) => {
+          active.delete(listener)
+        }
+      }
+      /** This signal exposes forbidden post-cancellation admission independently of operation IO. */
+      const second = {
+        aborted: false,
+        addEventListener: laterAdded,
+        removeEventListener: () => undefined
+      }
+      /** Both original public owners must stop inside the same listener-admission loop. */
+      const pending =
+        operation === 'withTimeout'
+          ? withTimeout(started, {
+              signals: [first, second],
+              timeoutMs: 10,
+              scheduler: createManualScheduler()
+            })
+          : raceWithAbort(started, { signals: [first, second] })
+      await expect(pending).rejects.toMatchObject({ code: 'ABORTED' })
+      expect(started).not.toHaveBeenCalled()
+      expect(laterAdded).not.toHaveBeenCalled()
+      expect(active.size).toBe(0)
+    }
+  )
+
   it.each(['sleep', 'withTimeout', 'raceWithAbort'] as const)(
     'rolls back partial signal registration in %s',
     async (operation) => {
