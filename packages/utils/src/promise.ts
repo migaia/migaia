@@ -1,3 +1,4 @@
+/** Own Promise completion, retry and concurrency primitives together with their native cleanup. */
 import { ERROR_SOURCE, UtilsErrorCode } from './error-code.js'
 import { UtilsErrorText } from './error-text.js'
 import {
@@ -1042,8 +1043,17 @@ async function retryCore<T>(
     try {
       if (remainingMs !== undefined && remainingMs <= 0)
         throw new UtilsTimeoutError('total', options.totalTimeoutMs!)
-      const operationCall: ITimeoutOperation<T> = (context) =>
-        operation({ attempt, signal: context.signal, remainingMs })
+      /** Lend only the same three inputs retained by the original attempt callback. */
+      const operationInput = { operation, attempt, remainingMs }
+      const operationCall: ITimeoutOperation<T> = (context) => {
+        /** The original operation remains a plain call rather than a method on its input record. */
+        const operation = operationInput.operation
+        return operation({
+          attempt: operationInput.attempt,
+          signal: context.signal,
+          remainingMs: operationInput.remainingMs
+        })
+      }
       if (options.attemptTimeoutMs !== undefined) {
         return await withTimeout(operationCall, {
           timeoutMs: options.attemptTimeoutMs,
@@ -1084,6 +1094,8 @@ async function retryCore<T>(
       if (externalAbort.kind === 'failed') throw externalAbort.error
       if (externalAbort.kind === 'aborted' && error instanceof UtilsAbortError) throw error
       lastError = error
+      /** A late policy retains its original inputs without also retaining the business operation. */
+      const policyInput = { options, error, attempt, signal }
       if (
         attempt >= options.maxAttempts ||
         (error instanceof UtilsTimeoutError && error.scope === 'total') ||
@@ -1091,7 +1103,11 @@ async function retryCore<T>(
           ? options.shouldRetry(error, { attempt, maxAttempts: options.maxAttempts, signal })
           : runWithAbort(
               () =>
-                options.shouldRetry(error, { attempt, maxAttempts: options.maxAttempts, signal }),
+                policyInput.options.shouldRetry(policyInput.error, {
+                  attempt: policyInput.attempt,
+                  maxAttempts: policyInput.options.maxAttempts,
+                  signal: policyInput.signal
+                }),
               externalSignals,
               attemptController,
               options.report
@@ -1146,13 +1162,15 @@ export function retry<T>(
     )
   if (snapshot.totalTimeoutMs === undefined) return retryCore(operation, snapshot)
   const externalSignals = snapshotSignals(snapshot.signals, snapshot.signal)
+  /** The original entry snapshot is still spread only when its existing deadline operation runs. */
+  const executionInput = { operation, snapshot, externalSignals }
   return withTimeout(
     ({ signal }) =>
-      retryCore(operation, {
-        ...snapshot,
+      retryCore(executionInput.operation, {
+        ...executionInput.snapshot,
         signal: undefined,
-        signals: [...externalSignals, signal],
-        totalTimeoutMs: snapshot.totalTimeoutMs
+        signals: [...executionInput.externalSignals, signal],
+        totalTimeoutMs: executionInput.snapshot.totalTimeoutMs
       }),
     {
       timeoutMs: snapshot.totalTimeoutMs,
