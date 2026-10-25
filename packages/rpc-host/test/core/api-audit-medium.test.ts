@@ -3,35 +3,7 @@ import { RpcCapability } from '@migaia/rpc-contract'
 import { expect, it } from 'vitest'
 import { connect } from '../../dist/core/middleware/connect.js'
 
-import { createRuntimeApiEndpoint } from '../../dist/core/runtime-api-endpoint.js'
 import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
-
-it('publishes the binding disposal settlement before one synchronous reentry', async () => {
-  /** The bound operation is allowed to synchronously join disposal before returning its Promise. */
-  let calls = 0
-  /** A reentrant observer must receive the same facade-owned settlement. */
-  let nested: Promise<void> | undefined
-  /** These complete public binding operations need no physical transport. */
-  const endpoint = createRuntimeApiEndpoint({
-    binding: {
-      ready: Promise.resolve(),
-      request: async () => undefined,
-      notify: async () => undefined,
-      stream: { open: () => (async function* () {})() },
-      dispose() {
-        calls++
-        if (calls === 1) nested = endpoint.dispose()
-        return Promise.resolve()
-      }
-    }
-  })
-  /** The public facade owns a stable Promise even while the binding is executing synchronously. */
-  const closing = endpoint.dispose()
-  await closing
-  expect(calls).toBe(1)
-  expect(nested).toBe(closing)
-  expect(endpoint.dispose()).toBe(closing)
-})
 
 it.each([true, false])(
   'keeps native AbortError and the exact reason (pre-aborted=%s)',

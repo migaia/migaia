@@ -273,3 +273,45 @@ it('C003 retains a lifecycle diagnostic beside an independent native cleanup fai
     await host.dispose()
   }
 })
+
+// RPC-TEST-00776736DCA7-C001: native disposal retains once and shared completion semantics.
+it('C001 publishes native disposal settlement before synchronous cleanup reentry', async () => {
+  /** The existing listener joins the same genuine native Host as the original cleanup callback. */
+  const server = coreMemoryServer('audit-native-disposal-reentry')
+  /** Declaration and execution authority come from this one actual native owner. */
+  const rpc = rpcHostPipelines(
+    () => host,
+    (key) => host.pipeline(key),
+    ['memory']
+  )
+  /** Native disposal remains the tested boundary; no binding facade or RPC Root.close is used. */
+  const host = defineHost({
+    ...rpc,
+    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
+  })
+  /** Only the actual owned disposer increments the original release count. */
+  let calls = 0
+  /** Synchronous reentry must borrow the same completion already published by native disposal. */
+  let nested: ReturnType<typeof host.dispose> | undefined
+  /** The real flow installation gives native disposal its one original asynchronous callback. */
+  const flow = observedCleanupFlow(
+    'audit-native-disposal-reentry-flow',
+    () => undefined,
+    () => {
+      calls++
+      if (calls === 1) nested = host.dispose()
+      return Promise.resolve()
+    }
+  )
+  await host.use(flow, server.transport)
+  try {
+    /** The callback reenters directly; no delay or awaiting its own nested completion is added. */
+    const closing = host.dispose()
+    await closing
+    expect(calls).toBe(1)
+    expect(nested).toBe(closing)
+    expect(host.dispose()).toBe(closing)
+  } finally {
+    await host.dispose()
+  }
+})
