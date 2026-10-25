@@ -1,59 +1,85 @@
-import { createRuntimeEndpointComposition } from '../../dist/core/runtime-api-endpoint.js'
-import { RpcCapability } from '@migaia/rpc-contract'
-import { runtimeSources } from '../runtime-api/fixture.js'
-import { RUNTIME_API_CAPABILITIES } from '../../dist/remote/runtime-api/constants.js'
-import { createRuntimePeer } from '../../dist/remote/runtime-api/peer.js'
-import { expect, it, vi } from 'vitest'
-
-import { connect } from '../../dist/core/middleware/connect.js'
-import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
+/** Original R3 identity and filtering observations use genuine public Hosts and native controls. */
+import { createRpcHost, type IRpcContext } from '@migaia/rpc-host'
+import { defineTransportPlugin } from '@migaia/rpc-host/sdk'
+import type { IRpcSessionHandle, IRpcTransportContext } from '@migaia/rpc-contract/interfaces'
+import type { IRpcPortableValue } from '@migaia/rpc-contract/protocol'
+import { assert, expect, it, vi } from 'vitest'
 import {
   defineProbe,
+  probe,
   RpcProbeDirection,
   RpcProbeKind,
   RpcProbeStage,
   RpcProbeStageName,
   type IRpcProbeEventView
-} from '../../dist/core/probe/index.js'
-import { RpcEnvelopeKind, RpcRouteProfile, RpcRouteType } from '@migaia/rpc-contract'
-import { readRuntimePeerEndpoint } from '../../dist/remote/runtime-api/peer.js'
-import { readEndpointOwner } from '../../dist/core/internal/endpoint-projection.js'
-import { EndpointOwnerKey } from '../../dist/core/endpoint-kernel.js'
-import type { RpcOutboundAttachment } from '../../dist/core/internal/outbound-attachment.js'
+} from '@migaia/rpc-host/plugins/probe'
+import { MemoryCarrier } from '../fixtures/core-carrier.js'
+import { coreMemoryServer } from '../host/core-fixture.js'
+
+/** The original held business payload distinguishes active cancellation from ordinary echo. */
+const held = 'held-variation'
+
+/** Business entry and native signal observation stay with the same actual registered provider. */
+class R3Provider {
+  /** Genuine callback entry precedes the matching caller's cancellation. */
+  started = false
+  /** Only the genuine context signal listener records successful remote cancellation delivery. */
+  aborted = false
+
+  /** Hold only the original cancellation payload and return all other data unchanged. */
+  readonly echo = async (value: IRpcPortableValue | undefined, context: IRpcContext) => {
+    if (value === held) {
+      this.started = true
+      await new Promise<void>((resolve) => {
+        context.signal.addEventListener(
+          'abort',
+          () => {
+            this.aborted = true
+            resolve()
+          },
+          { once: true }
+        )
+      })
+    }
+    return context.success(value)
+  }
+}
+
+/** One real native attachment borrows its actual public SDK control ports after installation. */
+type IR3NativeEndpoint = {
+  carrier: MemoryCarrier
+  context?: IRpcTransportContext
+  handle?: IRpcSessionHandle
+}
+
+/** Attach the original medium without creating another control, Session or receiver implementation. */
+function openR3Endpoint(endpoint: IR3NativeEndpoint, context: IRpcTransportContext) {
+  endpoint.context = context
+  endpoint.handle = context.attach(endpoint.carrier)
+  return { dispose: () => undefined }
+}
 
 it('provides the actual serving endpoint identity', async () => {
-  /** Existing memory transport exercises the provider context through the public endpoint. */
-  const [left, right] = createMemoryTransportPair()
-  /** Provider identity comes from its executor rather than the request sender. */
-  const server = await createRuntimeEndpointComposition(
-    {
-      id: 'r3-server',
-      transport: right,
-      middlewares: [connect()],
-      provider: { identity: (context) => context.success(context.localEndpointId) }
-    },
-    { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
-  ).installing
-  /** Caller retains a distinct identity to detect accidental sender-id forwarding. */
-  const client = await createRuntimeEndpointComposition(
-    {
-      id: 'r3-client',
-      transport: left,
-      middlewares: [connect()]
-    },
-    { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
-  ).installing
+  /** The existing native memory fixture keeps serving and sending Host identities distinct. */
+  const listener = coreMemoryServer('r3-server')
+  /** Provider identity comes from its actual executor context rather than the request sender. */
+  const server = await createRpcHost({
+    ...listener.options,
+    provide: { identity: (_payload, context) => context.success(context.localEndpointId) }
+  })
+  /** Caller identity cannot accidentally satisfy the unchanged serving-endpoint assertion. */
+  const client = await listener.connect('r3-client')
   try {
-    expect(await client.send('r3-server', 'identity', undefined)).toBe('r3-server')
+    expect(await client.host.memory.send('r3-server', 'identity', undefined)).toBe('r3-server')
   } finally {
-    await Promise.all([client.dispose(), server.dispose()])
+    await Promise.all([client.host.close(), server.close()])
   }
 })
 
 it('preserves variation identity through both real Peer directions and method filtering', async () => {
-  /** Snapshots retain only the explicit test consumer's view copies from the two original emitters. */
+  /** Snapshots retain only this explicit test consumer's copies from the two genuine emitters. */
   const observations: IRpcProbeEventView[][] = [[], []]
-  /** Every stage is observed to detect a variation leaking into a later reused view. */
+  /** Every original stage remains selected to detect stale subtype data in a reused view. */
   const probes = observations.map((events) =>
     defineProbe({
       stages: RpcProbeStageName,
@@ -61,122 +87,68 @@ it('preserves variation identity through both real Peer directions and method fi
       emit: (view) => events.push(Object.freeze({ ...view }))
     })
   )
-  /** Existing side spreading forwards the original probes without widening the public pair helper. */
-  const configurations = {
-    a: { provide: {}, probe: probes[0]! },
-    b: { provide: {}, probe: probes[1]! }
-  }
-  /** The public pair creates original runtime Peers on the canonical reference memory carrier. */
-  const pairOptions = configurations
-  /** Reuse the independently negotiated sources and actual canonical Peer constructors. */
-  const pairChannel = runtimeSources(RUNTIME_API_CAPABILITIES, RUNTIME_API_CAPABILITIES)
-  const [a, b] = await Promise.all([
-    createRuntimePeer({
-      ...pairOptions.a,
-      self: { name: 'a', instanceId: 'test-pair-a' },
-      connect: pairChannel.sources[0]
-    }),
-    createRuntimePeer({
-      ...pairOptions.b,
-      self: { name: 'b', instanceId: 'test-pair-b' },
-      connect: pairChannel.sources[1]
-    })
-  ])
-  const pair = { a, b }
-  /** Stable local fixture data distinguishes a registered subtype from the cancelled echo payload. */
-  const variationFixture = { user: 'user-observation', held: 'held-variation' } as const
-  /** Existing private readers expose the genuine controls without installing a test dispatcher. */
-  const peers = [pair.a, pair.b] as const
-  /** Public endpoint controls supply legacy variation traffic on each genuine Peer connection. */
-  const endpoints = peers.map((peer) => readRuntimePeerEndpoint(peer).endpoint)
-  /** The original outbound attachment already owns user variation registration and physical sends. */
-  const outbound = endpoints.map((endpoint) =>
-    readEndpointOwner<RpcOutboundAttachment>(endpoint, EndpointOwnerKey.outboundAttachment)!
-  )
-  /** Provider-start evidence prevents an abort before its actual request reaches the other endpoint. */
-  const started = [false, false]
-  /** Provider signal evidence proves each abort was delivered, rather than only rejected locally. */
-  const aborted = [false, false]
-  /** One explicitly registered subtype has its own real receiver completion evidence. */
-  const customReceived = [0, 0]
-  /** Release handles belong to the canonical registration owner and are closed before the Peers. */
-  const releases = outbound.map((owner, index) =>
-    owner.variations.register(variationFixture.user, () => {
-      customReceived[index]++
-    })
-  )
-  for (let index = 0; index < endpoints.length; index++) {
-    /** Echo remains the selected business method, including the actively cancelled invocation. */
-    endpoints[index]!.provide('echo', async (context) => {
-      if (context.data === variationFixture.held) {
-        started[index] = true
-        await new Promise<void>((resolve) => {
-          context.signal.addEventListener(
-            'abort',
-            () => {
-              aborted[index] = true
-              resolve()
-            },
-            { once: true }
-          )
-        })
-      }
-      return context.success(context.data)
-    })
-    /** This second method executes normally but is excluded by the compiled observation filter. */
-    endpoints[index]!.provide('other', (context) => context.success(context.data))
-  }
-  try {
-    for (let index = 0; index < peers.length; index++) {
-      /** Each orientation proves outbound on one emitter and inbound on the other. */
-      const sender = endpoints[index]!
-      /** The target identity comes from the actual Peer pair, not a fabricated route registry. */
-      const target = peers[1 - index]!.self.instanceId
-      expect(await sender.send(target, 'echo', index)).toBe(index)
-      expect(await sender.send(target, 'other', index)).toBe(index)
-      expect(await sender.ping(target)).toBe(true)
-      await sender.announceClose(target, { drainMs: 0 })
-      /**
-       * Existing caller cancellation emits the canonical abort variation only after execution
-       * starts.
-       */
-      const controller = new AbortController()
-      /** Attach rejection observation before the native signal settles the genuine caller operation. */
-      const cancellation = expect(
-        sender.send(target, 'echo', variationFixture.held, {
-          signal: controller.signal,
-          timeoutMs: false
-        })
-      ).rejects.toMatchObject({ code: 'CANCELLED' })
-      await vi.waitFor(() => expect(started[1 - index]).toBe(true))
-      controller.abort()
-      await cancellation
-      await vi.waitFor(() => expect(aborted[1 - index]).toBe(true))
-      /** Custom traffic passes through the same production pipeline and registered receiver owner. */
-      const receiver = await outbound[index]!.resolveReceiver(target)
-      await outbound[index]!.sendFrame({
-        kind: RpcEnvelopeKind.variation,
-        id: `${variationFixture.user}-${index}`,
-        data: {
-          route: {
-            profile: RpcRouteProfile,
-            type: RpcRouteType.variation,
-            applicationVersion: '1',
-            senderId: peers[index]!.self.instanceId,
-            targetId: target,
-            receiverId: receiver.receiverId,
-            sentAt: Date.now(),
-            variation: variationFixture.user
-          }
+  /** The established medium drives real codec, Session and physical delivery in both directions. */
+  const endpoints: readonly IR3NativeEndpoint[] = [
+    { carrier: new MemoryCarrier('r3-a') },
+    { carrier: new MemoryCarrier('r3-b') }
+  ]
+  endpoints[0]!.carrier.link(endpoints[1]!.carrier)
+  endpoints[1]!.carrier.link(endpoints[0]!.carrier)
+  /** Cold self identities remain different from both physical carrier ids. */
+  const identities = ['test-pair-a', 'test-pair-b'] as const
+  /** Each native Host registers its own original provider callback and cancellation witnesses. */
+  const providers = [new R3Provider(), new R3Provider()] as const
+  /** No old Peer, endpoint projection, variation registry or private outbound sender is recreated. */
+  const hosts = await Promise.all(
+    endpoints.map((endpoint, index) =>
+      createRpcHost({
+        self: { name: index === 0 ? 'a' : 'b', instanceId: identities[index]! },
+        plugins: [
+          probe(probes[index]!),
+          defineTransportPlugin({
+            name: `r3-memory-${index}`,
+            namespace: 'memory',
+            open: (context) => openR3Endpoint(endpoint, context)
+          })
+        ],
+        provide: {
+          echo: providers[index]!.echo,
+          other: (value, context) => context.success(value)
         }
       })
-      await vi.waitFor(() => expect(customReceived[1 - index]).toBe(1))
+    )
+  )
+  try {
+    await Promise.all(endpoints.map((endpoint) => endpoint.handle!.ready))
+    for (let index = 0; index < hosts.length; index++) {
+      /** Each orientation proves outbound here and inbound on the other genuine emitter. */
+      const sender = hosts[index]!.memory
+      /** The configured opposite Host identity is admitted by its real handshake. */
+      const target = identities[1 - index]!
+      expect(await sender.send(target, 'echo', index)).toBe(index)
+      expect(await sender.send(target, 'other', index)).toBe(index)
+      /** Public native SDK checks keep the actual ping/pong exchange and rejection semantics. */
+      await expect(
+        endpoints[index]!.context!.ping(endpoints[index]!.handle!)
+      ).resolves.toBeUndefined()
+      /** BC2 names the old announceClose/drain operation drain; this connection stays open. */
+      await endpoints[index]!.context!.drain(endpoints[index]!.handle!, 0)
+      /** The original cancellation observes rejection before the actual caller abort occurs. */
+      const controller = new AbortController()
+      /** The same original provider-entry and signal witnesses still precede CANCELLED. */
+      const cancellation = expect(
+        sender.send(target, 'echo', held, { signal: controller.signal, timeout: false })
+      ).rejects.toMatchObject({ code: 'CANCELLED' })
+      await vi.waitFor(() => expect(providers[1 - index]!.started).toBe(true))
+      controller.abort()
+      await cancellation
+      await vi.waitFor(() => expect(providers[1 - index]!.aborted).toBe(true))
     }
     for (const events of observations) {
       for (const stage of [RpcProbeStage.message, RpcProbeStage.envelope])
-        for (const direction of [RpcProbeDirection.outbound, RpcProbeDirection.inbound])
-          for (const variation of ['ping', 'pong', 'close', 'abort', variationFixture.user]) {
-            /** One real event in each direction retains the original route's subtype identity. */
+        for (const direction of [RpcProbeDirection.outbound, RpcProbeDirection.inbound]) {
+          for (const variation of ['ping', 'pong', 'drain']) {
+            /** Real controls keep their subtype through both original observation boundaries. */
             const event = events.find(
               (entry) =>
                 entry.stage === stage &&
@@ -184,11 +156,21 @@ it('preserves variation identity through both real Peer directions and method fi
                 entry.variation === variation
             )
             expect(event).toBeDefined()
-            if (stage === RpcProbeStage.message)
-              expect(event!.kind).toBe(
-                variation === 'abort' ? RpcProbeKind.cancel : RpcProbeKind.control
-              )
+            if (stage === RpcProbeStage.message) expect(event!.kind).toBe(RpcProbeKind.control)
           }
+          if (stage === RpcProbeStage.message) {
+            /** BC2 exposes cancel as its own logical kind rather than an abort variation subtype. */
+            const cancellation = events.find(
+              (entry) =>
+                entry.stage === stage &&
+                entry.direction === direction &&
+                entry.kind === RpcProbeKind.cancel
+            )
+            expect(cancellation).toBeDefined()
+            assert(cancellation)
+            expect(cancellation.method).toBe('echo')
+          }
+        }
       expect(events.some((event) => event.method === 'echo')).toBe(true)
       expect(
         events.some(
@@ -207,7 +189,6 @@ it('preserves variation identity through both real Peer directions and method fi
       }
     }
   } finally {
-    for (const release of releases) release()
-    await Promise.all(peers.map((peer) => peer.close()))
+    await Promise.all(hosts.map((host) => host.close()))
   }
 })

@@ -1193,6 +1193,8 @@ export class Session {
     this.#observe({
       stage,
       direction,
+      variation:
+        stage === S.envelope && message?.kind === K.control ? message.operation : undefined,
       messageId: routed?.id,
       method: message && 'task' in message ? message.task.method : undefined,
       senderId: routed?.route.senderId,
