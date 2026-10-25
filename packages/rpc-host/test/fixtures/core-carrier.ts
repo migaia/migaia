@@ -40,6 +40,8 @@ export class MemoryCarrier implements IRpcCarrier {
   #peer: MemoryCarrier | undefined
   /** An explicit fixture gate models a native accepting write that has not completed. */
   #acceptGate: IDeferred<void> | undefined
+  /** A business-write gate borrows this carrier's real close controller for close/drain oracles. */
+  #writeGate: IDeferred<void> | undefined
   /** A close owns one completion, including reentrant native close notifications. */
   #closed: Promise<void> | undefined
   /** The same close reason cancels a held native accepting write. */
@@ -94,6 +96,17 @@ export class MemoryCarrier implements IRpcCarrier {
     this.#acceptGate?.resolve()
   }
 
+  /** Hold actual physical writes without changing the Session or adding another pending owner. */
+  holdWrites(): void {
+    this.#writeGate = deferred<void>()
+  }
+
+  /** Release the existing physical boundary; carrier.close also cancels this same wait. */
+  releaseWrites(): void {
+    this.#writeGate?.resolve()
+    this.#writeGate = undefined
+  }
+
   /** Install one receiver and return its exact native cleanup receipt. */
   subscribe(receiver: IRpcCarrierReceiver): () => void {
     this.#receiver = receiver
@@ -115,6 +128,14 @@ export class MemoryCarrier implements IRpcCarrier {
     const message = typeof frame.data === 'string' ? undefined : (frame.data as IRpcSemanticFrame)
     if (message?.kind === 'handshake' && message.step === 'accept' && this.#acceptGate)
       await raceWithAbort(() => this.#acceptGate!.promise, {
+        signals: options?.signal
+          ? [options.signal, this.#controller.signal]
+          : [this.#controller.signal]
+      })
+    /** This original carrier owns both the native wait and its actual physical-close rejection. */
+    const gate = this.#writeGate
+    if (gate)
+      await raceWithAbort(() => gate.promise, {
         signals: options?.signal
           ? [options.signal, this.#controller.signal]
           : [this.#controller.signal]

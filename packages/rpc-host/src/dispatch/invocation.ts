@@ -293,8 +293,18 @@ export class ProviderInvocation {
   }
 
   /** Dispatch preparation runs first; only actual provider execution waits for its original turn. */
-  #executeOrdered(): Promise<IRpcDispatchOutcome> {
-    return this.#order ? this.#order.permission.then(() => this.#execute()) : this.#execute()
+  async #executeOrdered(): Promise<IRpcDispatchOutcome> {
+    try {
+      if (this.#order) await this.#order.permission
+      return await this.#execute()
+    } catch (error) {
+      /** Provider failures acquire their RPC identity before crossing the native runner boundary. */
+      throw identifyRpcBoundaryFailure(
+        error,
+        RpcCoreErrorCode.internal,
+        RpcCoreErrorText.providerFailed
+      )
+    }
   }
 
   /** Queued cancellation withdraws once; started business keeps its lease until actual completion. */
