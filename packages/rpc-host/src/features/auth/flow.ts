@@ -102,6 +102,8 @@ export class RpcAuthenticationFlow {
     this.#requests = new RequestReplayLedger(config.maxReplayEntriesPerPeer)
     this.#representation = new AuthenticationRepresentation(config.encodedType)
     this.value = {
+      /** Encryption includes binary bytes only through the codec's original inline preparation. */
+      nativeBinary: config.encrypt ? false : undefined,
       /** Transfer preflight borrows this installed integrity policy before reading caller options. */
       ...(config.sign ? { transferRequiresIntegrity: true as const } : {}),
       observationFacts: {

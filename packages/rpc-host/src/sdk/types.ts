@@ -108,6 +108,8 @@ export type IRpcFlowInstallation<E extends object = Record<never, never>> = Read
   observe?(event: IRpcObservation): void
   extensions?: readonly string[]
   requiredExtensions?: readonly string[]
+  /** Installed media protection may narrow physical native storage; it cannot grant capability. */
+  nativeBinary?: false
   /** The installed wire protection owner lends this cold native-transfer safety fact before getters. */
   transferRequiresIntegrity?: true
   /** Only a genuine installed protection owner describes its observable authentication mode. */

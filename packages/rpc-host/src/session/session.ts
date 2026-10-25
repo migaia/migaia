@@ -353,10 +353,15 @@ export class Session {
 
   /** Reject unsupported native transfer presence without reading caller getters or payload data. */
   assertTransfer(options?: object): void {
-    if (options && Object.hasOwn(options, 'transfer'))
-      this.#options.carrier.assertTransfer(
-        this.#options.flow.facts(this.#options.namespace).transferRequiresIntegrity
+    if (!options || !Object.hasOwn(options, 'transfer')) return
+    /** Selected flow restrictions narrow actual native capability before caller getters run. */
+    const facts = this.#options.flow.facts(this.#options.namespace)
+    if (facts.nativeBinary === false)
+      throw createRpcError(
+        RpcCoreErrorCode.capabilityUnsupported,
+        RpcCoreErrorText.capabilityUnsupported
       )
+    this.#options.carrier.assertTransfer(facts.transferRequiresIntegrity)
   }
 
   /** Freeze closing admission and FIFO position before asynchronous preparation can complete. */
@@ -1201,7 +1206,10 @@ export class Session {
   #codecContext(bootstrap: boolean, options?: IRpcSessionWriteOptions): IRpcCodecContext {
     return {
       codec: bootstrap ? RpcWireJsonCodec : this.#view!.codec,
-      nativeBinary: !bootstrap && this.#options.carrier.nativeBinary,
+      nativeBinary:
+        !bootstrap &&
+        this.#options.carrier.nativeBinary &&
+        this.#options.flow.facts(this.#options.namespace).nativeBinary !== false,
       errorMetadata: hostErrorWireMetadata,
       maxFrameBytes: bootstrap
         ? Math.min(SessionText.handshakeMaxFrameBytes, this.#options.maxFrameBytes)

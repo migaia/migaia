@@ -37,6 +37,7 @@ type IFlowFacts = Readonly<{
   extensions: readonly string[]
   required: readonly string[]
   observing: boolean
+  nativeBinary?: false
   transferRequiresIntegrity: boolean
   observationFacts?: IRpcFlowInstallation['observationFacts']
 }>
@@ -217,6 +218,8 @@ export class FlowRegistry {
     const required = new Set<string>()
     /** Only a genuine selected observer can enable raw-carrier observation. */
     let observing = false
+    /** Any selected media restriction wins; an installation cannot enable physical capability. */
+    let nativeBinary: false | undefined
     /** Integrity requirements combine across the namespace's actual selected installations. */
     let transferRequiresIntegrity = false
     /** A later selected installation retains the original protection-fact precedence. */
@@ -225,6 +228,7 @@ export class FlowRegistry {
       for (const name of installed.extensions ?? []) extensions.add(name)
       for (const name of installed.requiredExtensions ?? []) required.add(name)
       observing ||= installed.observe !== undefined
+      nativeBinary = installed.nativeBinary === false ? false : nativeBinary
       transferRequiresIntegrity ||= installed.transferRequiresIntegrity === true
       observationFacts = installed.observationFacts ?? observationFacts
     }
@@ -233,6 +237,7 @@ export class FlowRegistry {
       extensions: [...extensions],
       required: [...required],
       observing,
+      nativeBinary,
       transferRequiresIntegrity,
       observationFacts
     }
