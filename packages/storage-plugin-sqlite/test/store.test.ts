@@ -613,6 +613,24 @@ describe('native SQLite installation', () => {
     native.length = 0
     expect(store.sync.keys()).toEqual(['text'])
     expect(native).toContainEqual(expect.stringContaining('SELECT key FROM "migaia_text"'))
+    native.length = 0
+    expect(await store.has('text')).toBe(true)
+    expect(native).toContainEqual(
+      expect.stringContaining('SELECT value,expires_at FROM "migaia_text"')
+    )
+    native.length = 0
+    expect(await store.keys()).toEqual(['text'])
+    expect(native).toContainEqual(expect.stringContaining('SELECT key FROM "migaia_text"'))
+    native.length = 0
+    await store.setMany([{ key: 'batch-native', value: 'batch' }])
+    expect(native).toContainEqual(expect.stringContaining('INSERT INTO "migaia_text"('))
+    native.length = 0
+    expect(await store.removeMany(['batch-native'])).toBe(1)
+    expect(native).toContainEqual(expect.stringContaining('DELETE FROM "migaia_text"'))
+    await store.set('remove-native', 'remove')
+    native.length = 0
+    await store.remove('remove-native')
+    expect(native).toContainEqual(expect.stringContaining('DELETE FROM "migaia_text"'))
     const bytes = new Uint8Array([1, 2])
     await store.setBytes('bytes', bytes)
     bytes[0] = 9
@@ -634,6 +652,12 @@ describe('native SQLite installation', () => {
     await store.setBytes('text', new Uint8Array([5]), { conflictPolicy: 'replace' })
     expect(await store.get('text')).toBeNull()
     expect(await store.getBytes('text')).toEqual(new Uint8Array([5]))
+    native.length = 0
+    await store.clearValues()
+    expect(native).toContainEqual(
+      expect.stringContaining('DELETE FROM "migaia_text" WHERE org_id=?')
+    )
+    native.length = 0
     await store.clearAll()
     for (const table of ['migaia_text', 'migaia_bytes', 'migaia_records'])
       expect(native).toContainEqual(
