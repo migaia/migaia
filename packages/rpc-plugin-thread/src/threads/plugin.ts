@@ -13,6 +13,8 @@ import type {
   IRpcTransportPlugin,
   IRpcTransportSetupContext,
   IRpcNativeTransportFeature,
+  IRpcFlowFeature,
+  IRpcTransportFeatureExtensions,
   IRpcNativePoolEvents
 } from '@migaia/rpc-host/sdk'
 import type { IRpcCallFeature } from '@migaia/rpc-contract/interfaces'
@@ -30,7 +32,7 @@ export type IThreadCommonOptions = Readonly<{
   name?: string
   namespace?: string
   expose?: readonly string[]
-  features?: readonly (IRpcCallFeature | IRpcNativeTransportFeature)[]
+  features?: readonly (IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>)[]
   report?(error: unknown): void
 }>
 /** Sources are real native recipes or entry shorthand, never callbacks returning completed Peers. */
@@ -60,9 +62,9 @@ class ThreadInstallation {
     const nativeContext = report === context.report ? context : { ...context, report }
     /** Complete native features acquire members only through this source's repeatable constructor. */
     const feature = this.#options.features?.find(
-      (value) => value.kind === RpcNativeFeatureKind.pool
+      (value) => 'kind' in value && value.kind === RpcNativeFeatureKind.pool
     )
-    if (feature?.kind === RpcNativeFeatureKind.pool) {
+    if (feature && 'kind' in feature && feature.kind === RpcNativeFeatureKind.pool) {
       /** The complete feature returns its original controls and one resource disposer. */
       const installed = await feature.install({
         ...nativeContext,
@@ -126,14 +128,24 @@ class ThreadInstallation {
 /** Define a reusable native transport; one invalid source fails before Worker acquisition. */
 export function threadPlugin<
   const N extends string = typeof THREAD_NAMESPACE,
-  E extends object = Record<never, never>
+  E extends object = Record<never, never>,
+  const TFeatures extends readonly (
+    | IRpcCallFeature
+    | IRpcNativeTransportFeature
+    | IRpcFlowFeature<object>
+  )[] = readonly (IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>)[]
 >(
   options: IThreadPluginOptions &
     Readonly<{
       namespace?: N
-      features?: readonly (IRpcCallFeature | IRpcNativeTransportFeature<E>)[]
+      features?: TFeatures &
+        readonly (IRpcCallFeature | IRpcNativeTransportFeature<E> | IRpcFlowFeature<object>)[]
     }>
-): IRpcTransportPlugin<N, IThreadNamespaceExtensions & E, true> {
+): IRpcTransportPlugin<
+  N,
+  IThreadNamespaceExtensions & E & IRpcTransportFeatureExtensions<TFeatures[number]>,
+  true
+> {
   /** Runtime and exactly-one-source admission retain the original public source diagnostic. */
   const configured = options as IThreadPluginOptions & { connectToParent?: unknown }
   /** Omitted configuration is rejected synchronously without touching any native resource. */
@@ -159,5 +171,9 @@ export function threadPlugin<
     expose: configured.expose,
     features: configured.features,
     open: installation.open
-  }) as IRpcTransportPlugin<N, IThreadNamespaceExtensions & E, true>
+  }) as IRpcTransportPlugin<
+    N,
+    IThreadNamespaceExtensions & E & IRpcTransportFeatureExtensions<TFeatures[number]>,
+    true
+  >
 }

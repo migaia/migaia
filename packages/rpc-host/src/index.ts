@@ -5,6 +5,7 @@ export type {
   IRpcNamespace,
   IRpcCallOptions,
   IRpcNotifyOptions,
+  IRpcStreamOptions,
   IRpcFanoutResult,
   IRpcClosingEvent,
   IRpcPeerClosedEvent,

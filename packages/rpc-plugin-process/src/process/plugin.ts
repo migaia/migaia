@@ -8,7 +8,8 @@ import {
   type IRpcTransportPlugin,
   type IRpcNativeMemberControls,
   type IRpcNativePoolEvents,
-  type IRpcNativeTransportFeature
+  type IRpcNativeTransportFeature,
+  type IRpcTransportFeatureExtensions
 } from '@migaia/rpc-host/sdk'
 import { RpcError, RuntimeApiErrorText } from '@migaia/rpc-contract/errors'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
@@ -114,9 +115,9 @@ class ProcessInstallation {
       : context
     /** Unsupported parent/listener sources expose no repeatable acquisition capability. */
     const feature = this.#options.features?.find(
-      (value) => value.kind === RpcNativeFeatureKind.pool
+      (value) => 'kind' in value && value.kind === RpcNativeFeatureKind.pool
     )
-    if (feature?.kind === RpcNativeFeatureKind.pool) {
+    if (feature && 'kind' in feature && feature.kind === RpcNativeFeatureKind.pool) {
       /** The complete feature returns its original controls and one resource disposer. */
       const installed = await feature.install({
         ...nativeContext,
@@ -254,17 +255,23 @@ class ProcessInstallation {
 /** Define the cold process transport; ambiguous or unsupported sources reject before native launch. */
 export function processPlugin<
   const N extends string = typeof PROCESS_NAMESPACE,
-  E extends object = Record<never, never>
+  E extends object = Record<never, never>,
+  const TFeatures extends readonly IProcessFeature[] = readonly IProcessFeature[]
 >(
   options: IProcessPluginOptions &
     Readonly<{
       namespace?: N
-      features?: readonly (
-        | Exclude<IProcessFeature, IRpcNativeTransportFeature>
-        | IRpcNativeTransportFeature<E>
-      )[]
+      features?: TFeatures &
+        readonly (
+          | Exclude<IProcessFeature, IRpcNativeTransportFeature>
+          | IRpcNativeTransportFeature<E>
+        )[]
     }>
-): IRpcTransportPlugin<N, IProcessNamespaceExtensions & E, true> {
+): IRpcTransportPlugin<
+  N,
+  IProcessNamespaceExtensions & E & IRpcTransportFeatureExtensions<TFeatures[number]>,
+  true
+> {
   /** Runtime input may arrive from plain JavaScript; capture its four existing physical source arms. */
   const configured = options as IProcessPluginOptions & { connectToParent?: unknown }
   /** Native source selection is independent from routing metadata or an incoming peer claim. */
@@ -292,5 +299,9 @@ export function processPlugin<
     features: configured.features,
     nameAdmissionTimeoutMs: configured.connect?.timeoutMs,
     open: installation.open
-  }) as IRpcTransportPlugin<N, IProcessNamespaceExtensions & E, true>
+  }) as IRpcTransportPlugin<
+    N,
+    IProcessNamespaceExtensions & E & IRpcTransportFeatureExtensions<TFeatures[number]>,
+    true
+  >
 }

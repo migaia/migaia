@@ -17,6 +17,10 @@ export const HostErrorText = {
   featureCombinationConflict: 'RPC plugin installs the same call feature kind more than once',
   /** Fixed flow hooks cannot be changed after transport startup. */
   flowStarted: 'RPC flow hooks cannot be installed after transport startup',
+  /** Advanced stage authoring accepts only the SDK's finite public positions. */
+  flowLayerInvalid: 'RPC flow stage layer must be a supported RpcFlowLayer value',
+  /** Information flow belongs to reusable Features; native observer plugins cannot add stages. */
+  flowFeatureRequired: 'RPC flow stages must be declared by defineFlowFeature',
   /** Native SDK installations require declarations and execution authority from their actual host. */
   nativePipelinesRequired:
     'RPC native host must configure rpcHostPipelines with its actual pipeline owner',

@@ -25,6 +25,8 @@ export type IRpcCallOptions<Support extends boolean = false> = IRpcCallFeatures 
 /** Explicit notification selection preserves the original target override. */
 export type IRpcNotifyOptions<Support extends boolean = false> = IRpcCallOptions<Support> &
   Readonly<{ targetId?: string }>
+/** A directed stream captures one existing accepted target; omission preserves stream fanout. */
+export type IRpcStreamOptions<Support extends boolean = false> = IRpcNotifyOptions<Support>
 /** Independent target outcomes use the established null-record key grammar. */
 export type IRpcFanoutResult<T> = Readonly<{
   fulfilled: Partial<Record<string, T>>
@@ -171,7 +173,14 @@ type IRpcNamespaceSurface<TRemote, S, Support extends boolean> = Readonly<{
   /** Each direct target owns an independent returned iterator. */
   stream<M extends IStreamKeys<S>>(
     method: M,
-    ...args: [...IPayload<S[M]>, options?: IRpcCallOptions<Support>]
+    ...args: [
+      ...IPayload<S[M]>,
+      options: IRpcStreamOptions<Support> & Readonly<{ targetId: string }>
+    ]
+  ): AsyncIterableIterator<IYield<S[M]>>
+  stream<M extends IStreamKeys<S>>(
+    method: M,
+    ...args: [...IPayload<S[M]>, options?: IRpcStreamOptions<Support>]
   ): AsyncIterableIterator<IYield<S[M]>> | IRpcFanoutResult<AsyncIterableIterator<IYield<S[M]>>>
   /** Atomicity remains local to each target; no cross-target transaction is implied. */
   group<Steps extends readonly IGroupStep<S>[]>(

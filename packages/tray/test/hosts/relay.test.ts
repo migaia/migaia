@@ -36,6 +36,9 @@ describe('Tray receipt-bound relay', () => {
         expect(await caller.request('node.svc.collect', { ...address, total: 3 })).toEqual([
           1, 2, 3
         ])
+        /** The shared namespace must execute only this target's actual stream once. */
+        expect(await target.request('node.svc.streamCalls')).toBe(1)
+        expect(await caller.request('node.svc.streamCalls')).toBe(0)
         /** Business source/code and native cause chain must pass through unchanged in meaning. */
         const failure = await caller
           .request('node.svc.relayFail', address)
@@ -110,6 +113,7 @@ describe('Tray receipt-bound relay', () => {
           () => target.request('node.svc.aborted'),
           (count) => count === 2
         )
+        expect(await caller.request('node.svc.aborted')).toBe(0)
         expect(
           reports.some(
             (error) => chainHas(error, 'CANCELLED') || chainHas(error, 'DEADLINE_EXCEEDED')

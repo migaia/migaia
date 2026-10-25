@@ -9,12 +9,25 @@ import type {
   IRpcStepOutcome
 } from '@migaia/rpc-contract/protocol'
 import { normalizeRpcTrace } from '@migaia/rpc-contract/protocol'
-import type { IRpcSessionView } from '@migaia/rpc-contract/interfaces'
+import type {
+  IRpcSessionView,
+  IRpcTransportDefinition,
+  IRpcTransportInstallation
+} from '@migaia/rpc-contract/interfaces'
+import { getPluginRuntimeIntegration, type IPluginHostCore } from '@migaia/plugin-host'
+import {
+  createAbortController,
+  createLifecycleScope,
+  type ILifecycleScope
+} from '@migaia/lifecycle'
+import { observeAbortSubscription } from '@migaia/lifecycle/abort'
+import { attachSecondaryErrors } from '@migaia/utils/error'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import {
   RpcCoreErrorText,
   RpcLifecycleError,
-  RuntimeApiErrorText
+  RuntimeApiErrorText,
+  tagRpcError
 } from '@migaia/rpc-contract/errors'
 import {
   createRpcContractError,
@@ -32,11 +45,33 @@ import type {
   IRpcCallOptions as IPublicCallOptions,
   IRpcFanoutResult,
   IRpcNotifyOptions as IPublicNotifyOptions,
+  IRpcStreamOptions as IPublicStreamOptions,
   IRpcClosingHandler,
   IRpcPeerClosedHandler
 } from './types.js'
 import type { IRpcSessionScope } from '../session/types.js'
 import type { IStreamAdmissionFailure } from '../stream/types.js'
+import type { IProviderCommitGate } from '../dispatch/types.js'
+import { createProviderCommitGate } from '../dispatch/exposure.js'
+import { HostErrorText } from '../host/error-text.js'
+import type { IRpcTransportSetupContext } from '../sdk/types.js'
+
+/** Per-source native extensions remain distinct from the fixed RPC namespace publication. */
+const sourceFamily = Object.freeze({})
+/** One ordered boundary defines publication and forbids extensions replacing mandatory calls. */
+const reservedMethods = new Set<PropertyKey>([
+  'peers',
+  'request',
+  'notify',
+  'send',
+  'dispatch',
+  'group',
+  'stream',
+  'close',
+  'onClosing',
+  'onPeerClosed',
+  Symbol.asyncDispose
+])
 
 /** Runtime admission can read a supported intent; public namespace types condition its presence. */
 type IRpcCallOptions = IPublicCallOptions<true>
@@ -62,11 +97,25 @@ export type INamespaceOptions = Readonly<{
   closingWrites: boolean
   /** Event registrations remain isolated to the original installation, including staged rollback. */
   sessionScope: IRpcSessionScope
+  /** The original namespace resource owner also joins late source registrations at shutdown. */
+  resources: ILifecycleScope
+  configuredReport?: (error: unknown) => void
+  settleFailedGate(gate: IProviderCommitGate): Promise<void>
   /** Global close seals new work before joining native origin drains. */
   assertOpen?(): void
   sessions: Pick<
     SessionTable,
-    'get' | 'select' | 'values' | 'assertTransfer' | 'onClosing' | 'onPeerClosed'
+    | 'get'
+    | 'select'
+    | 'values'
+    | 'assertTransfer'
+    | 'onClosing'
+    | 'onPeerClosed'
+    | 'stageAppend'
+    | 'commitAppend'
+    | 'context'
+    | 'closeScope'
+    | 'releaseScope'
   >
   calls: Pick<CallTable, 'invoke'>
   stream(
@@ -122,9 +171,129 @@ async function settleDelivery(
   }
 }
 
+/** One native source retains the original staged admission and resource receipts, not a registry. */
+class NamespaceSource {
+  /** The actual receiving namespace lends identity indexes, reporting and its existing resources. */
+  readonly #owner: Namespace
+  /** Source cleanup borrows its namespace's actual table and resource ports. */
+  readonly #options: INamespaceOptions
+  /** The genuine source registration alone grants native commit and rollback authority. */
+  readonly #core: IPluginHostCore
+  /** Original native source construction remains with its concrete transport factory. */
+  readonly #definition: IRpcTransportDefinition<unknown, object, IRpcTransportSetupContext>
+  /** Acquisition cancellation stays live until the same source Sessions finish closing. */
+  readonly #controller = createAbortController()
+  /** Actual acquired source and Session handles retain original reverse cleanup ownership. */
+  readonly #resources = createLifecycleScope({ errorPolicy: 'collect' })
+  /** One existing gate fences both source publication and incoming business operations. */
+  readonly #gate: ReturnType<typeof createProviderCommitGate>
+  /** The appended scope borrows canonical identity indexes without creating another peer table. */
+  readonly #scope: IRpcSessionScope
+  /** Reentrant native/namespace removal joins this same actual cleanup. */
+  #closing: Promise<void> | undefined
+
+  /** Publish resource ownership before native source construction can yield or reenter. */
+  constructor(
+    owner: Namespace,
+    options: INamespaceOptions,
+    core: IPluginHostCore,
+    definition: IRpcTransportDefinition<unknown, object, IRpcTransportSetupContext>
+  ) {
+    this.#owner = owner
+    this.#options = options
+    this.#core = core
+    this.#definition = definition
+    this.#gate = createProviderCommitGate(core.lifecycle.signal)
+    this.#scope = options.sessions.stageAppend(
+      options.sessionScope,
+      {
+        signal: this.#controller.signal,
+        handshakeTimeoutMs: definition.handshakeTimeoutMs,
+        nameAdmissionTimeoutMs: definition.nameAdmissionTimeoutMs
+      },
+      this.#gate
+    )
+    options.resources.own(this, { force: () => this.close() })
+    core.onDispose(() => this.close(core.lifecycle.signal.reason))
+  }
+
+  /** Original native open runs under this source core; only its native commit publishes peers. */
+  async open(): Promise<void> {
+    /** Source callbacks use their original resource lifetime while borrowing the fixed namespace. */
+    const context: IRpcTransportSetupContext = {
+      owner: this.#core,
+      configuredReport: this.#options.configuredReport,
+      ...this.#options.sessions.context(
+        this.#scope,
+        this.#resources,
+        () => this.#controller.signal.reason
+      )
+    }
+    /** Only the original opener supplies native extensions and their exact disposer. */
+    const installed = await this.#owner.openTransport(
+      this.#core,
+      this.#definition,
+      context,
+      this.#resources,
+      this.close
+    )
+    /** This is a native extension key only; it declares no RPC namespace or pipeline group. */
+    const value = installed.namespaceExtensions ?? Object.freeze({})
+    /** Native publication remains tied to this original source core's own commit receipt. */
+    const slot = getPluginRuntimeIntegration(this.#core).acquireSharedSlot(
+      this.#definition.namespace,
+      sourceFamily,
+      () => value
+    )
+    slot.register(value, () => {
+      this.#gate.open()
+      this.#options.sessions.commitAppend(this.#scope)
+    })
+  }
+
+  /** Fail admission before joining its actual terminals, then close Session before native media. */
+  readonly close = (reason?: unknown): Promise<void> => {
+    if (!this.#closing) {
+      this.#gate.fail(reason)
+      this.#closing = this.#release(reason)
+    }
+    return this.#closing
+  }
+
+  /** Release only this source's exact scope; parent namespace handlers and other sources survive. */
+  async #release(reason: unknown): Promise<void> {
+    await this.#options.settleFailedGate(this.#gate)
+    /** Every original cleanup error remains reachable in observed release order. */
+    const failures: unknown[] = []
+    try {
+      await this.#options.sessions.closeScope(this.#scope, reason)
+    } catch (error) {
+      failures.push(error)
+    }
+    this.#controller.abort(reason)
+    /** Original lifecycle collection preserves all native cleanup failures without early exit. */
+    const cleanup = await this.#resources.dispose()
+    this.#options.sessions.releaseScope(this.#scope)
+    this.#options.resources.release(this)
+    for (const entry of cleanup) failures.push(entry.error)
+    if (failures.length) {
+      /** The first failure remains exact, with aggregates used only for multiple original failures. */
+      const error =
+        failures.length === 1
+          ? failures[0]
+          : createRpcLifecycleError(
+              RpcCoreErrorText.endpointDisposed,
+              new AggregateError(failures, HostErrorText.cleanupFailed)
+            )
+      this.#options.report(error)
+      throw error
+    }
+  }
+}
+
 /** Project the host's single execution owners into one unique transport namespace. */
 export class Namespace {
-  /** Root publishes closing methods only when this cold transport declaration is true. */
+  /** Public closing methods exist only when this cold transport declaration is true. */
   readonly closingWrites: boolean
   /** Explicit collaborators own calls, streams, accepted session lookup and transport shutdown. */
   readonly #options: INamespaceOptions
@@ -141,6 +310,84 @@ export class Namespace {
   constructor(options: INamespaceOptions) {
     this.#options = options
     this.closingWrites = options.closingWrites
+  }
+
+  /** Publish approved calls and installed extensions as one immutable namespace-owned surface. */
+  surface(
+    flowExtensions: readonly Readonly<Record<string, unknown>>[],
+    transportExtensions?: object
+  ): Record<PropertyKey, unknown> {
+    /** This owner lends exact call identities without exposing its mutable collaborators. */
+    const surface: Record<PropertyKey, unknown> = {}
+    for (const key of reservedMethods) {
+      if ((key === 'onClosing' || key === 'onPeerClosed') && !this.closingWrites) continue
+      surface[key] = key === Symbol.asyncDispose ? this.close : Reflect.get(this, key)
+    }
+    for (const extension of flowExtensions) this.#extend(surface, extension)
+    if (transportExtensions)
+      this.#extend(surface, transportExtensions as Readonly<Record<string, unknown>>)
+    return Object.freeze(surface)
+  }
+
+  /** Installed native contributions cannot override mandatory namespace methods or one another. */
+  #extend(surface: object, extension: Readonly<Record<string, unknown>>): void {
+    for (const key of Reflect.ownKeys(extension)) {
+      if (reservedMethods.has(key) || Object.hasOwn(surface, key))
+        throw tagRpcError(
+          new TypeError(HostErrorText.namespaceDuplicate),
+          RpcCoreErrorCode.invalidConfig
+        )
+      /** Snapshot descriptors without running extension accessors. */
+      const descriptor = Object.getOwnPropertyDescriptor(extension, key)!
+      if (!Object.hasOwn(descriptor, 'value'))
+        throw tagRpcError(
+          new TypeError(HostErrorText.pluginInvalid),
+          RpcCoreErrorCode.invalidConfig
+        )
+      Object.defineProperty(surface, key, { ...descriptor, configurable: false, writable: false })
+    }
+  }
+
+  /** A genuine source definition joins this already-declared namespace's original admission owner. */
+  installSource(
+    core: IPluginHostCore,
+    definition: IRpcTransportDefinition<unknown, object, IRpcTransportSetupContext>
+  ): Promise<void> {
+    this.#assertOpen()
+    return new NamespaceSource(this, this.#options, core, definition).open()
+  }
+
+  /** Transport and source acquisition share the original operation-abort and resource handoff. */
+  async openTransport(
+    core: IPluginHostCore,
+    definition: IRpcTransportDefinition<unknown, object, IRpcTransportSetupContext>,
+    context: IRpcTransportSetupContext,
+    resources: ILifecycleScope,
+    close: (reason: unknown) => Promise<void>
+  ): Promise<IRpcTransportInstallation<object>> {
+    /** This receipt borrows actual close/report ports without retaining a second lifecycle owner. */
+    const operation = { close, report: this.#options.report }
+    /** This native operation receipt cancels only the registration whose open is still pending. */
+    const preparing = observeAbortSubscription(
+      core.operation.signal,
+      (reason) => void operation.close(reason).catch(operation.report),
+      operation.report
+    )
+    core.onDispose(preparing.unsubscribe)
+    /** Acquired cleanup is admitted before its original installation result becomes observable. */
+    const installed = await definition.open(context)
+    preparing.unsubscribe()
+    try {
+      resources.own(installed, { force: () => installed.dispose() })
+    } catch (primary) {
+      try {
+        await installed.dispose()
+      } catch (cleanup) {
+        throw attachSecondaryErrors(primary, [cleanup])
+      }
+      throw primary
+    }
+    return installed
   }
 
   /** Handlers borrow the original SessionTable scope; Namespace owns no parallel listener set. */
@@ -223,13 +470,16 @@ export class Namespace {
   readonly stream = (
     method: string,
     payload?: IRpcPortableValue,
-    options: IRpcCallOptions = {}
+    options: IPublicStreamOptions<true> = {}
   ):
     | AsyncIterableIterator<IRpcPortableValue>
     | IRpcFanoutResult<AsyncIterableIterator<IRpcPortableValue>> => {
     assertTrace(options)
     /** One snapshot fixes target identity before any iterator starts. */
-    const selected = this.#targets(options)
+    const selected =
+      options.targetId === undefined
+        ? this.#targets(options)
+        : [this.#direct(options.targetId, options)]
     this.#assertTransfer(selected, options)
     if (selected.length === 1) return this.#stream(selected[0]!, method, payload, options)
     /** Stream fanout contains iterators, never promises masquerading as an iterator. */

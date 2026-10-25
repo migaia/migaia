@@ -5,7 +5,7 @@ import { processPlugin } from '@migaia/rpc-plugin-process'
 import { threadPlugin } from '@migaia/rpc-plugin-thread'
 import { deferred } from '@migaia/utils/promise'
 import { probe } from '@migaia/rpc-host/plugins/probe'
-import { defineFlowPlugin, type IRpcFlowInstallation } from '@migaia/rpc-host/sdk'
+import { defineFlowFeature, type IRpcFlowInstallation } from '@migaia/rpc-host/sdk'
 import { RpcProbeDirection, RpcProbeKind } from '@migaia/rpc-contract/interfaces'
 import { RpcError } from '@migaia/rpc-contract/errors'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
@@ -38,7 +38,7 @@ class ClosingWriteGate {
   /** Later frames use the same stage without another wait. */
   #held = false
   /** The normal SDK factory installs this exact stage, with no alternate send or codec path. */
-  readonly plugin = defineFlowPlugin({
+  readonly plugin = defineFlowFeature({
     name: 'a23-closing-write-gate',
     setup: () => this.#installation()
   })

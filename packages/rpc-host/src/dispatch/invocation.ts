@@ -84,6 +84,7 @@ export type IProviderInvocationInput = Readonly<{
   ports: IProviderDispatcherOptions
   source: IRpcFlowContext
   targetSource?: IRpcTargetSource
+  sourceGate?: IProviderCommitGate
   envelope: Extract<
     IRpcEnvelope,
     { kind: 'call' | 'group' } | { kind: 'outcome'; operation: 'lookup' }
@@ -182,13 +183,11 @@ export class ProviderInvocation {
 
   /** Selected methods alone cannot prove entry when a dispatch hook is still awaiting user work. */
   belongsToGate(gate: IProviderCommitGate): boolean {
-    return this.#waitingGate === gate
+    return this.#waitingGate === gate || this.#input.sourceGate === gate
   }
 
   /** Borrow the exact original wait; ordinary calls allocate no extra Promise or gate state. */
-  #waitForGate(entry: IProviderMethodEntry): Promise<void> | undefined {
-    /** Local and forwarded entries already carry the same canonical native installation gate. */
-    const gate = entryGate(entry)
+  #waitForGate(gate: IProviderCommitGate | undefined): Promise<void> | undefined {
     if (!gate || gate.isOpen()) return
     this.#waitingGate = gate
     return gate.wait(this.signal).then(() => {
@@ -227,13 +226,16 @@ export class ProviderInvocation {
     /** Reply-bearing failures report their original error only after the physical response settles. */
     let failed: { error: unknown } | undefined
     try {
+      /** A late native source cannot enter any business stage before its own atomic commit. */
+      const sourceWaiting = this.#waitForGate(this.#input.sourceGate)
+      if (sourceWaiting) await sourceWaiting
       if (this.#input.admission) throw this.#input.admission.error
       /** Plugins may replay without calling next; completion still belongs to this operation. */
       /** Replay and the actual provider share one explicit result cell under native void-next. */
       const result: { value: IRpcDispatchOutcome } = { value: RpcDispatchDrop }
       await this.#input.ports
         .pipelines()
-        .pipeline(RpcFlowPoint.dispatchInbound)
+        .pipeline(RpcFlowPoint.dispatchInbound, this.#input.source.namespace)
         .run(
           {
             context: {
@@ -358,7 +360,7 @@ export class ProviderInvocation {
     /** A pending native install must commit before all local guards can be checked together. */
     for (const entry of entries) {
       /** Rollback may join only an actual native wait entered by this invocation. */
-      const waiting = this.#waitForGate(entry)
+      const waiting = this.#waitForGate(entryGate(entry))
       if (waiting) await waiting
       if (this.signal.aborted) throw this.signal.reason
       if (entry.kind !== 'forward')
@@ -451,7 +453,7 @@ export class ProviderInvocation {
     try {
       if (mode === RpcCallMode.stream) this.#streamContext = context
       /** Original local and forwarded native candidates wait at this one invocation boundary. */
-      const waiting = this.#waitForGate(entry)
+      const waiting = this.#waitForGate(entryGate(entry))
       if (waiting) await waiting
       if (this.signal.aborted) throw this.signal.reason
       if (entry.kind === 'forward') {

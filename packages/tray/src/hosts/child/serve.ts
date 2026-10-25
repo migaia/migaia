@@ -25,7 +25,8 @@ export async function serveChild(
   /** Native construction receives declarations and lazy execution authority through one SDK call. */
   const rpc = rpcHostPipelines(
     () => host,
-    (name) => host.pipeline(name)
+    (name) => host.pipeline(name),
+    [admitted.runtime]
   )
   /** PluginHost cleanup diagnostics retain their native errors on the configured reporter. */
   const host = defineHost({

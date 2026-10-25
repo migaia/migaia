@@ -1,6 +1,6 @@
 /** Builds the SharedWorker transport from one borrowed page port or native connect-event scope. */
 import { defineTransportPlugin } from '@migaia/rpc-host/sdk'
-import type { IRpcTransportPlugin } from '@migaia/rpc-host/sdk'
+import type { IRpcTransportPlugin, IRpcTransportFeatureExtensions } from '@migaia/rpc-host/sdk'
 import { BrowserPeerErrorText } from '../error-text.js'
 import { RpcBrowserErrorCode } from '@migaia/rpc-contract/error-code'
 import { createBrowserPeerError } from './peer-error.js'
@@ -9,11 +9,15 @@ import { attachBrowserCarrier } from './native-message.js'
 import { createSharedWorkerCarrier } from './adapters/shared-worker.js'
 import { listenBrowserPorts } from './peer-listener.js'
 import type { ISharedWorkerPluginOptions } from './peer-types.js'
+import type { IBrowserFeature } from './plugin-types.js'
 
 /** Capture one existing page port or native connect scope; no physical effect occurs cold. */
-export function sharedWorkerPlugin<const N extends string = 'sharedWorker'>(
-  options: ISharedWorkerPluginOptions & Readonly<{ namespace?: N }>
-): IRpcTransportPlugin<NoInfer<N>, Record<never, never>, true> {
+export function sharedWorkerPlugin<
+  const N extends string = 'sharedWorker',
+  const TFeatures extends readonly IBrowserFeature[] = readonly IBrowserFeature[]
+>(
+  options: ISharedWorkerPluginOptions & Readonly<{ namespace?: N; features?: TFeatures }>
+): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true> {
   if (
     !options ||
     Number(options.sharedWorker !== undefined) + Number(options.listen !== undefined) !== 1
@@ -50,5 +54,5 @@ export function sharedWorkerPlugin<const N extends string = 'sharedWorker'>(
       scope
         ? listenBrowserPorts(scope, context)
         : attachBrowserCarrier(createSharedWorkerCarrier(port!, context), context)
-  })
+  }) as IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true>
 }

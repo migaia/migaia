@@ -129,7 +129,8 @@ export class ProviderDispatcher {
     source: IRpcFlowContext,
     envelope: IRpcEnvelope,
     rejection?: Readonly<{ error: unknown }>,
-    targetSource?: IRpcTargetSource
+    targetSource?: IRpcTargetSource,
+    sourceGate?: IProviderCommitGate
   ): Promise<void> {
     /** The carrier index grants no authority to a same id from another physical session. */
     const table = this.#incoming.get(source.carrierId)
@@ -210,6 +211,7 @@ export class ProviderDispatcher {
       methods,
       admission,
       targetSource,
+      sourceGate,
       ordering: this.#ordering
     })
     /** Publish before dispatch so synchronous hooks/reentrant cancellation observe the original id. */

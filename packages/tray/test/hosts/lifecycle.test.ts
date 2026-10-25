@@ -576,7 +576,7 @@ describe('Tray lifecycle management', () => {
     /** This exact package module is also consumed by the parent registry. */
     const owner = await import(runtimeUrl)
     /** Original accessor remains the sole runtime-family selector. */
-    const original = owner.outletOf
+    const original = owner.membersOf
     /** Only this assembled parent gets a held read; child construction stays unchanged. */
     let parent: any
     /** Only the exit snapshot is held; background and manual reads remain unmodified. */
@@ -594,31 +594,28 @@ describe('Tray lifecycle management', () => {
       captured = resolve
     })
     /** Read instrumentation delegates every operation to the original canonical outlet. */
-    const observing = vi
-      .spyOn(owner, 'outletOf')
-      .mockImplementation((actualHost: any, definition: any, id?: any) => {
-        /** The original facade keeps its brands, private slot and native receipt ownership. */
-        const outlet = original(actualHost, definition, id)
-        if (actualHost !== parent) return outlet
-        return {
-          ...outlet,
-          members: {
-            ...outlet.members,
-            get: async (...args: any[]) => {
-              /** Only the first old-generation exit read waits behind this test barrier. */
-              const hold = armed
-              armed = false
-              /** Real get captures supervision before its real native resources sampler awaits. */
-              const snapshot = await outlet.members.get(...args)
-              if (hold) {
-                captured()
-                await blocked
-              }
-              return snapshot
-            }
+    const observing = vi.spyOn(owner, 'membersOf').mockImplementation((...args: unknown[]) => {
+      /** Dynamic module instrumentation receives the unchanged native helper arguments. */
+      const [actualHost, id] = args
+      /** The original facade keeps its brands, private slot and native receipt ownership. */
+      const members = original(actualHost, id)
+      if (actualHost !== parent) return members
+      return {
+        ...members,
+        get: async (...args: any[]) => {
+          /** Only the first old-generation exit read waits behind this test barrier. */
+          const hold = armed
+          armed = false
+          /** Real get captures supervision before its real native resources sampler awaits. */
+          const snapshot = await members.get(...args)
+          if (hold) {
+            captured()
+            await blocked
           }
+          return snapshot
         }
-      })
+      }
+    })
     /** Process DSL uses native on-failure restart with its existing 250 ms backoff. */
     const api = await fixture()
     /** Actual parent outlet, not a cloned facade, drives this race. */

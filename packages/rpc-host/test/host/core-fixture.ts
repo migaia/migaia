@@ -3,7 +3,6 @@ import { createRpcHost, defaultRpcReporter, type IRpcHostOptions } from '@migaia
 import { defineTransportPlugin } from '@migaia/rpc-host/sdk'
 import { assert } from 'vitest'
 import type {
-  IRpcCallFeature,
   IRpcTransportContext,
   IRpcCarrierCodec,
   IRpcAttachedSession,
@@ -111,7 +110,7 @@ class CoreMemoryServer {
     name: string,
     instanceId: string,
     namespace: string,
-    features: readonly IRpcCallFeature[],
+    features: readonly unknown[],
     expose: readonly string[],
     codec?: ICoreCodec
   ) {
@@ -183,7 +182,7 @@ export function coreMemoryServer(
   name: string,
   instanceId = name,
   namespace = 'memory',
-  features: readonly IRpcCallFeature[] = [],
+  features: readonly unknown[] = [],
   expose: readonly string[] = [],
   codec?: ICoreCodec
 ) {

@@ -3,7 +3,7 @@ import { expect, it } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
 import { auth } from '@migaia/rpc-host/plugins/auth'
 import { probe } from '@migaia/rpc-host/plugins/probe'
-import { defineFlowPlugin, defineTransportPlugin } from '@migaia/rpc-host/sdk'
+import { defineFlowFeature, defineTransportPlugin } from '@migaia/rpc-host/sdk'
 import { coreMemoryServer } from '../../host/core-fixture.js'
 import { MemoryCarrier } from '../../fixtures/core-carrier.js'
 
@@ -50,7 +50,7 @@ it.each([false, true])(
     /** The original listener context owns every accepted Session, including two simultaneous peers. */
     const server = coreMemoryServer('server', 'credential-server')
     /** Ordinary stages must never receive the private value, even by enumerating the full context. */
-    const inspect = defineFlowPlugin({
+    const inspect = defineFlowFeature({
       name: 'inspect-credential-context',
       setup: () => ({
         stages: {

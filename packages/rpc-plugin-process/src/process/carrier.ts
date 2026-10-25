@@ -84,8 +84,9 @@ class ProcessCarrierFeatures {
     this.#raw = raw
     this.#context = context
     /** One cold selection avoids installing a feature or shared flow more than once. */
-    const selected = new Map<string, IProcessFeature>()
+    const selected = new Map<string, Extract<IProcessFeature, { kind: string }>>()
     for (const feature of options.features ?? []) {
+      if (!('kind' in feature)) continue
       if (selected.has(feature.kind))
         throw tagRpcError(
           new TypeError(RpcCoreErrorText.ipcGateDuplicated),

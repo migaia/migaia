@@ -97,6 +97,8 @@ class NodePluginFixture {
   #aborted = 0
   /** Successful one-way dispatch increments only this generation's receipt count. */
   #noted = 0
+  /** Actual stream entry count proves only the specifically addressed native record runs. */
+  #streamCalls = 0
   /** Held remote retains its original parent-issued admission receipt. */
   #captured
   /** Actual Feature creation count proves one init per native generation. */
@@ -188,6 +190,8 @@ class NodePluginFixture {
     this.#tray = deps.tray
     if (this.#info.config?.topic)
       this.#topicInit = this.#subscribeTopic({ topic: this.#info.config.topic })
+    /** The original generator retains native function shape while counting this generation only. */
+    const owner = this
     return {
       topicPublish: this.#topicPublishAction,
       topicSubscribe: this.#subscribeTopic,
@@ -200,8 +204,10 @@ class NodePluginFixture {
 
       /** @param {number} total Number of items. @returns {AsyncGenerator<number>} Ordered items. */
       count: async function* (total) {
+        owner.#streamCalls += 1
         for (let index = 1; index <= total; index += 1) yield index
       },
+      streamCalls: this.#streamCallsAction,
       sleep: this.#sleepAction,
       held: (milliseconds) => this.#heldAction(milliseconds),
       aborted: this.#abortedAction,
@@ -319,6 +325,8 @@ class NodePluginFixture {
 
   /** @returns {number} Successful one-way deliveries. */
   #notedCountAction = () => this.#noted
+  /** @returns {number} Real stream invocations in this exact accepted generation. */
+  #streamCallsAction = () => this.#streamCalls
 
   /** @returns {void} Records one-way delivery. */
   #notedAction = () => {

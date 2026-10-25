@@ -9,6 +9,8 @@ import {
   RpcNativePoolMember,
   type IRpcNativePoolEvents,
   type IRpcNativeTransportFeature,
+  type IRpcFlowFeature,
+  type IRpcTransportFeatureExtensions,
   type IRpcTransportSetupContext,
   type IRpcNativeMemberControls,
   type IRpcTransportPlugin
@@ -28,7 +30,7 @@ export type ICoroutineCommonOptions = Readonly<{
   name?: string
   namespace?: string
   expose?: readonly string[]
-  features?: readonly (IRpcCallFeature | IRpcNativeTransportFeature)[]
+  features?: readonly (IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>)[]
   report?(error: unknown): void
 }>
 /** Exactly one original native source is admitted before any task or port can be acquired. */
@@ -64,9 +66,9 @@ class CoroutineInstallation {
   readonly open = async (context: IRpcTransportSetupContext) => {
     /** Native selection is cold; call timeout/retry definitions stay untouched. */
     const feature = this.#options.features?.find(
-      (value) => value.kind === RpcNativeFeatureKind.pool
+      (value) => 'kind' in value && value.kind === RpcNativeFeatureKind.pool
     )
-    if (feature?.kind === RpcNativeFeatureKind.pool) {
+    if (feature && 'kind' in feature && feature.kind === RpcNativeFeatureKind.pool) {
       /** The complete feature returns its original controls and one resource disposer. */
       const installed = await feature.install({
         ...context,
@@ -99,14 +101,24 @@ class CoroutineInstallation {
 /** Capture a cold actual source; the original factory name remains the single public entry. */
 export function coroutinePlugin<
   const N extends string = typeof CoroutineText.namespace,
-  E extends object = Record<never, never>
+  E extends object = Record<never, never>,
+  const TFeatures extends readonly (
+    | IRpcCallFeature
+    | IRpcNativeTransportFeature
+    | IRpcFlowFeature<object>
+  )[] = readonly (IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>)[]
 >(
   options: ICoroutinePluginOptions &
     Readonly<{
       namespace?: N
-      features?: readonly (IRpcCallFeature | IRpcNativeTransportFeature<E>)[]
+      features?: TFeatures &
+        readonly (IRpcCallFeature | IRpcNativeTransportFeature<E> | IRpcFlowFeature<object>)[]
     }>
-): IRpcTransportPlugin<N, ICoroutineNamespaceExtensions & E, true> {
+): IRpcTransportPlugin<
+  N,
+  ICoroutineNamespaceExtensions & E & IRpcTransportFeatureExtensions<TFeatures[number]>,
+  true
+> {
   /** Source selection retains native TypeError/source/code and does no IO. */
   const task = options?.spawn,
     parent = options?.connectToParent
@@ -128,5 +140,9 @@ export function coroutinePlugin<
     expose: options.expose,
     features: options.features,
     open: installation.open
-  }) as IRpcTransportPlugin<N, ICoroutineNamespaceExtensions & E, true>
+  }) as IRpcTransportPlugin<
+    N,
+    ICoroutineNamespaceExtensions & E & IRpcTransportFeatureExtensions<TFeatures[number]>,
+    true
+  >
 }

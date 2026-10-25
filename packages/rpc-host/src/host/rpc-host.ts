@@ -3,7 +3,6 @@
  * owners.
  */
 import { defineHost, getPluginRuntimeIntegration, type IPluginHostCore } from '@migaia/plugin-host'
-import { observeAbortSubscription } from '@migaia/lifecycle/abort'
 import {
   createAbortController,
   createLifecycleScope,
@@ -30,7 +29,7 @@ import { callTarget } from '../call/target.js'
 import type { ICallCommand, ICallLocalOptions, ICallTargetRef } from '../call/types.js'
 import { ProviderDispatcher } from '../dispatch/dispatcher.js'
 import type { ProviderRegistration } from '../dispatch/registration.js'
-import type { IRpcProvide, IRpcProvideOptions } from '../dispatch/types.js'
+import type { IRpcProvide, IRpcProvideOptions, IProviderCommitGate } from '../dispatch/types.js'
 import { createProviderCommitGate, exposedProvide } from '../dispatch/exposure.js'
 import { FeatureScope } from '../feature/scope.js'
 import { FlowRegistry } from '../flow/registry.js'
@@ -39,10 +38,11 @@ import { Namespace } from '../namespace/namespace.js'
 import { SessionTable } from '../session/table.js'
 import type { IRpcSessionScope, IRpcSessionWriteOptions } from '../session/types.js'
 import { StreamChannel } from '../stream/channel.js'
-import type { IRpcHostPlugin, IRpcTransportSetupContext } from '../sdk/types.js'
-import { RpcFlowPipelines, type IRpcPipelineOwner } from '../sdk/flow-pipelines.js'
+import type { IRpcTransportSetupContext } from '../sdk/types.js'
+import { rpcPipelineOwner, type IRpcPipelineOwner } from '../sdk/flow-pipelines.js'
+import type { RpcFlowProgram } from '../sdk/flow-program.js'
 import type { IRpcDefinitionMetadata } from '../sdk/metadata.js'
-import { readRpcDefinition } from '../sdk/metadata.js'
+import { RpcDefinitionKind } from '../sdk/metadata.js'
 import { HostIdentity, defaultRpcId } from './identity.js'
 import {
   createRpcAbortError,
@@ -63,21 +63,6 @@ import { resolveAbortReason } from './abort-reason.js'
 const namespaceFamily = Object.freeze({})
 /** Native host method names cannot be shadowed by a transport's public namespace. */
 const reservedNamespaces = new Set(['self', 'provide', 'close', 'use', 'dispose', 'unUse'])
-/** One ordered boundary defines publication and forbids extensions replacing mandatory calls. */
-const reservedMethods = new Set<PropertyKey>([
-  'peers',
-  'request',
-  'notify',
-  'send',
-  'dispatch',
-  'group',
-  'stream',
-  'close',
-  'onClosing',
-  'onPeerClosed',
-  Symbol.asyncDispose
-])
-
 /**
  * Native resources belong to one transport registration, independent from SessionTable's live
  * index.
@@ -245,12 +230,18 @@ export class RpcHost {
   }
 
   /** One native host commits the cold flow prefix before carriers can perform protected startup. */
-  async open(plugins: readonly IRpcHostPlugin[]): Promise<IRpcHost> {
+  async open(program: RpcFlowProgram): Promise<IRpcHost> {
+    /** This same public helper lends genuine handles to ordinary native hosts. */
+    const pipelineConfiguration = this.#flow.declarations(
+      () => native,
+      (name) => native.pipeline(name),
+      program.namespaces
+    )
     /** Native publication supplies namespaces through its canonical extension slots. */
     const publicContext = { owner: this }
     /** The surface borrows this explicit owner; no root RPC invocation methods are exposed. */
     const native = defineHost({
-      pipelines: RpcFlowPipelines,
+      pipelines: pipelineConfiguration.pipelines,
       host: {
         identity: { name: this.self.name },
         execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
@@ -263,18 +254,14 @@ export class RpcHost {
         close: this.close,
         [Symbol.asyncDispose]: this.close
       },
-      domainCore: () => ({ [rpcInstallationOwner]: this })
+      domainCore: () => ({ ...pipelineConfiguration.domainCore(), [rpcInstallationOwner]: this })
     })
     this.#native = native
-    this.#pipelineOwner = native
+    this.#pipelineOwner = pipelineConfiguration.domainCore()[rpcPipelineOwner]
     try {
       /** Candidate stages are invisible until native commit; no transport can negotiate before it. */
-      await native.use(
-        ...plugins.filter((plugin) => readRpcDefinition(plugin)?.kind !== 'transport')
-      )
-      await native.use(
-        ...plugins.filter((plugin) => readRpcDefinition(plugin)?.kind === 'transport')
-      )
+      await native.use(...program.flows, program.plugin())
+      await native.use(...program.transports)
       /**
        * Publish the complete cold batch after child sources have contributed their accepted
        * methods.
@@ -294,20 +281,38 @@ export class RpcHost {
   /** Actual SDK native hooks join this receiving owner; no second plugin-host is created here. */
   async install(core: IPluginHostCore, metadata: IRpcDefinitionMetadata): Promise<void> {
     this.#assertOpen()
-    if (metadata.kind === 'transport') return this.#installTransport(core, metadata.definition)
-    if (metadata.kind === 'policy') {
+    if (metadata.kind === RpcDefinitionKind.transport)
+      return this.#installTransport(core, metadata.definition)
+    if (metadata.kind === RpcDefinitionKind.source)
+      return this.#namespace(metadata.namespace).installSource(core, metadata.definition)
+    if (metadata.kind === RpcDefinitionKind.policy) {
       core.onDispose(this.#features.setDefaults(metadata.definition.features))
       return
     }
-    /** Reusable definitions construct complete flow behavior separately for each receiving host. */
-    const installed = await metadata.prepare(core, this.#controller.signal, {
+    if (metadata.kind === RpcDefinitionKind.feature)
+      throw tagRpcError(
+        new TypeError(HostErrorText.flowFeatureRequired),
+        RpcCoreErrorCode.invalidConfig
+      )
+    /** Setup borrows the same Host lifetime and real work owners for every optional registration. */
+    const context = {
       signal: core.lifecycle.signal,
       report: this.#report,
       self: () => this.#identity.directorySelf,
       call: (namespace, command, local) => this.#namespace(namespace).invoke(command, local),
       observe: this.#flow.observe,
       retire: (carrierId, reason, kind) => this.#sessions.detach(carrierId, reason, kind)
-    })
+    } satisfies import('../sdk/types.js').IRpcFlowSetupContext
+    if (metadata.kind === RpcDefinitionKind.features)
+      return this.#flow.registerFeatures(
+        core,
+        await metadata.prepare(core, this.#controller.signal, context)
+      )
+    /**
+     * Readonly observers retain their native registration rather than becoming information-flow
+     * Features.
+     */
+    const installed = await metadata.prepare(core, this.#controller.signal, context)
     this.#flow.register(core, metadata.definition, installed)
   }
 
@@ -392,7 +397,8 @@ export class RpcHost {
     carrierId: string,
     view: IRpcSessionView,
     frame: IRpcSemanticFrame,
-    source?: IRpcTargetSource
+    source?: IRpcTargetSource,
+    sourceGate?: IProviderCommitGate
   ): void => {
     if (frame.kind === RpcWireKind.handshake || frame.kind === RpcWireKind.directory) return
     if (frame.kind === RpcWireKind.control) {
@@ -419,7 +425,7 @@ export class RpcHost {
       frame.kind === RpcWireKind.cancel ||
       frame.kind === RpcWireKind.outcome
     )
-      void this.#providers.accept(context, frame, undefined, source).catch(this.#report)
+      void this.#providers.accept(context, frame, undefined, source, sourceGate).catch(this.#report)
     else if (frame.kind === RpcWireKind.error) this.#report(deserializeHostWireError(frame.error))
     else
       this.#report(createRpcError(RpcCoreErrorCode.contractInvalid, HostErrorText.replyUnclaimed))
@@ -578,6 +584,9 @@ export class RpcHost {
       name: definition.namespace,
       closingWrites: definition.closingWrites === true,
       sessionScope,
+      resources,
+      configuredReport: this.#configuredReport,
+      settleFailedGate: (gate) => this.#providers.settleFailedGate(gate),
       assertOpen: () => this.#assertOpen(),
       sessions: this.#sessions,
       calls: this.#calls,
@@ -614,23 +623,16 @@ export class RpcHost {
       configuredReport: this.#configuredReport,
       ...this.#sessions.context(sessionScope, resources, () => this.#reason)
     }
-    /**
-     * Pending native disposal closes real sessions before joining the installation it cancels.
-     * Global close's original reason takes precedence over native disposal's operation reason.
-     */
-    const preparing = observeAbortSubscription(
-      core.operation.signal,
-      (reason) => void namespace.close(this.#closing ? this.#reason : reason).catch(this.#report),
-      this.#report
+    /** Namespace owns the same native acquisition path for original and appended sources. */
+    const installed = await namespace.openTransport(
+      core,
+      definition,
+      transport,
+      resources,
+      (reason) => namespace.close(this.#closing ? this.#reason : reason)
     )
-    core.onDispose(preparing.unsubscribe)
-    /** Native rollback already owns attached sessions when asynchronous acquisition begins. */
-    const installed = await definition.open(transport)
-    preparing.unsubscribe()
-    resources.own(installed, { force: () => installed.dispose() })
-    registration.surface = this.#surface(
-      namespace,
-      definition.namespace,
+    registration.surface = namespace.surface(
+      this.#flow.namespaceExtensions(definition.namespace),
       installed.namespaceExtensions
     )
     /** Compose all methods before native publication; a published namespace is immutable. */
@@ -651,27 +653,6 @@ export class RpcHost {
     })
   }
 
-  /**
-   * Native namespace publication contains only approved public calls and installed extension
-   * methods.
-   */
-  #surface(
-    namespace: Namespace,
-    name: string,
-    transportExtensions?: object
-  ): Record<PropertyKey, unknown> {
-    /** This namespace object enforces the public boundary; it is never a per-session peer facade. */
-    const surface: Record<PropertyKey, unknown> = {}
-    for (const key of reservedMethods) {
-      if ((key === 'onClosing' || key === 'onPeerClosed') && !namespace.closingWrites) continue
-      surface[key] = key === Symbol.asyncDispose ? namespace.close : Reflect.get(namespace, key)
-    }
-    for (const extension of this.#flow.namespaceExtensions(name)) this.#extend(surface, extension)
-    if (transportExtensions)
-      this.#extend(surface, transportExtensions as Readonly<Record<string, unknown>>)
-    return Object.freeze(surface)
-  }
-
   /** Native shared slots publish one stable facade while replacement swaps only its committed value. */
   #sharedSurface(surface: Record<PropertyKey, unknown>): Record<PropertyKey, unknown> {
     /** The facade owns its last committed target; failed candidates cannot change this cell. */
@@ -690,25 +671,6 @@ export class RpcHost {
     })
     this.#publications.set(facade, publication)
     return facade
-  }
-
-  /** Installed native contributions cannot override mandatory namespace methods or one another. */
-  #extend(surface: object, extension: Readonly<Record<string, unknown>>): void {
-    for (const key of Reflect.ownKeys(extension)) {
-      if (reservedMethods.has(key) || Object.hasOwn(surface, key))
-        throw tagRpcError(
-          new TypeError(HostErrorText.namespaceDuplicate),
-          RpcCoreErrorCode.invalidConfig
-        )
-      /** Snapshot descriptors without running extension accessors. */
-      const descriptor = Object.getOwnPropertyDescriptor(extension, key)!
-      if (!Object.hasOwn(descriptor, 'value'))
-        throw tagRpcError(
-          new TypeError(HostErrorText.pluginInvalid),
-          RpcCoreErrorCode.invalidConfig
-        )
-      Object.defineProperty(surface, key, { ...descriptor, configurable: false, writable: false })
-    }
   }
 
   /**

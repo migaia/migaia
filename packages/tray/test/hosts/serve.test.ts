@@ -15,7 +15,8 @@ describe('Tray child topology', () => {
       /** This local genuine Host supplies the same native execution declarations as child serve. */
       const rpc = rpcHostPipelines(
         () => local,
-        (name) => local.pipeline(name)
+        (name) => local.pipeline(name),
+        [api.hosts[index].runtime]
       )
       /** PluginHost owns Feature activation and the dispatcher registration. */
       const local = defineHost({
@@ -63,8 +64,9 @@ describe('Tray child topology', () => {
           config: { label: 'input' }
         })
         /** RPC family accessor comes from the runtime declaration, not a mock transport. */
-        const outlet = host[`${TrayInternal.namespacePrefix}child`]
-        expect((await outlet.members.list()).connections).toHaveLength(1)
+        const source = host[`${TrayInternal.namespacePrefix}child`]
+        const outlet = host[TrayInternal.connection]
+        expect((await source.members.list()).connections).toHaveLength(1)
         for (let count = 0; count < 3; count += 1) {
           expect(await remote.request('node.svc.hello')).toMatchObject({
             id: 'child',

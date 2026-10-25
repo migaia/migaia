@@ -24,7 +24,8 @@ class NativeTrayHost extends PluginHost<IRpcCore, unknown, readonly [], IRpcSetu
     /** These lazy arrows preserve protected access without exposing a public pipeline facade. */
     const rpc = rpcHostPipelines(
       () => this,
-      (name) => this.pipeline(name)
+      (name) => this.pipeline(name),
+      ['memory']
     )
     super({
       identity: { name: 'tray-rpc-class' },

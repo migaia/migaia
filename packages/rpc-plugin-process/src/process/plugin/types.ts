@@ -8,7 +8,7 @@ import type { IProcessHandle, IProcessSupervisorOptions } from '@migaia/supervis
 import type { ISupervisorBaseOptions } from '@migaia/supervision'
 import type { IScheduler } from '@migaia/utils/scheduler'
 import type { IRpcCallFeature } from '@migaia/rpc-contract/interfaces'
-import type { IRpcNativeTransportFeature } from '@migaia/rpc-host/sdk'
+import type { IRpcNativeTransportFeature, IRpcFlowFeature } from '@migaia/rpc-host/sdk'
 import type { IRpcPeerInfo, IRpcPortableValue } from '@migaia/rpc-contract/protocol'
 import type { sendQueue } from '../../features/send-queue.js'
 import type { flowControl } from '../../features/flow-control.js'
@@ -24,6 +24,7 @@ import type {
 /** Installed process behavior is complete execution; call features remain selected by Host. */
 export type IProcessFeature =
   | IRpcCallFeature
+  | IRpcFlowFeature<object>
   | IRpcNativeTransportFeature
   | ReturnType<typeof sendQueue>
   | ReturnType<typeof flowControl>

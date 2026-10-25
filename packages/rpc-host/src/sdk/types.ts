@@ -2,7 +2,12 @@
  * Native RPC definition types describe real installed behavior; transport and flow algorithms
  * remain with plugins.
  */
-import type { IDefinedPluginConstraint, IPluginHostCore } from '@migaia/plugin-host'
+import type {
+  IDefinedPluginConstraint,
+  IPluginHostCore,
+  IFeature,
+  IFeatureDependencyRecord
+} from '@migaia/plugin-host'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import type { IRpcDirectory } from '@migaia/rpc-contract/protocol'
 import type { ICallCommand } from '../call/types.js'
@@ -16,6 +21,8 @@ import type {
 } from '@migaia/rpc-contract/interfaces'
 import type { IRpcTransportContext } from '@migaia/rpc-contract/interfaces'
 import type { IRpcFlowStages } from './flow-pipelines.js'
+import type { IRpcNativeTransportFeature } from './native-feature-types.js'
+import type { IRpcIntersection } from '../namespace/types.js'
 
 /** Native source policy borrows its genuine installation core, including dependency liquidation. */
 export type IRpcTransportSetupContext = IRpcTransportContext &
@@ -55,11 +62,28 @@ export type IRpcFlowPlugin<
   N extends string = string
 > = IRpcNamespacePlugin<N, E, 'flow', false>
 
+/** Opaque native Features carry cold flow configuration; the generic SDK wrapper owns setup. */
+export type IRpcFlowFeature<
+  E extends object = Record<never, never>,
+  N extends string = string
+> = IFeature<Record<never, never>, IRpcFlowDefinition<E>, IFeatureDependencyRecord> &
+  Readonly<{ [rpcNamespaceSurface]: Readonly<{ kind: 'feature'; namespace: N; extensions: E }> }>
+
 /**
  * Host accepts genuine SDK registrations only; structural metadata grants no installation
  * authority.
  */
-export type IRpcHostPlugin = IRpcTransportPlugin | IRpcFlowPlugin
+export type IRpcHostPlugin = IRpcTransportPlugin | IRpcFlowPlugin | IRpcFlowFeature<object>
+
+/** Project local feature extensions once so every native transport uses the same public inference. */
+export type IRpcTransportFeatureExtensions<TFeature> = IRpcIntersection<
+  TFeature extends IRpcFlowFeature<infer E>
+    ? E
+    : TFeature extends IRpcNativeTransportFeature<infer E>
+      ? E
+      : never
+> &
+  object
 
 /** Per-host setup receives cancellation and reporting without mutable host work tables. */
 export type IRpcFlowSetupContext = Readonly<{
@@ -81,6 +105,8 @@ export type IRpcFlowInstallation<E extends object = Record<never, never>> = Read
   observe?(event: IRpcObservation): void
   extensions?: readonly string[]
   requiredExtensions?: readonly string[]
+  /** The installed wire protection owner lends this cold native-transfer safety fact before getters. */
+  transferRequiresIntegrity?: true
   /** Only a genuine installed protection owner describes its observable authentication mode. */
   observationFacts?: Readonly<Pick<IRpcProbeDescriptor, 'authentication'>>
   dispose?: IRpcDispose
@@ -92,6 +118,8 @@ export type IRpcFlowInstallation<E extends object = Record<never, never>> = Read
 export type IRpcFlowDefinition<E extends object = Record<never, never>> = Readonly<{
   name: string
   namespaces?: readonly string[]
+  /** The same native opaque Features determine dependency order inside each fixed stage position. */
+  dependencies?: IFeatureDependencyRecord
   setup(context: IRpcFlowSetupContext): IRpcFlowInstallation<E> | Promise<IRpcFlowInstallation<E>>
 }>
 

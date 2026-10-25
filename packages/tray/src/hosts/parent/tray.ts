@@ -33,10 +33,13 @@ import { createRoutingRegistry, createRoutingNamespace } from '../routing.js'
 import { createParentTopics } from './topics.js'
 import {
   runtimePlugin,
+  parentRuntimeTransport,
+  membersOf,
   rpcCallOptions,
   outletOf,
   type ITrayRuntimeHost,
-  type ITrayRuntimeOutlet
+  type ITrayRuntimeOutlet,
+  type ITrayRuntimeMembers
 } from '../runtime.js'
 import { serveChild } from '../child/serve.js'
 import { createRegistry, type ITrayRecord } from './registry.js'
@@ -108,7 +111,7 @@ class TrayRuntime<
   /** Read-only lifecycle observations remain separate from business topics. */
   #events: ReturnType<typeof createTrayEvents>
   /** Family receipts track actual outlet identity and release their original subscriptions. */
-  #subscriptions: Map<string, { outlet: ITrayRuntimeOutlet; release: (() => void)[] }>
+  #subscriptions: Map<string, { members: ITrayRuntimeMembers; release: (() => void)[] }>
   /** Parent admission closes synchronously before any asynchronous disposal work. */
   #disposing: boolean
   /** Concurrent callers share exactly one original disposal promise. */
@@ -143,7 +146,8 @@ class TrayRuntime<
     /** This exact parent's handle lends execution only when native installation requests its core. */
     const rpc = rpcHostPipelines(
       () => this.#host,
-      (name) => this.#host.pipeline(name)
+      (name) => this.#host.pipeline(name),
+      [TrayInternal.connection]
     )
 
     /** Parent PluginHost remains separate from every instance's plain PluginHost. */
@@ -173,7 +177,8 @@ class TrayRuntime<
       (record, delivery) =>
         outletOf(this.#host, record.definition, record.id).notify(
           TrayInternal.deliver,
-          toWire(delivery)
+          toWire(delivery),
+          { targetId: record.instanceId! }
         ) as Promise<void>,
       this.#report
     )
@@ -185,7 +190,10 @@ class TrayRuntime<
     this.#events = createTrayEvents(this.#report)
 
     /** Family subscription identity follows the actual outlet object's lifetime. */
-    this.#subscriptions = new Map<string, { outlet: ITrayRuntimeOutlet; release: (() => void)[] }>()
+    this.#subscriptions = new Map<
+      string,
+      { members: ITrayRuntimeMembers; release: (() => void)[] }
+    >()
 
     /** Closing rejects operations synchronously while disposal keeps one completion promise. */
     this.#disposing = false
@@ -208,6 +216,7 @@ class TrayRuntime<
           this.#assertActive
         )
       )
+      .then(() => this.#host.use(parentRuntimeTransport()))
       .then(() => undefined)
     this.#tray = this.#surface()
   }
@@ -315,9 +324,12 @@ class TrayRuntime<
         /** The stopped rejection remains joined instead of escaping one-way delivery. */
         const outlet = ready(input)
         if (outlet instanceof Promise) return outlet
-        await outlet.notify(TrayInternal.invoke, toWire(input), rpcCallOptions(callOptions))
+        await outlet.notify(TrayInternal.invoke, toWire(input), {
+          ...rpcCallOptions(callOptions),
+          targetId: record.instanceId!
+        })
       },
-      stream: (input, callOptions) => this.#streamAfterReady(ready, input, callOptions)
+      stream: (input, callOptions) => this.#streamAfterReady(record, ready, input, callOptions)
     }
   }
 
@@ -337,6 +349,7 @@ class TrayRuntime<
 
   /** Readiness and admission are checked at the original first pull, not iterator construction. */
   async *#streamAfterReady(
+    record: ITrayRecord,
     ready: (input: ITrayInvocation) => ITrayRuntimeOutlet | Promise<never>,
     input: ITrayInvocation,
     options?: Parameters<ITraySender['stream']>[1]
@@ -344,11 +357,10 @@ class TrayRuntime<
     /** Only stopped calls await; a ready stream still selects its generation at this first pull. */
     const outlet = ready(input)
     if (outlet instanceof Promise) return await outlet
-    return yield* outlet.stream(
-      TrayInternal.stream,
-      toWire(input),
-      rpcCallOptions(options)
-    ) as AsyncIterableIterator<unknown>
+    return yield* outlet.stream(TrayInternal.stream, toWire(input), {
+      ...rpcCallOptions(options),
+      targetId: record.instanceId!
+    })
   }
 
   /** Outlet detail contains the authoritative native generation and accepted remote identity. */
@@ -401,7 +413,7 @@ class TrayRuntime<
   #reconcile = async (record: ITrayRecord, event: IRpcMemberEvent): Promise<void> => {
     await Promise.resolve()
     if (record.removed || record.management === TrayManagementMode.manual) return
-    const detail = await outletOf(this.#host, record.definition, record.id).members.get(record.id)
+    const detail = await membersOf(this.#host, record.id).get(record.id)
     if (
       record.removed ||
       this.#registry.records.get(record.id) !== record ||
@@ -425,12 +437,12 @@ class TrayRuntime<
   /** Attach to a newly created family and correlate background ready entries with their receipt. */
   #subscribe = (record: ITrayRecord): void => {
     const family = record.id
-    const outlet = outletOf(this.#host, record.definition, record.id)
-    if (this.#subscriptions.get(family)?.outlet === outlet) return
+    const members = membersOf(this.#host, record.id)
+    if (this.#subscriptions.get(family)?.members === members) return
     this.#releaseSubscription(family)
     const release = [
-      outlet.members.on(RpcMemberEventName.ready, (event) => this.#memberReady(outlet, event)),
-      outlet.members.on(RpcMemberEventName.exit, (event) => {
+      members.on(RpcMemberEventName.ready, (event) => this.#memberReady(members, event)),
+      members.on(RpcMemberEventName.exit, (event) => {
         const admitted = this.#registry.records.get(event.name)
         if (admitted && typeof event.generation === 'number') {
           this.#topics.remove(admitted, event.generation)
@@ -444,12 +456,12 @@ class TrayRuntime<
           return
         void this.#reconcile(admitted, event).catch(this.#report)
       }),
-      outlet.members.on(RpcMemberEventName.terminal, (event) => {
+      members.on(RpcMemberEventName.terminal, (event) => {
         const admitted = this.#registry.records.get(event.name)
         if (admitted) void this.#reconcile(admitted, event).catch(this.#report)
       })
     ]
-    this.#subscriptions.set(family, { outlet, release })
+    this.#subscriptions.set(family, { members, release })
   }
 
   /** Logical removal drops the exact retained outlet before invoking its original native removers. */
@@ -462,7 +474,7 @@ class TrayRuntime<
   }
 
   /** Only a genuine later native ready event may enqueue background initialization. */
-  #memberReady(outlet: ITrayRuntimeOutlet, event: IRpcMemberEvent): void {
+  #memberReady(members: ITrayRuntimeMembers, event: IRpcMemberEvent): void {
     /** The original admission must still own this safe registered member name. */
     const admitted = this.#registry.records.get(event.name)
     if (
@@ -481,10 +493,10 @@ class TrayRuntime<
       instanceId: event.instanceId
     }
     /** One queued input retains the original admission and its exact native ready receipt. */
-    const initialization = { admitted, outlet, receipt }
+    const initialization = { admitted, members, receipt }
     void admitted.queue
       .run(() =>
-        this.#reinitialize(initialization.admitted, initialization.outlet, initialization.receipt)
+        this.#reinitialize(initialization.admitted, initialization.members, initialization.receipt)
       )
       .catch(this.#report)
   }
@@ -492,7 +504,7 @@ class TrayRuntime<
   /** Recheck the exact ready receipt after native event publication and before application init. */
   async #reinitialize(
     admitted: ITrayRecord,
-    outlet: ITrayRuntimeOutlet,
+    members: ITrayRuntimeMembers,
     receipt: Readonly<{ admission: object; generation: number; instanceId: string }>
   ): Promise<void> {
     admitted.management = TrayManagementMode.background
@@ -500,7 +512,7 @@ class TrayRuntime<
       await Promise.resolve()
       if (admitted.removed || receipt.admission !== admitted.admission) return
       /** This actual source samples its original accepted/native generation, never a copied state. */
-      const detail = await outlet.members.get(admitted.id)
+      const detail = await members.get(admitted.id)
       if (
         !('generation' in detail.unit) ||
         !('instanceId' in detail.identity) ||
@@ -607,11 +619,11 @@ class TrayRuntime<
       try {
         await this.#shutdown(record)
         this.#transition(record, TrayInstanceState.restarting)
-        const outlet = outletOf(this.#host, record.definition, record.id)
+        const members = membersOf(this.#host, record.id)
         const outcome =
           operation === 'restart'
-            ? await outlet.members.restart(record.id)
-            : await outlet.members.replace(record.id)
+            ? await members.restart(record.id)
+            : await members.replace(record.id)
         this.#current(record)
         const accepted =
           'state' in outcome ? outcome.state === SupervisorState.ready : outcome.kind === 'replaced'
@@ -629,7 +641,7 @@ class TrayRuntime<
           const cause = 'error' in outcome ? outcome.error : undefined
           throw createTrayError(TrayErrorCode.instanceStartFailed, cause)
         }
-        const generation = this.#identify(record, await outlet.members.get(record.id))
+        const generation = this.#identify(record, await members.get(record.id))
         await this.#initOnce(record, generation, config)
         record.config = config
         this.#transition(record, TrayInstanceState.ready)
@@ -638,9 +650,7 @@ class TrayRuntime<
         if (!record.removed && !this.#disposing) {
           await Promise.resolve()
           try {
-            const detail = await outletOf(this.#host, record.definition, record.id).members.get(
-              record.id
-            )
+            const detail = await membersOf(this.#host, record.id).get(record.id)
             if ('state' in detail.unit && detail.unit.state === 'stopped')
               this.#transition(record, TrayInstanceState.stopped)
             else this.#transition(record, TrayInstanceState.failed)
@@ -741,7 +751,7 @@ class TrayRuntime<
       this.#subscribe(record)
       const generation = this.#identify(
         record,
-        await outletOf(this.#host, definition, record.id).members.get(record.id)
+        await membersOf(this.#host, record.id).get(record.id)
       )
       await this.#initOnce(record, generation, config)
       this.#transition(record, TrayInstanceState.ready)
@@ -784,7 +794,7 @@ class TrayRuntime<
   #getEntry = async (id: string) => {
     this.#assertActive()
     const record = this.#registry.get(id)
-    const detail = await outletOf(this.#host, record.definition, record.id).members.get(id)
+    const detail = await membersOf(this.#host, record.id).get(id)
     this.#current(record)
     return Object.freeze({ ...detail, ...this.#registry.snapshot(record) })
   }
@@ -802,7 +812,7 @@ class TrayRuntime<
       try {
         await this.#shutdown(record, stopOptions?.graceMs)
         this.#topics.remove(record)
-        await outletOf(this.#host, record.definition, record.id).members.stop(id, stopOptions)
+        await membersOf(this.#host, record.id).stop(id, stopOptions)
         this.#current(record)
         this.#transition(record, TrayInstanceState.stopped)
       } finally {

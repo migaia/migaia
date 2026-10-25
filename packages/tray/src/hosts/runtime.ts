@@ -5,6 +5,11 @@ import type {
   RpcNativeMemberKind,
   rpcHostPipelines
 } from '@migaia/rpc-host/sdk'
+import {
+  defineRpcSourcePlugin,
+  defineTransportPlugin,
+  type IRpcTransportPlugin
+} from '@migaia/rpc-host/sdk'
 import { timeout } from '@migaia/rpc-host/features'
 import {
   coroutinePlugin,
@@ -19,8 +24,9 @@ import { TrayInternal, TrayRuntime, TrayRuntimeMode } from './constants.js'
 import type { IAnyTrayHost, ITrayCallOptions } from './typing.js'
 
 /** This is the actual published RPC namespace, without a separate callable facade. */
-export type ITrayRuntimeOutlet = IRpcNamespace &
-  Readonly<{ members: IRpcNativeMemberControls<RpcNativeMemberKind> }>
+export type ITrayRuntimeOutlet = IRpcNamespace
+/** Exact native controls remain owned by one actual source and its supervisor. */
+export type ITrayRuntimeMembers = IRpcNativeMemberControls<RpcNativeMemberKind>
 /** Business and RPC definitions share the original receiving native plugin-host. */
 export type ITrayRuntimeHost = IHostHandle<
   ReturnType<ReturnType<typeof rpcHostPipelines>['domainCore']>,
@@ -39,6 +45,20 @@ export type ITrayRuntimeOptions = Readonly<{
 function instanceNamespace(id: string): string {
   return `${TrayInternal.namespacePrefix}${id}`
 }
+/** The parent admits one fixed namespace without acquiring a process, Worker or task. */
+export function parentRuntimeTransport(): IRpcTransportPlugin<
+  typeof TrayInternal.connection,
+  Record<never, never>,
+  true
+> {
+  return defineTransportPlugin({
+    name: TrayInternal.transportPlugin,
+    namespace: TrayInternal.connection,
+    closingWrites: true,
+    expose: [TrayInternal.relayPlugin],
+    open: () => ({ dispose: () => undefined })
+  })
+}
 /** Translate Tray's unchanged delay option into the sole supported complete RPC feature form. */
 export function rpcCallOptions(options?: ITrayCallOptions): IRpcCallOptions | undefined {
   if (options === undefined) return undefined
@@ -47,7 +67,7 @@ export function rpcCallOptions(options?: ITrayCallOptions): IRpcCallOptions | un
     ...(options.timeoutMs === undefined ? {} : { timeout: timeout({ ms: options.timeoutMs }) })
   }
 }
-/** Runtime and mode select one native source; per-admission parent namespaces cannot collide. */
+/** Runtime selects the original native source; parent sources append to its fixed cold namespace. */
 export function runtimePlugin(
   definition: IAnyTrayHost,
   mode: TrayRuntimeMode,
@@ -62,14 +82,16 @@ export function runtimePlugin(
     expose: [mode === TrayRuntimeMode.parent ? TrayInternal.relayPlugin : TrayInternal.childPlugin],
     report: options.report
   }
+  /** Every branch retains the concrete factory's original source and native member implementation. */
+  let plugin: IRpcTransportPlugin
   if (definition.runtime === TrayRuntime.coroutine)
-    return coroutinePlugin(
+    plugin = coroutinePlugin(
       mode === TrayRuntimeMode.parent
         ? { ...common, spawn: options.task!, supervisor: definition.supervisor }
         : { ...common, connectToParent: options.connect! }
-    ) as IPluginConstraint<any>
-  if (definition.runtime === TrayRuntime.thread)
-    return threadPlugin(
+    )
+  else if (definition.runtime === TrayRuntime.thread)
+    plugin = threadPlugin(
       mode === TrayRuntimeMode.parent
         ? {
             ...common,
@@ -80,18 +102,24 @@ export function runtimePlugin(
             }
           }
         : { ...common, connectToParent: true }
-    ) as IPluginConstraint<any>
-  return processPlugin(
-    mode === TrayRuntimeMode.parent
-      ? {
-          ...common,
-          spawn: {
-            entry: definition.entry!,
-            supervision: definition.supervisor,
-            ...(definition.sandbox ? { wrap: definition.sandbox.wrap } : {})
+    )
+  else
+    plugin = processPlugin(
+      mode === TrayRuntimeMode.parent
+        ? {
+            ...common,
+            spawn: {
+              entry: definition.entry!,
+              supervision: definition.supervisor,
+              ...(definition.sandbox ? { wrap: definition.sandbox.wrap } : {})
+            }
           }
-        }
-      : { ...common, connectToParent: true }
+        : { ...common, connectToParent: true }
+    )
+  return (
+    mode === TrayRuntimeMode.parent
+      ? defineRpcSourcePlugin(plugin, TrayInternal.connection)
+      : plugin
   ) as IPluginConstraint<any>
 }
 /** Read the current actual namespace so removing and re-admitting an id cannot revive old calls. */
@@ -100,5 +128,10 @@ export function outletOf(
   definition: IAnyTrayHost,
   id?: string
 ): ITrayRuntimeOutlet {
-  return host[id === undefined ? definition.runtime : instanceNamespace(id)]!
+  return host[id === undefined ? definition.runtime : TrayInternal.connection]!
+}
+/** Native source extension identity stays separate from the fixed namespace's business calls. */
+export function membersOf(host: ITrayRuntimeHost, id: string): ITrayRuntimeMembers {
+  return (host[instanceNamespace(id)] as unknown as Readonly<{ members: ITrayRuntimeMembers }>)
+    .members
 }

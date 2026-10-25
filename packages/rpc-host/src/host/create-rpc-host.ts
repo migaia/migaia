@@ -2,6 +2,7 @@
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { tagRpcError } from '@migaia/rpc-contract/errors'
 import { readRpcDefinition } from '../sdk/metadata.js'
+import { RpcFlowProgram } from '../sdk/flow-program.js'
 import { RpcHost } from './rpc-host.js'
 import type { IRpcHostPlugin } from '../sdk/types.js'
 import { HostErrorText } from './error-text.js'
@@ -45,7 +46,7 @@ export function createRpcHost<
       new TypeError(HostErrorText.transportMissing),
       RpcCoreErrorCode.hostTransportMissing
     )
-  return new RpcHost(options).open([...flows, ...namespaces.values()]) as unknown as Promise<
-    IRpcHost<TRemote, TPlugins>
-  >
+  /** Invalid local Feature placement is rejected before Root subscribes to an external signal. */
+  const program = new RpcFlowProgram([...flows, ...namespaces.values()])
+  return new RpcHost(options).open(program) as unknown as Promise<IRpcHost<TRemote, TPlugins>>
 }

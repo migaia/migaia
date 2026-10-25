@@ -39,6 +39,9 @@ describe('Tray instance admission and discovery', () => {
       expect(tray.list({ runtime: 'thread' })).toHaveLength(2)
       expect(tray.list({ host: 'node-pr' })).toHaveLength(2)
       expect(tray.list({ state: 'ready' })).toHaveLength(6)
+      /** All genuine records share one cold namespace while source controls stay native extensions. */
+      const namespace = host[TrayInternal.connection]
+      expect(Object.keys(namespace.peers)).toHaveLength(6)
       expect((await liveThreads()).length - before.length).toBe(2)
       expect(await tray.get('thread-0')).toMatchObject({
         state: 'ready',
@@ -56,6 +59,8 @@ describe('Tray instance admission and discovery', () => {
       const admitted = tray.list()
       for (const record of admitted) await tray.remove(record.id)
       expect(tray.list()).toEqual([])
+      expect(host[TrayInternal.connection]).toBe(namespace)
+      expect(Object.keys(namespace.peers)).toEqual([])
       for (const record of admitted)
         expect(host[`${TrayInternal.namespacePrefix}${record.id}`]).toBeUndefined()
       expect(await liveThreads()).toEqual(before)

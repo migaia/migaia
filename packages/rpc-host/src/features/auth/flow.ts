@@ -102,6 +102,8 @@ export class RpcAuthenticationFlow {
     this.#requests = new RequestReplayLedger(config.maxReplayEntriesPerPeer)
     this.#representation = new AuthenticationRepresentation(config.encodedType)
     this.value = {
+      /** Transfer preflight borrows this installed integrity policy before reading caller options. */
+      ...(config.sign ? { transferRequiresIntegrity: true as const } : {}),
       observationFacts: {
         authentication: config.encrypt
           ? RpcProbeAuthentication.encryptSign
@@ -117,7 +119,17 @@ export class RpcAuthenticationFlow {
           await next({ ...payload, prepared })
         },
         [RpcFlowPoint.envelopeInbound]: async (payload, next) => {
-          const prepared = await this.#restoreEnvelope(payload.prepared, payload.context)
+          /** Only this feature's restoration failure may drop a forged accepted-source frame. */
+          let prepared: IRpcPreparedMessage
+          try {
+            prepared = await this.#restoreEnvelope(payload.prepared, payload.context)
+          } catch (error) {
+            if (payload.context.session && isLocalRpcError(error, RpcAuthenticationError)) {
+              payload.context.report(error)
+              return
+            }
+            throw error
+          }
           await next({ ...payload, prepared })
         },
         [RpcFlowPoint.dispatchInbound]: this.#dispatch

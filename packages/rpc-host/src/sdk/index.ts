@@ -2,9 +2,16 @@
  * Author real carriers, flow plugins and executing features through the one native installation
  * owner.
  */
-export { defineTransportPlugin, defineFlowPlugin, defineLinkPolicy } from './define.js'
+export {
+  defineTransportPlugin,
+  defineFlowPlugin,
+  defineFlowFeature,
+  defineLinkPolicy
+} from './define.js'
 export type * from './types.js'
-export { RpcFlowPoint, rpcHostPipelines } from './flow-pipelines.js'
+export { rpcFlowPlugin } from './flow-program.js'
+export { defineRpcSourcePlugin } from './source.js'
+export { RpcFlowPoint, RpcFlowLayer, rpcHostPipelines } from './flow-pipelines.js'
 export type {
   IRpcFlowStage,
   IRpcFlowStages,

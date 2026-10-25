@@ -1,6 +1,11 @@
 /** Public host ownership is global; every RPC invocation is projected under a transport namespace. */
 import type { IAbortSignal } from '@migaia/utils/promise'
-import type { IRpcHostPlugin, IRpcTransportPlugin, IRpcNamespacePlugin } from '../sdk/types.js'
+import type {
+  IRpcHostPlugin,
+  IRpcTransportPlugin,
+  IRpcNamespacePlugin,
+  IRpcFlowFeature
+} from '../sdk/types.js'
 import type { IRpcProvide, IRpcProvideOptions } from '../dispatch/types.js'
 import type { IRpcProviderDeclaration } from '@migaia/rpc-contract/protocol'
 import type { IRpcNamespace, IRpcIntersection } from '../namespace/types.js'
@@ -38,7 +43,13 @@ type IRpcHostRoot = Readonly<{
 type IRpcNamespaceNames<TPlugin> = TPlugin extends IRpcTransportPlugin<infer N, object> ? N : never
 /** Shared erased metadata correlates complete flow/transport extensions with the selected namespace. */
 type IRpcNamespaceExtensions<TPlugin, N extends string> =
-  TPlugin extends IRpcNamespacePlugin<infer Scope, infer E> ? (N extends Scope ? E : never) : never
+  TPlugin extends IRpcFlowFeature<infer E>
+    ? E
+    : TPlugin extends IRpcNamespacePlugin<infer Scope, infer E>
+      ? N extends Scope
+        ? E
+        : never
+      : never
 /** Closing calls exist only when the installed transport explicitly declares native write support. */
 type IRpcNamespaceClosing<TPlugin, N extends string> =
   TPlugin extends IRpcTransportPlugin<infer Scope, object, infer A>

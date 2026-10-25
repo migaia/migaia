@@ -1,7 +1,7 @@
 /** Optional application parser execution is separate from the host's inert method declarations. */
 import { RpcCallMode, RpcWireKind } from '@migaia/rpc-contract/protocol'
-import { defineFlowPlugin } from '../../sdk/define.js'
-import type { IRpcFlowPlugin } from '../../sdk/types.js'
+import { defineBuiltinFlowFeature } from '../../sdk/flow-feature.js'
+import type { IRpcFlowFeature } from '../../sdk/types.js'
 import { RpcFlowPoint, type IRpcFlowStage } from '../../sdk/flow-pipelines.js'
 import type { IRpcSchemaOptions } from './types.js'
 import { validateContractData } from './validate.js'
@@ -67,8 +67,8 @@ class SchemaValidation {
 }
 
 /** Install actual schema behavior at the fixed envelope and provider dispatch boundaries. */
-export function schema(options: IRpcSchemaOptions = {}): IRpcFlowPlugin {
-  return defineFlowPlugin({
+export function schema(options: IRpcSchemaOptions = {}): IRpcFlowFeature {
+  return defineBuiltinFlowFeature('schema', {
     name: RpcSchemaName,
     namespaces: options.namespaces,
     setup() {

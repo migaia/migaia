@@ -1,6 +1,10 @@
 /** Acquire borrowed ServiceWorker endpoints and retire only their exact native Client routes. */
 import { defineTransportPlugin } from '@migaia/rpc-host/sdk'
-import type { IRpcTransportPlugin, IRpcTransportSetupContext } from '@migaia/rpc-host/sdk'
+import type {
+  IRpcTransportPlugin,
+  IRpcTransportSetupContext,
+  IRpcTransportFeatureExtensions
+} from '@migaia/rpc-host/sdk'
 import type { IRpcSessionHandle } from '@migaia/rpc-contract/interfaces'
 import {
   RpcBrowserErrorCode,
@@ -25,6 +29,7 @@ import type {
   IServiceWorkerClientsScope,
   IServiceWorkerPluginOptions
 } from './service-worker-types.js'
+import type { IBrowserFeature } from './plugin-types.js'
 
 /** Native Client routing retains only its held lookup operation, exact receiver and Host handle. */
 type IServiceWorkerClientSession = {
@@ -180,9 +185,12 @@ class ServiceWorkerClientListener {
 }
 
 /** Capture either an actual page target/container or native worker Clients scope, without IO. */
-export function serviceWorkerPlugin<const N extends string = 'serviceWorker'>(
-  options: IServiceWorkerPluginOptions & Readonly<{ namespace?: N }>
-): IRpcTransportPlugin<NoInfer<N>, Record<never, never>, true> {
+export function serviceWorkerPlugin<
+  const N extends string = 'serviceWorker',
+  const TFeatures extends readonly IBrowserFeature[] = readonly IBrowserFeature[]
+>(
+  options: IServiceWorkerPluginOptions & Readonly<{ namespace?: N; features?: TFeatures }>
+): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true> {
   /** Native page receive owner stays independent of the outgoing ServiceWorker. */
   const receiver =
     options?.receiver ??
@@ -226,5 +234,5 @@ export function serviceWorkerPlugin<const N extends string = 'serviceWorker'>(
       const listener = new ServiceWorkerClientListener(coldContext.clients, context)
       return { dispose: listener.close }
     }
-  })
+  }) as IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true>
 }

@@ -1,3 +1,4 @@
+/** Preserve managed native Host capability types without widening named pipeline authoring. */
 import type { TrayShutdownMode } from '../state-constants.js'
 import type {
   IExtractPluginConfig,
@@ -6,11 +7,10 @@ import type {
   IFeatureReference,
   IPluginConstraint,
   IPluginConstraintTuple,
-  IHostHandle,
   IPluginHostCoreFor,
+  IPluginHostCoreTypeInfo,
   IPluginHostConfigFor,
   IPluginHostDisposalResult,
-  IPluginHostInstalledPlugins,
   IMergePluginExts,
   PluginHost
 } from '@migaia/plugin-host'
@@ -18,8 +18,12 @@ import { asyncDisposeKey } from '@migaia/plugin-host'
 import type { IEventContext } from '@migaia/event-subscriber'
 import type { ICleanupResult } from '@migaia/lifecycle'
 
-/** Both canonical PluginHost entries expose the same managed composition capability. */
-export type ITrayHostSource = PluginHost<any, any, any> | IHostHandle<any, any, any>
+/**
+ * Managed composition borrows only native install/removal/disposal and type provenance. Named
+ * pipeline authoring remains on its actual Host, so its payload/mode variance is never widened.
+ */
+export type ITrayHostSource = IPluginHostCoreTypeInfo<any, any, any> &
+  Pick<PluginHost<any, any, any, any>, 'use' | 'unUse' | 'dispose' | '__installedPlugins'>
 
 /** Plugin hooks receive the declared domain core and lifecycle core, rather than the Host handle. */
 export type ITrayPluginCore<THost extends ITrayHostSource> = IPluginHostCoreFor<THost>
@@ -48,12 +52,11 @@ export type ITrayHostReadyPlugins<THost extends ITrayHostTypeInfo> =
   THost[typeof trayHostTypes]['ready']
 
 /** Constructor-installed plugins remain part of every exact and dynamic Tray view. */
-export type IHostBaselinePlugins<THost extends ITrayHostSource> =
-  THost extends PluginHost<any, any, any>
-    ? IPluginHostInstalledPlugins<THost>
-    : THost extends { readonly __installedPlugins?: infer TInstalled }
-      ? Extract<TInstalled, readonly IPluginConstraint<any>[]>
-      : readonly []
+export type IHostBaselinePlugins<THost extends ITrayHostSource> = THost extends {
+  readonly __installedPlugins?: infer TInstalled
+}
+  ? Extract<TInstalled, readonly IPluginConstraint<any>[]>
+  : readonly []
 
 /** Avoids the PluginHost empty-merge sentinel from poisoning dynamic unknown-key fallbacks. */
 type IHostBaselineExtensions<THost extends ITrayHostSource> =

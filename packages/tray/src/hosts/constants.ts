@@ -59,8 +59,10 @@ export const TrayInternal = {
   childPlugin: 'trayChild',
   clientPlugin: 'trayClient',
   relayPlugin: 'trayRelay',
+  /** Parent peers share this one cold transport registration and its seven native pipelines. */
+  transportPlugin: 'trayTransport',
   connection: 'tray',
-  /** Each parent admission installs one genuine transport namespace, separate from root keys. */
+  /** Each source publishes native member controls under its original key, not an RPC namespace. */
   namespacePrefix: 'tray:',
   init: 'trayChild.init',
   invoke: 'trayChild.invoke',

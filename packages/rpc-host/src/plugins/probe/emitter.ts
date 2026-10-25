@@ -3,7 +3,11 @@
  * Readonly Host/native observations supply facts; callback failure isolation, capture and stage
  * subscriptions stay here without owning carrier IO or retaining business event queues.
  */
-import { RpcProbeObservationKind, type IRpcObservation } from '@migaia/rpc-contract/interfaces'
+import {
+  RpcProbeObservationKind,
+  RpcProbeAuthentication,
+  type IRpcObservation
+} from '@migaia/rpc-contract/interfaces'
 import { createRpcError } from '../../host/error-owner.js'
 import { tagRpcError, RpcCoreErrorText } from '@migaia/rpc-contract/errors'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
@@ -297,8 +301,18 @@ class ProbeEmitter {
    */
   describe(descriptor: IRpcProbeDescriptor): void {
     if (this.#closed) return
+    /** Only the actual installed protection fact can declare a protected observation stage. */
+    const authentication = descriptor.authentication ?? RpcProbeAuthentication.none
+    /** Generic physical stages remain supplied by the acquired Session; protection belongs here. */
+    const stageMask =
+      descriptor.stageMask |
+      (authentication === RpcProbeAuthentication.none ? 0 : 1 << RpcProbeStage.protected)
     /** Session's existing publish fence owns once-per-carrier delivery; this emitter covers a Host. */
-    const available = Object.freeze({ ...descriptor, stageMask: descriptor.stageMask & this.mask })
+    const available = Object.freeze({
+      ...descriptor,
+      authentication,
+      stageMask: stageMask & this.mask
+    })
     for (let i = 0; i < this.#subscribers.length; i++) {
       /** This callback receipt is precomputed at installation. */ const subscriber =
         this.#subscribers[i]!

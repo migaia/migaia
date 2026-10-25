@@ -23,15 +23,21 @@ class ProviderCommitGate implements IProviderCommitGate {
   readonly #completion = deferred<ReturnType<typeof createRpcError> | undefined>()
   /** Only the original slot commit opens admission; later generations reuse the open gate. */
   #open = false
+  /** Native operation cancellation may fail admission before physical source cleanup starts. */
+  #failed = false
   /** Native lifecycle supplies the original rollback cause rather than an install wrapper. */
   readonly #lifecycle: IAbortSignal
   /** Rollback records its native reason before releasing this shared completion. */
-  readonly #onAbort = (): void => {
+  readonly #onAbort = (): void => this.fail(resolveAbortReason(this.#lifecycle))
+  /** Fail the existing admission completion while preserving the original native rollback cause. */
+  readonly fail = (reason: unknown): void => {
+    if (this.#open || this.#failed) return
+    this.#failed = true
     /** The original native rollback reason remains this failure's cause. */
     const failure = createRpcError(
       RpcCoreErrorCode.targetUnknown,
       RuntimeApiErrorText.targetUnknown,
-      resolveAbortReason(this.#lifecycle)
+      reason
     )
     registerLocalErrorWireSummary(
       failure,
@@ -40,6 +46,7 @@ class ProviderCommitGate implements IProviderCommitGate {
       { preserveSerializedError: true }
     )
     this.#completion.resolve(failure)
+    this.#lifecycle.removeEventListener('abort', this.#onAbort)
   }
   /** Subscribe once to the actual installation lifetime, including already aborted construction. */
   constructor(lifecycle: IAbortSignal) {
@@ -50,10 +57,10 @@ class ProviderCommitGate implements IProviderCommitGate {
   /** Availability can be read before allocating an invocation resource. */
   readonly isOpen = (): boolean => this.#open
   /** A live uncommitted install cannot be joined while native cancellation waits for cleanup. */
-  readonly isFailed = (): boolean => !this.#open && this.#lifecycle.aborted
+  readonly isFailed = (): boolean => this.#failed
   /** Actual native slot commit releases waiters before ready publication. */
   readonly open = (): void => {
-    if (this.#lifecycle.aborted) return
+    if (this.#failed || this.#lifecycle.aborted) return
     this.#open = true
     this.#lifecycle.removeEventListener('abort', this.#onAbort)
     this.#completion.resolve(undefined)
@@ -87,7 +94,7 @@ class ProviderCommitGate implements IProviderCommitGate {
 /** Construct the single commit boundary consumed by native installation and actual methods. */
 export function createProviderCommitGate(
   lifecycle: IAbortSignal
-): IProviderCommitGate & { open(): void } {
+): IProviderCommitGate & { open(): void; fail(reason: unknown): void } {
   return new ProviderCommitGate(lifecycle)
 }
 

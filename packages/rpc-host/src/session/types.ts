@@ -11,10 +11,13 @@ import type {
 import type { IRpcDirectory, IRpcEnvelope, IRpcSemanticFrame } from '@migaia/rpc-contract/protocol'
 import type { FlowRegistry } from '../flow/registry.js'
 import type { IRpcPipelineOwner } from '../sdk/flow-pipelines.js'
+import type { IProviderCommitGate } from '../dispatch/types.js'
 
 /** Only these flow operations participate in carrier preparation and session negotiation. */
 export type IRpcSessionFlow = Pick<FlowRegistry, 'extensions' | 'requiredExtensions'> &
-  Partial<Pick<FlowRegistry, 'observe' | 'observationFacts' | 'observing'>>
+  Partial<
+    Pick<FlowRegistry, 'observe' | 'observationFacts' | 'observing' | 'transferRequiresIntegrity'>
+  >
 
 /** A native registration holds only this opaque table-owned publication token. */
 export type IRpcSessionScope = Readonly<object>
@@ -50,7 +53,8 @@ export type IRpcSessionTableOptions = Readonly<{
     carrierId: string,
     view: IRpcSessionView,
     frame: IRpcSemanticFrame,
-    source?: IRpcTargetSource
+    source?: IRpcTargetSource,
+    sourceGate?: IProviderCommitGate
   ): void | Promise<void>
   /** Admitted correlated hook failures belong to the operation, not physical connection failure. */
   rejected?(

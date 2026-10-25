@@ -6,7 +6,11 @@ import {
   RpcCarrierObservation,
   defaultRpcId
 } from '@migaia/rpc-host/sdk'
-import type { IRpcTransportPlugin, IRpcTransportSetupContext } from '@migaia/rpc-host/sdk'
+import type {
+  IRpcTransportPlugin,
+  IRpcTransportSetupContext,
+  IRpcTransportFeatureExtensions
+} from '@migaia/rpc-host/sdk'
 import {
   RpcCarrierPlatform,
   RpcCarrierTopology,
@@ -30,6 +34,7 @@ import type {
   IWebTransportPluginOptions,
   IWebTransportReliableSession
 } from './web-transport-types.js'
+import type { IBrowserFeature } from './plugin-types.js'
 
 /** Acquire one actual reliable stream; SDK borrows its successfully acquired native locks. */
 async function openStream(
@@ -133,9 +138,12 @@ function cleanupFailed(errors: readonly unknown[]): Error {
 }
 
 /** Opening is cold; the reliable stream is created only by the receiving native host install. */
-export function webTransportPlugin<const N extends string = 'webTransport'>(
-  options: IWebTransportPluginOptions & Readonly<{ namespace?: N }>
-): IRpcTransportPlugin<NoInfer<N>, Record<never, never>, true> {
+export function webTransportPlugin<
+  const N extends string = 'webTransport',
+  const TFeatures extends readonly IBrowserFeature[] = readonly IBrowserFeature[]
+>(
+  options: IWebTransportPluginOptions & Readonly<{ namespace?: N; features?: TFeatures }>
+): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true> {
   if (!options?.session || typeof options.session.createBidirectionalStream !== 'function')
     throw createBrowserPeerError(
       RpcBrowserErrorCode.invalidPeerSource,
@@ -149,5 +157,5 @@ export function webTransportPlugin<const N extends string = 'webTransport'>(
     features: options.features,
     handshakeTimeoutMs: options.connect?.timeoutMs,
     open: (context) => openStream(options.session, context)
-  })
+  }) as IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true>
 }

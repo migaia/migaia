@@ -61,6 +61,8 @@ export class CoroutineSource {
   readonly #context: IRpcTransportContext
   /** Initial and replacement task cleanup borrow the same original effective reporter. */
   readonly #report: (error: unknown) => void
+  /** The original optional pool receiver determines whether native child naming stays private. */
+  readonly #events: IRpcNativePoolEvents | undefined
   /** Repeated or reentrant installation cleanup joins the original completion Promise. */
   #closing: Promise<void> | undefined
   /** This actual native source is the unique issuer for all of its restart generations. */
@@ -101,6 +103,7 @@ export class CoroutineSource {
     this.#options = options
     this.#context = context
     this.#report = options.report ?? context.report
+    this.#events = events
     if (source.task) {
       this.#supervisor = createCoroutineSupervisor({
         ...options.supervisor,
@@ -140,15 +143,22 @@ export class CoroutineSource {
     } else {
       /** The exact token's physical port and stable launch facts were minted by its original task. */
       const connection = connectionOf(source.parent!)
+      /** Only the original task token lends child naming and parent-generation facts. */
+      const facts = connection.facts
       /** Construction rollback releases the acquired canonical carrier without closing task ports. */
       const carrier = coroutineCarrier(connection.port, this.#id, this.#report)
       try {
         this.#parent = context.attach(
           carrier,
-          connection.facts
+          facts
             ? {
-                generation: connection.facts.generation,
-                expectedPeerId: connection.facts.parent.instanceId
+                ...(facts.childName === undefined
+                  ? {}
+                  : {
+                      self: { name: facts.childName, instanceId: context.self().instanceId }
+                    }),
+                generation: facts.generation,
+                expectedPeerId: facts.parent.instanceId
               }
             : {}
         )
@@ -236,6 +246,7 @@ export class CoroutineSource {
     /** Parent identity and execution generation come from their actual original owners. */
     const self = this.#context.self()
     return {
+      ...(this.#events ? {} : { childName: this.record.name }),
       parent: { name: self.name, instanceId: self.instanceId },
       generation: { kind: 'restart', value: this.#supervisor!.generation, providerId: this.#id }
     }

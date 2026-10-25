@@ -3,8 +3,8 @@
  * installation receives its own RpcChunkFlow; the entry declares extension participation without
  * implementing a second codec, Session or fragment store.
  */
-import { defineFlowPlugin } from '../../sdk/define.js'
-import type { IRpcFlowPlugin } from '../../sdk/types.js'
+import { defineBuiltinFlowFeature } from '../../sdk/flow-feature.js'
+import type { IRpcFlowFeature } from '../../sdk/types.js'
 import { RpcChunkPluginName } from './constants.js'
 import { RpcChunkFlow } from './flow.js'
 import type { IRpcChunkOptions } from './types.js'
@@ -17,10 +17,10 @@ export type IRpcChunkFeatureOptions = Omit<IRpcChunkOptions, 'errorMetadata'> &
   }>
 
 /** Install actual optional chunk@1 hooks; no chunk resources exist when this factory is absent. */
-export function chunk(options: IRpcChunkFeatureOptions = {}): IRpcFlowPlugin {
+export function chunk(options: IRpcChunkFeatureOptions = {}): IRpcFlowFeature {
   /** Limits are captured now and validated by the actual setup owner before any frame is emitted. */
   const captured = { ...options }
-  return defineFlowPlugin({
+  return defineBuiltinFlowFeature('chunk', {
     name: RpcChunkPluginName,
     namespaces: captured.namespaces,
     setup: (context) => new RpcChunkFlow(captured, context.signal, captured.required ?? false).value

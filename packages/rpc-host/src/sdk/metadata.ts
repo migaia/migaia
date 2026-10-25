@@ -9,11 +9,34 @@ import type {
   IRpcLinkPolicyDefinition,
   IRpcTransportSetupContext
 } from './types.js'
+import type { IRpcBuiltinFeature } from './flow-feature.js'
+
+/** Prepared placements retain native Feature identity and one actual setup result. */
+export type IRpcFlowEntry = Readonly<{
+  definition: IRpcFlowDefinition<object>
+  installed: IRpcFlowInstallation<object>
+  builtin?: IRpcBuiltinFeature
+}>
+
+/** SDK definition kinds are private admission facts, never caller-supplied discriminators. */
+export const RpcDefinitionKind = {
+  transport: 'transport',
+  source: 'source',
+  flow: 'flow',
+  policy: 'policy',
+  feature: 'feature',
+  features: 'features'
+} as const
 
 /** Exact native definitions carry their private resource-admission adapter outside public SDK types. */
 export type IRpcDefinitionMetadata = Readonly<
   | {
       kind: 'transport'
+      definition: IRpcTransportDefinition<unknown, object, IRpcTransportSetupContext>
+    }
+  | {
+      kind: 'source'
+      namespace: string
       definition: IRpcTransportDefinition<unknown, object, IRpcTransportSetupContext>
     }
   | {
@@ -26,6 +49,20 @@ export type IRpcDefinitionMetadata = Readonly<
       ): Promise<IRpcFlowInstallation<object>>
     }
   | { kind: 'policy'; definition: IRpcLinkPolicyDefinition }
+  | {
+      kind: 'feature'
+      definition: IRpcFlowDefinition<object>
+      /** Only package-owned factories may assign a built-in capability identity. */
+      builtin?: IRpcBuiltinFeature
+    }
+  | {
+      kind: 'features'
+      prepare(
+        core: IPluginHostCore,
+        rootSignal: IAbortSignal,
+        context: IRpcFlowSetupContext
+      ): Promise<ReadonlyMap<string, readonly IRpcFlowEntry[]>>
+    }
 >
 
 /** Definitions are configuration-only and disappear when their native identity is unreachable. */

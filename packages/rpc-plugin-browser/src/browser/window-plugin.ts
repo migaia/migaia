@@ -1,6 +1,6 @@
 /** Builds the Window transport definition from a borrowed target and explicit origin policy. */
 import { defineTransportPlugin } from '@migaia/rpc-host/sdk'
-import type { IRpcTransportPlugin } from '@migaia/rpc-host/sdk'
+import type { IRpcTransportPlugin, IRpcTransportFeatureExtensions } from '@migaia/rpc-host/sdk'
 import { BrowserPeerErrorText } from '../error-text.js'
 import { RpcBrowserErrorCode } from '@migaia/rpc-contract/error-code'
 import { createBrowserPeerError } from './peer-error.js'
@@ -10,11 +10,15 @@ import { BrowserPluginName, BrowserNamespace } from './peer-text.js'
 import { attachBrowserCarrier } from './native-message.js'
 import { createWindowCarrier } from './adapters/window.js'
 import type { IWindowPluginOptions } from './peer-types.js'
+import type { IBrowserFeature } from './plugin-types.js'
 
 /** Capture the exact borrowed Window and required origin before installation can touch native IO. */
-export function windowPlugin<const N extends string = 'window'>(
-  options: IWindowPluginOptions & Readonly<{ namespace?: N }>
-): IRpcTransportPlugin<NoInfer<N>, Record<never, never>, true> {
+export function windowPlugin<
+  const N extends string = 'window',
+  const TFeatures extends readonly IBrowserFeature[] = readonly IBrowserFeature[]
+>(
+  options: IWindowPluginOptions & Readonly<{ namespace?: N; features?: TFeatures }>
+): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true> {
   if (!options?.window || typeof options.window.postMessage !== 'function')
     throw createBrowserPeerError(
       RpcBrowserErrorCode.invalidPeerSource,
@@ -49,5 +53,5 @@ export function windowPlugin<const N extends string = 'window'>(
         ),
         context
       )
-  })
+  }) as IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true>
 }

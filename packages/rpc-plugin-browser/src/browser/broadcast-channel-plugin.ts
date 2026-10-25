@@ -6,7 +6,11 @@ import {
   createRpcBackingDigest,
   defaultRpcId
 } from '@migaia/rpc-host/sdk'
-import type { IRpcTransportPlugin, IRpcTransportSetupContext } from '@migaia/rpc-host/sdk'
+import type {
+  IRpcTransportPlugin,
+  IRpcTransportSetupContext,
+  IRpcTransportFeatureExtensions
+} from '@migaia/rpc-host/sdk'
 import {
   type IRpcCarrierWriteOptions,
   type IRpcSessionHandle
@@ -26,7 +30,7 @@ import {
 } from './error.js'
 import { BrowserPeerErrorText } from '../error-text.js'
 import { BrowserRpcErrorText } from './error-text.js'
-import type { IBrowserPluginOptions } from './plugin-types.js'
+import type { IBrowserPluginOptions, IBrowserFeature } from './plugin-types.js'
 import { BroadcastChannelControl } from './broadcast-channel-text.js'
 import { BrowserNamespace } from './peer-text.js'
 
@@ -228,9 +232,12 @@ class BroadcastChannelListener {
 }
 
 /** Capture a borrowed native channel; each real installation owns independent discovery membership. */
-export function broadcastChannelPlugin<const N extends string = 'broadcastChannel'>(
-  options: IBroadcastChannelPluginOptions & Readonly<{ namespace?: N }>
-): IRpcTransportPlugin<NoInfer<N>, Record<never, never>, true> {
+export function broadcastChannelPlugin<
+  const N extends string = 'broadcastChannel',
+  const TFeatures extends readonly IBrowserFeature[] = readonly IBrowserFeature[]
+>(
+  options: IBroadcastChannelPluginOptions & Readonly<{ namespace?: N; features?: TFeatures }>
+): IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true> {
   /** Native source shape is admitted before subscribing or publishing any discovery frame. */
   const channel = options?.channel
   if (
@@ -255,5 +262,5 @@ export function broadcastChannelPlugin<const N extends string = 'broadcastChanne
       const listener = new BroadcastChannelListener(channel, context)
       return { dispose: listener.close }
     }
-  })
+  }) as IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true>
 }

@@ -1,5 +1,9 @@
 /** Defines shared cold browser transport options, namespace metadata and installed call features. */
 import type { IRpcCallFeature } from '@migaia/rpc-contract/interfaces'
+import type { IRpcFlowFeature } from '@migaia/rpc-host/sdk'
+
+/** Call policies and opaque flow capabilities share the same receiving transport namespace. */
+export type IBrowserFeature = IRpcCallFeature | IRpcFlowFeature<object>
 
 /** Shared cold carrier options keep installation and handshake policy in the host SDK. */
 export type IBrowserPluginOptions<N extends string = string> = Readonly<{
@@ -11,6 +15,6 @@ export type IBrowserPluginOptions<N extends string = string> = Readonly<{
   expose?: readonly string[]
   /** One budget for the existing message identity and agreement exchange. */
   connect?: Readonly<{ timeoutMs?: number }>
-  /** Complete call features are installed by the actual transport scope. */
-  features?: readonly IRpcCallFeature[]
+  /** Complete call policies and opaque flow features share the actual transport scope. */
+  features?: readonly IBrowserFeature[]
 }>

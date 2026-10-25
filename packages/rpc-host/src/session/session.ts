@@ -17,7 +17,6 @@ import {
   rpcProbeEnvelopeFacts,
   RpcProbeLifecycle,
   RpcProbeObservationKind,
-  RpcProbeAuthentication,
   rpcCarrierWriteFacts,
   type IRpcProbeObservation,
   type IRpcCarrierFrame,
@@ -59,7 +58,6 @@ import {
   createContractError,
   RpcCoreErrorText,
   identifyRpcBoundaryFailure,
-  RpcAuthenticationError,
   RpcLifecycleError,
   RpcSerializationError,
   tagRpcError
@@ -355,16 +353,10 @@ export class Session {
 
   /** Reject unsupported native transfer presence without reading caller getters or payload data. */
   assertTransfer(options?: object): void {
-    if (options && Object.hasOwn(options, 'transfer')) {
-      /** Native policy borrows actual installed signing, before any caller transfer getter is read. */
-      const authentication = this.#options.flow.observationFacts?.(
-        this.#options.namespace
-      )?.authentication
+    if (options && Object.hasOwn(options, 'transfer'))
       this.#options.carrier.assertTransfer(
-        authentication === RpcProbeAuthentication.sign ||
-          authentication === RpcProbeAuthentication.encryptSign
+        this.#options.flow.transferRequiresIntegrity?.(this.#options.namespace)
       )
-    }
   }
 
   /** Freeze closing admission and FIFO position before asynchronous preparation can complete. */
@@ -748,12 +740,7 @@ export class Session {
     this.#media(S.frame, D.inbound, frame.data)
     this.#receiving = this.#receiving
       .then(() => this.#receiveFrame(frame))
-      .catch((error) => {
-        /** A forged authenticated frame cannot evict an already accepted legitimate source. */
-        if (this.#view && isLocalRpcError(error, RpcAuthenticationError))
-          this.#options.report(error)
-        else return this.#fail(error, true)
-      })
+      .catch((error) => this.#fail(error, true))
   }
 
   /** Process one admitted ingress slot through its actual accepted or bootstrap codec boundary. */
@@ -762,7 +749,7 @@ export class Session {
     if (this.#view)
       await this.#options
         .pipelines()
-        .pipeline(RpcFlowPoint.frameInbound)
+        .pipeline(RpcFlowPoint.frameInbound, this.#options.namespace)
         .run({ frame, context: this.#context('inbound') }, async (payload) =>
           this.#decode(payload.frame)
         )
@@ -795,7 +782,7 @@ export class Session {
     try {
       await this.#options
         .pipelines()
-        .pipeline(RpcFlowPoint.envelopeInbound)
+        .pipeline(RpcFlowPoint.envelopeInbound, this.#options.namespace)
         .run({ prepared: decoded, context: envelopeContext }, async (payload) => {
           /** Codec restore returns a frame admitted through the sole pure wire grammar. */
           message = await payload.context.restore(payload.prepared)
@@ -1011,7 +998,7 @@ export class Session {
     let prepared: IRpcPreparedMessage | undefined
     await this.#options
       .pipelines()
-      .pipeline(RpcFlowPoint.envelopeOutbound)
+      .pipeline(RpcFlowPoint.envelopeOutbound, this.#options.namespace)
       .run(
         {
           prepared: captured,
@@ -1080,7 +1067,11 @@ export class Session {
         write: physical
       }
       if (bootstrap) await write(payload)
-      else await this.#options.pipelines().pipeline(RpcFlowPoint.frameOutbound).run(payload, write)
+      else
+        await this.#options
+          .pipelines()
+          .pipeline(RpcFlowPoint.frameOutbound, this.#options.namespace)
+          .run(payload, write)
     } finally {
       admission?.release()
     }
@@ -1121,7 +1112,6 @@ export class Session {
         bootstrap ||
         isRpcCarrierAdmissionFailure(cause) ||
         (admission && cause === admission.error) ||
-        isLocalRpcError(cause, RpcAuthenticationError) ||
         isLocalRpcError(cause, RpcLifecycleError)
       )
         throw cause
@@ -1134,10 +1124,6 @@ export class Session {
     /** A carrier without acquired observation metadata cannot claim a guessed platform. */
     const observation = this.#options.carrier.observation
     if (!observation) return
-    /** Authentication mode comes from the real selected installation, never a plugin name or frame. */
-    const authentication =
-      this.#options.flow.observationFacts?.(this.#options.namespace)?.authentication ??
-      RpcProbeAuthentication.none
     this.#options.flow.observe?.({
       kind: RpcProbeObservationKind.descriptor,
       namespace: this.#options.namespace,
@@ -1145,10 +1131,10 @@ export class Session {
       peerId: this.#view?.peerId,
       data: Object.freeze({
         ...observation.facts,
+        ...this.#options.flow.observationFacts?.(this.#options.namespace),
         endpointId: this.#options.self().instanceId,
         namespace: this.#options.namespace,
         carrierId: this.#options.carrier.id,
-        authentication,
         carrier: observation.facts.platform,
         stageMask:
           (1 << S.peer) |
@@ -1157,8 +1143,7 @@ export class Session {
           (1 << S.encoded) |
           (1 << S.frame) |
           (1 << S.carrier) |
-          (1 << S.forward) |
-          (authentication === RpcProbeAuthentication.none ? 0 : 1 << S.protected)
+          (1 << S.forward)
       })
     })
   }
@@ -1280,7 +1265,8 @@ export class Session {
     await this.#options
       .pipelines()
       .pipeline(
-        direction === 'outbound' ? RpcFlowPoint.handshakeOutbound : RpcFlowPoint.handshakeInbound
+        direction === 'outbound' ? RpcFlowPoint.handshakeOutbound : RpcFlowPoint.handshakeInbound,
+        this.#options.namespace
       )
       .run({ handshake, context: this.#handshakeContext(direction) }, async (payload) => {
         selected = payload.handshake

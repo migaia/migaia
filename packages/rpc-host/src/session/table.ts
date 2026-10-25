@@ -34,6 +34,7 @@ import {
 import { HostErrorText } from '../host/error-text.js'
 import { Session } from './session.js'
 import { SessionText } from './text.js'
+import type { IProviderCommitGate } from '../dispatch/types.js'
 import { SessionDrain } from './drain.js'
 import { OriginSession } from './origin.js'
 import { createSessionView } from './view.js'
@@ -86,12 +87,23 @@ type ISessionAttachment = {
 type IStagedSessions = Readonly<{
   namespace: string
   index: INamespaceIndex
+  signal?: IAbortSignal
+  gate?: IProviderCommitGate
+  parent?: IStagedSessions
   handshakeTimeoutMs?: number
   nameAdmissionTimeoutMs?: number
   sessions: Set<Session>
   closing: Set<IRpcClosingHandler>
   peerClosed: Set<IRpcPeerClosedHandler>
 }>
+
+/** Full and appended registration scopes use the same native signal and connect policy fields. */
+type ISessionScopeOptions = Pick<IRpcSessionTableOptions, 'handshakeTimeoutMs'> & {
+  signal?: IAbortSignal
+  nameAdmissionTimeoutMs?: number
+  parent?: IRpcSessionScope
+  gate?: IProviderCommitGate
+}
 
 /** Existing resource ownership and exact scope identity supply native context methods. */
 type ISessionTransportPorts = Readonly<{
@@ -124,7 +136,7 @@ class SessionTransportContext implements IRpcTransportContext {
   constructor(ports: ISessionTransportPorts) {
     this.#ports = ports
     this.namespace = ports.staged.namespace
-    this.signal = ports.staged.index.signal!
+    this.signal = ports.staged.signal!
     this.self = ports.self
     this.report = ports.report
   }
@@ -239,13 +251,7 @@ export class SessionTable {
   }
 
   /** Prepare a namespace candidate without publishing peers, global names or readiness events. */
-  stage(
-    namespace: string,
-    options?: Pick<IRpcSessionTableOptions, 'handshakeTimeoutMs'> & {
-      signal?: IAbortSignal
-      nameAdmissionTimeoutMs?: number
-    }
-  ): IRpcSessionScope {
+  stage(namespace: string, options?: ISessionScopeOptions): IRpcSessionScope {
     if (this.#closing) throw createRpcLifecycleError(RpcCoreErrorText.endpointDisposed)
     /** Validate cold native connect policy before a transport acquires any physical source. */
     const handshakeTimeoutMs = options?.handshakeTimeoutMs
@@ -257,9 +263,14 @@ export class SessionTable {
         )
     /** Only token identity crosses the native registration boundary. */
     const scope = Object.freeze({})
+    /** Appended sources borrow canonical identity indexes and retain their own resource scope. */
+    const parent = options?.parent === undefined ? undefined : this.#scopes.get(options.parent)!
     this.#scopes.set(scope, {
       namespace,
-      index: this.#newIndex(options?.signal),
+      index: parent?.index ?? this.#newIndex(options?.signal),
+      signal: options?.signal,
+      parent,
+      gate: options?.gate,
       handshakeTimeoutMs,
       nameAdmissionTimeoutMs: options?.nameAdmissionTimeoutMs,
       sessions: new Set(),
@@ -267,6 +278,26 @@ export class SessionTable {
       peerClosed: new Set()
     })
     return scope
+  }
+
+  /** A source joins one cold namespace without allocating another identity index or replacing it. */
+  stageAppend(
+    parent: IRpcSessionScope,
+    options: ISessionScopeOptions,
+    gate: IProviderCommitGate
+  ): IRpcSessionScope {
+    return this.stage(this.#scopes.get(parent)!.namespace, { ...options, parent, gate })
+  }
+
+  /** Native source commit publishes only that registration's original reserved physical peers. */
+  commitAppend(scope: IRpcSessionScope): void {
+    for (const session of this.#scopes.get(scope)!.sessions) {
+      /** Existing handle identity supplies the exact attachment without another source index. */
+      const input = this.#handles.get(session.handle)!.attachment!
+      /** A directory arbitration still in flight cannot publish its provisional replacement view. */
+      const pending = this.#reserved.get(input.carrierId)
+      if (pending && pending.view === session.current()?.view) this.#publish(input, pending.view)
+    }
   }
 
   /** Move only transport context wiring into the existing scope and Session owners. */
@@ -376,17 +407,12 @@ export class SessionTable {
       admit: (directory, codec, extensions, authentication) =>
         this.#admit(input, directory, codec, extensions, authentication),
       publish: (view) => this.#publish(input, view),
-      receive: (view, frame) => this.#options.receive(input.carrierId, view, frame),
-      rejected:
-        this.#options.rejected === undefined
-          ? undefined
-          : (view, frame, error) => this.#options.rejected!(input.carrierId, view, frame, error),
-      closing: (view, reason) => this.#notifyClosing(input.scope, view, reason),
       retire: (view, error, physicalFailure, closeFrame) =>
         this.#retire(input, view, error, physicalFailure, closeFrame)
     })
     this.#sessions.set(input.carrierId, session)
     input.scope?.sessions.add(session)
+    input.scope?.parent?.sessions.add(session)
     if (facts?.nativeGeneration)
       this.#nativeGenerations.set(input.carrierId, facts.nativeGeneration)
     input.native = facts?.nativeGeneration !== undefined
@@ -427,10 +453,6 @@ export class SessionTable {
           facts?.isExclusive
         ),
       publish: () => undefined,
-      receive: (view, frame) => this.#options.receive(carrier.id, view, frame, source),
-      rejected: (view, frame, error) =>
-        this.#options.rejected?.(carrier.id, view, frame, error, source),
-      closing: (view, reason) => this.#notifyClosing(input.scope, view, reason),
       retire: (view, error, physicalFailure, closeFrame) => {
         this.#draining.retire(input.carrier.id)
         this.#options.retired?.(input.carrier.id, view, error, physicalFailure, false, input.source)
@@ -490,21 +512,31 @@ export class SessionTable {
     scope: IRpcSessionScope | undefined,
     callbacks: Pick<
       IRpcSessionOptions,
-      | 'admit'
-      | 'publish'
-      | 'receive'
-      | 'rejected'
-      | 'retire'
-      | 'source'
-      | 'changed'
-      | 'connection'
-      | 'closing'
+      'admit' | 'publish' | 'retire' | 'source' | 'changed' | 'connection'
     >
   ): Session {
     if (this.#closing) throw createRpcLifecycleError(RpcCoreErrorText.endpointDisposed)
     if (facts) this.#options.admitSourceFacts?.(facts)
+    /** Direct and private physical sessions share one ingress/gate and lifecycle notification path. */
+    const staged = scope === undefined ? undefined : this.#scopes.get(scope)
+    /** Capture only accepted routing ports; never retain the callback object's native credentials. */
+    const ingress = { owner: this, id: carrier.id, source: callbacks.source, scope: staged }
     return new Session({
       ...callbacks,
+      receive: (view, frame) =>
+        ingress.owner.#options.receive(
+          ingress.id,
+          view,
+          frame,
+          ingress.source,
+          ingress.scope?.gate
+        ),
+      rejected:
+        this.#options.rejected === undefined && ingress.source === undefined
+          ? undefined
+          : (view, frame, error) =>
+              ingress.owner.#options.rejected?.(ingress.id, view, frame, error, ingress.source),
+      closing: (view, reason) => ingress.owner.#notifyClosing(ingress.scope, view, reason),
       namespace,
       carrier,
       keepalive: this.#keepalive,
@@ -797,13 +829,18 @@ export class SessionTable {
     const peer = index.peers.get(directory.self.instanceId)
     if (
       (peer && peer.carrierId !== input.carrierId) ||
-      index.pendingPeers.has(directory.self.instanceId)
+      (index.pendingPeers.has(directory.self.instanceId) &&
+        index.pendingPeers.get(directory.self.instanceId) !== input.carrierId)
     )
       throw createRpcError(
         RpcCoreErrorCode.capabilityConflict,
         RpcCoreErrorText.uuidConflict(directory.self.instanceId)
       )
-    if (index.probing.has(directory.self.name)) throw this.#duplicate()
+    if (
+      index.probing.has(directory.self.name) &&
+      index.probing.get(directory.self.name) !== input.carrierId
+    )
+      throw this.#duplicate()
     /** Method lookup is compiled once, and provisional identity is releasable during a health wait. */
     const view = createSessionView(
       input.namespace,
@@ -816,6 +853,7 @@ export class SessionTable {
     )
     /** Retirement can find this reservation even while the previous peer's ping is pending. */
     const selection = Object.freeze({ carrierId: input.carrierId, view })
+    this.#releaseReservation(input)
     index.probing.set(directory.self.name, input.carrierId)
     index.pendingPeers.set(directory.self.instanceId, input.carrierId)
     this.#reserved.set(input.carrierId, selection)
@@ -862,6 +900,7 @@ export class SessionTable {
     const selection = this.#reserved.get(input.carrierId)
     if (!selection || selection.view !== view || this.#closing)
       throw createRpcLifecycleError(RpcCoreErrorText.endpointDisposed)
+    if (input.scope?.gate && !input.scope.gate.isOpen()) return
     const index = input.index
     /** Existing views are removed before a rename can publish its new lookup keys. */
     const old = this.#accepted.get(input.carrierId)?.selection
@@ -954,8 +993,8 @@ export class SessionTable {
     this.#sessions.delete(input.carrierId)
     if (session instanceof Session && input.scope)
       void session.handle.closed.then(
-        () => input.scope!.sessions.delete(session),
-        () => input.scope!.sessions.delete(session)
+        () => this.#releaseMembership(input.scope!, session),
+        () => this.#releaseMembership(input.scope!, session)
       )
     this.#draining.retire(input.carrierId)
     this.#options.retired?.(
@@ -969,6 +1008,12 @@ export class SessionTable {
       this.#notifyPeerClosed(input.scope, (selection?.view ?? view)!, error, closeFrame)
   }
 
+  /** Source cleanup withdraws the same physical membership from its namespace's close snapshot. */
+  #releaseMembership(scope: IStagedSessions, session: Session): void {
+    scope.sessions.delete(session)
+    scope.parent?.sessions.delete(session)
+  }
+
   /** Handler failure is diagnostic only; Session retains its one bounded close transaction. */
   async #notifyClosing(
     scope: IStagedSessions | undefined,
@@ -976,6 +1021,7 @@ export class SessionTable {
     reason: unknown
   ): Promise<void> {
     if (!scope) return
+    scope = scope.parent ?? scope
     /** The same original Error supplies both the readable reason and complete causal chain. */
     const event = Object.freeze({
       peer: view,
@@ -1000,6 +1046,7 @@ export class SessionTable {
     closeFrame?: Readonly<{ reason: unknown }>
   ): void {
     if (!scope) return
+    scope = scope.parent ?? scope
     /** An observed remote close remains separate from an already-started local primary. */
     const reason = closeFrame ? closeFrame.reason : localReason
     /** Actual close-frame receipt is an ingress fact and is never guessed from an error code. */
