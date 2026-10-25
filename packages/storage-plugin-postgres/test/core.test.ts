@@ -67,16 +67,30 @@ describe.each(['pg', 'postgres-js'] as const)('%s real native core', (adapter) =
     nativeQueries.length = 0
     expect(await store.get('nul\0\ud800')).toBe('value\0\ud800')
     expect(nativeQueries).toContainEqual(expect.stringMatching(/^SELECT value.*_kv"/))
+    nativeQueries.length = 0
     await store.use(kv).setMany([
       { key: ['batch', 1], value: 'one' },
       { key: ['batch', 2], value: 'two' },
       { key: 'batch-native', value: 'three' }
     ])
+    expect(nativeQueries).toContainEqual(expect.stringMatching(/^INSERT INTO .*_kv"/))
+    nativeQueries.length = 0
+    expect(await store.has('batch-native')).toBe(true)
+    expect(nativeQueries).toContainEqual(expect.stringMatching(/^SELECT value.*_kv"/))
+    nativeQueries.length = 0
+    expect(await store.keys()).toContain('batch-native')
+    expect(nativeQueries).toContainEqual(expect.stringMatching(/^SELECT key FROM .*_kv"/))
     expect(
       await store.use(kv).getMany([['batch', 2], ['batch', 1], ['batch', 2], 'missing'])
     ).toEqual(['two', 'one', 'two', undefined])
     expect(await store.use(kv).removeByPrefix(['batch'])).toBe(2)
+    nativeQueries.length = 0
     expect(await store.use(kv).removeMany(['batch-native', 'batch-native', 'missing'])).toBe(1)
+    expect(nativeQueries).toContainEqual(expect.stringMatching(/^DELETE FROM .*_kv"/))
+    await store.set('remove-native', 'remove')
+    nativeQueries.length = 0
+    await store.remove('remove-native')
+    expect(nativeQueries).toContainEqual(expect.stringMatching(/^DELETE FROM .*_kv"/))
     await store.setBytes('binary', new Uint8Array([0, 255]))
     expect(await store.getBytes('binary')).toEqual(new Uint8Array([0, 255]))
     await expect(store.putRecord({ x: 1 }, 'binary')).rejects.toMatchObject({
@@ -109,6 +123,17 @@ describe.each(['pg', 'postgres-js'] as const)('%s real native core', (adapter) =
     for await (const entry of store.iterateRecords()) iterated.push(entry)
     expect(iterated).toHaveLength(3)
     expect(nativeQueries).toContainEqual(expect.stringMatching(/^SELECT key,value,.*_records"/))
+    nativeQueries.length = 0
+    await store.clearValues()
+    expect(nativeQueries).toContainEqual(expect.stringMatching(/^DELETE FROM .*_kv"/))
+    expect(await store.get('nul\0\ud800')).toBeNull()
+    nativeQueries.length = 0
+    await store.clearAll()
+    for (const channel of ['kv', 'bytes', 'records'])
+      expect(nativeQueries).toContainEqual(
+        expect.stringMatching(new RegExp('^DELETE FROM .*_' + channel + '"'))
+      )
+    expect(await store.getRecord(['record', 1])).toBeUndefined()
   })
   it('owns READ COMMITTED, rollback and first failure through the original transaction views', async () => {
     const { store, nativeQueries } = await installed(adapter)
