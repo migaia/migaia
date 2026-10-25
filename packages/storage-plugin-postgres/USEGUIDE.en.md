@@ -150,7 +150,21 @@ Notification channels are nonempty UTF-8 names of at most 63 bytes; payloads are
 
 ## Follow committed changes
 
-Prepare `wal_level=logical`, a REPLICATION role, a persistent pgoutput slot and a FOR ALL TABLES publication before installation. Set `PG_REPLICATION_SLOT` and `PG_PUBLICATION` to their existing names. Only the PostgreSQL preset with `/pg` supports this Feature. Detection checks those facts without creating deployment resources.
+Prepare `wal_level=logical`, a REPLICATION role and a persistent pgoutput slot. The publication must include the selected schema/prefix's `kv`, `bytes` and `records` tables, plus existing vector tables consumed by the feed, and enable `insert,update,delete,truncate`. The `truncate: 'block'` policy also needs truncate publication to detect and stop that commit. Set `PG_REPLICATION_SLOT` and `PG_PUBLICATION` to their existing names. Only the PostgreSQL preset with `/pg` supports this Feature. Detection checks those facts without creating deployment resources.
+
+First install the backend without the replication Feature using the same schema/prefix to prepare its storage tables. Then have deployment create a publication containing only the required tables. For the default `public` / `migaia` layout:
+
+```sql
+CREATE PUBLICATION migaia_storage_publication
+  FOR TABLE public.migaia_kv, public.migaia_bytes, public.migaia_records
+  WITH (publish = 'insert, update, delete, truncate');
+```
+
+When using managed vector collections, add each new physical vector table with `ALTER PUBLICATION ... ADD TABLE ...` before the next feed read. Alternatively, keep storage in a dedicated schema such as `storage`. After creating that schema, `CREATE PUBLICATION migaia_storage_publication FOR TABLES IN SCHEMA storage WITH (publish = 'insert, update, delete, truncate');` also includes future tables. Keep that schema limited to the storage tables you intend to publish; a schema publication includes its other eligible tables too.
+
+**Admission and migration:** older versions accepted only `FOR ALL TABLES`. Admission now uses `pg_publication_tables` uniformly for explicit-table, schema-wide and all-table publications covering every feed table and all four operations. Existing `FOR ALL TABLES` deployments with all operations enabled need no change. Missing tables or disabled operations raise `UNSUPPORTED_CAPABILITY` with the missing table or operation in the message; repair deployment and detect again. Previously accepted configurations that omitted operation types must enable all four.
+
+The [PG16 logical decoding documentation](https://www.postgresql.org/docs/16/logicaldecoding-explanation.html) describes a logical slot as one database's change stream; [publications](https://www.postgresql.org/docs/16/logical-replication-publication.html) select the tables and operations to publish. Logical decoding still reads WAL for the whole database. A publication filters pgoutput's output tables. Narrowing it reduces unrelated output and network traffic and keeps unrelated table changes out of the consumer stream, but does not reduce WAL decoding itself, isolate concurrent DDL in the same database or guarantee that decoding errors disappear.
 
 With an existing slot, PostgreSQL may need to read retained older WAL before tailChanges finishes starting, so the next write in this example also waits. Startup time depends on that backlog: inspect confirmedFlushLagBytes and retainedWalBytes first, and do not reset or share a production slot to run this example.
 

@@ -23,7 +23,8 @@ import type {
 } from './types.js'
 import { pgResource } from './driver-resource.js'
 import { invalidArgument, normalizePostgresError } from './errors.js'
-import { PgNames, PgTruncatePolicy } from './constants.js'
+import { PgNames, PgTruncatePolicy, PgPublicationOperation } from './constants.js'
+import { PostgresErrorText } from './error-text.js'
 import { quotePgIdentifier } from './copy-command.js'
 
 /** Durable positions contain no row values and are scoped to one original store/slot/route. */
@@ -75,10 +76,21 @@ function expired(): StorageContractError {
   })
 }
 /** Deployment configuration cannot be silently replaced by a different plugin or publication. */
-function unsupported(): StorageContractError {
-  return new StorageContractError(StorageContractErrorCode.unsupported, {
-    backend: PgNames.backend
-  })
+function unsupported(message?: string): StorageContractError {
+  return new StorageContractError(
+    StorageContractErrorCode.unsupported,
+    { backend: PgNames.backend },
+    message
+  )
+}
+/** Admission and decoding share the same table scope, including lazily created vector collections. */
+function pgReplicationTable(prefix: string, name: string): boolean {
+  return (
+    name === prefix + '_' + PgNames.text ||
+    name === prefix + '_' + PgNames.bytes ||
+    name === prefix + '_' + PgNames.record ||
+    (name.startsWith(prefix + '_v') && name !== prefix + '_' + PgNames.vectorConfiguration)
+  )
 }
 /** A commit carries either ordered org summaries or one route-wide reset. */
 type IPgCommit = {
@@ -102,14 +114,7 @@ class PgCommitAccumulator {
 
   /** Ignore internal bookkeeping tables and unrelated stores before copying route identities. */
   #accepted(schema: string, name: string): boolean {
-    return (
-      schema === this.#route.schema &&
-      (name === this.#route.prefix + '_kv' ||
-        name === this.#route.prefix + '_bytes' ||
-        name === this.#route.prefix + '_records' ||
-        (name.startsWith(this.#route.prefix + '_v') &&
-          name !== this.#route.prefix + '_vector_config'))
-    )
+    return schema === this.#route.schema && pgReplicationTable(this.#route.prefix, name)
   }
 
   /** Copy only the routing scalar and immediately discard the peer's row object. */
@@ -186,7 +191,8 @@ async function inspectPgReplication(
       s.confirmed_flush_lsn::text AS confirmed,s.restart_lsn::text AS restart,s.wal_status,
       pg_wal_lsn_diff(pg_current_wal_lsn(),s.confirmed_flush_lsn)::text AS flush_lag,
       pg_wal_lsn_diff(pg_current_wal_lsn(),s.restart_lsn)::text AS retained_wal,
-      s.plugin,s.temporary,s.database AS slot_database,p.puballtables,
+      s.plugin,s.temporary,s.database AS slot_database,
+      p.pubinsert,p.pubupdate,p.pubdelete,p.pubtruncate,
       current_setting('wal_level') AS wal_level,current_setting('max_slot_wal_keep_size') AS max_keep,
       r.rolreplication OR r.rolsuper AS replication
       FROM pg_database d JOIN pg_roles r ON r.rolname=current_user
@@ -199,7 +205,6 @@ async function inspectPgReplication(
     !row ||
     row.plugin !== 'pgoutput' ||
     row.temporary !== false ||
-    row.puballtables !== true ||
     row.wal_level !== 'logical' ||
     row.replication !== true ||
     row.slot_database !== row.database
@@ -211,6 +216,40 @@ async function inspectPgReplication(
     typeof row.confirmed !== 'string'
   )
     throw expired()
+  for (const [operation, enabled] of [
+    [PgPublicationOperation.insert, row.pubinsert],
+    [PgPublicationOperation.update, row.pubupdate],
+    [PgPublicationOperation.delete, row.pubdelete],
+    [PgPublicationOperation.truncate, row.pubtruncate]
+  ] as const)
+    if (enabled !== true)
+      throw unsupported(
+        PostgresErrorText.publicationOperationMissing(options.publication, operation)
+      )
+  /** This expanded view treats explicit, schema-wide and all-table publications uniformly. */
+  const tables = await context.query(
+    context.pool,
+    `SELECT c.relname AS table_name,p.tablename AS published
+      FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+      LEFT JOIN pg_publication_tables p
+        ON p.pubname=$1 AND p.schemaname=n.nspname AND p.tablename=c.relname
+      WHERE n.nspname=$2 AND c.relkind IN ('r','p')`,
+    [options.publication, options.schema]
+  )
+  /** Base channels always belong to a store; vector collections join once their table exists. */
+  const required = new Set([
+    options.prefix + '_' + PgNames.text,
+    options.prefix + '_' + PgNames.bytes,
+    options.prefix + '_' + PgNames.record
+  ])
+  for (const table of tables.rows)
+    if (pgReplicationTable(options.prefix, String(table.table_name)))
+      required.add(String(table.table_name))
+  for (const table of required)
+    if (!tables.rows.some((entry) => entry.table_name === table && entry.published === table))
+      throw unsupported(
+        PostgresErrorText.publicationTableMissing(options.publication, options.schema, table)
+      )
   const identity = JSON.stringify([
     row.database,
     row.database_oid,

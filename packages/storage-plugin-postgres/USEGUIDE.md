@@ -150,7 +150,21 @@ COPY 使用结构化表名、列名和返回异步字节流的 source factory。
 
 ## 持续读取变更
 
-部署方先配置 `wal_level=logical`、REPLICATION 角色、持久 pgoutput slot 与 FOR ALL TABLES publication。把已有名称放入 `PG_REPLICATION_SLOT`、`PG_PUBLICATION`。该功能仅支持 PostgreSQL preset 的 `/pg` 驱动，检测不创建这些部署资源。
+部署方先配置 `wal_level=logical`、REPLICATION 角色与持久 pgoutput slot。publication 必须覆盖当前 schema/prefix 的 `kv`、`bytes`、`records` 表，以及 feed 使用的已创建向量表，并启用 `insert,update,delete,truncate`。`truncate: 'block'` 也需要发布 truncate，才能发现并停止该提交。把已有名称放入 `PG_REPLICATION_SLOT`、`PG_PUBLICATION`。该功能仅支持 PostgreSQL preset 的 `/pg` 驱动，检测不创建这些部署资源。
+
+推荐先用相同 schema/prefix 安装不带复制 Feature 的后端以准备 storage 表，再由部署方创建仅包含所需表的 publication。默认 `public` / `migaia` 布局示例：
+
+```sql
+CREATE PUBLICATION migaia_storage_publication
+  FOR TABLE public.migaia_kv, public.migaia_bytes, public.migaia_records
+  WITH (publish = 'insert, update, delete, truncate');
+```
+
+使用托管向量集合时，在下一次读取前用 `ALTER PUBLICATION ... ADD TABLE ...` 加入新建的向量物理表。也可把 storage 放在专属 schema，例如 `storage`，在该 schema 创建后用 `CREATE PUBLICATION migaia_storage_publication FOR TABLES IN SCHEMA storage WITH (publish = 'insert, update, delete, truncate');` 自动包含之后创建的表。专属 schema 只放需要发布的 storage 表；schema publication 也会发布该 schema 的其他合格表。
+
+**准入与迁移：** 旧版本仅接受 `FOR ALL TABLES`；现在统一通过 `pg_publication_tables` 接受显式表、schema 与全部表三种 publication，只要覆盖 feed 的实际表和四种操作。原有启用全部操作的 `FOR ALL TABLES` 部署无需修改。缺表或关闭操作现在以 `UNSUPPORTED_CAPABILITY` 拒绝，并在错误文本中指出表或操作；修正部署后重新检测。旧版本可能接受但不完整发布操作的配置，现在必须补齐四种操作。
+
+[PG16 逻辑解码文档](https://www.postgresql.org/docs/16/logicaldecoding-explanation.html)说明逻辑 slot 对应一个数据库的变更流；[publication 文档](https://www.postgresql.org/docs/16/logical-replication-publication.html)定义发布表与操作范围。逻辑解码仍读取整个数据库的 WAL，publication 只筛选 pgoutput 的输出表。缩小 publication 能减少无关变更的输出和网络量，不会把无关表的变更发给消费者，但不减少 WAL 解码本身的工作，也不能隔离同库 DDL 或保证消除解码错误。
 
 使用已有 slot 时，PostgreSQL 可能需要先读取保留的旧 WAL，tailChanges 才能完成启动，示例随后的写入也会等待。启动耗时取决于积压，请先检查 confirmedFlushLagBytes 和 retainedWalBytes；不要为运行示例重置或共用生产 slot。
 

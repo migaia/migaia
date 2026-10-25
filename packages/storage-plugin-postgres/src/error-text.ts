@@ -11,6 +11,12 @@ export const PostgresErrorText = {
   invalidIdentifier: 'Invalid PostgreSQL identifier',
   invalidServer: 'PostgreSQL server does not match the selected preset',
   unsupported: 'PostgreSQL capability is unavailable',
+  /** Admission names the missing feed table so deployment can repair its publication membership. */
+  publicationTableMissing: (publication: string, schema: string, table: string) =>
+    `PostgreSQL publication "${publication}" is missing table "${schema}"."${table}"`,
+  /** Admission names the disabled action because both TRUNCATE policies require its WAL event. */
+  publicationOperationMissing: (publication: string, operation: string) =>
+    `PostgreSQL publication "${publication}" does not publish ${operation}`,
   commitUnknown: 'PostgreSQL commit result is unknown',
   invalidCursor: 'Invalid PostgreSQL change cursor',
   expiredCursor: 'PostgreSQL change cursor is no longer retained',

@@ -122,3 +122,5 @@ pnpm add pg pg-copy-streams pg-logical-replication postgres
 组织共享物理表，同名键、期限、锁及标准向量点隔离。原生 SQL、自有向量表查询和 COPY 属于调用方表访问；显式组织视图拒绝这些入口。详细类型、并发、错误和日志限制见 [USEGUIDE](./USEGUIDE.md#行为边界)。
 
 逻辑复制的 `truncate` 默认 `reset`。根流遇到 TRUNCATE 后，每个提交只发一条无 `orgId` 的 `reset`，消费者必须让所有组织缓存失效；`block` 会停止且不确认该提交。检测报告延迟与 WAL 保留量；无限 WAL 保留会警告。没有持续流需求时，不要保留复制 slot，可使用 TTL 或定时同步；关闭 host 不会删除 slot。
+
+逻辑复制推荐仅发布当前 storage 的业务表（`kv`、`bytes`、`records` 及实际使用的向量表），并启用 insert/update/delete/truncate。显式表、专属 schema 和 `FOR ALL TABLES` publication 均可；原有全部表部署无需迁移。建表顺序、示例 SQL 和旧行为迁移见 [持续读取变更](./USEGUIDE.md#持续读取变更)。publication 缩小只减少输出和网络量，不减少整个数据库的 WAL 解码工作。

@@ -2,12 +2,100 @@ import { randomUUID } from 'node:crypto'
 import { Pool, type QueryArrayConfig } from 'pg'
 import { it, expect, onTestFinished, vi } from 'vitest'
 import { createStorageHost } from '@migaia/storage-host'
-import { durableChangeFeed } from '@migaia/storage-contract'
+import {
+  durableChangeFeed,
+  STORAGE_CONTRACT_SOURCE,
+  StorageContractErrorCode
+} from '@migaia/storage-contract'
 import { deferred } from '@migaia/utils/promise'
 import { postgresBackendPlugin } from '../src/index.js'
 import { pgDriver } from '../src/pg.js'
 import { pgLogicalReplicationFeature } from '../src/features/logical-replication.js'
 import { pgKey, encodePgText } from '../src/codec.js'
+
+/** Public admission accepts every publication form only when the complete feed remains observable. */
+for (const mode of ['tables', 'schema', 'all', 'missing-table', 'without-truncate'] as const) {
+  it('checks publication coverage through the public feed: ' + mode, async () => {
+    /** The repository launcher supplies the real PostgreSQL database for this file. */
+    const connectionString = process.env.MIGAIA_PG_URL
+    if (!connectionString) throw new Error('PostgreSQL replication service is required')
+    /** Each public case owns its deployment resources and leaves no persistent fixture slot. */
+    const pool = new Pool({ connectionString })
+    /** Native identifiers stay within PostgreSQL's limit and need no caller interpolation. */
+    const suffix = randomUUID().replaceAll('-', '')
+    /** Every case has a separate physical store and publication. */
+    const prefix = 'pg_pub_' + suffix.slice(0, 8)
+    /** Slot and publication are unique within the test database and cluster. */
+    const slot = 'pg_pub_' + suffix
+    /** A separate name makes publication ownership visible in native catalog assertions. */
+    const publication = 'pg_pub_' + suffix
+    /** Installation prepares the tables; explicit detection follows deployment resource creation. */
+    const host = await createStorageHost({
+      autoDetect: false,
+      plugins: [
+        postgresBackendPlugin(
+          { driver: pgDriver(pool), prefix },
+          { replication: pgLogicalReplicationFeature({ slot, publication }) }
+        )
+      ] as const
+    })
+    onTestFinished(async () => {
+      await host.dispose()
+      await pool.query(
+        'SELECT pg_drop_replication_slot(slot_name) FROM pg_replication_slots WHERE slot_name=$1',
+        [slot]
+      )
+      await pool.query('DROP PUBLICATION IF EXISTS ' + publication)
+      await pool.end()
+    })
+    /** Only the three always-present business channels belong to the explicit-table publication. */
+    const tables = ['kv', 'bytes', ...(mode === 'missing-table' ? [] : ['records'])]
+    await pool.query(
+      'CREATE PUBLICATION ' +
+        publication +
+        (mode === 'all'
+          ? ' FOR ALL TABLES'
+          : mode === 'schema'
+            ? ' FOR TABLES IN SCHEMA public'
+            : ' FOR TABLE ' + tables.map((table) => 'public.' + prefix + '_' + table).join(',')) +
+        (mode === 'without-truncate' ? " WITH (publish='insert,update,delete')" : '')
+    )
+    await pool.query('SELECT pg_create_logical_replication_slot($1,$2)', [slot, 'pgoutput'])
+    if (mode === 'missing-table' || mode === 'without-truncate') {
+      await expect(host.detect()).rejects.toMatchObject({
+        source: STORAGE_CONTRACT_SOURCE,
+        code: StorageContractErrorCode.unsupported,
+        message:
+          mode === 'missing-table'
+            ? `PostgreSQL publication "${publication}" is missing table "public"."${prefix}_records"`
+            : `PostgreSQL publication "${publication}" does not publish truncate`
+      })
+      return
+    }
+    await host.detect()
+    if (mode === 'tables')
+      expect(
+        (
+          await pool.query(
+            'SELECT tablename FROM pg_publication_tables WHERE pubname=$1 ORDER BY tablename',
+            [publication]
+          )
+        ).rows.map((row) => row.tablename)
+      ).toEqual(['bytes', 'kv', 'records'].map((table) => prefix + '_' + table))
+    /** The supported public path must deliver a committed write after successful admission. */
+    const store = host.backend('postgres')
+    /** Save initial progress before writing so the returned invalidation proves native delivery. */
+    const feed = store.use(durableChangeFeed)
+    /** The first read binds a real cursor to the selected slot and store. */
+    const initial = await feed.readChanges()
+    await store.set('publication:change', mode)
+    /** A real WAL read must produce the new committed invalidation for every accepted form. */
+    const changed = await feed.readChanges({ after: initial.cursor })
+    expect(changed.changes).toHaveLength(1)
+    expect(changed.changes[0]).toMatchObject({ channel: 'all' })
+    expect(await store.get('publication:change')).toBe(mode)
+  })
+}
 
 /** TRUNCATE invalidates all organizations and confirms only after the consumer finishes. */
 it('resets root and routed consumers on TRUNCATE and exposes read-only WAL health', async () => {
@@ -322,6 +410,12 @@ for (const mode of ['pid-query', 'abort', 'ready-query-abort'] as const) {
     const pool = new Pool({ connectionString })
     const slot = 'pg_startup_' + randomUUID().replaceAll('-', '')
     await pool.query('SELECT pg_create_logical_replication_slot($1,$2)', [slot, 'pgoutput'])
+    /** A real storage layout keeps startup failure checks beyond publication admission. */
+    const prefix = 'pg_startup_' + randomUUID().slice(0, 8)
+    /** This host owns the layout only; the directly opened transport remains under test. */
+    const host = await createStorageHost({
+      plugins: [postgresBackendPlugin({ driver: pgDriver(pool), prefix })] as const
+    })
     const original = new Error('replication-startup-original')
     const cancellation = new AbortController()
     let reported: unknown
@@ -369,7 +463,7 @@ for (const mode of ['pid-query', 'abort', 'ready-query-abort'] as const) {
             slot,
             publication,
             schema: 'public',
-            prefix: 'never_written',
+            prefix,
             from: 'now',
             onChange: async () => {},
             onError: (cause) => {
@@ -389,6 +483,7 @@ for (const mode of ['pid-query', 'abort', 'ready-query-abort'] as const) {
       if (mode === 'ready-query-abort') expect(startupSettled).toBe(true)
       expect((await pool.query('SELECT 1::int4 AS alive')).rows[0]).toEqual({ alive: 1 })
     } finally {
+      await host.dispose()
       await pool.query('SELECT pg_drop_replication_slot($1)', [slot])
       await pool.end()
     }

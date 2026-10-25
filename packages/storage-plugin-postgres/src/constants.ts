@@ -81,3 +81,11 @@ export const PgQuantizedIndexPrefix = 'storage_q_'
 /** The replication policy either invalidates the route or leaves TRUNCATE for manual handling. */
 export const PgTruncatePolicy = { reset: 'reset', block: 'block' } as const
 export type PgTruncatePolicy = keyof typeof PgTruncatePolicy
+
+/** Every feed route requires all native change actions, including reset and block TRUNCATE policies. */
+export const PgPublicationOperation = {
+  insert: 'insert',
+  update: 'update',
+  delete: 'delete',
+  truncate: 'truncate'
+} as const

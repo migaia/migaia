@@ -87,7 +87,7 @@ export type IPgLogicalReplicationPort = {
   ): Promise<IStorageResource & { acknowledge(commitEndLsn: string): Promise<void> }>
   dropSlot(slot: string, ctx?: IOperationContext): Promise<void>
 }
-/** Deployment creates the persistent slot and FOR ALL TABLES publication before installation. */
+/** Deployment creates a persistent slot and publishes every feed table and change action. */
 export type IPgLogicalReplicationOptions = {
   readonly slot: string
   readonly publication: string
