@@ -62,6 +62,8 @@ export type IPluginRuntimeIntegration = Readonly<{
   }>
   /** One private runtime node fact is shared by every adapter installed on this Host. */
   readonly nodeId: string
+  /** Borrow the configured Host diagnostic outlet; absence preserves the receiving domain's default. */
+  readonly report?: (error: unknown) => void
   /** Query only the original managed-host authority; this confers no mutation permission. */
   matchesHost(host: object): boolean
   /** Reuse original Host/registration admission for explicitly exposed reserved controls. */

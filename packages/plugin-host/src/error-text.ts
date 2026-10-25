@@ -401,6 +401,8 @@ export default ERROR_TEXT
  * keep their unprefixed spelling; the root's public ERROR_TEXT object remains unchanged.
  */
 export const PluginHostInternalText = {
+  /** Native domain integrations report original failures through the configured Host diagnostic. */
+  DOMAIN_REPORTED_FAILURE: 'domain runtime reported a failure',
   /** Optional budget validation used during Host option admission. */
   TIMEOUT_OPTION: (label: string): string =>
     `${label} must be false or a non-negative finite number`,

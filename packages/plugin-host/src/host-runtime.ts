@@ -292,6 +292,17 @@ class PluginHostConstructor<
       bindTerminalSink(this.#diagnostic, onDiagnosticFailure)
       bindTerminalSink(this.#pipelineDiagnostic, onDiagnosticFailure)
     }
+    /** Only a configured native outlet replaces a domain runtime's own default reporter. */
+    const domainReport =
+      diagnostic === defaultDiagnostic
+        ? undefined
+        : (error: unknown): void =>
+            reportDiagnostic(
+              this.#diagnostic,
+              PluginHostInternalText.DOMAIN_REPORTED_FAILURE,
+              undefined,
+              error
+            )
     this.#enablementRuntime = new PluginHostEnablementRuntime({
       invokeHook: this.#invokeHook,
       state: this.#state,
@@ -543,6 +554,7 @@ class PluginHostConstructor<
         return Object.freeze({
           identity: this.identity,
           nodeId: readHostNodeId(this),
+          report: domainReport,
           matchesHost: (host: object) => matchesManagedHost(host, this),
           assertCurrent,
           assertPreparedRegistration: () => {
