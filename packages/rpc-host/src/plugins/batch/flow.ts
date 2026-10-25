@@ -48,6 +48,8 @@ export class RpcBatchFlow {
     const { context } = payload
     if (this.#closed)
       return Promise.reject(createRpcLifecycleError(RpcCoreErrorText.endpointDisposed))
+    /** The Session's closing FIFO already serializes these writes before its final close frame. */
+    if (payload.write?.closing) return next(payload)
     if (!context.session?.extensions.has(RpcBatchExtension)) return next(payload)
     /** Carrier ids are host-local physical identities, not decoded route or provider addresses. */
     const id = context.carrierId

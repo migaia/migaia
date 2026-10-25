@@ -233,9 +233,9 @@ export const RpcCoreErrorCode = {
   endpointDisposed: 'ENDPOINT_DISPOSED',
 
   /**
-   * A keepalive call admitted during Session closing exceeds its in-flight semantic byte quota. R21
-   * rejects the call immediately without queueing; the caller reduces the payload or waits for
-   * existing keepalive work to settle. The final close frame never consumes this quota.
+   * A keepalive call admitted during Session closing exceeds its in-flight prepared-message quota.
+   * R21 counts the captured metadata/manifest and native sidecars before optional feature overhead.
+   * The caller reduces the payload or waits for existing work to settle; final close is uncharged.
    */
   keepaliveQuotaExceeded: 'KEEPALIVE_QUOTA_EXCEEDED',
 

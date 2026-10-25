@@ -13,7 +13,7 @@ import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { RpcAbortError, RpcCoreErrorText } from '@migaia/rpc-contract/errors'
 import type { IRpcFlowContext, IRpcTargetSource } from '@migaia/rpc-contract/interfaces'
 import { deferred, type IDeferred, type IAbortSignal } from '@migaia/utils/promise'
-import { createRpcError, isLocalRpcError } from '../host/error-owner.js'
+import { createRpcError, createRpcLifecycleError, isLocalRpcError } from '../host/error-owner.js'
 import type { ICallLocalOptions, ICallTargetRef } from '../call/types.js'
 import { StreamConsumer } from './consumer.js'
 import { StreamProducer } from './producer.js'
@@ -53,7 +53,7 @@ export class StreamChannel {
     this.#ports = ports
     this.#owner = {
       ...ports,
-      assertOpen: () => this.#assertOpen(),
+      assertOpen: (keepalive) => this.#assertOpen(keepalive),
       finish: (iterable, reason) => this.finish(iterable, reason),
       trackConsumer: (carrierId, consumer) =>
         this.#track(this.#activeConsumers, carrierId, consumer),
@@ -74,11 +74,24 @@ export class StreamChannel {
     options?: ICallLocalOptions,
     admission?: IStreamAdmissionFailure
   ): AsyncIterableIterator<IRpcPortableValue> {
-    this.#assertOpen()
+    /** Only an iterator created during actual closing may retain this local admission. */
+    const closing = this.#ports.canKeepalive?.(target.carrierId, target.source) === true
+    /** An ordinary stream cannot enter an asynchronous feature while its Session is closing. */
+    const keepalive = options?.keepalive === true && closing
+    if (closing && !keepalive) throw createRpcLifecycleError(RpcCoreErrorText.endpointDisposed)
+    this.#assertOpen(keepalive)
     if (target.source && !target.origin) target.source.assertTransfer(target.carrierId, options)
     else this.#ports.assertTransfer(target.carrierId, options)
     /** Relay metadata is attached only to this original public iterator, never a copyable token. */
-    const consumer = new StreamConsumer(this.#owner, target, method, payload, options, admission)
+    const consumer = new StreamConsumer(
+      this.#owner,
+      target,
+      method,
+      payload,
+      options,
+      admission,
+      keepalive
+    )
     this.#iterators.set(consumer.value, consumer)
     return consumer.value
   }
@@ -274,8 +287,8 @@ export class StreamChannel {
   }
 
   /** Closed owners never revive lazy iterators into new provider operations. */
-  #assertOpen(): void {
-    if (this.#closed)
+  #assertOpen(keepalive = false): void {
+    if (this.#closed && (!keepalive || this.#closing))
       throw createRpcError(RpcCoreErrorCode.endpointDisposed, RpcCoreErrorText.endpointDisposed)
   }
 }

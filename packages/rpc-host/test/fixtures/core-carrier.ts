@@ -56,6 +56,8 @@ export class MemoryCarrier implements IRpcCarrier {
   unsubscribed = 0
   /** Original backings remain available on this in-memory physical medium. */
   readonly nativeBinary: boolean
+  /** An explicit fixture opt-in exercises the same bounded Session close path as native media. */
+  readonly closingWrites: true | undefined
   /** Physical local identity is independent of semantic peer names. */
   readonly id: string
   /** These actual ordered proposals participate in the common negotiation. */
@@ -73,11 +75,13 @@ export class MemoryCarrier implements IRpcCarrier {
     id: string,
     codecs: readonly string[] = [RpcCarrierCodecId],
     codec?: IRpcCarrierCodec,
-    nativeBinary = true
+    nativeBinary = true,
+    closingWrites?: true
   ) {
     this.id = id
     this.codecs = codecs
     this.nativeBinary = nativeBinary
+    this.closingWrites = closingWrites
     if (codec) this.codec = codec
   }
 

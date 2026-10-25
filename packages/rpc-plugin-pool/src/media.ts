@@ -95,6 +95,10 @@ export class PoolMedia implements IRpcTargetSource {
   current(_carrierId: string): IRpcSessionSelection | undefined {
     return (this.#member?.current() ?? this.#handle)?.current()
   }
+  /** A stale physical id cannot borrow a successor's closing capability or budget. */
+  canKeepalive(carrierId: string): boolean {
+    return this.#handle?.carrierId === carrierId && this.#handle.canKeepalive()
+  }
   /** Exact ids prevent a late cancellation from being redirected to a successor generation. */
   send(
     carrierId: string,

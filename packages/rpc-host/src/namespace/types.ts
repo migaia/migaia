@@ -4,6 +4,13 @@
  */
 import type { IAbortSignal } from '@migaia/utils/promise'
 import type { IRpcCallFeatures } from '@migaia/rpc-contract/interfaces'
+import type { IRpcClosingHandler, IRpcPeerClosedHandler } from '../session/types.js'
+export type {
+  IRpcClosingEvent,
+  IRpcPeerClosedEvent,
+  IRpcClosingHandler,
+  IRpcPeerClosedHandler
+} from '../session/types.js'
 import type {
   IRpcPortableValue,
   IRpcStepOutcome,
@@ -11,11 +18,13 @@ import type {
 } from '@migaia/rpc-contract/protocol'
 
 /** Only complete call features or false may override installed policies. */
-export type IRpcCallOptions = IRpcCallFeatures &
+export type IRpcCallOptions<Support extends boolean = false> = IRpcCallFeatures &
   IRpcWireCallOptions &
-  Readonly<{ signal?: IAbortSignal; transfer?: readonly ArrayBuffer[]; trace?: string }>
+  Readonly<{ signal?: IAbortSignal; transfer?: readonly ArrayBuffer[]; trace?: string }> &
+  (Support extends true ? Readonly<{ keepalive?: boolean }> : Record<never, never>)
 /** Explicit notification selection preserves the original target override. */
-export type IRpcNotifyOptions = IRpcCallOptions & Readonly<{ targetId?: string }>
+export type IRpcNotifyOptions<Support extends boolean = false> = IRpcCallOptions<Support> &
+  Readonly<{ targetId?: string }>
 /** Independent target outcomes use the established null-record key grammar. */
 export type IRpcFanoutResult<T> = Readonly<{
   fulfilled: Partial<Record<string, T>>
@@ -129,48 +138,56 @@ export type IRpcIntersection<T> = [T] extends [never]
     : never
 
 /** One namespace contains RPC calls; no root-level request/notify facade is generated. */
-export type IRpcNamespace<TRemote = Record<never, never>> = IRpcNamespaceSurface<
-  TRemote,
-  IMethods<TRemote>
->
+export type IRpcNamespace<
+  TRemote = Record<never, never>,
+  Support extends boolean = false
+> = IRpcNamespaceSurface<TRemote, IMethods<TRemote>, Support> &
+  (Support extends true
+    ? Readonly<{
+        /** The physical Session's one close budget bounds all callbacks and their keepalive work. */
+        onClosing(handler: IRpcClosingHandler): () => void
+        /** Native loss and an admitted peer close frame retain their distinct original reasons. */
+        onPeerClosed(handler: IRpcPeerClosedHandler): () => void
+      }>
+    : Record<never, never>)
 
 /** Internal helper parameters preserve the declared remote method inventory. */
-type IRpcNamespaceSurface<TRemote, S> = Readonly<{
+type IRpcNamespaceSurface<TRemote, S, Support extends boolean> = Readonly<{
   /** Namespace shutdown owns one Promise and retires only this transport's sessions. */
-  close(): Promise<void>
+  close(reason?: unknown): Promise<void>
   [Symbol.asyncDispose](): Promise<void>
   /** Current held capabilities reject once their original connection generation retires. */
   peers: IPeers<TRemote>
   /** Broadcast scalar calls preserve each direct target's independent settlement. */
   request<M extends IScalarKeys<S>>(
     method: M,
-    ...args: [...IPayload<S[M]>, options?: IRpcCallOptions]
+    ...args: [...IPayload<S[M]>, options?: IRpcCallOptions<Support>]
   ): Promise<IResult<S[M]> | IRpcFanoutResult<IResult<S[M]>>>
   /** Physical-send completion is independent of remote provider acknowledgement. */
   notify<M extends IScalarKeys<S>>(
     method: M,
-    ...args: [...IPayload<S[M]>, options?: IRpcNotifyOptions]
+    ...args: [...IPayload<S[M]>, options?: IRpcNotifyOptions<Support>]
   ): Promise<void | IRpcFanoutResult<void>>
   /** Each direct target owns an independent returned iterator. */
   stream<M extends IStreamKeys<S>>(
     method: M,
-    ...args: [...IPayload<S[M]>, options?: IRpcCallOptions]
+    ...args: [...IPayload<S[M]>, options?: IRpcCallOptions<Support>]
   ): AsyncIterableIterator<IYield<S[M]>> | IRpcFanoutResult<AsyncIterableIterator<IYield<S[M]>>>
   /** Atomicity remains local to each target; no cross-target transaction is implied. */
   group<Steps extends readonly IGroupStep<S>[]>(
     steps: Steps,
-    options?: IRpcCallOptions
+    options?: IRpcCallOptions<Support>
   ): Promise<readonly IRpcStepOutcome[] | IRpcFanoutResult<readonly IRpcStepOutcome[]>>
   /** Send to one direct target with that target's declared scalar method contract. */
   send<K extends ITargets<TRemote>, M extends IScalarKeys<ITargetMethods<TRemote, NoInfer<K>>>>(
     targetId: K,
     method: M,
-    ...args: [...IPayload<ITargetMethods<TRemote, K>[M]>, options?: IRpcCallOptions]
+    ...args: [...IPayload<ITargetMethods<TRemote, K>[M]>, options?: IRpcCallOptions<Support>]
   ): Promise<IResult<ITargetMethods<TRemote, K>[M]>>
   /** Fire-and-report dispatch retains the same direct target and payload correlation. */
   dispatch<K extends ITargets<TRemote>, M extends IScalarKeys<ITargetMethods<TRemote, NoInfer<K>>>>(
     targetId: K,
     method: M,
-    ...args: [...IPayload<ITargetMethods<TRemote, K>[M]>, options?: IRpcCallOptions]
+    ...args: [...IPayload<ITargetMethods<TRemote, K>[M]>, options?: IRpcCallOptions<Support>]
   ): void
 }>

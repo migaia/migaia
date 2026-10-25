@@ -39,6 +39,8 @@ import type { IStreamOwner, IStreamTerminal, IStreamAdmissionFailure } from './t
 
 /** One lazy public iterator owns its input until first physical handoff, then only compact state. */
 export class StreamConsumer {
+  /** Closing admission is fixed when the public iterator is created, independent from lazy start. */
+  readonly #keepalive: boolean
   /** Explicit ports keep media and feature policy outside the consumer state machine. */
   readonly #owner: IStreamOwner
   /** The original selected binding never follows a same-name replacement mid-stream. */
@@ -97,9 +99,11 @@ export class StreamConsumer {
     method: string,
     payload?: IRpcPortableValue,
     options?: ICallLocalOptions,
-    admission?: IStreamAdmissionFailure
+    admission?: IStreamAdmissionFailure,
+    keepalive = false
   ) {
     this.#owner = owner
+    this.#keepalive = keepalive
     this.#target = target
     this.#method = method
     this.#payload = payload
@@ -175,7 +179,7 @@ export class StreamConsumer {
    * path.
    */
   #start(): void {
-    this.#owner.assertOpen()
+    this.#owner.assertOpen(this.#keepalive)
     this.#started = true
     this.#createdAt = this.#now()
     this.#owner.trackConsumer(this.#target.carrierId, this)
@@ -257,7 +261,7 @@ export class StreamConsumer {
           method: this.#method,
           ...(this.#payload === undefined ? {} : { payload: this.#payload })
         },
-        { ...this.#options, signal, remainingMs: budget }
+        { ...this.#options, signal, remainingMs: budget, keepalive: this.#keepalive }
       )
       this.#owner.registerConsumer(this.#target.carrierId, this.#prepared.envelope.id, this)
       this.#observe(this.#prepared.envelope, RpcProbeOutcome.created, RpcProbeDirection.outbound)
@@ -267,7 +271,12 @@ export class StreamConsumer {
       if (signal.aborted) this.#abort()
       if (!this.#terminal) {
         /** Physical handoff releases business input even when open/terminal has not returned. */
-        const write = { signal, transfer: this.#options?.transfer, onWriteStart: this.#handoff }
+        const write = {
+          signal,
+          transfer: this.#options?.transfer,
+          onWriteStart: this.#handoff,
+          ...(this.#keepalive ? { keepalive: true } : {})
+        }
         void Promise.resolve(
           this.#owner.send(
             this.#target.carrierId,
@@ -502,7 +511,12 @@ export class StreamConsumer {
           kind: RpcWireKind.cancel,
           reason: this.#wire(reason)
         }
-    await this.#owner.send(this.#target.carrierId, frame, undefined, this.#target.source)
+    await this.#owner.send(
+      this.#target.carrierId,
+      frame,
+      this.#keepalive ? { keepalive: true } : undefined,
+      this.#target.source
+    )
     this.#observe(frame, RpcProbeOutcome.sent, RpcProbeDirection.outbound, undefined, reason)
   }
 

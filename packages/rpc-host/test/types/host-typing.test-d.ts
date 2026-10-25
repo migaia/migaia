@@ -8,7 +8,7 @@ import type { IRpcStepOutcome, IRpcOutcomeLookupResult } from '@migaia/rpc-contr
 import type { IRpcFanoutResult } from '@migaia/rpc-host'
 import { createRpcHost, type IRpcHost, type IRpcHostOptions } from '@migaia/rpc-host'
 import { idempotency } from '@migaia/rpc-host/plugins/idempotency'
-import type { IRpcTransportPlugin } from '@migaia/rpc-host/sdk'
+import { defineTransportPlugin, type IRpcTransportPlugin } from '@migaia/rpc-host/sdk'
 
 /** Client A owns one scalar route and one streaming route. */
 type IAApi = { resize(width: number): string; frames(count: number): AsyncIterableIterator<number> }
@@ -114,3 +114,39 @@ single.request('resize', 800)
 single.memory.request('resize', 800, { timeout: 20 })
 // @ts-expect-error Only installed transports introduce namespaces.
 single.other.request('resize', 800)
+
+/** Cold transport declaration alone controls closing APIs and local keepalive options. */
+const unsupportedTransport = defineTransportPlugin({
+  name: 'ordinary',
+  namespace: 'ordinary',
+  open: () => ({ dispose: () => undefined })
+})
+/** Type-only hosts acquire no native resource or extra lifetime owner. */
+declare const unsupported: IRpcHost<IAApi, readonly [typeof unsupportedTransport]>
+// @ts-expect-error A generic transport has no native closing-write capability.
+unsupported.ordinary.onClosing(() => undefined)
+// @ts-expect-error Peer-close API is absent until the actual transport declares support.
+unsupported.ordinary.onPeerClosed(() => undefined)
+// @ts-expect-error Keepalive cannot appear in an unsupported namespace's call options.
+unsupported.ordinary.request('resize', 800, { keepalive: true })
+/** The same generic SDK accepts an actual native opt-in without another plugin or type facade. */
+const supportedTransport = defineTransportPlugin({
+  name: 'native',
+  namespace: 'native',
+  closingWrites: true,
+  open: () => ({ dispose: () => undefined })
+})
+/** Literal true must survive the cold definition's third transport generic into public calls. */
+declare const supported: IRpcHost<IAApi, readonly [typeof supportedTransport]>
+supported.native.request('resize', 800, { keepalive: true })
+supported.native.notify('resize', 800, { keepalive: true })
+expectTypeOf(
+  supported.native.onClosing((event) => {
+    expectTypeOf(event.reason).toEqualTypeOf<unknown>()
+  })
+).toEqualTypeOf<() => void>()
+expectTypeOf(
+  supported.native.onPeerClosed((event) => {
+    expectTypeOf(event.closeFrame).toEqualTypeOf<boolean>()
+  })
+).toEqualTypeOf<() => void>()

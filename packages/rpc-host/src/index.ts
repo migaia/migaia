@@ -5,7 +5,11 @@ export type {
   IRpcNamespace,
   IRpcCallOptions,
   IRpcNotifyOptions,
-  IRpcFanoutResult
+  IRpcFanoutResult,
+  IRpcClosingEvent,
+  IRpcPeerClosedEvent,
+  IRpcClosingHandler,
+  IRpcPeerClosedHandler
 } from './namespace/types.js'
 export type {
   IRpcContext,

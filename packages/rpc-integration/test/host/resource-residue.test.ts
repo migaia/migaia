@@ -146,6 +146,8 @@ class ResidueBusiness {
 class ResidueInspector {
   /** This in-process debugging connection never opens a network inspector listener. */
   readonly #session = new InspectorSession()
+  /** Original physical Session references remain inspectable after the real table removes them. */
+  readonly #physical = new Map<string, readonly Runtime.RemoteObject[]>()
 
   /** The test's retained references stay alive until its final resource sample. */
   constructor(owners: Record<string, unknown>) {
@@ -203,6 +205,29 @@ class ResidueInspector {
       const retained = await this.root(label)
       /** The same physical root owns all actual mandatory work tables. */
       const host = await this.field(retained, 'host')
+      if (!this.#physical.has(label)) {
+        /** The native Map snapshot only retains actual owner references; it never runs RPC work. */
+        const sessions = await this.field(await this.field(host, '#sessions'), '#sessions')
+        /** Preserve the exact physical instances before their original close removes table entries. */
+        const array = await this.#session.post('Runtime.callFunctionOn', {
+          objectId: sessions.objectId!,
+          functionDeclaration: 'function () { return Array.from(this.values()) }',
+          objectGroup: 'rpc-a17'
+        })
+        /** Dense native array indices contain only the original Session objects. */
+        const entries = await this.#session.post('Runtime.getProperties', {
+          objectId: array.result.objectId!,
+          ownProperties: true
+        })
+        this.#physical.set(
+          label,
+          entries.result.filter((entry) => /^\d+$/u.test(entry.name)).map((entry) => entry.value!)
+        )
+      }
+      for (const [index, session] of this.#physical.get(label)!.entries())
+        counts[`${label}.Session.${index}.#keepaliveBytes`] = (
+          await this.field(session, '#keepaliveBytes')
+        ).value as number
       for (const [owner, fields] of [
         ['#calls', ['#records', '#bySource', '#invocations']],
         ['#streams', ['#consumers', '#producers', '#activeConsumers', '#activeProducers']],
@@ -219,7 +244,6 @@ class ResidueInspector {
         '#sessions',
         '#accepted',
         '#reserved',
-        '#nodeIds',
         '#nativeGenerations',
         '#globalNames',
         '#namespaces'
@@ -297,20 +321,23 @@ function nativeSource(
   return defineTransportPlugin({
     name: `a17-${namespace}-source`,
     namespace,
+    closingWrites: true,
     open: async (context) => {
       /** Each physical endpoint uses the same real JSON codec as its listening native namespace. */
       const left = new MemoryCarrier(
         `a17-${namespace}-server`,
         undefined,
         new RpcJsonCarrierCodec(),
-        false
+        false,
+        true
       )
       /** The local endpoint retains the original receiver, controller and close implementation. */
       const right = new MemoryCarrier(
         `a17-${namespace}-client`,
         undefined,
         new RpcJsonCarrierCodec(),
-        false
+        false,
+        true
       )
       left.link(right)
       right.link(left)
@@ -467,7 +494,8 @@ function createResidueFixture() {
   const listeners = ['alpha', 'beta'].map((namespace) =>
     coreMemoryServer('a17-server', 'a17-server', namespace, [], [], {
       create: createA17JsonCodec,
-      nativeBinary: false
+      nativeBinary: false,
+      closingWrites: true
     })
   )
   /** Construct real RPC owners directly so Inspector can retain their actual private references. */

@@ -26,6 +26,8 @@ export type IStreamAdmissionFailure = Readonly<{ error: unknown }>
 
 /** The Host supplies actual write, global identity and the canonical call header/id allocator. */
 export type IStreamChannelOptions = Readonly<{
+  /** Lazy streams freeze closing admission before an iterator can be held across shutdown. */
+  canKeepalive?(carrierId: string, source?: IRpcTargetSource): boolean
   /** Borrow the same physical capability check before a lazy iterator reads any caller option. */
   assertTransfer(carrierId: string, options?: object): void
   self(): ICallSelf
@@ -64,7 +66,7 @@ export type IStreamTerminal = Readonly<
 /** Credit owners borrow only sending, indexing and reporting rather than another transport facade. */
 export type IStreamOwner = IStreamChannelOptions &
   Readonly<{
-    assertOpen(): void
+    assertOpen(keepalive?: boolean): void
     finish(
       iterable: AsyncIterable<IRpcPortableValue> | Iterable<IRpcPortableValue>,
       reason?: unknown

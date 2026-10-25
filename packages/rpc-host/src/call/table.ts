@@ -11,12 +11,18 @@ import {
 } from '@migaia/rpc-contract/protocol'
 import { RpcCoreErrorCode, RpcRemoteLayerErrorCode } from '@migaia/rpc-contract/error-code'
 import { RpcProbeObservationKind, type IRpcAttemptOptions } from '@migaia/rpc-contract/interfaces'
-import { RpcCoreErrorText, identifyRpcBoundaryFailure } from '@migaia/rpc-contract/errors'
+import {
+  RpcCoreErrorText,
+  RpcLifecycleError,
+  identifyRpcBoundaryFailure
+} from '@migaia/rpc-contract/errors'
 import { systemScheduler, systemWallClock } from '@migaia/utils/scheduler'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import {
   createRpcAbortError,
   createRpcError,
+  createRpcLifecycleError,
+  isLocalRpcError,
   createRpcPhysicalTransportError
 } from '../host/error-owner.js'
 import { callEnvelope } from './envelope.js'
@@ -126,12 +132,21 @@ export class CallTable {
     options: ICallLocalOptions = {}
   ): Promise<unknown> {
     try {
-      this.#assertAdmission()
+      /** Only admission during this exact Session's closing interval may survive later awaits. */
+      const closing = this.#options.canKeepalive?.(target.carrierId, target.source) === true
+      /** Ordinary work is refused before arbitrary feature code can suspend the close callback. */
+      const keepalive = options.keepalive === true && closing
+      if (closing && !keepalive) throw createRpcLifecycleError(RpcCoreErrorText.endpointDisposed)
+      this.#assertAdmission(keepalive)
       this.#assertTransfer(target, options)
       /** Step admission returns the canonical captured data instead of re-reading caller arrays. */
       const normalized = this.#validate(command, options)
       /** Capture user choices once; transit cannot activate an originating retry implementation. */
-      const local = { ...options, ...(options.origin === false ? { retry: false as const } : {}) }
+      const local = {
+        ...options,
+        keepalive,
+        ...(options.origin === false ? { retry: false as const } : {})
+      }
       /** Resolution is the sole cache/precedence owner, including complete call-only instances. */
       const selected = this.#options.features.resolve(target.namespace, local)
       if (!target.origin) return this.#invoke(target, normalized, local, selected)
@@ -194,14 +209,19 @@ export class CallTable {
   ): IPreparedCall {
     this.#assertOpen()
     this.#assertTransfer(target, options)
-    return this.#prepare(target, this.#validate(command, options), options)
+    /** Stream preparation freezes the same physical fact before the first encode can suspend. */
+    const keepalive =
+      options.keepalive === true &&
+      this.#options.canKeepalive?.(target.carrierId, target.source) === true
+    return this.#prepare(target, this.#validate(command, options), options, keepalive)
   }
 
   /** Already admitted invocations reuse preparation without walking their group steps again. */
   #prepare(
     target: ICallTargetRef,
     command: ICallPreparationCommand,
-    options: ICallLocalOptions
+    options: ICallLocalOptions,
+    keepalive = options.keepalive === true
   ): IPreparedCall {
     /** The stream owner retains its own actual signal/iterator and releases its own resources. */
     const signal = options.signal ?? this.#closing.signal
@@ -218,6 +238,7 @@ export class CallTable {
         options.remainingMs
       ),
       signal,
+      keepalive,
       ...(options.remainingMs === undefined ? {} : { remainingMs: options.remainingMs })
     }
   }
@@ -271,12 +292,16 @@ export class CallTable {
     this.#bySource.delete(sourceKey)
     /** All written calls from one physical source share its exact original transport diagnostic. */
     let failure: Error | undefined
+    /** Explicit close keeps the default lifecycle identity; custom close reasons remain its cause. */
+    const closing = isLocalRpcError(reason, RpcLifecycleError)
+      ? reason
+      : createRpcLifecycleError(RpcCoreErrorText.endpointDisposed, reason)
     if (records)
       for (const record of records)
         record.reject(
           physicalFailure && record.written
             ? (failure ??= createRpcPhysicalTransportError(reason))
-            : reason
+            : closing
         )
   }
 
@@ -362,7 +387,8 @@ export class CallTable {
       options.origin === false &&
         command.mode === RpcCallMode.notify &&
         (options.forwardRoute?.length ?? 0) > 0,
-      current.source
+      current.source,
+      options.keepalive === true
     )
     /** Capture before send; synchronous carrier delivery is allowed to settle immediately. */
     const promise = record.promise
@@ -401,10 +427,14 @@ export class CallTable {
         reason: serializeHostWireError(reason, { report: (failure) => this.#report(failure.error) })
       }
       if (this.#closed || this.#records.get(record.id) !== record) return
-      Promise.resolve(this.#options.send(record.carrierId, frame, undefined, record.source)).then(
-        () => record.cancelSent(),
-        this.#report
-      )
+      Promise.resolve(
+        this.#options.send(
+          record.carrierId,
+          frame,
+          record.keepalive ? { keepalive: true } : undefined,
+          record.source
+        )
+      ).then(() => record.cancelSent(), this.#report)
     } catch (error) {
       this.#report(error)
     }
@@ -481,8 +511,11 @@ export class CallTable {
   }
 
   /** A host closing fence rejects new calls without aborting already accepted work. */
-  #assertAdmission(): void {
-    if (this.#sealed) throw this.#closeReason
+  #assertAdmission(keepalive = false): void {
+    if (this.#sealed && !keepalive)
+      throw isLocalRpcError(this.#closeReason, RpcLifecycleError)
+        ? this.#closeReason
+        : createRpcLifecycleError(RpcCoreErrorText.endpointDisposed, this.#closeReason)
     this.#assertOpen()
   }
 

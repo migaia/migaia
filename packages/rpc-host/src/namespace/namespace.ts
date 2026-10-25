@@ -11,11 +11,16 @@ import type {
 import { normalizeRpcTrace } from '@migaia/rpc-contract/protocol'
 import type { IRpcSessionView } from '@migaia/rpc-contract/interfaces'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
-import { RpcCoreErrorText, RuntimeApiErrorText } from '@migaia/rpc-contract/errors'
+import {
+  RpcCoreErrorText,
+  RpcLifecycleError,
+  RuntimeApiErrorText
+} from '@migaia/rpc-contract/errors'
 import {
   createRpcContractError,
   createRpcError,
-  createRpcLifecycleError
+  createRpcLifecycleError,
+  isLocalRpcError
 } from '../host/error-owner.js'
 import { assertCallMethod, type CallTable } from '../call/table.js'
 import type { ICallCommand, ICallTargetRef } from '../call/types.js'
@@ -23,8 +28,20 @@ import type { IAbortSignal } from '@migaia/utils/promise'
 import type { SessionTable } from '../session/table.js'
 import type { IRpcSessionSelection } from '@migaia/rpc-contract/interfaces'
 import { callTarget } from '../call/target.js'
-import type { IRpcCallOptions, IRpcFanoutResult, IRpcNotifyOptions } from './types.js'
+import type {
+  IRpcCallOptions as IPublicCallOptions,
+  IRpcFanoutResult,
+  IRpcNotifyOptions as IPublicNotifyOptions,
+  IRpcClosingHandler,
+  IRpcPeerClosedHandler
+} from './types.js'
+import type { IRpcSessionScope } from '../session/types.js'
 import type { IStreamAdmissionFailure } from '../stream/types.js'
+
+/** Runtime admission can read a supported intent; public namespace types condition its presence. */
+type IRpcCallOptions = IPublicCallOptions<true>
+/** Directed notifications use the same optional local closing intent as all other call modes. */
+type IRpcNotifyOptions = IPublicNotifyOptions<true>
 
 /** Preserve synchronous local trace admission while the one Contract validator owns its grammar. */
 function assertTrace(options: IRpcCallOptions): void {
@@ -41,9 +58,16 @@ function assertTrace(options: IRpcCallOptions): void {
 /** Namespace borrows only actual operation ports, never a per-session callable peer. */
 export type INamespaceOptions = Readonly<{
   name: string
+  /** Cold transport metadata alone determines which closing APIs this namespace publishes. */
+  closingWrites: boolean
+  /** Event registrations remain isolated to the original installation, including staged rollback. */
+  sessionScope: IRpcSessionScope
   /** Global close seals new work before joining native origin drains. */
   assertOpen?(): void
-  sessions: Pick<SessionTable, 'get' | 'select' | 'values' | 'assertTransfer'>
+  sessions: Pick<
+    SessionTable,
+    'get' | 'select' | 'values' | 'assertTransfer' | 'onClosing' | 'onPeerClosed'
+  >
   calls: Pick<CallTable, 'invoke'>
   stream(
     target: ICallTargetRef,
@@ -100,6 +124,8 @@ async function settleDelivery(
 
 /** Project the host's single execution owners into one unique transport namespace. */
 export class Namespace {
+  /** Root publishes closing methods only when this cold transport declaration is true. */
+  readonly closingWrites: boolean
   /** Explicit collaborators own calls, streams, accepted session lookup and transport shutdown. */
   readonly #options: INamespaceOptions
   /** These callable snapshots retain compact generation metadata, never mutable Session instances. */
@@ -114,7 +140,16 @@ export class Namespace {
   /** Native publication receives this owner's one stable namespace projection. */
   constructor(options: INamespaceOptions) {
     this.#options = options
+    this.closingWrites = options.closingWrites
   }
+
+  /** Handlers borrow the original SessionTable scope; Namespace owns no parallel listener set. */
+  readonly onClosing = (handler: IRpcClosingHandler): (() => void) =>
+    this.#options.sessions.onClosing(this.#options.sessionScope, handler)
+
+  /** Native loss and close-frame events use the same scoped table publication owner. */
+  readonly onPeerClosed = (handler: IRpcPeerClosedHandler): (() => void) =>
+    this.#options.sessions.onPeerClosed(this.#options.sessionScope, handler)
 
   /** Readonly public capability groups are replaced only at accepted generation changes. */
   get peers(): Readonly<Record<string, object>> {
@@ -194,7 +229,7 @@ export class Namespace {
     | IRpcFanoutResult<AsyncIterableIterator<IRpcPortableValue>> => {
     assertTrace(options)
     /** One snapshot fixes target identity before any iterator starts. */
-    const selected = this.#targets()
+    const selected = this.#targets(options)
     this.#assertTransfer(selected, options)
     if (selected.length === 1) return this.#stream(selected[0]!, method, payload, options)
     /** Stream fanout contains iterators, never promises masquerading as an iterator. */
@@ -252,14 +287,24 @@ export class Namespace {
   }
 
   /** New work rejects with the exact reason already selected by this namespace's close owner. */
-  #assertOpen(): void {
-    this.#options.assertOpen?.()
-    if (this.#closing) throw this.#reason
+  #assertOpen(options?: IRpcCallOptions): void {
+    if (options?.keepalive === true) {
+      if (!this.closingWrites)
+        throw createRpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.capabilityUnsupported)
+      return
+    }
+    try {
+      this.#options.assertOpen?.()
+      if (this.#closing) throw this.#reason
+    } catch (reason) {
+      if (isLocalRpcError(reason, RpcLifecycleError)) throw reason
+      throw createRpcLifecycleError(RpcCoreErrorText.endpointDisposed, reason)
+    }
   }
 
   /** Names retain priority over peer-id fallback through SessionTable's canonical selection. */
-  #direct(address: string): IRpcSessionSelection {
-    this.#assertOpen()
+  #direct(address: string, options: IRpcCallOptions): IRpcSessionSelection {
+    this.#assertOpen(options)
     /** Invalid addresses never enter the host's source/name indexes. */
     const selection =
       typeof address === 'string' && address
@@ -271,8 +316,8 @@ export class Namespace {
   }
 
   /** Enumerate only this namespace; broadcasting never visits another transport's peers. */
-  #targets(): readonly IRpcSessionSelection[] {
-    this.#assertOpen()
+  #targets(options?: IRpcCallOptions): readonly IRpcSessionSelection[] {
+    this.#assertOpen(options)
     return this.#options.sessions.values(this.#options.name)
   }
 
@@ -329,7 +374,7 @@ export class Namespace {
   ): Promise<unknown> {
     assertTrace(options)
     try {
-      return this.#invoke(this.#direct(address), command, options)
+      return this.#invoke(this.#direct(address, options), command, options)
     } catch (error) {
       return Promise.reject(error)
     }
@@ -342,7 +387,7 @@ export class Namespace {
     /** Retain one actual selection; ordinary selection failures keep their Promise rejection timing. */
     let selected: readonly IRpcSessionSelection[]
     try {
-      selected = this.#targets()
+      selected = this.#targets(options)
     } catch (error) {
       return Promise.reject(error)
     }
@@ -361,7 +406,7 @@ export class Namespace {
   async #deliver(
     command: ICallCommand,
     options: IRpcCallOptions,
-    selected = this.#targets()
+    selected = this.#targets(options)
   ): Promise<unknown> {
     if (selected.length === 1) return this.#invoke(selected[0]!, command, options)
     /** The result remains null-prototype even for zero targets. */

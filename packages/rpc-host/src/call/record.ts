@@ -48,6 +48,8 @@ type IAbortRegistration = {
 
 /** One first-terminal guard merges RuntimeOperation with stronger request cleanup semantics. */
 export class CallRecord {
+  /** The entry-time closing admission is compact metadata retained across writes and cancellation. */
+  readonly keepalive: boolean
   /** The globally unique carrier key isolates this source's calls from other namespaces. */
   readonly carrierId: string
   /** Namespace is compact admitted routing metadata, never a retained Session. */
@@ -98,10 +100,12 @@ export class CallRecord {
     beforeStart: boolean,
     callerSignal?: IAbortSignal,
     terminalNotify = false,
-    source?: IRpcTargetSource
+    source?: IRpcTargetSource,
+    keepalive = false
   ) {
     this.#owner = owner
     this.source = source
+    this.keepalive = keepalive
     this.carrierId = carrierId
     this.namespace = namespace
     this.#startedAt = owner.now()
@@ -168,6 +172,7 @@ export class CallRecord {
       const writing = this.#owner.send(this, frame, {
         signal,
         transfer,
+        ...(this.keepalive ? { keepalive: true } : {}),
         onWriteStart: handoff
       })
       Promise.resolve(writing).then(

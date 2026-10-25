@@ -56,6 +56,8 @@ export type IPreparedCall = Readonly<{
   envelope: IRpcEnvelope
   signal: IAbortSignal
   remainingMs?: number
+  /** Admission freezes this flag before any feature or physical encode may suspend. */
+  keepalive?: boolean
 }>
 
 /** Local feature/signal/transfer choices never leak into the closed wire options record. */
@@ -63,6 +65,8 @@ export type ICallLocalOptions = IRpcCallFeatures &
   IRpcCallOptions &
   Readonly<{
     signal?: IAbortSignal
+    /** Only an already-closing supported Session can turn this local intent into an admitted write. */
+    keepalive?: boolean
     transfer?: readonly ArrayBuffer[]
     /** Explicit caller correlation remains local until copied to the one route. */
     trace?: string
@@ -77,12 +81,16 @@ export type ICallLocalOptions = IRpcCallFeatures &
 /** The Session reports handoff immediately before the real carrier.write invocation. */
 export type ICallWriteOptions = Readonly<{
   signal?: IAbortSignal
+  /** This is the call admission snapshot, never a wire option or a late upgrade from open work. */
+  keepalive?: boolean
   transfer?: readonly ArrayBuffer[]
   onWriteStart?: () => void
 }>
 
 /** Explicit collaborators own media, feature policy, clocks and reporting outside this table. */
 export type ICallTableOptions = Readonly<{
+  /** Public and private sources borrow the same exact Session's existing closing admission fact. */
+  canKeepalive?(carrierId: string, source?: IRpcTargetSource): boolean
   /** The original Session checks actual native transfer capability before caller option getters. */
   assertTransfer(carrierId: string, options?: object): void
   send(

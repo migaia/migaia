@@ -4,7 +4,8 @@ import {
   raceWithAbort,
   withTimeout,
   type IAbortSignal,
-  type IDeferred
+  type IDeferred,
+  type ITimeoutOperation
 } from '@migaia/utils/promise'
 import { UtilsAbortError, UtilsTimeoutError, attachSecondaryErrors } from '@migaia/utils/error'
 import type { IScheduledTask } from '@migaia/utils/scheduler'
@@ -30,13 +31,13 @@ import {
   type IRpcPingOptions,
   type IRpcPrivateSession,
   type IRpcSessionSelection,
-  type IRpcSessionView
+  type IRpcSessionView,
+  type RpcSessionRetirement
 } from '@migaia/rpc-contract/interfaces'
 import {
   acceptRpcHandshake,
   completeRpcHandshake,
   normalizeRpcHandshake,
-  normalizeRpcDirectory,
   serializeRpcWireError,
   deserializeRpcWireError,
   RpcWireKind as K,
@@ -64,6 +65,7 @@ import {
   tagRpcError
 } from '@migaia/rpc-contract/errors'
 import {
+  createRpcError,
   createRpcAbortError,
   createRpcLifecycleError,
   createRpcProtocolError,
@@ -75,6 +77,8 @@ import {
 import { hostErrorWireMetadata } from '../host/error-wire-metadata.js'
 import { SessionText } from './text.js'
 import { carrierSizeBytes } from '../sdk/wire/probe-content.js'
+import { portableBytes } from '../sdk/wire/portable-size.js'
+import { rpcPortableBackingLength } from '@migaia/rpc-contract/portable'
 import { isRpcCarrierAdmissionFailure } from '../sdk/carrier/admission.js'
 import { RpcFlowPoint } from '../sdk/flow-pipelines.js'
 import type { IRpcSessionOptions, IRpcSessionWriteOptions } from './types.js'
@@ -82,6 +86,29 @@ import { bindSessionCredentials, type ISessionCredentials } from './credentials.
 
 /** A live control record holds settlement only, never a business payload or request facade. */
 type IControlPending = { completion: IDeferred<void>; signal: IAbortSignal }
+
+/** Prepared data and its codec context stay paired through the one original encoding path. */
+type ISessionPreparation = Readonly<{ prepared: IRpcPreparedMessage; context: IRpcCodecContext }>
+/** One short-lived media job retains admission facts, never a second business call table. */
+type ISessionWrite = {
+  frame: IRpcSemanticFrame
+  options?: IRpcSessionWriteOptions
+  keepalive: boolean
+  continuing: boolean
+  bytes: number
+  capture?: ISessionPreparation
+}
+
+/** Existing terminals and control exchanges can finish without admitting a new provider task. */
+function isSessionReply(frame: IRpcSemanticFrame): boolean {
+  return (
+    frame.kind !== K.call &&
+    frame.kind !== K.group &&
+    frame.kind !== K.handshake &&
+    frame.kind !== K.directory &&
+    (frame.kind !== K.outcome || frame.operation === 'result')
+  )
+}
 
 /** Stateful media work remains here, outside the pure contract and outside business work tables. */
 export class Session {
@@ -123,6 +150,16 @@ export class Session {
   #receiving: Promise<void> = Promise.resolve()
   /** Terminal transition synchronously stops all later writes and publication. */
   #closing = false
+  /** The final close seals further writes only after all admitted closing work has drained. */
+  #ending = false
+  /** A queued admitted wire close takes precedence over a following native EOF fallback. */
+  #receivedClose: false | Readonly<{ reason: unknown }> = false
+  /** Only an initial native fallback may later yield to its already-queued complete close reason. */
+  #physicalFailure = false
+  /** Closing writes enter this one FIFO before asynchronous codec preparation can reorder them. */
+  #writing: Promise<void> = Promise.resolve()
+  /** Only in-flight closing keepalive semantic bytes consume the physical Session quota. */
+  #keepaliveBytes = 0
   /** Work callbacks and pending controls receive the same original terminal reason. */
   #reason: unknown
   /** Control correlation is independent of business CallTable records. */
@@ -150,6 +187,7 @@ export class Session {
       ready: this.#ready.promise,
       closed: this.#closed.promise,
       close: this.close,
+      canKeepalive: () => this.canKeepalive(),
       current: () => this.current(),
       send: (frame, writeOptions) => this.send(frame, writeOptions),
       assertTransfer: (writeOptions) => this.assertTransfer(writeOptions),
@@ -173,6 +211,16 @@ export class Session {
   /** Table admission checks terminal state again after every awaited same-name probe. */
   get closing(): boolean {
     return this.#closing
+  }
+
+  /** Closing admission borrows the actual carrier capability and this Session's final write seal. */
+  canKeepalive(): boolean {
+    return (
+      this.#closing &&
+      this.#options.carrier.closingWrites === true &&
+      !this.#ending &&
+      !this.#controller.signal.aborted
+    )
   }
 
   /** Candidate name probes borrow this existing lifetime rather than outliving a retired source. */
@@ -319,40 +367,91 @@ export class Session {
     }
   }
 
-  /** Business send observes readiness, caller cancellation and connection closure before IO. */
+  /** Freeze closing admission and FIFO position before asynchronous preparation can complete. */
   send(frame: IRpcSemanticFrame, options?: IRpcSessionWriteOptions): Promise<void> {
-    /** Utils owns abort listener cleanup and late failure observation for this operation. */
-    const signals = options?.signal
-      ? [this.#controller.signal, options.signal]
-      : [this.#controller.signal]
-    return raceWithAbort(
-      async ({ signal }) => {
-        this.#assertOpen()
-        /**
-         * Sender ownership begins before readiness, codec digest, authentication or frame gates
-         * yield.
-         */
-        const transfer = this.#snapshotTransfer(options)
-        if (!this.#view) await this.#ready.promise
-        this.#assertOpen()
-        await this.#encode(
-          frame,
-          transfer === undefined
-            ? { ...options, signal }
-            : {
-                sendClass: options?.sendClass,
-                trace: options?.trace,
-                transfer,
-                signal,
-                onWriteStart: options?.onWriteStart
-              },
-          false
-        )
-      },
-      { signals, report: this.#options.report }
-    ).catch((error) => {
-      throw this.#controlError(error)
-    })
+    /** Open keepalive flags remain ordinary even when later codec work resumes during closing. */
+    const keepalive = this.canKeepalive() && options?.keepalive === true
+    /** All callbacks borrow one explicit operation context rather than parallel captured locals. */
+    const job: ISessionWrite = {
+      frame,
+      options,
+      keepalive,
+      continuing: keepalive || isSessionReply(frame),
+      bytes: 0
+    }
+    if (!keepalive) return this.#sendJob(job)
+    /** Reserve FIFO order now; early capture/quota rejection never overtakes an older write. */
+    const previous = this.#writing
+    const writing = this.#captureKeepalive(job)
+      .then(() => previous.then(() => this.#sendJob(job)))
+      .finally(() => {
+        this.#keepaliveBytes -= job.bytes
+      })
+    this.#writing = previous.then(() => writing).catch(this.#options.report)
+    return writing
+  }
+
+  /** Capture once before the queue, then charge prepared metadata plus actual native backings. */
+  async #captureKeepalive(job: ISessionWrite): Promise<void> {
+    await this.#controlled(async () => {
+      this.#assertOpen(true)
+      const transfer = this.#snapshotTransfer(job.options)
+      job.options = {
+        signal: job.options?.signal,
+        transfer,
+        keepalive: true,
+        sendClass: job.options?.sendClass,
+        trace: job.options?.trace,
+        onWriteStart: job.options?.onWriteStart
+      }
+      const context = this.#codecContext(false, job.options)
+      this.#media(S.envelope, D.outbound, job.frame, job.frame)
+      const prepared = await this.#options.carrier.codec.prepare(job.frame, context)
+      this.#assertOpen(true)
+      job.capture = { prepared, context }
+    }, job.options?.signal)
+    const available =
+      (this.#options.keepalive?.maxBytes ?? SessionText.defaultKeepaliveBytes) -
+      this.#keepaliveBytes
+    const prepared = job.capture!.prepared
+    let bytes = portableBytes(
+      (prepared.manifest ?? prepared.message) as Parameters<typeof portableBytes>[0],
+      available
+    )
+    for (const backing of prepared.sidecars) {
+      if (bytes > available) break
+      bytes += rpcPortableBackingLength(backing)
+    }
+    if (bytes > available)
+      throw createRpcError(
+        RpcCoreErrorCode.keepaliveQuotaExceeded,
+        RpcCoreErrorText.keepaliveQuotaExceeded
+      )
+    job.bytes = bytes
+    this.#keepaliveBytes += bytes
+  }
+
+  /** The original controlled write consumes the same preparation without recapturing queued data. */
+  #sendJob(job: ISessionWrite): Promise<void> {
+    return this.#controlled(async ({ signal }) => {
+      this.#assertOpen(job.continuing)
+      const transfer = job.capture ? job.options?.transfer : this.#snapshotTransfer(job.options)
+      if (!this.#view) await this.#ready.promise
+      await this.#encode(
+        job.frame,
+        {
+          signal,
+          transfer,
+          keepalive: job.keepalive,
+          sendClass: job.options?.sendClass,
+          trace: job.options?.trace,
+          onWriteStart: job.options?.onWriteStart
+        },
+        false,
+        job.continuing,
+        job.capture
+      )
+    }, job.options?.signal)
   }
 
   /** Capture the original sender's shallow immutable list without iterating or cloning its backings. */
@@ -384,39 +483,41 @@ export class Session {
     }
   }
 
-  /**
-   * A bounded health control uses utils' existing timer/abort owner, not a business timeout
-   * feature.
-   */
-  ping(options?: IRpcPingOptions): Promise<void> {
-    /** Id membership stays local to this physical carrier's control table. */
-    const id = String(++this.#controlSerial)
-    /** Caller false leaves native supervisor grace as the only deadline. */
-    const timeoutMs = options?.timeoutMs ?? this.#options.controlTimeoutMs
-    /** One cleanup path removes both timer/listeners and the control record. */
-    const signals = options?.signal
-      ? [this.#controller.signal, options.signal]
-      : [this.#controller.signal]
-    /** A lazy operation prevents physical ping after an already-aborted caller signal. */
-    const operation = ({ signal }: { signal: IAbortSignal }): Promise<void> =>
-      this.#ping(id, signal)
-    /** Both APIs use the same generic abort owner and report original late rejection values. */
-    const result =
-      timeoutMs === false
-        ? raceWithAbort(operation, { signals, report: this.#options.report })
+  /** Share native cancellation and error translation across media writes and health controls. */
+  #controlled(
+    operation: ITimeoutOperation<void>,
+    signal?: IAbortSignal,
+    timeoutMs?: number | false
+  ): Promise<void> {
+    const controls = {
+      signals: signal ? [this.#controller.signal, signal] : [this.#controller.signal],
+      report: this.#options.report
+    }
+    return (
+      timeoutMs === undefined || timeoutMs === false
+        ? raceWithAbort(operation, controls)
         : withTimeout(operation, {
+            ...controls,
             timeoutMs,
-            signals,
             scheduler: this.#options.scheduler,
-            report: this.#options.report,
             zeroTimeoutBehavior: 'start'
           })
-    return result
+    ).catch((error) => {
+      throw this.#controlError(error)
+    })
+  }
+
+  /** Health controls use the same abort/error owner plus their own bounded timer and id cleanup. */
+  ping(options?: IRpcPingOptions): Promise<void> {
+    /** Allocate correlation before reading caller options, preserving the original entry order. */
+    const id = String(++this.#controlSerial)
+    /** Timeout precedes signal getter observation even though both share the controlled owner. */
+    const timeoutMs = options?.timeoutMs ?? this.#options.controlTimeoutMs
+    return this.#controlled(({ signal }) => this.#ping(id, signal), options?.signal, timeoutMs)
       .catch((error) => {
-        /** Settle a timeout loser so no deferred/promise observer is retained after its map entry. */
         const pending = this.#controls.get(id)
         pending?.completion.reject(pending.signal.reason ?? error)
-        throw this.#controlError(error)
+        throw error
       })
       .finally(() => {
         this.#controls.delete(id)
@@ -445,12 +546,25 @@ export class Session {
   }
 
   /** Explicit lifecycle close retains its original reason and public Promise identity. */
-  readonly close = (reason?: unknown): Promise<void> => this.#close(reason)
+  readonly close = (reason?: unknown, kind?: RpcSessionRetirement): Promise<void> =>
+    this.#close(
+      kind && this.#options.carrier.mapRetirement
+        ? this.#options.carrier.mapRetirement(kind, reason)
+        : reason
+    )
 
   /** The physical ingress fact survives retirement without changing shared native error identity. */
-  #close(reason?: unknown, physicalFailure = false): Promise<void> {
+  #close(reason?: unknown, physicalFailure = false, closeFrame = false): Promise<void> {
+    if (closeFrame) {
+      this.#receivedClose = {
+        reason: reason ?? createRpcLifecycleError(RpcCoreErrorText.endpointDisposed)
+      }
+      reason = this.#receivedClose.reason
+      if (this.#closing && this.#physicalFailure) this.#reason = reason
+    }
     if (this.#closing) return this.#closed.promise
     this.#closing = true
+    this.#physicalFailure = physicalFailure
     this.#reason = reason ?? createRpcLifecycleError(RpcCoreErrorText.endpointDisposed)
     this.#lifecycle(RpcProbeLifecycle.closing, this.#reason)
     /** Timer cleanup remains secondary to an already selected abort/EOF/deadline primary. */
@@ -469,22 +583,85 @@ export class Session {
     this.#admissionDeadline = undefined
     this.#handshakeResult.authentication = undefined
     this.#credentials.value = undefined
+    void this.#finishClose(timerFailures, physicalFailure).then(
+      this.#closed.resolve,
+      this.#closed.reject
+    )
+    return this.#closed.promise
+  }
+
+  /** One budget bounds native reason selection, application hooks, FIFO writes and final close. */
+  async #finishClose(timerFailures: unknown[], physicalFailure: boolean): Promise<void> {
+    if (
+      (this.#view && this.#options.carrier.closingWrites) ||
+      (physicalFailure && this.#options.carrier.terminalReason)
+    ) {
+      try {
+        await withTimeout(
+          async ({ signal }) => {
+            if (physicalFailure) await this.#receiving
+            if (physicalFailure && !this.#receivedClose && this.#options.carrier.terminalReason) {
+              const reason = await this.#options.carrier.terminalReason()
+              if (!signal.aborted && reason !== undefined) this.#reason = reason
+            }
+            if (signal.aborted) return
+            if (this.#view && this.#options.carrier.closingWrites) {
+              try {
+                await this.#options.closing?.(this.#view, this.#reason)
+              } catch (error) {
+                this.#options.report(error)
+              }
+              await this.#writing
+              this.#ending = true
+              if (!physicalFailure && !this.#receivedClose && !signal.aborted)
+                await this.#encode(
+                  {
+                    ...this.#control(C.close, String(++this.#controlSerial)),
+                    reason: serializeRpcWireError(
+                      this.#reason,
+                      { report: this.#options.report },
+                      hostErrorWireMetadata
+                    )
+                  },
+                  { signal, keepalive: true },
+                  false,
+                  true
+                )
+            }
+          },
+          {
+            timeoutMs: this.#options.keepalive?.timeoutMs ?? SessionText.defaultKeepaliveTimeoutMs,
+            scheduler: this.#options.scheduler,
+            report: this.#options.report
+          }
+        )
+      } catch (error) {
+        this.#options.report(
+          attachSecondaryErrors(
+            createRpcLifecycleError(RpcCoreErrorText.endpointDisposed, this.#reason),
+            [error]
+          )
+        )
+      }
+    }
+    this.#ending = true
     try {
-      this.#options.retire(this.#view, this.#reason, physicalFailure)
+      this.#options.retire(
+        this.#view,
+        this.#reason,
+        physicalFailure && !this.#receivedClose,
+        this.#receivedClose || undefined
+      )
     } catch (error) {
       this.#options.report(error)
     }
     this.#controller.abort(this.#reason)
     for (const pending of this.#controls.values()) pending.completion.reject(this.#reason)
     this.#controls.clear()
-    /** Listener cleanup cannot replace the primary reason or prevent physical close. */
     const remove = this.#unsubscribe
     this.#unsubscribe = undefined
-    void this.#cleanup(remove, timerFailures, physicalFailure).then(
-      this.#closed.resolve,
-      this.#closed.reject
-    )
-    return this.#closed.promise
+    await this.#writing
+    await this.#cleanup(remove, timerFailures, physicalFailure || Boolean(this.#receivedClose))
   }
 
   /** Physical close settles queued writes before joining the reply; ingress never waits on itself. */
@@ -495,26 +672,23 @@ export class Session {
   ): Promise<void> {
     /** Keep all original cleanup values reachable if multiple native releases fail. */
     const failures: unknown[] = [...timerFailures]
-    try {
-      await remove?.()
-    } catch (error) {
-      failures.push(error)
-      this.#options.report(error)
-    }
-    try {
-      await this.#options.carrier.close(this.#reason)
-    } catch (error) {
-      failures.push(error)
-      this.#options.report(error)
-    }
-    /** Physical-close failures precede observation cleanup, preserving original failure order. */
-    const unobserve = this.#unobserve
-    this.#unobserve = undefined
-    try {
-      await unobserve?.()
-    } catch (error) {
-      failures.push(error)
-      this.#options.report(error)
+    // This fixed three-step native cleanup order is independent of growable call/frame tables.
+    for (const release of [
+      () => remove?.(),
+      () => this.#options.carrier.close(this.#reason),
+      () => {
+        // Observe late successful acquisition only when its original release step is reached.
+        const unobserve = this.#unobserve
+        this.#unobserve = undefined
+        return unobserve?.()
+      }
+    ]) {
+      try {
+        await release()
+      } catch (error) {
+        failures.push(error)
+        this.#options.report(error)
+      }
     }
     try {
       await this.#reply
@@ -570,7 +744,7 @@ export class Session {
    * slot.
    */
   readonly #onFrame = (frame: IRpcCarrierFrame): void => {
-    if (this.#closing) return
+    if (this.#controller.signal.aborted) return
     this.#media(S.frame, D.inbound, frame.data)
     this.#receiving = this.#receiving
       .then(() => this.#receiveFrame(frame))
@@ -584,7 +758,7 @@ export class Session {
 
   /** Process one admitted ingress slot through its actual accepted or bootstrap codec boundary. */
   async #receiveFrame(frame: IRpcCarrierFrame): Promise<void> {
-    this.#assertOpen()
+    this.#assertOpen(true, true)
     if (this.#view)
       await this.#options
         .pipelines()
@@ -602,22 +776,17 @@ export class Session {
     this.#media(S.encoded, D.inbound, frame.data)
     /** Four-stage media boundary leaves protected metadata visible before restoration. */
     const decoded = await this.#options.carrier.codec.decode(frame, context)
-    /** Only actual codec admission can authorize correlation after an optional hook fails. */
-    const operation = {
-      owner: this,
-      codec: context,
-      admitted: undefined as IRpcSemanticFrame | undefined
-    }
+    /** Only a restored, route-admitted frame can authorize correlated failure settlement. */
+    let admitted: IRpcSemanticFrame | undefined
     /** Auth can join native integrity before committing replay state; codec owns its one result. */
     const envelopeContext: IRpcEnvelopeContext = {
       ...this.#context('inbound'),
       restore: async (prepared) => {
-        const message = await operation.owner.#options.carrier.codec.restore(
-          prepared,
-          operation.codec
-        )
-        if (!operation.owner.#admitRoute(message)) return undefined
-        operation.admitted = message
+        const message = await this.#options.carrier.codec.restore(prepared, context)
+        if (!this.#admitRoute(message)) return undefined
+        admitted = message
+        if (this.#closing && this.#view && !isSessionReply(message))
+          throw this.#controlError(this.#reason)
         return message
       }
     }
@@ -632,7 +801,6 @@ export class Session {
           message = await payload.context.restore(payload.prepared)
         })
     } catch (error) {
-      const admitted = operation.admitted
       if (
         !admitted ||
         admitted.kind === K.handshake ||
@@ -646,7 +814,7 @@ export class Session {
       return
     }
     if (message === undefined) return
-    this.#assertOpen()
+    this.#assertOpen(true, true)
     this.#media(S.envelope, D.inbound, message, message)
     if (message.kind === K.handshake) {
       await this.#handshake(message)
@@ -730,65 +898,55 @@ export class Session {
       this.#scheduleHandshake(this.#remainingAdmission())
       return
     }
-    if (remote.step === H.hello) {
-      if (offer.peer.id < remote.peer.id) {
-        /** A later pending notice cannot bypass actual common codec/extension negotiation. */
-        acceptRpcHandshake(offer, remote, hostErrorWireMetadata)
-        return
-      }
-      /** The larger id is responder; codec preference remains the initiating offer's order. */
-      const accept = acceptRpcHandshake(remote, offer, hostErrorWireMetadata)
-      /** Name arbitration precedes any accepting wire reply or published identity. */
-      const view = await this.#options.admit(
-        remote.directory,
-        accept.codec,
-        accept.extensions,
-        this.#authentication()
+    /** Deterministic role changes confirmation, never the canonical validation or source owner. */
+    const responder = offer.peer.id > remote.peer.id
+    const accepted =
+      remote.step === H.hello
+        ? acceptRpcHandshake(
+            responder ? remote : offer,
+            responder ? offer : remote,
+            hostErrorWireMetadata
+          )
+        : completeRpcHandshake(offer, remote, hostErrorWireMetadata)
+    if (remote.step === H.hello && !responder) return
+    if (remote.step === H.accept && responder) {
+      const view = this.#candidate
+      if (
+        !view ||
+        view.codec !== accepted.codec ||
+        view.extensions.size !== accepted.extensions.length ||
+        accepted.extensions.some((extension) => !view.extensions.has(extension))
       )
-      this.#assertOpen()
-      this.#candidate = view
-      this.#reply = this.#writeHandshake(accept)
-      await this.#reply
-    } else {
-      /** Both accept directions validate against this side's actual immutable offer. */
-      const accepted = completeRpcHandshake(offer, remote, hostErrorWireMetadata)
-      if (offer.peer.id > remote.peer.id) {
-        /** The same reserved identity is published once, without repeating name arbitration. */
-        const view = this.#candidate
-        if (
-          !view ||
-          view.codec !== accepted.codec ||
-          view.extensions.size !== accepted.extensions.length ||
-          accepted.extensions.some((extension) => !view.extensions.has(extension))
-        )
-          throw createRpcProtocolError(SessionText.handshakeUnexpected)
-        this.#publish(view)
-        return
-      }
-      /** Initiator admission can still reject a live same-name peer after the first accept. */
-      const view = await this.#options.admit(
-        accepted.directory,
-        accepted.codec,
-        accepted.extensions,
-        this.#authentication()
-      )
-      this.#assertOpen()
-      /** The existing accept grammar carries this confirmation; no new frame or timer is needed. */
-      this.#reply = this.#writeHandshake({
-        profile: RpcWireProfile,
-        kind: K.handshake,
-        step: H.accept,
-        major: accepted.major,
-        minor: accepted.minor,
-        codec: accepted.codec,
-        extensions: accepted.extensions,
-        peer: offer.peer,
-        directory: offer.directory,
-        ...(offer.auth === undefined ? {} : { auth: offer.auth })
-      })
-      await this.#reply
+        throw createRpcProtocolError(SessionText.handshakeUnexpected)
       this.#publish(view)
+      return
     }
+    const view = await this.#options.admit(
+      remote.step === H.hello ? remote.directory : accepted.directory,
+      accepted.codec,
+      accepted.extensions,
+      this.#authentication()
+    )
+    this.#assertOpen()
+    if (responder) this.#candidate = view
+    this.#reply = this.#writeHandshake(
+      responder
+        ? accepted
+        : {
+            profile: RpcWireProfile,
+            kind: K.handshake,
+            step: H.accept,
+            major: accepted.major,
+            minor: accepted.minor,
+            codec: accepted.codec,
+            extensions: accepted.extensions,
+            peer: offer.peer,
+            directory: offer.directory,
+            ...(offer.auth === undefined ? {} : { auth: offer.auth })
+          }
+    )
+    await this.#reply
+    if (!responder) this.#publish(view)
   }
 
   /** Ready is fulfilled only after the table's exact reserved view has become selectable. */
@@ -818,13 +976,11 @@ export class Session {
    * identity.
    */
   async #directory(value: IRpcDirectory): Promise<void> {
-    /** Schema3 has one pure directory validator and method lookup is recompiled once per update. */
-    const directory = normalizeRpcDirectory(value, hostErrorWireMetadata)
-    if (directory.self.instanceId !== this.#view!.peerId)
+    if (value.self.instanceId !== this.#view!.peerId)
       throw createRpcProtocolError(SessionText.identityMismatch)
     /** Preserve selected codec/extensions across descriptive method or display-name updates. */
     const view = await this.#options.admit(
-      directory,
+      value,
       this.#view!.codec,
       [...this.#view!.extensions],
       this.#view!.authentication
@@ -836,16 +992,20 @@ export class Session {
   async #encode(
     message: IRpcSemanticFrame,
     options: IRpcSessionWriteOptions | undefined,
-    bootstrap: boolean
+    bootstrap: boolean,
+    continuing = false,
+    capture?: ISessionPreparation
   ): Promise<void> {
-    this.#assertOpen()
+    const final = message.kind === K.control && message.operation === C.close
+    this.#assertOpen(continuing, final)
     /** Derive header-only native admission facts before the selected codec makes frames opaque. */
     options = { ...options, ...rpcCarrierWriteFacts(message) }
     /** Bootstrap always uses common JSON and has no native transfer permission. */
-    const context = this.#codecContext(bootstrap, options)
-    this.#media(S.envelope, D.outbound, message, message)
-    /** Binary capture occurs once before outbound envelope authentication. */
-    const captured = await this.#options.carrier.codec.prepare(message, context)
+    const context = capture?.context ?? this.#codecContext(bootstrap, options)
+    if (!capture) this.#media(S.envelope, D.outbound, message, message)
+    /** Closing quota already owns this exact preparation; ordinary traffic captures here once. */
+    const captured =
+      capture?.prepared ?? (await this.#options.carrier.codec.prepare(message, context))
     /** Auth/schema plugins see prepared metadata outside physical codec execution. */
     /** Only a native terminal may publish transformed metadata to physical encoding. */
     let prepared: IRpcPreparedMessage | undefined
@@ -874,20 +1034,26 @@ export class Session {
       throw createRpcSerializationError(RpcCoreErrorText.protocolEncodeFailed, cause)
     }
     this.#media(S.encoded, D.outbound, encoded.data, message, options?.transfer)
-    this.#assertOpen()
+    this.#assertOpen(continuing, final)
     /** A single logical reservation belongs to this whole run, including all native next branches. */
     const admission = this.#options.carrier.reserveWrite?.(options)
     /** This write borrows the prepared operation's exact options, message and bootstrap boundary. */
-    const writeContext = { options: { ...options, admission }, message, bootstrap }
+    const writeContext = {
+      options: { ...options, admission, ...(options?.keepalive ? { closing: true as const } : {}) },
+      message,
+      bootstrap,
+      continuing,
+      final
+    }
     /** The continuation is the sole physical handoff point, including optional chunk/batch output. */
     const write = async (payload: IRpcFramePayload): Promise<void> => {
       /** Replacement frame payloads carry the matching physical options through every branch. */
       const { frame, write: physical = writeContext.options } = payload
-      this.#assertOpen()
+      this.#assertOpen(writeContext.continuing, writeContext.final)
       /** A batch may clear only its first logical signal, never the held Session's terminal fence. */
       const signal = physical?.signal === false ? this.#controller.signal : physical?.signal
       this.#media(S.frame, D.outbound, frame.data, writeContext.message, physical?.transfer)
-      this.#assertOpen()
+      this.#assertOpen(writeContext.continuing, writeContext.final)
       if (signal?.aborted) throw createRpcAbortError(undefined, undefined, signal.reason)
       await this.#write(
         frame,
@@ -1141,6 +1307,14 @@ export class Session {
 
   /** Ping and pong are Session controls; drain is delivered to the host work lifecycle port. */
   async #receiveControl(frame: IRpcControlFrame): Promise<void> {
+    if (frame.operation === C.close) {
+      void this.#close(
+        frame.reason && deserializeRpcWireError(frame.reason, hostErrorWireMetadata),
+        false,
+        true
+      )
+      return
+    }
     if (frame.operation === C.ping) {
       await this.send(this.#control(C.pong, frame.id))
       return
@@ -1161,7 +1335,7 @@ export class Session {
 
   /** Controls and catalog announcements share the same actual direct physical-hop route. */
   #route(): IRpcRoute {
-    this.#assertOpen()
+    this.#assertOpen(true, true)
     /** Global local self remains stable across all namespaces and native carriers. */
     const self = this.#options.self()
     return {
@@ -1175,7 +1349,10 @@ export class Session {
 
   /** Translate only utils-owned control wrappers while retaining the original reason/cause. */
   #controlError(error: unknown): unknown {
-    if (this.#closing) return this.#reason
+    if (this.#closing)
+      return this.#options.carrier.closingWrites
+        ? createRpcLifecycleError(RpcCoreErrorText.endpointDisposed, this.#reason)
+        : this.#reason
     if (error instanceof UtilsAbortError)
       return createRpcAbortError(undefined, undefined, error.cause)
     if (error instanceof UtilsTimeoutError) {
@@ -1207,15 +1384,17 @@ export class Session {
         this.#options.report(failure)
       }
     }
-    try {
-      await this.#close(error, true)
-    } catch (failure) {
-      this.#options.report(failure)
-    }
+    // Ingress never joins its own close: the same bounded close may wait for this receive tail.
+    void this.#close(error, true).catch(this.#options.report)
   }
 
   /** Every asynchronous codec/hook continuation checks this before publication or physical write. */
-  #assertOpen(): void {
-    if (this.#closing) throw this.#reason
+  #assertOpen(continuing = false, final = false): void {
+    if (
+      this.#controller.signal.aborted ||
+      (this.#closing && !continuing) ||
+      (this.#ending && !final)
+    )
+      throw this.#controlError(this.#reason)
   }
 }

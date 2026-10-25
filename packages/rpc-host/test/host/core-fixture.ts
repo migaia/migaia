@@ -18,7 +18,11 @@ type ICoreConnectionOptions = Omit<IRpcHostOptions, 'self' | 'plugins'> &
   Partial<Pick<IRpcHostOptions, 'plugins'>>
 
 /** Cold physical storage facts select the real codec's original inline or native capture policy. */
-type ICoreCodec = Readonly<{ create(): IRpcCarrierCodec; nativeBinary: boolean }>
+type ICoreCodec = Readonly<{
+  create(): IRpcCarrierCodec
+  nativeBinary: boolean
+  closingWrites?: true
+}>
 
 /** Each genuine connecting native source owns exactly its original two physical endpoints. */
 class CoreMemoryConnection {
@@ -34,13 +38,20 @@ class CoreMemoryConnection {
     this.#server = server
     this.#name = name
     /** Two simultaneous subscriptions occur before either asynchronous hello can write. */
-    const left = new MemoryCarrier(`${key}-server`, undefined, codec?.create(), codec?.nativeBinary)
+    const left = new MemoryCarrier(
+      `${key}-server`,
+      undefined,
+      codec?.create(),
+      codec?.nativeBinary,
+      codec?.closingWrites
+    )
     /** The opposite original endpoint is owned by the client's native installation. */
     const right = new MemoryCarrier(
       `${key}-client`,
       undefined,
       codec?.create(),
-      codec?.nativeBinary
+      codec?.nativeBinary,
+      codec?.closingWrites
     )
     left.link(right)
     right.link(left)
@@ -53,6 +64,7 @@ class CoreMemoryConnection {
     const plugin = defineTransportPlugin({
       name: 'core-memory-client-transport',
       namespace: this.#server.namespace,
+      closingWrites: this.pair[0].closingWrites,
       open: this.#open
     })
     /** The real transport hook joins both original handshake completions before publishing client. */
@@ -107,6 +119,7 @@ class CoreMemoryServer {
     this.transport = defineTransportPlugin({
       name: `${namespace}-${name}-transport`,
       namespace,
+      closingWrites: codec?.closingWrites,
       features,
       expose,
       open: this.#open

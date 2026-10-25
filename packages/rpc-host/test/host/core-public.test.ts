@@ -20,6 +20,30 @@ class CountedTimeout implements IRpcTimeoutFeature {
   }
 }
 
+it('omits closing APIs and rejects keepalive on a generic unsupported transport', async () => {
+  /** No physical source is needed to prove cold namespace capability publication and admission. */
+  const transport = defineTransportPlugin({
+    name: 'ordinary',
+    namespace: 'ordinary',
+    open: () => ({ dispose: () => undefined })
+  })
+  /** The genuine public Host receives no synthetic Session or native capability declaration. */
+  const host = await createRpcHost({ plugins: [transport], report: () => undefined })
+  try {
+    expect('onClosing' in host.ordinary).toBe(false)
+    expect('onPeerClosed' in host.ordinary).toBe(false)
+    /** A plain-JS caller cannot enable the missing capability by bypassing static option types. */
+    await expect(
+      Reflect.apply(host.ordinary.request, undefined, ['echo', undefined, { keepalive: true }])
+    ).rejects.toMatchObject({
+      source: 'rpc.endpoint',
+      code: RpcCoreErrorCode.invalidConfig
+    })
+  } finally {
+    await host.close()
+  }
+})
+
 it('context dispatchTo keeps explicit targeting and excludes its original sender from default peers', async () => {
   /** One real namespace fixes peer registration order before the provider originates notifications. */
   const server = coreMemoryServer('gateway')

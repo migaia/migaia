@@ -11,11 +11,7 @@ import {
 } from '@migaia/lifecycle'
 import type {
   IRpcAttemptFacts,
-  IRpcCarrier,
   IRpcFlowContext,
-  IRpcLocalSourceFacts,
-  IRpcConnectionContext,
-  IRpcSessionHandle,
   IRpcSessionView,
   IRpcTransportDefinition,
   IRpcTargetSource
@@ -77,6 +73,8 @@ const reservedMethods = new Set<PropertyKey>([
   'group',
   'stream',
   'close',
+  'onClosing',
+  'onPeerClosed',
   Symbol.asyncDispose
 ])
 
@@ -173,11 +171,14 @@ export class RpcHost {
       updated: this.#updated,
       hidden: (carrierId) => this.#forwarder.retired(carrierId),
       retired: this.#retired,
+      keepalive: options.keepalive,
       report: this.#report
     })
     /** Every business owner borrows the same real IO, identity, drain and readonly diagnostic ports. */
     const work = {
       features: this.#features,
+      canKeepalive: (id: string, source?: IRpcTargetSource) =>
+        source ? source.canKeepalive?.(id) === true : this.#sessions.canKeepalive(id),
       assertTransfer: (id: string, options?: object) => this.#sessions.assertTransfer(id, options),
       self: this.#callSelf,
       observe: this.#flow.observe,
@@ -305,7 +306,7 @@ export class RpcHost {
       self: () => this.#identity.directorySelf,
       call: (namespace, command, local) => this.#namespace(namespace).invoke(command, local),
       observe: this.#flow.observe,
-      retire: (carrierId, reason) => this.#sessions.detach(carrierId, reason)
+      retire: (carrierId, reason, kind) => this.#sessions.detach(carrierId, reason, kind)
     })
     this.#flow.register(core, metadata.definition, installed)
   }
@@ -575,6 +576,8 @@ export class RpcHost {
      */
     const namespace = new Namespace({
       name: definition.namespace,
+      closingWrites: definition.closingWrites === true,
+      sessionScope,
       assertOpen: () => this.#assertOpen(),
       sessions: this.#sessions,
       calls: this.#calls,
@@ -609,28 +612,7 @@ export class RpcHost {
     const transport: IRpcTransportSetupContext = {
       owner: core,
       configuredReport: this.#configuredReport,
-      namespace: definition.namespace,
-      signal: controller.signal,
-      self: () => this.#identity.directorySelf,
-      lookup: (address) => this.#sessions.lookup(definition.namespace, address),
-      attach: (carrier, facts, connection) =>
-        this.#attach(registration, carrier, facts, connection),
-      openPrivateSession: (carrier, facts, source, changed, connection) =>
-        this.#sessions.openPrivateSession(
-          definition.namespace,
-          carrier,
-          facts,
-          source,
-          changed,
-          sessionScope,
-          connection
-        ),
-      attachOrigin: (binding) =>
-        this.#sessions.attachOrigin(definition.namespace, binding, sessionScope),
-      detach: (handle, reason) => this.#sessions.detach(handle, reason),
-      ping: (handle, options) => this.#sessions.ping(handle, options),
-      drain: (handle, reason) => this.#sessions.drain(handle, reason),
-      report: this.#report
+      ...this.#sessions.context(sessionScope, resources, () => this.#reason)
     }
     /**
      * Pending native disposal closes real sessions before joining the installation it cancels.
@@ -669,37 +651,6 @@ export class RpcHost {
     })
   }
 
-  /** Every physical attachment joins the original native installation's existing lifecycle scope. */
-  #attach(
-    context: ITransportRegistration,
-    carrier: IRpcCarrier,
-    facts?: IRpcLocalSourceFacts,
-    connection?: IRpcConnectionContext
-  ): IRpcSessionHandle {
-    if (context.controller.signal.aborted) throw context.controller.signal.reason
-    if (facts === undefined) this.#identity.admit({})
-    /**
-     * SessionTable creates and owns the one physical Session; the scope borrows only its cleanup
-     * handle.
-     */
-    const handle = this.#sessions.attach(
-      context.name,
-      carrier,
-      facts,
-      context.sessionScope,
-      connection
-    )
-    context.resources.own(handle, { force: () => handle.close(this.#reason) })
-    void handle.closed.then(
-      () => context.resources.release(handle),
-      (error) => {
-        context.resources.release(handle)
-        this.#report(error)
-      }
-    )
-    return handle
-  }
-
   /**
    * Native namespace publication contains only approved public calls and installed extension
    * methods.
@@ -711,8 +662,10 @@ export class RpcHost {
   ): Record<PropertyKey, unknown> {
     /** This namespace object enforces the public boundary; it is never a per-session peer facade. */
     const surface: Record<PropertyKey, unknown> = {}
-    for (const key of reservedMethods)
+    for (const key of reservedMethods) {
+      if ((key === 'onClosing' || key === 'onPeerClosed') && !namespace.closingWrites) continue
       surface[key] = key === Symbol.asyncDispose ? namespace.close : Reflect.get(namespace, key)
+    }
     for (const extension of this.#flow.namespaceExtensions(name)) this.#extend(surface, extension)
     if (transportExtensions)
       this.#extend(surface, transportExtensions as Readonly<Record<string, unknown>>)
@@ -763,6 +716,13 @@ export class RpcHost {
    * reverse.
    */
   async #releaseNamespace(registration: ITransportRegistration, reason: unknown): Promise<void> {
+    /** Public Sessions finish their own grace while the transport and its native hooks remain live. */
+    const sessionFailures: unknown[] = []
+    try {
+      await this.#sessions.closeScope(registration.sessionScope, reason)
+    } catch (error) {
+      sessionFailures.push(error)
+    }
     registration.controller.abort(reason)
     if (this.#namespaces.get(registration.name) === registration) {
       this.#features.unregister(registration.name)
@@ -772,17 +732,17 @@ export class RpcHost {
       this.#pendingNamespaces.delete(registration.name)
     /** Scope disposal preserves exact resource errors and attempts all original reverse releases. */
     const errors = await registration.resources.dispose()
+    this.#sessions.releaseScope(registration.sessionScope)
     if (this.#namespaces.size === 0 && !this.#everCommittedTransport)
       this.#flow.reopenBeforeStartup()
-    if (errors.length) {
+    if (errors.length || sessionFailures.length) {
+      /** Every original close or scope failure remains reachable in its observed order. */
+      const failures = [...sessionFailures, ...errors.map((entry) => entry.error)]
       /** The original cleanup aggregate stays observable separately from construction's primary. */
-      const cleanup = new AggregateError(
-        errors.map((entry) => entry.error),
-        HostErrorText.cleanupFailed
-      )
+      const cleanup = new AggregateError(failures, HostErrorText.cleanupFailed)
       this.#report(cleanup)
-      throw errors.length === 1
-        ? errors[0]!.error
+      throw failures.length === 1
+        ? failures[0]
         : createRpcLifecycleError(RpcCoreErrorText.endpointDisposed, cleanup)
     }
   }
@@ -793,22 +753,21 @@ export class RpcHost {
    */
   async #release(): Promise<void> {
     await this.#sessions.quiesce(this.#reason)
-    this.#controller.abort(this.#reason)
-    this.#calls.close(this.#reason)
-    this.#providers.close(this.#reason)
     /** Collection is bounded by actual owners, never an invented global rollback transaction. */
     const failures: unknown[] = []
-    /** Start stream retirement before IO closes, then join it after queued physical writes settle. */
-    const streamClosing = this.#streams.close(this.#reason)
-    /** Observe immediately while native release settles any writes that stream cleanup is awaiting. */
-    const streamResult = streamClosing.catch((error: unknown) => {
-      failures.push(error)
-    })
     try {
       await this.#sessions.close(this.#reason)
     } catch (error) {
       failures.push(error)
     }
+    /** Session grace is complete; pending replies can no longer arrive on the retired carriers. */
+    this.#controller.abort(this.#reason)
+    this.#calls.close(this.#reason)
+    this.#providers.close(this.#reason)
+    /** Stream retirement joins its original pending owners after Session has settled physical IO. */
+    const streamResult = this.#streams.close(this.#reason).catch((error: unknown) => {
+      failures.push(error)
+    })
     if (this.#native) {
       try {
         failures.push(...(await this.#native.dispose()).cleanupErrors)

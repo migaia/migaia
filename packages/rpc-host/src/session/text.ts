@@ -1,5 +1,9 @@
 /** Stable protocol coordination diagnostics for the actual session owner. */
 export const SessionText = {
+  /** Closing keepalive semantic bytes are bounded independently for each physical connection. */
+  defaultKeepaliveBytes: 65_536,
+  /** One shared close budget covers handlers, native reason and all final physical writes. */
+  defaultKeepaliveTimeoutMs: 1000,
   /** Business frames cannot execute before the host accepts both identity and directory. */
   handshakeRequired: 'RPC session handshake is not complete',
   /** A physical source cannot replace its accepted direct peer identity in a later frame. */

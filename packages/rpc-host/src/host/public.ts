@@ -17,6 +17,8 @@ export type IRpcHostOptions<
   self?: IRpcSelf
   /** Each forwarding host bounds its own absolute forwarding ordinal before downstream handoff. */
   forward?: Readonly<{ maxHops?: number }>
+  /** Every supported physical Session owns its closing byte quota and complete grace deadline. */
+  keepalive?: Readonly<{ maxBytes?: number; timeoutMs?: number }>
   report?(error: unknown): void
   signal?: IAbortSignal
 }>
@@ -28,7 +30,7 @@ export type IRpcRuntimeOptions = Omit<IRpcHostOptions, 'plugins'>
 type IRpcHostRoot = Readonly<{
   self: IRpcSelf
   provide(input: IRpcProvide, options?: IRpcProvideOptions): void
-  close(): Promise<void>
+  close(reason?: unknown): Promise<void>
   [Symbol.asyncDispose](): Promise<void>
 }>
 
@@ -37,6 +39,13 @@ type IRpcNamespaceNames<TPlugin> = TPlugin extends IRpcTransportPlugin<infer N, 
 /** Shared erased metadata correlates complete flow/transport extensions with the selected namespace. */
 type IRpcNamespaceExtensions<TPlugin, N extends string> =
   TPlugin extends IRpcNamespacePlugin<infer Scope, infer E> ? (N extends Scope ? E : never) : never
+/** Closing calls exist only when the installed transport explicitly declares native write support. */
+type IRpcNamespaceClosing<TPlugin, N extends string> =
+  TPlugin extends IRpcTransportPlugin<infer Scope, object, infer A>
+    ? N extends Scope
+      ? A
+      : never
+    : never
 
 /** Correlate remote call types and genuine plugin extension types inside each installed namespace. */
 export type IRpcHost<
@@ -44,6 +53,9 @@ export type IRpcHost<
   TPlugins extends readonly IRpcHostPlugin[] = readonly IRpcHostPlugin[]
 > = IRpcHostRoot &
   Readonly<{
-    [N in IRpcNamespaceNames<TPlugins[number]>]: IRpcNamespace<TRemote> &
+    [N in IRpcNamespaceNames<TPlugins[number]>]: IRpcNamespace<
+      TRemote,
+      IRpcNamespaceClosing<TPlugins[number], N>
+    > &
       IRpcIntersection<IRpcNamespaceExtensions<TPlugins[number], N>>
   }>
