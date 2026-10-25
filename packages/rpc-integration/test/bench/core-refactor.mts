@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { performance } from 'node:perf_hooks'
+import { Session } from 'node:inspector/promises'
 
 /** Only the public operations exercised by this fixed measurement are needed by the fixture. */
 type IEndpoint = {
@@ -333,12 +334,20 @@ class CorePerformanceCell {
 async function measure(scenario: IScenario, enhanced: boolean): Promise<unknown> {
   /** One cell owns every resource acquired for this exact scenario and feature arm. */
   const cell = new CorePerformanceCell(scenario)
+  /** Optional native CPU diagnostics record exchanges alone, with no timing credit for profiles. */
+  const profiler = process.env.CORE_PERF_CPU_DIR ? new Session() : undefined
   try {
     await cell.open(enhanced)
     for (let index = 0; index < warmup; index++) await cell.exchange()
     cell.reset()
     /** Every operation has its own duration; sorting happens only after the measurement ends. */
     const durations: number[] = []
+    if (profiler) {
+      profiler.connect()
+      await profiler.post('Profiler.enable')
+      await profiler.post('Profiler.setSamplingInterval', { interval: 100 })
+      await profiler.post('Profiler.start')
+    }
     /** Wall time measures the complete sequential workload, including genuine async scheduling. */
     const beginning = performance.now()
     for (let index = 0; index < samples; index++) {
@@ -349,6 +358,14 @@ async function measure(scenario: IScenario, enhanced: boolean): Promise<unknown>
     }
     /** Capture timing before any sorting, JSON reporting or provenance work. */
     const elapsedMs = performance.now() - beginning
+    if (profiler) {
+      /** Stop after capturing elapsed time; file output stays outside the measured workload. */
+      const { profile } = await profiler.post('Profiler.stop')
+      writeFileSync(
+        join(process.env.CORE_PERF_CPU_DIR!, `phase7-${scenario.name}-${enhanced}.cpuprofile`),
+        JSON.stringify(profile)
+      )
+    }
     durations.sort((left, right) => left - right)
     if (
       cell.counters.settled !== samples ||
@@ -371,6 +388,7 @@ async function measure(scenario: IScenario, enhanced: boolean): Promise<unknown>
       durationsMs: durations
     }
   } finally {
+    profiler?.disconnect()
     await cell.close()
   }
 }
@@ -381,6 +399,9 @@ async function main(): Promise<void> {
   const results: unknown[] = []
   matrix: for (const enhanced of [false, true])
     for (const scenario of scenarios) {
+      /** A diagnostic profile can isolate one existing cell without changing its timed workload. */
+      if (process.env.CORE_PERF_SCENARIO && scenario.name !== process.env.CORE_PERF_SCENARIO)
+        continue
       try {
         results.push(await measure(scenario, enhanced))
       } catch (error) {
