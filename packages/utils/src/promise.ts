@@ -638,12 +638,7 @@ class TimeoutOperation<T> {
       const error = new UtilsTimeoutError(this.#timeoutScope, 0)
       return this.#finish(() => this.#reject(error), error)
     }
-    this.#timer = this.#scheduler.schedule(() => {
-      this.#timedOut = true
-      const timeoutError = new UtilsTimeoutError(this.#timeoutScope, this.#timeoutMs)
-      this.#controller?.abort(timeoutError)
-      this.#finish(() => this.#reject(timeoutError), timeoutError)
-    }, this.#timeoutMs)
+    this.#timer = this.#scheduler.schedule(this.#onTimeout, this.#timeoutMs)
     if (this.#settled) this.#timer.cancel()
     try {
       if (this.#unref) this.#timer.unref?.()
@@ -674,26 +669,35 @@ class TimeoutOperation<T> {
             signal: (this.#operationSignal ?? inertTimeoutSignal) as INativeAbortSignal
           }
         ])
-      ).then(
-        (value) => {
-          if (this.#settled) return
-          this.#finish(() => this.#resolve(value))
-        },
-        (error) => {
-          if (this.#settled) {
-            if (!acknowledgesCancellation(error, this.#controller?.signal))
-              reportDiagnostic(this.#report, error, {
-                operation: 'withTimeout',
-                phase: 'late-rejection'
-              })
-            return
-          }
-          this.#finish(() => this.#reject(error), error)
-        }
-      )
+      ).then(this.#onFulfilled, this.#onRejected)
     } catch (error) {
       this.#finish(() => this.#reject(error), error)
     }
+  }
+  /** Abort cooperative work with the deadline error before releasing resources and rejecting. */
+  #onTimeout = (): void => {
+    this.#timedOut = true
+    /** The same deadline error first cancels cooperative work and then becomes the rejection. */
+    const timeoutError = new UtilsTimeoutError(this.#timeoutScope, this.#timeoutMs)
+    this.#controller?.abort(timeoutError)
+    this.#finish(() => this.#reject(timeoutError), timeoutError)
+  }
+  /** Publish the original value only after the admitted timer and listeners have been released. */
+  #onFulfilled = (value: T): void => {
+    if (this.#settled) return
+    this.#finish(() => this.#resolve(value))
+  }
+  /** Keep late failure reporting separate from the original cleanup-before-rejection transaction. */
+  #onRejected = (error: unknown): void => {
+    if (this.#settled) {
+      if (!acknowledgesCancellation(error, this.#controller?.signal))
+        reportDiagnostic(this.#report, error, {
+          operation: 'withTimeout',
+          phase: 'late-rejection'
+        })
+      return
+    }
+    this.#finish(() => this.#reject(error), error)
   }
   /** Release the originally admitted resources before publishing settlement. */
   #finish = (callback: () => void, primaryError?: unknown): void => {
@@ -881,25 +885,26 @@ class AbortRaceOperation<T> {
     try {
       Promise.resolve(
         Reflect.apply(this.#operation, undefined, [{ signal: this.#operationSignal }])
-      ).then(
-        (value) => {
-          if (!this.#settled) this.#finish(() => this.#resolve(value))
-        },
-        (error) => {
-          if (this.#settled) {
-            if (!acknowledgesCancellation(error, this.#controller.signal))
-              reportDiagnostic(this.#report, error, {
-                operation: 'raceWithAbort',
-                phase: 'late-rejection'
-              })
-            return
-          }
-          this.#finish(() => this.#reject(error), error)
-        }
-      )
+      ).then(this.#onFulfilled, this.#onRejected)
     } catch (error) {
       this.#finish(() => this.#reject(error), error)
     }
+  }
+  /** Publish the original value after listener cleanup, retaining the configured cleanup policy. */
+  #onFulfilled = (value: T): void => {
+    if (!this.#settled) this.#finish(() => this.#resolve(value))
+  }
+  /** Report late failures once without replacing the first rejection or its original cause. */
+  #onRejected = (error: unknown): void => {
+    if (this.#settled) {
+      if (!acknowledgesCancellation(error, this.#controller.signal))
+        reportDiagnostic(this.#report, error, {
+          operation: 'raceWithAbort',
+          phase: 'late-rejection'
+        })
+      return
+    }
+    this.#finish(() => this.#reject(error), error)
   }
   /** Release the originally admitted resources before publishing settlement. */
   #finish = (callback: () => void, primaryError?: unknown): void => {
