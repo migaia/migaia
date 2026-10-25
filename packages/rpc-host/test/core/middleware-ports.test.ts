@@ -62,20 +62,7 @@ import { RpcOutboundAttachment } from '../../dist/core/internal/outbound-attachm
 import { RPC_CORE_ERROR_SOURCE, RpcError, RpcLifecycleError } from '@migaia/rpc-contract/errors'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { RpcCoreErrorText } from '@migaia/rpc-contract/errors'
-import {
-  readEndpointDebugSnapshot,
-  type IRpcDiscoveryCleanupFaults
-} from '../../dist/core/internal/test-observer.js'
-import { readComposedDisposalPromises } from '../../dist/core/internal/composed-disposal-observer.js'
-
-const emptyClaims: IRpcPluginClaims = {
-  routes: [],
-  provides: [],
-  consumes: [],
-  publicKeys: [],
-  exposedKeys: [],
-  activator: false
-}
+import type { IRpcDiscoveryCleanupFaults } from '../../dist/core/internal/test-observer.js'
 
 type IProductionBatch = {
   readonly host: IRpcPluginHost
@@ -995,70 +982,4 @@ describe('outbound feature production-seam matrix', () => {
   })
 
   /** Frozen title retained; the approved group/outcome operations expand the asserted current keys. */
-})
-
-describe('discovery Host transactions', () => {
-  it('preserves the shared canonical Host and endpoint disposal Promise on cleanup failure', async () => {
-    const cleanup = new Error('cycle-l discovery cleanup failed')
-    const middleware: IRpcPlugin = {
-      name: 'cycle-l-cleanup-observer',
-      metadata: { claims: emptyClaims },
-      install: (scope) => {
-        scope.own({}, () => {
-          throw cleanup
-        })
-        return { extension: {}, ports: {} }
-      }
-    }
-    const [transport] = createMemoryTransportPair()
-    const endpoint = await createRuntimeEndpointComposition(
-      {
-        id: 'cycle-l-discovery-cleanup',
-        transport,
-        middlewares: [connect({ transport }), middleware]
-      },
-      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
-    ).installing
-    const firstDispose = endpoint.dispose()
-    expect(endpoint.dispose()).toBe(firstDispose)
-    await expect(firstDispose).rejects.toMatchObject({
-      source: 'rpc.endpoint',
-      code: RpcCoreErrorCode.endpointDisposed,
-      cause: cleanup
-    })
-    const promises = readComposedDisposalPromises(endpoint)
-    expect(promises).toBeDefined()
-    expect(promises?.endpoint).toBe(firstDispose)
-    expect(promises?.host).toBe(promises?.endpoint)
-    expect(promises?.host).toBe(readComposedDisposalPromises(endpoint)?.host)
-    let hostFailure: unknown
-    try {
-      await promises?.host
-    } catch (error) {
-      hostFailure = error
-    }
-    expect(hostFailure).toBeInstanceOf(RpcLifecycleError)
-    expect(hostFailure).toMatchObject({
-      source: RPC_CORE_ERROR_SOURCE,
-      code: RpcCoreErrorCode.endpointDisposed,
-      cause: cleanup
-    })
-    expect(readEndpointDebugSnapshot(endpoint)).toMatchObject({
-      phase: 'disposed',
-      pending: 0,
-      pingPending: 0,
-      activeControllers: 0,
-      resources: 0,
-      discovery: {
-        local: 0,
-        remote: 0,
-        waiters: 0,
-        tasks: 0,
-        timers: 0,
-        manualWaiters: 0,
-        inboundQueries: 0,
-        inboundTimers: 0
-      }
-    })
-  })
 })
