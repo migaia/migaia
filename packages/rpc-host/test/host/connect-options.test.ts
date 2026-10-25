@@ -23,14 +23,12 @@ import { SilentManagedMessageIO } from './managed-memory-fixture.js'
 function releaseSilentSource(): void {}
 
 /** Record only actual provider admission through its genuine fixed flow hook. */
-function receivedCallHooks(received: IRpcEnvelope[]): IRpcFlowInstallation {
+function receivedCallStages(received: IRpcEnvelope[]): IRpcFlowInstallation {
   return {
-    hooks: {
-      dispatch: {
-        inbound(context, next) {
-          received.push(context.envelope)
-          return next()
-        }
+    stages: {
+      dispatchInbound(payload, next) {
+        received.push(payload.context.envelope)
+        return next(payload)
       }
     }
   }
@@ -91,7 +89,7 @@ it.each(['deployment', 'managed'] as const)(
     /** Only the real fixed dispatch hook records actual business admission. */
     const observer = defineFlowPlugin({
       name: 'received-call-policy',
-      setup: () => receivedCallHooks(received)
+      setup: () => receivedCallStages(received)
     })
     /** A real accepted declaration is the only authority for retry idempotency. */
     const client = await server.connect('remote', {
@@ -127,7 +125,7 @@ it.each(['deployment', 'managed'] as const)(
   }
 )
 
-// RPC-TEST-FD465BC50212-C002: preserve original deadline/code/remover business for both native facts.
+// RPC-TEST-FD465BC50212-C002: BC2/BC3 retire initial/ACK diagnostics; Session keeps the 50 ms/remover effects.
 it.each([undefined, 'silent-peer'])(
   'applies the SDK budget to a real message source with peerId %s',
   async (peerId) => {
@@ -155,8 +153,8 @@ it.each([undefined, 'silent-peer'])(
         plugins: [silentCarrierTransport(carrier, peerId)],
         report: () => undefined
       }).catch(observeConnectionFailure)
-      /** Preserve the original public message-source error code even when implementation is RED. */
-      const failed = expect(opening).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
+      /** This is the current Session deadline, independent from the retired initial/ACK diagnostic. */
+      const failed = expect(opening).rejects.toMatchObject({ code: 'DEADLINE_EXCEEDED' })
       await written.promise
       await Promise.resolve()
       expect(scheduler.pendingCount).toBe(1)
@@ -164,6 +162,7 @@ it.each([undefined, 'silent-peer'])(
       expect(events.listenerCount('message')).toBe(1)
       scheduler.advance(1)
       await failed
+      expect(scheduler.now()).toBe(50)
       expect(events.listenerCount('message')).toBe(0)
       expect(scheduler.pendingCount).toBe(0)
     } finally {

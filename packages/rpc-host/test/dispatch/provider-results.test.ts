@@ -1,8 +1,7 @@
 /** Original provider failure cleanup is observed through actual public hosts and native flows. */
 import { createRpcHost } from '@migaia/rpc-host'
-import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
+import { defineFlowPlugin, type IRpcFlowStages } from '@migaia/rpc-host/sdk'
 import { limits } from '@migaia/rpc-host/plugins/limits'
-import type { IRpcFlowHooks } from '@migaia/rpc-contract/interfaces'
 import type { IRpcSemanticFrame } from '@migaia/rpc-contract/protocol'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { walkErrorCauses } from '@migaia/utils/error'
@@ -18,13 +17,12 @@ it('releases admission and the original request identity when params validation 
   const validator = defineFlowPlugin({
     name: 'provider-result-validation',
     setup: () => ({
-      hooks: {
-        dispatch: {
-          inbound: (context, next) => {
-            if (context.envelope.kind === 'call' && context.envelope.payload === 'invalid')
-              throw validation
-            return next()
-          }
+      stages: {
+        dispatchInbound: (payload, next) => {
+          const { context } = payload
+          if (context.envelope.kind === 'call' && context.envelope.payload === 'invalid')
+            throw validation
+          return next(payload)
         }
       }
     })
@@ -67,19 +65,18 @@ it('releases same-session capacity when the validation error reply write fails',
   /** This original validation failure occurs after the actual capacity-one admission. */
   const validation = createRpcSchemaValidationError('invalid params', { field: 'data' })
   /** Sibling callbacks keep the real dispatch hook within its native setup owner. */
-  const hooks: IRpcFlowHooks = {
-    dispatch: {
-      inbound: (context, next) => {
-        if (context.envelope.kind === 'call' && context.envelope.payload === 'invalid')
-          throw validation
-        return next()
-      }
+  const stages: IRpcFlowStages = {
+    dispatchInbound: (payload, next) => {
+      const { context } = payload
+      if (context.envelope.kind === 'call' && context.envelope.payload === 'invalid')
+        throw validation
+      return next(payload)
     }
   }
   /** The complete native definition adds validation without another provider or lease. */
   const validator = defineFlowPlugin({
     name: 'provider-result-write-failure-validation',
-    setup: () => ({ hooks })
+    setup: () => ({ stages })
   })
   /** The exact native physical failure must remain reachable through the public reporter. */
   const feedback = { failure: new Error('transport failed'), reported: deferred<unknown>() }

@@ -18,11 +18,9 @@ it('advertises current namespace schemas and idempotency only at a fresh accepte
     const feature = defineFlowPlugin({
       name: `${name}-directory`,
       setup: () => ({
-        hooks: {
-          observe(event) {
-            if (event.kind === HostObservationKind.peerReady)
-              descriptions.push(event.data as IRpcSessionView)
-          }
+        observe(event) {
+          if (event.kind === HostObservationKind.peerReady)
+            descriptions.push(event.data as IRpcSessionView)
         }
       })
     })

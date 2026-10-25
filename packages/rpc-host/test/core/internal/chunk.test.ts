@@ -1,17 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import { createStringFramer } from '@migaia/rpc-contract/framing'
+import { createStringChunkAssembler } from '../../../dist/plugins/chunk/assembly.js'
 
 /** Retains WebRPC coverage at the physical framing boundary. */
 describe('canonical physical framing', () => {
   it('roundtrips ordered fragments', () => {
-    const f = createStringFramer({ chunkBytes: 1, maxMessageBytes: 8 })
+    const f = createStringChunkAssembler({ chunkBytes: 1, maxMessageBytes: 8 })
     const c = { source: 'a', messageId: 'm' }
     const x = f.frame('ab', c)
     expect(f.accept(x[0], c)).toEqual({ status: 'pending' })
     expect(f.accept(x[1], c)).toEqual({ status: 'complete', value: 'ab' })
   })
   it('isolates opaque sources', () => {
-    const f = createStringFramer({ chunkBytes: 1, maxMessageBytes: 8 })
+    const f = createStringChunkAssembler({ chunkBytes: 1, maxMessageBytes: 8 })
     const a = { source: 'a', messageId: 'm' },
       b = { source: 'b', messageId: 'm' }
     const x = f.frame('ab', a),
@@ -24,7 +24,7 @@ describe('canonical physical framing', () => {
   it('rejects malformed metadata before allocation', () => {
     /** Counts timer allocation so malformed input cannot retain canonical state. */
     let schedules = 0
-    const f = createStringFramer({
+    const f = createStringChunkAssembler({
       chunkBytes: 1,
       maxMessageBytes: 8,
       schedule: () => {
@@ -38,7 +38,7 @@ describe('canonical physical framing', () => {
     expect(schedules).toBe(0)
   })
   it('rejects duplicate and out-of-order fragments', () => {
-    const f = createStringFramer({ chunkBytes: 1, maxMessageBytes: 8 })
+    const f = createStringChunkAssembler({ chunkBytes: 1, maxMessageBytes: 8 })
     const c = { source: 'a', messageId: 'm' }
     const x = f.frame('ab', c)
     expect(f.accept(x[1], c).status).toBe('rejected')
@@ -47,7 +47,7 @@ describe('canonical physical framing', () => {
   })
   it('rejects bounded capacity before scheduling', () => {
     let schedules = 0
-    const f = createStringFramer({
+    const f = createStringChunkAssembler({
       chunkBytes: 1,
       maxMessageBytes: 8,
       maxConcurrentMessages: 1,
@@ -64,11 +64,11 @@ describe('canonical physical framing', () => {
     expect(f.accept(f.frame('ab', a)[1], a)).toEqual({ status: 'complete', value: 'ab' })
   })
   it('rejects byte and message limits', () => {
-    const f = createStringFramer({ chunkBytes: 1, maxMessageBytes: 2, maxChunks: 2 })
+    const f = createStringChunkAssembler({ chunkBytes: 1, maxMessageBytes: 2, maxChunks: 2 })
     expect(() => f.frame('abc', { source: 'a', messageId: 'm' })).toThrow()
   })
   it('rejects hostile accepted-frame count, chunk, length, and buffered-byte limits', () => {
-    const f = createStringFramer({
+    const f = createStringChunkAssembler({
       chunkBytes: 2,
       maxMessageBytes: 4,
       maxChunks: 2,
@@ -88,7 +88,7 @@ describe('canonical physical framing', () => {
   })
   it('cancels partial assembly on close', () => {
     let cancelled = 0
-    const f = createStringFramer({
+    const f = createStringChunkAssembler({
       chunkBytes: 1,
       maxMessageBytes: 8,
       schedule: () => ({}),
@@ -102,7 +102,7 @@ describe('canonical physical framing', () => {
     expect(cancelled).toBe(1)
   })
   it('rejects frames after close', () => {
-    const f = createStringFramer({ chunkBytes: 1, maxMessageBytes: 8 })
+    const f = createStringChunkAssembler({ chunkBytes: 1, maxMessageBytes: 8 })
     const c = { source: 'a', messageId: 'm' }
     f.close()
     expect(f.accept(f.frame('a', c)[0], c).status).toBe('rejected')

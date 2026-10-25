@@ -84,7 +84,7 @@ it('disposes the original late fulfilled setup once after caller cancellation is
   const disposal = { calls: 0 }
   /** The original setup output owns its exact cleanup callback and receiver. */
   const installation: IRpcFlowInstallation = {
-    hooks: {},
+    stages: {},
     dispose() {
       disposal.calls += 1
     }

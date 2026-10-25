@@ -115,7 +115,7 @@ it('BC1 rejects absent or duplicate transport namespaces before any native open'
   /** Plugin identity differs, so namespace uniqueness itself owns this rejection. */
   const second = defineTransportPlugin({ name: 'second', namespace: 'same', open })
   /** A genuine flow alone cannot provide a native source, just as the retired feature could not. */
-  const flow = defineFlowPlugin({ name: 'flow-only', setup: () => ({ hooks: {} }) })
+  const flow = defineFlowPlugin({ name: 'flow-only', setup: () => ({ stages: {} }) })
   expect(() => createRpcHost({ plugins: [] })).toThrow(
     expect.objectContaining({
       name: 'TypeError',
