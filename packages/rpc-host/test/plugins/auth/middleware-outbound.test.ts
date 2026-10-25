@@ -243,6 +243,8 @@ it('preserves the original inbound decrypt failure through the public authentica
       const failure = await observed.promise
       expect(failure).toMatchObject({ code: 'AUTHENTICATION_FAILED', cause: hostile })
       expect(walkErrorCauses(failure).includes(hostile)).toBe(true)
+      /** A dropped unauthenticated input has no reply; join its caller only after real cleanup. */
+      await client.host.close()
       await pending
     } finally {
       state.armed = false
