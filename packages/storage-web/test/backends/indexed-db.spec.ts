@@ -412,6 +412,310 @@ describe('indexedDbHost backend', () => {
     await store.dispose()
   })
 
+  it('invalidates an issued backfill when the index fingerprint changes during public preparation', async () => {
+    /** The registered provider and public index API share their real generation owner. */
+    const { store, capability } = await createBackfillDb()
+    expect(capability.prepare).toBeTypeOf('function')
+    await capability.prepare!()
+    await store.putRecord({ value: 1 }, 'row')
+    /** This first handle is authentic, and its successor comes from a real definition change. */
+    const handle = await store.ensureRecordIndexes('changing-definition', [
+      { name: 'value', unique: false, multiEntry: false, revision: 1 }
+    ])
+    /** An asynchronous application preparation can overlap a legitimate schema revision. */
+    const session = await capability.openBackfillSession(handle, backfillOptions)
+    await expect(
+      session.readBatch(undefined, {
+        prepare: async () => {
+          await store.ensureRecordIndexes('changing-definition', [
+            { name: 'value', unique: false, multiEntry: false, revision: 2 }
+          ])
+          return { decodedBytes: 1, outcome: 'skipped' }
+        }
+      })
+    ).rejects.toMatchObject({ code: 'INDEX_BACKFILL_STALE' })
+    await expect(session.renew()).rejects.toMatchObject({ code: 'INDEX_BACKFILL_STALE' })
+    await expect(session.fail(new Error('obsolete preparation'))).rejects.toMatchObject({
+      code: 'INDEX_BACKFILL_STALE'
+    })
+    await expect(
+      store.putIndexedRecord({ value: 2 }, 'row', handle, {
+        value: { kind: 'single', key: 2 }
+      })
+    ).rejects.toMatchObject({ code: 'INDEX_BACKFILL_STALE' })
+    expect(await store.getRecord('row')).toEqual({ value: 1 })
+    session.release()
+  })
+
+  it.each(['error', 'function'] as const)(
+    'persists a failed readiness and releases the lease for an uncloneable %s cause',
+    async (causeKind) => {
+      /** Failure reporting and durable readiness remain owned by the installed native provider. */
+      const { store, capability } = await createBackfillDb()
+      /** Same definitions after failure must issue a fresh generation instead of reviving a lease. */
+      const definitions = [
+        { name: 'value', unique: false, multiEntry: false, revision: 1 }
+      ] as const
+      /** The original issued handle acquires a real metadata-owned lease. */
+      const handle = await store.ensureRecordIndexes('uncloneable-failure', definitions)
+      /** Session failure accepts the application's original unknown cause. */
+      const session = await capability.openBackfillSession(handle, backfillOptions)
+      /** Error.cause and a function value both fail structuredClone through supported input paths. */
+      const cause =
+        causeKind === 'error'
+          ? new Error('application preparation failed', { cause: () => undefined })
+          : () => undefined
+      /** Capture the public cleanup report without replacing the original backfill method. */
+      const captured = await captureOperationCleanup(() => session.fail(cause))
+      expect(captured.reports).toContain(cause)
+      expect(await store.getRecordIndexReadiness(handle)).toMatchObject({
+        status: 'failed',
+        scanned: 0,
+        indexed: 0
+      })
+      await expect(session.renew()).rejects.toMatchObject({ code: 'STORE_DISPOSED' })
+      /** A fresh real registration proves failed ownership no longer blocks acquisition. */
+      const replacement = await store.ensureRecordIndexes('uncloneable-failure', definitions)
+      expect(replacement.generation).not.toBe(handle.generation)
+      /** The successor lease opens immediately without a timeout or private-state edit. */
+      const successor = await capability.openBackfillSession(replacement, backfillOptions)
+      await expect(successor.readBatch()).resolves.toMatchObject({
+        candidates: [],
+        endOfScan: true
+      })
+      successor.release()
+    }
+  )
+
+  it('rejects old lease actions after a committed batch while allowing a fresh owner to resume', async () => {
+    /** A nonterminal batch releases its lease through the normal commit receipt. */
+    const { store, capability } = await createBackfillDb()
+    await store.putRecord({ value: 1 }, 'a')
+    await store.putRecord({ value: 2 }, 'b')
+    /** Both records use one real generation, with one issued candidate per page. */
+    const handle = await store.ensureRecordIndexes('released-batch', [
+      { name: 'value', unique: false, multiEntry: false, revision: 1 }
+    ])
+    /** The first owner commits its issued page without claiming complete readiness. */
+    const session = await capability.openBackfillSession(handle, {
+      ...backfillOptions,
+      batchSize: 1
+    })
+    /** The issued manifest supplies exactly the accepted revision and checkpoint. */
+    const batch = await session.readBatch()
+    expect(
+      await session.commitBatch({
+        generation: handle.generation,
+        ownerToken: session.ownerToken,
+        checkpoint: batch.checkpoint,
+        nextCheckpoint: batch.candidates[0]!.key,
+        endOfScan: batch.endOfScan,
+        projections: batch.candidates.map((candidate) => ({
+          key: candidate.key,
+          expectedRevision: candidate.revision,
+          outcome: 'skipped' as const
+        }))
+      })
+    ).toMatchObject({ status: 'running', scanned: 1 })
+    await expect(session.readBatch()).rejects.toMatchObject({ code: 'BACKEND_UNAVAILABLE' })
+    await expect(session.fail('late failure after commit')).rejects.toMatchObject({
+      code: 'BACKEND_UNAVAILABLE'
+    })
+    /** A newly acquired owner resumes after a without repeating the committed candidate. */
+    const successor = await capability.openBackfillSession(handle, {
+      ...backfillOptions,
+      batchSize: 1
+    })
+    await expect(successor.readBatch()).resolves.toMatchObject({
+      checkpoint: 'a',
+      candidates: [{ key: 'b', raw: { value: 2 } }]
+    })
+    successor.release()
+    session.release()
+  })
+
+  it('requires legacy participation when a legitimate scan resumes in its legacy phase', async () => {
+    /** A canonical-to-legacy transition comes only from an actually committed canonical batch. */
+    const { store, capability } = await createBackfillDb()
+    /** This scope is empty so both phase transitions exercise normal completion, not forged data. */
+    const handle = await store.ensureRecordIndexes('legacy-resume-contract', [
+      { name: 'value', unique: false, multiEntry: false, revision: 1 }
+    ])
+    /** Legacy inclusion is part of the original scan's public options. */
+    const session = await capability.openBackfillSession(handle, {
+      ...backfillOptions,
+      includeLegacy: true
+    })
+    /** The issued empty canonical page advances readiness into the real legacy phase. */
+    const batch = await session.readBatch()
+    expect(
+      await session.commitBatch({
+        phase: batch.phase,
+        generation: handle.generation,
+        ownerToken: session.ownerToken,
+        checkpoint: batch.checkpoint,
+        nextCheckpoint: undefined,
+        endOfScan: true,
+        projections: []
+      })
+    ).toMatchObject({ status: 'running' })
+    session.release()
+    await expect(capability.openBackfillSession(handle, backfillOptions)).rejects.toMatchObject({
+      code: 'INVALID_CONFIG'
+    })
+    /** Keeping the required option resumes and completes the remaining empty phase normally. */
+    const legacy = await capability.openBackfillSession(handle, {
+      ...backfillOptions,
+      includeLegacy: true
+    })
+    /** The successor observes the durable phase rather than a caller-invented phase value. */
+    const finalBatch = await legacy.readBatch()
+    expect(finalBatch.phase).toBe(RecordIndexBackfillPhase.legacy)
+    expect(
+      await legacy.commitBatch({
+        phase: finalBatch.phase,
+        generation: handle.generation,
+        ownerToken: legacy.ownerToken,
+        checkpoint: finalBatch.checkpoint,
+        nextCheckpoint: undefined,
+        endOfScan: true,
+        projections: []
+      })
+    ).toMatchObject({ status: 'complete' })
+    legacy.release()
+  })
+
+  it('rejects a negative decoded budget before issuing a batch and accepts a later valid preparation', async () => {
+    /** Application preparation runs through the registered provider with a real stored candidate. */
+    const { store, capability } = await createBackfillDb()
+    await store.putRecord({ value: 1 }, 'row')
+    /** The decoder budget belongs to this one public backfill operation. */
+    const handle = await store.ensureRecordIndexes('negative-decoded-budget', [
+      { name: 'value', unique: false, multiEntry: false, revision: 1 }
+    ])
+    /** A rejected application result does not release or publish the session's candidate manifest. */
+    const session = await capability.openBackfillSession(handle, backfillOptions)
+    await expect(
+      session.readBatch(undefined, {
+        prepare: async () => ({ decodedBytes: -1, outcome: 'skipped' })
+      })
+    ).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
+    await expect(
+      session.readBatch(undefined, {
+        prepare: async () => ({ decodedBytes: 1, outcome: 'skipped' })
+      })
+    ).resolves.toMatchObject({ candidates: [{ key: 'row' }], endOfScan: true })
+    expect(await store.getRecordIndexReadiness(handle)).toMatchObject({
+      status: 'running',
+      scanned: 0
+    })
+    session.release()
+  })
+
+  it('keeps a newer indexed write when an earlier issued projection commits and omits absent index entries', async () => {
+    /** Revision changes made through indexed writes retain this same generation and raw epoch. */
+    const { store, capability } = await createBackfillDb()
+    await store.putRecord({ value: 1 }, 'a')
+    await store.putRecord({ value: 3 }, 'b')
+    /** Optional entries are an allowed projection representation for a missing indexed field. */
+    const handle = await store.ensureRecordIndexes('indexed-revision-race', [
+      { name: 'value', unique: false, multiEntry: false, revision: 1 },
+      { name: 'optional', unique: false, multiEntry: false, revision: 1 }
+    ])
+    /** The original page captures a's old revision before the concurrent legitimate indexed write. */
+    const session = await capability.openBackfillSession(handle, backfillOptions)
+    /** Candidate identity and revision come from the actual issued page. */
+    const batch = await session.readBatch()
+    await store.putIndexedRecord({ value: 2 }, 'a', handle, {
+      value: { kind: 'single', key: 2 },
+      optional: undefined
+    })
+    expect(
+      await session.commitBatch({
+        generation: handle.generation,
+        ownerToken: session.ownerToken,
+        checkpoint: batch.checkpoint,
+        nextCheckpoint: batch.candidates.at(-1)!.key,
+        endOfScan: batch.endOfScan,
+        projections: batch.candidates.map((candidate) => ({
+          key: candidate.key,
+          expectedRevision: candidate.revision,
+          outcome: 'indexed' as const,
+          projection: {
+            value: { kind: 'single' as const, key: (candidate.raw as { value: number }).value },
+            optional: undefined
+          }
+        }))
+      })
+    ).toMatchObject({ status: 'complete', scanned: 2, indexed: 1 })
+    /** The accepted index exposes the fresh write and stable row, without replaying a's stale value. */
+    const values: unknown[] = []
+    for await (const [, value] of store.iterateRecordIndex({ handle, index: 'value' }))
+      values.push(value)
+    expect(values).toEqual([{ value: 2 }, { value: 3 }])
+    await expect(
+      store.iterateRecordIndex({ handle, index: 'optional' }).next()
+    ).resolves.toMatchObject({ done: true })
+    /** The authentic transaction source applies reverse direction and limit to the same sidecars. */
+    expect(
+      await store.transaction(async (scope) => {
+        /** The native iterator must stop after one emitted row instead of draining the index. */
+        const rows: unknown[] = []
+        for await (const [, value] of scope.iterateRecordIndex!({
+          handle,
+          index: 'value',
+          direction: 'prev',
+          limit: 1
+        }))
+          rows.push(value)
+        return rows
+      })
+    ).toEqual([{ value: 3 }])
+    session.release()
+  })
+
+  it('rejects native index iteration before readiness is complete', async () => {
+    /** A public issued handle starts pending and cannot substitute for complete projection proof. */
+    const store = await freshDb()
+    /** No backfill is run, so the pending state is produced by the normal ensure API. */
+    const handle = await store.ensureRecordIndexes('pending-native-index', [
+      { name: 'value', unique: false, multiEntry: false, revision: 1 }
+    ])
+    await expect(store.iterateRecordIndex({ handle, index: 'value' }).next()).rejects.toMatchObject(
+      {
+        code: 'BACKEND_UNAVAILABLE',
+        cause: expect.objectContaining({
+          message: 'record index is not complete; caller must use fallback scan'
+        })
+      }
+    )
+    expect(await store.getRecordIndexReadiness(handle)).toMatchObject({ status: 'pending' })
+  })
+
+  it('rejects root and transaction index cursors without native range support', async () => {
+    /** Range support is optional for CRUD, but both native index cursor routes require it. */
+    const store = await createIndexedDbTestStore({
+      factory: freshFactory(),
+      dbName: 'index-without-keyrange'
+    })
+    /** This valid issued handle does not manufacture an invalid native owner or generation. */
+    const handle = await store.ensureRecordIndexes('missing-native-range', [
+      { name: 'value', unique: false, multiEntry: false, revision: 1 }
+    ])
+    await expect(store.iterateRecordIndex({ handle, index: 'value' }).next()).rejects.toMatchObject(
+      { code: 'BACKEND_UNAVAILABLE' }
+    )
+    await expect(
+      store.transaction(async (scope) => {
+        for await (const _entry of scope.iterateRecordIndex!({ handle, index: 'value' })) {
+          throw new Error('a cursor without IDBKeyRange must not emit a row')
+        }
+      })
+    ).rejects.toMatchObject({ code: 'BACKEND_UNAVAILABLE' })
+    await store.set('still-usable', 'value')
+    expect(await store.get('still-usable')).toBe('value')
+  })
+
   it('opens a leased backfill session and returns immutable record snapshots', async () => {
     const { store, capability: backfill } = await createBackfillDb()
     await store.putRecord({ value: 1 }, 'record-1')
