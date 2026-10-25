@@ -1,16 +1,22 @@
 import { randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
-import { expect, it, vi } from 'vitest'
+import { afterAll, beforeAll, expect, it, vi } from 'vitest'
 import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
 import { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'
 import { pgDriver } from '@migaia/storage-plugin-postgres/pg'
 import { pgLogicalReplicationFeature } from '@migaia/storage-plugin-postgres/features/logical-replication'
 import { cachePlugin } from '../src/index.js'
+import { PgReplicationTestService } from '../../storage-plugin-postgres/test/helpers/replication-service.js'
+
+/** Cache joins the same scheduler as the PostgreSQL logical-decoding files. */
+const replicationService = new PgReplicationTestService()
+beforeAll(() => replicationService.acquire(), 120000)
+afterAll(() => replicationService.release())
 
 /** A root reset must remove upper-tier copies for every already accessed organization. */
 it('invalidates every cache org after the PostgreSQL root feed emits reset', async () => {
-  /** The repository service launcher supplies the existing local PostgreSQL fixture. */
-  const connectionString = process.env.MIGAIA_PG_URL
+  /** The repository launcher supplies a cluster isolated from ordinary PostgreSQL tests. */
+  const connectionString = replicationService.connectionString
   const publication = process.env.MIGAIA_PG_PUBLICATION
   if (!connectionString || !publication)
     throw new Error('PostgreSQL replication service is required')

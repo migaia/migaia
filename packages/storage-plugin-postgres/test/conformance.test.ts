@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
 import postgres from 'postgres'
-import { describe, it, expect, onTestFinished } from 'vitest'
+import { afterAll, beforeAll, describe, it, expect, onTestFinished } from 'vitest'
 import { createStorageHost } from '@migaia/storage-host'
 import { runConformance } from '@migaia/storage-contract/conformance'
 import { kv, records, ttl, counter, sql, vector, durableChangeFeed } from '@migaia/storage-contract'
@@ -11,6 +11,11 @@ import { postgresJsDriver } from '../src/postgres-js.js'
 import { pgvectorFeature } from '../src/features/pgvector.js'
 import { pgLogicalReplicationFeature } from '../src/features/logical-replication.js'
 import { decodePgRecord } from '../src/codec.js'
+import { PgReplicationTestService } from './helpers/replication-service.js'
+/** The pg adapter owns slots; postgres-js conformance keeps using the ordinary service. */
+const replicationService = new PgReplicationTestService()
+beforeAll(() => replicationService.acquire(), 120000)
+afterAll(() => replicationService.release())
 /** The real fixture is mandatory; an absent address never becomes a passing skipped backend. */
 const connectionString = process.env.MIGAIA_PG_URL
 if (!connectionString)
@@ -43,8 +48,11 @@ for (const adapter of ['pg', 'postgres-js'] as const)
         opaqueEntries: false
       },
       create: async () => {
-        const pool = new Pool({ connectionString })
-        const client = postgres(connectionString!, { max: 8 })
+        /** Only the adapter that creates a slot enters the dedicated replication cluster. */
+        const adapterConnectionString =
+          adapter === 'pg' ? replicationService.connectionString : connectionString!
+        const pool = new Pool({ connectionString: adapterConnectionString })
+        const client = postgres(adapterConnectionString, { max: 8 })
         const org = randomUUID()
         const driver = adapter === 'pg' ? pgDriver(pool) : postgresJsDriver(client)
         const prefix = adapter === 'pg' ? 'pg_contract_selected' : 'pg_js_contract_selected'
@@ -102,7 +110,7 @@ for (const adapter of ['pg', 'postgres-js'] as const)
           await client.end()
           if (adapter === 'pg') {
             // The already-disposed host leaves its deployment-owned slot for explicit fixture cleanup.
-            const cleanup = new Pool({ connectionString })
+            const cleanup = new Pool({ connectionString: adapterConnectionString })
             try {
               await cleanup.query('SELECT pg_drop_replication_slot($1)', [slot])
             } finally {

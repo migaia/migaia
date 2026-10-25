@@ -6,6 +6,7 @@ x-storage-test-environment:
   MIGAIA_VALKEY_URL: redis://127.0.0.1:${MIGAIA_VALKEY_PORT:-17380}
   MIGAIA_REDIS_STACK_URL: redis://127.0.0.1:${MIGAIA_REDIS_STACK_PORT:-17381}
   MIGAIA_PG_URL: postgresql://storage:storage-local@127.0.0.1:${MIGAIA_PG_PORT:-15432}/storage
+  MIGAIA_PG_REPLICATION_URL: postgresql://storage:storage-local@127.0.0.1:${MIGAIA_PG_REPLICATION_PORT:-15433}/storage
   MIGAIA_PG_PUBLICATION: migai_storage_publication
   MIGAIA_QDRANT_URL: http://127.0.0.1:${MIGAIA_QDRANT_PORT:-16333}
   MIGAIA_SPARQL_QUERY_URL: http://127.0.0.1:${MIGAIA_FUSEKI_PORT:-13030}/storage/sparql
@@ -56,6 +57,32 @@ services:
       POSTGRES_PASSWORD: storage-local
     ports: ['127.0.0.1:${MIGAIA_PG_PORT:-15432}:5432']
     volumes: [postgres-data:/var/lib/postgresql/data]
+    configs:
+      - source: postgres-init
+        target: /docker-entrypoint-initdb.d/storage.sql
+    healthcheck:
+      test: [CMD, pg_isready, -U, storage, -d, storage]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  # Logical-decoding tests need their own cluster: slot snapshots can wait on cluster transactions.
+  postgres-replication:
+    image: pgvector/pgvector:0.8.7-pg16
+    command:
+      - postgres
+      - -c
+      - wal_level=logical
+      - -c
+      - max_replication_slots=16
+      - -c
+      - max_wal_senders=16
+    environment:
+      POSTGRES_DB: storage
+      POSTGRES_USER: storage
+      POSTGRES_PASSWORD: storage-local
+    ports: ['127.0.0.1:${MIGAIA_PG_REPLICATION_PORT:-15433}:5432']
+    volumes: [postgres-replication-data:/var/lib/postgresql/data]
     configs:
       - source: postgres-init
         target: /docker-entrypoint-initdb.d/storage.sql
@@ -126,6 +153,7 @@ volumes:
   redis-data:
   valkey-data:
   postgres-data:
+  postgres-replication-data:
   qdrant-data:
   fuseki-data:
   redis-stack-data:

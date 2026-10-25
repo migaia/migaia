@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { Pool, type QueryArrayConfig } from 'pg'
-import { it, expect, onTestFinished, vi } from 'vitest'
+import { afterAll, beforeAll, it, expect, onTestFinished, vi } from 'vitest'
 import { createStorageHost } from '@migaia/storage-host'
 import {
   durableChangeFeed,
@@ -12,12 +12,19 @@ import { postgresBackendPlugin } from '../src/index.js'
 import { pgDriver } from '../src/pg.js'
 import { pgLogicalReplicationFeature } from '../src/features/logical-replication.js'
 import { pgKey, encodePgText } from '../src/codec.js'
+import { PgReplicationTestService } from './helpers/replication-service.js'
+
+/** Only logical-decoding files share this idle-session scheduler on the separate cluster. */
+const replicationService = new PgReplicationTestService()
+// Waiting for another complete file changes only the setup budget, never the business timeout.
+beforeAll(() => replicationService.acquire(), 120000)
+afterAll(() => replicationService.release())
 
 /** Public admission accepts every publication form only when the complete feed remains observable. */
 for (const mode of ['tables', 'schema', 'all', 'missing-table', 'without-truncate'] as const) {
   it('checks publication coverage through the public feed: ' + mode, async () => {
     /** The repository launcher supplies the real PostgreSQL database for this file. */
-    const connectionString = process.env.MIGAIA_PG_URL
+    const connectionString = replicationService.connectionString
     if (!connectionString) throw new Error('PostgreSQL replication service is required')
     /** Each public case owns its deployment resources and leaves no persistent fixture slot. */
     const pool = new Pool({ connectionString })
@@ -99,7 +106,7 @@ for (const mode of ['tables', 'schema', 'all', 'missing-table', 'without-truncat
 
 /** TRUNCATE invalidates all organizations and confirms only after the consumer finishes. */
 it('resets root and routed consumers on TRUNCATE and exposes read-only WAL health', async () => {
-  const connectionString = process.env.MIGAIA_PG_URL
+  const connectionString = replicationService.connectionString
   const publication = process.env.MIGAIA_PG_PUBLICATION
   if (!connectionString || !publication)
     throw new Error('PostgreSQL replication service is required')
@@ -220,7 +227,7 @@ it('resets root and routed consumers on TRUNCATE and exposes read-only WAL healt
 
 /** Explicit block policy keeps both polling and live commits available for manual intervention. */
 it('blocks TRUNCATE without acknowledging when the selected policy is block', async () => {
-  const connectionString = process.env.MIGAIA_PG_URL
+  const connectionString = replicationService.connectionString
   const publication = process.env.MIGAIA_PG_PUBLICATION
   if (!connectionString || !publication)
     throw new Error('PostgreSQL replication service is required')
@@ -275,7 +282,7 @@ it('blocks TRUNCATE without acknowledging when the selected policy is block', as
 
 /** Deployment owns a unique fixture slot; the Feature never creates it or removes it on disposal. */
 it('replays partial multi-org commits and confirms only complete caller-processed positions', async () => {
-  const connectionString = process.env.MIGAIA_PG_URL
+  const connectionString = replicationService.connectionString
   const publication = process.env.MIGAIA_PG_PUBLICATION
   if (!connectionString || !publication)
     throw new Error(
@@ -401,7 +408,7 @@ it('replays partial multi-org commits and confirms only complete caller-processe
 /** A real replication transport must reject startup failures instead of leaving open pending. */
 for (const mode of ['pid-query', 'abort', 'ready-query-abort'] as const) {
   it('drains and rejects actual replication startup ' + mode, async () => {
-    const connectionString = process.env.MIGAIA_PG_URL
+    const connectionString = replicationService.connectionString
     const publication = process.env.MIGAIA_PG_PUBLICATION
     if (!connectionString || !publication)
       throw new Error(

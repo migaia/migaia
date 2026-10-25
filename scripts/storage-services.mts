@@ -12,7 +12,8 @@ const projectName = 'migai-storage'
 const Command = { build: 'build', up: 'up', status: 'status', env: 'env', run: 'run' } as const
 /** Stable command messages belong here rather than in the backend packages. */
 const Text = {
-  usage: 'Usage: node scripts/storage-services.mts build|up|status|env|run -- <command...>',
+  usage:
+    'Usage: node scripts/storage-services.mts build|up|status|env|run -- <command...>\nMIGAIA_PG_REPLICATION_URL selects the separate PostgreSQL cluster used only by logical-decoding tests.',
   environmentFailure: (service: string, status: number | null) =>
     `storage-services: environment failure starting ${service} (exit ${status ?? 'unknown'})`,
   missingCommand: 'storage-services: run requires a command after --'
