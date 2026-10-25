@@ -1,4 +1,5 @@
 import { defineHost } from '@migaia/plugin-host'
+import { probe } from '@migaia/rpc-host/plugins/probe'
 import { deferred } from '@migaia/utils/promise'
 import type { ICoroutineConnect } from '@migaia/rpc-plugin-coroutines'
 import { createChildDispatcher } from './dispatch.js'
@@ -43,6 +44,9 @@ export async function serveChild(
   }
   try {
     await host.use(
+      ...(options.probe === undefined
+        ? []
+        : [probe(...(Array.isArray(options.probe) ? options.probe : [options.probe]))]),
       createChildDispatcher(admitted, host, () => outletOf(host, admitted), exit, options.report)
     )
     await host.use(runtimePlugin(admitted, TrayRuntimeMode.child, { ...options, connect }))

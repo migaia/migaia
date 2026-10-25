@@ -28,7 +28,7 @@ if (child) {
     })
     try {
       await host.use(plugin)
-      console.log(JSON.stringify({ value: await host.thread.request('worker', 'double', 21) }))
+      console.log(JSON.stringify({ value: await host.thread.send('worker', 'double', 21) }))
     } finally {
       await host.dispose()
     }
@@ -53,9 +53,9 @@ if (child) {
       peer = await createRpcHost({ plugins: [threadPlugin({ spawn })] })
       console.log(
         JSON.stringify({
-          value: await peer.request('double', 21),
-          child: await peer.request('child'),
-          ...(mode === 'self' ? { flags: await peer.request('flags') } : {})
+          value: await peer.thread.request('double', 21),
+          child: await peer.thread.request('child'),
+          ...(mode === 'self' ? { flags: await peer.thread.request('flags') } : {})
         })
       )
     } catch (error) {

@@ -1,120 +1,109 @@
-import { ThreadBootstrap, ThreadEvent, THREAD_RUNTIME_API_VERSION } from './constants.js'
-import type { IRuntimePeerIdentity } from '@migaia/rpc-host/plugin'
-import type { IRuntimePeerSourceContext } from '@migaia/rpc-host/plugin'
-import type { IRpcRuntimeGeneration } from '@migaia/rpc-contract'
-import type { IRpcPortableValue } from '@migaia/rpc-contract'
-import type { IThreadWebPort } from './types.js'
+/**
+ * Encodes and admits bounded native Worker bootstrap identity and optional business initialization.
+ * Trusted launch relationship facts are handed to Session attachment separately from payload data.
+ */
+import { normalizeRpcGeneration, RpcWireLimit } from '@migaia/rpc-contract/protocol'
+import { normalizeRpcPortable, type IRpcPortableValue } from '@migaia/rpc-contract/portable'
+import type { IRpcLocalSourceFacts } from '@migaia/rpc-contract/interfaces'
+import { ThreadBootstrap } from './constants.js'
 import { invalidThreadConfig } from './error.js'
 import { ThreadErrorText } from './error-text.js'
-import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'
+import type { IThreadLaunchFacts } from './types.js'
 
-/** Launcher addressing is separate from portable business initialization data. */
-export type IThreadBootstrapData = Readonly<{
-  /** Launcher-selected route identity; a valid data wrapper alone does not prove runtime trust. */
-  peerId: string
-  /** Optional normalized portable business data, without the private runtime bootstrap wrapper. */
-  data?: IRpcPortableValue
-}>
+/** Business initialization stays separate from trusted native launch relationship facts. */
+export type IThreadBootstrapData = Readonly<{ peerId: string; data?: IRpcPortableValue }>
+/** A real native parentPort/Worker initial capture supplies these facts to Session.attach. */
+export type IThreadBootstrap = IThreadBootstrapData & Readonly<{ source?: IRpcLocalSourceFacts }>
 
-/** A library launcher supplies exact safe addresses; the native Worker supplies physical provenance. */
-export type IThreadRuntimeBootstrap = Readonly<{
-  version: typeof THREAD_RUNTIME_API_VERSION
-  self: IRuntimePeerIdentity
-  parent: IRuntimePeerIdentity
-  capabilities: readonly string[]
-  /** Native launch metadata supplies a stable namespace and accepted execution ordinal. */
-  generation?: IRpcRuntimeGeneration
-}>
-
-/**
- * A local clone adapter offers native storage only when its compiled endpoint restores portable
- * binary. Peer declarations stay untouched; core still requires the actual clone carrier.
- */
-export function createThreadRuntimeCapabilityOffer(
-  capabilities: readonly string[]
-): readonly string[] {
-  /** The standard clone-control profile owns this one capability-proposal augmentation. */
-  const parsed = rpcMessageCapabilityControl.localOffer(capabilities)
-  if (!parsed.valid) return invalidThreadConfig(parsed.field, ThreadErrorText.bootstrapFailed)
-  return parsed.value
+/** Retain the bounded closed native identity grammar without an RPC capability offer. */
+function identity(value: unknown): Readonly<{ name: string; instanceId: string }> {
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    return invalidThreadConfig('bootstrap', ThreadErrorText.bootstrapFailed)
+  /** Native structured clone supplies plain own fields. */
+  const record = value as Record<string, unknown>
+  if (
+    Object.keys(record).length !== 2 ||
+    typeof record.name !== 'string' ||
+    !record.name ||
+    record.name.length > RpcWireLimit.maxIdentifierChars ||
+    typeof record.instanceId !== 'string' ||
+    !record.instanceId ||
+    record.instanceId.length > RpcWireLimit.maxIdentifierChars
+  )
+    return invalidThreadConfig('bootstrap', ThreadErrorText.bootstrapFailed)
+  return Object.freeze({ name: record.name, instanceId: record.instanceId })
 }
 
-/** Enable only independent declarations shared by both endpoints. */
-export function intersectThreadCapabilities(
-  local: readonly string[],
-  peer: readonly string[]
-): readonly string[] {
-  return rpcMessageCapabilityControl.intersect(local, peer)
-}
-
-/** Decode only a complete versioned runtime envelope; legacy business data never supplies authority. */
-export function readThreadRuntimeBootstrap(value: unknown): IThreadRuntimeBootstrap {
-  /** Contract owns the complete original closed bootstrap grammar and portable admission order. */
-  const parsed = rpcMessageCapabilityControl.readInitial(value)
-  if (!parsed.valid) return invalidThreadConfig(parsed.field, ThreadErrorText.bootstrapFailed)
-  return parsed.value.metadata
-}
-
-/** Original launchers admit their metadata before native Worker construction. */
-export function createThreadRuntimeBootstrap(
+/** Build native initialization; protocol handshake and extension selection occur in Session. */
+export function createThreadBootstrap(
   name: string,
-  fingerprint: string,
-  context: IRuntimePeerSourceContext & Readonly<{ generation?: IRpcRuntimeGeneration }>
-): IThreadRuntimeBootstrap {
-  return readThreadRuntimeBootstrap({
+  peerId: string,
+  data: unknown,
+  facts?: IThreadLaunchFacts
+): unknown {
+  return {
     kind: ThreadBootstrap.data,
-    peerId: fingerprint,
-    runtimeApi: {
-      version: THREAD_RUNTIME_API_VERSION,
-      self: { name, instanceId: fingerprint },
-      parent: context.self,
-      capabilities: createThreadRuntimeCapabilityOffer(context.capabilities),
-      ...(context.generation ? { generation: context.generation } : {})
-    }
+    peerId,
+    ...(data === undefined ? {} : { data }),
+    ...(facts
+      ? {
+          source: {
+            self: { name: facts.childName ?? name, instanceId: peerId },
+            parent: facts.parent,
+            generation: facts.generation
+          }
+        }
+      : {})
+  }
+}
+
+/** Admit native initialization once; application frames cannot enter this acquisition path. */
+export function readThreadInitial(value: unknown): IThreadBootstrap {
+  if (
+    !value ||
+    typeof value !== 'object' ||
+    !('kind' in value) ||
+    value.kind !== ThreadBootstrap.data ||
+    !('peerId' in value) ||
+    typeof value.peerId !== 'string' ||
+    !value.peerId
+  )
+    return invalidThreadConfig('bootstrap', ThreadErrorText.bootstrapFailed)
+  /** Portable data precedes native relationship metadata, preserving original failure order. */
+  const data =
+    'data' in value && value.data !== undefined ? normalizeRpcPortable(value.data) : undefined
+  /** Low-level manually constructed launchers carry data without automatic host identity. */
+  let source: IRpcLocalSourceFacts | undefined
+  if ('source' in value && value.source !== undefined) {
+    if (!value.source || typeof value.source !== 'object' || Array.isArray(value.source))
+      return invalidThreadConfig('bootstrap', ThreadErrorText.bootstrapFailed)
+    /** Native source fields are closed; capability or token fields confer no authority. */
+    const record = value.source as Record<string, unknown>
+    if (Object.keys(record).length !== 3)
+      return invalidThreadConfig('bootstrap', ThreadErrorText.bootstrapFailed)
+    /** Child identity must agree with the launcher's native route fingerprint. */
+    const self = identity(record.self)
+    if (self.instanceId !== value.peerId)
+      return invalidThreadConfig('bootstrap', ThreadErrorText.bootstrapFailed)
+    source = Object.freeze({
+      self,
+      expectedPeerId: identity(record.parent).instanceId,
+      generation: normalizeRpcGeneration(record.generation)
+    })
+  }
+  return Object.freeze({
+    peerId: value.peerId,
+    ...(data === undefined ? {} : { data }),
+    ...(source ? { source } : {})
   })
 }
 
-/**
- * Validate Node workerData or a Web initial message using Contract's closed bootstrap grammar.
- * Return only peerId and optional portable data, not executable ports or runtime trust. Invalid
- * bootstrap/data throws Core INVALID_CONFIG with a field diagnostic before service preparation.
- */
+/** Low-level consumers receive business data without private parent relationship metadata. */
 export function readThreadBootstrap(value: unknown): IThreadBootstrapData {
-  /** Address/data admission delegates to the same single grammar used by Core resource capture. */
-  const parsed = rpcMessageCapabilityControl.readData(value)
-  if (!parsed.valid) return invalidThreadConfig(parsed.field, ThreadErrorText.bootstrapFailed)
-  return parsed.value
-}
-
-/**
- * Wait for the first matching Web bootstrap, remove this listener, then await prepare(data, peerId)
- * before posting readiness ACK. Unrelated messages are ignored. Validation, prepare, or ACK-post
- * failure rejects this Promise and no success ACK is sent. This helper installs no timeout and does
- * not terminate the borrowed Worker/port; its launcher/supervisor owns that lifetime.
- */
-export function receiveThreadData(
-  port: IThreadWebPort,
-  prepare: (data: IRpcPortableValue | undefined, peerId: string) => PromiseLike<void> | void
-): Promise<IRpcPortableValue | undefined> {
-  return new Promise((resolve, reject) => {
-    /** This listener owns only the first private bootstrap message. */
-    const receive = (event: { data: unknown }): void => {
-      if (
-        event.data === null ||
-        typeof event.data !== 'object' ||
-        !('kind' in event.data) ||
-        event.data.kind !== ThreadBootstrap.data
-      )
-        return
-      port.removeEventListener(ThreadEvent.message, receive)
-      void (async () => {
-        /** A fresh snapshot keeps private business data under the public portable contract. */
-        const bootstrap = readThreadBootstrap(event.data)
-        await prepare(bootstrap.data, bootstrap.peerId)
-        port.postMessage({ kind: ThreadBootstrap.acknowledged }, undefined)
-        resolve(bootstrap.data)
-      })().catch(reject)
-    }
-    port.addEventListener(ThreadEvent.message, receive)
+  /** One native admission owns both business data and source facts. */
+  const initial = readThreadInitial(value)
+  return Object.freeze({
+    peerId: initial.peerId,
+    ...(initial.data === undefined ? {} : { data: initial.data })
   })
 }

@@ -1,3 +1,7 @@
+/**
+ * Publishes browser transport factories, their native source options and centralized browser error
+ * identities.
+ */
 export { windowPlugin } from './browser/window-plugin.js'
 export { dedicatedWorkerPlugin } from './browser/dedicated-worker-plugin.js'
 export { sharedWorkerPlugin } from './browser/shared-worker-plugin.js'
@@ -11,9 +15,9 @@ export type {
 export type { IBrowserPluginOptions } from './browser/plugin-types.js'
 export {
   RpcBrowserErrorCode,
-  ERROR_SOURCE as RPC_BROWSER_ERROR_SOURCE,
+  RPC_BROWSER_ERROR_SOURCE,
   type IRpcBrowserErrorCode
-} from './error-code.js'
+} from '@migaia/rpc-contract/error-code'
 export { webTransportPlugin } from './browser/web-transport-plugin.js'
 export type { IWebTransportPluginOptions } from './browser/web-transport-types.js'
 export { serviceWorkerPlugin } from './browser/service-worker-plugin.js'

@@ -1,7 +1,9 @@
+/**
+ * Exercise actual RPC archives through public entries; native acquisition uses the installed
+ * coroutine owner.
+ */
 import { execFileSync } from 'node:child_process'
-import { createHash } from 'node:crypto'
 import {
-  cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -13,16 +15,13 @@ import {
   writeFileSync
 } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, join, resolve } from 'node:path'
-import { fileURLToPath, pathToFileURL } from 'node:url'
+import { join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { chromium } from '@playwright/test'
-import { parseSync } from 'oxc-parser'
 import { orderStringKeys } from '@migaia/utils/string'
 
 const integrationDirectory = resolve(fileURLToPath(new URL('../..', import.meta.url)))
 const repositoryRoot = resolve(integrationDirectory, '../..')
-/** Canonical Core assertions and digest-pinned fixtures remain with their physical owner. */
-const packageDirectory = join(repositoryRoot, 'packages/rpc-host')
 /** All final lockstep artifacts are installed without an umbrella package. */
 const rpcOwners = [
   'rpc-contract',
@@ -74,7 +73,12 @@ const obsoleteSubpaths = [
   './features/control',
   './adapters/message-port',
   './adapters/web-worker',
-  './internal/chunk-attachment'
+  './internal/chunk-attachment',
+  './plugin',
+  './probe',
+  './features/auth',
+  './features/chunk',
+  './features/typegen'
 ]
 /**
  * Packs rpc, resolves it from a clean consumer directory, and checks both every declared public
@@ -100,21 +104,10 @@ async function main() {
     console.log('CHECK five-packed-artifacts PASS')
     assertIdentityObserverDeclarationsHidden(packedPackage)
     console.log('CHECK identity-observer-hidden PASS')
-    assertDefineFeatureDocumentation(packedPackage)
-    console.log('CHECK define-feature-docs PASS')
     assertPackedCoreRuntimeHidden(consumerDirectory)
     console.log('CHECK composed-runtime-hidden PASS')
     assertPackedLegacyEnvelopeRejection(consumerDirectory)
     console.log('CHECK legacy-envelope-rejection PASS')
-    assertPackedLegacyEnvelopePerturbation(
-      consumerDirectory,
-      join(packedPackages['rpc-contract'], 'dist/contract/v1/normalize.js')
-    )
-    console.log('CHECK contract-normalize PASS')
-    assertPackedLegacyRootAliasPerturbation(packedPackage, consumerDirectory)
-    console.log('CHECK root-entry PASS')
-    assertPackedCanonicalFeatureRoutePerturbation(packedPackage, consumerDirectory)
-    console.log('CHECK canonical-chunk PASS')
     await assertPackedSelectiveBrowserImport(
       consumerDirectory,
       packedPackage,
@@ -143,21 +136,22 @@ async function main() {
           skipLibCheck: true,
           noEmit: true
         },
-        include: ['type-contract.ts', 'kernel-type-contract.ts']
+        include: ['type-contract.ts', 'carrier-type-contract.ts']
       }),
       'utf8'
     )
-    /** Original low-level type assertions remain on the same private packed kernel owners. */
-    const kernelTypeContract = readFileSync(
-      resolve(integrationDirectory, 'test/core/fixtures/packed/kernel-type-contract.ts'),
-      'utf8'
-    ).replace(/(?:\.\.\/)+(rpc-[a-z-]+)\/dist\//gu, './node_modules/@migaia/$1/dist/')
-    writeFileSync(join(consumerDirectory, 'kernel-type-contract.ts'), kernelTypeContract, 'utf8')
-    execFileSync(resolve(repositoryRoot, 'node_modules/.bin/tsc'), ['-p', typeConfig], {
+    writeFileSync(
+      join(consumerDirectory, 'carrier-type-contract.ts'),
+      readFileSync(
+        resolve(integrationDirectory, 'test/core/fixtures/packed/carrier-type-contract.ts'),
+        'utf8'
+      )
+    )
+    execFileSync('bun', ['check', '-p', typeConfig], {
       cwd: consumerDirectory,
       stdio: 'inherit'
     })
-    console.log('CHECK type-contract-tsc PASS')
+    console.log('CHECK type-contract-bun PASS')
     writeFileSync(consumerModule, createSmokeModule(), 'utf8')
     execFileSync(process.execPath, [consumerModule], { cwd: consumerDirectory, stdio: 'inherit' })
   } finally {
@@ -165,38 +159,33 @@ async function main() {
   }
 }
 
-/** The preserved private composition owner still hides its unchecked implementation. */
+/** Removed private owners must be absent from the actual archive, not hidden by an export alias. */
 function assertPackedCoreRuntimeHidden(consumerDirectory) {
-  const probe = join(consumerDirectory, 'core-runtime-hidden.mjs')
-  writeFileSync(
-    probe,
-    [
-      "import * as core from './node_modules/@migaia/rpc-host/dist/core/composed.js'",
-      "if ('createComposedEndpointRuntime' in core)",
-      "  throw new Error('packed core exposed unchecked composition runtime')"
-    ].join('\n'),
-    'utf8'
-  )
-  execFileSync(process.execPath, [probe], { cwd: consumerDirectory, stdio: 'inherit' })
+  /** The real installed publication is the only filesystem being inspected. */
+  const packed = join(consumerDirectory, 'node_modules/@migaia/rpc-host/dist')
+  for (const retired of ['core', 'remote', 'runtime-adapter'])
+    if (existsSync(join(packed, retired)))
+      throw new Error('Packed RPC retained a retired owner directory: ' + retired)
 }
 
 /** Rejects three retired WebRPC semantic shapes through the packed rpc-contract normalizer. */
 function assertPackedLegacyEnvelopeRejection(
   consumerDirectory,
-  kinds = ['request', 'chunk', 'variation']
+  kinds = ['request', 'chunk', 'variation', 'jsonrpc']
 ) {
   const probe = join(consumerDirectory, 'legacy-envelope-probe.mjs')
   writeFileSync(
     probe,
     [
-      "import { normalizeRpcEnvelope } from '@migaia/rpc-contract'",
+      "import { normalizeRpcFrame } from '@migaia/rpc-contract/protocol'",
       'const legacy = [',
       "  { kind: 'request', taskId: 'old-request', version: '1', data: null },",
       "  { kind: 'chunk', taskId: 'old-chunk', index: 0, total: 1, data: null },",
-      "  { kind: 'variation', variation: 'abort', taskId: 'old-abort', senderId: 'a', targetId: 'b', data: null }",
+      "  { kind: 'variation', variation: 'abort', taskId: 'old-abort', senderId: 'a', targetId: 'b', data: null },",
+      "  { jsonrpc: '2.0', id: 'old-jsonrpc', method: 'ping', params: null }",
       ']',
-      'for (const value of legacy.filter((candidate) => process.argv[2] === candidate.kind)) {',
-      '  try { normalizeRpcEnvelope(value) } catch (error) {',
+      "for (const value of legacy.filter((candidate) => process.argv[2] === (candidate.kind ?? 'jsonrpc'))) {",
+      '  try { normalizeRpcFrame(value) } catch (error) {',
       "    if (error?.code === 'INVALID_ENVELOPE') continue",
       '    throw error',
       '  }',
@@ -207,248 +196,6 @@ function assertPackedLegacyEnvelopeRejection(
   )
   for (const kind of kinds)
     execFileSync(process.execPath, [probe, kind], { cwd: consumerDirectory, stdio: 'pipe' })
-}
-
-/** Makes only the packed normalizer accept retired shapes and requires the unchanged oracle to fail. */
-function assertPackedLegacyEnvelopePerturbation(consumerDirectory, normalizerPath) {
-  const original = readFileSync(normalizerPath, 'utf8')
-  const target =
-    "export function normalizeRpcEnvelope(value, options) {\n    const record = snapshotRpcRecord(value, '', RpcEnvelopeViolation.type);"
-  const replacement = target.replace(
-    '    const record =',
-    "    if (value && typeof value === 'object' && ('taskId' in value || value.kind === 'chunk' || value.variation === 'abort')) return value;\n    const record ="
-  )
-  if (!original.includes(target))
-    throw new Error('Packed rpc-contract normalizer mutation anchor is unavailable')
-  try {
-    writeFileSync(normalizerPath, original.replace(target, replacement), 'utf8')
-    for (const kind of ['request', 'chunk', 'variation']) {
-      let failed = false
-      try {
-        assertPackedLegacyEnvelopeRejection(consumerDirectory, [kind])
-      } catch (error) {
-        if (String(error.stderr ?? '').includes(`Legacy envelope unexpectedly normalized: ${kind}`))
-          failed = true
-        else throw error
-      }
-      if (!failed) throw new Error(`Legacy ${kind} oracle accepted the mutated packed normalizer`)
-    }
-  } finally {
-    writeFileSync(normalizerPath, original, 'utf8')
-  }
-  assertPackedLegacyEnvelopeRejection(consumerDirectory)
-}
-
-/**
- * Restores the retired root export only inside the extracted packed package and proves its
- * behavior.
- */
-function assertPackedLegacyRootAliasPerturbation(packedPackage, consumerDirectory) {
-  /** Preserved retired owner source used only to perturb the extracted packed package. */
-  const fixture = JSON.parse(
-    readFileSync(
-      resolve(integrationDirectory, 'test/core/fixtures/packed/legacy-chunk-owner.json'),
-      'utf8'
-    )
-  )
-  if (createHash('sha256').update(fixture.source).digest('hex') !== fixture.sha256)
-    throw new Error('Packed legacy chunk fixture digest drifted')
-  /**
-   * Digest-pinned retired owner with its pre-layering import names bound to the renamed core
-   * exports, so the perturbation still loads against the current packed dist.
-   */
-  const legacyChunkSource = fixture.source
-    .replace("'../internal/utf8.js'", "'@migaia/utils/bytes'")
-    .replace(
-      'import { WebRpcError, WebRpcErrorCode }',
-      'import { RpcError as WebRpcError, RpcCoreErrorCode as WebRpcErrorCode }'
-    )
-    .replace(
-      'import { WebRpcFirstPartyRoleSchema }',
-      'import { RpcFirstPartyRoleSchema as WebRpcFirstPartyRoleSchema }'
-    )
-    .replace('import { WebRpcSharedKey }', 'import { RpcPortName as WebRpcSharedKey }')
-  if (legacyChunkSource.includes('import { WebRpc'))
-    throw new Error('Packed legacy chunk fixture imports an unmapped pre-layering name')
-  /** Packed files whose exact bytes establish the root-export sensitivity baseline. */
-  const rootPath = join(packedPackage, 'dist/index.js')
-  const canonicalChunkPath = join(packedPackage, 'dist/core/middleware/canonical-chunk.js')
-  const sharedKeysPath = join(packedPackage, 'dist/core/internal/plugin-shared-keys.js')
-  const roleSchemaPath = join(packedPackage, 'dist/core/internal/plugin-contract.js')
-  /** Original packed bytes restored in `finally` so the next oracle observes the real package. */
-  const root = readFileSync(rootPath)
-  const sharedKeys = readFileSync(sharedKeysPath)
-  const roleSchema = readFileSync(roleSchemaPath)
-  if (existsSync(canonicalChunkPath))
-    throw new Error('Packed canonical chunk owner unexpectedly exists before restoration')
-  const sharedKeysSource = sharedKeys.toString('utf8')
-  const roleSchemaSource = roleSchema.toString('utf8')
-  /** Stable anchors that ensure this probe changes only the retired owner contract. */
-  const sharedAnchor = "outboundAttachment: 'outboundAttachment'"
-  const roleAnchor = "'middleware-finalize': Object.freeze({"
-  if (!sharedKeysSource.includes(sharedAnchor) || !roleSchemaSource.includes(roleAnchor))
-    throw new Error('Packed root-alias restoration anchors are unavailable')
-  /** Derived packed metadata used solely for the temporary retired-owner restoration. */
-  const restoredSharedKeys = `${sharedKeysSource.replace(
-    sharedAnchor,
-    `${sharedAnchor},\n    chunk: 'chunk'`
-  )}`
-  const restoredRoleSchema = roleSchemaSource.replace(
-    roleAnchor,
-    `chunk: Object.freeze({\n        sharedProvides: Object.freeze([RpcPortName.chunk]),\n        sharedConsumes: Object.freeze([]),\n        sharedOptionalConsumes: Object.freeze([])\n    }),\n    ${roleAnchor}`
-  )
-  /** Child-process entry that observes root exports without sharing the parent ESM cache. */
-  const probe = join(consumerDirectory, 'legacy-root-alias-probe.mjs')
-  /** Cache-busting suffix for each independent root export observation. */
-  let probeVersion = 0
-  /** Asserts the root export visibility expected before, during, or after the perturbation. */
-  const assertRootChunkAbsent = (expectPresent) => {
-    probeVersion += 1
-    writeFileSync(
-      probe,
-      [
-        `import * as root from ${JSON.stringify(`${pathToFileURL(rootPath).href}?${probeVersion}`)}`,
-        "if ('chunk' in root) {",
-        "  process.stderr.write('Packed root chunk export is present\\n')",
-        '  process.exit(1)',
-        '}'
-      ].join('\n'),
-      'utf8'
-    )
-    try {
-      execFileSync(process.execPath, [probe], { cwd: consumerDirectory, stdio: 'pipe' })
-    } catch (error) {
-      const stderr = String(error.stderr ?? '').trim()
-      if (expectPresent && stderr === 'Packed root chunk export is present') return
-      throw error
-    }
-    if (expectPresent) throw new Error('Packed root chunk export was not observed')
-  }
-  assertRootChunkAbsent(false)
-  try {
-    writeFileSync(sharedKeysPath, restoredSharedKeys, 'utf8')
-    writeFileSync(roleSchemaPath, restoredRoleSchema, 'utf8')
-    writeFileSync(canonicalChunkPath, legacyChunkSource, 'utf8')
-    writeFileSync(
-      rootPath,
-      `${root.toString('utf8')}\nexport { canonicalChunk as chunk } from './core/middleware/canonical-chunk.js'\n`,
-      'utf8'
-    )
-    assertRootChunkAbsent(true)
-    probeVersion += 1
-    writeFileSync(
-      probe,
-      [
-        `import * as root from ${JSON.stringify(`${pathToFileURL(rootPath).href}?${probeVersion}`)}`,
-        `import { RpcPortName } from ${JSON.stringify(pathToFileURL(sharedKeysPath).href)}`,
-        'const installed = root.chunk({ chunkSize: 4 }).install()',
-        'const chunk = installed.shared[RpcPortName.chunk]',
-        "if (JSON.stringify(chunk.split('abcdefgh', 4)) !== JSON.stringify(['abcd', 'efgh']))",
-        "  throw new Error('Restored root chunk export did not install the exact split capability')"
-      ].join('\n'),
-      'utf8'
-    )
-    execFileSync(process.execPath, [probe], { cwd: consumerDirectory, stdio: 'pipe' })
-  } finally {
-    writeFileSync(rootPath, root)
-    writeFileSync(sharedKeysPath, sharedKeys)
-    writeFileSync(roleSchemaPath, roleSchema)
-    if (existsSync(canonicalChunkPath)) rmSync(canonicalChunkPath)
-  }
-  if (
-    !readFileSync(rootPath).equals(root) ||
-    !readFileSync(sharedKeysPath).equals(sharedKeys) ||
-    !readFileSync(roleSchemaPath).equals(roleSchema)
-  )
-    throw new Error('Packed root-alias restoration did not preserve exact original bytes')
-  assertRootChunkAbsent(false)
-}
-
-/** Proves that the compiled canonical feature rejects an injected retired chunk route. */
-function assertPackedCanonicalFeatureRoutePerturbation(packedPackage, consumerDirectory) {
-  /** Actual compiled feature file whose install body is the only mutation target. */
-  const canonicalFeaturePath = join(packedPackage, 'dist/core/features/canonical-chunk.js')
-  /** Original bytes retained for byte-exact restoration after the adversarial installation. */
-  const original = readFileSync(canonicalFeaturePath)
-  const source = original.toString('utf8')
-  /** Exact compiled constructor statement still inside native Feature installation claim capture. */
-  const anchor = 'this.#core = core;'
-  if (!source.includes(anchor))
-    throw new Error('Packed canonical feature route mutation anchor is unavailable')
-  /** One-line perturbation that makes the real canonical feature claim the retired route. */
-  const mutated = source.replace(
-    anchor,
-    `${anchor}\n        this.#core.featureExpose.getKernel().registerRoute('chunk', () => undefined);`
-  )
-  /** Fresh child-process probe that preserves the packed outbound-to-canonical dependency path. */
-  const probe = join(consumerDirectory, 'canonical-feature-route-probe.mjs')
-  /** Exact stderr marker emitted only for the expected production parity rejection. */
-  const expectedFailure =
-    'Packed canonical chunk feature retained forbidden legacy chunk route authority'
-  /** Runs a fresh composed installation and distinguishes the intended mutant rejection. */
-  const run = (expectFailure) => {
-    writeFileSync(
-      probe,
-      [
-        "import { createComposedEndpoint } from './node_modules/@migaia/rpc-host/dist/core/composed.js'",
-        "import { createCanonicalChunkFeature } from './node_modules/@migaia/rpc-host/dist/core/features/canonical-chunk.js'",
-        "import { createOutboundFeature } from './node_modules/@migaia/rpc-host/dist/core/features/outbound.js'",
-        "import { connect } from './node_modules/@migaia/rpc-host/dist/core/middleware/connect.js'",
-        "import { codec } from './node_modules/@migaia/rpc-host/dist/core/middleware/codec.js'",
-        "import { MessageChannel } from 'node:worker_threads'",
-        "import { createNodeMessagePortTransport } from './node_modules/@migaia/rpc-host/dist/core/adapters/message-port.js'",
-        "import { createStringFramer } from '@migaia/rpc-contract/framing'",
-        "import { defineJsonCodec } from '@migaia/serialize/codecs/json'",
-        'const { port1, port2 } = new MessageChannel()',
-        'const transport = createNodeMessagePortTransport(port1)',
-        'port1.unref(); port2.unref()',
-        'try {',
-        '  const endpoint = await createComposedEndpoint(',
-        "    { id: 'packed-canonical-feature-route', transport, framer: createStringFramer(), middlewares: [codec(defineJsonCodec({ version: 1 })), connect({ transport })] },",
-        '    { outbound: createOutboundFeature(createCanonicalChunkFeature()) }',
-        '  )',
-        "  if ('chunk' in endpoint) throw new Error('Canonical feature leaked a root chunk surface')",
-        '  await endpoint.dispose()',
-        "  if (process.argv[2] === 'mutated') throw new Error('Injected canonical feature route was not rejected')",
-        '} catch (error) {',
-        "  if (process.argv[2] === 'mutated' && error?.source === 'rpc.endpoint' && error?.code === 'INVALID_CONFIG' && error?.message === 'endpoint module token is invalid') {",
-        `    process.stderr.write(${JSON.stringify(`${expectedFailure}\n`)})`,
-        '    process.exit(1)',
-        '  }',
-        '  throw error',
-        '} finally { port1.close(); port2.close() }'
-      ].join('\n'),
-      'utf8'
-    )
-    try {
-      execFileSync(process.execPath, [probe, expectFailure ? 'mutated' : 'baseline'], {
-        cwd: consumerDirectory,
-        stdio: 'pipe'
-      })
-    } catch (error) {
-      if (expectFailure && String(error.stderr ?? '').trim() === expectedFailure) return
-      throw error
-    }
-    if (expectFailure) throw new Error('Injected canonical feature route was not rejected')
-  }
-  run(false)
-  try {
-    writeFileSync(canonicalFeaturePath, mutated, 'utf8')
-    if (
-      !readFileSync(canonicalFeaturePath, 'utf8').includes(
-        "this.#core.featureExpose.getKernel().registerRoute('chunk', () => undefined);"
-      )
-    )
-      throw new Error('Packed canonical feature route mutation was not written')
-    run(true)
-  } finally {
-    writeFileSync(canonicalFeaturePath, original)
-  }
-  if (!readFileSync(canonicalFeaturePath).equals(original))
-    throw new Error(
-      'Packed canonical feature route restoration did not preserve exact original bytes'
-    )
-  run(false)
 }
 
 /** Bundles one packed public import and executes its observable result in a fresh Chromium page. */
@@ -490,12 +237,13 @@ async function assertPackedSelectiveBrowserImport(
   const retainedInputs = Object.entries(output.inputs)
     .filter(([, input]) => input.bytesInOutput > 0)
     .map(([path]) => resolve(consumerDirectory, path))
-  const coreDist = `${resolve(packedPackage, 'dist/core')}/`
-  const contractDist = `${resolve(packedContract, 'dist/contract')}/`
-  if (!retainedInputs.some((path) => path.startsWith(coreDist)))
-    throw new Error('Selective browser bundle omitted retained rpc core input')
-  if (retainedInputs.some((path) => path.startsWith(contractDist)))
-    throw new Error('Selective browser bundle retained rpc contract input')
+  /** Error behavior belongs to Contract; the root re-export must not retain Host execution. */
+  const hostDist = resolve(packedPackage, 'dist') + '/'
+  const errorsDist = resolve(packedContract, 'dist/errors') + '/'
+  if (!retainedInputs.some((path) => path.startsWith(errorsDist)))
+    throw new Error('Selective browser bundle omitted canonical error behavior')
+  if (retainedInputs.some((path) => path.startsWith(hostDist)))
+    throw new Error('Selective error import retained Host execution')
 
   let browser
   let context
@@ -526,354 +274,18 @@ function resolveEsbuildBinary() {
   return binary
 }
 
-/** Verifies the retained Feature owner documentation graph with TypeScript symbols. */
-function assertDefineFeatureDocumentation(packedPackage) {
-  const roots = [
-    resolve(packageDirectory, 'src/core/feature.ts'),
-    resolve(packageDirectory, 'dist/core/feature.d.ts'),
-    join(packedPackage, 'dist/core/feature.d.ts')
-  ]
-  const manifests = roots.map((path) => readFeatureDocumentationManifest(path))
-  if (JSON.stringify(manifests[0]) !== JSON.stringify(manifests[1]))
-    throw new Error('Built root feature documentation manifest drifted from source')
-  if (JSON.stringify(manifests[1]) !== JSON.stringify(manifests[2]))
-    throw new Error('Packed root feature documentation manifest drifted from built declarations')
-
-  const negativeDirectory = mkdtempSync(join(smokeDirectory, 'feature-doc-negative-'))
-  try {
-    const fixtureDist = join(negativeDirectory, 'dist')
-    const fixtureRoot = join(fixtureDist, 'core/feature.d.ts')
-    const fixtureFeature = join(fixtureDist, 'core/feature.d.ts')
-    cpSync(join(packedPackage, 'dist'), fixtureDist, { recursive: true })
-    const originalFeature = readFileSync(fixtureFeature, 'utf8')
-    if (
-      JSON.stringify(readFeatureDocumentationManifest(fixtureRoot)) !== JSON.stringify(manifests[2])
-    )
-      throw new Error('Complete packed feature documentation fixture drifted before mutation')
-    writeFileSync(fixtureFeature, originalFeature.replace(/\/\*\*[\s\S]*?\*\//gu, ''), 'utf8')
-    expectFeatureDocumentationFailure(
-      fixtureRoot,
-      'comment-stripped declaration',
-      'Feature documentation missing for public symbol: defineFeature'
-    )
-    writeFileSync(fixtureFeature, originalFeature, 'utf8')
-    if (
-      JSON.stringify(readFeatureDocumentationManifest(fixtureRoot)) !== JSON.stringify(manifests[2])
-    )
-      throw new Error('Complete packed feature documentation fixture did not recover')
-    writeFileSync(fixtureRoot, 'export {}\n', 'utf8')
-    expectFeatureDocumentationFailure(
-      fixtureRoot,
-      'missing root export',
-      'Feature documentation root export missing: defineFeature'
-    )
-  } finally {
-    rmSync(negativeDirectory, { recursive: true, force: true })
-  }
-}
-
-/**
- * Parses one source or declaration file for the documentation manifest.
- *
- * @param {string} path Absolute `.ts` or `.d.ts` path.
- * @returns {{
- *   path: string
- *   text: string
- *   program: import('oxc-parser').Program
- *   comments: import('oxc-parser').Comment[]
- * }}
- */
-function parseDocumentationFile(path) {
-  const text = readFileSync(path, 'utf8')
-  const { program, comments } = parseSync(path, text)
-  return { path, text, program, comments }
-}
-
-/**
- * Resolves one relative module specifier the way the matching tree is laid out: declarations
- * resolve to `.d.ts` siblings, sources to `.ts` sources.
- *
- * @param {string} fromFile Importing file.
- * @param {string} specifier Relative specifier as written.
- * @returns {string} Existing target file.
- * @throws {Error} When the specifier is bare or no matching file exists.
- */
-function resolveDocumentationModule(fromFile, specifier) {
-  if (!specifier.startsWith('.'))
-    throw new Error(`Feature documentation import is not relative: ${specifier}`)
-  const base = resolve(dirname(fromFile), specifier)
-  const candidates = fromFile.endsWith('.d.ts')
-    ? [base.replace(/\.(?:js|ts)$/u, '.d.ts')]
-    : [base.replace(/\.js$/u, '.ts'), base]
-  const found = candidates.find((candidate) => existsSync(candidate))
-  if (!found) throw new Error(`Feature documentation import is unresolved: ${specifier}`)
-  return found
-}
-
-/** Name written by an import/export specifier side (`Identifier` or string `Literal`). */
-function specifierName(node) {
-  return node.type === 'Identifier' ? node.name : node.value
-}
-
-/** Names declared by one declaration node, for the declaration kinds the manifest reads. */
-function declaredNames(declaration) {
-  if (declaration.type === 'VariableDeclaration')
-    return declaration.declarations.flatMap((item) =>
-      item.id.type === 'Identifier' ? [item.id.name] : []
-    )
-  return declaration.id?.type === 'Identifier' ? [declaration.id.name] : []
-}
-
-/**
- * Follows the export graph from one file to every declaration of an exported name. Overloads are
- * separate declarations of the same name.
- *
- * @param {string} path File whose export is requested.
- * @param {string} name Exported name.
- * @param {Set<string>} [seen] Visited `file#name` pairs; stops `export *` cycles.
- * @returns {{
- *       file: ReturnType<typeof parseDocumentationFile>
- *       declarations: { statement: any; node: any }[]
- *     }
- *   | undefined}
- */
-function findExportedDeclarations(path, name, seen = new Set()) {
-  if (seen.has(`${path}#${name}`)) return undefined
-  seen.add(`${path}#${name}`)
-  const file = parseDocumentationFile(path)
-  /** Finds a same-file declaration or import binding of a locally re-exported name. */
-  const findLocal = (local) => {
-    const declarations = []
-    for (const statement of file.program.body) {
-      const node =
-        statement.type === 'ExportNamedDeclaration' && statement.declaration
-          ? statement.declaration
-          : statement
-      if (node.type === 'ImportDeclaration') {
-        for (const specifier of node.specifiers)
-          if (specifier.local.name === local)
-            return findExportedDeclarations(
-              resolveDocumentationModule(path, node.source.value),
-              specifier.type === 'ImportSpecifier' ? specifierName(specifier.imported) : 'default',
-              seen
-            )
-      } else if (declaredNames(node).includes(local)) declarations.push({ statement, node })
-    }
-    return declarations.length > 0 ? { file, declarations } : undefined
-  }
-  const declarations = []
-  for (const statement of file.program.body) {
-    if (statement.type === 'ExportNamedDeclaration') {
-      if (statement.declaration) {
-        if (declaredNames(statement.declaration).includes(name))
-          declarations.push({ statement, node: statement.declaration })
-        continue
-      }
-      for (const specifier of statement.specifiers) {
-        if (specifierName(specifier.exported) !== name) continue
-        const local = specifierName(specifier.local)
-        return statement.source
-          ? findExportedDeclarations(
-              resolveDocumentationModule(path, statement.source.value),
-              local,
-              seen
-            )
-          : findLocal(local)
-      }
-    }
-    if (statement.type === 'ExportAllDeclaration' && statement.exported === null) {
-      const found = findExportedDeclarations(
-        resolveDocumentationModule(path, statement.source.value),
-        name,
-        seen
-      )
-      if (found) return found
-    }
-  }
-  return declarations.length > 0 ? { file, declarations } : undefined
-}
-
-/**
- * Reads the JSDoc block written directly before one node: its description and its `@tag` blocks.
- *
- * @param {ReturnType<typeof parseDocumentationFile>} file Parsed file holding the node.
- * @param {{ start: number }} node Statement or member the comment documents.
- * @returns {{ description: string; tags: { name: string; text: string }[] }}
- */
-function readJSDoc(file, node) {
-  const comment = file.comments
-    .filter(
-      (candidate) =>
-        candidate.type === 'Block' &&
-        candidate.value.startsWith('*') &&
-        candidate.end <= node.start &&
-        /^\s*$/u.test(file.text.slice(candidate.end, node.start))
-    )
-    .at(-1)
-  if (!comment) return { description: '', tags: [] }
-  const lines = comment.value
-    .slice(1)
-    .split('\n')
-    .map((line) => line.replace(/^\s*\*?\s?/u, ''))
-  const firstTag = lines.findIndex((line) => line.startsWith('@'))
-  const description = (firstTag < 0 ? lines : lines.slice(0, firstTag)).join(' ')
-  const tags = []
-  for (const line of firstTag < 0 ? [] : lines.slice(firstTag)) {
-    const tag = /^@(\w+)\s*(.*)$/u.exec(line)
-    if (tag) tags.push({ name: tag[1], text: tag[2] })
-    else if (tags.length > 0) tags.at(-1).text += ` ${line}`
-  }
-  return {
-    description: normalizeJSDocComment(description),
-    tags: tags.map((tag) => ({ name: tag.name, text: normalizeJSDocComment(tag.text) }))
-  }
-}
-
-/**
- * Order tag names by the shared UTF-16 contract while retaining every same-name tag in source
- * order.
- *
- * @param {readonly { name: string; text: string }[]} tags Original tags, including repeated names.
- * @returns {[string, string][]} All original entries grouped in stable canonical name order.
- */
-function orderedDocumentationTags(tags) {
-  /** Each name keeps its original ordered cohort; no tag is deduplicated or overwritten. */
-  const groups = new Map()
-  for (const tag of tags) {
-    /** The cohort belongs to this exact stable tag name. */
-    let entries = groups.get(tag.name)
-    if (!entries) groups.set(tag.name, (entries = []))
-    entries.push([tag.name, tag.text])
-  }
-  return orderStringKeys([...groups.keys()]).flatMap((name) => groups.get(name))
-}
-
-/**
- * Extracts a stable public-symbol and overload documentation manifest through the root export
- * graph.
- */
-function readFeatureDocumentationManifest(rootPath) {
-  if (!existsSync(rootPath))
-    throw new Error(`Feature documentation root is unreadable: ${rootPath}`)
-  const names = ['defineFeature', 'IRpcFeatureDefinition', 'IRpcFeature', 'IRpcFeatureSurface']
-  const manifest = {}
-  for (const name of names) {
-    const exported = findExportedDeclarations(rootPath, name)
-    if (!exported) throw new Error(`Feature documentation root export missing: ${name}`)
-    const docs = exported.declarations.map(({ statement }) => readJSDoc(exported.file, statement))
-    const documentation = [...new Set(docs.map((doc) => doc.description).filter(Boolean))].join(' ')
-    if (!documentation) throw new Error(`Feature documentation missing for public symbol: ${name}`)
-    const tags = orderedDocumentationTags(docs.flatMap((doc) => doc.tags))
-    if (name === 'defineFeature') {
-      const overloads = exported.declarations.filter(
-        ({ node }) => node.type === 'TSDeclareFunction'
-      )
-      if (overloads.length !== 2)
-        throw new Error(`defineFeature overload count drifted in ${rootPath}`)
-      const overloadManifest = overloads.map(({ statement, node }) => {
-        const doc = readJSDoc(exported.file, statement)
-        const overloadTags = orderedDocumentationTags(doc.tags)
-        /** `@param name - text` and `@typeParam name - text` both split on the first word. */
-        const named = (tagName) =>
-          doc.tags
-            .filter((tag) => tag.name === tagName)
-            .map((tag) => {
-              const parsed = tag.text.match(/^([^\s-]+)\s*-?\s*(.*)$/u)
-              return { name: parsed?.[1] ?? '', documentation: parsed?.[2] ?? '' }
-            })
-        const parameters = named('param')
-        const typeParameters = named('typeParam')
-        const expectedParameters = node.params.map((parameter) =>
-          exported.file.text
-            .slice(parameter.start, parameter.typeAnnotation?.start ?? parameter.end)
-            .replace(/\??\s*$/u, '')
-        )
-        if (
-          !doc.description ||
-          JSON.stringify(parameters.map((parameter) => parameter.name)) !==
-            JSON.stringify(expectedParameters) ||
-          parameters.some((parameter) => !parameter.documentation) ||
-          JSON.stringify(typeParameters.map((parameter) => parameter.name)) !==
-            JSON.stringify(
-              node.typeParameters?.params.map((parameter) => parameter.name.name) ?? []
-            ) ||
-          typeParameters.some((parameter) => !parameter.documentation) ||
-          !['remarks', 'returns', 'throws'].every((tag) =>
-            overloadTags.some(([name, text]) => name === tag && text)
-          )
-        )
-          throw new Error(`defineFeature overload documentation is incomplete in ${rootPath}`)
-        return {
-          documentation: doc.description,
-          parameters,
-          tags: overloadTags,
-          typeParameters
-        }
-      })
-      manifest[name] = { documentation, tags, overloads: overloadManifest }
-    } else {
-      manifest[name] = { documentation, tags }
-    }
-  }
-  const config = findExportedDeclarations(
-    resolve(dirname(rootPath), rootPath.endsWith('.d.ts') ? 'typing.d.ts' : 'typing.ts'),
-    'IRpcFactoryConfig'
-  )
-  if (!config) throw new Error('Feature documentation root export missing: IRpcFactoryConfig')
-  const declaration = config.declarations.find(({ node }) => node.type === 'TSTypeAliasDeclaration')
-  const property = declaration?.node.typeAnnotation.members?.find(
-    (member) =>
-      member.type === 'TSPropertySignature' &&
-      config.file.text.slice(member.key.start, member.key.end) === 'features'
-  )
-  const configurationDocumentation = property ? readJSDoc(config.file, property).description : ''
-  const propertyType = property?.typeAnnotation
-    ? config.file.text.slice(
-        property.typeAnnotation.typeAnnotation.start,
-        property.typeAnnotation.typeAnnotation.end
-      )
-    : ''
-  if (!property || !configurationDocumentation || !propertyType.includes('TFeatures'))
-    throw new Error(`Feature configuration documentation is incomplete in ${rootPath}`)
-  manifest.IRpcFactoryConfig = {
-    documentation: configurationDocumentation,
-    type: propertyType
-  }
-  return manifest
-}
-
-/** Requires the same root-graph validator to reject a deliberately invalid declaration surface. */
-function expectFeatureDocumentationFailure(rootPath, label, expectedMessage) {
-  try {
-    readFeatureDocumentationManifest(rootPath)
-  } catch (error) {
-    if (error instanceof Error && error.message === expectedMessage) return
-    throw error
-  }
-  throw new Error(`Feature documentation validator accepted ${label}`)
-}
-
-/** Collapses JSDoc whitespace so source and emitted declarations compare equal. */
-function normalizeJSDocComment(comment) {
-  return comment.replace(/\s+/gu, ' ').trim()
-}
-
-/** Rejects packed declaration or export-map leakage of package-test identity observers. */
+/** Retired test observers have neither a shipped implementation nor a public entry. */
 function assertIdentityObserverDeclarationsHidden(packedPackage) {
-  const declaration = readFileSync(
-    join(packedPackage, 'dist/core/internal/test-observer.d.ts'),
-    'utf8'
+  if (existsSync(join(packedPackage, 'dist/core/internal/test-observer.d.ts')))
+    throw new Error('Packed RPC retained a deleted identity-observer declaration')
+  /** Only the archive's genuine export map is admitted; no private wildcard can bypass it. */
+  const manifest = JSON.parse(readFileSync(join(packedPackage, 'package.json'), 'utf8'))
+  if (
+    Object.keys(manifest.exports).some(
+      (path) => path.includes('test-observer') || path.includes('*')
+    )
   )
-  const packageJson = JSON.parse(readFileSync(join(packedPackage, 'package.json'), 'utf8'))
-  const forbiddenNames = [
-    'registerInboundIdentityReleaseObservation',
-    'recordInboundIdentityRelease',
-    'readInboundIdentityReleaseObservation'
-  ]
-  if (forbiddenNames.some((name) => declaration.includes(name)))
-    throw new Error('Packed identity observer declaration leaked a callable')
-  if (Object.hasOwn(packageJson.exports, './core/internal/test-observer'))
-    throw new Error('Packed identity observer internal subpath is exported')
+    throw new Error('Packed RPC exposes a private identity-observer entry')
 }
 
 /** Packs each runtime dependency and installs only its extracted tarball in the isolated consumer. */
@@ -891,7 +303,7 @@ function createSmokeModule() {
   const publicImports = [
     ...publicSubpaths.map(
       (specifier) =>
-        `{ const publicModule = await import('${specifier}'${specifier === '@migaia/rpc-contract/schema/wire-error' ? ", { with: { type: 'json' } }" : ''}); ${specifier === '@migaia/rpc-contract/schema/wire-error' ? "if (Object.keys(publicModule).length !== 1 || !('default' in publicModule)) throw new Error('Native wire-error schema must expose only its default JSON value');" : ''} if ('assertRpcModuleInstance' in publicModule) throw new Error('Private instance helper is publicly exported: ${specifier}'); process.stdout.write('SUBPATH ${specifier} ' + Object.keys(publicModule).length + '\\n'); }`
+        `{ const publicModule = await import('${specifier}'${specifier.startsWith('@migaia/rpc-contract/schema/') ? ", { with: { type: 'json' } }" : ''}); ${specifier.startsWith('@migaia/rpc-contract/schema/') ? "if (Object.keys(publicModule).length !== 1 || !('default' in publicModule)) throw new Error('Native wire-error schema must expose only its default JSON value');" : ''} if ('assertRpcModuleInstance' in publicModule) throw new Error('Private instance helper is publicly exported: ${specifier}'); process.stdout.write('SUBPATH ${specifier} ' + Object.keys(publicModule).length + '\\n'); }`
     ),
     "process.stdout.write('CHECK subpath-imports PASS\\n');"
   ].join('\n')
@@ -957,7 +369,7 @@ for (const name of ['createProcessHost', 'createServeProcessHost', 'createServeP
 /** Only the real installed user root can establish the final public factory contract. */
 const publicRoot = await import('@migaia/rpc-host');
 /** Author SDK inspection is independent of the lower-level private kernel probes below. */
-const publicSdk = await import('@migaia/rpc-host/plugin');
+const publicSdk = await import('@migaia/rpc-host/sdk');
 assert.equal(typeof publicRoot.createRpcHost, 'function', 'packed Host factory');
 for (const name of ['createEndpoint', 'createFullEndpoint', 'createFullOneWayEndpoint', 'createRuntimeApiEndpoint'])
   assert.equal(name in publicRoot, false, 'retired packed Host factory: ' + name);
@@ -965,6 +377,15 @@ for (const name of ['createRuntimePeer', 'createManagedRuntimePeer', 'createRunt
   assert.equal(name in publicSdk, false, 'retired packed SDK factory: ' + name);
 /** Cooperative transport construction must resolve from the real new package root. */
 const coroutineExports = await import('@migaia/rpc-plugin-coroutines');
+/** Existing Utils deferred owns the task's single wait until native cancellation. */
+const { deferred } = await import('@migaia/utils/promise');
+/** A once listener is released by its owning native task signal before child cleanup begins. */
+function waitForTaskAbort(signal) {
+  const waiting = deferred();
+  if (signal.aborted) waiting.resolve();
+  else signal.addEventListener('abort', () => waiting.resolve(), { once: true });
+  return waiting.promise;
+}
 assert.equal(typeof coroutineExports.coroutinePlugin, 'function', 'packed coroutine plugin');
 /** The task publishes its actual child Host after the same native message handshake. */
 let resolveChild;
@@ -981,38 +402,19 @@ const packedHost = await publicRoot.createRpcHost({
       });
       resolveChild(child);
       try {
-        await new Promise((resolve) => {
-          if (signal.aborted) resolve();
-          else signal.addEventListener('abort', () => resolve(), { once: true });
-        });
+        await waitForTaskAbort(signal);
       } finally { await child.close(); }
     }
   })]
 });
 await childReady;
-try { assert.equal(await packedHost.request('echo', 42), 42); }
+try {
+  assert.equal('request' in packedHost, false);
+  assert.equal(await packedHost.coroutine.request('echo', 42), 42);
+}
 finally { await packedHost.close(); }
 process.stdout.write('CHECK host-entry PASS\\n');
-const { connect } = await import('./node_modules/@migaia/rpc-host/dist/core/middleware/connect.js');
-const { defineFeature } = await import('./node_modules/@migaia/rpc-host/dist/core/feature.js');
-const composed = await import('./node_modules/@migaia/rpc-host/dist/core/composed.js');
-const { MessageChannel } = await import('node:worker_threads');
-const { createNodeMessagePortTransport } = await import('./node_modules/@migaia/rpc-host/dist/core/adapters/message-port.js');
-const { port1, port2 } = new MessageChannel();
-const transport = createNodeMessagePortTransport(port1);
-port1.unref(); port2.unref();
-const middleware = connect();
-const packedFeature = defineFeature(() => ({ packedCustom: () => 'packed-custom' }));
-try {
-  await composed.createComposedEndpoint({ id: 'packed-legacy-shape', transport, middlewares: [{ name: 'legacy', install() {} }] }, {});
-  throw new Error('Packed legacy middleware shape was accepted');
-} catch (error) {
-  if (error?.code !== 'INVALID_CONFIG') throw error;
-}
-const custom = await composed.createComposedEndpoint({ id: 'packed-composed', transport, middlewares: [middleware], features: [packedFeature] }, {});
-if (custom.packedCustom() !== 'packed-custom') throw new Error('Packed custom feature runtime projection failed');
-await custom.dispose();
-port1.close(); port2.close();
+
 `
 }
 
@@ -1038,9 +440,9 @@ function assertPackedOwnerManifests(packedPackages) {
     'rpc-host': ['@migaia/rpc-contract'],
     'rpc-plugin-process': ['@migaia/rpc-contract', '@migaia/rpc-host'],
     'rpc-plugin-thread': ['@migaia/rpc-contract', '@migaia/rpc-host'],
-    'rpc-plugin-browser': ['@migaia/rpc-host'],
+    'rpc-plugin-browser': ['@migaia/rpc-contract', '@migaia/rpc-host'],
     'rpc-plugin-coroutines': ['@migaia/rpc-contract', '@migaia/rpc-host'],
-    'rpc-plugin-pool': ['@migaia/rpc-host'],
+    'rpc-plugin-pool': ['@migaia/rpc-contract', '@migaia/rpc-host'],
     'rpc-plugin-devtools': ['@migaia/rpc-contract', '@migaia/rpc-host']
   }
   for (const [owner, directory] of Object.entries(packedPackages)) {
@@ -1066,7 +468,7 @@ function assertPackedOwnerManifests(packedPackages) {
         throw new Error(`Packed owner exposes a private entry: ${owner}${subpath}`)
       /** The public JSON schema resolves its own JSON type; every code entry has a declaration. */
       const targetFields =
-        owner === 'rpc-contract' && subpath === './schema/wire-error'
+        owner === 'rpc-contract' && subpath.startsWith('./schema/')
           ? ['default']
           : ['types', 'default']
       for (const field of targetFields)

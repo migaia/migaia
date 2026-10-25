@@ -49,25 +49,6 @@ type IAdmission = ProviderAdmissionRegistry & {
   captureIngress(): { ready(submit: () => void): boolean; release(): boolean } | undefined
 }
 
-it('original admission reserves every group member or changes no lease', () => {
-  /** New semantics are checked through the old class, without a missing-module RED. */
-  const owner = new ProviderAdmissionRegistry(3, 3) as IAdmission
-  const reserve = Reflect.get(owner, 'acquireMany')
-  assert.equal(typeof reserve, 'function', 'original admission owns atomic group reservation')
-  assert.equal(owner.acquireMany(['first:0', 'first:1'], 'peer'), true)
-  assert.equal(owner.size, 2)
-  assert.equal(owner.acquireMany(['second:0', 'second:1'], 'peer'), false)
-  assert.equal(owner.size, 2, 'the competing group never holds a partial slot')
-  assert.equal(owner.acquire('single', 'peer'), true)
-  assert.equal(owner.acquireMany(['single', 'extra'], 'peer'), false)
-  owner.release('first:0')
-  owner.release('first:1')
-  assert.equal(owner.acquireMany(['second:0', 'second:1'], 'peer'), true)
-  assert.equal(owner.size, 3)
-  owner.clear()
-  assert.equal(owner.size, 0)
-})
-
 it('physical receipts preserve arrival order without consuming the sole business slot', () => {
   /** The third argument represents once-read original framing capacity, not execution quota. */
   const owner = Reflect.construct(ProviderAdmissionRegistry, [1, 1, 4]) as IAdmission

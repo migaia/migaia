@@ -33,10 +33,7 @@ import {
   createRuntimeBytePipeline,
   runtimeMessagePipeline
 } from '../../../rpc-host/dist/runtime-adapter/byte/pipeline.js'
-import {
-  ERROR_SOURCE,
-  RpcProcessErrorCode
-} from '../../../rpc-plugin-process/dist/process/error-code.js'
+import { RPC_PROCESS_ERROR_SOURCE as ERROR_SOURCE, RpcProcessErrorCode } from '@migaia/rpc-contract/error-code'
 import { RpcProcessErrorText } from '../../../rpc-plugin-process/dist/process/error-text.js'
 import { attachIpcStderr } from '../../../rpc-plugin-process/dist/process/stderr.js'
 

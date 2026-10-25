@@ -2,38 +2,11 @@
 
 [README](./README.en.md) · [中文](./USEGUIDE.md)
 
-Choose a process source, then install the actual processPlugin on createRpcHost. The host owns providers, calls, and unified closure; native owners retain launch, sockets, authentication, supervision, and drain.
+A Host normally selects one transport kind. The root owns `self/provide/close`; calls live under a namespace, `process` by default. These complete TypeScript modules are checked against current public dist, not proof of native-environment or authentication acceptance.
 
-## Execute in a real child and close it
+## Bidirectional local connections
 
-Save this as a standalone ESM entry. Node 24 can run TypeScript directly; other toolchains compile first. A self-spawned entry checks isProcessChild before parent work, with explicit connectToParent on the child to prevent recursive spawning.
-
-```ts doc-test=check
-import { createRpcHost } from '@migaia/rpc-host'
-import { processPlugin, isProcessChild } from '@migaia/rpc-plugin-process'
-
-if (await isProcessChild()) {
-  await createRpcHost({
-    plugins: [processPlugin({ connectToParent: true })],
-    provide: { double: (value: number) => value * 2 }
-  })
-} else {
-  const host = await createRpcHost<{ double(value: number): number }>({
-    plugins: [processPlugin({ spawn: true, connect: { timeoutMs: 1500 } })]
-  })
-  try {
-    console.log(await host.request('double', 21))
-  } finally {
-    await host.close()
-  }
-}
-```
-
-The parent prints 42. spawn:true selects the actual main entry; a path/URL selects another entry. Short options also support command/args, cwd, env, wrap, limits, permissions, and supervision. Explicit commands run without a shell; wrap transforms the original command once per launch. stdout belongs to stdio RPC; application logs use stderr.
-
-## Bidirectional sessions and multiple clients
-
-This Node/POSIX same-user named-service example interleaves methods in both directions on one session:
+Both sides of a connection may provide methods. This Node/POSIX named-service example demonstrates calls without asserting completed service authentication.
 
 ```ts doc-test=check
 import { randomUUID } from 'node:crypto'
@@ -41,22 +14,19 @@ import { createRpcHost } from '@migaia/rpc-host'
 import { processPlugin } from '@migaia/rpc-plugin-process'
 
 const address = 'service-' + randomUUID()
-const server = await createRpcHost<{ clientValue(value: string): string }>({
+const server = await createRpcHost({
   plugins: [processPlugin({ listen: address })],
   provide: { double: (value: number) => value * 2 }
 })
 try {
-  const client = await createRpcHost<{ double(value: number): number }>({
+  const client = await createRpcHost({
     self: { name: 'client-a', instanceId: randomUUID() },
     plugins: [processPlugin({ connect: { target: address, timeoutMs: 1500 } })],
     provide: { clientValue: (value: string) => 'client:' + value }
   })
   try {
-    const values = await Promise.all([
-      client.request('double', 21),
-      server.send('client-a', 'clientValue', 'ready')
-    ])
-    console.log(values)
+    console.log(await client.process.request('double', 21))
+    console.log(await server.process.send('client-a', 'clientValue', 'ready'))
   } finally {
     await client.close()
   }
@@ -65,38 +35,63 @@ try {
 }
 ```
 
-After a separate client-b joins, server.request('clientValue',value) broadcasts and retains fulfilled/rejected per target identity. send('client-a',...) selects only that current direct client. Streams have independent target iterators. Closing a client releases its session, not the service or other clients; server.close releases its listener and sessions.
+Untargeted `request` uses the current namespace's direct targets, retaining per-target results for several peers. `send(nameOrId, method, payload)` selects one current direct peer. A business stream owns its iterator/cancellation, not the entire native process. Empty-session calls during restart still differ from the old downtime error; an empty set does not indicate completed recovery.
 
-## Credentials, addresses, and preparation budgets
+## Complete feature instances and probe
 
-Use connect:{target:nameOrAddress,timeoutMs?}, with target inside connect. spawn/listen/connectToParent can also carry timeout-only connect settings. connect.timeoutMs bounds real handshake preparation; top-level connectTimeoutMs bounds named-local rendezvous. Initial explicit-address dialing does not use the rendezvous loop. The original supervisor still owns established-session recovery, including an explicit socket service restarting.
-
-Same-user named endpoints retain original OS isolation and credentials. Explicit socket/TCP services need matching token, protocol, and service policies. Environment values or fabricated bootstrap objects do not establish trusted source identity. connectToParent reads actual stdin bootstrap only in a genuine child, before constructing the one call endpoint.
-
-wire:'jsonrpc' uses Content-Length byte framing and needs an actual contract or establish callback. Foreign services must implement matching protocol, authentication, capabilities, and descriptions; printing arbitrary JSON is insufficient.
-
-## Existing IPC features and business deadlines
+Native capacities, FIFO and logging belong to Process. This installs one flow and lends it to queue/log. Timeout is a transport-selected business feature; probe is a host intervention plugin installed before transport startup.
 
 ```ts doc-test=check
-import { sendQueueFeature, ipcLogFeature } from '@migaia/rpc-plugin-process/features'
-import timeoutFeature from '@migaia/rpc-host/features/timeout'
+import { createRpcHost } from '@migaia/rpc-host'
+import { processPlugin } from '@migaia/rpc-plugin-process'
+import { flowControl, sendQueue, ipcLog } from '@migaia/rpc-plugin-process/features'
+import { timeout } from '@migaia/rpc-host/features/timeout'
+import { probe } from '@migaia/rpc-host/plugins/probe'
 
-export const features = [
-  sendQueueFeature({ maxPendingData: 32, maxPendingControl: 8 }),
-  ipcLogFeature({
-    report: (record) => {
-      console.log(record)
+export async function openWorker(entry: URL) {
+  const flow = flowControl({ maxPendingData: 32, maxPendingControl: 8 })
+  const observer = probe({
+    stages: ['peer'],
+    emit(view) {
+      console.error(view.lifecycle)
     }
-  }),
-  timeoutFeature({ ms: 1500 })
-]
+  })
+  return createRpcHost({
+    plugins: [
+      observer,
+      processPlugin({
+        spawn: entry,
+        features: [
+          flow,
+          sendQueue({ flow }),
+          ipcLog({
+            report(record) {
+              console.error(record)
+            }
+          }),
+          timeout({ ms: 1500 })
+        ]
+      })
+    ]
+  })
+}
 ```
 
-Spread features into host.plugins alongside exactly one processPlugin. sendQueueFeature configures existing maxPendingData/maxPendingControl; ipcLogFeature supplies the original log sink. Omitted fields retain original configuration. The flow-control entry exports existing lane/event values and types, not another factory. Each definition installs at most once per host.
+The caller eventually awaits `host.close()`. A standalone `flowControl` is supported, and `sendQueue` may own a default flow. Supplying an explicit flow alongside duplicate capacity fields fails during cold configuration. These are not host-root configuration switches; the old `ipc.log` fallback field is removed. Logging alone does not enable throttling.
 
-Calls accept signal, timeoutMs, and idempotencyKey. Business deadlines are independent of handshake and rendezvous. Cancellation is cooperative; disconnection does not prove that work never executed. Declare actual idempotency and check storage/identity scope before using retry. Reconnection under the same authenticated principal can reuse the original scope/store; different principals stay isolated.
+`/features/send-queue`, `/features/flow-control` and `/features/log` expose their corresponding factories. Cancellation and capacity use actual installed owners. Per-logical-call accounting with batch remains unverified. Capacity rejection retains `OVERLOADED`; actual physical I/O failure uses `TRANSPORT` with its original cause.
 
-## Install on an existing PluginHost
+## Options and deadlines
+
+`connect: { target, timeoutMs? }` selects an existing service; timeout-only connect also decorates spawn/listen/parent. Negotiation defaults to 10,000 ms; name admission then uses `connect.timeoutMs`, also 10,000 ms by default. `pending` carries the unspent negotiation time plus this one name-probe budget; only the first notice extends the deadline, and repeated notices never refresh it. `connectTimeoutMs` bounds named-local discovery. Business calls use a complete `timeout(...)` feature or `timeout: false`, with an optional `signal`; these deadlines remain independent.
+
+Spawn accepts the main entry, a path/URL, short options or a complete native recipe. See README for self-spawn. Native `supervision` retains restart, health and stop policy; reconnection does not replay unconfirmed work. stdout belongs to stdio RPC; application logs use stderr.
+
+Automatic verification/principal, session/scope across reconnects and parts of native auth wiring remain incomplete. A token, environment value, claimed identity or client ID is not admission proof. Select actual `/plugins/auth`, `/plugins/schema`, `/plugins/chunk`, `/plugins/batch` and `/plugins/typegen` when needed. These are neither Contract internals nor transport configuration fields. Flow plugins install before transport startup; adding them afterward rejects.
+
+## Native members and ordinary PluginHost
+
+Use `host.process.members` for queries and controls. `list/get` return safe native-source descriptions; `on/watch` observe actual events. `stop/kill/restart/replace` depend on genuine ownership. Connecting to an external service does not grant remote process control.
 
 ```ts doc-test=check
 import { PluginHost } from '@migaia/plugin-host'
@@ -114,12 +109,14 @@ export async function installAndRelease(entry: URL) {
 }
 ```
 
-This installs a genuine definition instead of returning another complete call object as a source. The process outlet retains stop/restart/kill/replace, native exit, notices, and generations. name is local installation identity, separate from remote self.name. Services and tray retain their original outlet controls rather than bypassing replacement or leases.
+The same cold definition installs on the actual PluginHost without creating another Host. Ordinary `expose` names real installed Features through an explicit allowlist; calls still use the process namespace. Custom carriers use `@migaia/rpc-host/sdk`, without a retired assembler or endpoint-returning source.
 
-## Closure, failures, and platforms
+## Closure and errors
 
-Existing drain handles accepted requests/providers/streams before releasing a listener or owned child. Closing cannot publish a late unaccepted candidate, and cleanup failure cannot replace the primary. Native/cause/errors remain traceable. A borrowed service releases only this session, not its process. Repeated closure shares the original Promise; a terminate request is not native exit.
+Real supervisors stop owned children; borrowed services release only the local connection. Closing a listener grants no authority to terminate client processes. `close()` requests cleanup; do not assume every accepted operation drains successfully. Host close order versus original drain behavior remains unresolved.
 
-Responsive same-name sessions reject a candidate with HOST_PEER_NAME_DUPLICATE. A dead session or failed/expired original ping retires normally before admission, without a background heartbeat. Missing business targets use TARGET_UNKNOWN; reconcile uncertain work before retrying.
+Startup failures retain the actual channel-close, connection-failure or native `EPIPE` phase without promising two identical coded shells. Follow `cause/errors` rather than a fixed depth. `timeout: false` adds no Process business-call deadline; native startup, health and stop budgets remain separate.
 
-Native errors use rpc.transport.process; host/call and managed failures can retain rpc.endpoint/rpc.remote. Branch on source/code rather than text and preserve native TypeError/AbortError and the whole cause chain. Node/Bun/Deno behavior depends on real adapter capabilities; Electron uses the Node I/O path. Permissions/limits do not invent native isolation.
+Same-name admission diagnostics retain a failing oracle; a generic startup wrapper does not satisfy the original error contract. Use unique application identities rather than deriving remote identity from a registration name. Retain `source/code/cause/errors`, native types and stacks. An unknown result does not prove non-execution; recovery does not establish idempotent replay or persistent outcomes.
+
+`@migaia/rpc-contract` owns pure data, types, errors and protocol admission. Actual plugins/features own business schema and policy, Process owns native resources, and Host owns call lifetime. Full migration acceptance remains pending.

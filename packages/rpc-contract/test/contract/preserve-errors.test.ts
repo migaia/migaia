@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import { it } from 'vitest'
-import { createContractError } from '../../dist/contract/contract-error.js'
-import { RpcContractErrorCode } from '../../dist/contract/error-code.js'
-import { serializeRpcError, deserializeRpcError } from '../../dist/contract/index.js'
+import { createContractError } from '@migaia/rpc-contract/errors'
+import { RpcContractErrorCode } from '@migaia/rpc-contract/error-code'
+import { serializeRpcError, deserializeRpcError } from '@migaia/rpc-contract/errors'
 
 it('native error vectors retain complete identity and ordered causes independently', () => {
   /**

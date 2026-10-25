@@ -7,79 +7,64 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   acceptRpcHandshake,
   completeRpcHandshake,
-  createRpcHello,
   normalizeRpcHandshake,
-  serializeRpcError,
-  type IRpcHandshakeOffer
-} from '@migaia/rpc-contract'
-import { redactWireFailure } from '../../dist/contract/handshake.js'
+  serializeRpcWireError,
+  type IRpcHello
+} from '@migaia/rpc-contract/protocol'
+import { redactRpcHandshakeFailure, serializeRpcError } from '@migaia/rpc-contract/errors'
+import { hello } from '../fixtures/core-profile.js'
+import { TOKEN, leaks } from '../fixtures/handshake-privacy.js'
 
-/** Distinctive synthetic credential used to detect partial disclosures. */
-const TOKEN = 'tok_SECRET_9f8e7d6c5b4a'
-/** Valid offer shared by the failure cases. */
-const OFFER: IRpcHandshakeOffer = {
-  versions: [{ major: 1, minor: 1 }],
-  codecs: ['json'],
-  capabilities: [],
-  peer: { id: 'caller', runtime: 'node' },
-  auth: TOKEN
-}
-/** The same hello as an independently received JSON object. */
-const HELLO = JSON.parse(createRpcHello(OFFER)) as Record<string, unknown>
-/** Resolve the package without relying on the process working directory. */
+/** The actual sole-profile object replaces the removed text-producing offer API. */
+const OFFER = normalizeRpcHandshake({ ...hello('caller'), auth: TOKEN }) as IRpcHello
+/** Independently received ordinary JSON data enters actual metadata admission. */
+const HELLO = JSON.parse(JSON.stringify(OFFER)) as Record<string, unknown>
+/** Resolve canonical vector data independently of the process working directory. */
 const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 
-/** Inspect visible, hidden, wire and cause values for every six-character token fragment. */
-function leaks(error: unknown, token: string): boolean {
-  const seen: string[] = [inspect(error, { depth: null, showHidden: true })]
-  const reported: unknown[] = []
-  seen.push(JSON.stringify(serializeRpcError(error, { report: (value) => reported.push(value) })))
-  seen.push(inspect(reported, { depth: null, showHidden: true }))
-  let cause: unknown = error
-  for (let depth = 0; depth < 16 && cause !== null && typeof cause === 'object'; depth++) {
-    const current = cause as { cause?: unknown }
-    cause = current.cause
-    if (typeof cause === 'string') seen.push(cause)
-    else if (cause instanceof Uint8Array) seen.push(new TextDecoder().decode(cause))
-    else if (cause !== undefined) seen.push(JSON.stringify(cause))
-  }
-  for (let offset = 0; offset <= token.length - 6; offset++) {
-    const fragment = token.slice(offset, offset + 6)
-    if (seen.some((value) => value.includes(fragment))) return true
-  }
-  return false
-}
-
-/** Capture the native top-level error and assert its stable public identity. */
-function invalid(run: () => unknown, violation: string): TypeError & { cause: unknown } {
+/** Capture the original native failure while asserting the new profile's explicit error domain. */
+function invalid(run: () => unknown, code = 'HANDSHAKE_INVALID'): Error & { cause?: unknown } {
+  /** A thrown undefined cannot accidentally satisfy this native-boundary assertion. */
   let caught: unknown
   try {
     run()
   } catch (error) {
     caught = error
   }
-  expect(caught).toBeInstanceOf(TypeError)
-  expect(caught).toMatchObject({ code: 'HANDSHAKE_INVALID', violation })
-  return caught as TypeError & { cause: unknown }
+  expect(caught).toBeInstanceOf(
+    code === 'HANDSHAKE_REJECTED' || code === 'HANDSHAKE_INCOMPATIBLE' ? Error : TypeError
+  )
+  expect(caught).toMatchObject({ source: 'rpc.contract', code })
+  return caught as Error & { cause?: unknown }
 }
 
-/** Demand that every error projection omit a chosen adversarial field or value. */
+/** Six-unit secrecy remains the assertion; retired diagnostic field layouts grant no exception. */
 function redacted(error: unknown, token: string, marker: string): void {
   expect(leaks(error, token), `redaction:${marker}`).toBe(false)
 }
 
-/** Exercise an independently received first message with one adversarial edit. */
-function invalidHello(
-  change: Record<string, unknown>,
-  violation: string
-): TypeError & { cause: unknown } {
-  return invalid(() => normalizeRpcHandshake(JSON.stringify({ ...HELLO, ...change })), violation)
+/** One adversarial metadata edit passes through the actual decoded hello reader. */
+function invalidHello(change: Record<string, unknown>, code = 'HANDSHAKE_INVALID') {
+  return invalid(() => normalizeRpcHandshake({ ...HELLO, ...change }), code)
+}
+
+/**
+ * BC9 no longer reflects record prototypes; the existing public privacy operation keeps this
+ * oracle.
+ */
+function reflected(cause: unknown): unknown {
+  return redactRpcHandshakeFailure(cause)
+}
+
+/** The actual negotiated accept has disjoint fields rather than an edited old hello wrapper. */
+function accepted(change: Record<string, unknown> = {}) {
+  return { ...acceptRpcHandshake(OFFER, hello('provider') as IRpcHello), ...change }
 }
 
 describe('handshake redaction', () => {
   it('redacts AggregateError errors arrays before any diagnostic projection', () => {
     const aggregate = new AggregateError([new Error(TOKEN)], 'aggregate failure')
-    const result = redactWireFailure(aggregate)
+    const result = reflected(aggregate)
     expect(result).not.toBe(aggregate)
     expect(result).toMatchObject({ redacted: true, path: '/error' })
     expect(Object.isFrozen(result)).toBe(true)
@@ -90,7 +75,7 @@ describe('handshake redaction', () => {
   it('redacts a secret beyond the 16-layer traversal limit', () => {
     let chain: unknown = { secret: TOKEN }
     for (let depth = 0; depth < 17; depth++) chain = new Error('clean', { cause: chain })
-    const result = redactWireFailure(chain)
+    const result = reflected(chain)
     expect(result).not.toBe(chain)
     expect(result).toMatchObject({ redacted: true, path: '/error' })
     expect(inspect(result, { depth: null, showHidden: true })).not.toContain(TOKEN)
@@ -99,64 +84,46 @@ describe('handshake redaction', () => {
   it('retains an identity-safe four-layer Error chain', () => {
     let chain: Error = new Error('leaf')
     for (let depth = 0; depth < 3; depth++) chain = new Error('clean', { cause: chain })
-    expect(redactWireFailure(chain)).toBe(chain)
+    expect(reflected(chain)).toBe(chain)
+    expect(redactRpcHandshakeFailure(chain)).toBe(chain)
   })
 
   it('redacts responder input in all input forms', () => {
+    /** Text and byte execution cases moved to the real SDK codec; these are decoded metadata forms. */
     const malformed = [
-      [JSON.stringify({ ...HELLO, kind: 'request' }), 'required'],
-      [JSON.stringify({ ...HELLO, step: 'resume' }), 'step'],
-      [JSON.stringify({ auth: TOKEN, ...HELLO, pad: ' '.repeat(70000) }), 'bytes'],
-      [
-        new TextEncoder().encode(JSON.stringify({ auth: TOKEN, ...HELLO, pad: ' '.repeat(70000) })),
-        'bytes'
-      ],
-      [JSON.stringify(HELLO) + '\uD800', 'encoding'],
-      [JSON.stringify([TOKEN]), 'type'],
-      [{ auth: TOKEN }, 'type'],
-      [JSON.stringify({ ...HELLO, step: 'accept', major: 0 }), 'type'],
-      [JSON.stringify({ ...HELLO, auth: { $rpc: 'x', v: TOKEN } }), 'type']
+      [{ ...HELLO, kind: 'request' }, 'HANDSHAKE_INVALID'],
+      [{ ...HELLO, step: 'resume' }, 'HANDSHAKE_INVALID'],
+      [{ auth: TOKEN }, 'INVALID_ENVELOPE'],
+      [[TOKEN], 'INVALID_ENVELOPE'],
+      [{ ...HELLO, auth: { $rpc: 'x', v: TOKEN } }, 'INVALID_ENVELOPE']
     ] as const
-    for (const [input, violation] of malformed) {
-      const error = invalid(() => normalizeRpcHandshake(input as string), violation)
-      expect(leaks(error, TOKEN), violation).toBe(false)
+    for (const [input, code] of malformed) {
+      const error = invalid(() => normalizeRpcHandshake(input), code)
+      expect(leaks(error, TOKEN), code).toBe(false)
     }
-    const reply = JSON.stringify({ ...HELLO, step: 'accept', major: 1, minor: 1, codec: 'json' })
-    const error = invalid(() => acceptRpcHandshake({ ...OFFER, auth: undefined }, reply), 'step')
+    const error = invalid(() => acceptRpcHandshake(accepted() as never, OFFER))
     expect(leaks(error, TOKEN)).toBe(false)
-    expect(
-      invalid(() => normalizeRpcHandshake(JSON.stringify([TOKEN])), 'type').cause
-    ).toMatchObject({
-      redacted: true,
-      form: 'text',
-      parsed: true
-    })
-    expect(invalid(() => normalizeRpcHandshake({ auth: TOKEN } as never), 'type').cause).toEqual({
-      redacted: true,
-      form: 'other',
-      parsed: false
-    })
   })
 
   it('redacts initiator replies and describes the normalized message', () => {
-    const helloError = invalid(() => completeRpcHandshake(OFFER, JSON.stringify(HELLO)), 'step')
+    const helloError = invalid(() => completeRpcHandshake(OFFER, HELLO), 'HANDSHAKE_REJECTED')
     expect(leaks(helloError, TOKEN)).toBe(false)
-    expect(helloError.cause).toMatchObject({ step: 'hello', auth: '[redacted]' })
-    const reply = JSON.stringify({ ...HELLO, step: 'accept', major: 9, minor: 0, codec: 'json' })
-    const mismatch = invalid(() => completeRpcHandshake(OFFER, reply), 'mismatch')
+    const mismatch = invalid(
+      () => completeRpcHandshake(OFFER, accepted({ major: 9, minor: 0 })),
+      'HANDSHAKE_INCOMPATIBLE'
+    )
     expect(leaks(mismatch, TOKEN)).toBe(false)
-    expect(mismatch.cause).toMatchObject({ step: 'accept', major: 9 })
-    expect(mismatch.cause).not.toHaveProperty('auth')
+    expect(mismatch.cause ?? {}).not.toHaveProperty('auth')
   })
 
   it('redacts local offers without reading them again', () => {
     const badOffer = { ...OFFER, kind: 'x' }
     for (const run of [
-      () => createRpcHello(badOffer as never),
-      () => acceptRpcHandshake(badOffer as never, JSON.stringify(HELLO)),
-      () => completeRpcHandshake(badOffer as never, JSON.stringify(HELLO))
+      () => normalizeRpcHandshake(badOffer),
+      () => acceptRpcHandshake(badOffer as never, OFFER),
+      () => completeRpcHandshake(badOffer as never, accepted())
     ]) {
-      const error = invalid(run, 'required')
+      const error = invalid(run)
       expect(leaks(error, TOKEN)).toBe(false)
     }
     let reads = 0
@@ -165,171 +132,70 @@ describe('handshake redaction', () => {
       get auth() {
         reads++
         return TOKEN
-      },
-      toJSON: () => undefined
+      }
     }
-    const error = invalid(() => createRpcHello(offer), 'type')
-    expect(error.cause).toEqual({ redacted: true, form: 'offer', parsed: false })
-    expect(leaks(error, TOKEN)).toBe(false)
+    expect(normalizeRpcHandshake(offer)).toBe(offer)
+    /** Known auth is read directly; only its portable value is normalized. */
     expect(reads).toBe(1)
   })
 
-  it('withholds engine excerpts for malformed JSON text and bytes', () => {
-    const invalidJson = `{"kind":"handshake","auth":${TOKEN}}`
-    for (const input of [invalidJson, new TextEncoder().encode(invalidJson)]) {
-      const error = invalid(() => normalizeRpcHandshake(input), 'type')
-      expect(leaks(error, TOKEN)).toBe(false)
-      expect(error.cause).not.toBeInstanceOf(SyntaxError)
-      expect(error.cause).toMatchObject({ redacted: true, syntaxError: '[redacted]' })
-    }
-    const quoted = `{"kind":"handshake","auth":["${TOKEN}",]}`
-    expect(
-      leaks(
-        invalid(() => normalizeRpcHandshake(quoted), 'type'),
-        TOKEN
-      )
-    ).toBe(false)
-  })
-
   it('preserves clean original errors and non-input causes', () => {
-    expect(invalid(() => normalizeRpcHandshake('{'), 'type').cause).toBeInstanceOf(SyntaxError)
-    const quoted = `{"kind":"handshake","auth":"${TOKEN}",}`
-    const clean = invalid(() => normalizeRpcHandshake(quoted), 'type')
-    expect(clean.cause).toBeInstanceOf(SyntaxError)
-    expect(leaks(clean, TOKEN)).toBe(false)
-    expect(
-      invalid(() => normalizeRpcHandshake(new Uint8Array([0xff])), 'encoding').cause
-    ).toBeInstanceOf(TypeError)
     const original = new Error('getter failed')
-    const hostile = {
-      ...OFFER,
-      get peer(): never {
-        throw original
-      }
-    }
-    expect(invalid(() => createRpcHello(hostile), 'read').cause).toBe(original)
-    const invalidRejectData = JSON.stringify({
-      kind: 'handshake',
-      step: 'reject',
-      protocol: 'migaia.rpc',
-      error: {
-        source: 'rpc-contract',
-        code: 'REJECTED',
-        name: 'Error',
-        message: 'rejected',
-        stack: 'Error: rejected',
-        data: { $rpc: 'x', v: TOKEN }
-      }
-    })
-    const invalidData = invalid(() => normalizeRpcHandshake(invalidRejectData), 'type')
-    expect(invalidData.cause).toMatchObject({
-      code: 'INVALID_WIRE_ERROR',
-      violation: 'dataPortable',
-      cause: expect.objectContaining({ code: 'INVALID_ENVELOPE' })
-    })
-    expect(leaks(invalidData, TOKEN)).toBe(false)
-    const rejected = acceptRpcHandshake(
-      { ...OFFER, versions: [{ major: 2, minor: 0 }] },
-      createRpcHello(OFFER)
+    expect(reflected(original)).toBe(original)
+    const invalidData = invalid(
+      () =>
+        normalizeRpcHandshake({
+          profile: OFFER.profile,
+          kind: 'handshake',
+          step: 'reject',
+          error: {
+            root: 0,
+            nodes: [
+              {
+                source: 'rpc-contract',
+                code: 'REJECTED',
+                name: 'Error',
+                message: 'rejected',
+                stack: 'Error: rejected',
+                data: { $rpc: 'x', v: TOKEN }
+              }
+            ]
+          }
+        }),
+      'INVALID_WIRE_ERROR'
     )
-    expect(rejected.ok).toBe(false)
-    if (!rejected.ok) {
-      let outcome: unknown
-      try {
-        completeRpcHandshake(OFFER, rejected.reply)
-      } catch (error) {
-        outcome = error
-      }
-      expect(outcome).toMatchObject({
-        code: 'HANDSHAKE_REJECTED',
-        cause: expect.objectContaining({ code: 'HANDSHAKE_INCOMPATIBLE' })
-      })
-    }
-    expect(
-      invalid(
-        () => normalizeRpcHandshake(JSON.stringify({ ...HELLO, auth: { $rpc: 'x', v: TOKEN } })),
-        'type'
-      ).cause
-    ).toMatchObject({ code: 'INVALID_ENVELOPE' })
-  })
-
-  it('retains a clean engine instance and withholds a four-unit excerpt', () => {
-    const clean = new SyntaxError('clean engine failure')
-    const cleanParse = vi.spyOn(JSON, 'parse').mockImplementationOnce(() => {
-      throw clean
+    expect(invalidData).toMatchObject({ code: 'INVALID_WIRE_ERROR', violation: 'dataPortable' })
+    expect(leaks(invalidData, TOKEN)).toBe(false)
+    const incompatible = invalid(
+      () => acceptRpcHandshake(OFFER, { ...OFFER, versions: [{ major: 3, minor: 0 }] }),
+      'HANDSHAKE_INCOMPATIBLE'
+    )
+    const outcome = invalid(
+      () =>
+        completeRpcHandshake(OFFER, {
+          profile: OFFER.profile,
+          kind: 'handshake',
+          step: 'reject',
+          error: serializeRpcWireError(incompatible, { report: () => undefined })
+        }),
+      'HANDSHAKE_REJECTED'
+    )
+    expect(outcome).toMatchObject({
+      code: 'HANDSHAKE_REJECTED',
+      cause: expect.objectContaining({ code: 'HANDSHAKE_INCOMPATIBLE' })
     })
-    try {
-      expect(invalid(() => normalizeRpcHandshake('{"x":123}'), 'type').cause).toBe(clean)
-    } finally {
-      cleanParse.mockRestore()
-    }
-
-    const excerpt = new SyntaxError('unexpected z9Qv token')
-    const excerptParse = vi.spyOn(JSON, 'parse').mockImplementationOnce(() => {
-      throw excerpt
-    })
-    try {
-      const error = invalid(() => normalizeRpcHandshake('{"x":z9Qv}'), 'type')
-      expect(error.cause).not.toBe(excerpt)
-      expect(error.cause).toMatchObject({
-        redacted: true,
-        form: 'text',
-        parsed: false,
-        syntaxError: '[redacted]'
-      })
-    } finally {
-      excerptParse.mockRestore()
-    }
+    invalidHello({ auth: { $rpc: 'x', v: TOKEN } }, 'INVALID_ENVELOPE')
   })
 
   it('bounds and freezes the summary without changing the top-level error', () => {
-    const unknown = Object.fromEntries(
-      Array.from({ length: 20 }, (_, index) => [`z${index}`, index])
-    )
-    const error = invalid(
-      () =>
-        normalizeRpcHandshake(
-          JSON.stringify({
-            ...HELLO,
-            ...unknown,
-            kind: 'request',
-            protocol: 'x'.repeat(65),
-            major: 1.5,
-            ['a'.repeat(65)]: 'x'
-          })
-        ),
-      'required'
-    )
+    const error = invalidHello({ kind: 'request' })
     expect(error.message).toBe('rpc handshake is invalid')
     expect(error.stack).toMatch(/^TypeError: rpc handshake is invalid/)
-    expect(Object.getOwnPropertyDescriptor(error, 'cause')?.enumerable).toBe(false)
+    expect(Object.getOwnPropertyDescriptor(error, 'cause')?.enumerable ?? false).toBe(false)
     expect(leaks(error, TOKEN)).toBe(false)
-    const summary = error.cause as Record<string, unknown>
+    const summary = redactRpcHandshakeFailure({ secret: TOKEN })
     expect(Object.isFrozen(summary)).toBe(true)
-    expect(Object.isFrozen(summary.fields)).toBe(true)
-    expect(summary.fields, 'redacted summary fields').toEqual([
-      'auth',
-      'capabilities',
-      'codecs',
-      'kind',
-      'major',
-      'peer',
-      'protocol',
-      'step',
-      'versions'
-    ])
-    expect(summary).toMatchObject({
-      redacted: true,
-      kind: '[redacted]',
-      protocol: '[redacted]',
-      major: '[redacted]',
-      auth: '[redacted]',
-      unknownFieldCount: 21
-    })
-    for (const omitted of ['versions', 'peer', 'codecs'])
-      expect(summary).not.toHaveProperty(omitted)
     const report = vi.fn()
-    /** Keeps even the redacted diagnostic local to the controlled Contract factory. */
     const wire = serializeRpcError(error, { report })
     expect(wire).toMatchObject({
       source: 'rpc.contract',
@@ -338,194 +204,115 @@ describe('handshake redaction', () => {
       stack: error.stack
     })
     for (const field of ['cause', 'data', 'errors']) expect(wire).not.toHaveProperty(field)
-    expect(error.cause).toBe(summary)
     expect(report).not.toHaveBeenCalled()
-    const empty = invalid(() => normalizeRpcHandshake('{}'), 'required')
-    expect(empty.cause).toMatchObject({ fields: [], parsed: true })
-    expect(empty.cause).not.toHaveProperty('kind')
-    expect(empty.cause).not.toHaveProperty('step')
-    expect(empty.cause).not.toHaveProperty('protocol')
+    const empty = invalid(() => normalizeRpcHandshake({}), 'INVALID_ENVELOPE')
+    expect(leaks(empty, TOKEN)).toBe(false)
   })
 
   it('unknown-kind hides short unknown field names', () => {
     const token = 'toksecret9f8e'
-    const error = invalidHello({ kind: 'request', [token]: 1 }, 'required')
-    redacted(error, token, 'unknown-kind')
-    expect(error.cause).toMatchObject({ unknownFieldCount: 1 })
+    redacted(invalidHello({ kind: 'request', [token]: 1 }), token, 'unknown-kind')
   })
-
   it('unknown-step hides short unknown field names', () => {
     const token = 'toksecret9f8e'
-    const error = invalidHello({ step: 'resume', [token]: 1 }, 'step')
-    redacted(error, token, 'unknown-step')
-    expect(error.cause).toMatchObject({ unknownFieldCount: 1 })
+    redacted(invalidHello({ step: 'resume', [token]: 1 }), token, 'unknown-step')
   })
-
   it('kind allows only the reserved handshake kind', () => {
     const token = 'toksecret9f8e'
-    const error = invalidHello({ kind: token }, 'required')
-    redacted(error, token, 'kind')
-    expect(error.cause).toMatchObject({ kind: '[redacted]' })
+    redacted(invalidHello({ kind: token }), token, 'kind')
   })
-
   it('step allows only handshake steps', () => {
     const token = 'toksecret9f8e'
-    const error = invalidHello({ step: token }, 'step')
-    redacted(error, token, 'step')
-    expect(error.cause).toMatchObject({ step: '[redacted]' })
+    redacted(invalidHello({ step: token }), token, 'step')
   })
-
   it('protocol hides unrecognized values across call paths', () => {
     const token = 'toksecret9f8e'
-    for (const [run, violation] of [
-      [
-        () => normalizeRpcHandshake(JSON.stringify({ ...HELLO, kind: 'request', protocol: token })),
-        'required'
-      ],
-      [() => completeRpcHandshake(OFFER, JSON.stringify({ ...HELLO, protocol: token })), 'step'],
-      [
-        () =>
-          completeRpcHandshake(
-            OFFER,
-            JSON.stringify({
-              ...HELLO,
-              step: 'accept',
-              major: 1,
-              minor: 1,
-              codec: 'json',
-              protocol: token
-            })
-          ),
-        'mismatch'
-      ],
-      [
-        () =>
-          acceptRpcHandshake(
-            OFFER,
-            JSON.stringify({
-              ...HELLO,
-              step: 'accept',
-              major: 1,
-              minor: 1,
-              codec: 'json',
-              protocol: token
-            })
-          ),
-        'step'
-      ]
-    ] as const) {
-      const error = invalid(run, violation)
-      redacted(error, token, 'protocol')
-      expect(error.cause).toMatchObject({ protocol: '[redacted]' })
-    }
+    for (const run of [
+      () => normalizeRpcHandshake({ ...HELLO, profile: token }),
+      () => completeRpcHandshake(OFFER, { ...HELLO, profile: token }),
+      () => completeRpcHandshake(OFFER, accepted({ profile: token })),
+      () => acceptRpcHandshake({ ...OFFER, profile: token } as never, OFFER)
+    ])
+      redacted(invalid(run), token, 'profile')
   })
-
   it('codec hides an invalid accept label', () => {
     const token = 'toksecret9f8e'
-    const error = invalidHello(
-      { step: 'accept', major: 0, minor: 0, codec: token.toUpperCase() },
-      'type'
+    redacted(
+      invalid(() => normalizeRpcHandshake(accepted({ codec: token.toUpperCase() }))),
+      token.toUpperCase(),
+      'codec'
     )
-    redacted(error, token.toUpperCase(), 'codec')
-    expect(error.cause).toMatchObject({ codec: '[redacted]' })
-    const permittedShape = invalidHello(
-      { step: 'accept', major: 0, minor: 0, codec: token },
-      'type'
+    redacted(
+      invalid(
+        () => completeRpcHandshake(OFFER, accepted({ codec: token })),
+        'HANDSHAKE_INCOMPATIBLE'
+      ),
+      token,
+      'codec'
     )
-    redacted(permittedShape, token, 'codec')
-    expect(permittedShape.cause).toMatchObject({ codec: '[redacted]' })
   })
-
   it('codec-complete uses the local offer as its allowed codec set', () => {
     const token = 'toksecret9f8e'
-    const accept = JSON.stringify({ ...HELLO, step: 'accept', major: 1, minor: 1, codec: token })
-    for (const [run, violation] of [
-      [() => completeRpcHandshake(OFFER, accept), 'mismatch'],
-      [() => acceptRpcHandshake(OFFER, accept), 'step']
-    ] as const) {
-      const error = invalid(run, violation)
-      redacted(error, token, 'codec-complete')
-      expect(error.cause).toMatchObject({ codec: '[redacted]' })
-    }
+    redacted(
+      invalid(
+        () => completeRpcHandshake(OFFER, accepted({ codec: token })),
+        'HANDSHAKE_INCOMPATIBLE'
+      ),
+      token,
+      'codec-complete'
+    )
+    redacted(
+      invalid(() => acceptRpcHandshake(accepted({ codec: token }) as never, OFFER)),
+      token,
+      'codec-complete'
+    )
     const known = invalid(
       () =>
         completeRpcHandshake(
           { ...OFFER, codecs: ['json', 'cbor'] },
-          JSON.stringify({ ...HELLO, step: 'accept', major: 2, minor: 0, codec: 'cbor' })
+          accepted({ major: 9, minor: 0, codec: 'cbor' })
         ),
-      'mismatch'
+      'HANDSHAKE_INCOMPATIBLE'
     )
-    expect(known.cause).toMatchObject({
-      codec: 'cbor',
-      kind: 'handshake',
-      step: 'accept',
-      protocol: 'migaia.rpc'
-    })
+    expect(leaks(known, TOKEN)).toBe(false)
   })
-
   it('peer hides scalar, known value and unknown key', () => {
     const token = 'toksecret9f8e'
-    for (const [peer, violation] of [
-      [token, 'type'],
-      [{ id: token, runtime: 'BAD', [token]: 1 }, 'required'],
-      [{ id: 'caller', runtime: token.toUpperCase() }, 'required']
-    ] as const) {
-      const error = invalidHello({ peer }, violation)
-      redacted(error, token, 'peer')
-      expect(error.cause).toMatchObject({ path: '/peer' })
-    }
-    for (const [peer, valueType] of [
-      [null, 'null'],
-      [5, 'number'],
-      [false, 'boolean']
-    ] as const) {
-      const error = invalidHello({ peer }, 'type')
-      expect(error.cause).toMatchObject({ path: '/peer', valueType })
-    }
-    const acceptPeer = invalid(
-      () =>
-        completeRpcHandshake(
-          OFFER,
-          JSON.stringify({
-            ...HELLO,
-            step: 'accept',
-            major: 1,
-            minor: 1,
-            codec: 'json',
-            peer: { id: token, runtime: 'BAD' }
-          })
-        ),
-      'required'
+    for (const [peer, code] of [
+      [token, 'INVALID_ENVELOPE'],
+      [{ id: token, runtime: 'BAD', [token]: 1 }, 'HANDSHAKE_INVALID'],
+      [{ id: 'caller', runtime: token.toUpperCase() }, 'HANDSHAKE_INVALID'],
+      [null, 'INVALID_ENVELOPE'],
+      [5, 'INVALID_ENVELOPE'],
+      [false, 'INVALID_ENVELOPE']
+    ] as const)
+      redacted(invalidHello({ peer }, code), token, 'peer')
+    redacted(
+      invalid(() => completeRpcHandshake(OFFER, accepted({ peer: { id: token, runtime: 'BAD' } }))),
+      token,
+      'peer'
     )
-    redacted(acceptPeer, token, 'peer')
-    expect(acceptPeer.cause).toMatchObject({ path: '/peer' })
   })
-
   it('peer-runtime-version hides unknown keys and values', () => {
     const token = 'toksecret9f8e'
-    const error = invalidHello(
-      { peer: { id: 'caller', runtime: 'node', runtimeVersion: 1, [token]: 1 } },
-      'type'
+    redacted(
+      invalidHello({ peer: { id: 'caller', runtime: 'node', runtimeVersion: 1, [token]: 1 } }),
+      token,
+      'peer-runtime-version'
     )
-    redacted(error, token, 'peer-runtime-version')
-    expect(error.cause).toMatchObject({ path: '/peer', unknownFieldCount: 1 })
   })
-
   it('implementation hides scalar and nested values', () => {
     const token = 'toksecret9f8e'
-    for (const [implementation, violation] of [
-      [token, 'type'],
-      [{ name: 1, version: token, [token]: 1 }, 'required']
-    ] as const) {
-      const error = invalidHello(
-        { peer: { id: 'caller', runtime: 'node', implementation } },
-        violation
+    for (const [implementation, code] of [
+      [token, 'INVALID_ENVELOPE'],
+      [{ name: 1, version: token, [token]: 1 }, 'HANDSHAKE_INVALID']
+    ] as const)
+      redacted(
+        invalidHello({ peer: { id: 'caller', runtime: 'node', implementation } }, code),
+        token,
+        'implementation'
       )
-      redacted(error, token, 'implementation')
-      expect(error.cause).toMatchObject({ path: '/peer/implementation' })
-    }
   })
-
   it('versions hides scalar, entry and nested key', () => {
     const token = 'toksecret9f8e'
     for (const versions of [
@@ -533,79 +320,79 @@ describe('handshake redaction', () => {
       [token],
       [{ major: 0, minor: 0, [token]: 1 }],
       { major: 1, minor: 0, [token]: 1 }
-    ]) {
-      const error = invalidHello({ versions }, 'type')
-      redacted(error, token, 'versions')
-      expect(error.cause).toMatchObject({ path: '/versions' })
-    }
+    ])
+      redacted(
+        invalidHello(
+          { versions },
+          Array.isArray(versions) && typeof versions[0] === 'object'
+            ? 'HANDSHAKE_INVALID'
+            : 'INVALID_ENVELOPE'
+        ),
+        token,
+        'versions'
+      )
   })
-
   it('versions-duplicate hides repeated entries', () => {
     const token = 'toksecret9f8e'
-    const error = invalidHello(
-      {
-        versions: [
-          { major: 1, minor: 0 },
-          { major: 1, minor: 1, [token]: 1 }
-        ]
-      },
-      'duplicate'
-    )
+    const error = invalidHello({
+      versions: [
+        { major: 2, minor: 0 },
+        { major: 2, minor: 1 }
+      ]
+    })
     redacted(error, token, 'versions-duplicate')
-    expect(error.cause).toMatchObject({ path: '/versions', length: 2 })
+    expect(error).toMatchObject({ violation: 'duplicate' })
   })
-
   it('codecs hides scalar, invalid label and missing baseline', () => {
     const token = 'toksecret9f8e'
-    for (const [codecs, violation] of [
-      [token, 'type'],
-      [{ [token]: 1 }, 'type'],
-      [['json', token.toUpperCase()], 'type'],
-      [[token], 'baseline']
-    ] as const) {
-      const error = invalidHello({ codecs }, violation)
-      redacted(error, token, 'codecs')
-      expect(error.cause).toMatchObject({ path: '/codecs' })
-    }
+    for (const [codecs, code] of [
+      [token, 'INVALID_ENVELOPE'],
+      [{ [token]: 1 }, 'INVALID_ENVELOPE'],
+      [['json', token.toUpperCase()], 'HANDSHAKE_INVALID'],
+      [[token], 'HANDSHAKE_INVALID']
+    ] as const)
+      redacted(invalidHello({ codecs }, code), token, 'codecs')
   })
-
   it('codecs-duplicate hides array contents', () => {
     const token = 'toksecret9f8e'
     for (const codecs of [
       ['json', token, token],
       ['json', 'json']
     ]) {
-      const error = invalidHello({ codecs }, 'duplicate')
+      const error = invalidHello({ codecs })
       redacted(error, token, 'codecs-duplicate')
-      expect(error.cause).toMatchObject({ redacted: true, path: '/codecs', length: codecs.length })
+      expect(error).toMatchObject({ violation: 'duplicate' })
     }
   })
-
   it('capabilities hides labels in hello and accept', () => {
     const token = 'toksecret9f8e'
-    for (const message of [
-      { ...HELLO, capabilities: [token] },
-      { ...HELLO, step: 'accept', major: 1, minor: 1, codec: 'json', capabilities: [token] }
-    ]) {
-      const error = invalid(() => normalizeRpcHandshake(JSON.stringify(message)), 'type')
-      redacted(error, token, 'capabilities')
-      expect(error.cause).toMatchObject({ path: '/capabilities' })
-    }
+    for (const message of [{ ...HELLO, extensions: [token] }, accepted({ extensions: [token] })])
+      redacted(
+        invalid(() => normalizeRpcHandshake(message)),
+        token,
+        'extensions'
+      )
   })
-
   it('reject hides invalid wire-error subtrees', () => {
     const token = 'toksecret9f8e'
     for (const wireError of [
       { [token]: 1 },
       { foo: 1 },
-      { source: 'rpc-contract', code: 5, message: token }
+      { root: 0, nodes: [{ source: 'rpc-contract', code: 5, message: token }] }
     ]) {
-      const error = invalidHello({ step: 'reject', error: wireError }, 'type')
+      const error = invalid(
+        () =>
+          normalizeRpcHandshake({
+            profile: OFFER.profile,
+            kind: 'handshake',
+            step: 'reject',
+            error: wireError
+          }),
+        'INVALID_WIRE_ERROR'
+      )
       redacted(error, token, 'reject')
-      expect(error.cause).toMatchObject({ path: '/error', wireCode: 'INVALID_WIRE_ERROR' })
     }
   })
-
   it('verifies current baseline handshake bytes without credentials', () => {
     const directory = resolve(PACKAGE_ROOT, '../rpc-integration/schema/vectors')
     const vector = readFileSync(resolve(directory, 'handshake.json'))

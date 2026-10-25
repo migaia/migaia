@@ -1,4 +1,12 @@
-import { RpcProbeOutcome, RpcProbeStage, type IRpcProbeEventView } from '@migaia/rpc-host/probe'
+/**
+ * Maintains endpoint and method histograms independently of query retention, then exposes
+ * snapshots.
+ */
+import {
+  RpcProbeOutcome,
+  RpcProbeStage,
+  type IRpcProbeEventView
+} from '@migaia/rpc-host/plugins/probe'
 import type { IRpcDevtoolsStats } from '../contract/service.js'
 import { NameTable } from './intern.js'
 import { CollectorLimit } from './text.js'

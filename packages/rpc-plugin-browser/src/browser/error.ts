@@ -1,5 +1,11 @@
+/**
+ * Preserves browser configuration, transport and handshake diagnostics under centralized RPC
+ * identities.
+ */
 import { attachErrorIdentity } from '@migaia/utils/error'
-import { RPC_CORE_ERROR_SOURCE, RpcCoreErrorCode } from '@migaia/rpc-host'
+import { RpcError, RpcCoreErrorText, RpcTimeoutError } from '@migaia/rpc-contract/errors'
+import { BrowserPeerErrorText } from '../error-text.js'
+import { RPC_ENDPOINT_ERROR_SOURCE, RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 
 /** Existing first-party diagnostic family names remain recognizable by Core's public error guards. */
 const BrowserRpcErrorFamily = {
@@ -19,7 +25,7 @@ export function createBrowserConfigurationError(message: string): Error {
   error.name = BrowserRpcErrorFamily.rpc
   error.cause = undefined
   return attachErrorIdentity(error, {
-    source: RPC_CORE_ERROR_SOURCE,
+    source: RPC_ENDPOINT_ERROR_SOURCE,
     code: RpcCoreErrorCode.invalidConfig
   })
 }
@@ -34,7 +40,21 @@ export function createBrowserTransportError(message: string, cause?: unknown): E
   error.name = BrowserRpcErrorFamily.transport
   error.cause = cause
   return attachErrorIdentity(error, {
-    source: RPC_CORE_ERROR_SOURCE,
+    source: RPC_ENDPOINT_ERROR_SOURCE,
     code: RpcCoreErrorCode.transport
   })
+}
+
+/** These native media cannot transfer ownership; reject before caller transfer getters are read. */
+export function rejectBrowserTransfer(): never {
+  throw new RpcError(RpcCoreErrorCode.capabilityUnsupported, RpcCoreErrorText.capabilityUnsupported)
+}
+
+/** Preserve message-source startup diagnostics while Session retains the sole handshake deadline. */
+export function normalizeBrowserHandshakeFailure(error: unknown): unknown {
+  if (!(error instanceof RpcTimeoutError)) return error
+  return attachErrorIdentity(
+    new TypeError(BrowserPeerErrorText.handshakeNotAcknowledged, { cause: error }),
+    { source: RPC_ENDPOINT_ERROR_SOURCE, code: RpcCoreErrorCode.invalidConfig }
+  )
 }

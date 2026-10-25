@@ -51,7 +51,10 @@ const portMembers: Readonly<Record<string, IMemberDoc>> = {
       '宿主同步发送原始请求外层的回调，不应当作应用载荷重新解释，第二参数是可选原生转移列表，不使用返回值，宿主抛错进入传输错误处理。'
     ),
     params: {
-      message: t('Raw envelope received from the transport.', '来自传输层的原始请求外层。'),
+      value: t(
+        'Original frame value supplied by the canonical worker transport; forward it unchanged to native postMessage rather than wrapping it as another application request.',
+        '标准工作线程传输提供的原始帧值，应原样交给原生 `postMessage`，不要再封装成另一层应用请求。'
+      ),
       transfer: t(
         'Optional native transfer list received from send options; omit for ordinary cloning.',
         '来自发送选项的可选原生转移列表，默认 `undefined`，不提供转移列表时走普通复制。'
@@ -65,6 +68,24 @@ const portMembers: Readonly<Record<string, IMemberDoc>> = {
 const adapter = new WorkerAdapter(port)
 await adapter.dispose()
 port.terminate()`
+  },
+  start: {
+    summary: t(
+      'Optional synchronous native MessagePort start operation borrowed from the supplied port. The canonical worker transport invokes it before installing its message listener; Worker-like ports without this method need no substitute.',
+      '从传入端口借用的可选同步原生 `MessagePort.start` 操作。标准工作线程传输在安装消息监听前调用它；没有该方法的线程类端口不需要补充替代实现。'
+    ),
+    default: t(
+      'Omitted for ports that do not require explicit message delivery startup.',
+      '无需显式启动消息投递的端口可省略此方法。'
+    ),
+    returns: t(
+      'Void after native startup; this operation does not acquire ownership of the port or terminate it during cleanup.',
+      '原生启动后无返回值；此操作不取得端口所有权，也不在清理时终止端口。'
+    ),
+    example: `const channel = new MessageChannel()
+channel.port1.start()
+channel.port1.close()
+channel.port2.close()`
   },
   addEventListener: {
     summary: t(
@@ -631,16 +652,16 @@ worker.terminate()`
     },
     IWorkerPort: {
       summary: t(
-        'Alias of the rpc-plugin-browser/adapters/web-worker IWebWorkerLikePort; dedicated Worker, MessagePort and compatible listener-based hosts implement this external protocol.',
-        '请求包工作适配器端口协议的别名，专用线程、消息端口及兼容监听宿主实现此外包协议。'
+        'Alias of the native port accepted by rpc-plugin-browser dedicatedWorkerPlugin options.worker, through IWorkerMessagePort. It borrows synchronous postMessage, listener registration and removal, and optional start; the application retains the physical Worker or MessagePort lifetime.',
+        '经 `IWorkerMessagePort` 引用 `rpc-plugin-browser` 的 `dedicatedWorkerPlugin` 所接收的 `options.worker` 原生端口。借用同步消息发送、监听注册与移除及可选启动方法，实际线程或消息端口的生命周期仍由应用持有。'
       ),
       example: computeExample,
       members: portMembers
     },
     IWorkerLike: {
       summary: t(
-        'IWebWorkerLikePort plus optional terminate; parser disposal borrows it by default and terminates only when explicitly requested.',
-        '外包工作端口协议加可选终止方法，解析器默认借用，仅显式请求时终止。'
+        'The same borrowed native worker port accepted through IWorkerMessagePort, with an additional optional terminate callback. Parser disposal releases its endpoint but leaves the Worker alive by default; terminateOnDispose explicitly opts into native termination.',
+        '通过 `IWorkerMessagePort` 接收的同一借用原生端口，额外提供可选 `terminate` 回调。解析器销毁默认只释放端点、保留线程存活，显式设置 `terminateOnDispose` 才连带执行原生终止。'
       ),
       example: codecExample,
       members: {

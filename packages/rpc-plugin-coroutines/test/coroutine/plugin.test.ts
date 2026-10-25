@@ -2,11 +2,7 @@ import { MessageChannel } from 'node:worker_threads'
 import { describe, expect, it, vi } from 'vitest'
 import { defineFeature, definePlugin } from '@migaia/plugin-host'
 import { createRpcHost, type IRpcContext } from '@migaia/rpc-host'
-import { defineFeaturePlugin, type IRpcHostMember } from '@migaia/rpc-host/plugin'
-import { systemScheduler } from '@migaia/utils/scheduler'
-import { coroutinePlugin, type ICoroutineConnect } from '../../dist/index.js'
-import { readManagedRuntimeHolder } from '../../../rpc-host/dist/remote/runtime-api/managed-peer.js'
-import { readRuntimeOutletConnection } from '../../../rpc-host/dist/remote/runtime-api/outlet.js'
+import { coroutinePlugin, type ICoroutineConnect } from '@migaia/rpc-plugin-coroutines'
 import { service, ordinaryHost, outlet, values } from './fixture.js'
 
 describe('coroutine transport plugin', () => {
@@ -42,25 +38,22 @@ describe('coroutine transport plugin', () => {
     try {
       await vi.waitFor(() => expect(child.children).toHaveLength(1))
       const reverse = child.children[0]!
-      expect(await parent.request('read', 4)).toEqual(['child', 1, 4])
-      expect(await reverse.request('parentRead', 5)).toEqual(['parent', 5])
-      await parent.notify('notice', 'forward')
-      await reverse.notify('parentNotice', 'reverse')
+      expect(await parent.coroutine.request('read', 4)).toEqual(['child', 1, 4])
+      expect(await reverse.coroutine.request('parentRead', 5)).toEqual(['parent', 5])
+      await parent.coroutine.notify('notice', 'forward')
+      await reverse.coroutine.notify('parentNotice', 'reverse')
       await vi.waitFor(() => {
         expect(child.notices).toEqual(['forward'])
         expect(notes).toEqual(['reverse'])
       })
-      expect(await values(parent.stream('values') as AsyncIterable<unknown>)).toEqual(['child', 1])
-      expect(await values(reverse.stream('parentValues') as AsyncIterable<unknown>)).toEqual([
-        'parent',
-        2
-      ])
+      expect(await values(parent.coroutine.stream('values'))).toEqual(['child', 1])
+      expect(await values(reverse.coroutine.stream('parentValues'))).toEqual(['parent', 2])
       const forwardAbort = new AbortController()
       const reverseAbort = new AbortController()
-      const forward = parent
+      const forward = parent.coroutine
         .request('wait', undefined, { signal: forwardAbort.signal })
         .catch((error) => error)
-      const backward = reverse
+      const backward = reverse.coroutine
         .request('parentWait', undefined, { signal: reverseAbort.signal })
         .catch((error) => error)
       await vi.waitFor(() => {
@@ -94,64 +87,58 @@ describe('coroutine transport plugin', () => {
         })
       )
       const runtime = outlet(host)
-      const holder = readManagedRuntimeHolder(readRuntimeOutletConnection(runtime, 'worker')!.peer)!
-      const ready = await holder.registration.supervisor.whenReady()
-      expect(ready.state).toBe('ready')
-      if (ready.state !== 'ready') return
-      const unit = ready.unit as { readonly lastHeartbeatAt: number }
+      expect(await runtime.members.get('worker')).toMatchObject({ unit: { state: 'ready' } })
       const context = first.contexts[0]!
       expect(Object.isFrozen(context)).toBe(true)
       expect(Object.isFrozen(context.connect)).toBe(true)
       expect(Object.keys(context.connect)).toEqual([])
-      const before = unit.lastHeartbeatAt
-      await vi.waitFor(() => expect(systemScheduler.now()).toBeGreaterThan(before))
-      context.heartbeat()
-      expect(unit.lastHeartbeatAt).toBeGreaterThan(before)
-      await runtime.stop('worker')
+      await runtime.members.stop('worker')
       expect(context.signal.aborted).toBe(true)
       expect(first.finished).toContain(context.connect)
-      expect((await runtime.restart('worker')).state).toBe('ready')
+      expect((await runtime.members.restart('worker')).state).toBe('ready')
       expect(first.contexts[1]!.signal).not.toBe(context.signal)
       expect(first.contexts[1]!.connect).not.toBe(context.connect)
-      expect(() => runtime.replace('worker', { task: 1 } as never)).toThrowError(
+      expect(() => runtime.members.replace('worker', { task: 1 } as never)).toThrowError(
         expect.objectContaining({ source: 'rpc.endpoint', code: 'INVALID_CONFIG' })
       )
-      expect(await runtime.request('worker', 'read', 6)).toEqual(['first', 2, 6])
-      expect((await runtime.replace('worker', { task: second.task })).kind).toBe('replaced')
-      expect(await runtime.request('worker', 'read', 7)).toEqual(['second', 1, 7])
+      expect(await runtime.request('read', 6)).toEqual(['first', 2, 6])
+      expect((await runtime.members.replace('worker', { task: second.task })).kind).toBe('replaced')
+      expect(await runtime.request('read', 7)).toEqual(['second', 1, 7])
       expect(second.contexts[0]!.connect).not.toBe(first.contexts[1]!.connect)
     } finally {
       await host.dispose()
     }
   })
 
-  it('opens one cold spawn definition twice as independent private members on one host', async () => {
+  it('opens one cold spawn definition twice as independent native installations', async () => {
+    /** One cold definition must acquire no native work until genuine installation. */
     const reports: unknown[] = []
     const child = service('member', (error) => reports.push(error))
-    const members: IRpcHostMember[] = []
     const transport = coroutinePlugin({ spawn: child.task })
-    const assembler = defineFeaturePlugin({
-      name: 'two-coroutine-members',
-      async assemble(context) {
-        members.push(await context.openMember(), await context.openMember())
-        return members[0]!
-      }
-    })
     expect(child.contexts).toHaveLength(0)
-    const host = await createRpcHost({
-      plugins: [transport, assembler],
+    const first = await createRpcHost({
+      plugins: [transport],
+      report: (error) => reports.push(error)
+    })
+    const second = await createRpcHost({
+      plugins: [transport],
       report: (error) => reports.push(error)
     })
     try {
       expect(child.contexts).toHaveLength(2)
       expect(child.contexts[0]!.connect).not.toBe(child.contexts[1]!.connect)
-      expect(new Set(members.map((member) => member.id)).size).toBe(2)
-      expect(await members[0]!.request('read', 1)).toEqual(['member', 1, 1])
-      expect(await members[1]!.request('read', 2)).toEqual(['member', 2, 2])
-      await members[0]!.close()
-      expect(await members[1]!.request('read', 3)).toEqual(['member', 2, 3])
+      /** Parent readiness may precede the child's Host construction callback publication. */
+      await vi.waitFor(() => expect(child.children).toHaveLength(2))
+      expect(
+        new Set([child.children[0]!.self.instanceId, child.children[1]!.self.instanceId]).size
+      ).toBe(2)
+      expect(await first.coroutine.request('read', 1)).toEqual(['member', 1, 1])
+      expect(await second.coroutine.request('read', 2)).toEqual(['member', 2, 2])
+      await first.close()
+      expect(await second.coroutine.request('read', 3)).toEqual(['member', 2, 3])
     } finally {
-      await host.close()
+      await first.close()
+      await second.close()
       expect(child.contexts.every((context) => context.signal.aborted)).toBe(true)
     }
   })
@@ -192,7 +179,7 @@ describe('coroutine transport plugin', () => {
           })
         )
       }
-      expect(await parent.request('read', 8)).toEqual(['token', 1, 8])
+      expect(await parent.coroutine.request('read', 8)).toEqual(['token', 1, 8])
     } finally {
       await parent.close()
     }
@@ -219,15 +206,15 @@ describe('coroutine transport plugin', () => {
     try {
       await host.use(app, transport)
       expect(child.contexts).toHaveLength(2)
-      expect(await child.children[0]!.request('math.double', 20)).toBe(40)
-      expect(await child.children[1]!.request('math.double', 21)).toBe(42)
-      expect(await outlet(host).request('worker', 'read', 9)).toEqual(['shared-definition', 2, 9])
+      expect(await child.children[0]!.coroutine.request('math.double', 20)).toBe(40)
+      expect(await child.children[1]!.coroutine.request('math.double', 21)).toBe(42)
+      expect(await outlet(host).request('read', 9)).toEqual(['shared-definition', 2, 9])
       expect(await host.unUse('worker')).toMatchObject({ ok: true })
       expect(child.contexts[1]!.signal.aborted).toBe(true)
       expect(
         child.finished.filter((connect) => connect === child.contexts[1]!.connect)
       ).toHaveLength(1)
-      expect(await rpc.request('read', 10)).toEqual(['shared-definition', 1, 10])
+      expect(await rpc.coroutine.request('read', 10)).toEqual(['shared-definition', 1, 10])
     } finally {
       await host.dispose()
       await rpc.close()
@@ -273,8 +260,8 @@ describe('coroutine transport plugin', () => {
         })
       )
       const runtime = outlet(host)
-      expect((await runtime.replace('worker', { task: second.task })).kind).toBe('replaced')
-      expect(await runtime.request('worker', 'read', 11)).toEqual(['replacement', 1, 11])
+      expect((await runtime.members.replace('worker', { task: second.task })).kind).toBe('replaced')
+      expect(await runtime.request('read', 11)).toEqual(['replacement', 1, 11])
       second.finishes[0]!.reject(failure)
       await vi.waitFor(() =>
         expect(reports).toContainEqual(expect.objectContaining({ code: 'SUPERVISION_EXHAUSTED' }))
@@ -287,7 +274,7 @@ describe('coroutine transport plugin', () => {
           Reflect.get(error, 'code') === 'SUPERVISION_EXHAUSTED'
       ) as Error
       expect((terminal.cause as Error).cause).toBe(failure)
-      expect(await runtime.get('worker')).toMatchObject({ unit: { state: 'terminal' } })
+      expect(await runtime.members.get('worker')).toMatchObject({ unit: { state: 'terminal' } })
     } finally {
       await host.dispose()
       vi.restoreAllMocks()

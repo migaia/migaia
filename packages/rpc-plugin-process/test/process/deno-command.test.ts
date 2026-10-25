@@ -1,8 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { RpcWireLimit } from '@migaia/rpc-contract'
-import type { IRpcRuntimeGeneration } from '@migaia/rpc-contract'
-import { encodeRpcStreamFrame } from '@migaia/rpc-contract/framing/stream'
-import { RPC_CORE_ERROR_SOURCE, RpcCoreErrorCode } from '@migaia/rpc-host'
+import { RpcWireLimit, type IRpcGeneration } from '@migaia/rpc-contract/protocol'
+import { encodeRpcStreamFrame } from '@migaia/rpc-host/sdk'
+import { RPC_ENDPOINT_ERROR_SOURCE, RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { RpcProcessErrorCode, RPC_PROCESS_ERROR_SOURCE } from '@migaia/rpc-plugin-process'
 import type { IProcessSpec } from '@migaia/supervision/process'
 import {
@@ -222,7 +221,7 @@ afterEach(() => {
 
 describe('Deno command native boundary', () => {
   /** Optional generation metadata must preserve the one bootstrap identity through native launch. */
-  it.each<IRpcRuntimeGeneration | undefined>([
+  it.each<IRpcGeneration | undefined>([
     undefined,
     { kind: 'restart', value: 3, providerId: 'fixture-provider' }
   ])('writes the exact bootstrap identity and optional generation %j', async (generation) => {
@@ -532,7 +531,7 @@ describe('Deno command native boundary', () => {
         { signal: new AbortController().signal, output: () => undefined }
       )
       await expect(rejected).rejects.toMatchObject({
-        source: RPC_CORE_ERROR_SOURCE,
+        source: RPC_ENDPOINT_ERROR_SOURCE,
         code: RpcCoreErrorCode.invalidConfig
       })
       expect(fixture.commands).toEqual([])

@@ -1,54 +1,49 @@
-import { describe, expect, it } from 'vitest'
-import { connect } from '../../dist/core/middleware/connect.js'
-import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
-import { createComposedEndpoint } from '../../dist/core/composed.js'
-import { createOutboundFeature } from '../../dist/core/features/outbound.js'
-import { createProviderFeature } from '../../dist/core/internal/provider-feature.js'
-import { createCanonicalChunkFeature, createStreamFeature } from '../../dist/core/stream/index.js'
+/** The original public stream delivery uses the sole Host namespace instead of deleted roots. */
+import { expect, it } from 'vitest'
+import { connectedCoreHosts } from '../host/core-fixture.js'
+import { RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
 
-/** Proves a package consumer can build both stream peers using published subpaths. */
-function publicRoots() {
-  const chunk = createCanonicalChunkFeature()
-  const outbound = createOutboundFeature(chunk)
-  const provider = createProviderFeature(outbound)
-  const stream = createStreamFeature(outbound, provider)
-  return {
-    'first-party-chunk': chunk,
-    'first-party-outbound': outbound,
-    'first-party-provider': provider,
-    'first-party-stream': stream
-  }
-}
-
-describe('streaming public subpath', () => {
-  it('exposes the complete composition path without the core root stream runtime', async () => {
-    const [clientTransport, serverTransport] = createMemoryTransportPair()
-    const server = await createComposedEndpoint(
-      {
-        id: 'server',
-        transport: serverTransport,
-        middlewares: [connect({ transport: serverTransport })]
-      },
-      publicRoots()
-    )
-    const client = await createComposedEndpoint(
-      {
-        id: 'client',
-        transport: clientTransport,
-        middlewares: [connect({ transport: clientTransport })]
-      },
-      publicRoots()
-    )
-    server.stream.provide('one', function* () {
+it('delivers the original stream items through the complete public Host entry', async () => {
+  /** Both real Hosts install their original raw memory carriers and complete actual handshakes. */
+  const fixture = await connectedCoreHosts({
+    one: function* () {
       yield 'value'
-    })
-    try {
-      const values = client.stream.open('server', 'one', null)
-      expect(await values.next()).toEqual({ done: false, value: 'value' })
-      expect(await values.next()).toEqual({ done: true, value: undefined })
-    } finally {
-      await client.dispose()
-      await server.dispose()
     }
   })
+  try {
+    /** Exactly one accepted provider selects the ordinary iterator rather than broadcast output. */
+    const values = fixture.b.memory.stream('one', null) as AsyncIterableIterator<unknown>
+    expect(await values.next()).toEqual({ done: false, value: 'value' })
+    expect(await values.next()).toEqual({ done: true, value: undefined })
+  } finally {
+    await fixture.b.close()
+    await fixture.a.close()
+  }
 })
+
+it.each(['item', 'end'] as const)(
+  'R18 public sender rejects an oversized %s without hanging',
+  async (event) => {
+    /** Actual JSON media owns the sole sender measurement before native write. */
+    const fixture = await connectedCoreHosts(
+      {
+        oversized: function* () {
+          if (event === 'item') yield 'x'.repeat(16383)
+          else return 'x'.repeat(16383)
+        }
+      },
+      {},
+      () => undefined,
+      { create: () => new RpcJsonCarrierCodec(), nativeBinary: false }
+    )
+    try {
+      const values = fixture.b.memory.stream('oversized', null) as AsyncIterableIterator<unknown>
+      await expect(values.next()).rejects.toMatchObject({
+        source: 'rpc.endpoint',
+        code: 'PAYLOAD_INVALID'
+      })
+    } finally {
+      await fixture.close()
+    }
+  }
+)

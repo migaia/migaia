@@ -5837,11 +5837,11 @@
         {
           "name": "ITrayInstanceDetail",
           "kind": "type",
-          "signature": "export type ITrayInstanceDetail = ITrayInstance & Omit<IRuntimeConnectionDetail, 'generation'>;",
+          "signature": "export type ITrayInstanceDetail = ITrayInstance & Omit<IRpcMemberConnectionDetail, 'generation'>;",
           "declarationLine": 62,
           "source": "packages/tray/dist/hosts/typing.d.ts",
           "purpose": "`ITrayInstance` plus RPC connection details, from `tray.get(id)`.",
-          "core": "methods: Method paths callable on the other side, from its accepted directory.\ncounters: Call counters: `inFlight` (calls not yet finished) is measured; `sent`, `received`, `errors`, `lastActiveAt` are reported unavailable; or `{ status: \"unavailable\", reason }` when the owner cannot observe it.\nrecent: Recent lifecycle records (`IRuntimeRecent`), newest last.\nidentity: Identity `{ name, instanceId }` the other side announced, or `{ status: \"unavailable\", reason }` when the owner cannot observe it.\ngeneration: Number of the current initialisation; it grows on every restart, replace or supervised restart.\nkind: How the connection was configured: `spawn`, `connect` or `listen`.\ndirection: Who started it: `spawned`, `spawned-by` (this side is the child), `connect` or `listen`.\ncarrier: Name of the physical carrier, such as a MessagePort or stdio.\nconnection: `{ status }`: `ready`, `closed`, `departed`, or unavailable.\nunit: Supervised unit `{ kind, state, generation, degraded }`, or `{ status: \"unavailable\", reason }` when the owner cannot observe it.\nhealth: Health check metric `{ state, failures }`, or `{ status: \"unavailable\", reason }` when the owner cannot observe it.\nrestartCount: Number of restarts as a metric, or `{ status: \"unavailable\", reason }` when the owner cannot observe it.\nresources: Sampled resources (pid or threadId, memory, CPU time, event-loop utilisation), or `{ status: \"unavailable\", reason }` when the owner cannot observe it.\nlastExit: Last exit `{ generation, reason, code, signal, error? }`, or `{ status: \"unavailable\", reason }` when the owner cannot observe it.\nid: Instance id given to `spawn(host, { id })`.\nhost: Name of the host definition the instance runs.\nconfig: Inside plugins(instance) and the child client self(), config is the validator output, or the input without a validator. Parent list/get snapshots instead retain the portable spawn/replace input; they do not publish the transformed child value.\nruntime: How the instance runs: `coroutine`, `thread` or `process`.\nstate: Registry state of the instance.\ninFlight: Business calls (`request`, `notify`, `stream`) sent to this admission and not finished; `leastInFlight` routing compares it.",
+          "core": "methods: Method paths callable on the other side, from its accepted directory.\ncounters: The current native-member projection reports `{ status: \"unavailable\", reason: \"canonical-counter-not-available\" }`; it has no canonical pending-call counter input. A declared metric shape does not make a measurement available.\nrecent: Recent lifecycle records (`IRpcMemberRecent`), newest last.\nidentity: Identity `{ name, instanceId }` the other side announced, or `{ status: \"unavailable\", reason }` when the owner cannot observe it.\ngeneration: Number of the current initialisation; it grows on every restart, replace or supervised restart.\nkind: How the connection was configured: `spawn`, `connect` or `listen`.\nThe local source launched the remote native unit.\nThe local source initiated the connection.\nThe local source accepted the connection.\ndirection: Who started it: `spawned`, `spawned-by` (this side is the child), `connect` or `listen`.\nThis owner launched the remote unit.\nThis side is the child of its bootstrap parent.\nThis side initiated the connection.\nThis side accepted the connection.\ncarrier: Name of the physical carrier, such as a MessagePort or stdio.\nconnection: `{ status }`: `ready`, `closed`, `departed`, or unavailable.\nunit: Supervised unit `{ kind, state, generation, degraded }`, or `{ status: \"unavailable\", reason }` when the owner cannot observe it.\nhealth: Native health metric whose `value` is `{ state, failures }`, with explicit scope, unit and observation time; or `{ status: \"unavailable\", reason }` when the owner cannot observe it.\nrestartCount: Number of restarts as a metric, or `{ status: \"unavailable\", reason }` when the owner cannot observe it.\nresources: Sampled resources (pid or threadId, memory, CPU time, event-loop utilisation), or `{ status: \"unavailable\", reason }` when the owner cannot observe it.\nlastExit: Last exit `{ generation, reason, code, signal, error? }`, or `{ status: \"unavailable\", reason }` when the owner cannot observe it.\nid: Instance id given to `spawn(host, { id })`.\nhost: Name of the host definition the instance runs.\nconfig: Inside plugins(instance) and the child client self(), config is the validator output, or the input without a validator. Parent list/get snapshots instead retain the portable spawn/replace input; they do not publish the transformed child value.\nruntime: How the instance runs: `coroutine`, `thread` or `process`.\nstate: Registry state of the instance.\ninFlight: Business calls (`request`, `notify`, `stream`) sent to this admission and not finished; `leastInFlight` routing compares it.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -5854,28 +5854,28 @@
               "name": "identity",
               "kind": "property",
               "optional": false,
-              "signature": "identity: IRuntimePeerIdentity | IRuntimeUnavailable;",
+              "signature": "identity: IRpcMemberIdentity | IRpcMemberUnavailable;",
               "description": "Accepted remote identity, or an explicit unavailable record.",
               "parameterDetails": [],
-              "returns": "IRuntimePeerIdentity | IRuntimeUnavailable"
+              "returns": "IRpcMemberIdentity | IRpcMemberUnavailable"
             },
             {
               "name": "kind",
               "kind": "property",
               "optional": false,
-              "signature": "kind: RuntimeSourceKind;",
+              "signature": "kind: RpcMemberSourceKind;",
               "description": "Actual local spawn/connect/listen source mode.",
               "parameterDetails": [],
-              "returns": "RuntimeSourceKind"
+              "returns": "RpcMemberSourceKind"
             },
             {
               "name": "direction",
               "kind": "property",
               "optional": false,
-              "signature": "direction: RuntimeConnectionDirection;",
+              "signature": "direction: RpcMemberConnectionDirection;",
               "description": "Actual connection direction, independent of ownership.",
               "parameterDetails": [],
-              "returns": "RuntimeConnectionDirection"
+              "returns": "RpcMemberConnectionDirection"
             },
             {
               "name": "carrier",
@@ -5890,37 +5890,37 @@
               "name": "connection",
               "kind": "property",
               "optional": false,
-              "signature": "connection: Readonly<{ status: string | IRuntimeUnavailable; }>;",
+              "signature": "connection: Readonly<{ status: string | IRpcMemberUnavailable; }>;",
               "description": "Connection availability reported by its original owner.",
               "parameterDetails": [],
-              "returns": "Readonly<{ status: string | IRuntimeUnavailable; }>"
+              "returns": "Readonly<{ status: string | IRpcMemberUnavailable; }>"
             },
             {
               "name": "unit",
               "kind": "property",
               "optional": false,
-              "signature": "unit: IRuntimeUnavailable | Readonly<{ kind: string; state: string; generation: number; degraded: readonly string[]; }>;",
+              "signature": "unit: IRpcMemberUnavailable | Readonly<{ kind: string; state: string; generation: number; degraded: readonly string[]; }>;",
               "description": "Original execution-unit facts, or unavailable when no owned unit is observable.",
               "parameterDetails": [],
-              "returns": "IRuntimeUnavailable | Readonly<{ kind: string; state: string; generation: number; degraded: readonly string[]; }>"
+              "returns": "IRpcMemberUnavailable | Readonly<{ kind: string; state: string; generation: number; degraded: readonly string[]; }>"
             },
             {
               "name": "health",
               "kind": "property",
               "optional": false,
-              "signature": "health: IRuntimeUnavailable | IRuntimeMetric<Readonly<{ state: string; failures: number; }>>;",
+              "signature": "health: IRpcMemberUnavailable | IRpcMemberMetric<Readonly<{ state: string; failures: number; }>>;",
               "description": "Original health metric or unavailable; channel readiness does not imply native health.",
               "parameterDetails": [],
-              "returns": "IRuntimeUnavailable | IRuntimeMetric<Readonly<{ state: string; failures: number; }>>"
+              "returns": "IRpcMemberUnavailable | IRpcMemberMetric<Readonly<{ state: string; failures: number; }>>"
             },
             {
               "name": "restartCount",
               "kind": "property",
               "optional": false,
-              "signature": "restartCount: IRuntimeUnavailable | IRuntimeMetric;",
+              "signature": "restartCount: IRpcMemberUnavailable | IRpcMemberMetric;",
               "description": "Original supervisor restart metric, or unavailable.",
               "parameterDetails": [],
-              "returns": "IRuntimeUnavailable | IRuntimeMetric"
+              "returns": "IRpcMemberUnavailable | IRpcMemberMetric"
             },
             {
               "name": "methods",
@@ -5935,43 +5935,43 @@
               "name": "counters",
               "kind": "property",
               "optional": false,
-              "signature": "counters: IRuntimeUnavailable | IRuntimeCounters;",
+              "signature": "counters: IRpcMemberUnavailable | IRpcMemberCounters;",
               "description": "Canonical endpoint counters when available, with explicit absent fields.",
               "parameterDetails": [],
-              "returns": "IRuntimeUnavailable | IRuntimeCounters"
+              "returns": "IRpcMemberUnavailable | IRpcMemberCounters"
             },
             {
               "name": "resources",
               "kind": "property",
               "optional": false,
-              "signature": "resources: IRuntimeUnavailable | IRuntimeResources;",
+              "signature": "resources: IRpcMemberUnavailable | IRpcMemberResources;",
               "description": "Native resource observations when connected to the original sampler; otherwise unavailable.",
               "parameterDetails": [],
-              "returns": "IRuntimeUnavailable | IRuntimeResources"
+              "returns": "IRpcMemberUnavailable | IRpcMemberResources"
             },
             {
               "name": "recent",
               "kind": "property",
               "optional": false,
-              "signature": "recent: readonly IRuntimeRecent[];",
+              "signature": "recent: readonly IRpcMemberRecent[];",
               "description": "Bounded original departure history for this connection.",
               "parameterDetails": [],
-              "returns": "readonly IRuntimeRecent[]"
+              "returns": "readonly IRpcMemberRecent[]"
             },
             {
               "name": "lastExit",
               "kind": "property",
               "optional": false,
-              "signature": "lastExit: IRuntimeUnavailable | Readonly<{ generation: number; reason: string; code: number | IRuntimeUnavailable; signal: string | IRuntimeUnavailable; error?: Readonly<{ source?: string; code?: string; }>; observedAt?: number; }>;",
+              "signature": "lastExit: IRpcMemberUnavailable | Readonly<{ generation: number; reason: string; code: number | IRpcMemberUnavailable; signal: string | IRpcMemberUnavailable; error?: Readonly<{ source?: string; code?: string; }>; observedAt?: number; }>;",
               "description": "Safe observed native exit facts, or unavailable.",
               "parameterDetails": [],
-              "returns": "IRuntimeUnavailable | Readonly<{ generation: number; reason: string; code: number | IRuntimeUnavailable; signal: string | IRuntimeUnavailable; error?: Readonly<{ source?: string; code?: string; }>; observedAt?: number; }>"
+              "returns": "IRpcMemberUnavailable | Readonly<{ generation: number; reason: string; code: number | IRpcMemberUnavailable; signal: string | IRpcMemberUnavailable; error?: Readonly<{ source?: string; code?: string; }>; observedAt?: number; }>"
             }
           ],
           "composes": ["ITrayInstance"],
           "exportPath": ".",
           "overloadSignatures": [
-            "export type ITrayInstanceDetail = ITrayInstance & Omit<IRuntimeConnectionDetail, 'generation'>;"
+            "export type ITrayInstanceDetail = ITrayInstance & Omit<IRpcMemberConnectionDetail, 'generation'>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -6001,7 +6001,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "methods: Method paths callable on the other side, from its accepted directory.\ncounters: Call counters: `inFlight` (calls not yet finished) is measured; `sent`, `received`, `errors`, `lastActiveAt` are reported unavailable; or `{ status: \"unavailable\", reason }` when the owner cannot observe it.\nrecent: Recent lifecycle records (`IRuntimeRecent`), newest last.\nidentity: Identity `{ name, instanceId }` the other side announced, or `{ status: \"unavailable\", reason }` when the owner cannot observe it.\ngeneration: Number of the current initialisation; it grows on every restart, replace or supervised restart.\nkind: How the connection was configured: `spawn`, `connect` or `listen`.\ndirection: Who started it: `spawned`, `spawned-by` (this side is the child), `connect` or `listen`.\ncarrier: Name of the physical carrier, such as a MessagePort or stdio.\nconnection: `{ status }`: `ready`, `closed`, `departed`, or unavailable.\nunit: Supervised unit `{ kind, state, generation, degraded }`, or `{ status: \"unavailable\", reason }` when the owner cannot observe it.\nhealth: Health check metric `{ state, failures }`, or `{ status: \"unavailable\", reason }` when the owner cannot observe it.\nrestartCount: Number of restarts as a metric, or `{ status: \"unavailable\", reason }` when the owner cannot observe it.\nresources: Sampled resources (pid or threadId, memory, CPU time, event-loop utilisation), or `{ status: \"unavailable\", reason }` when the owner cannot observe it.\nlastExit: Last exit `{ generation, reason, code, signal, error? }`, or `{ status: \"unavailable\", reason }` when the owner cannot observe it.\nid: Instance id given to `spawn(host, { id })`.\nhost: Name of the host definition the instance runs.\nconfig: Inside plugins(instance) and the child client self(), config is the validator output, or the input without a validator. Parent list/get snapshots instead retain the portable spawn/replace input; they do not publish the transformed child value.\nruntime: How the instance runs: `coroutine`, `thread` or `process`.\nstate: Registry state of the instance.\ninFlight: Business calls (`request`, `notify`, `stream`) sent to this admission and not finished; `leastInFlight` routing compares it."
+              "content": "methods: Method paths callable on the other side, from its accepted directory.\ncounters: The current native-member projection reports `{ status: \"unavailable\", reason: \"canonical-counter-not-available\" }`; it has no canonical pending-call counter input. A declared metric shape does not make a measurement available.\nrecent: Recent lifecycle records (`IRpcMemberRecent`), newest last.\nidentity: Identity `{ name, instanceId }` the other side announced, or `{ status: \"unavailable\", reason }` when the owner cannot observe it.\ngeneration: Number of the current initialisation; it grows on every restart, replace or supervised restart.\nkind: How the connection was configured: `spawn`, `connect` or `listen`.\nThe local source launched the remote native unit.\nThe local source initiated the connection.\nThe local source accepted the connection.\ndirection: Who started it: `spawned`, `spawned-by` (this side is the child), `connect` or `listen`.\nThis owner launched the remote unit.\nThis side is the child of its bootstrap parent.\nThis side initiated the connection.\nThis side accepted the connection.\ncarrier: Name of the physical carrier, such as a MessagePort or stdio.\nconnection: `{ status }`: `ready`, `closed`, `departed`, or unavailable.\nunit: Supervised unit `{ kind, state, generation, degraded }`, or `{ status: \"unavailable\", reason }` when the owner cannot observe it.\nhealth: Native health metric whose `value` is `{ state, failures }`, with explicit scope, unit and observation time; or `{ status: \"unavailable\", reason }` when the owner cannot observe it.\nrestartCount: Number of restarts as a metric, or `{ status: \"unavailable\", reason }` when the owner cannot observe it.\nresources: Sampled resources (pid or threadId, memory, CPU time, event-loop utilisation), or `{ status: \"unavailable\", reason }` when the owner cannot observe it.\nlastExit: Last exit `{ generation, reason, code, signal, error? }`, or `{ status: \"unavailable\", reason }` when the owner cannot observe it.\nid: Instance id given to `spawn(host, { id })`.\nhost: Name of the host definition the instance runs.\nconfig: Inside plugins(instance) and the child client self(), config is the validator output, or the input without a validator. Parent list/get snapshots instead retain the portable spawn/replace input; they do not publish the transformed child value.\nruntime: How the instance runs: `coroutine`, `thread` or `process`.\nstate: Registry state of the instance.\ninFlight: Business calls (`request`, `notify`, `stream`) sent to this admission and not finished; `leastInFlight` routing compares it."
             },
             {
               "id": "advanced-usage",
@@ -6010,7 +6010,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/tray/dist/hosts/typing.d.ts:ITrayInstanceDetail:export type ITrayInstanceDetail = ITrayInstance & Omit<IRuntimeConnectionDetail, 'generation'>;",
+          "identity": "packages/tray/dist/hosts/typing.d.ts:ITrayInstanceDetail:export type ITrayInstanceDetail = ITrayInstance & Omit<IRpcMemberConnectionDetail, 'generation'>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],

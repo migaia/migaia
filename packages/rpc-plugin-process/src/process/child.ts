@@ -1,3 +1,8 @@
+/**
+ * Classifies the current native process from its launcher discovery marker without opening IO.
+ * Consumed nonsecret child classification is retained locally; bootstrap authentication remains
+ * independent.
+ */
 import { PROCESS_RUNTIME_API_ENV, PROCESS_RUNTIME_API_ENV_VERSION } from './constants.js'
 
 /** Discovery consumes the native environment marker; retain only its nonsecret child classification. */

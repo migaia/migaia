@@ -1,15 +1,8 @@
 # `@migaia/rpc-plugin-browser`
 
-Connect real browser carriers to `createRpcHost`: Window, Dedicated/Shared/Service Workers, BroadcastChannel, reliable RTCDataChannel, and WebTransport.
+Connect actual Windows, Workers, BroadcastChannels, reliable RTCDataChannels or WebTransport to RPC. Applications create native objects; Browser owns native sources/I/O, and Host owns sessions, directories and calls.
 
 [中文](./README.md) · [Usage guide](./USEGUIDE.en.md)
-
-## Why use it
-
-- Every carrier uses the host's bidirectional calls, directory, deadlines, cancellation, and error representation.
-- Window binds the actual sender and explicit origin; ServiceWorker separates the sending target from the receiving owner.
-- SharedWorker, BroadcastChannel, and ServiceWorker accept independent sessions while each host still uses one call endpoint.
-- Workers, ports, channels, and sessions stay application-owned; closing RPC does not terminate borrowed resources.
 
 ## Start here
 
@@ -17,19 +10,19 @@ Connect real browser carriers to `createRpcHost`: Window, Dedicated/Shared/Servi
 pnpm add @migaia/rpc-host @migaia/rpc-contract @migaia/rpc-plugin-browser
 ```
 
-Create an actual module Worker in the page. `worker.js` is the compiled address of the separate Worker entry below.
+This page borrows a module Worker and calls the default `worker` namespace. `worker.js` is the compiled separate Worker entry below.
 
-```ts
+```ts doc-test=check
 import { createRpcHost } from '@migaia/rpc-host'
 import { dedicatedWorkerPlugin } from '@migaia/rpc-plugin-browser'
 
 const worker = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' })
 try {
-  const host = await createRpcHost<{ double(value: number): number }>({
+  const host = await createRpcHost({
     plugins: [dedicatedWorkerPlugin({ worker, connect: { timeoutMs: 1500 } })]
   })
   try {
-    console.log(await host.request('double', 21))
+    console.log(await host.worker.request('double', 21))
   } finally {
     await host.close()
   }
@@ -38,9 +31,9 @@ try {
 }
 ```
 
-Compile this separate `worker.ts` entry with Worker globals and module settings:
+Compile the separate `worker.ts` with Worker globals, without casting a page Window to Worker:
 
-```ts
+```ts doc-test=check environment=worker
 import { createRpcHost } from '@migaia/rpc-host'
 import { dedicatedWorkerPlugin } from '@migaia/rpc-plugin-browser'
 
@@ -50,36 +43,40 @@ await createRpcHost({
 })
 ```
 
-The page prints `42`. Both sides need a compatible RPC protocol. The application owns the Worker address, construction, and final termination.
+After the Worker provides `double`, the compatible page call can receive `42`. Applications own the address, creation, deployment and eventual termination. These examples receive public-dist typechecking, not cross-realm runtime acceptance.
 
-## Seven carriers
+## Seven factories and default namespaces
 
-| Factory                  | Actual source                                             | Behavior                                                                                                                      |
-| ------------------------ | --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `windowPlugin`           | `{ window, origin, receiver? }`                           | Window/iframe peer; origin is required, and `'*'` also requires `allowUnsafeTargetOrigin: true`                               |
-| `dedicatedWorkerPlugin`  | `{ worker }`                                              | A page Worker or worker-side `self`, using the original EventTarget carrier                                                   |
-| `sharedWorkerPlugin`     | `{ sharedWorker }` **or** `{ listen: self }`              | The page borrows sharedWorker.port; the worker accepts ports from native connect events                                       |
-| `broadcastChannelPlugin` | `{ channel }`                                             | Borrows a real BroadcastChannel and discovers/handshakes each participant                                                     |
-| `serviceWorkerPlugin`    | `{ serviceWorker, receiver? }` **or** `{ clients: self }` | The page targets a real worker, receiving through navigator.serviceWorker by default; worker-side sessions use real Client.id |
-| `rtcDataChannelPlugin`   | `{ rtcDataChannel }`                                      | Requires ordered=true and null maxRetransmits/maxPacketLifeTime                                                               |
-| `webTransportPlugin`     | `{ session }`                                             | Awaits existing session.ready and creates one reliable bidirectional byte stream; no datagrams                                |
+| Factory                  | Source options                                        | Default namespace  |
+| ------------------------ | ----------------------------------------------------- | ------------------ |
+| `windowPlugin`           | `{ window, origin, receiver? }`                       | `window`           |
+| `dedicatedWorkerPlugin`  | `{ worker }`                                          | `worker`           |
+| `sharedWorkerPlugin`     | `{ sharedWorker }` or `{ listen: self }`              | `sharedWorker`     |
+| `broadcastChannelPlugin` | `{ channel }`                                         | `broadcastChannel` |
+| `serviceWorkerPlugin`    | `{ serviceWorker, receiver? }` or `{ clients: self }` | `serviceWorker`    |
+| `rtcDataChannelPlugin`   | `{ rtcDataChannel }`                                  | `rtcDataChannel`   |
+| `webTransportPlugin`     | `{ session }`                                         | `webTransport`     |
 
-Common options are `name`, `expose`, and `connect: { timeoutMs }`. SharedWorker and ServiceWorker source alternatives are mutually exclusive. Ordinary objects or client IDs claimed inside payloads do not establish accepted source identity.
+Common options include `name`, `namespace`, `expose`, `connect: { timeoutMs }` and complete business `features`. SharedWorker/ServiceWorker source alternatives are exclusive. Root exports are these factories, their option types, `RpcBrowserErrorCode` and `RPC_BROWSER_ERROR_SOURCE`.
 
-## Targets, sources, and calls
+Prefer one transport kind per Host rather than mixed media. Several ports or participants may belong to that one kind. If mixing is necessary, define namespaces, routing and permissions explicitly; heterogeneous media are not a homogeneous member pool.
 
-Both sides of a session can `provide` and use `request`, `notify`, `stream`, `group`, and `outcome`. With multiple peers, untargeted calls broadcast using the [host result rules](../rpc-host/README.en.md#calls-and-targets); `send(nameOrId, method, payload)` selects a current direct peer.
+## Calls and sources
 
-BroadcastChannel participants must finish discovery and handshake; the channel name is not a peer identity. ServiceWorker's `serviceWorker` is the sending target, while `receiver` owns message subscription. Its worker-side source resolves the native Client from the real event source/Client.id before RPC handshake. Window checks both origin and actual event.source. `connect.timeoutMs` bounds preparation; business methods do not run before acceptance.
+The root owns `self/provide/close`; actual namespaces such as `host.worker` or `host.window` expose `request/notify/stream/group`. `send(nameOrId, method, payload)` selects one current direct peer. Untargeted calls use that namespace's current direct set. Extensions such as `outcome` require their corresponding plugin.
 
-WebTransport's server must implement the same reliable byte RPC protocol. The plugin owns only its created stream: close releases reader/writer resources and locks without calling the borrowed session's close. Unreliable datagram RPC is not supported.
+Window binds actual `event.source` and an explicit origin; `'*'` also needs `allowUnsafeTargetOrigin: true`. ServiceWorker admission uses native sources and Client lookup, never a client ID claimed in payload. BroadcastChannel names are not peer identities; discovery and protocol handshake are still required.
 
-## Ownership, errors, and extension
+## Ownership and protocol
 
-`await host.close()` withdraws the host's receivers and logical sessions. The application still owns Workers, MessagePorts, BroadcastChannels, RTCDataChannels, and WebTransport sessions it created. Closing a SharedWorker listener does not terminate the shared Worker, and retiring one session does not close others.
+Host closure withdraws its subscriptions/sessions without terminating borrowed Workers, MessagePorts, BroadcastChannels, RTCDataChannels or WebTransport sessions. WebTransport owns only its created reliable bidirectional stream, reader/writer and locks; it uses no datagrams. Applications release their own native objects.
 
-Native structured clone does not automatically permit RPC ownership transfer. Transfer depends on actual session capabilities and authentication. BroadcastChannel has no transfer list. Failures retain original causes; clone support does not promise arbitrary lossless JavaScript graph transfer.
+The only profile is `migaia.rpc/2`. `@migaia/rpc-contract/protocol` provides pure protocol data/admission, `/interfaces` capability types, and `/errors` plus `/error-code` error contracts. Contract performs no business schema execution, I/O or policy. Custom carriers use canonical carriers from `@migaia/rpc-host/sdk`. Actual `/plugins/*` provide business validation and other intervention, rather than hidden transport switches.
 
-Browser source/carrier errors use `rpc.transport.browser`; general handshake/call errors can use `rpc.endpoint` or `rpc.remote`. Inspect source/code/cause. Missing sources, missing Window origins, and unreliable RTC settings reject at their original admission boundary.
+Native structured clone and explicit ownership transfer are separate capabilities. BroadcastChannel, RTC and WebTransport do not expose the native transfer required by these plugins. Window/Worker transfer still depends on actual media and installed policies.
 
-The root exports seven plugins, options, and error identity. Plugins reuse package-owned carrier implementations internally; custom raw deployments use the `@migaia/rpc-host/plugin` SDK. See the [usage guide](./USEGUIDE.en.md).
+## Current boundaries
+
+Native source filtering does not establish an authenticated principal or session/scope across reconnects. Automatic auth/source freshness, parts of outcome/idempotency and observer diagnostic compatibility remain unresolved. Neither a channel name nor a native source automatically supplies those guarantees. Generic Host close/drain and restart downtime differences are not browser guarantees either.
+
+Failures may originate from `rpc.transport.browser` or shared RPC owners. Retain `source/code/cause/errors` and native stacks; text or one code alone does not establish execution outcome. Full migration acceptance remains pending. See the [usage guide](./USEGUIDE.en.md).

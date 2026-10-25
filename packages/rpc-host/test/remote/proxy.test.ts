@@ -1,7 +1,7 @@
 import { RpcRuntimeGenerationKind } from '@migaia/rpc-contract/framing/v1'
 import { createRuntimePeer, readRuntimePeerEndpoint } from '../../dist/remote/runtime-api/peer.js'
 import { describe, expect, it, vi } from 'vitest'
-import { RpcRemoteLayerErrorCode } from '../../dist/remote/error-code.js'
+import { RpcRemoteLayerErrorCode } from '@migaia/rpc-contract/error-code'
 import {
   createRemoteGenerationHolder,
   createRemoteRuntimeRegistration
@@ -10,11 +10,8 @@ import { remoteHarness } from './fixture.js'
 import { RuntimeStreamFixture } from './stream-fixture.js'
 import { RpcStreamOwner } from '../../dist/core/internal/stream/owner.js'
 import { RpcOutboundAttachment } from '../../dist/core/internal/outbound-attachment.js'
-import {
-  RpcCoreErrorCode,
-  RpcLifecycleError,
-  RPC_CORE_ERROR_SOURCE
-} from '../../dist/core/errors.js'
+import { RpcLifecycleError, RPC_CORE_ERROR_SOURCE } from '@migaia/rpc-contract/errors'
+import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { attachErrorIdentity } from '@migaia/utils/error'
 
 describe('remote generation proxy', () => {

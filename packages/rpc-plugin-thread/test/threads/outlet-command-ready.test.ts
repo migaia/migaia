@@ -4,10 +4,11 @@ import { threadPlugin } from '@migaia/rpc-plugin-thread'
 import {
   createNodeThreadLauncher,
   createNodeThreadChannelFactory
-} from '../../dist/threads/adapters/node.js'
+} from '../../dist/threads/node-launcher.js'
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { runtimeTestHost } from '../../../rpc-host/test/runtime-api/public-host.js'
+import { defineHost } from '@migaia/plugin-host'
+import type { INativeFixtureHost } from './fixture.js'
 
 /** A real Worker uses only public factories and exposes its own admitted instance identity. */
 const entry = fileURLToPath(new URL('./fixtures/outlet-command-worker.mjs', import.meta.url))
@@ -17,9 +18,9 @@ describe('thread outlet command readiness', () => {
     '[DX3-thread] %s resolves only after the new generation can receive an immediate request',
     async (command) => {
       /** Host owns every generation; no event wait or retry hides publication ordering. */
-      const host = runtimeTestHost({
+      const host = defineHost({
         host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
-      })
+      }) as INativeFixtureHost
       /** Keep native diagnostics observable without changing their objects. */
       const reported: unknown[] = []
       /** Native channel and supervisor share the same scheduler. */
@@ -44,20 +45,21 @@ describe('thread outlet command readiness', () => {
           })
         )
         /** The first identity proves subsequent success belongs to the replacement generation. */
-        const previous = await host.thread!.request('worker', 'identity')
+        const previous = await host.thread!.send('worker', 'identity')
         /** Await only the public command; the next operation must already be routable. */
-        const outcome = await host.thread![command]('worker')
+        const outcome = await host.thread!.members[command]('worker')
         expect(outcome).toMatchObject(
           command === 'restart' ? { state: 'ready' } : { kind: 'replaced' }
         )
-        expect(await host.thread!.request('worker', 'math.double', 4)).toBe(8)
-        expect(await host.thread!.request('worker', 'identity')).not.toBe(previous)
-        expect(() =>
-          host.thread!.request({ name: 'worker', instanceId: previous as string }, 'identity')
-        ).toThrow(expect.objectContaining({ source: 'rpc.endpoint', code: 'TARGET_UNKNOWN' }))
+        expect(await host.thread!.send('worker', 'math.double', 4)).toBe(8)
+        expect(await host.thread!.send('worker', 'identity')).not.toBe(previous)
+        await expect(host.thread!.send(previous as string, 'identity')).rejects.toMatchObject({
+          source: 'rpc.endpoint',
+          code: 'TARGET_UNKNOWN'
+        })
         /**
          * Native retirement closes generation 1 before its supervisor leaves ready. The existing
-         * observer reports that rejected stale preparation with the original transport cause.
+         * observer reports that rejected stale preparation without inventing a native cause.
          */
         expect(reported).toEqual([
           expect.objectContaining({
@@ -66,16 +68,11 @@ describe('thread outlet command readiness', () => {
             source: 'rpc.remote',
             code: 'REMOTE_CLOSED',
             detail: { generation: 1 },
-            stack: expect.stringMatching(/\S/),
-            cause: expect.objectContaining({
-              name: 'Error',
-              message: '[rpc] message port closed',
-              source: 'rpc.endpoint',
-              code: 'TRANSPORT',
-              stack: expect.stringMatching(/\S/)
-            })
+            stack: expect.stringMatching(/\S/)
           })
         ])
+        /** BC11 preserves absence when intentional native retirement has no original error. */
+        expect((reported[0] as Error).cause).toBeUndefined()
       } finally {
         await host.dispose()
       }

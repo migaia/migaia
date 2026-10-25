@@ -1,15 +1,22 @@
-import type { IRpcTransportPlugin } from '@migaia/rpc-host/plugin'
-import { defineTransportPlugin, RpcTransportMode } from '@migaia/rpc-host/plugin'
+/**
+ * Builds the transport definition for a borrowed Worker or worker global without launching its
+ * owner.
+ */
+import { defineTransportPlugin } from '@migaia/rpc-host/sdk'
+import type { IRpcTransportPlugin } from '@migaia/rpc-host/sdk'
 import { BrowserPeerErrorText } from '../error-text.js'
-import { RpcBrowserErrorCode } from '../error-code.js'
+import { RpcBrowserErrorCode } from '@migaia/rpc-contract/error-code'
 import { createBrowserPeerError } from './peer-error.js'
-import { BrowserPluginName } from './peer-text.js'
-import { getBrowserMessageAdapter } from './peer-adapter.js'
+import { BrowserPluginName, BrowserNamespace } from './peer-text.js'
+import { attachBrowserCarrier } from './native-message.js'
 import type { IWorkerPluginOptions } from './peer-types.js'
+import { createDedicatedWorkerCarrier } from './adapters/dedicated-worker.js'
 
-/** Borrow an existing Worker or worker self without launching or terminating its native owner. */
-export function dedicatedWorkerPlugin(options: IWorkerPluginOptions): IRpcTransportPlugin {
-  /** Native operations admit both sides of the same EventTarget carrier. */
+/** Borrow a real Worker or worker self; installation never launches or terminates its native owner. */
+export function dedicatedWorkerPlugin<const N extends string = 'worker'>(
+  options: IWorkerPluginOptions & Readonly<{ namespace?: N }>
+): IRpcTransportPlugin<NoInfer<N>> {
+  /** Source admission is cold and precedes all native subscriptions. */
   const worker = options?.worker
   if (
     !worker ||
@@ -23,9 +30,10 @@ export function dedicatedWorkerPlugin(options: IWorkerPluginOptions): IRpcTransp
     )
   return defineTransportPlugin({
     name: options.name ?? BrowserPluginName.worker,
+    namespace: (options.namespace ?? BrowserNamespace.worker) as N,
     expose: options.expose,
-    connect: options.connect,
-    mode: RpcTransportMode.connect,
-    deployment: getBrowserMessageAdapter().deployment({ connect: { worker } })
+    features: options.features,
+    handshakeTimeoutMs: options.connect?.timeoutMs,
+    open: (context) => attachBrowserCarrier(createDedicatedWorkerCarrier(worker, context), context)
   })
 }

@@ -1,0 +1,4776 @@
+{
+  "profile": "migaia.rpc/2",
+  "valid": [
+    {
+      "id": "core-hello-directory-and-required-extension",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "handshake",
+        "step": "hello",
+        "versions": [
+          {
+            "major": 2,
+            "minor": 0
+          }
+        ],
+        "codecs": ["json"],
+        "extensions": ["auth@1", "chunk@1"],
+        "requiredExtensions": ["auth@1"],
+        "peer": {
+          "id": "peer-a",
+          "runtime": "node",
+          "runtimeVersion": "22",
+          "implementation": {
+            "name": "vector",
+            "version": "2"
+          }
+        },
+        "directory": {
+          "schemaVersion": 3,
+          "self": {
+            "name": "alpha",
+            "instanceId": "peer-a",
+            "generation": {
+              "kind": "session",
+              "value": 0,
+              "providerId": "peer-a"
+            }
+          },
+          "methods": [
+            {
+              "name": "echo",
+              "supportedModes": ["request", "notify"],
+              "modeSource": "declared",
+              "idempotent": true,
+              "input": {
+                "type": "object"
+              },
+              "output": {
+                "type": "object"
+              }
+            },
+            {
+              "name": "items",
+              "supportedModes": ["stream"],
+              "modeSource": "declared",
+              "yield": {
+                "type": "integer"
+              }
+            }
+          ]
+        },
+        "auth": {
+          "token": "fixture-only"
+        }
+      }
+    },
+    {
+      "id": "core-accept",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "handshake",
+        "step": "accept",
+        "major": 2,
+        "minor": 0,
+        "codec": "json",
+        "extensions": ["auth@1"],
+        "peer": {
+          "id": "peer-a",
+          "runtime": "node",
+          "runtimeVersion": "22",
+          "implementation": {
+            "name": "vector",
+            "version": "2"
+          }
+        },
+        "directory": {
+          "schemaVersion": 3,
+          "self": {
+            "name": "alpha",
+            "instanceId": "peer-a",
+            "generation": {
+              "kind": "session",
+              "value": 0,
+              "providerId": "peer-a"
+            }
+          },
+          "methods": [
+            {
+              "name": "echo",
+              "supportedModes": ["request", "notify"],
+              "modeSource": "declared",
+              "idempotent": true,
+              "input": {
+                "type": "object"
+              },
+              "output": {
+                "type": "object"
+              }
+            },
+            {
+              "name": "items",
+              "supportedModes": ["stream"],
+              "modeSource": "declared",
+              "yield": {
+                "type": "integer"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "core-reject-flat-error",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "handshake",
+        "step": "reject",
+        "error": {
+          "root": 0,
+          "nodes": [
+            {
+              "source": "vector",
+              "code": "FAILED",
+              "name": "TypeError",
+              "message": "vector failure",
+              "stack": "TypeError: vector failure\n    at remote:1:1"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "core-request-zero-budget-key-order",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "call",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0,
+          "remainingMs": 0
+        },
+        "task": {
+          "mode": "request",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          },
+          "method": "echo"
+        },
+        "options": {
+          "orderKey": "lane-1"
+        },
+        "payload": {
+          "z": 1,
+          "a": 2,
+          "nested": [true, null]
+        }
+      }
+    },
+    {
+      "id": "core-notify-correlated-id",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "call",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "notify",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          },
+          "method": "echo"
+        },
+        "options": {
+          "cancel": "before-start",
+          "idempotencyKey": "notify:1"
+        },
+        "payload": {
+          "value": 1
+        }
+      }
+    },
+    {
+      "id": "core-stream-call",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "call",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "stream",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          },
+          "method": "items"
+        },
+        "options": {},
+        "payload": {
+          "count": 2
+        }
+      }
+    },
+    {
+      "id": "core-relative-fractional-budget",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "call",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0,
+          "remainingMs": 0.5
+        },
+        "task": {
+          "mode": "request",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          },
+          "method": "echo"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "core-group-ordered-steps",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "group",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "group",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          }
+        },
+        "options": {
+          "idempotencyKey": "group:1"
+        },
+        "steps": [
+          {
+            "method": "first",
+            "payload": 1
+          },
+          {
+            "method": "second"
+          }
+        ]
+      }
+    },
+    {
+      "id": "core-result-omitted-undefined",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "result",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "request",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          },
+          "method": "echo"
+        }
+      }
+    },
+    {
+      "id": "core-group-result-fail-stop",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "result",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "group",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          }
+        },
+        "result": [
+          {
+            "state": "success",
+            "result": 1
+          },
+          {
+            "state": "failure",
+            "error": {
+              "root": 0,
+              "nodes": [
+                {
+                  "source": "vector",
+                  "code": "FAILED",
+                  "name": "TypeError",
+                  "message": "vector failure",
+                  "stack": "TypeError: vector failure\n    at remote:1:1"
+                }
+              ]
+            }
+          },
+          {
+            "state": "not-executed"
+          }
+        ]
+      }
+    },
+    {
+      "id": "core-error-shared-cyclic-flat-indexes",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "error",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "request",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          },
+          "method": "echo"
+        },
+        "error": {
+          "root": 0,
+          "nodes": [
+            {
+              "source": "vector",
+              "code": "AGGREGATE",
+              "name": "AggregateError",
+              "message": "two aliases",
+              "stack": "remote aggregate",
+              "cause": 1,
+              "errors": [1, 1]
+            },
+            {
+              "source": "vector",
+              "code": "CAUSE",
+              "name": "RangeError",
+              "message": "shared cause",
+              "stack": "remote cause",
+              "cause": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "core-notify-cancel",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "cancel",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "notify",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          },
+          "method": "echo"
+        },
+        "reason": {
+          "root": 0,
+          "nodes": [
+            {
+              "source": "vector",
+              "code": "FAILED",
+              "name": "TypeError",
+              "message": "vector failure",
+              "stack": "TypeError: vector failure\n    at remote:1:1"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "core-stream-open",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "stream",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "stream",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          },
+          "method": "items"
+        },
+        "stream": {
+          "event": "open",
+          "seq": 0
+        }
+      }
+    },
+    {
+      "id": "core-stream-pull",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "stream",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "stream",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          },
+          "method": "items"
+        },
+        "stream": {
+          "event": "pull",
+          "seq": 1
+        }
+      }
+    },
+    {
+      "id": "core-stream-item",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "stream",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "stream",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          },
+          "method": "items"
+        },
+        "stream": {
+          "event": "item",
+          "seq": 1,
+          "value": 7
+        }
+      }
+    },
+    {
+      "id": "core-stream-end",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "stream",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "stream",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          },
+          "method": "items"
+        },
+        "stream": {
+          "event": "end",
+          "seq": 1,
+          "value": "done"
+        }
+      }
+    },
+    {
+      "id": "core-stream-fail",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "stream",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "stream",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          },
+          "method": "items"
+        },
+        "stream": {
+          "event": "fail",
+          "seq": 1,
+          "error": {
+            "root": 0,
+            "nodes": [
+              {
+                "source": "vector",
+                "code": "FAILED",
+                "name": "TypeError",
+                "message": "vector failure",
+                "stack": "TypeError: vector failure\n    at remote:1:1"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "core-stream-cancelled",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "stream",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "stream",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          },
+          "method": "items"
+        },
+        "stream": {
+          "event": "cancelled",
+          "seq": 1,
+          "error": {
+            "root": 0,
+            "nodes": [
+              {
+                "source": "vector",
+                "code": "FAILED",
+                "name": "TypeError",
+                "message": "vector failure",
+                "stack": "TypeError: vector failure\n    at remote:1:1"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "core-stream-finish-without-items",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "stream",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "stream",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          },
+          "method": "items"
+        },
+        "stream": {
+          "event": "finish-without-items",
+          "seq": 1,
+          "reason": {
+            "root": 0,
+            "nodes": [
+              {
+                "source": "vector",
+                "code": "FAILED",
+                "name": "TypeError",
+                "message": "vector failure",
+                "stack": "TypeError: vector failure\n    at remote:1:1"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "core-outcome-lookup",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "outcome",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "outcome",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          }
+        },
+        "operation": "lookup",
+        "idempotencyKey": "request:1"
+      }
+    },
+    {
+      "id": "core-outcome-pending-memory",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "outcome",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "outcome",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          }
+        },
+        "operation": "result",
+        "state": "pending",
+        "store": {
+          "kind": "memory",
+          "epoch": "epoch-1",
+          "continuity": "retained"
+        }
+      }
+    },
+    {
+      "id": "core-outcome-unknown-unavailable",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "outcome",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "outcome",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          }
+        },
+        "operation": "result",
+        "state": "unknown",
+        "store": {
+          "kind": "unavailable",
+          "continuity": "unavailable"
+        }
+      }
+    },
+    {
+      "id": "core-outcome-done-request",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "outcome",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "outcome",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          }
+        },
+        "operation": "result",
+        "state": "done",
+        "store": {
+          "kind": "external",
+          "epoch": "epoch-2",
+          "continuity": "lost-since-restart"
+        },
+        "outcome": {
+          "mode": "request",
+          "targetGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "completion": {
+            "ok": true,
+            "result": {
+              "value": 1
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "core-outcome-done-group",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "outcome",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "outcome",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          }
+        },
+        "operation": "result",
+        "state": "done",
+        "store": {
+          "kind": "memory",
+          "epoch": "epoch-1",
+          "continuity": "retained"
+        },
+        "outcome": {
+          "mode": "group",
+          "targetGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "completion": {
+            "ok": true,
+            "result": [
+              {
+                "state": "success"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "core-control-ping",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "control",
+        "id": "control-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "operation": "ping"
+      }
+    },
+    {
+      "id": "core-control-pong",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "control",
+        "id": "control-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "operation": "pong"
+      }
+    },
+    {
+      "id": "core-control-drain",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "control",
+        "id": "control-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0,
+          "remainingMs": 25
+        },
+        "operation": "drain",
+        "reason": {
+          "root": 0,
+          "nodes": [
+            {
+              "source": "vector",
+              "code": "FAILED",
+              "name": "TypeError",
+              "message": "vector failure",
+              "stack": "TypeError: vector failure\n    at remote:1:1"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "core-directory-update",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "directory",
+        "id": "directory-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "directory": {
+          "schemaVersion": 3,
+          "self": {
+            "name": "alpha",
+            "instanceId": "peer-a",
+            "generation": {
+              "kind": "session",
+              "value": 0,
+              "providerId": "peer-a"
+            }
+          },
+          "methods": [
+            {
+              "name": "echo",
+              "supportedModes": ["request", "notify"],
+              "modeSource": "declared",
+              "idempotent": true,
+              "input": {
+                "type": "object"
+              },
+              "output": {
+                "type": "object"
+              }
+            },
+            {
+              "name": "items",
+              "supportedModes": ["stream"],
+              "modeSource": "declared",
+              "yield": {
+                "type": "integer"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "core-closed-envelope-field",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "call",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "request",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          },
+          "method": "echo"
+        },
+        "options": {},
+        "unexpected": 1
+      }
+    },
+    {
+      "id": "core-wire-timeout-forbidden",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "call",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "request",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          },
+          "method": "echo"
+        },
+        "options": {
+          "timeoutMs": 10
+        }
+      }
+    },
+    {
+      "id": "core-wire-feature-forbidden",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "call",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "request",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          },
+          "method": "echo"
+        },
+        "options": {
+          "retry": false
+        }
+      }
+    },
+    {
+      "id": "core-stream-open-unknown-value",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "stream",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "stream",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          },
+          "method": "items"
+        },
+        "stream": {
+          "event": "open",
+          "seq": 0,
+          "value": {
+            "$rpc": "unknown-on-open"
+          }
+        }
+      }
+    },
+    {
+      "id": "core-group-task-forbids-method",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "group",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "group",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          },
+          "method": "forbidden"
+        },
+        "options": {},
+        "steps": [
+          {
+            "method": "first"
+          }
+        ]
+      }
+    },
+    {
+      "id": "core-variant-unknown-completion-success-error",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "outcome",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "outcome",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          }
+        },
+        "operation": "result",
+        "state": "done",
+        "store": {
+          "kind": "external",
+          "epoch": "epoch-2",
+          "continuity": "lost-since-restart"
+        },
+        "outcome": {
+          "mode": "request",
+          "targetGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "completion": {
+            "ok": true,
+            "result": {
+              "value": 1
+            },
+            "error": false
+          }
+        }
+      }
+    },
+    {
+      "id": "core-variant-unknown-completion-failure-result",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "outcome",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "outcome",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          }
+        },
+        "operation": "result",
+        "state": "done",
+        "store": {
+          "kind": "external",
+          "epoch": "epoch-2",
+          "continuity": "lost-since-restart"
+        },
+        "outcome": {
+          "mode": "request",
+          "targetGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "completion": {
+            "ok": false,
+            "result": {
+              "$rpc": "ignored"
+            },
+            "error": {
+              "root": 0,
+              "nodes": [
+                {
+                  "source": "vector",
+                  "code": "FAILED",
+                  "name": "TypeError",
+                  "message": "vector failure",
+                  "stack": "TypeError: vector failure\n    at remote:1:1"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "core-variant-unknown-group-success-error",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "result",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "group",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          }
+        },
+        "result": [
+          {
+            "state": "success",
+            "result": 1,
+            "error": false
+          },
+          {
+            "state": "failure",
+            "error": {
+              "root": 0,
+              "nodes": [
+                {
+                  "source": "vector",
+                  "code": "FAILED",
+                  "name": "TypeError",
+                  "message": "vector failure",
+                  "stack": "TypeError: vector failure\n    at remote:1:1"
+                }
+              ]
+            }
+          },
+          {
+            "state": "not-executed"
+          }
+        ]
+      }
+    },
+    {
+      "id": "core-variant-unknown-group-failure-result",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "result",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "group",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          }
+        },
+        "result": [
+          {
+            "state": "success",
+            "result": 1
+          },
+          {
+            "state": "failure",
+            "error": {
+              "root": 0,
+              "nodes": [
+                {
+                  "source": "vector",
+                  "code": "FAILED",
+                  "name": "TypeError",
+                  "message": "vector failure",
+                  "stack": "TypeError: vector failure\n    at remote:1:1"
+                }
+              ]
+            },
+            "result": {
+              "$rpc": "ignored"
+            }
+          },
+          {
+            "state": "not-executed"
+          }
+        ]
+      }
+    },
+    {
+      "id": "core-variant-unknown-group-not-executed-result-error",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "result",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "group",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          }
+        },
+        "result": [
+          {
+            "state": "success",
+            "result": 1
+          },
+          {
+            "state": "failure",
+            "error": {
+              "root": 0,
+              "nodes": [
+                {
+                  "source": "vector",
+                  "code": "FAILED",
+                  "name": "TypeError",
+                  "message": "vector failure",
+                  "stack": "TypeError: vector failure\n    at remote:1:1"
+                }
+              ]
+            }
+          },
+          {
+            "state": "not-executed",
+            "result": {
+              "$rpc": "ignored"
+            },
+            "error": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "core-variant-unknown-lookup-result-fields",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "outcome",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "outcome",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          }
+        },
+        "operation": "lookup",
+        "idempotencyKey": "request:1",
+        "state": false,
+        "store": false,
+        "outcome": false
+      }
+    },
+    {
+      "id": "core-variant-unknown-pending-outcome",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "outcome",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "outcome",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          }
+        },
+        "operation": "result",
+        "state": "pending",
+        "store": {
+          "kind": "memory",
+          "epoch": "epoch-1",
+          "continuity": "retained"
+        },
+        "outcome": false
+      }
+    },
+    {
+      "id": "core-variant-unknown-unavailable-store-epoch",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "outcome",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "outcome",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          }
+        },
+        "operation": "result",
+        "state": "unknown",
+        "store": {
+          "kind": "unavailable",
+          "continuity": "unavailable",
+          "epoch": false
+        }
+      }
+    },
+    {
+      "id": "core-variant-unknown-result-idempotency-key",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "outcome",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "outcome",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          }
+        },
+        "operation": "result",
+        "state": "done",
+        "store": {
+          "kind": "external",
+          "epoch": "epoch-2",
+          "continuity": "lost-since-restart"
+        },
+        "outcome": {
+          "mode": "request",
+          "targetGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "completion": {
+            "ok": true,
+            "result": {
+              "value": 1
+            }
+          }
+        },
+        "idempotencyKey": false
+      }
+    },
+    {
+      "id": "core-forward-route-16-hops",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "call",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0,
+          "remainingMs": 0,
+          "forwardRoute": [
+            "00000000000000000000000000000000",
+            "00000000000000000000000000000001",
+            "00000000000000000000000000000002",
+            "00000000000000000000000000000003",
+            "00000000000000000000000000000004",
+            "00000000000000000000000000000005",
+            "00000000000000000000000000000006",
+            "00000000000000000000000000000007",
+            "00000000000000000000000000000008",
+            "00000000000000000000000000000009",
+            "0000000000000000000000000000000a",
+            "0000000000000000000000000000000b",
+            "0000000000000000000000000000000c",
+            "0000000000000000000000000000000d",
+            "0000000000000000000000000000000e",
+            "0000000000000000000000000000000f",
+            "00000000000000000000000000000010"
+          ]
+        },
+        "task": {
+          "mode": "request",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          },
+          "method": "echo"
+        },
+        "options": {
+          "orderKey": "lane-1"
+        },
+        "payload": {
+          "z": 1,
+          "a": 2,
+          "nested": [true, null]
+        }
+      }
+    },
+    {
+      "id": "core-error-route-17-nodes",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "error",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "request",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          },
+          "method": "echo"
+        },
+        "error": {
+          "root": 0,
+          "nodes": [
+            {
+              "source": "vector",
+              "code": "AGGREGATE",
+              "name": "AggregateError",
+              "message": "two aliases",
+              "stack": "remote aggregate",
+              "cause": 1,
+              "errors": [1, 1],
+              "route": [
+                "00000000000000000000000000000000",
+                "00000000000000000000000000000001",
+                "00000000000000000000000000000002",
+                "00000000000000000000000000000003",
+                "00000000000000000000000000000004",
+                "00000000000000000000000000000005",
+                "00000000000000000000000000000006",
+                "00000000000000000000000000000007",
+                "00000000000000000000000000000008",
+                "00000000000000000000000000000009",
+                "0000000000000000000000000000000a",
+                "0000000000000000000000000000000b",
+                "0000000000000000000000000000000c",
+                "0000000000000000000000000000000d",
+                "0000000000000000000000000000000e",
+                "0000000000000000000000000000000f",
+                "00000000000000000000000000000010"
+              ]
+            },
+            {
+              "source": "vector",
+              "code": "CAUSE",
+              "name": "RangeError",
+              "message": "shared cause",
+              "stack": "remote cause",
+              "cause": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "core-name-admission-pending",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "handshake",
+        "step": "pending",
+        "peer": {
+          "id": "peer-a",
+          "runtime": "node"
+        },
+        "remainingMs": 10000
+      }
+    },
+    {
+      "id": "core-name-admission-pending-fractional",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "handshake",
+        "step": "pending",
+        "peer": {
+          "id": "peer-a",
+          "runtime": "node"
+        },
+        "remainingMs": 0.5
+      }
+    }
+  ],
+  "invalid": [
+    {
+      "id": "core-reject-v1-profile",
+      "frame": {
+        "profile": "migaia.rpc/1",
+        "kind": "request",
+        "id": "old-1",
+        "data": {}
+      },
+      "reason": "Legacy v1 profiles are not admitted by the sole semantic parser."
+    },
+    {
+      "id": "core-reject-runtime-api-profile",
+      "frame": {
+        "profile": "migaia.rpc.runtime-api/1",
+        "kind": "runtime-call",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "request",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          },
+          "method": "echo"
+        },
+        "options": {}
+      },
+      "reason": "Legacy runtime-api profile and kinds are not admitted."
+    },
+    {
+      "id": "core-reject-jsonrpc",
+      "frame": {
+        "jsonrpc": "2.0",
+        "id": "old-2",
+        "method": "echo",
+        "params": {}
+      },
+      "reason": "JSON-RPC is not a semantic profile fallback."
+    },
+    {
+      "id": "core-notify-missing-id",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "call",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "notify",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          },
+          "method": "echo"
+        },
+        "options": {}
+      },
+      "reason": "Every notify has a correlation id for cancellation."
+    },
+    {
+      "id": "core-call-missing-options",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "call",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "request",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          },
+          "method": "echo"
+        }
+      },
+      "reason": "Call options remains a required record even when empty."
+    },
+    {
+      "id": "core-generation-negative",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "call",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "request",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": -1,
+            "providerId": "peer-b"
+          },
+          "method": "echo"
+        },
+        "options": {}
+      },
+      "reason": "Generation counters are nonnegative safe integers."
+    },
+    {
+      "id": "core-relative-budget-negative",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "call",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0,
+          "remainingMs": -1
+        },
+        "task": {
+          "mode": "request",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          },
+          "method": "echo"
+        },
+        "options": {}
+      },
+      "reason": "Relative remaining budget cannot be negative."
+    },
+    {
+      "id": "core-relative-budget-above-limit",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "call",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0,
+          "remainingMs": 2147483648
+        },
+        "task": {
+          "mode": "request",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          },
+          "method": "echo"
+        },
+        "options": {}
+      },
+      "reason": "Relative remaining budget cannot exceed maxDurationMs."
+    },
+    {
+      "id": "core-notify-idempotency-requires-cancel",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "call",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "notify",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          },
+          "method": "echo"
+        },
+        "options": {
+          "idempotencyKey": "notify:1"
+        }
+      },
+      "reason": "Notify idempotency requires before-start cancellation intent."
+    },
+    {
+      "id": "core-extension-is-not-semantic-kind",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "extension",
+        "extension": "chunk@1",
+        "data": {}
+      },
+      "reason": "Carrier extension shells are handled separately from semantic frames."
+    },
+    {
+      "id": "core-stream-task-mode",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "stream",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "request",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          },
+          "method": "echo"
+        },
+        "stream": {
+          "event": "open",
+          "seq": 0
+        }
+      },
+      "reason": "Stream frames require the stream task mode."
+    },
+    {
+      "id": "core-stream-open-sequence",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "stream",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "stream",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          },
+          "method": "items"
+        },
+        "stream": {
+          "event": "open",
+          "seq": 1
+        }
+      },
+      "reason": "Stream open sequence must be zero."
+    },
+    {
+      "id": "core-stream-cancel-envelope-only",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "stream",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "stream",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          },
+          "method": "items"
+        },
+        "stream": {
+          "event": "cancel",
+          "seq": 1
+        }
+      },
+      "reason": "Cancellation uses the correlated cancel envelope, not a stream cancel event."
+    },
+    {
+      "id": "core-stream-item-missing-value",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "stream",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "stream",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          },
+          "method": "items"
+        },
+        "stream": {
+          "event": "item",
+          "seq": 1
+        }
+      },
+      "reason": "Each item event requires its own value field."
+    },
+    {
+      "id": "core-flat-root-outside-nodes",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "error",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "request",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          },
+          "method": "echo"
+        },
+        "error": {
+          "root": 1,
+          "nodes": [
+            {
+              "source": "vector",
+              "code": "FAILED",
+              "name": "TypeError",
+              "message": "vector failure",
+              "stack": "TypeError: vector failure\n    at remote:1:1"
+            }
+          ]
+        }
+      },
+      "reason": "Flat root index must refer to an admitted node; JSON Schema alone cannot relate this index to nodes.length."
+    },
+    {
+      "id": "core-flat-cause-outside-nodes",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "cancel",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "request",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          },
+          "method": "echo"
+        },
+        "reason": {
+          "root": 0,
+          "nodes": [
+            {
+              "source": "vector",
+              "code": "FAILED",
+              "name": "TypeError",
+              "message": "vector failure",
+              "stack": "TypeError: vector failure\n    at remote:1:1",
+              "cause": 1
+            }
+          ]
+        }
+      },
+      "reason": "Flat cause index must refer to an admitted node."
+    },
+    {
+      "id": "core-flat-empty-aggregate",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "error",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "request",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          },
+          "method": "echo"
+        },
+        "error": {
+          "root": 0,
+          "nodes": [
+            {
+              "source": "vector",
+              "code": "FAILED",
+              "name": "TypeError",
+              "message": "vector failure",
+              "stack": "TypeError: vector failure\n    at remote:1:1",
+              "errors": []
+            }
+          ]
+        }
+      },
+      "reason": "An errors edge list cannot be empty."
+    },
+    {
+      "id": "core-reject-legacy-nested-error",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "handshake",
+        "step": "reject",
+        "error": {
+          "source": "vector",
+          "code": "FAILED",
+          "name": "TypeError",
+          "message": "vector failure",
+          "stack": "TypeError: vector failure\n    at remote:1:1"
+        }
+      },
+      "reason": "Handshake rejection carries root/nodes, never the legacy recursive error shape."
+    },
+    {
+      "id": "core-hello-json-baseline",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "handshake",
+        "step": "hello",
+        "versions": [
+          {
+            "major": 2,
+            "minor": 0
+          }
+        ],
+        "codecs": ["cbor"],
+        "extensions": ["auth@1", "chunk@1"],
+        "requiredExtensions": ["auth@1"],
+        "peer": {
+          "id": "peer-a",
+          "runtime": "node",
+          "runtimeVersion": "22",
+          "implementation": {
+            "name": "vector",
+            "version": "2"
+          }
+        },
+        "directory": {
+          "schemaVersion": 3,
+          "self": {
+            "name": "alpha",
+            "instanceId": "peer-a",
+            "generation": {
+              "kind": "session",
+              "value": 0,
+              "providerId": "peer-a"
+            }
+          },
+          "methods": [
+            {
+              "name": "echo",
+              "supportedModes": ["request", "notify"],
+              "modeSource": "declared",
+              "idempotent": true,
+              "input": {
+                "type": "object"
+              },
+              "output": {
+                "type": "object"
+              }
+            },
+            {
+              "name": "items",
+              "supportedModes": ["stream"],
+              "modeSource": "declared",
+              "yield": {
+                "type": "integer"
+              }
+            }
+          ]
+        },
+        "auth": {
+          "token": "fixture-only"
+        }
+      },
+      "reason": "Every hello must offer the mandatory JSON startup codec."
+    },
+    {
+      "id": "core-hello-directory-identity",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "handshake",
+        "step": "hello",
+        "versions": [
+          {
+            "major": 2,
+            "minor": 0
+          }
+        ],
+        "codecs": ["json"],
+        "extensions": ["auth@1", "chunk@1"],
+        "requiredExtensions": ["auth@1"],
+        "peer": {
+          "id": "peer-a",
+          "runtime": "node",
+          "runtimeVersion": "22",
+          "implementation": {
+            "name": "vector",
+            "version": "2"
+          }
+        },
+        "directory": {
+          "schemaVersion": 3,
+          "self": {
+            "name": "alpha",
+            "instanceId": "other-peer",
+            "generation": {
+              "kind": "session",
+              "value": 0,
+              "providerId": "peer-a"
+            }
+          },
+          "methods": [
+            {
+              "name": "echo",
+              "supportedModes": ["request", "notify"],
+              "modeSource": "declared",
+              "idempotent": true,
+              "input": {
+                "type": "object"
+              },
+              "output": {
+                "type": "object"
+              }
+            },
+            {
+              "name": "items",
+              "supportedModes": ["stream"],
+              "modeSource": "declared",
+              "yield": {
+                "type": "integer"
+              }
+            }
+          ]
+        },
+        "auth": {
+          "token": "fixture-only"
+        }
+      },
+      "reason": "Directory instance identity must match the same presented handshake peer."
+    },
+    {
+      "id": "core-required-extension-not-offered",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "handshake",
+        "step": "hello",
+        "versions": [
+          {
+            "major": 2,
+            "minor": 0
+          }
+        ],
+        "codecs": ["json"],
+        "extensions": ["auth@1", "chunk@1"],
+        "requiredExtensions": ["batch@1"],
+        "peer": {
+          "id": "peer-a",
+          "runtime": "node",
+          "runtimeVersion": "22",
+          "implementation": {
+            "name": "vector",
+            "version": "2"
+          }
+        },
+        "directory": {
+          "schemaVersion": 3,
+          "self": {
+            "name": "alpha",
+            "instanceId": "peer-a",
+            "generation": {
+              "kind": "session",
+              "value": 0,
+              "providerId": "peer-a"
+            }
+          },
+          "methods": [
+            {
+              "name": "echo",
+              "supportedModes": ["request", "notify"],
+              "modeSource": "declared",
+              "idempotent": true,
+              "input": {
+                "type": "object"
+              },
+              "output": {
+                "type": "object"
+              }
+            },
+            {
+              "name": "items",
+              "supportedModes": ["stream"],
+              "modeSource": "declared",
+              "yield": {
+                "type": "integer"
+              }
+            }
+          ]
+        },
+        "auth": {
+          "token": "fixture-only"
+        }
+      },
+      "reason": "Required extensions must be a subset of the actual offered handlers."
+    },
+    {
+      "id": "core-directory-legacy-version",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "directory",
+        "id": "directory-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "directory": {
+          "schemaVersion": 2,
+          "self": {
+            "name": "alpha",
+            "instanceId": "peer-a",
+            "generation": {
+              "kind": "session",
+              "value": 0,
+              "providerId": "peer-a"
+            }
+          },
+          "methods": [
+            {
+              "name": "echo",
+              "supportedModes": ["request", "notify"],
+              "modeSource": "declared",
+              "idempotent": true,
+              "input": {
+                "type": "object"
+              },
+              "output": {
+                "type": "object"
+              }
+            },
+            {
+              "name": "items",
+              "supportedModes": ["stream"],
+              "modeSource": "declared",
+              "yield": {
+                "type": "integer"
+              }
+            }
+          ]
+        }
+      },
+      "reason": "The direct new-profile directory requires schemaVersion3."
+    },
+    {
+      "id": "core-group-result-after-failure",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "result",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "group",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          }
+        },
+        "result": [
+          {
+            "state": "failure",
+            "error": {
+              "root": 0,
+              "nodes": [
+                {
+                  "source": "vector",
+                  "code": "FAILED",
+                  "name": "TypeError",
+                  "message": "vector failure",
+                  "stack": "TypeError: vector failure\n    at remote:1:1"
+                }
+              ]
+            }
+          },
+          {
+            "state": "success"
+          }
+        ]
+      },
+      "reason": "After first group failure, every remaining report is not-executed."
+    },
+    {
+      "id": "core-outcome-done-missing-value",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "outcome",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "outcome",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          }
+        },
+        "operation": "result",
+        "state": "done",
+        "store": {
+          "kind": "memory",
+          "epoch": "epoch-1",
+          "continuity": "retained"
+        }
+      },
+      "reason": "Done outcome state requires the retained outcome record."
+    },
+    {
+      "id": "core-forward-route-overflow",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "call",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0,
+          "remainingMs": 0,
+          "forwardRoute": [
+            "00000000000000000000000000000000",
+            "00000000000000000000000000000001",
+            "00000000000000000000000000000002",
+            "00000000000000000000000000000003",
+            "00000000000000000000000000000004",
+            "00000000000000000000000000000005",
+            "00000000000000000000000000000006",
+            "00000000000000000000000000000007",
+            "00000000000000000000000000000008",
+            "00000000000000000000000000000009",
+            "0000000000000000000000000000000a",
+            "0000000000000000000000000000000b",
+            "0000000000000000000000000000000c",
+            "0000000000000000000000000000000d",
+            "0000000000000000000000000000000e",
+            "0000000000000000000000000000000f",
+            "00000000000000000000000000000010",
+            "00000000000000000000000000000011"
+          ]
+        },
+        "task": {
+          "mode": "request",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          },
+          "method": "echo"
+        },
+        "options": {
+          "orderKey": "lane-1"
+        },
+        "payload": {
+          "z": 1,
+          "a": 2,
+          "nested": [true, null]
+        }
+      },
+      "reason": "The origin plus sixteen forwarding hosts fits seventeen route nodes; eighteen exceeds the canonical protocol maximum."
+    },
+    {
+      "id": "core-error-route-overflow",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "error",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "request",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          },
+          "method": "echo"
+        },
+        "error": {
+          "root": 0,
+          "nodes": [
+            {
+              "source": "vector",
+              "code": "AGGREGATE",
+              "name": "AggregateError",
+              "message": "two aliases",
+              "stack": "remote aggregate",
+              "cause": 1,
+              "errors": [1, 1],
+              "route": [
+                "00000000000000000000000000000000",
+                "00000000000000000000000000000001",
+                "00000000000000000000000000000002",
+                "00000000000000000000000000000003",
+                "00000000000000000000000000000004",
+                "00000000000000000000000000000005",
+                "00000000000000000000000000000006",
+                "00000000000000000000000000000007",
+                "00000000000000000000000000000008",
+                "00000000000000000000000000000009",
+                "0000000000000000000000000000000a",
+                "0000000000000000000000000000000b",
+                "0000000000000000000000000000000c",
+                "0000000000000000000000000000000d",
+                "0000000000000000000000000000000e",
+                "0000000000000000000000000000000f",
+                "00000000000000000000000000000010",
+                "00000000000000000000000000000011"
+              ]
+            },
+            {
+              "source": "vector",
+              "code": "CAUSE",
+              "name": "RangeError",
+              "message": "shared cause",
+              "stack": "remote cause",
+              "cause": 0
+            }
+          ]
+        }
+      },
+      "reason": "Error provenance retains the same origin plus sixteen forwarding hosts; eighteen nodes exceeds the canonical route maximum."
+    },
+    {
+      "id": "core-pending-missing-peer",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "handshake",
+        "step": "pending",
+        "remainingMs": 10000
+      }
+    },
+    {
+      "id": "core-pending-missing-remainingMs",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "handshake",
+        "step": "pending",
+        "peer": {
+          "id": "peer-a",
+          "runtime": "node"
+        }
+      }
+    },
+    {
+      "id": "core-pending-string",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "handshake",
+        "step": "pending",
+        "peer": {
+          "id": "peer-a",
+          "runtime": "node"
+        },
+        "remainingMs": "100"
+      }
+    },
+    {
+      "id": "core-pending-negative",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "handshake",
+        "step": "pending",
+        "peer": {
+          "id": "peer-a",
+          "runtime": "node"
+        },
+        "remainingMs": -1
+      }
+    },
+    {
+      "id": "core-pending-over-limit",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "handshake",
+        "step": "pending",
+        "peer": {
+          "id": "peer-a",
+          "runtime": "node"
+        },
+        "remainingMs": 2147483648
+      }
+    }
+  ],
+  "unknownIgnored": [
+    {
+      "id": "core-unknown-ignored-frame",
+      "baseline": {
+        "profile": "migaia.rpc/2",
+        "kind": "call",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0,
+          "remainingMs": 0
+        },
+        "task": {
+          "mode": "request",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          },
+          "method": "echo"
+        },
+        "options": {
+          "orderKey": "lane-1"
+        },
+        "payload": {
+          "z": 1,
+          "a": 2,
+          "nested": [true, null]
+        }
+      },
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "call",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0,
+          "remainingMs": 0
+        },
+        "task": {
+          "mode": "request",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          },
+          "method": "echo"
+        },
+        "options": {
+          "orderKey": "lane-1"
+        },
+        "payload": {
+          "z": 1,
+          "a": 2,
+          "nested": [true, null]
+        },
+        "futureA": {
+          "$rpc": "not-portable-but-not-a-business-value"
+        },
+        "futureB": [false, null]
+      },
+      "pointer": ""
+    },
+    {
+      "id": "core-unknown-ignored-route",
+      "baseline": {
+        "profile": "migaia.rpc/2",
+        "kind": "call",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0,
+          "remainingMs": 0
+        },
+        "task": {
+          "mode": "request",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          },
+          "method": "echo"
+        },
+        "options": {
+          "orderKey": "lane-1"
+        },
+        "payload": {
+          "z": 1,
+          "a": 2,
+          "nested": [true, null]
+        }
+      },
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "call",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0,
+          "remainingMs": 0,
+          "futureA": {
+            "$rpc": "not-portable-but-not-a-business-value"
+          },
+          "futureB": [false, null]
+        },
+        "task": {
+          "mode": "request",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          },
+          "method": "echo"
+        },
+        "options": {
+          "orderKey": "lane-1"
+        },
+        "payload": {
+          "z": 1,
+          "a": 2,
+          "nested": [true, null]
+        }
+      },
+      "pointer": "/route"
+    },
+    {
+      "id": "core-unknown-ignored-task",
+      "baseline": {
+        "profile": "migaia.rpc/2",
+        "kind": "call",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0,
+          "remainingMs": 0
+        },
+        "task": {
+          "mode": "request",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          },
+          "method": "echo"
+        },
+        "options": {
+          "orderKey": "lane-1"
+        },
+        "payload": {
+          "z": 1,
+          "a": 2,
+          "nested": [true, null]
+        }
+      },
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "call",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0,
+          "remainingMs": 0
+        },
+        "task": {
+          "mode": "request",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          },
+          "method": "echo",
+          "futureA": {
+            "$rpc": "not-portable-but-not-a-business-value"
+          },
+          "futureB": [false, null]
+        },
+        "options": {
+          "orderKey": "lane-1"
+        },
+        "payload": {
+          "z": 1,
+          "a": 2,
+          "nested": [true, null]
+        }
+      },
+      "pointer": "/task"
+    },
+    {
+      "id": "core-unknown-ignored-generation",
+      "baseline": {
+        "profile": "migaia.rpc/2",
+        "kind": "call",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0,
+          "remainingMs": 0
+        },
+        "task": {
+          "mode": "request",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          },
+          "method": "echo"
+        },
+        "options": {
+          "orderKey": "lane-1"
+        },
+        "payload": {
+          "z": 1,
+          "a": 2,
+          "nested": [true, null]
+        }
+      },
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "call",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0,
+          "remainingMs": 0
+        },
+        "task": {
+          "mode": "request",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a",
+            "futureA": {
+              "$rpc": "not-portable-but-not-a-business-value"
+            },
+            "futureB": [false, null]
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          },
+          "method": "echo"
+        },
+        "options": {
+          "orderKey": "lane-1"
+        },
+        "payload": {
+          "z": 1,
+          "a": 2,
+          "nested": [true, null]
+        }
+      },
+      "pointer": "/task/callerGeneration"
+    },
+    {
+      "id": "core-unknown-ignored-options",
+      "baseline": {
+        "profile": "migaia.rpc/2",
+        "kind": "call",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0,
+          "remainingMs": 0
+        },
+        "task": {
+          "mode": "request",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          },
+          "method": "echo"
+        },
+        "options": {
+          "orderKey": "lane-1"
+        },
+        "payload": {
+          "z": 1,
+          "a": 2,
+          "nested": [true, null]
+        }
+      },
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "call",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0,
+          "remainingMs": 0
+        },
+        "task": {
+          "mode": "request",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          },
+          "method": "echo"
+        },
+        "options": {
+          "orderKey": "lane-1",
+          "futureA": {
+            "$rpc": "not-portable-but-not-a-business-value"
+          },
+          "futureB": [false, null]
+        },
+        "payload": {
+          "z": 1,
+          "a": 2,
+          "nested": [true, null]
+        }
+      },
+      "pointer": "/options"
+    },
+    {
+      "id": "core-unknown-ignored-hello",
+      "baseline": {
+        "profile": "migaia.rpc/2",
+        "kind": "handshake",
+        "step": "hello",
+        "versions": [
+          {
+            "major": 2,
+            "minor": 0
+          }
+        ],
+        "codecs": ["json"],
+        "extensions": ["auth@1", "chunk@1"],
+        "requiredExtensions": ["auth@1"],
+        "peer": {
+          "id": "peer-a",
+          "runtime": "node",
+          "runtimeVersion": "22",
+          "implementation": {
+            "name": "vector",
+            "version": "2"
+          }
+        },
+        "directory": {
+          "schemaVersion": 3,
+          "self": {
+            "name": "alpha",
+            "instanceId": "peer-a",
+            "generation": {
+              "kind": "session",
+              "value": 0,
+              "providerId": "peer-a"
+            }
+          },
+          "methods": [
+            {
+              "name": "echo",
+              "supportedModes": ["request", "notify"],
+              "modeSource": "declared",
+              "idempotent": true,
+              "input": {
+                "type": "object"
+              },
+              "output": {
+                "type": "object"
+              }
+            },
+            {
+              "name": "items",
+              "supportedModes": ["stream"],
+              "modeSource": "declared",
+              "yield": {
+                "type": "integer"
+              }
+            }
+          ]
+        },
+        "auth": {
+          "token": "fixture-only"
+        }
+      },
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "handshake",
+        "step": "hello",
+        "versions": [
+          {
+            "major": 2,
+            "minor": 0
+          }
+        ],
+        "codecs": ["json"],
+        "extensions": ["auth@1", "chunk@1"],
+        "requiredExtensions": ["auth@1"],
+        "peer": {
+          "id": "peer-a",
+          "runtime": "node",
+          "runtimeVersion": "22",
+          "implementation": {
+            "name": "vector",
+            "version": "2"
+          }
+        },
+        "directory": {
+          "schemaVersion": 3,
+          "self": {
+            "name": "alpha",
+            "instanceId": "peer-a",
+            "generation": {
+              "kind": "session",
+              "value": 0,
+              "providerId": "peer-a"
+            }
+          },
+          "methods": [
+            {
+              "name": "echo",
+              "supportedModes": ["request", "notify"],
+              "modeSource": "declared",
+              "idempotent": true,
+              "input": {
+                "type": "object"
+              },
+              "output": {
+                "type": "object"
+              }
+            },
+            {
+              "name": "items",
+              "supportedModes": ["stream"],
+              "modeSource": "declared",
+              "yield": {
+                "type": "integer"
+              }
+            }
+          ]
+        },
+        "auth": {
+          "token": "fixture-only"
+        },
+        "futureA": {
+          "$rpc": "not-portable-but-not-a-business-value"
+        },
+        "futureB": [false, null]
+      },
+      "pointer": ""
+    },
+    {
+      "id": "core-unknown-ignored-peer",
+      "baseline": {
+        "profile": "migaia.rpc/2",
+        "kind": "handshake",
+        "step": "hello",
+        "versions": [
+          {
+            "major": 2,
+            "minor": 0
+          }
+        ],
+        "codecs": ["json"],
+        "extensions": ["auth@1", "chunk@1"],
+        "requiredExtensions": ["auth@1"],
+        "peer": {
+          "id": "peer-a",
+          "runtime": "node",
+          "runtimeVersion": "22",
+          "implementation": {
+            "name": "vector",
+            "version": "2"
+          }
+        },
+        "directory": {
+          "schemaVersion": 3,
+          "self": {
+            "name": "alpha",
+            "instanceId": "peer-a",
+            "generation": {
+              "kind": "session",
+              "value": 0,
+              "providerId": "peer-a"
+            }
+          },
+          "methods": [
+            {
+              "name": "echo",
+              "supportedModes": ["request", "notify"],
+              "modeSource": "declared",
+              "idempotent": true,
+              "input": {
+                "type": "object"
+              },
+              "output": {
+                "type": "object"
+              }
+            },
+            {
+              "name": "items",
+              "supportedModes": ["stream"],
+              "modeSource": "declared",
+              "yield": {
+                "type": "integer"
+              }
+            }
+          ]
+        },
+        "auth": {
+          "token": "fixture-only"
+        }
+      },
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "handshake",
+        "step": "hello",
+        "versions": [
+          {
+            "major": 2,
+            "minor": 0
+          }
+        ],
+        "codecs": ["json"],
+        "extensions": ["auth@1", "chunk@1"],
+        "requiredExtensions": ["auth@1"],
+        "peer": {
+          "id": "peer-a",
+          "runtime": "node",
+          "runtimeVersion": "22",
+          "implementation": {
+            "name": "vector",
+            "version": "2"
+          },
+          "futureA": {
+            "$rpc": "not-portable-but-not-a-business-value"
+          },
+          "futureB": [false, null]
+        },
+        "directory": {
+          "schemaVersion": 3,
+          "self": {
+            "name": "alpha",
+            "instanceId": "peer-a",
+            "generation": {
+              "kind": "session",
+              "value": 0,
+              "providerId": "peer-a"
+            }
+          },
+          "methods": [
+            {
+              "name": "echo",
+              "supportedModes": ["request", "notify"],
+              "modeSource": "declared",
+              "idempotent": true,
+              "input": {
+                "type": "object"
+              },
+              "output": {
+                "type": "object"
+              }
+            },
+            {
+              "name": "items",
+              "supportedModes": ["stream"],
+              "modeSource": "declared",
+              "yield": {
+                "type": "integer"
+              }
+            }
+          ]
+        },
+        "auth": {
+          "token": "fixture-only"
+        }
+      },
+      "pointer": "/peer"
+    },
+    {
+      "id": "core-unknown-ignored-version",
+      "baseline": {
+        "profile": "migaia.rpc/2",
+        "kind": "handshake",
+        "step": "hello",
+        "versions": [
+          {
+            "major": 2,
+            "minor": 0
+          }
+        ],
+        "codecs": ["json"],
+        "extensions": ["auth@1", "chunk@1"],
+        "requiredExtensions": ["auth@1"],
+        "peer": {
+          "id": "peer-a",
+          "runtime": "node",
+          "runtimeVersion": "22",
+          "implementation": {
+            "name": "vector",
+            "version": "2"
+          }
+        },
+        "directory": {
+          "schemaVersion": 3,
+          "self": {
+            "name": "alpha",
+            "instanceId": "peer-a",
+            "generation": {
+              "kind": "session",
+              "value": 0,
+              "providerId": "peer-a"
+            }
+          },
+          "methods": [
+            {
+              "name": "echo",
+              "supportedModes": ["request", "notify"],
+              "modeSource": "declared",
+              "idempotent": true,
+              "input": {
+                "type": "object"
+              },
+              "output": {
+                "type": "object"
+              }
+            },
+            {
+              "name": "items",
+              "supportedModes": ["stream"],
+              "modeSource": "declared",
+              "yield": {
+                "type": "integer"
+              }
+            }
+          ]
+        },
+        "auth": {
+          "token": "fixture-only"
+        }
+      },
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "handshake",
+        "step": "hello",
+        "versions": [
+          {
+            "major": 2,
+            "minor": 0,
+            "futureA": {
+              "$rpc": "not-portable-but-not-a-business-value"
+            },
+            "futureB": [false, null]
+          }
+        ],
+        "codecs": ["json"],
+        "extensions": ["auth@1", "chunk@1"],
+        "requiredExtensions": ["auth@1"],
+        "peer": {
+          "id": "peer-a",
+          "runtime": "node",
+          "runtimeVersion": "22",
+          "implementation": {
+            "name": "vector",
+            "version": "2"
+          }
+        },
+        "directory": {
+          "schemaVersion": 3,
+          "self": {
+            "name": "alpha",
+            "instanceId": "peer-a",
+            "generation": {
+              "kind": "session",
+              "value": 0,
+              "providerId": "peer-a"
+            }
+          },
+          "methods": [
+            {
+              "name": "echo",
+              "supportedModes": ["request", "notify"],
+              "modeSource": "declared",
+              "idempotent": true,
+              "input": {
+                "type": "object"
+              },
+              "output": {
+                "type": "object"
+              }
+            },
+            {
+              "name": "items",
+              "supportedModes": ["stream"],
+              "modeSource": "declared",
+              "yield": {
+                "type": "integer"
+              }
+            }
+          ]
+        },
+        "auth": {
+          "token": "fixture-only"
+        }
+      },
+      "pointer": "/versions/0"
+    },
+    {
+      "id": "core-unknown-ignored-directory",
+      "baseline": {
+        "profile": "migaia.rpc/2",
+        "kind": "handshake",
+        "step": "hello",
+        "versions": [
+          {
+            "major": 2,
+            "minor": 0
+          }
+        ],
+        "codecs": ["json"],
+        "extensions": ["auth@1", "chunk@1"],
+        "requiredExtensions": ["auth@1"],
+        "peer": {
+          "id": "peer-a",
+          "runtime": "node",
+          "runtimeVersion": "22",
+          "implementation": {
+            "name": "vector",
+            "version": "2"
+          }
+        },
+        "directory": {
+          "schemaVersion": 3,
+          "self": {
+            "name": "alpha",
+            "instanceId": "peer-a",
+            "generation": {
+              "kind": "session",
+              "value": 0,
+              "providerId": "peer-a"
+            }
+          },
+          "methods": [
+            {
+              "name": "echo",
+              "supportedModes": ["request", "notify"],
+              "modeSource": "declared",
+              "idempotent": true,
+              "input": {
+                "type": "object"
+              },
+              "output": {
+                "type": "object"
+              }
+            },
+            {
+              "name": "items",
+              "supportedModes": ["stream"],
+              "modeSource": "declared",
+              "yield": {
+                "type": "integer"
+              }
+            }
+          ]
+        },
+        "auth": {
+          "token": "fixture-only"
+        }
+      },
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "handshake",
+        "step": "hello",
+        "versions": [
+          {
+            "major": 2,
+            "minor": 0
+          }
+        ],
+        "codecs": ["json"],
+        "extensions": ["auth@1", "chunk@1"],
+        "requiredExtensions": ["auth@1"],
+        "peer": {
+          "id": "peer-a",
+          "runtime": "node",
+          "runtimeVersion": "22",
+          "implementation": {
+            "name": "vector",
+            "version": "2"
+          }
+        },
+        "directory": {
+          "schemaVersion": 3,
+          "self": {
+            "name": "alpha",
+            "instanceId": "peer-a",
+            "generation": {
+              "kind": "session",
+              "value": 0,
+              "providerId": "peer-a"
+            }
+          },
+          "methods": [
+            {
+              "name": "echo",
+              "supportedModes": ["request", "notify"],
+              "modeSource": "declared",
+              "idempotent": true,
+              "input": {
+                "type": "object"
+              },
+              "output": {
+                "type": "object"
+              }
+            },
+            {
+              "name": "items",
+              "supportedModes": ["stream"],
+              "modeSource": "declared",
+              "yield": {
+                "type": "integer"
+              }
+            }
+          ],
+          "futureA": {
+            "$rpc": "not-portable-but-not-a-business-value"
+          },
+          "futureB": [false, null]
+        },
+        "auth": {
+          "token": "fixture-only"
+        }
+      },
+      "pointer": "/directory"
+    },
+    {
+      "id": "core-unknown-ignored-self",
+      "baseline": {
+        "profile": "migaia.rpc/2",
+        "kind": "handshake",
+        "step": "hello",
+        "versions": [
+          {
+            "major": 2,
+            "minor": 0
+          }
+        ],
+        "codecs": ["json"],
+        "extensions": ["auth@1", "chunk@1"],
+        "requiredExtensions": ["auth@1"],
+        "peer": {
+          "id": "peer-a",
+          "runtime": "node",
+          "runtimeVersion": "22",
+          "implementation": {
+            "name": "vector",
+            "version": "2"
+          }
+        },
+        "directory": {
+          "schemaVersion": 3,
+          "self": {
+            "name": "alpha",
+            "instanceId": "peer-a",
+            "generation": {
+              "kind": "session",
+              "value": 0,
+              "providerId": "peer-a"
+            }
+          },
+          "methods": [
+            {
+              "name": "echo",
+              "supportedModes": ["request", "notify"],
+              "modeSource": "declared",
+              "idempotent": true,
+              "input": {
+                "type": "object"
+              },
+              "output": {
+                "type": "object"
+              }
+            },
+            {
+              "name": "items",
+              "supportedModes": ["stream"],
+              "modeSource": "declared",
+              "yield": {
+                "type": "integer"
+              }
+            }
+          ]
+        },
+        "auth": {
+          "token": "fixture-only"
+        }
+      },
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "handshake",
+        "step": "hello",
+        "versions": [
+          {
+            "major": 2,
+            "minor": 0
+          }
+        ],
+        "codecs": ["json"],
+        "extensions": ["auth@1", "chunk@1"],
+        "requiredExtensions": ["auth@1"],
+        "peer": {
+          "id": "peer-a",
+          "runtime": "node",
+          "runtimeVersion": "22",
+          "implementation": {
+            "name": "vector",
+            "version": "2"
+          }
+        },
+        "directory": {
+          "schemaVersion": 3,
+          "self": {
+            "name": "alpha",
+            "instanceId": "peer-a",
+            "generation": {
+              "kind": "session",
+              "value": 0,
+              "providerId": "peer-a"
+            },
+            "futureA": {
+              "$rpc": "not-portable-but-not-a-business-value"
+            },
+            "futureB": [false, null]
+          },
+          "methods": [
+            {
+              "name": "echo",
+              "supportedModes": ["request", "notify"],
+              "modeSource": "declared",
+              "idempotent": true,
+              "input": {
+                "type": "object"
+              },
+              "output": {
+                "type": "object"
+              }
+            },
+            {
+              "name": "items",
+              "supportedModes": ["stream"],
+              "modeSource": "declared",
+              "yield": {
+                "type": "integer"
+              }
+            }
+          ]
+        },
+        "auth": {
+          "token": "fixture-only"
+        }
+      },
+      "pointer": "/directory/self"
+    },
+    {
+      "id": "core-unknown-ignored-method",
+      "baseline": {
+        "profile": "migaia.rpc/2",
+        "kind": "handshake",
+        "step": "hello",
+        "versions": [
+          {
+            "major": 2,
+            "minor": 0
+          }
+        ],
+        "codecs": ["json"],
+        "extensions": ["auth@1", "chunk@1"],
+        "requiredExtensions": ["auth@1"],
+        "peer": {
+          "id": "peer-a",
+          "runtime": "node",
+          "runtimeVersion": "22",
+          "implementation": {
+            "name": "vector",
+            "version": "2"
+          }
+        },
+        "directory": {
+          "schemaVersion": 3,
+          "self": {
+            "name": "alpha",
+            "instanceId": "peer-a",
+            "generation": {
+              "kind": "session",
+              "value": 0,
+              "providerId": "peer-a"
+            }
+          },
+          "methods": [
+            {
+              "name": "echo",
+              "supportedModes": ["request", "notify"],
+              "modeSource": "declared",
+              "idempotent": true,
+              "input": {
+                "type": "object"
+              },
+              "output": {
+                "type": "object"
+              }
+            },
+            {
+              "name": "items",
+              "supportedModes": ["stream"],
+              "modeSource": "declared",
+              "yield": {
+                "type": "integer"
+              }
+            }
+          ]
+        },
+        "auth": {
+          "token": "fixture-only"
+        }
+      },
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "handshake",
+        "step": "hello",
+        "versions": [
+          {
+            "major": 2,
+            "minor": 0
+          }
+        ],
+        "codecs": ["json"],
+        "extensions": ["auth@1", "chunk@1"],
+        "requiredExtensions": ["auth@1"],
+        "peer": {
+          "id": "peer-a",
+          "runtime": "node",
+          "runtimeVersion": "22",
+          "implementation": {
+            "name": "vector",
+            "version": "2"
+          }
+        },
+        "directory": {
+          "schemaVersion": 3,
+          "self": {
+            "name": "alpha",
+            "instanceId": "peer-a",
+            "generation": {
+              "kind": "session",
+              "value": 0,
+              "providerId": "peer-a"
+            }
+          },
+          "methods": [
+            {
+              "name": "echo",
+              "supportedModes": ["request", "notify"],
+              "modeSource": "declared",
+              "idempotent": true,
+              "input": {
+                "type": "object"
+              },
+              "output": {
+                "type": "object"
+              },
+              "futureA": {
+                "$rpc": "not-portable-but-not-a-business-value"
+              },
+              "futureB": [false, null]
+            },
+            {
+              "name": "items",
+              "supportedModes": ["stream"],
+              "modeSource": "declared",
+              "yield": {
+                "type": "integer"
+              }
+            }
+          ]
+        },
+        "auth": {
+          "token": "fixture-only"
+        }
+      },
+      "pointer": "/directory/methods/0"
+    },
+    {
+      "id": "core-unknown-ignored-error-graph",
+      "baseline": {
+        "profile": "migaia.rpc/2",
+        "kind": "handshake",
+        "step": "reject",
+        "error": {
+          "root": 0,
+          "nodes": [
+            {
+              "source": "vector",
+              "code": "FAILED",
+              "name": "TypeError",
+              "message": "vector failure",
+              "stack": "TypeError: vector failure\n    at remote:1:1"
+            }
+          ]
+        }
+      },
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "handshake",
+        "step": "reject",
+        "error": {
+          "root": 0,
+          "nodes": [
+            {
+              "source": "vector",
+              "code": "FAILED",
+              "name": "TypeError",
+              "message": "vector failure",
+              "stack": "TypeError: vector failure\n    at remote:1:1"
+            }
+          ],
+          "futureA": {
+            "$rpc": "not-portable-but-not-a-business-value"
+          },
+          "futureB": [false, null]
+        }
+      },
+      "pointer": "/error"
+    },
+    {
+      "id": "core-unknown-ignored-error-node",
+      "baseline": {
+        "profile": "migaia.rpc/2",
+        "kind": "handshake",
+        "step": "reject",
+        "error": {
+          "root": 0,
+          "nodes": [
+            {
+              "source": "vector",
+              "code": "FAILED",
+              "name": "TypeError",
+              "message": "vector failure",
+              "stack": "TypeError: vector failure\n    at remote:1:1"
+            }
+          ]
+        }
+      },
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "handshake",
+        "step": "reject",
+        "error": {
+          "root": 0,
+          "nodes": [
+            {
+              "source": "vector",
+              "code": "FAILED",
+              "name": "TypeError",
+              "message": "vector failure",
+              "stack": "TypeError: vector failure\n    at remote:1:1",
+              "futureA": {
+                "$rpc": "not-portable-but-not-a-business-value"
+              },
+              "futureB": [false, null]
+            }
+          ]
+        }
+      },
+      "pointer": "/error/nodes/0"
+    },
+    {
+      "id": "core-unknown-ignored-stream",
+      "baseline": {
+        "profile": "migaia.rpc/2",
+        "kind": "stream",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "stream",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          },
+          "method": "items"
+        },
+        "stream": {
+          "event": "item",
+          "seq": 1,
+          "value": 7
+        }
+      },
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "stream",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "stream",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          },
+          "method": "items"
+        },
+        "stream": {
+          "event": "item",
+          "seq": 1,
+          "value": 7,
+          "futureA": {
+            "$rpc": "not-portable-but-not-a-business-value"
+          },
+          "futureB": [false, null]
+        }
+      },
+      "pointer": "/stream"
+    },
+    {
+      "id": "core-unknown-ignored-group-step",
+      "baseline": {
+        "profile": "migaia.rpc/2",
+        "kind": "group",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "group",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          }
+        },
+        "options": {
+          "idempotencyKey": "group:1"
+        },
+        "steps": [
+          {
+            "method": "first",
+            "payload": 1
+          },
+          {
+            "method": "second"
+          }
+        ]
+      },
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "group",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "group",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          }
+        },
+        "options": {
+          "idempotencyKey": "group:1"
+        },
+        "steps": [
+          {
+            "method": "first",
+            "payload": 1,
+            "futureA": {
+              "$rpc": "not-portable-but-not-a-business-value"
+            },
+            "futureB": [false, null]
+          },
+          {
+            "method": "second"
+          }
+        ]
+      },
+      "pointer": "/steps/0"
+    },
+    {
+      "id": "core-unknown-ignored-group-outcome",
+      "baseline": {
+        "profile": "migaia.rpc/2",
+        "kind": "result",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "group",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          }
+        },
+        "result": [
+          {
+            "state": "success",
+            "result": 1
+          },
+          {
+            "state": "failure",
+            "error": {
+              "root": 0,
+              "nodes": [
+                {
+                  "source": "vector",
+                  "code": "FAILED",
+                  "name": "TypeError",
+                  "message": "vector failure",
+                  "stack": "TypeError: vector failure\n    at remote:1:1"
+                }
+              ]
+            }
+          },
+          {
+            "state": "not-executed"
+          }
+        ]
+      },
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "result",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "group",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          }
+        },
+        "result": [
+          {
+            "state": "success",
+            "result": 1,
+            "futureA": {
+              "$rpc": "not-portable-but-not-a-business-value"
+            },
+            "futureB": [false, null]
+          },
+          {
+            "state": "failure",
+            "error": {
+              "root": 0,
+              "nodes": [
+                {
+                  "source": "vector",
+                  "code": "FAILED",
+                  "name": "TypeError",
+                  "message": "vector failure",
+                  "stack": "TypeError: vector failure\n    at remote:1:1"
+                }
+              ]
+            }
+          },
+          {
+            "state": "not-executed"
+          }
+        ]
+      },
+      "pointer": "/result/0"
+    },
+    {
+      "id": "core-unknown-ignored-outcome-store",
+      "baseline": {
+        "profile": "migaia.rpc/2",
+        "kind": "outcome",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "outcome",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          }
+        },
+        "operation": "result",
+        "state": "done",
+        "store": {
+          "kind": "external",
+          "epoch": "epoch-2",
+          "continuity": "lost-since-restart"
+        },
+        "outcome": {
+          "mode": "request",
+          "targetGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "completion": {
+            "ok": true,
+            "result": {
+              "value": 1
+            }
+          }
+        }
+      },
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "outcome",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "outcome",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          }
+        },
+        "operation": "result",
+        "state": "done",
+        "store": {
+          "kind": "external",
+          "epoch": "epoch-2",
+          "continuity": "lost-since-restart",
+          "futureA": {
+            "$rpc": "not-portable-but-not-a-business-value"
+          },
+          "futureB": [false, null]
+        },
+        "outcome": {
+          "mode": "request",
+          "targetGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "completion": {
+            "ok": true,
+            "result": {
+              "value": 1
+            }
+          }
+        }
+      },
+      "pointer": "/store"
+    },
+    {
+      "id": "core-unknown-ignored-outcome",
+      "baseline": {
+        "profile": "migaia.rpc/2",
+        "kind": "outcome",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "outcome",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          }
+        },
+        "operation": "result",
+        "state": "done",
+        "store": {
+          "kind": "external",
+          "epoch": "epoch-2",
+          "continuity": "lost-since-restart"
+        },
+        "outcome": {
+          "mode": "request",
+          "targetGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "completion": {
+            "ok": true,
+            "result": {
+              "value": 1
+            }
+          }
+        }
+      },
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "outcome",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "outcome",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          }
+        },
+        "operation": "result",
+        "state": "done",
+        "store": {
+          "kind": "external",
+          "epoch": "epoch-2",
+          "continuity": "lost-since-restart"
+        },
+        "outcome": {
+          "mode": "request",
+          "targetGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "completion": {
+            "ok": true,
+            "result": {
+              "value": 1
+            }
+          },
+          "futureA": {
+            "$rpc": "not-portable-but-not-a-business-value"
+          },
+          "futureB": [false, null]
+        }
+      },
+      "pointer": "/outcome"
+    },
+    {
+      "id": "core-unknown-ignored-completion",
+      "baseline": {
+        "profile": "migaia.rpc/2",
+        "kind": "outcome",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "outcome",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          }
+        },
+        "operation": "result",
+        "state": "done",
+        "store": {
+          "kind": "external",
+          "epoch": "epoch-2",
+          "continuity": "lost-since-restart"
+        },
+        "outcome": {
+          "mode": "request",
+          "targetGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "completion": {
+            "ok": true,
+            "result": {
+              "value": 1
+            }
+          }
+        }
+      },
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "outcome",
+        "id": "call-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "task": {
+          "mode": "outcome",
+          "callerId": "caller-a",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "targetGeneration": {
+            "kind": "restart",
+            "value": 2,
+            "providerId": "peer-b"
+          }
+        },
+        "operation": "result",
+        "state": "done",
+        "store": {
+          "kind": "external",
+          "epoch": "epoch-2",
+          "continuity": "lost-since-restart"
+        },
+        "outcome": {
+          "mode": "request",
+          "targetGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "peer-a"
+          },
+          "completion": {
+            "ok": true,
+            "result": {
+              "value": 1
+            },
+            "futureA": {
+              "$rpc": "not-portable-but-not-a-business-value"
+            },
+            "futureB": [false, null]
+          }
+        }
+      },
+      "pointer": "/outcome/completion"
+    },
+    {
+      "id": "core-handshake-pending-unknown-fields-ignored",
+      "baseline": {
+        "profile": "migaia.rpc/2",
+        "kind": "handshake",
+        "step": "pending",
+        "peer": {
+          "id": "peer-a",
+          "runtime": "node"
+        },
+        "remainingMs": 10000
+      },
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "handshake",
+        "step": "pending",
+        "peer": {
+          "id": "peer-a",
+          "runtime": "node"
+        },
+        "remainingMs": 10000,
+        "futureA": 1,
+        "futureB": {
+          "ignored": true
+        }
+      },
+      "pointer": ""
+    }
+  ]
+}

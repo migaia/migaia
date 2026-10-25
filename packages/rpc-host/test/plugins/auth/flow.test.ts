@@ -1,0 +1,442 @@
+import { expect, it, vi } from 'vitest'
+import { deferred, type IAbortSignal } from '@migaia/utils/promise'
+import type { IRpcEnvelopeContext, IRpcCarrierFrame } from '@migaia/rpc-contract/interfaces'
+import type { IRpcEnvelope, IRpcHello } from '@migaia/rpc-contract/protocol'
+import { RpcWireProfile } from '@migaia/rpc-contract/protocol'
+import { auth, type IRpcAuthenticationOptions } from '../../../dist/plugins/auth/index.js'
+import { setAuthenticationReplayCounter } from '../../../dist/plugins/auth/counter.js'
+import { readRpcDefinition } from '../../../dist/sdk/metadata.js'
+import { RpcJsonCarrierCodec } from '../../../dist/sdk/carrier/json-codec.js'
+import { FlowPipeline } from '../../../dist/flow/pipeline.js'
+
+/** Original correlations and own-key order are ordinary semantic fixtures, not another codec. */
+function message(id: string, payload: unknown = id): IRpcEnvelope {
+  return {
+    profile: RpcWireProfile,
+    kind: 'call',
+    id,
+    route: {
+      applicationVersion: '1',
+      senderId: 'caller',
+      receiverId: 'target',
+      targetId: 'target',
+      sentAt: 0
+    },
+    task: {
+      mode: 'request',
+      callerId: 'caller',
+      callerGeneration: { kind: 'session', value: 1, providerId: 'caller' },
+      targetGeneration: { kind: 'session', value: 1, providerId: 'target' },
+      method: 'echo'
+    },
+    options: {},
+    payload: payload as never
+  }
+}
+
+/** Exercise genuine native setup, FlowPipeline and executing codec rather than a legacy capability. */
+async function fixture(options: IRpcAuthenticationOptions, nativeBinary = false) {
+  /** The real public factory captures original callback identity and paired-transform validation. */
+  const metadata = readRpcDefinition(auth(options))
+  if (metadata?.kind !== 'flow') throw new TypeError('expected actual auth flow')
+  /** Physical source retirement remains distinct from installation rollback. */
+  const source = new AbortController()
+  /** Setup cleanup owns only this actual native installation. */
+  const setup = new AbortController()
+  /** Credential verifier failures must never enter this original report channel. */
+  const reports: unknown[] = []
+  /** Hash calls expose repeated restore without replacing the original SDK integrity algorithm. */
+  const hashes = { count: 0 }
+  /**
+   * This controlled digest fixture covers its complete four-byte backing and canonical digest
+   * shape.
+   */
+  const codec = new RpcJsonCarrierCodec({
+    digest: async (backing) => {
+      hashes.count += 1
+      return Array.from(new Uint8Array(backing), (byte) => byte.toString(16).padStart(2, '0'))
+        .join('')
+        .padEnd(64, '0')
+    }
+  })
+  /** Actual executing codec policy is shared by prepare/decode and the one cached restore operation. */
+  const codecContext = { codec: 'json', nativeBinary, maxFrameBytes: 16 * 1024 * 1024 }
+  /** Every case installs the actual hooks returned by the native factory. */
+  const installation = await metadata.definition.setup({
+    signal: setup.signal,
+    report: (error) => {
+      reports.push(error)
+    },
+    retire: async () => undefined,
+    call: async () => undefined
+  })
+  /** The fixed real hook runner supplies actual direction and original prepared objects. */
+  const flow = new FlowPipeline((error) => {
+    reports.push(error)
+  })
+  flow.register({
+    name: metadata.definition.name,
+    namespaces: metadata.definition.namespaces,
+    ...installation
+  })
+  flow.start()
+  /** Physical facts and the exact codec operation are explicit inputs to tiny fixture callbacks. */
+  const ports = { source, reports, codec, codecContext }
+  /** The required restore port is the actual codec, never a successful admission stub. */
+  const context = (
+    direction: 'outbound' | 'inbound',
+    signal: IAbortSignal = ports.source.signal,
+    carrierId = 'source'
+  ): IRpcEnvelopeContext => ({
+    namespace: 'test',
+    carrierId,
+    direction,
+    signal,
+    connectionSignal: signal,
+    report: (error) => {
+      ports.reports.push(error)
+    },
+    restore: (prepared) => ports.codec.restore(prepared, ports.codecContext)
+  })
+  /** The fixture owns its actual executing path rather than several shared callback captures. */
+  const path = { codec, flow, codecContext, context }
+  /** One ordinary outbound path runs prepare, hooks and encode with original identities. */
+  const send = async (value: IRpcEnvelope): Promise<IRpcCarrierFrame> =>
+    path.codec.encode(
+      await path.flow.envelope(
+        await path.codec.prepare(value, path.codecContext),
+        path.context('outbound')
+      ),
+      path.codecContext
+    )
+  /** One ordinary receive path runs decode, hooks and the same cached final restore. */
+  const receive = async (
+    value: IRpcCarrierFrame,
+    signal = path.context('inbound').signal,
+    id = 'source'
+  ) =>
+    path.codec.restore(
+      await path.flow.envelope(
+        path.codec.decode(value, path.codecContext),
+        path.context('inbound', signal, id)
+      ),
+      path.codecContext
+    )
+
+  return {
+    source,
+    setup,
+    reports,
+    hashes,
+    installation,
+    flow,
+    context,
+    codec,
+    codecContext,
+    send,
+    receive
+  }
+}
+
+it('preserves default JSON text, encrypt-before-sign, verify-before-decrypt and original payload', async () => {
+  /**
+   * Existing transform-order oracle now runs through actual prepared hooks and the selected JSON
+   * codec.
+   */
+  const calls: string[] = []
+  /** Default any receives the same original JSON string category rather than an owner object. */
+  const categories: string[] = []
+  /** Explicit transforms retain their original text roundtrip and callback order. */
+  const f = await fixture({
+    encrypt: (value) => {
+      calls.push('encrypt')
+      categories.push(typeof value)
+      return `encrypted:${String(value)}`
+    },
+    sign: (value) => {
+      calls.push('sign')
+      return `signed:${String(value)}`
+    },
+    verify: (value) => {
+      calls.push('verify')
+      return String(value).slice('signed:'.length)
+    },
+    decrypt: (value) => {
+      calls.push('decrypt')
+      return String(value).slice('encrypted:'.length)
+    }
+  })
+  /** Own-key order and exact correlation survive the actual JSON text protection path. */
+  const original = message('ordered', { z: 1, a: 2 })
+  expect(await f.receive(await f.send(original))).toEqual(original)
+  expect(calls).toEqual(['encrypt', 'sign', 'verify', 'decrypt'])
+  expect(categories).toEqual(['string'])
+  await f.installation.dispose?.()
+  f.flow.close()
+})
+
+it.each(['string', 'uint8array'] as const)(
+  'preserves explicit %s transform category through the actual JSON carrier',
+  async (encodedType) => {
+    /** The byte path cannot silently become a JSON numeric-key object before verification. */
+    const categories: string[] = []
+    /** Original identity transforms expose the actual representation delivered in both directions. */
+    const f = await fixture({
+      encodedType,
+      sign: (value) => {
+        categories.push(value instanceof Uint8Array ? 'uint8array' : typeof value)
+        return value
+      },
+      verify: (value) => {
+        categories.push(value instanceof Uint8Array ? 'uint8array' : typeof value)
+        return value
+      }
+    })
+    /** Actual codec encoding/decoding preserves the sole auth owner's category projection. */
+    const original = message('category')
+    expect(await f.receive(await f.send(original))).toEqual(original)
+    expect(categories).toEqual([encodedType, encodedType])
+    await f.installation.dispose?.()
+    f.flow.close()
+  }
+)
+
+it('retains the original 64-slot window, concurrent single commit and physical-source isolation', async () => {
+  /** Actual signed frames allocate counters synchronously before any receive order is selected. */
+  const f = await fixture({ sign: (value) => value, verify: (value) => value })
+  /** Only real encoded protected frames are replayed, not invented nonce/counter values. */
+  const frames: IRpcCarrierFrame[] = []
+  for (let index = 1; index <= 66; index++) frames.push(await f.send(message(String(index))))
+  expect(await f.receive(frames[65]!)).toMatchObject({ id: '66' })
+  expect(await f.receive(frames[2]!)).toMatchObject({ id: '3' })
+  await expect(f.receive(frames[1]!)).rejects.toMatchObject({
+    code: 'AUTHENTICATION_FAILED',
+    message: 'Authentication frame was replayed'
+  })
+  await expect(f.receive(frames[2]!)).rejects.toMatchObject({ code: 'AUTHENTICATION_FAILED' })
+  /** A different original physical source owns an independent pinned nonce/window. */
+  const sibling = new AbortController()
+  expect(await f.receive(frames[2]!, sibling.signal, 'sibling')).toMatchObject({ id: '3' })
+  /** Concurrent actual restore completion may commit this same counter only once. */
+  const concurrent = await Promise.allSettled([f.receive(frames[3]!), f.receive(frames[3]!)])
+  expect(concurrent.map((entry) => entry.status).sort()).toEqual(['fulfilled', 'rejected'])
+  sibling.abort()
+  await f.installation.dispose?.()
+  f.flow.close()
+})
+
+it('finishes original native integrity before replay commit and reuses the exact cached restore Promise', async () => {
+  /** Signing covers the original complete manifest including full backing digest/length. */
+  const f = await fixture({ sign: (value) => value, verify: (value) => value }, true)
+  /** The original complete backing is retained, including bytes outside a selected view. */
+  const bytes = new Uint8Array([1, 2, 3, 4])
+  /** This genuine protected physical packet retains the actual original sidecar identity. */
+  const packet = await f.send(message('binary', bytes.subarray(1, 3)))
+  expect(packet.sidecars?.[0]).toBe(bytes.buffer)
+  expect(f.hashes.count).toBe(1)
+  bytes[0] = 9
+  /** Failed native integrity must retain its grammar classification rather than auth wrapping. */
+  const failure = await f.receive(packet).catch((error: unknown) => error)
+  expect(failure).toBeInstanceOf(Error)
+  expect((failure as { code: string }).code).not.toBe('AUTHENTICATION_FAILED')
+  bytes[0] = 1
+  /** The same authentic counter remains admissible because its failed backing did not commit. */
+  expect(await f.receive(packet)).toMatchObject({ id: 'binary', payload: new Uint8Array([2, 3]) })
+  expect(f.hashes.count).toBe(3)
+  await f.installation.dispose?.()
+  f.flow.close()
+})
+
+it('rejects verification after physical retirement and preserves custom verification failure cause', async () => {
+  /** The original delayed-verifier lifecycle oracle reaches the actual fixed hook. */
+  const wait = deferred<void>()
+  /** Arrival is separate from real connection retirement and verifier completion. */
+  const arrived = deferred<void>()
+  /** This explicit state object keeps the verifier callback's owned ports together. */
+  const state = { wait, arrived }
+  /** User verification can suspend while the exact physical source closes. */
+  const f = await fixture({
+    sign: (value) => value,
+    verify: async (value) => {
+      state.arrived.resolve()
+      await state.wait.promise
+      return value
+    }
+  })
+  /** Only the original actual packet is delivered to the waiting verifier. */
+  const packet = await f.send(message('late'))
+  /** Rejection remains observed during asynchronous physical shutdown. */
+  const pending = f.receive(packet).catch((error: unknown) => error)
+  await arrived.promise
+  f.source.abort()
+  wait.resolve()
+  expect(await pending).toMatchObject({ code: 'AUTHENTICATION_FAILED' })
+  await f.installation.dispose?.()
+  f.flow.close()
+  /**
+   * A native user callback error is preserved unless the separate credential-redaction rule
+   * applies.
+   */
+  const cause = new RangeError('fixture bad signature')
+  /** Actual verify failure keeps the original cause/type/stack reachable. */
+  const bad = await fixture({
+    sign: (value) => value,
+    verify: () => {
+      throw cause
+    }
+  })
+  await expect(bad.receive(await bad.send(message('bad')))).rejects.toMatchObject({
+    code: 'AUTHENTICATION_FAILED',
+    cause
+  })
+  await bad.installation.dispose?.()
+  bad.flow.close()
+})
+
+it('retains the last uint64 allocation and sanitizes actual handshake verifier credentials', async () => {
+  /** Reuse the original private exact-owner injection seam, without adding a public counter option. */
+  const f = await fixture({ sign: (value) => value, verify: (value) => value })
+  expect(setAuthenticationReplayCounter({ ...f.installation }, 0n)).toBe(false)
+  expect(setAuthenticationReplayCounter(f.installation, 0xfffffffffffffffen)).toBe(true)
+  expect(await f.receive(await f.send(message('last')))).toMatchObject({ id: 'last' })
+  await expect(f.send(message('overflow'))).rejects.toMatchObject({
+    code: 'INVALID_CONFIG',
+    message: 'Authentication replay counter is exhausted'
+  })
+  await f.installation.dispose?.()
+  f.flow.close()
+  /** A real native credential callback is independent from the optional frame protection policy. */
+  const secret = 'fixture-private-token'
+  /** User verifier errors may contain credentials and must not enter cause/report paths. */
+  const credentials = await fixture({
+    credentials: secret,
+    verifyCredentials: () => {
+      throw new Error(secret)
+    }
+  })
+  /** Fixed handshake hook adds only the admitted portable auth field to the actual hello shape. */
+  const hello = {
+    profile: RpcWireProfile,
+    kind: 'handshake',
+    step: 'hello',
+    versions: [{ major: 2, minor: 0 }],
+    codecs: ['json'],
+    extensions: [],
+    peer: { id: 'caller', runtime: 'custom' },
+    directory: {
+      schemaVersion: 3,
+      self: {
+        name: 'caller',
+        instanceId: 'caller',
+        generation: { kind: 'session', value: 1, providerId: 'caller' }
+      },
+      methods: []
+    }
+  } as IRpcHello
+  /** Outbound and inbound use the same actual native FlowPipeline handshake owner. */
+  const offered = await credentials.flow.handshake(hello, credentials.context('outbound'))
+  expect(offered).toMatchObject({ auth: secret })
+  /** The sanitized rejection deliberately withholds the original secret-bearing native exception. */
+  const rejected = await credentials.flow
+    .handshake(offered, credentials.context('inbound'))
+    .catch((error: unknown) => error)
+  expect(rejected).toMatchObject({ code: 'AUTHENTICATION_FAILED' })
+  expect((rejected as Error).cause).toBeUndefined()
+  expect(String(rejected)).not.toContain(secret)
+  expect(credentials.reports).toEqual([])
+  await credentials.installation.dispose?.()
+  credentials.flow.close()
+  /** Native credential resolution keeps independent carrier tokens without inspecting wire identity. */
+  const verify = vi.fn()
+  /** The same actual optional flow resolves both native sources through its fixed handshake hook. */
+  const perSource = await fixture({
+    credentials: (context) => {
+      if (context.carrierId === 'failed-source') throw new Error(secret)
+      return context.carrierId
+    },
+    verifyCredentials: verify
+  })
+  /** Exact original context identity is also lent to the inbound native verifier. */
+  const sourceOne = perSource.context('inbound', undefined, 'source-one')
+  expect(
+    await perSource.flow.handshake(hello, perSource.context('outbound', undefined, 'source-one'))
+  ).toMatchObject({ auth: 'source-one' })
+  expect(
+    await perSource.flow.handshake(hello, perSource.context('outbound', undefined, 'source-two'))
+  ).toMatchObject({ auth: 'source-two' })
+  await perSource.flow.handshake(hello, sourceOne)
+  expect(verify.mock.calls[0]?.[2]).toBe(sourceOne)
+  /** Resolver failures follow the same privacy boundary as native credential verification. */
+  const resolverFailure = await perSource.flow
+    .handshake(hello, perSource.context('outbound', undefined, 'failed-source'))
+    .catch((error: unknown) => error)
+  expect(resolverFailure).toMatchObject({ code: 'AUTHENTICATION_FAILED' })
+  expect((resolverFailure as Error).cause).toBeUndefined()
+  expect(String(resolverFailure)).not.toContain(secret)
+  expect(perSource.reports).toEqual([])
+  await perSource.installation.dispose?.()
+  perSource.flow.close()
+})
+
+it.each([
+  [{ encrypt: (value: unknown) => value }, 'encrypt/decrypt'],
+  [{ sign: (value: unknown) => value }, 'sign/verify'],
+  [{}, 'requires encryption or signing'],
+  [
+    { encrypt: (value: unknown) => value, decrypt: (value: unknown) => value },
+    'encryption requires sign/verify replay binding'
+  ]
+] as const)(
+  'retains original incomplete-pair and encrypt-only configuration rejection %#',
+  (options, text) => {
+    /** One factory call preserves the original code and precise existing rejection branch. */
+    let failure: unknown
+    try {
+      auth(options)
+    } catch (error) {
+      failure = error
+    }
+    expect(failure).toMatchObject({ code: 'INVALID_CONFIG' })
+    expect((failure as Error).message).toContain(text)
+  }
+)
+
+it('fails closed for absent/throwing secure entropy while preserving the original native cause', async () => {
+  /** The old native entropy boundary now reaches the actual optional installed hook. */
+  const missing = await fixture({ sign: (value) => value, verify: (value) => value })
+  vi.stubGlobal('crypto', undefined)
+  try {
+    await expect(missing.send(message('missing-entropy'))).rejects.toMatchObject({
+      code: 'INVALID_CONFIG',
+      message: 'Authentication replay nonce is unavailable'
+    })
+  } finally {
+    vi.unstubAllGlobals()
+    await missing.installation.dispose?.()
+    missing.flow.close()
+  }
+  /**
+   * This exact native failure must remain reachable, with its original stack, rather than weak
+   * fallback.
+   */
+  const cause = new RangeError('fixture native entropy failure')
+  /** A fresh installation owns an independent not-yet-allocated nonce. */
+  const throwing = await fixture({ sign: (value) => value, verify: (value) => value })
+  vi.stubGlobal('crypto', {
+    getRandomValues: () => {
+      throw cause
+    }
+  })
+  try {
+    await expect(throwing.send(message('throwing-entropy'))).rejects.toMatchObject({
+      code: 'INVALID_CONFIG',
+      message: 'Authentication replay nonce generation failed',
+      cause
+    })
+    expect(cause.stack).toBeTruthy()
+  } finally {
+    vi.unstubAllGlobals()
+    await throwing.installation.dispose?.()
+    throwing.flow.close()
+  }
+})

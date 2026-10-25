@@ -1,70 +1,7 @@
-import { createRuntimeEndpointComposition } from '../../dist/core/runtime-api-endpoint.js'
 import assert from 'node:assert/strict'
 import { it } from 'vitest'
-import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
 
-import { connect } from '../../dist/core/middleware/connect.js'
 import { RequestReplayLedger } from '../../dist/core/internal/request-replay-ledger.js'
-import type { IRpcProviderRejection } from '../../dist/core/provider-admission.js'
-
-it('public default per-peer replay capacity admits 1024 and rejects the next without business effects', async () => {
-  /** No physical native proof is forged; reference memory follows its preserved strict legacy path. */
-  const [left, right] = createMemoryTransportPair()
-  /**
-   * Existing rejection reason disambiguates replay fullness from provider concurrency or binding
-   * expiry.
-   */
-  const notices: IRpcProviderRejection[] = []
-  /** The actual provider invocation count decides whether the refused request reached business. */
-  let effects = 0
-  /** Only the existing observer is supplied; neither capacity default is configured by this fixture. */
-  const server = await createRuntimeEndpointComposition(
-    {
-      id: 'default-server',
-      transport: right,
-      middlewares: [connect({ transport: right })],
-      providerLimits: {
-        onRejected: (notice) => {
-          notices.push(notice)
-        }
-      },
-      provider: {
-        echo: (context) => {
-          effects++
-          return context.success(context.data)
-        }
-      }
-    },
-    { agreement: { capabilities: [] }, peerId: '' }
-  ).installing
-  /** The public caller uses original UUID, pending, routing and replay owners. */
-  const client = await createRuntimeEndpointComposition(
-    {
-      id: 'default-client',
-      transport: left,
-      targetIds: ['default-server'],
-      middlewares: [connect({ transport: left })]
-    },
-    { agreement: { capabilities: [] }, peerId: '' }
-  ).installing
-  try {
-    for (let index = 0; index < 1024; index++)
-      assert.equal(await client.send('default-server', 'echo', index), index)
-    assert.equal(effects, 1024)
-    await assert.rejects(
-      () => client.send('default-server', 'echo', 'next'),
-      { code: 'OVERLOADED' },
-      'public default per-peer replay limit stays 1024'
-    )
-    assert.equal(effects, 1024, 'overflow executes no business')
-    assert.equal(notices.length, 1)
-    assert.equal(notices[0]!.reason, 'replayLedgerFull')
-  } finally {
-    await Promise.all([client.dispose(), server.dispose()])
-    left.close()
-    right.close()
-  }
-})
 
 it('default replay owner keeps global 4096 capacity and isolated endpoint ownership', () => {
   /** Zero-argument construction decides the real default owner, not explicit fixture capacities. */

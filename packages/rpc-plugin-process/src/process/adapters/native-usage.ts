@@ -1,11 +1,12 @@
-import { ERROR_SOURCE as RPC_PROCESS_ERROR_SOURCE } from '../error-code.js'
-import { attachErrorIdentity } from '@migaia/utils/error'
+/** Sample native process usage without owning channels, supervision or RPC lifecycle. */
+import { deferred } from '@migaia/utils/promise'
 import { execFile } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
 import process from 'node:process'
 import type { IProcessUsage } from '@migaia/supervision/process'
-import { RpcProcessErrorCode } from '../error-code.js'
+import { RpcProcessErrorCode } from '@migaia/rpc-contract/error-code'
 import { RpcProcessErrorText } from '../error-text.js'
+import { createProcessError } from '../error.js'
 
 /** OS field names and argument grammar belong only to this local sampler. */
 const ProcessUsageSource = {
@@ -17,17 +18,22 @@ const ProcessUsageSource = {
 
 /** Executes a read-only native utility without a shell or caller-supplied argument grammar. */
 function nativeRead(command: string, args: readonly string[]): Promise<string> {
-  return new Promise((resolve, reject) => {
+  /** Native output and synchronous invocation failure settle the same one utility operation. */
+  const completion = deferred<string>()
+  try {
     execFile(
       command,
       [...args],
       { encoding: 'utf8', timeout: 2000, maxBuffer: 65536 },
       (error, stdout) => {
-        if (error) reject(error)
-        else resolve(stdout)
+        if (error) completion.reject(error)
+        else completion.resolve(stdout)
       }
     )
-  })
+  } catch (error) {
+    completion.reject(error)
+  }
+  return completion.promise
 }
 
 /** Converts ps cumulative duration, including optional day/hour fields, to microseconds. */
@@ -109,13 +115,6 @@ export async function sampleNativeProcess(pid: number): Promise<IProcessUsage> {
       cpuTimeMs: (cpuUserMicros + cpuSystemMicros) / 1000
     }
   } catch (cause) {
-    throw ((originalCause: unknown) =>
-      attachErrorIdentity(
-        new Error(
-          RpcProcessErrorText.usageSampleFailed,
-          originalCause === undefined ? undefined : { cause: originalCause }
-        ),
-        { source: RPC_PROCESS_ERROR_SOURCE, code: RpcProcessErrorCode.usageSampleFailed }
-      ))(cause)
+    throw createProcessError(RpcProcessErrorCode.usageSampleFailed, cause)
   }
 }

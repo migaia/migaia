@@ -2,7 +2,7 @@ import { createProbeEmitter, bindInstalledProbe } from '../../dist/core/internal
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { createRuntimeEndpointComposition } from '../../dist/core/runtime-api-endpoint.js'
 import { RpcCapability } from '@migaia/rpc-contract'
-import { carrierSizeBytes } from '../../dist/core/adapters/probe-content.js'
+import { carrierSizeBytes } from '../../dist/sdk/wire/probe-content.js'
 import { describe, expect, it, vi } from 'vitest'
 import { identityCodec } from '@migaia/serialize/codecs/identity/v1'
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'

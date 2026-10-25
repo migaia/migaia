@@ -6,7 +6,7 @@ import {
   EndpointKernelState,
   type IEndpointKernelCallbacks
 } from '../../dist/core/endpoint-kernel.js'
-import { RpcCoreErrorCode } from '../../dist/core/errors.js'
+import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import type { IRpcInboundMessage } from '../../dist/core/transport.js'
 import type { IRpcTransport } from '../../dist/core/transport.js'
 import { createEndpointTransportActivation } from '../../dist/core/internal/transport-activation.js'

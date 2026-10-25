@@ -6,7 +6,7 @@ import { it, vi, expect } from 'vitest'
 import { PluginHost, definePlugin, defineFeature } from '@migaia/plugin-host'
 import { threadProtocolDefinition as createThreadPlugin } from './fixtures/thread-protocol.js'
 import { runtimeSources } from '../../../rpc-host/test/runtime-api/fixture.js'
-import { RpcCoreErrorCode } from '../../../rpc-host/dist/core/errors.js'
+import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 
 /** Rejection checks retain the canonical wrapper while requiring the original permission code. */
 function permission(error: unknown, code: string, source = 'plugin.host'): boolean {

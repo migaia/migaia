@@ -1,46 +1,53 @@
-# RPC Devtools 使用指南
+# Devtools 使用指南
 
-[English](./USEGUIDE.en.md) · [包概览](./README.md) · [Host 指南](../rpc-host/USEGUIDE.md)
+[English](./USEGUIDE.en.md) · [包概览](./README.md)
 
-`devtoolsPlugin()` 是可安装的 feature。它的 collector 就是原有有界采集器；query/watch/stats/describe/close 五个便捷方法直接转交同一个 collector。它不创建业务连接，也不转发一份新的 probe 事件流。
+Contract 提供纯事件/接口契约；Host 拥有业务会话和调用；transport 提供真实载体。Devtools 是 flow plugin，通过统一 probe 的 observe 入口借用真实事件；timeout/retry feature 则拥有调用策略。应用持有 collector，不创建第二个观察连接。一个 Host 可有不同 namespace 的 transport；示例仅使用 coroutine。
 
-## 观察真实双端调用
+## 观察真实调用
 
-下面把同一 tools 对象安装到父子两个真实 host。watch 首次 next 先订阅未来事件，再发业务；最后先关闭 host，再显式关闭应用拥有的 collector。
+此示例另需安装 `@migaia/rpc-plugin-coroutines`。将同一 tools 安装到父子两个真实 Host，watch 首次 next 先订阅未来事件，再发业务。安装 flow plugin 时使用 Host.plugins，而非 transport.features。
 
 ```ts doc-test=check
 import { createRpcHost } from '@migaia/rpc-host'
-import { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'
+import { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'
 import { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'
 
+async function untilStopped(signal: AbortSignal): Promise<void> {
+  let complete!: () => void
+  const stopped = new Promise<void>((resolve) => {
+    complete = resolve
+  })
+  signal.addEventListener('abort', complete, { once: true })
+  if (signal.aborted) complete()
+  try {
+    await stopped
+  } finally {
+    signal.removeEventListener('abort', complete)
+  }
+}
+
 const tools = devtoolsPlugin({ maxEvents: 1000, methods: ['double'] })
-const parent = await createRpcHost<{ double(value: number): number }>({
-  plugins: [
-    coroutinePlugin({
-      spawn: async ({ connect, signal }) => {
-        const child = await createRpcHost({
-          plugins: [coroutinePlugin({ connectToParent: connect }), tools],
-          provide: { double: (value: number) => value * 2 }
-        })
-        try {
-          if (!signal.aborted)
-            await new Promise<void>((resolve) => {
-              signal.addEventListener('abort', () => resolve(), { once: true })
-            })
-        } finally {
-          await child.close()
-        }
-      }
-    }),
-    tools
-  ]
-})
+const task: ICoroutineUserTask = async ({ connect, signal }) => {
+  const child = await createRpcHost({
+    plugins: [tools, coroutinePlugin({ connectToParent: connect })],
+    provide: { double: (value: number) => value * 2 }
+  })
+  try {
+    await untilStopped(signal)
+  } finally {
+    await child.close()
+  }
+}
+
+type IWorkerApi = { double(value: number): number }
+const plugins = [tools, coroutinePlugin({ spawn: task })] as const
+const parent = await createRpcHost<IWorkerApi, typeof plugins>({ plugins })
 const watch = tools.watch({ stages: ['message'] })
 try {
   const next = watch.next()
-  console.log(await parent.request('double', 21))
-  const batch = await next
-  console.log(batch.value?.events.length)
+  console.log(await parent.coroutine.request('double', 21))
+  console.log((await next).value?.events.length)
   console.log(tools.stats().methods)
 } finally {
   await watch.return(undefined)
@@ -49,14 +56,13 @@ try {
 }
 ```
 
-业务输出 42；观察计数取决于两端合格事件，不应把“一次业务”固定等同于“一条记录”。同一 tools 可装到多个 host；每个 host 内同一定义只能安装一次。关闭其中一个 host 只撤回它的观察，其他 host 和 collector 继续工作。
+业务返回 42；事件数取决于两端实际合格观察，不能把一次业务固定等同于一条事件。默认 message/peer/forward 足够观察这次调用；其他阶段要显式启用，且真实载体必须提供相应事实。
 
-## 阶段、捕获与脱敏
-
-默认 stages 是 message 与 peer。envelope、encoded、frame、protected、carrier 需显式启用；其可见性还取决于真实载体和所经过的阶段。仅订阅 stages 不会保存内容。capture 必须是 stages 的子集，默认不捕获；redact 在原 emitter 上同步投影内容。
+## 捕获、脱敏、查询与服务
 
 ```ts doc-test=check
-import { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'
+import { devtoolsPlugin, type IRpcDevtools } from '@migaia/rpc-plugin-devtools'
+import type { IRpcHost } from '@migaia/rpc-host'
 
 export const tools = devtoolsPlugin({
   stages: ['message', 'peer', 'carrier'],
@@ -66,34 +72,26 @@ export const tools = devtoolsPlugin({
   maxContentBytes: 1024 * 1024,
   onError: (error) => console.error(error)
 })
-```
-
-该示例明确替换全部捕获内容。应用需要按自己的数据结构编写脱敏策略，不应假定自动递归删除凭据。redact 抛错会报告 REDACT_FAILED 并丢弃该内容，不改变已完成业务结果。
-
-methods 是精确方法过滤；sample 是大于 0 且不超过 1 的确定性采样比率。暂停请使用 collector.pause，而不是 sample: 0。collector.resume 恢复保存的阶段选择，不复活已关闭 collector。
-
-## 查询、watch 与容量
-
-query 使用序列游标而非数组位置。把 nextSeq 作为下次 afterSeq，即使过滤掉一些行也不重复扫描。默认 limit=1000，允许范围 1 到 1000。
-
-```ts doc-test=check
-import type { IRpcDevtools } from '@migaia/rpc-plugin-devtools'
 
 export function readPage(collector: IRpcDevtools, afterSeq: number) {
   const page = collector.query({ afterSeq, limit: 100, stages: ['message'] })
   return { events: page.events, cursor: page.nextSeq, loss: page.counters }
 }
+
+export function exposeDiagnostics(host: IRpcHost) {
+  host.provide({ diagnostics: tools.collector.service })
+}
 ```
 
-watch 在首次 next 时订阅未来事件，不代替 query 的历史读取。每批最多 256 项、最多排队 64 批；原始待过滤窗口也有界。batch.dropped 包含相应丢失，慢消费者不能声称零丢失。return 只关闭该 watch，并唤醒其等待；collector.close 则让等待的 next 以 CLOSED 拒绝。
+上例明确替换捕获内容。redact 同步运行，异常报告 REDACT_FAILED 并丢弃该内容，不改业务结果。方法过滤为精确匹配；sample 大于 0 且不超过 1，暂停使用 collector.pause。resume 恢复原阶段选择，不复活已关闭采集器。
 
-主环 maxEvents 默认 10000；maxContentBytes 默认 8388608，仅限制主环内容预算；maxInterned 默认 65536。watch、record 和内容/detail/error 的引用另有归属，不应把主环上限当作进程内存硬上限。query.counters 可解释淘汰、内容丢弃、重入丢失与 intern 溢出。
+query.afterSeq 是排他序列游标，使用 page.nextSeq 继续；它包含已扫描但被过滤的行。limit 默认 1000，范围 1–1000。watch 在首次 next 订阅未来事件，不能代替历史 query；每批最多 256 条、最多 64 批待取，batch.dropped 报告丢失。return 只结束自己的 watch，collector.close 让等待的 next 以 CLOSED 拒绝。
 
-stats 累计合格 message 事件，主环淘汰不减去累计值。延迟百分位来自有界直方图桶的插值，不是保留样本的精确分位数。clear 重置主环、统计和计数，保留序列进度、record 与 watch 寿命。
+主环 maxEvents 默认 10000、maxContentBytes 默认 8388608、maxInterned 默认 65536。watch、record 和 content/detail/error 引用另有归属，不能将主环容量解释为任意对象图的深复制或全局内存预算。query.counters 报告淘汰、内容丢弃、重入丢失、采样与 intern 溢出。
 
-## 独立录制与 NDJSON
+collector.service 是嵌套 provide。授权由应用负责；默认远程读取不公开捕获内容，只有 exposeContent:true 才允许。服务读取排除其实际服务 Host 的观察，避免查询递归；不为观察另外创建业务 Host。
 
-一次只能有一个活动 recording。record 使用自己的容量，stop 消费该句柄并返回记录。export/import 是纯 codec，不持久化，也不把导入数据注入当前 collector。
+## 录制与 NDJSON
 
 ```ts doc-test=check
 import { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'
@@ -104,32 +102,20 @@ try {
   tools.collector.clear()
   const record = recording.stop()
   const text = tools.collector.exportRecord(record)
-  const decoded = tools.collector.importRecord(text)
-  console.log(decoded.header.version)
+  console.log(tools.collector.importRecord(text).header.version)
 } finally {
   tools.close()
 }
 ```
 
-record v1 的头保持 `{ format: 'migaia-rpc-devtools', version: 1 }`，包改名不改变格式。collector.exportRecord/importRecord 负责记录编解码。字节采用保留的 `$bytes` 语法及规范 base64；原生错误恢复名称、stack 与原因链，不重新生成远端 stack。格式不承诺任意 JS 类实例图往返。
+同一时刻只有一个活动录制，stop 消费该句柄。clear 重置主环、统计和计数，保留序列进度及 record/watch 寿命。stats 累计合格 message 事件，主环淘汰不倒减；延迟分位值来自有界直方图插值。
 
-## 既有 host 上的远程 service
+记录头保持 `{ format: 'migaia-rpc-devtools', version: 1 }`。export/import 为纯 NDJSON codec，不持久化、不向当前 collector 注入事件。字节与错误图按记录契约转换，不承诺任意 JS 类实例图无损往返。
 
-collector.service 是嵌套 provide，可由应用发布到自己的既有 host。授权和业务连接由应用负责；不要为观察再建立第二个调用端点。
+## 清理与边界
 
-```ts doc-test=check
-import type { IRpcHost } from '@migaia/rpc-host'
-import type { IDevtoolsPlugin } from '@migaia/rpc-plugin-devtools'
+先结束自己的 watch 和 recording，再关闭业务 Host，最后关闭应用拥有的 collector。Host 安装只拥有其 emitter 清理，collector.close 不负责关闭业务。同步 emit 的可复用 view 若需保留，消费者必须按公开 probe 契约及时读取或复制字段。
 
-export function exposeDiagnostics(host: IRpcHost, tools: IDevtoolsPlugin) {
-  host.provide({ diagnostics: tools.collector.service })
-}
-```
+自定义 probe 从 `@migaia/rpc-host/plugins/probe` 导入；SDK 从 `@migaia/rpc-host/sdk` 导入。物理 carrier/protected 阶段依赖实际路径，不用语义消息伪造。诊断失败不得替换原业务结果；错误 source 为 rpc.devtools，包含 INVALID_OPTION、CLOSED、RECORD_ACTIVE/RECORD_NOT_ACTIVE、RECORD_FORMAT_INVALID、REDACT_FAILED、SERVICE_RESULT_INVALID，保留原类型与 cause。
 
-capture 与 exposeContent: true 是独立选择；默认远程服务隐藏捕获内容。服务读取会排除其实际服务 host 的观察记录，避免查询观察自身业务。服务保留 query/watch/stats/describe、record.start/stop、clear、pause/resume；跨 RPC 输出沿原 portable/wire 转换。
-
-## 最终清理与错误
-
-先 return 自己的 watch，停止 recording，关闭业务 host，再关闭仍由应用拥有的 collector。collector.close 幂等且不关闭业务 host；host.close 同样不关闭 collector。
-
-本包 source 为 rpc.devtools。INVALID_OPTION、CLOSED、RECORD_ACTIVE、RECORD_NOT_ACTIVE、RECORD_FORMAT_INVALID、REDACT_FAILED、SERVICE_RESULT_INVALID 保留原生错误类型与原 cause。诊断与清理错误需要处理或报告，不能用采集失败替换原业务错误。
+默认包含转发事件。查询或记录有序事件后，可关联 `messageId`、`route` 与调用方可选 `trace`，查看各 host 的 `hop`、`maxHops` 和拒绝原因。既有环在保留事件时复制借用路由；实时 probe 回调仍只借用该数组。

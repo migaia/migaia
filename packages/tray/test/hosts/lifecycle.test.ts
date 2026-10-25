@@ -1,3 +1,4 @@
+import { TrayInternal } from '../../src/hosts/constants.js'
 import { describe, expect, it, vi } from 'vitest'
 import { setTimeout as delay } from 'node:timers/promises'
 import { execFileSync, spawnSync } from 'node:child_process'
@@ -94,9 +95,12 @@ describe('Tray lifecycle management', () => {
         /** Actual RPC ready, rather than early native unit readiness, admits the background receipt. */
         let readyGeneration = 0
         /** Parent queue has observed this same exact ready before this later listener records it. */
-        const releaseReady = host[api.hosts[index].runtime].on('ready', (event: any) => {
-          if (event.name === 'stale') readyGeneration = event.generation
-        })
+        const releaseReady = host[`${TrayInternal.namespacePrefix}stale`].members.on(
+          'ready',
+          (event: any) => {
+            if (event.name === 'stale') readyGeneration = event.generation
+          }
+        )
         /**
          * Blocking one existing queue entry allows public replace to be admitted before native g2
          * ready.
@@ -523,7 +527,9 @@ describe('Tray lifecycle management', () => {
     try {
       /** Child crash is initiated only through deps.tray.exit. */
       const remote = await tray.spawn(definition.name, { id: 'timeline' })
-      host.process.on('exit', () => order.push('rpc-exit'))
+      host[`${TrayInternal.namespacePrefix}timeline`].members.on('exit', () =>
+        order.push('rpc-exit')
+      )
       tray.on('restarting', () => {
         order.push('tray-restarting')
         snapshots.push(tray.get('timeline'))
@@ -583,23 +589,26 @@ describe('Tray lifecycle management', () => {
     /** Read instrumentation delegates every operation to the original canonical outlet. */
     const observing = vi
       .spyOn(owner, 'outletOf')
-      .mockImplementation((actualHost: any, definition: any) => {
+      .mockImplementation((actualHost: any, definition: any, id?: any) => {
         /** The original facade keeps its brands, private slot and native receipt ownership. */
-        const outlet = original(actualHost, definition)
+        const outlet = original(actualHost, definition, id)
         if (actualHost !== parent) return outlet
         return {
           ...outlet,
-          get: async (...args: any[]) => {
-            /** Only the first old-generation exit read waits behind this test barrier. */
-            const hold = armed
-            armed = false
-            /** Real get captures supervision before its real native resources sampler awaits. */
-            const snapshot = await outlet.get(...args)
-            if (hold) {
-              captured()
-              await blocked
+          members: {
+            ...outlet.members,
+            get: async (...args: any[]) => {
+              /** Only the first old-generation exit read waits behind this test barrier. */
+              const hold = armed
+              armed = false
+              /** Real get captures supervision before its real native resources sampler awaits. */
+              const snapshot = await outlet.members.get(...args)
+              if (hold) {
+                captured()
+                await blocked
+              }
+              return snapshot
             }
-            return snapshot
           }
         }
       })
@@ -613,7 +622,7 @@ describe('Tray lifecycle management', () => {
       const remote = await tray.spawn('node-pr', { id: 'late' })
       /** Late snapshot belongs only to this old unit generation. */
       const initial = (await tray.get('late')).generation
-      host.process.on('exit', (event: any) => {
+      host[`${TrayInternal.namespacePrefix}late`].members.on('exit', (event: any) => {
         if (event.generation === initial) armed = true
       })
       await remote.notify('node.svc.exitCrash', undefined)

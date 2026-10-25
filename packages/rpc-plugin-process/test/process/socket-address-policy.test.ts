@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest'
 import {
   dialProcessByteChannel,
   listenProcessByteChannel
-} from '../../src/process/adapters/node-socket.js'
+} from '../../dist/process/adapters/node-socket.js'
 import {
   dialProcessByteChannel as dialDenoByteChannel,
   listenProcessByteChannel as listenDenoByteChannel
-} from '../../src/process/adapters/deno-socket.js'
+} from '../../dist/process/adapters/deno-socket.js'
 
 /** Named-pipe grammar is valid only for the Node Windows adapter. */
 describe('process socket address policy', () => {
@@ -19,7 +19,6 @@ describe('process socket address policy', () => {
       await expect(
         listenProcessByteChannel({
           address,
-          auth: { mode: 'required', verify: () => 'principal' },
           onConnection: () => undefined,
           report: () => undefined
         })
@@ -31,7 +30,6 @@ describe('process socket address policy', () => {
     expect(() =>
       listenDenoByteChannel({
         address,
-        auth: { mode: 'required', verify: () => 'principal' },
         onConnection: () => undefined,
         report: () => undefined
       })

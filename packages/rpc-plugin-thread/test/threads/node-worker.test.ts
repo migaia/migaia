@@ -8,7 +8,7 @@ import {
   UtilsErrorCode,
   walkErrorCauses
 } from '@migaia/utils/error'
-import { createNodeThreadLauncher } from '../../src/threads/adapters/node.js'
+import { createNodeThreadLauncher } from '../../src/threads/node-launcher.js'
 
 /** Native exit fixture has no RPC protocol or Vitest runtime in the Worker. */
 const entry = fileURLToPath(new URL('./fixtures/lifecycle-worker.mjs', import.meta.url))

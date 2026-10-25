@@ -3,13 +3,12 @@ import { join } from 'node:path'
 import { runInNewContext } from 'node:vm'
 import { parseSync } from 'oxc-parser'
 import { describe, expect, it } from 'vitest'
-import { createContractError } from '../../dist/contract/contract-error.js'
-import { RpcContractErrorCode } from '@migaia/rpc-contract'
-import { createBinaryFramer } from '@migaia/rpc-contract/framing'
-import { normalizePortable } from '@migaia/rpc-contract'
+import { createContractError } from '@migaia/rpc-contract/errors'
+import { RpcContractErrorCode } from '@migaia/rpc-contract/error-code'
+import { normalizePortable } from '@migaia/rpc-contract/portable'
 
 /** Contract sources whose new dependency allowlist is enforced here. */
-const contractRoot = join(import.meta.dirname, '../../src/contract')
+const contractRoot = join(import.meta.dirname, '../../src')
 
 /** Recursively gathers contract source files without generated declarations. */
 function sourceFiles(directory: string): string[] {
@@ -46,15 +45,13 @@ describe('contract utility ownership', () => {
         '@migaia/serialize',
         '@migaia/utils/bytes',
         '@migaia/utils/error',
-        '@migaia/utils/function',
-        '@migaia/utils/string'
+        '@migaia/utils/string',
+        '@migaia/utils/promise'
       ])
     )
-    const normalizeSource = readFileSync(join(contractRoot, 'normalize.ts'), 'utf8')
-    const framerSource = readFileSync(join(contractRoot, 'framing/message-framer.ts'), 'utf8')
-    const errorSource = readFileSync(join(contractRoot, 'contract-error.ts'), 'utf8')
+    const normalizeSource = readFileSync(join(contractRoot, 'portable/normalize.ts'), 'utf8')
+    const errorSource = readFileSync(join(contractRoot, 'contract/contract-error.ts'), 'utf8')
     expect(normalizeSource).not.toMatch(/function isUint8Array|instanceof Uint8Array/u)
-    expect(framerSource).not.toMatch(/function isUint8Array|instanceof Uint8Array/u)
     expect(errorSource).toContain('attachErrorIdentity')
     expect(errorSource).not.toMatch(/Object\.defineProperty\([^,]+,\s*['"](?:source|code)['"]/u)
     const error = createContractError(RpcContractErrorCode.invalidDescriptor)
@@ -82,21 +79,8 @@ describe('contract utility ownership', () => {
     Object.defineProperty(tagged, Symbol.toStringTag, { value: 'Uint8Array' })
     const forged = Object.create(Uint8Array.prototype) as Uint8Array
     const ordinaryNormalize = rejection(() => normalizePortable(ordinary))
-    const ordinaryFrame = createBinaryFramer().accept(ordinary, {
-      source: 'peer',
-      messageId: 'frame'
-    })
-    expect(ordinaryFrame.status).toBe('rejected')
     for (const value of [tagged, forged]) {
       expect(rejection(() => normalizePortable(value))).toEqual(ordinaryNormalize)
-      const frame = createBinaryFramer().accept(value, { source: 'peer', messageId: 'frame' })
-      expect(frame.status).toBe('rejected')
-      if (frame.status === 'rejected' && ordinaryFrame.status === 'rejected') {
-        expect(frame.error.constructor).toBe(ordinaryFrame.error.constructor)
-        expect(frame.error).toMatchObject({
-          code: (ordinaryFrame.error as { code?: unknown }).code
-        })
-      }
     }
   })
 })

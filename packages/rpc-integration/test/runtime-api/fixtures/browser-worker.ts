@@ -8,8 +8,9 @@ import {
   RpcTransportMode
 } from '@migaia/rpc-host/plugin'
 import type { IThreadWebPort } from '../../../../rpc-plugin-thread/dist/threads/types.js'
-import { RpcError, RpcCoreErrorCode } from '../../../../rpc-host/dist/core/errors.js'
-import { RpcCoreErrorText } from '../../../../rpc-host/dist/core/error-text.js'
+import { RpcError } from '@migaia/rpc-contract/errors'
+import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
+import { RpcCoreErrorText } from '@migaia/rpc-contract/errors'
 import type { IRpcContext } from '../../../../rpc-host/dist/core/typing.js'
 
 /** These counts belong to actual Worker business, independent of browser caller in-flight state. */

@@ -1,68 +1,17 @@
+/**
+ * Constructs native Contract failures and classifies callback failures without replacing their
+ * original identity. Optional caller-owned metadata records provenance; no global error state lives
+ * here.
+ */
 import {
   attachErrorIdentity,
   attachSecondaryErrors,
   isNativeErrorValue,
   tryReadProperty
 } from '@migaia/utils/error'
-import { RpcContractErrorCode, type IRpcContractErrorCode } from './error-code.js'
+import { RpcContractErrorCode, type IRpcContractErrorCode } from '../error-code.js'
 import { RPC_CONTRACT_SOURCE, RpcContractErrorText } from './error-text.js'
-
-/** A factory may preserve only its own bounded chain; this permission never propagates to children. */
-type ILocalErrorWireSummary = Readonly<{
-  code: string
-  message: string
-  preserveSerializedError?: true
-}>
-
-/** Route provenance joins the existing summary owner; unrelated thrown values incur no new reads. */
-type ILocalErrorWireMetadata = Readonly<{
-  summary?: ILocalErrorWireSummary
-  route?: readonly string[]
-}>
-
-/** Only genuine local registration can opt in; serialized or user-defined properties cannot. */
-const summaries = new WeakMap<Error, ILocalErrorWireMetadata>()
-
-/** Retain only admitted node ids on the existing error metadata owner without inspecting an Error. */
-export function registerLocalErrorWireRoute(error: Error, route: readonly string[]): void {
-  summaries.set(error, Object.freeze({ ...summaries.get(error), route }))
-}
-
-/** Read package-minted metadata without invoking ordinary business error property traps. */
-export function localErrorWireRoute(error: unknown): readonly string[] | undefined {
-  return (typeof error === 'object' && error !== null) || typeof error === 'function'
-    ? summaries.get(error as Error)?.route
-    : undefined
-}
-
-/** Retain the original local cause while limiting a contract failure's outbound disclosure. */
-export function registerLocalErrorWireSummary(
-  error: Error,
-  code: string,
-  message: string,
-  options?: Readonly<{ preserveSerializedError?: true }>
-): void {
-  summaries.set(
-    error,
-    Object.freeze({
-      ...summaries.get(error),
-      summary: Object.freeze({
-        code,
-        message,
-        ...(options?.preserveSerializedError === true
-          ? { preserveSerializedError: true as const }
-          : {})
-      })
-    })
-  )
-}
-
-/** Read the factory-owned summary without invoking any untrusted error property getters. */
-export function localErrorWireSummary(error: unknown): ILocalErrorWireSummary | undefined {
-  return (typeof error === 'object' && error !== null) || typeof error === 'function'
-    ? summaries.get(error as Error)?.summary
-    : undefined
-}
+import type { IRpcErrorWireMetadata } from './types.js'
 
 /**
  * Canonical text per public code. Keyed by code so every throw site shares one total mapping;
@@ -79,7 +28,8 @@ const TEXT_BY_CODE: Readonly<Record<IRpcContractErrorCode, string>> = {
   [RpcContractErrorCode.invalidWireError]: RpcContractErrorText.invalidWireError,
   [RpcContractErrorCode.handshakeInvalid]: RpcContractErrorText.handshakeInvalid,
   [RpcContractErrorCode.handshakeIncompatible]: RpcContractErrorText.handshakeIncompatible,
-  [RpcContractErrorCode.handshakeRejected]: RpcContractErrorText.handshakeRejected
+  [RpcContractErrorCode.handshakeRejected]: RpcContractErrorText.handshakeRejected,
+  [RpcContractErrorCode.extensionNegotiationFailed]: RpcContractErrorText.extensionNegotiationFailed
 }
 
 /**
@@ -97,7 +47,11 @@ const RANGE_CODES: ReadonlySet<IRpcContractErrorCode> = new Set([
  * enumerable own properties without rebuilding the error, and places an optional original error on
  * the standard non-enumerable `cause` so traceability is identical across all throw sites.
  */
-export function createContractError(code: IRpcContractErrorCode, cause?: unknown): Error {
+export function createContractError(
+  code: IRpcContractErrorCode,
+  cause?: unknown,
+  metadata?: IRpcErrorWireMetadata
+): Error {
   /** Constructor option object; omitted entirely so no `cause` key exists when none was given. */
   const options = cause === undefined ? undefined : { cause }
   /** Native error preserving the per-code runtime type. */
@@ -108,12 +62,15 @@ export function createContractError(code: IRpcContractErrorCode, cause?: unknown
         code === RpcContractErrorCode.handshakeRejected
       ? new Error(TEXT_BY_CODE[code], options)
       : new TypeError(TEXT_BY_CODE[code], options)
-  registerLocalErrorWireSummary(error, code, TEXT_BY_CODE[code])
+  metadata?.summaries?.set(error, Object.freeze({ code, message: TEXT_BY_CODE[code] }))
   return attachErrorIdentity(error, { source: RPC_CONTRACT_SOURCE, code })
 }
 
 /** Identifies a callback failure without replacing a mutable native error or another owner. */
-export function identifyContractCallbackFailure(error: unknown): Error {
+export function identifyContractCallbackFailure(
+  error: unknown,
+  metadata?: IRpcErrorWireMetadata
+): Error {
   if (isNativeErrorValue(error)) {
     /** A full semantic identity remains with the originating package. */
     const source = tryReadProperty(error as { source?: unknown }, 'source')
@@ -133,21 +90,23 @@ export function identifyContractCallbackFailure(error: unknown): Error {
         source: RPC_CONTRACT_SOURCE,
         code: RpcContractErrorCode.callbackFailed
       })
-      registerLocalErrorWireSummary(
+      metadata?.summaries?.set(
         error,
-        RpcContractErrorCode.callbackFailed,
-        RpcContractErrorText.callbackFailed
+        Object.freeze({
+          code: RpcContractErrorCode.callbackFailed,
+          message: RpcContractErrorText.callbackFailed
+        })
       )
       return error
     } catch (attachmentError) {
       return attachSecondaryErrors(
-        createContractError(RpcContractErrorCode.callbackFailed, error),
+        createContractError(RpcContractErrorCode.callbackFailed, error, metadata),
         [attachmentError]
       ) as Error
     }
   }
   /** Explicit cause presence retains even a callback that threw undefined. */
-  const failure = createContractError(RpcContractErrorCode.callbackFailed)
+  const failure = createContractError(RpcContractErrorCode.callbackFailed, undefined, metadata)
   Object.defineProperty(failure, 'cause', { value: error, configurable: true, writable: true })
   return failure
 }

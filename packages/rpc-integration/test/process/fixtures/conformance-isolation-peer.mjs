@@ -1,36 +1,21 @@
 import { readFileSync } from 'node:fs'
 import { inspect } from 'node:util'
-import { serializeRpcError } from '@migaia/rpc-contract'
-import { attachErrorIdentity } from '@migaia/utils/error'
-import {
-  ERROR_SOURCE,
-  RpcProcessErrorCode
-} from '../../../../rpc-plugin-process/dist/process/error-code.js'
-import { RpcProcessErrorText } from '../../../../rpc-plugin-process/dist/process/error-text.js'
+import { serializeRpcError, isRpcTimeoutError } from '@migaia/rpc-contract/errors'
 import { PluginHost, definePlugin, defineFeature } from '@migaia/plugin-host'
-import { systemScheduler } from '@migaia/utils/scheduler'
-import { createProcessResilience } from '../../../../rpc-plugin-process/dist/process/resilience/index.js'
-import { createNativeProcessOffer } from '../../../../rpc-plugin-process/dist/process/offer.js'
-import { createProcessTransport } from '../../../../rpc-plugin-process/dist/process/handshake.js'
-import { listenProcessByteChannel } from '../../../../rpc-plugin-process/dist/process/adapters/node-socket.js'
+import { createRpcHost } from '@migaia/rpc-host'
+import { auth } from '@migaia/rpc-host/plugins/auth'
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
+import { processPlugin } from '@migaia/rpc-plugin-process'
 import { openProcessStdioChannel } from '../../../../rpc-plugin-process/dist/process/adapters/node-child-process.js'
-import { serveProcessSessions } from '../../../../rpc-plugin-process/dist/process/plugin/serve.js'
-import { createRuntimePeer } from '../../../../rpc-host/dist/remote/runtime-api/peer.js'
-import { createProcessInstanceFallback } from '../../../../rpc-plugin-process/dist/process/resilience/fallback.js'
-import { createRuntimeEndpointComposition } from '../../../../rpc-host/dist/core/runtime-api-endpoint.js'
-import { codec } from '../../../../rpc-host/dist/core/middleware/codec.js'
-import { framer } from '../../../../rpc-host/dist/core/middleware/framer.js'
-import { abort } from '../../../../rpc-host/dist/core/middleware/abort.js'
-import { connect } from '../../../../rpc-host/dist/core/middleware/connect.js'
-import { ping } from '../../../../rpc-host/dist/core/middleware/ping.js'
-import { isRpcTimeoutError } from '@migaia/rpc-host'
-/** The published vector owns every business method and mode used by this fixture. */
+import { decodeProcessRuntimeBootstrap } from '../../../../rpc-plugin-process/dist/process/runtime-bootstrap.js'
+import { createProcessCleanupError } from '../../../../rpc-plugin-process/dist/process/error.js'
+/** The published vector owns every original business method and mode. */
 const contract = JSON.parse(
   readFileSync(new URL('../../../schema/vectors/remote-contract.json', import.meta.url), 'utf8')
 ).contracts[0].value
-/** CLI arguments carry mode and rendezvous location, never authentication material. */
+/** CLI selects native acquisition and original scenarios, never secret material. */
 const [mode, address] = process.argv.slice(2)
-/** Provider receipts remain in this actual child PID and expose no credential values. */
+/** Original provider receipts remain in the actual child PID. Missing authority facts stay absent. */
 const state = {
   executions: 0,
   contexts: [],
@@ -40,20 +25,20 @@ const state = {
   frames: [],
   reports: []
 }
-/** Control callbacks never enter the portable business receipt containing provider counters. */
-const control = { health: undefined, sequence: 0 }
-/** Bootstrap mode reads its secret through the public stdio owner. */
+/** No new fixture fallback is substituted for the unavailable native health receiver. */
+const control = { health: undefined }
+/** Stdio bootstrap remains native launch custody, independent from semantic grammar. */
 const opened = mode === 'stderr' ? await openProcessStdioChannel({ bootstrap: 'stdin' }) : undefined
-/** Socket authentication is inherited through a private descriptor, never argv or environment. */
-const credentials = opened
-  ? { alice: new TextDecoder().decode(opened.bootstrap) }
-  : JSON.parse(readFileSync(3, 'utf8'))
-/** This explicit governor changes only the connection capacity under the flood experiment. */
-const resilience =
-  mode === 'flood'
-    ? createProcessResilience({ scheduler: systemScheduler, report, maxConnections: 2 })
+/** Structured bootstrap supplies the original physical identity and mandatory token. */
+const bootstrap =
+  opened && opened.bootstrap[0] === 123
+    ? decodeProcessRuntimeBootstrap(opened.bootstrap)
     : undefined
-/** Reports contain only native semantic codes; failure text cannot echo authentication values. */
+/** Socket secrets arrive only through the original private read-only descriptor. */
+const credentials = opened
+  ? { alice: bootstrap?.token ?? new TextDecoder().decode(opened.bootstrap) }
+  : JSON.parse(readFileSync(3, 'utf8'))
+/** Keep complete original native failure evidence; fixture never redacts a faulty owner for it. */
 function report(error) {
   state.reports.push({
     inspected: inspect(error, { depth: null, showHidden: true }),
@@ -61,40 +46,28 @@ function report(error) {
   })
   process.stderr.write(`ISOLATION_REPORT:${String(error?.code ?? 'UNKNOWN')}\n`)
 }
-
-/** Build a public canonical graph with the exact session policy supplied by production serve. */
-async function endpointFactory(channel, _signal, session) {
-  /** Reuse the genuine runtime physical installation with this exact session's native policy. */
-  const { installing } = createRuntimeEndpointComposition(
-    {
-      id: 'ts-peer',
-      scheduler: channel.scheduler,
-      transport: channel.transport,
-      idempotency: session.idempotency,
-      providerLimits: session.limits,
-      middlewares: [
-        codec(channel.pipeline.codec),
-        framer(channel.pipeline.framer),
-        abort(),
-        connect({ transport: channel.transport }),
-        ping()
-      ],
-      features: channel.features
-    },
-    channel
-  )
-  const endpoint = await installing
-  /** The canonical transport emits decoded envelopes; this observer records only message metadata. */
-  channel.transport.subscribe(({ data }) => {
-    /** Received metadata demonstrates equal request IDs crossing independent connections. */
-    const frame = JSON.parse(typeof data === 'string' ? data : new TextDecoder().decode(data))
-    state.frames.push({
-      sessionId: session.identity.sessionId,
-      kind: frame.kind,
-      id: frame.id ?? null
-    })
-  })
-  return { endpoint, stream: endpoint.stream, oneWay: endpoint }
+/** The original verifier remains strict; its principal result has no current receiving port. */
+function verifyCredentials(value) {
+  if (value === credentials.alice) return 'alice'
+  if (value === credentials.bob && credentials.bob !== undefined) return 'bob'
+  throw new Error(String(value))
+}
+/** Explicit auth enforces the original verifier without claiming a principal-result receiver. */
+function authenticateCredentials(value) {
+  verifyCredentials(value)
+}
+/** Observe only admitted canonical envelope facts, without inventing a session identity. */
+function observeFrames() {
+  return {
+    hooks: {
+      envelope: {
+        inbound(value) {
+          state.frames.push({ kind: value.message.kind, id: value.message.id ?? null })
+          return value
+        }
+      }
+    }
+  }
 }
 
 /** One real PluginHost owns each target instance; providers borrow only its installed outputs. */
@@ -182,177 +155,100 @@ class IsolationTarget {
   }
 }
 
-/** Shared mode deliberately keeps the same target Host across independent physical sessions. */
+/** One original application target still constructs its actual Feature outputs. */
 const sharedTarget = new IsolationTarget()
 await sharedTarget.start()
-/** The original Host is also the canonical instance fallback replacement authority. */
-const host = sharedTarget.host
-
-/** Production serve owns handshake admission, connection scope, provider limits and fallback. */
-const options = {
-  host,
-  contract,
-  instanceMode: mode === 'per-connection' ? 'per-connection' : 'shared',
-  resilience,
-  endpointFactory,
-  report,
-  createSharedTarget: () => {
-    state.replacements += 1
-    state.revision += 1
-    return sharedTarget.definition()
-  },
-  onInstanceUnhealthy: (listener) => {
-    control.health = listener
-    return () => {
-      control.health = undefined
-    }
-  },
-  ingress: opened
-    ? {
-        kind: 'child',
-        channelKind: 'byte',
-        parentLoss: { exit: () => process.exit(0) },
-        openRaw: async () => ({ raw: opened.channel, bootstrap: opened.bootstrap }),
-        createVerifier: () => (auth) => {
-          if (auth !== credentials.alice) throw new Error('fixture authentication rejected')
-        },
-        establish: (raw, context) =>
-          createProcessTransport(raw, {
-            role: 'responder',
-            peerId: 'caller',
-            scheduler: context.scheduler,
-            offer: createNativeProcessOffer({
-              peer: { id: 'ts-peer', runtime: 'node' },
-              stream: true,
-              capabilities: ['runtime-api@1']
-            }),
-            auth: { mode: 'required', verify: context.verify },
-            ipc: { ...context.session, log: () => undefined },
-            report
-          })
-      }
-    : {
-        kind: 'listener',
-        address,
-        listen: listenProcessByteChannel,
-        offer: createNativeProcessOffer({
-          peer: { id: 'ts-peer', runtime: 'node' },
-          stream: true,
-          capabilities: ['runtime-api@1']
-        }),
-        verify: (auth) => {
-          if (auth === credentials.alice) return 'alice'
-          if (auth === credentials.bob) return 'bob'
-          throw new Error(String(auth))
-        },
-        createConnectionContext: () => ({
-          peerId: 'caller',
-          ipc: {
-            connectionId: `connection-${++control.sequence}`,
-            sessionId: `session-${control.sequence}`,
-            processId: String(process.pid),
-            log: () => undefined
-          }
-        })
-      }
-}
-/**
- * Register this fixture's application payloads on the actual accepted native Peer.
- *
- * @param {import('../../../../rpc-plugin-process/dist/process/plugin/serve.js').IProcessReadySession} session
- *   Genuine native accepted resource.
- * @returns {Promise<{ close(): Promise<void> }>} Original Peer and optional target cleanup
- *   transaction.
- * @throws {unknown} Original construction failure; rollback failures are reported independently.
- */
-async function serveSession({ channel, endpoint, identity, signal }) {
-  const owned = mode === 'per-connection' ? new IsolationTarget() : undefined
-  if (owned) await owned.start()
-  const feature = (owned ?? sharedTarget).output
-  /** Session identity is lent by the actual process governor, never reconstructed from peer names. */
-  const context = (actual) => ({ session: identity, signal: actual.signal })
-  let peer
-  try {
-    peer = await createRuntimePeer(
-      {
-        self: { name: 'ts-peer', instanceId: 'ts-peer' },
-        contract,
-        report,
-        provide: {
-          p: {
-            f: {
-              request: (params, actual) => feature.request(params[0], context(actual)),
-              oneWay: (params, actual) => feature.oneWay(params[0], context(actual)),
-              generator: (params, actual) => feature.generator(params[0], context(actual)),
-              asyncGenerator: (params, actual) => feature.asyncGenerator(params[0], context(actual))
-            }
+/** Native lifecycle borrows actual Host and application target owners, with one close Promise. */
+class IsolationService {
+  /** Public Host creation is the only handshake/session/provider owner in this fixture. */
+  #opening
+  /** Every SIGTERM/EOF joins the same cleanup transaction. */
+  #closing
+  /** Public providers pass the genuine IRpcContext unchanged; no session/principal DTO is minted. */
+  constructor() {
+    const feature = sharedTarget.output
+    this.#opening = createRpcHost({
+      self: bootstrap?.self ?? { name: 'ts-peer', instanceId: 'ts-peer' },
+      contract,
+      provide: {
+        p: {
+          f: {
+            request: (params, context) => feature.request(params[0], context),
+            oneWay: (params, context) => feature.oneWay(params[0], context),
+            generator: (params, context) => feature.generator(params[0], context),
+            asyncGenerator: (params, context) => feature.asyncGenerator(params[0], context)
           }
         }
       },
-      { channel, endpoint, signal }
-    )
-  } catch (primary) {
-    if (owned) {
-      try {
-        await owned.host.dispose()
-      } catch (cleanup) {
-        report(cleanup)
-      }
-    }
-    throw primary
-  }
-  return {
-    close: async () => {
-      const errors = []
-      try {
-        await peer.close()
-      } catch (error) {
-        errors.push(error)
-      }
-      if (owned) {
-        try {
-          await owned.host.dispose()
-        } catch (error) {
-          errors.push(error)
-        }
-      }
-      if (errors.length === 1) throw errors[0]
-      if (errors.length > 1)
-        throw attachErrorIdentity(new AggregateError(errors, RpcProcessErrorText.channelClosed), {
-          source: ERROR_SOURCE,
-          code: RpcProcessErrorCode.channelClosed
+      plugins: [
+        auth({ verifyCredentials: authenticateCredentials }),
+        defineFlowPlugin({ name: 'isolation-envelope-observer', setup: observeFrames }),
+        processPlugin({
+          name: 'p',
+          report,
+          ...(opened
+            ? {
+                connect: {
+                  target: {
+                    kind: 'connect',
+                    address: 'native-isolation-stdio',
+                    token: credentials.alice,
+                    dial: async () => opened.channel
+                  }
+                }
+              }
+            : { listen: address, token: credentials.alice, verify: verifyCredentials })
         })
+      ],
+      report
+    })
+  }
+  /** Publish the original readiness marker only after genuine native installation finishes. */
+  async ready() {
+    await this.#opening
+    process.stderr.write(`ISOLATION_READY:${process.pid}\n`)
+  }
+  /** Close actual RPC work before releasing the original application Host. */
+  close = () => {
+    this.#closing ??= this.#release()
+    return this.#closing
+  }
+  /** Retain primary cleanup order and original Process aggregate error semantics. */
+  async #release() {
+    const errors = []
+    try {
+      await (await this.#opening).close()
+    } catch (error) {
+      errors.push(error)
     }
+    try {
+      await sharedTarget.host.dispose()
+    } catch (error) {
+      errors.push(error)
+    }
+    if (errors.length === 1) throw errors[0]
+    if (errors.length > 1) throw createProcessCleanupError(errors)
   }
 }
-
-/** Original recovery and target selectors are shared with retained advanced service consumers. */
-const fallback = createProcessInstanceFallback({
-  mode: options.instanceMode,
-  targetName: contract.plugin,
-  host,
-  createSharedTarget: options.createSharedTarget,
-  onInstanceUnhealthy: options.onInstanceUnhealthy,
-  report
-})
-/** Only a default governor is service-owned; the flood governor remains caller-owned. */
-const governor = resilience ?? createProcessResilience({ scheduler: systemScheduler, report })
-const service = await serveProcessSessions(
-  options.ingress,
-  endpointFactory,
-  serveSession,
-  governor,
-  report,
-  fallback,
-  systemScheduler,
-  resilience ? undefined : { release: () => governor.close() }
-)
-/** Fixed readiness output is the only startup receipt; no token or fabricated trace appears. */
-process.stderr.write(`ISOLATION_READY:${process.pid}\n`)
-/** Fixture shutdown closes production session and governor owners before its target Host. */
-process.on('SIGTERM', async () => {
-  await service.close()
-  await resilience?.close()
-  await host.dispose()
-  process.exit(0)
+/** One native fixture lifetime joins both explicit termination and physical stdio loss. */
+const service = new IsolationService()
+await service.ready()
+if (opened)
+  opened.channel.onClose(() => {
+    void service.close().then(
+      () => process.exit(0),
+      (error) => {
+        report(error)
+        process.exit(1)
+      }
+    )
+  })
+process.on('SIGTERM', () => {
+  void service.close().then(
+    () => process.exit(0),
+    (error) => {
+      report(error)
+      process.exit(1)
+    }
+  )
 })

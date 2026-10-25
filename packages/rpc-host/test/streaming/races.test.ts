@@ -7,9 +7,10 @@ import type {
   IRpcOutboundOperationsPort
 } from '../../dist/core/internal/plugin-shared-keys.js'
 import { RpcStreamOwner } from '../../dist/core/internal/stream/owner.js'
-import { RpcCoreErrorCode, RPC_CORE_ERROR_SOURCE } from '../../dist/core/errors.js'
-import { deserializeRpcError } from '../../dist/core/internal/error-wire-metadata.js'
-import { createRpcError } from '../../dist/core/errors.js'
+import { RPC_CORE_ERROR_SOURCE } from '@migaia/rpc-contract/errors'
+import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
+import { deserializeRpcError } from '../../dist/host/error-wire-metadata.js'
+import { createRpcError } from '../../dist/host/error-owner.js'
 import { attachErrorIdentity } from '@migaia/utils/error'
 
 /** Inspect a test frame after the contract normalizer has accepted it. */

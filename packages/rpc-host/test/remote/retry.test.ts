@@ -2,8 +2,9 @@ import { createManualScheduler } from '@migaia/utils/testing'
 import { describe, expect, it, vi } from 'vitest'
 import { createRemoteRetryPort } from '../../dist/remote/retry.js'
 import type { IRemoteGenerationEvents } from '../../dist/remote/types.js'
-import { RpcCoreErrorCode, RPC_CORE_ERROR_SOURCE } from '../../dist/core/errors.js'
-import { deserializeRpcError } from '../../dist/core/internal/error-wire-metadata.js'
+import { RPC_CORE_ERROR_SOURCE } from '@migaia/rpc-contract/errors'
+import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
+import { deserializeRpcError } from '../../dist/host/error-wire-metadata.js'
 
 /** A controllable generation owner keeps the retry tests independent of transport timing. */
 function generations() {

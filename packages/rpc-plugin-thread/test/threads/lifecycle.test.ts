@@ -3,10 +3,10 @@ import { createManualScheduler } from '@migaia/utils/testing'
 import { describe, expect, it, vi } from 'vitest'
 import { threadPlugin } from '@migaia/rpc-plugin-thread'
 import { deferred } from '@migaia/utils/promise'
-import { runtimeTestHost } from '../../../rpc-host/test/runtime-api/public-host.js'
+import { defineHost } from '@migaia/plugin-host'
 import {
-  createAdapterWebThreadLauncher as createWebThreadLauncher,
-  createAdapterWebThreadChannelFactory as createWebThreadChannelFactory
+  createWebThreadLauncher,
+  createWebThreadChannelFactory
 } from '../../dist/threads/web-launcher.js'
 
 /** Flush supervisor/remote promise ownership without running a second lifecycle scheduler. */
@@ -33,7 +33,7 @@ describe('thread lifecycle ownership', () => {
     }
     const launcher = createWebThreadLauncher({ Worker, report })
     const budget = createUnitBudget({ kind: 'thread', maxUnits: 1, scheduler })
-    const host = runtimeTestHost({
+    const host = defineHost({
       host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
     })
     const plugin = threadPlugin({
@@ -43,7 +43,7 @@ describe('thread lifecycle ownership', () => {
         launcher,
         budget,
         scheduler,
-        channelFactory: createWebThreadChannelFactory({ scheduler }),
+        channelFactory: createWebThreadChannelFactory({ scheduler, report }),
         report,
         health: { check: async () => undefined },
         supervisor: { isolation: 'best-effort', stop: { exitTimeoutMs: 5, reapTimeoutMs: 5 } }

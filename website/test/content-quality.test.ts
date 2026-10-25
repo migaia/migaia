@@ -451,9 +451,9 @@ test('reactive Effect guide covers imports, handle lifecycle, factory API, and p
 })
 
 test('RPC chunk feature quick start uses the host and actual transport plugins', () => {
-  const guide = findApiGuide('rpc-host', 'features/chunk', 'chunkFeature', 'zh')
+  const guide = findApiGuide('rpc-host', 'plugins/chunk', 'chunk', 'zh')
   assert.ok(guide?.quickStart)
-  assert.match(guide.quickStart, /chunkFeature/)
+  assert.match(guide.quickStart, /chunk\(/)
   assert.match(guide.quickStart, /createRpcHost/)
   assert.match(guide.quickStart, /plugins:/)
   assert.match(guide.quickStart, /\.request\(|\.stream\(/)
@@ -600,27 +600,42 @@ test('Logger custom plugin guide covers extension, Host use, async completion, a
 
 test('RPC chunk route keeps a complete feature installation and cleanup guide', () => {
   for (const locale of ['zh', 'en'] as const) {
-    const guide = findApiGuide('rpc-host', 'features/chunk', 'chunkFeature', locale)
+    const guide = findApiGuide('rpc-host', 'plugins/chunk', 'chunk', locale)
     assert.ok(guide?.quickStart)
     assert.match(guide.quickStart, /createRpcHost/)
-    assert.match(guide.quickStart, /chunkFeature\(\)/)
+    assert.match(
+      guide.quickStart,
+      /chunk\(\{ required: true, chunkBytes: 16384, maxMessageBytes: 1048576 \}\)/
+    )
     assert.match(guide.quickStart, /finally/)
     assert.match(guide.quickStart, /\.close\(\)/)
-    assert.equal(
-      guide.options.length,
-      0,
-      'the canonical chunk feature factory takes no old composition dependencies'
+    assert.deepEqual(
+      guide.options.map((option) => option.name),
+      [
+        'chunkBytes',
+        'maxMessageBytes',
+        'maxChunks',
+        'maxBufferedBytes',
+        'maxConcurrentMessages',
+        'assemblyTimeoutMs',
+        'now',
+        'schedule',
+        'cancel',
+        'namespaces',
+        'required'
+      ],
+      'the chunk plugin exposes its actual bounded assembly and negotiation options'
     )
   }
 })
 
 test('every RPC feature explains its real configuration, installation, and cleanup', () => {
   for (const [module, feature] of [
-    ['features/auth', 'authFeature'],
-    ['features/chunk', 'chunkFeature'],
-    ['features/retry', 'retryFeature'],
-    ['features/timeout', 'timeoutFeature'],
-    ['features/typegen', 'typegenFeature']
+    ['plugins/auth', 'auth'],
+    ['plugins/chunk', 'chunk'],
+    ['features/retry', 'retry'],
+    ['features/timeout', 'timeout'],
+    ['plugins/typegen', 'typegen']
   ] as const)
     for (const locale of ['zh', 'en'] as const) {
       const guide = findApiGuide('rpc-host', module, feature, locale)

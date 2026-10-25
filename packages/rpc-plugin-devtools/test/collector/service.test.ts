@@ -1,19 +1,25 @@
 import { describe, expect, it } from 'vitest'
-import type { IRpcHost } from '@migaia/rpc-host'
-import { connectedHosts } from '../../../rpc-host/test/host/fixture.js'
-import { RpcProbeStage } from '@migaia/rpc-host/probe'
-import { devtoolsPlugin, RpcDevtoolsErrorCode, RPC_DEVTOOLS_SOURCE } from '../../src/index.js'
+import { createRpcHost, type IRpcContext, type IRpcNamespace } from '@migaia/rpc-host'
+import { coreMemoryServer } from '../../../rpc-host/test/host/core-fixture.js'
+import { RpcProbeStage } from '@migaia/rpc-host/plugins/probe'
+import {
+  devtoolsPlugin,
+  RpcDevtoolsErrorCode,
+  RPC_DEVTOOLS_SOURCE
+} from '@migaia/rpc-plugin-devtools'
 import type { IRpcDevtoolsQuery, IRpcDevtoolsServiceApi } from '../../src/contract/service.js'
 import { CollectorFixture, collectorView } from './fixture.js'
 
 describe('collector query, watch and service', () => {
   it('serves query, stats, watch, lifecycle and recording through actual connected Hosts', async () => {
     /** Capture is local opt-in; the service remains metadata-only without exposeContent. */
-    const devtools = devtoolsPlugin({
+    const plugin = devtoolsPlugin({
       stages: ['message', 'encoded'],
       capture: ['encoded']
-    }).collector
-    /** Nested service contract is checked by the public typed Peer surface. */
+    })
+    /** The actual flow plugin and its serving provider share the caller-owned collector. */
+    const devtools = plugin.collector
+    /** Nested service contract is checked by the public typed namespace surface. */
     const service = devtools.service as IRpcDevtoolsServiceApi
     /** The real provider iterator signals registration without a timing or transport assumption. */
     let signalStarted!: () => void
@@ -23,28 +29,41 @@ describe('collector query, watch and service', () => {
     })
     /** Keep the original public service entry and return its exact native generator. */
     const originalWatch = service.watch
-    service.watch = (input) => {
-      /** The collector remains the only owner of this iterator and its queue. */
-      const iterator = originalWatch(input)
+    service.watch = (input, context?: IRpcContext) => {
+      /** Keep the real provider signal and exact iterator while observing its first pending pull. */
+      const entry = {
+        iterator: Reflect.apply(originalWatch, undefined, [input, context]) as ReturnType<
+          typeof originalWatch
+        >,
+        signalStarted
+      }
       /** Native async-generator next requires its original receiver when forwarded. */
-      const originalNext = iterator.next
-      iterator.next = (value?: unknown) => {
+      const originalNext = entry.iterator.next
+      entry.iterator.next = (value?: unknown) => {
         /** Reflect.apply preserves native receiver semantics and the exact returned Promise. */
-        const pending = Reflect.apply(originalNext, iterator, [value])
-        signalStarted()
+        const pending = Reflect.apply(originalNext, entry.iterator, [value])
+        entry.signalStarted()
         return pending
       }
-      return iterator
+      return entry.iterator
     }
-    /** The service is exercised on its real serving Peer without depending on observation points. */
-    const servingSide = { provide: { devtools: service }, probe: devtools }
-    /** The existing test fixture owns both real memory bindings and public Hosts. */
-    const pair = await connectedHosts<
-      unknown,
-      Record<string, { devtools: IRpcDevtoolsServiceApi }>
-    >({ a: { provide: {} }, b: servingSide })
+    /** The existing listener and MemoryCarrier pair own both actual native connections. */
+    const server = coreMemoryServer('service-caller')
+    /** The requesting host holds no collector and introduces no test RPC facade. */
+    const a = await createRpcHost<Record<string, { devtools: IRpcDevtoolsServiceApi }>>(
+      server.options
+    )
+    /** The actual serving host installs the same collector through its genuine flow plugin. */
+    const connected = await server.connect('service-provider', {
+      provide: { devtools: service },
+      plugins: [plugin]
+    })
+    /** Cleanup retains only the two genuine public host owners. */
+    const pair = { a, b: connected.host }
+    /** Static declaration narrows the original public namespace; no runtime method is replaced. */
+    const namespace = pair.a.memory
     /** The direct capability projection addresses the one actual serving Host. */
-    const remote = pair.a.peers[pair.b.self.instanceId]!.devtools
+    const remote = namespace.peers[pair.b.self.name]!.devtools
     try {
       /** The first remote call activates the service; Core contract alone supplies no observations. */
       const remoteDescription = await remote.describe()
@@ -77,7 +96,7 @@ describe('collector query, watch and service', () => {
       for (const event of (await remote.query()).events) expect(event).not.toHaveProperty('content')
 
       /** Automatic providers support all modes; select the public stream operation explicitly. */
-      const watch = (pair.a.stream as IRpcHost['stream'])('devtools.watch', {
+      const watch = (pair.a.memory.stream as IRpcNamespace['stream'])('devtools.watch', {
         methods: [CollectorFixture.method]
       })
       if (!('next' in watch)) expect.fail('The single connected service must return one iterator')
@@ -111,20 +130,30 @@ describe('collector query, watch and service', () => {
     }
   })
 
-  it('does not ingest events from the actual serving endpoint when installed on its service Peer', async () => {
-    /** Installing this collector on its serving Peer must exclude that endpoint's traffic. */
-    const devtools = devtoolsPlugin().collector
+  it('does not ingest events from the actual serving endpoint when installed on its service Host', async () => {
+    /** Installing this collector on its serving Host must exclude that endpoint's traffic. */
+    const plugin = devtoolsPlugin()
+    /** The serving plugin lends its real collector without replacing the observation boundary. */
+    const devtools = plugin.collector
     /** The frozen service contract attaches through the original nested provider entry. */
     const service = devtools.service as IRpcDevtoolsServiceApi
-    /** Real Peer identity supplies the observed endpoint; the method name is no identity substitute. */
-    const servingSide = { provide: { devtools: service }, probe: devtools }
-    /** Memory Peers establish an actual provider call before its endpoint events are hand-filled. */
-    const pair = await connectedHosts<
-      unknown,
-      Record<string, { devtools: IRpcDevtoolsServiceApi }>
-    >({ a: { provide: {} }, b: servingSide })
+    /** The existing listener lends real peer identity rather than guessing from the method. */
+    const server = coreMemoryServer('excluded-service-caller')
+    /** This actual client has no collector to contaminate service endpoint exclusion. */
+    const a = await createRpcHost<Record<string, { devtools: IRpcDevtoolsServiceApi }>>(
+      server.options
+    )
+    /** The original service and plugin share the one caller-owned collector on the real provider. */
+    const connected = await server.connect('excluded-service-provider', {
+      provide: { devtools: service },
+      plugins: [plugin]
+    })
+    /** Cleanup retains only the two genuine public host owners. */
+    const pair = { a, b: connected.host }
+    /** Static service types refine the original namespace without introducing a runtime adapter. */
+    const namespace = pair.a.memory
     /** Address the exact service Host rather than the broadcast scalar/fanout union. */
-    const remote = pair.a.peers[pair.b.self.instanceId]!.devtools
+    const remote = namespace.peers[pair.b.self.name]!.devtools
     try {
       await remote.describe()
       /** Hand-filled views avoid a dependency on the separate probe-core observation leaf. */

@@ -584,6 +584,65 @@ function sanitizeData(
   return { value, bytes: 0, replaced: false }
 }
 
+/** Keep the original array/key/atomic-leaf order and return its scalar subtotal directly. */
+function countErrorDataValue(
+  value: IErrorChainData,
+  path: string,
+  pointer: string,
+  countText: (text: string, pointer: string) => number,
+  maxBytes: number,
+  invalid: (pointer: string) => never,
+  dataTextLeaf: IErrorChainStrategy['dataTextLeaf'],
+  bytes: number
+): number {
+  if (typeof value === 'string') bytes += countText(value, path)
+  else if (Array.isArray(value)) {
+    for (let index = 0; index < value.length; index++)
+      bytes = countErrorDataValue(
+        value[index]!,
+        `${path}/${index}`,
+        pointer,
+        countText,
+        maxBytes,
+        invalid,
+        dataTextLeaf,
+        bytes
+      )
+  } else if (value !== null && typeof value === 'object') {
+    /** Boundary-owned atomic text representations retain their original charging rule. */
+    const leaf = dataTextLeaf?.(value as Readonly<Record<string, IErrorChainData>>)
+    if (leaf) bytes += countText(leaf.text, `${path}/${escapePointer(leaf.key)}`)
+    else
+      for (const [key, item] of Object.entries(value)) {
+        bytes += countText(key, `${path}/${escapePointer(key)}`)
+        bytes = countErrorDataValue(
+          item,
+          `${path}/${escapePointer(key)}`,
+          pointer,
+          countText,
+          maxBytes,
+          invalid,
+          dataTextLeaf,
+          bytes
+        )
+      }
+  }
+  if (bytes > maxBytes) invalid(pointer)
+  return bytes
+}
+
+/** Count portable diagnostic text once using the caller's unchanged scalar and overflow policies. */
+export function countErrorDataText(
+  value: IErrorChainData,
+  pointer: string,
+  countText: (text: string, pointer: string) => number,
+  maxBytes: number,
+  invalid: (pointer: string) => never,
+  dataTextLeaf?: IErrorChainStrategy['dataTextLeaf']
+): number {
+  return countErrorDataValue(value, pointer, pointer, countText, maxBytes, invalid, dataTextLeaf, 0)
+}
+
 /** Read array length and entries once while reporting trapped reads at their owner. */
 function appendChildren(
   input: unknown,
@@ -720,41 +779,16 @@ class ErrorChainNormalizer {
 
   /** Count normalized portable text with one explicit subtotal for this data field. */
   #countData(data: IErrorChainData, pointer: string): void {
-    /** A single field has its own byte ceiling before debiting the shared error-tree budget. */
-    const subtotal = { bytes: 0 }
-    this.#countDataValue(data, pointer, pointer, subtotal)
-    this.#budget.bytes += subtotal.bytes
+    this.#budget.bytes += countErrorDataText(
+      data,
+      pointer,
+      (text, path) => this.#countText(text, path, false),
+      this.#limits.maxStringBytes,
+      (path) => this.#invalid(path, ErrorChainViolation.dataBytes),
+      this.#strategy.dataTextLeaf
+    )
     if (this.#budget.bytes > this.#limits.maxBytes)
       this.#invalid(pointer, ErrorChainViolation.totalBytes)
-  }
-
-  /** Visit plain data, with atomic text representations selected only by the boundary strategy. */
-  #countDataValue(
-    child: IErrorChainData,
-    path: string,
-    pointer: string,
-    subtotal: { bytes: number }
-  ): void {
-    if (typeof child === 'string') {
-      subtotal.bytes += this.#countText(child, path, false)
-    } else if (Array.isArray(child)) {
-      child.forEach((item, index) =>
-        this.#countDataValue(item, `${path}/${index}`, pointer, subtotal)
-      )
-    } else if (child !== null && typeof child === 'object') {
-      /** Protocol-owned atomic representations contribute only their selected text unit. */
-      const leaf = this.#strategy.dataTextLeaf?.(child as Readonly<Record<string, IErrorChainData>>)
-      if (leaf) {
-        subtotal.bytes += this.#countText(leaf.text, `${path}/${escapePointer(leaf.key)}`, false)
-      } else {
-        for (const [key, item] of Object.entries(child)) {
-          subtotal.bytes += this.#countText(key, `${path}/${escapePointer(key)}`, false)
-          this.#countDataValue(item, `${path}/${escapePointer(key)}`, pointer, subtotal)
-        }
-      }
-    }
-    if (subtotal.bytes > this.#limits.maxStringBytes)
-      this.#invalid(pointer, ErrorChainViolation.dataBytes)
   }
 
   /** Read and validate one node's own fields once before decoding any descendants. */

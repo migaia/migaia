@@ -1,3 +1,7 @@
+/**
+ * Selects the native Node/Bun or Deno discovery and stdio resource module lazily. Platform modules
+ * provide real IO and final exit without constructing a Session or Peer.
+ */
 import { detectServerRuntime } from '@migaia/utils'
 import type { IProcessByteChannel } from './types.js'
 
@@ -5,6 +9,8 @@ import type { IProcessByteChannel } from './types.js'
 export type IAdapterProcessRuntimeIO = Readonly<{
   /** Read native child discovery without opening streams or granting authentication. */
   discover(): Readonly<{ marker: string | undefined; runtime: string }>
+  /** Native parent-loss guard delegates its final process exit to this actual runtime. */
+  exit(code: 0 | 1): void
   /** Acquire the actual child I/O and optional already-read bootstrap for Core's one handoff. */
   open(): Promise<Readonly<{ channel: IProcessByteChannel; bootstrap?: Uint8Array }>>
 }>

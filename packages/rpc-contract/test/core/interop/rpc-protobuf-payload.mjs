@@ -1,4 +1,4 @@
-import { RpcContractErrorCode } from '@migaia/rpc-contract'
+import { RpcContractErrorCode } from '@migaia/rpc-contract/error-code'
 import { RPC_CONTRACT_SOURCE, RpcContractErrorText } from '../../../dist/contract/error-text.js'
 
 /**

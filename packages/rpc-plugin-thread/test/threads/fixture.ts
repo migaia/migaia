@@ -4,18 +4,40 @@ import { resolve } from 'node:path'
 import { vi } from 'vitest'
 import type { IThreadHandle } from '@migaia/supervision/threads'
 import { fileURLToPath } from 'node:url'
-import { runtimeTestHost } from '../../../rpc-host/test/runtime-api/public-host.js'
+import { defineHost } from '@migaia/plugin-host'
+import type { IRpcCallOptions } from '@migaia/rpc-host'
+import type { IRpcNativeMemberControls } from '@migaia/rpc-host/sdk'
+import type { IRpcCarrier } from '@migaia/rpc-contract/interfaces'
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
 
-import type { IRemoteContract } from '@migaia/rpc-host/plugin'
+import type { IRpcProviderDeclaration } from '@migaia/rpc-contract/protocol'
 
 import {
   createNodeThreadLauncher,
   createNodeThreadChannelFactory
-} from '../../src/threads/adapters/node.js'
+} from '../../src/threads/node-launcher.js'
 
-import type { IRuntimeThreadSpawn } from '../../src/threads/runtime-peer.js'
+import type { IThreadSpawn } from '../../src/threads/source.js'
+
+/** The genuine native Host contributes one actual thread namespace after installation. */
+export type INativeFixtureHost = ReturnType<typeof defineHost> &
+  Readonly<{
+    thread: Readonly<{
+      members: IRpcNativeMemberControls<'thread'>
+      send(
+        name: string,
+        method: string,
+        payload?: unknown,
+        options?: IRpcCallOptions
+      ): Promise<unknown>
+      stream(
+        method: string,
+        payload?: unknown,
+        options?: IRpcCallOptions
+      ): AsyncIterableIterator<unknown>
+    }>
+  }>
 
 import { threadRuntimeResource } from '../../dist/threads/runtime-resource.js'
 import { threadRuntimeResource as sourceThreadRuntimeResource } from '../../src/threads/runtime-resource.js'
@@ -83,7 +105,7 @@ export const workerEntry = resolve(
   'fixtures/rpc-worker.mjs'
 )
 /** Portable request and stream declarations are shared through workerData. */
-export const contract: IRemoteContract = {
+export const contract: IRpcProviderDeclaration = {
   schemaVersion: 1,
   plugin: 'p',
   features: {
@@ -101,14 +123,14 @@ export const contract: IRemoteContract = {
 }
 /** Portable proxy signatures stay explicit because contract Feature names are runtime data. */
 export type IFixtureFeature = {
-  read(params: unknown[], options?: { timeoutMs?: number; signal?: AbortSignal }): Promise<unknown>
-  write(params: unknown[], options?: { timeoutMs?: number }): Promise<unknown>
-  hold(params: unknown[], options?: { timeoutMs?: number; signal?: AbortSignal }): Promise<unknown>
+  read(params: unknown[], options?: IRpcCallOptions): Promise<unknown>
+  write(params: unknown[], options?: IRpcCallOptions): Promise<unknown>
+  hold(params: unknown[], options?: IRpcCallOptions): Promise<unknown>
   bad(params: unknown[]): Promise<unknown>
-  stream(params: unknown[], options?: { timeoutMs?: number }): AsyncIterableIterator<unknown>
+  stream(params: unknown[], options?: IRpcCallOptions): AsyncIterableIterator<unknown>
 }
 /** Native fixture overrides use the exact supported production spawn recipe. */
-export type IFixtureOptions = IRuntimeThreadSpawn<IThreadHandle>
+export type IFixtureOptions = IThreadSpawn<IThreadHandle>
 
 /** Record native generations and outbound frames without adding a retry or lifecycle policy. */
 /** Allocate only this case's original observations before installing native-shaped callbacks. */
@@ -116,9 +138,9 @@ function nativeThreadFixtureState(
   overrides: Partial<IFixtureOptions> = {},
   data: Record<string, unknown> = {}
 ) {
-  const host = runtimeTestHost({
+  const host = defineHost({
     host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
-  })
+  }) as INativeFixtureHost
   const budget = createUnitBudget({
     kind: 'thread',
     maxUnits: 1,
@@ -129,7 +151,7 @@ function nativeThreadFixtureState(
   const frames: { generation: number; message: any; transfer: unknown }[] = []
   const reported: unknown[] = []
   let generation = 0
-  const channels: import('@migaia/rpc-host/plugin').IRemoteChannel[] = []
+  const channels: IRpcCarrier[] = []
   const factory = createNodeThreadChannelFactory({
     scheduler: overrides.scheduler ?? systemScheduler
   })
@@ -190,7 +212,7 @@ class NativeThreadFixture {
         return handle
       }
     }
-    const { keyFactory, retryPort, ...sourceOverrides } = this.#state.overrides
+    const sourceOverrides = this.#state.overrides
     const spawn = {
       spec: { entry: workerEntry },
       launcher,
@@ -203,11 +225,8 @@ class NativeThreadFixture {
     }
     const pluginOptions = {
       name: 'p',
-      self: { name: 'parent', instanceId: 'client' },
       spawn,
-      report: (error: unknown) => this.#state.reported.push(error),
-      ...(keyFactory === undefined ? {} : { keyFactory }),
-      ...(retryPort === undefined ? {} : { retryPort })
+      report: (error: unknown) => this.#state.reported.push(error)
     }
     const plugin = threadPlugin(pluginOptions)
     this.value = {
@@ -228,15 +247,15 @@ class NativeThreadFixture {
         const outlet = this.#state.host.thread!
         return {
           /** Read sends the fixture business value through the new folded method name. */
-          read: (params, options) => outlet.request('p', 'p.read', params[0], options),
+          read: (params, options) => outlet.send('p', 'p.read', params[0], options),
           /** Non-idempotent writes retain the original managed retry classification. */
-          write: (params, options) => outlet.request('p', 'p.write', params[0], options),
+          write: (params, options) => outlet.send('p', 'p.write', params[0], options),
           /** A held provider exposes cancellation and total wall-cap behavior at the original owner. */
-          hold: (params, options) => outlet.request('p', 'p.hold', params[0], options),
+          hold: (params, options) => outlet.send('p', 'p.hold', params[0], options),
           /** Invalid business results still cross the real provider and serialization boundary. */
-          bad: (params) => outlet.request('p', 'p.bad', params[0]),
+          bad: (params) => outlet.send('p', 'p.bad', params[0]),
           /** The helper preserves the canonical consumer iterator, including return and failure. */
-          stream: (params, options) => outlet.stream('p', 'p.stream', params[0], options)
+          stream: (params, options) => outlet.stream('p.stream', params[0], options)
         } satisfies IFixtureFeature
       },
       close: async () => {

@@ -1,5 +1,5 @@
 import { deferred } from '@migaia/utils/promise'
-import { serializeRpcError } from '@migaia/rpc-host/plugin'
+import { serializeRpcWireError } from '@migaia/rpc-contract/protocol'
 import { createRpcHost } from '@migaia/rpc-host'
 import { processPlugin } from '@migaia/rpc-plugin-process'
 
@@ -21,11 +21,15 @@ const configuration =
         }
       }
     : { connect: { target: target!, timeoutMs: 500 }, token }
-let host: Awaited<ReturnType<typeof createRpcHost>> | undefined
+/** The same native recipe preserves its actual process namespace in the fixture's host type. */
+const transport = processPlugin(configuration)
+let host:
+  | Awaited<ReturnType<typeof createRpcHost<unknown, readonly [typeof transport]>>>
+  | undefined
 try {
   host = await createRpcHost({
     self: { name: name!, instanceId: `${name}-${process.pid}` },
-    plugins: [processPlugin(configuration)],
+    plugins: [transport],
     provide: {
       echo: (value: unknown) => value,
       pid: () => process.pid,
@@ -50,7 +54,7 @@ try {
       /** The command drives the actual host stream; IPC carries only its observed result. */
       if (command.operation === 'stream') {
         const values: unknown[] = []
-        for await (const item of host!.stream(
+        for await (const item of host!.process.stream(
           command.method!,
           command.payload
         ) as AsyncIterable<unknown>)
@@ -68,13 +72,13 @@ try {
           ? { verified }
           : command.operation === 'close'
             ? await host!.close()
-            : await host!.request(command.method!, command.payload)
+            : await host!.process.request(command.method!, command.payload)
       process.send?.({ id: command.id, result })
       if (command.operation === 'close') process.disconnect()
     } catch (error) {
       process.send?.({
         id: command.id,
-        error: serializeRpcError(error, { report: (failure) => console.error(failure.error) })
+        error: serializeRpcWireError(error, { report: (failure) => console.error(failure.error) })
       })
     }
   })
@@ -84,7 +88,7 @@ try {
 } catch (error) {
   process.send?.({
     event: 'failed',
-    error: serializeRpcError(error, { report: (failure) => console.error(failure.error) })
+    error: serializeRpcWireError(error, { report: (failure) => console.error(failure.error) })
   })
   process.disconnect?.()
   process.exitCode = 1

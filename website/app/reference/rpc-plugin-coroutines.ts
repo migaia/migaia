@@ -1,20 +1,31 @@
-/**
- * Bilingual public reference for @migaia/rpc-plugin-coroutines; native and call ownership follow
- * the actual package API.
- */
-import { rpcPluginOptionDocs } from './rpc-runtime-shared.js'
+/** Bilingual public reference for the current coroutines transport and feature ownership. */
 import type { ILibraryReference } from './contract.js'
 
-/** Authored public modules, symbols, configuration and ownership contracts. */
+/** Concrete public package example with actual namespace and resource ownership. */
+const example1 =
+  "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'\n\nasync function untilStopped(signal: AbortSignal): Promise<void> {\n  let complete!: () => void\n  const stopped = new Promise<void>((resolve) => {\n    complete = resolve\n  })\n  signal.addEventListener('abort', complete, { once: true })\n  if (signal.aborted) complete()\n  try {\n    await stopped\n  } finally {\n    signal.removeEventListener('abort', complete)\n  }\n}\n\nconst task: ICoroutineUserTask = async ({ connect, signal, heartbeat }) => {\n  const child = await createRpcHost({\n    plugins: [coroutinePlugin({ connectToParent: connect })],\n    provide: { double: (value: number) => value * 2 }\n  })\n  heartbeat()\n  try {\n    await untilStopped(signal)\n  } finally {\n    await child.close()\n  }\n}\n\ntype IWorkerApi = { double(value: number): number }\nconst plugins = [coroutinePlugin({ spawn: task })] as const\nconst parent = await createRpcHost<IWorkerApi, typeof plugins>({ plugins })\ntry {\n  console.log(await parent.coroutine.request('double', 21))\n} finally {\n  await parent.close()\n}"
+
+/** Public configuration example for this native capability. */
+const taskScopeExample =
+  "import { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'\n\nexport function renderer(task: ICoroutineUserTask) {\n  return coroutinePlugin({ spawn: task, namespace: 'jobs', name: 'renderer' })\n}"
+
+/** Public configuration example for this native capability. */
+const taskExposureExample =
+  "import { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'\n\nexport function exposeMath(task: ICoroutineUserTask) {\n  return coroutinePlugin({ spawn: task, expose: ['math.double'] })\n}"
+
+/** Public configuration example for this native capability. */
+const taskReportExample =
+  "import { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'\n\nexport function monitoredTask(task: ICoroutineUserTask) {\n  return coroutinePlugin({\n    spawn: task,\n    report(error) {\n      console.error('Cooperative task failure', error)\n    }\n  })\n}"
+
+/** Current public modules, configuration and installed capabilities. */
 export const rpcCoroutinesReference: ILibraryReference = {
   modules: {
     index: {
       summary: {
-        en: 'Run a cooperative task on real MessageChannel; original supervision owns generations, budget, stop and replacement. Same-loop tasks provide no process or Worker isolation and cannot preempt synchronous blocking. Parent uses spawn: task; child receives the exact opaque context.connect, never true.',
-        zh: '经真实消息通道运行协作任务，原监督器拥有代次、预算、停止和替换。同事件循环任务不提供进程或线程隔离，不能抢占同步阻塞。父端提供任务函数，子端接收上下文的精确不透明连接句柄，不能使用真值。'
+        en: 'Contract owns pure protocol, interfaces and errors. Host owns Sessions, calls and providers; this package owns cooperative tasks using real MessageChannels. Flow plugins use fixed hooks, and complete features own optional policy. Call through the transport namespace. Separate Hosts are usual; deliberate multi-transport installation uses distinct namespaces.',
+        zh: '契约包拥有纯协议、接口及错误；宿主拥有会话、调用及提供方，本包拥有使用真实消息通道的协作任务。流程插件使用固定钩子，完整功能拥有可选策略。通过传输命名空间调用；通常使用独立宿主，也可用不同命名空间明确隔离多传输安装。'
       },
-      example:
-        "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst parent = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      connect: { timeoutMs: 1500 },\n      spawn: async ({ connect, signal, heartbeat }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        heartbeat()\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    })\n  ]\n})\ntry {\n  console.log(await parent.request('double', 21))\n} finally {\n  await parent.close()\n}"
+      example: example1
     }
   },
   symbols: {
@@ -26,20 +37,18 @@ export const rpcCoroutinesReference: ILibraryReference = {
       },
       options: 'ICoroutinePluginOptions',
       returns: {
-        en: 'Registered cold transport definition for createRpcHost or ordinary PluginHost. Preserve exact object identity.',
-        zh: '返回供统一宿主或普通插件宿主安装的冷传输定义，须保留精确对象身份。'
+        en: 'Cold SDK transport definition. Installation publishes host.coroutine calls and actual native extensions; construction alone acquires no resource.',
+        zh: '返回冷 SDK 传输定义；安装后发布对应命名空间调用及实际原生扩展，仅构造定义不会获取资源。'
       },
-      example:
-        "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst parent = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      connect: { timeoutMs: 1500 },\n      spawn: async ({ connect, signal, heartbeat }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        heartbeat()\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    })\n  ]\n})\ntry {\n  console.log(await parent.request('double', 21))\n} finally {\n  await parent.close()\n}"
+      example: example1
     },
     RPC_COROUTINE_ERROR_SOURCE: {
       role: 'error',
       purpose: {
-        en: 'Stable rpc.transport.coroutine source admission domain; business and supervision errors keep their original owners.',
-        zh: '稳定的协程传输来源准入领域，业务及监督错误保留原所有者。'
+        en: 'Stable rpc.transport.coroutine source declared by @migaia/rpc-contract/error-code and re-exported here. Other RPC/native families retain their own source and code.',
+        zh: '由契约包错误码入口声明并在此重导出的稳定来源 rpc.transport.coroutine；其他远程调用及原生家族保留自身来源与错误码。'
       },
-      example:
-        "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst parent = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      connect: { timeoutMs: 1500 },\n      spawn: async ({ connect, signal, heartbeat }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        heartbeat()\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    })\n  ]\n})\ntry {\n  console.log(await parent.request('double', 21))\n} finally {\n  await parent.close()\n}"
+      example: example1
     },
     RpcCoroutineErrorCode: {
       role: 'error',
@@ -47,8 +56,7 @@ export const rpcCoroutinesReference: ILibraryReference = {
         en: 'Registered source admission failure attached to native TypeError without replacing the original instance.',
         zh: '附加到原生类型错误的来源准入失败，不替换原实例。'
       },
-      example:
-        "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst parent = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      connect: { timeoutMs: 1500 },\n      spawn: async ({ connect, signal, heartbeat }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        heartbeat()\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    })\n  ]\n})\ntry {\n  console.log(await parent.request('double', 21))\n} finally {\n  await parent.close()\n}"
+      example: example1
     }
   },
   types: {
@@ -57,120 +65,77 @@ export const rpcCoroutinesReference: ILibraryReference = {
         en: 'Exactly one task spawn or genuine parent handle plus cold installation configuration.',
         zh: '一个任务启动或真实父端句柄，加上冷安装配置。'
       },
-      example:
-        "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst parent = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      connect: { timeoutMs: 1500 },\n      spawn: async ({ connect, signal, heartbeat }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        heartbeat()\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    })\n  ]\n})\ntry {\n  console.log(await parent.request('double', 21))\n} finally {\n  await parent.close()\n}",
+      example: example1,
       members: {
-        'connect.timeoutMs': {
+        name: {
           summary: {
-            en: 'Finite positive identity/capability handshake budget shared by the original identity and ACK phases, independent of task and call deadlines.',
-            zh: '有限正数的身份及能力握手预算，由原身份与确认阶段共用，与任务及调用期限分开。'
+            en: 'Local native registration name, separate from accepted remote identity.',
+            zh: '本地原生登记名称，与已接纳的远端身份分开。'
           },
           default: {
-            en: 'Omitted: use the original source/default handshake budget.',
-            zh: '省略时使用原来源或默认握手预算。'
-          }
+            en: 'Omitted: the native registration default.',
+            zh: '省略时使用原生登记默认名称。'
+          },
+          example: taskScopeExample
         },
-        self: {
+        namespace: {
           summary: {
-            en: 'Application-owned local name and instanceId for ordinary Host installation; publish only the safe identity fields. Explicit createRpcHost identity takes precedence.',
-            zh: '应用为普通宿主安装提供的本端名称与实例标识，仅发布安全身份字段；显式 createRpcHost 身份优先。'
+            en: 'Unique Host property exposing this transport calls and extensions.',
+            zh: '宿主发布此传输调用及扩展的唯一属性名。'
           },
           default: {
-            en: 'Omitted: retain the canonical Host identity and generated instanceId.',
-            zh: '省略时保留规范宿主身份及生成的实例标识。'
-          }
+            en: 'Omitted: the factory namespace.',
+            zh: '省略时使用工厂默认命名空间。'
+          },
+          example: taskScopeExample
         },
-        provide: {
+        expose: {
           summary: {
-            en: 'Local methods, descriptors or permitted forwarding entries compiled by the existing provider owner. Explicit createRpcHost providers remain its input.',
-            zh: '由既有提供方所有者编译的本端方法、描述符或获准转发条目；显式 createRpcHost 提供方仍作为宿主输入。'
+            en: 'Feature output paths selected on an ordinary PluginHost; createRpcHost uses its own provide catalog.',
+            zh: '普通插件宿主选取的功能输出路径；远程调用宿主使用自身提供方目录。'
           },
           default: {
-            en: 'Omitted: add no application methods through this plugin option.',
-            zh: '省略时不经此插件选项添加应用方法。'
-          }
-        },
-        providerLimits: {
-          summary: {
-            en: 'Original provider admission limits for ordinary Host installation; they do not add another registry or transport queue.',
-            zh: '普通宿主安装沿用的原提供方接纳限制，不增加另一登记表或传输队列。'
+            en: 'Omitted: no ordinary Feature output selected.',
+            zh: '省略时不选取普通功能输出。'
           },
-          default: {
-            en: 'Omitted: retain the existing provider owner defaults.',
-            zh: '省略时保留既有提供方默认值。'
-          }
-        },
-        authentication: {
-          summary: {
-            en: 'Original sign/verify/encrypt configuration used by ordinary Host installation. It protects the accepted connection without granting process or Worker isolation.',
-            zh: '普通宿主安装使用的原签名、校验及加密配置，保护已接受连接，不授予进程或工作程序隔离。'
-          },
-          default: {
-            en: 'Omitted: add no authentication configuration through this option.',
-            zh: '省略时不经此选项添加认证配置。'
-          }
-        },
-        probe: {
-          summary: {
-            en: 'One observer or an array of observers forwarded to the same canonical endpoint observation owner.',
-            zh: '转交同一规范端点观察所有者的单个观察器或观察器数组。'
-          },
-          default: {
-            en: 'Omitted: install no additional probe from this option.',
-            zh: '省略时不经此选项安装额外观察器。'
-          }
-        },
-        defaultTimeoutMs: {
-          summary: {
-            en: 'Default request and stream deadline for ordinary Host installation; it is independent of handshake and cooperative task stop budgets.',
-            zh: '普通宿主安装的默认请求及流期限，与握手和协作任务停止预算分开。'
-          },
-          default: {
-            en: 'Omitted: retain the original runtime call default.',
-            zh: '省略时保留原运行时调用默认值。'
-          }
-        },
-        contract: {
-          summary: {
-            en: 'Local remote-method declaration consumed by the existing method compiler, including schemas, call modes and idempotency.',
-            zh: '交由既有方法编译器消费的对端方法本地声明，包含结构、调用模式及幂等性。'
-          },
-          default: {
-            en: 'Omitted: retain the original declaration inference.',
-            zh: '省略时保留原声明推导。'
-          }
+          example: taskExposureExample
         },
         report: {
           summary: {
-            en: 'Application error sink for background task, binding and installation failures; existing reporting keeps original error identity and cause chains.',
-            zh: '接收后台任务、绑定及安装失败的应用错误接收器，既有报告保留原错误身份及原因链。'
+            en: 'Receives native background and cleanup failures; operation rejections retain original causes.',
+            zh: '接收原生后台及清理失败；操作拒绝保留原始原因。'
           },
           default: {
-            en: 'Omitted: borrow the Host effective reporter.',
-            zh: '省略时借用宿主的有效报告器。'
-          }
+            en: 'Omitted: configured Host reporter, then effective default.',
+            zh: '省略时使用宿主显式报告器，再使用有效默认报告器。'
+          },
+          params: {
+            error: {
+              en: 'Original background or cleanup failure supplied by the native owner; preserve the error and its cause when sending it to monitoring.',
+              zh: '原生所有者提供的原始后台或清理失败；交给监控时应保留错误对象及其原因链。'
+            }
+          },
+          returns: {
+            en: 'No return value is required. The callback reports the failure; it does not settle an application request or own native cleanup.',
+            zh: '无需返回值；回调负责报告失败，不结算应用请求，也不取得原生清理所有权。'
+          },
+          whenToUse: {
+            en: 'Set an application monitoring sink when cooperative task background and cleanup failures must join your existing incident reports. Omit it to inherit the configured Host reporter.',
+            zh: '需要将原生后台及清理失败汇入应用现有告警时配置；省略则继承宿主显式报告器。'
+          },
+          example: taskReportExample
         },
-        keyFactory: {
+        features: {
           summary: {
-            en: 'Generate idempotency keys through the original managed task proxy. Parent-handle direct connections do not acquire a second retry owner.',
-            zh: '经原托管任务代理生成幂等键；父端句柄直连不会获取第二个重试所有者。'
+            en: 'Complete call and supported native feature definitions scoped to this transport. Per-call timeout and retry take instances or false.',
+            zh: '此传输作用域的完整调用及受支持原生功能定义；逐次调用的超时和重试使用完整实例或关闭值。'
           },
           default: {
-            en: 'Omitted: use the original managed proxy key factory.',
-            zh: '省略时使用原托管代理的幂等键工厂。'
-          }
-        },
-        retryPort: {
-          summary: {
-            en: 'Dispatch whole invocations through the original managed task proxy retry port, preserving its generation and cancellation ownership.',
-            zh: '经原托管任务代理的重试端口分派完整调用，保留其代次及取消归属。'
+            en: 'Omitted: no optional policy installed by this field.',
+            zh: '省略时不通过此字段安装可选策略。'
           },
-          default: {
-            en: 'Omitted: use the existing managed retry port.',
-            zh: '省略时使用既有托管重试端口。'
-          }
+          example: example1
         },
-
         spawn: {
           summary: {
             en: 'Actual task function. Returning settles its generation and closes native ports.',
@@ -180,8 +145,7 @@ export const rpcCoroutinesReference: ILibraryReference = {
             en: 'Absent in child mode.',
             zh: '子端模式不提供。'
           },
-          example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'\n\nexport const task: ICoroutineUserTask = async ({ connect, signal }) => {\n  const child = await createRpcHost({\n    plugins: [coroutinePlugin({ connectToParent: connect })],\n    provide: { echo: (value: string) => value }\n  })\n  try {\n    if (!signal.aborted)\n      await new Promise<void>((resolve) => {\n        signal.addEventListener('abort', () => resolve(), { once: true })\n      })\n  } finally {\n    await child.close()\n  }\n}"
+          example: example1
         },
         connectToParent: {
           summary: {
@@ -192,8 +156,7 @@ export const rpcCoroutinesReference: ILibraryReference = {
             en: 'Absent in spawn mode.',
             zh: '启动模式不提供。'
           },
-          example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst parent = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      connect: { timeoutMs: 1500 },\n      spawn: async ({ connect, signal, heartbeat }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        heartbeat()\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    })\n  ]\n})\ntry {\n  console.log(await parent.request('double', 21))\n} finally {\n  await parent.close()\n}"
+          example: example1
         },
         supervisor: {
           summary: {
@@ -204,34 +167,7 @@ export const rpcCoroutinesReference: ILibraryReference = {
             en: 'Omitted: original supervisor defaults.',
             zh: '省略时使用原监督默认。'
           },
-          example:
-            "import { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'\nimport { retryFeature, timeoutFeature } from '@migaia/rpc-host/features'\n\nexport function taskPlugins(task: ICoroutineUserTask) {\n  return [\n    coroutinePlugin({ spawn: task, supervisor: { startupTimeoutMs: 1500 } }),\n    retryFeature(),\n    timeoutFeature({ ms: 1000 })\n  ]\n}"
-        },
-        connect: {
-          summary: {
-            en: 'Original identity/capability handshake budget, separate from task stop and call timeouts.',
-            zh: '原身份及能力握手预算，与任务停止及调用期限分开。'
-          },
-          default: {
-            en: 'Omitted: original source/default budget.',
-            zh: '省略时使用原来源或默认预算。'
-          },
-          example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst parent = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      connect: { timeoutMs: 1500 },\n      spawn: async ({ connect, signal, heartbeat }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        heartbeat()\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    })\n  ]\n})\ntry {\n  console.log(await parent.request('double', 21))\n} finally {\n  await parent.close()\n}"
-        },
-        name: {
-          ...rpcPluginOptionDocs.name,
-          default: {
-            en: 'Omitted: coroutine registration name.',
-            zh: '省略时使用协程登记名。'
-          }
-        },
-        expose: {
-          ...rpcPluginOptionDocs.expose,
-          default: {
-            en: 'Omitted: original exposure policy.',
-            zh: '省略时使用原公开策略。'
-          }
+          example: example1
         }
       }
     },
@@ -240,8 +176,7 @@ export const rpcCoroutinesReference: ILibraryReference = {
         en: 'Generation-local opaque authority issued only by the original task registry. Physical ports and reporter ownership remain hidden.',
         zh: '仅由原任务登记签发的代内不透明权限，物理端口和报告器归属保持隐藏。'
       },
-      example:
-        "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst parent = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      connect: { timeoutMs: 1500 },\n      spawn: async ({ connect, signal, heartbeat }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        heartbeat()\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    })\n  ]\n})\ntry {\n  console.log(await parent.request('double', 21))\n} finally {\n  await parent.close()\n}",
+      example: example1,
       members: {}
     },
     ICoroutineUserTask: {
@@ -249,8 +184,7 @@ export const rpcCoroutinesReference: ILibraryReference = {
         en: 'Function receiving ICoroutineTaskContext and returning void or a thenable. Keep it alive until work or stop completes; use finally for child cleanup.',
         zh: '接收任务上下文并返回空值或可等待对象的函数，保持运行直到业务或停止完成，并在最终清理中关闭子端。'
       },
-      example:
-        "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'\n\nexport const task: ICoroutineUserTask = async ({ connect, signal }) => {\n  const child = await createRpcHost({\n    plugins: [coroutinePlugin({ connectToParent: connect })],\n    provide: { echo: (value: string) => value }\n  })\n  try {\n    if (!signal.aborted)\n      await new Promise<void>((resolve) => {\n        signal.addEventListener('abort', () => resolve(), { once: true })\n      })\n  } finally {\n    await child.close()\n  }\n}",
+      example: example1,
       members: {}
     },
     ICoroutineTaskContext: {
@@ -258,8 +192,7 @@ export const rpcCoroutinesReference: ILibraryReference = {
         en: 'Original per-task lifetime, liveness and source authority.',
         zh: '原逐任务寿命、活性及来源权限。'
       },
-      example:
-        "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst parent = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      connect: { timeoutMs: 1500 },\n      spawn: async ({ connect, signal, heartbeat }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        heartbeat()\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    })\n  ]\n})\ntry {\n  console.log(await parent.request('double', 21))\n} finally {\n  await parent.close()\n}",
+      example: example1,
       members: {
         signal: {
           summary: {
@@ -283,8 +216,7 @@ export const rpcCoroutinesReference: ILibraryReference = {
             en: 'Void; all timing remains supervisor-owned.',
             zh: '返回空值，所有计时仍归监督器。'
           },
-          example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst parent = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      connect: { timeoutMs: 1500 },\n      spawn: async ({ connect, signal, heartbeat }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        heartbeat()\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    })\n  ]\n})\ntry {\n  console.log(await parent.request('double', 21))\n} finally {\n  await parent.close()\n}"
+          example: example1
         }
       }
     },
@@ -293,16 +225,14 @@ export const rpcCoroutinesReference: ILibraryReference = {
         en: 'Replacement input for the original native outlet transaction.',
         zh: '原原生出口事务使用的替换输入。'
       },
-      example:
-        "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'\n\nexport const task: ICoroutineUserTask = async ({ connect, signal }) => {\n  const child = await createRpcHost({\n    plugins: [coroutinePlugin({ connectToParent: connect })],\n    provide: { echo: (value: string) => value }\n  })\n  try {\n    if (!signal.aborted)\n      await new Promise<void>((resolve) => {\n        signal.addEventListener('abort', () => resolve(), { once: true })\n      })\n  } finally {\n    await child.close()\n  }\n}",
+      example: example1,
       members: {
         task: {
           summary: {
             en: 'Next actual task function, wrapped through the same token/reporter registry.',
             zh: '下一实际任务函数，经同一令牌及报告器登记包装。'
           },
-          example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'\n\nexport const task: ICoroutineUserTask = async ({ connect, signal }) => {\n  const child = await createRpcHost({\n    plugins: [coroutinePlugin({ connectToParent: connect })],\n    provide: { echo: (value: string) => value }\n  })\n  try {\n    if (!signal.aborted)\n      await new Promise<void>((resolve) => {\n        signal.addEventListener('abort', () => resolve(), { once: true })\n      })\n  } finally {\n    await child.close()\n  }\n}"
+          example: example1
         }
       }
     },
@@ -311,32 +241,29 @@ export const rpcCoroutinesReference: ILibraryReference = {
         en: 'Partial original supervision configuration; no separate task scheduler or retry state.',
         zh: '原监督配置的部分选择，不另建任务调度或重试状态。'
       },
-      example:
-        "import { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'\nimport { retryFeature, timeoutFeature } from '@migaia/rpc-host/features'\n\nexport function taskPlugins(task: ICoroutineUserTask) {\n  return [\n    coroutinePlugin({ spawn: task, supervisor: { startupTimeoutMs: 1500 } }),\n    retryFeature(),\n    timeoutFeature({ ms: 1000 })\n  ]\n}",
+      example: example1,
       members: {
         restart: {
           summary: {
-            en: 'Original restart and replacement decision.',
-            zh: '原重启及替换决策。'
+            en: 'Original supervisor restart policy for actual task exits; it never replays an application method by itself.',
+            zh: '实际任务退出时使用的原监督器重启策略，自身不会重放应用方法调用。'
           },
           default: {
             en: 'Omitted: original supervisor default.',
             zh: '省略时使用原监督默认。'
           },
-          example:
-            "import { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'\nimport { retryFeature, timeoutFeature } from '@migaia/rpc-host/features'\n\nexport function taskPlugins(task: ICoroutineUserTask) {\n  return [\n    coroutinePlugin({ spawn: task, supervisor: { startupTimeoutMs: 1500 } }),\n    retryFeature(),\n    timeoutFeature({ ms: 1000 })\n  ]\n}"
+          example: example1
         },
         terminalPolicy: {
           summary: {
-            en: 'Original terminal-failure disposition.',
-            zh: '原终态失败处理。'
+            en: 'Original supervisor terminal policy after exhausted native recovery; distinct from the result of one RPC invocation.',
+            zh: '原生恢复耗尽后的原监督器终态策略，与单次远程调用的结果分开。'
           },
           default: {
             en: 'Omitted: original supervisor default.',
             zh: '省略时使用原监督默认。'
           },
-          example:
-            "import { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'\nimport { retryFeature, timeoutFeature } from '@migaia/rpc-host/features'\n\nexport function taskPlugins(task: ICoroutineUserTask) {\n  return [\n    coroutinePlugin({ spawn: task, supervisor: { startupTimeoutMs: 1500 } }),\n    retryFeature(),\n    timeoutFeature({ ms: 1000 })\n  ]\n}"
+          example: example1
         },
         startupTimeoutMs: {
           summary: {
@@ -347,8 +274,7 @@ export const rpcCoroutinesReference: ILibraryReference = {
             en: 'Omitted: original supervisor default.',
             zh: '省略时使用原监督默认。'
           },
-          example:
-            "import { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'\nimport { retryFeature, timeoutFeature } from '@migaia/rpc-host/features'\n\nexport function taskPlugins(task: ICoroutineUserTask) {\n  return [\n    coroutinePlugin({ spawn: task, supervisor: { startupTimeoutMs: 1500 } }),\n    retryFeature(),\n    timeoutFeature({ ms: 1000 })\n  ]\n}"
+          example: example1
         },
         stop: {
           summary: {
@@ -359,8 +285,7 @@ export const rpcCoroutinesReference: ILibraryReference = {
             en: 'Omitted: original supervisor default.',
             zh: '省略时使用原监督默认。'
           },
-          example:
-            "import { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'\nimport { retryFeature, timeoutFeature } from '@migaia/rpc-host/features'\n\nexport function taskPlugins(task: ICoroutineUserTask) {\n  return [\n    coroutinePlugin({ spawn: task, supervisor: { startupTimeoutMs: 1500 } }),\n    retryFeature(),\n    timeoutFeature({ ms: 1000 })\n  ]\n}"
+          example: example1
         },
         budget: {
           summary: {
@@ -371,8 +296,7 @@ export const rpcCoroutinesReference: ILibraryReference = {
             en: 'Omitted: original supervisor default.',
             zh: '省略时使用原监督默认。'
           },
-          example:
-            "import { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'\nimport { retryFeature, timeoutFeature } from '@migaia/rpc-host/features'\n\nexport function taskPlugins(task: ICoroutineUserTask) {\n  return [\n    coroutinePlugin({ spawn: task, supervisor: { startupTimeoutMs: 1500 } }),\n    retryFeature(),\n    timeoutFeature({ ms: 1000 })\n  ]\n}"
+          example: example1
         },
         heartbeat: {
           summary: {
@@ -383,8 +307,7 @@ export const rpcCoroutinesReference: ILibraryReference = {
             en: 'Omitted: original supervisor default.',
             zh: '省略时使用原监督默认。'
           },
-          example:
-            "import { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'\nimport { retryFeature, timeoutFeature } from '@migaia/rpc-host/features'\n\nexport function taskPlugins(task: ICoroutineUserTask) {\n  return [\n    coroutinePlugin({ spawn: task, supervisor: { startupTimeoutMs: 1500 } }),\n    retryFeature(),\n    timeoutFeature({ ms: 1000 })\n  ]\n}"
+          example: example1
         }
       }
     },
@@ -393,9 +316,101 @@ export const rpcCoroutinesReference: ILibraryReference = {
         en: 'Registered coroutine source error-code value union.',
         zh: '登记的协程来源错误码值联合。'
       },
-      example:
-        "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst parent = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      connect: { timeoutMs: 1500 },\n      spawn: async ({ connect, signal, heartbeat }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        heartbeat()\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    })\n  ]\n})\ntry {\n  console.log(await parent.request('double', 21))\n} finally {\n  await parent.close()\n}",
+      example: example1,
       members: {}
+    },
+    ICoroutineCommonOptions: {
+      summary: {
+        en: 'Cold native registration and scope; Host owns identity, providers and protocol execution.',
+        zh: '冷原生登记及作用域；身份、提供方及协议执行归宿主。'
+      },
+      members: {
+        name: {
+          summary: {
+            en: 'Local native registration name, separate from accepted remote identity.',
+            zh: '本地原生登记名称，与已接纳的远端身份分开。'
+          },
+          default: {
+            en: 'Omitted: the native registration default.',
+            zh: '省略时使用原生登记默认名称。'
+          },
+          example: taskScopeExample
+        },
+        namespace: {
+          summary: {
+            en: 'Unique Host property exposing this transport calls and extensions.',
+            zh: '宿主发布此传输调用及扩展的唯一属性名。'
+          },
+          default: {
+            en: 'Omitted: the factory namespace.',
+            zh: '省略时使用工厂默认命名空间。'
+          },
+          example: taskScopeExample
+        },
+        expose: {
+          summary: {
+            en: 'Feature output paths selected on an ordinary PluginHost; createRpcHost uses its own provide catalog.',
+            zh: '普通插件宿主选取的功能输出路径；远程调用宿主使用自身提供方目录。'
+          },
+          default: {
+            en: 'Omitted: no ordinary Feature output selected.',
+            zh: '省略时不选取普通功能输出。'
+          },
+          example: taskExposureExample
+        },
+        report: {
+          summary: {
+            en: 'Receives native background and cleanup failures; operation rejections retain original causes.',
+            zh: '接收原生后台及清理失败；操作拒绝保留原始原因。'
+          },
+          default: {
+            en: 'Omitted: configured Host reporter, then effective default.',
+            zh: '省略时使用宿主显式报告器，再使用有效默认报告器。'
+          },
+          params: {
+            error: {
+              en: 'Original background or cleanup failure supplied by the native owner; preserve the error and its cause when sending it to monitoring.',
+              zh: '原生所有者提供的原始后台或清理失败；交给监控时应保留错误对象及其原因链。'
+            }
+          },
+          returns: {
+            en: 'No return value is required. The callback reports the failure; it does not settle an application request or own native cleanup.',
+            zh: '无需返回值；回调负责报告失败，不结算应用请求，也不取得原生清理所有权。'
+          },
+          whenToUse: {
+            en: 'Set an application monitoring sink when cooperative task background and cleanup failures must join your existing incident reports. Omit it to inherit the configured Host reporter.',
+            zh: '需要将原生后台及清理失败汇入应用现有告警时配置；省略则继承宿主显式报告器。'
+          },
+          example: taskReportExample
+        },
+        features: {
+          summary: {
+            en: 'Complete call and supported native feature definitions scoped to this transport. Per-call timeout and retry take instances or false.',
+            zh: '此传输作用域的完整调用及受支持原生功能定义；逐次调用的超时和重试使用完整实例或关闭值。'
+          },
+          default: {
+            en: 'Omitted: no optional policy installed by this field.',
+            zh: '省略时不通过此字段安装可选策略。'
+          },
+          example: example1
+        }
+      },
+      example: example1
+    },
+    ICoroutineNamespaceExtensions: {
+      summary: {
+        en: 'Native controls contributed by this actual source installation.',
+        zh: '此实际来源安装提供的原生控制。'
+      },
+      members: {
+        members: {
+          summary: {
+            en: 'SDK member controls borrow the original source supervisor and generation.',
+            zh: 'SDK 成员控制借用原来源监督器及代次。'
+          }
+        }
+      },
+      example: example1
     }
   },
   enums: {
@@ -420,9 +435,22 @@ export const rpcCoroutinesReference: ILibraryReference = {
         en: 'Run a cooperative task on real MessageChannel; original supervision owns generations, budget, stop and replacement. Same-loop tasks provide no process or Worker isolation and cannot preempt synchronous blocking.',
         zh: '经真实消息通道运行协作任务，原监督器拥有代次、预算、停止和替换。同事件循环任务不提供进程或线程隔离，不能抢占同步阻塞。'
       },
-      install:
-        "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst parent = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      connect: { timeoutMs: 1500 },\n      spawn: async ({ connect, signal, heartbeat }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        heartbeat()\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    })\n  ]\n})\ntry {\n  console.log(await parent.request('double', 21))\n} finally {\n  await parent.close()\n}",
-      grants: [],
+      install: example1,
+      grants: [
+        {
+          signature: 'host.coroutine.members',
+          summary: {
+            en: 'Borrow the actual native source member controls from this namespace.',
+            zh: '从此命名空间借用实际原生来源的成员控制。'
+          },
+          params: {},
+          returns: {
+            en: 'SDK native controls for real stop, restart, replacement, events and resource queries.',
+            zh: '返回用于真实停止、重启、替换、事件及资源查询的 SDK 原生控制。'
+          },
+          example: example1
+        }
+      ],
       behaviors: [
         {
           en: 'The task owns its child host; close drains and signals the original supervised task.',
@@ -435,8 +463,7 @@ export const rpcCoroutinesReference: ILibraryReference = {
           zh: '无需原生隔离时使用协作任务。'
         }
       ],
-      example:
-        "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst parent = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      connect: { timeoutMs: 1500 },\n      spawn: async ({ connect, signal, heartbeat }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        heartbeat()\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    })\n  ]\n})\ntry {\n  console.log(await parent.request('double', 21))\n} finally {\n  await parent.close()\n}"
+      example: example1
     }
   }
 }

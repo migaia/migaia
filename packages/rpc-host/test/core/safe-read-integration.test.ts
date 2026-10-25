@@ -4,7 +4,7 @@ import { normalizeRpcEnvelope, reachRpcError } from '@migaia/rpc-contract'
 import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
 
 import { createEndpointKernel } from '../../dist/core/endpoint-kernel.js'
-import { RpcConstructionError } from '../../dist/core/errors.js'
+import { RpcConstructionError } from '@migaia/rpc-contract/errors'
 import { connect } from '../../dist/core/middleware/connect.js'
 import { assertPluginInstallResult } from '../../dist/core/internal/plugin-descriptor.js'
 import { validateContractData } from '../../dist/core/internal/contract.js'

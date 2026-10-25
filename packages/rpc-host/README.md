@@ -1,33 +1,28 @@
 # `@migaia/rpc-host`
 
-用一个 `createRpcHost` 入口，把业务函数接到进程、线程、浏览器或协作任务。每个 host 安装一个传输 plugin，按需叠加 feature。
+`contract` 定义协议、接口、可移植值和错误契约；`host` 负责 RPC 调用、会话、握手、provider、转发与取消。传输 plugin 负责原生连接、代际、编解码、分帧与 transfer；信息流 plugin 和依附于 plugin 的 feature 各自实现可选能力。
+
+一个 host 可以安装多个传输，调用按 `host.<ns>` 隔离。不建议一个 host 混用多种传输；通常每个 host 选择一种。
 
 [English](./README.en.md) · [使用指南](./USEGUIDE.md)
 
-## 为什么选它
-
-- **调用与资源归属放在一起。** host 负责调用、目录和在途任务；传输 plugin 保留真实进程、Worker、监听器或借用资源的释放责任。
-- **双向请求与流共用连接。** 双方都可以 `provide`，用 `request` 等待结果、`notify` 等待物理发送、`stream` 逐项消费。
-- **多对端行为明确。** 不指定目标就是广播；指定直连目标用 `send` 或 `dispatch`，每个目标的失败独立保留。
-- **功能按需安装。** 期限、认证、重试、分片和类型生成使用公开 feature，不需要组装底层调用对象。
-
-## 从这里开始
-
-安装 host、协议包和本例的协程传输：
+## 开始使用
 
 ```bash
 pnpm add @migaia/rpc-host @migaia/rpc-contract @migaia/rpc-plugin-coroutines
 ```
 
-下面在同一事件循环建立两个真实 host。任务接收的 `connect` 是本代专属句柄；父端关闭后，任务沿原取消信号退出。
+下面建立两个同一事件循环内的真实 host。父端的 timeout feature 安装在 coroutine plugin 上；子端接收本代专属 connect 句柄。输出 `42`，finally 关闭原生资源。
 
 ```ts doc-test=run
 import { createRpcHost } from '@migaia/rpc-host'
 import { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'
+import { timeout } from '@migaia/rpc-host/features'
 
 const host = await createRpcHost<{ double(value: number): number }>({
   plugins: [
     coroutinePlugin({
+      features: [timeout({ ms: 1500 })],
       spawn: async ({ connect, signal }) => {
         const child = await createRpcHost({
           plugins: [coroutinePlugin({ connectToParent: connect })],
@@ -35,9 +30,9 @@ const host = await createRpcHost<{ double(value: number): number }>({
         })
         try {
           if (!signal.aborted)
-            await new Promise<void>((resolve) => {
+            await new Promise<void>((resolve) =>
               signal.addEventListener('abort', () => resolve(), { once: true })
-            })
+            )
         } finally {
           await child.close()
         }
@@ -46,82 +41,80 @@ const host = await createRpcHost<{ double(value: number): number }>({
   ]
 })
 try {
-  console.log(await host.request('double', 21))
+  console.log(await host.coroutine.request('double', 21))
 } finally {
   await host.close()
 }
 ```
 
-输出 `42`。需要独立进程或线程时，换用下表中的传输；业务 `provide` 和调用接口不变。
+协程不提供 Worker 隔离。独立进程、原生线程和浏览器场景分别选择 [process](../rpc-plugin-process/README.md)、[thread](../rpc-plugin-thread/README.md) 和 [browser](../rpc-plugin-browser/README.md) 的传输 plugin。
 
-## 三分钟心智模型
+## 调用与归属
 
-| 概念             | 作用                                                                |
-| ---------------- | ------------------------------------------------------------------- |
-| host             | 本端身份、业务目录、调用和统一关闭；一个 host 只构造一个调用端点    |
-| transport plugin | 选择并准备真实来源，每个 host 恰好一个                              |
-| feature          | 为现有调用链贡献配置或观察能力；同一 feature 定义每个 host 至多一次 |
-| `provide`        | 本地普通函数或生成器；返回值成为结果，异常进入原错误链              |
-| `peers`          | 当前直连对端的能力；保存的函数绑定原连接代次，旧代退出后拒绝        |
+| 入口                                                       | 完成含义                                                  |
+| ---------------------------------------------------------- | --------------------------------------------------------- |
+| `host.<ns>.request(method, payload?, options?)`            | 等待业务结果                                              |
+| `host.<ns>.notify(method, payload?, options?)`             | 等待物理发送；不等待业务确认，`targetId` 可选单个直连目标 |
+| `host.<ns>.stream(method, payload?, options?)`             | 惰性迭代器；多目标时各自独立消费                          |
+| `host.<ns>.group(steps, options?)`                         | 每个目标按顺序执行 `{ method, payload }`，没有跨目标事务  |
+| `host.<ns>.send(targetId, method, payload?, options?)`     | 选择一个直连目标，返回标量                                |
+| `host.<ns>.dispatch(targetId, method, payload?, options?)` | 同步返回 `void`，异步失败交给 reporter                    |
+| `host.provide(definition)`                                 | 增量注册本地方法；重复名拒绝                              |
+| `host.<ns>.peers`                                          | 已接受的直连能力；保存的函数绑定原连接代次                |
+| `host.close()`                                             | 关闭整个 host；重复调用共享原 Promise                     |
 
-`self` 可指定 `{ name, instanceId }`；省略时生成独立身份。名称用于直连选择，`instanceId` 区分实际实例。同名新连接会探测旧会话：旧会话仍响应则拒绝，已失效才接纳新会话。
+上述无目标调用只在所属命名空间内选择目标：零个返回空 `fulfilled/rejected`，一个返回标量，多个返回按实例身份索引的 `fulfilled/rejected`。流集合中的迭代器独立取消。根级 `host.request` 等调用入口已删除。
 
-## 调用与目标
+`host.<ns>.send('b', 'c.render', value)` 先到直连 b，再由 b 查询当前目录并转发到 c。持有的 `host.<ns>.peers.c.render` 不会自动改指重连后的新代。转发可跨命名空间，且不能延长上游截止时间。
 
-| API                                          | 完成含义                                                              |
-| -------------------------------------------- | --------------------------------------------------------------------- |
-| `request(method, payload?, options?)`        | 向当前直连集合请求业务结果                                            |
-| `notify(method, payload?, options?)`         | 等待物理发送完成，不等待业务确认；`options.targetId` 可选单个直连目标 |
-| `stream(method, payload?, options?)`         | 取得一个迭代器，或按目标分开的迭代器集合                              |
-| `group(steps, options?)`                     | 每个目标执行一组 `{ method, payload }`，没有跨目标事务                |
-| `outcome(idempotencyKey)`                    | 查询各目标保留的逻辑结果                                              |
-| `send(targetId, method, payload?, options?)` | 只调用一个当前直连目标，返回标量                                      |
-| `dispatch(targetId, method, payload?)`       | 单目标发送后报告失败，同步返回 `void`                                 |
-| `provide(definition)`                        | 增量登记本地方法；重复名拒绝，不覆盖原方法                            |
-| `describe()` / `on(...)`                     | 读取目录、身份与状态，订阅原生命周期事件                              |
-| `close()`                                    | 释放本 host；重复调用共享同一 Promise                                 |
+在 `createRpcHost` 上用 `forward: { maxHops: 3 }` 配置各转发 host。默认 3，只接受 1–16 的整数，其他值以 `INVALID_CONFIG` 拒绝。各 host 检查自己的转发跳序；先检查环路，再检查跳数。
 
-普通 host 的无目标调用：0 个目标返回 `{ fulfilled: {}, rejected: {} }`；1 个目标返回该标量，失败直接拒绝；多个目标返回按目标身份索引的 `fulfilled` / `rejected`。流集合中的每个迭代器独立取消。安装 [pool](../rpc-plugin-pool/README.md) 后只公开一个逻辑目标 `pool`，每次只调度一个成员并返回标量。
+## 可选能力
 
-`send('b', 'c.render', payload)` 先到直连 b；b 必须确认 c 是自己当前存活的直连，再读取 c 当前目录并转发。a 不能直接指定未与自己连接的 c。也可在 b 使用 `provide({ render: b.peers.c.render })` 显式发布持有的能力；该能力不会悄悄改指重连后的新代。
+信息流 plugin 安装进 host 的 `plugins`；feature 安装进所依附 plugin 的 `features`。
 
-## 选择传输与功能
+```ts doc-test=check
+import { timeout, retry } from '@migaia/rpc-host/features'
+import { linkPolicy, limits, probe } from '@migaia/rpc-host/plugins'
+import timeoutFromSubpath from '@migaia/rpc-host/features/timeout'
 
-| 场景                                                          | 包 / 工厂                                                                          |
-| ------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| 子进程、本机服务、JSON-RPC 字节服务                           | [rpc-plugin-process](../rpc-plugin-process/README.md) / `processPlugin`            |
-| Node、Bun、Deno 原生线程                                      | [rpc-plugin-thread](../rpc-plugin-thread/README.md) / `threadPlugin`               |
-| Window、浏览器 Worker、广播、ServiceWorker、RTC、WebTransport | [rpc-plugin-browser](../rpc-plugin-browser/README.md) / 对应载体工厂               |
-| 同一事件循环的协作任务                                        | [rpc-plugin-coroutines](../rpc-plugin-coroutines/README.md) / `coroutinePlugin`    |
-| 有限容量、排队与排空                                          | [rpc-plugin-pool](../rpc-plugin-pool/README.md) / `poolPlugin` feature             |
-| 查询、观察与录制                                              | [rpc-plugin-devtools](../rpc-plugin-devtools/README.md) / `devtoolsPlugin` feature |
-
-公用功能有两种等价的按需导入写法：
-
-```ts
-import {
-  timeoutFeature,
-  chunkFeature,
-  authFeature,
-  retryFeature,
-  typegenFeature
-} from '@migaia/rpc-host/features'
-import timeout from '@migaia/rpc-host/features/timeout'
-
-const deadline = timeoutFeature({ ms: 1500 })
-const sameDefinition = timeout({ ms: 1500 })
+export const defaults = linkPolicy({ features: [timeout({ ms: 1500 }), retry({ attempts: 2 })] })
+export const capacity = limits({ maxGlobal: 256, maxPerPeer: 64 })
+export const observation = probe({
+  stages: ['message', 'peer'],
+  emit: (view) => console.log({ ...view })
+})
+export const perCallDeadline = timeoutFromSubpath({ ms: 100 })
 ```
 
-两种写法选一种安装；不能把同一 feature 的两个配置同时装进一个 host。`typegenFeature({ out: { write(fileName, text) { console.log(fileName, text) } } })` 读取已接受目录及方法 schema，应用负责实际文件 I/O。认证配置沿 `authFeature(config)` 的真实签名；不要把一项能力标签当作授权。
+汇总入口与默认子路径导入均可 tree-shake。其他信息流 plugin 为 `auth`、`chunk`、`batch`、`idempotency`、`schema`、`typegen`。推荐安装 `limits`；省略它就不启用这些配额。安装 `idempotency` 后，才有 `host.<ns>.outcome(key)`。`auth` 独立拥有请求 ID 重放账本；`maxReplayEntriesPerPeer` 限制每个已接纳对端保留的身份数量，`onRejected` 接收重放容量拒绝原因。
 
-## 期限、失败与关闭
+[pool](../rpc-plugin-pool/README.md) 是传输的 `pool({ size })` feature，同一池只包含同载体成员，只公开一个逻辑对端。成员打开、调度和关闭属于 pool；`host.<ns>.members` 由传输提供原生控制。
 
-传输的 `connect: { timeoutMs }` 约束握手准备；业务调用的 `timeoutMs`、host 的 `defaultTimeoutMs` 和 timeout feature 是另一层。单次调用优先于 host 设置，host 设置优先于 feature 默认。`signal` 支持协作取消；到期或断开不能证明业务未执行，非幂等操作应先对账再决定重试。
+## 期限、取消与错误
 
-错误按功能域区分：调用与 host 准入为 `rpc.endpoint`，远端托管调用为 `rpc.remote`，实际载体使用自己的 `rpc.transport.*`。按 `source` 与 `code` 判断，保留 `cause` / `errors` 和原生错误类型，不依赖消息文本。缺失/重复传输、无 SDK 身份、重复 feature/assembler、响应中的同名对端均在对应准入边界拒绝。
+`FeatureScope` 唯一解析覆盖顺序：单次调用 `options.timeout/retry`、所在传输 plugin 的 feature、链路策略 plugin。单次值只接受完整 feature 实例或 `false`，不接受数字或配置对象。`timeout: false` 不启用 feature 超时，持续等待响应；已经继承的上游剩余期限仍递减。`retry: false` 禁用重试。只有发起方的标量调用和 group 重试，stream 从不重放、只使用 timeout；转发跳不重新开始预算。
 
-传输和 feature 是真实 plugin-host 定义，也可交给普通 `PluginHost.use(...)`；它的原安装、替换和清理 owner 保持负责。自定义传输作者使用 `@migaia/rpc-host/plugin` 的冷部署及作用域工具；应用从 `createRpcHost` 开始，不需要底层工厂或私有文件。
+所有调用种类支持 `signal`，单向调用物理发送之后也能向下游传播取消。provider 读取自己的 `context.signal`。取消不等于杀进程，也不回滚业务副作用。
 
-公开子路径为 `/probe`、`/plugin` 和 `/features` 及其功能子路径。`/probe` 编译观察定义；把定义交给 `/plugin` 的 `defineFeaturePlugin({ name, probe })` 安装到同一个 host。观察器只借用该 host 的调用与物理连接，不创建额外端点。
+按 `source/code` 识别错误，保留原生类型、`stack`、`cause` 和 `AggregateError.errors`。超时或断开不证明业务未执行；非幂等操作须先对账再考虑重试。
 
-更多调用、取消与迁移说明见[使用指南](./USEGUIDE.md)。
+自定义 plugin 作者从 `@migaia/rpc-host/sdk` 开始。观察入口是 `/plugins/probe`；旧 `/plugin`、`/probe`、endpoint、per-session Peer 和 v1/JSON-RPC profile 已删除。rpc 家族可以直接依赖 `@migaia/rpc-contract`；只需错误码时导入 `/error-code`，不会带入协议与编解码执行代码。
+
+## C6 公开行为变更
+
+未分类的 provider 异常使用 `INTERNAL`，原生异常保留在错误图中。标量调用直接以还原的远端 Error 拒绝；不再增加 `RpcRemoteError` 外壳，调用方须改用真实错误的 `source/code`。协程远端 `context.signal.reason` 接收原 abort reason，不合成取消码；`stream.return(value)` 返回 runtime 的真实结束结果，不回传调用者传入的 `value`。
+
+无目标调用按调用时已接受的会话选择；从 `peers` 保存的函数绑定原代次，退场后拒绝且不转向替代连接。即时 process 启动失败只保留一层 `PROCESS_CHANNEL_CLOSED`，原生 EPIPE 在 cause 图中；没有真实原生错误的 thread 关闭诊断不合成 message-port cause。
+
+旧 RPC scope 的回滚 AggregateError 外壳与原生 host dispose 翻译层已退役。原生 host 的 dispose 返回其实际结果；清理叶子错误的身份、顺序、只清理一次和共享完成 Promise 保留。`RpcRoot.close` 的错误契约独立，不替代原生 dispose 的结果。
+
+幂等指纹使用对象自身的键序；同一 body 改变键序后是不同请求，同键冲突以 `CONTRACT_INVALID` 拒绝，原 store 的字符串指纹 ABI 保持不变。
+
+普通 NativeHost 的 dispose() 保留其原生 cleanup summary 与共享 Promise，不再翻译成 RPC dispose 错误。安装回滚也直接借原生 cleanup entries；不再添加旧 RPC resource-scope AggregateError 外壳。原失败叶对象、errors 顺序、cause 可达性和 disposer 一次执行不变。RpcRoot.close() 是独立的公共关闭 owner，不能用 NativeHost.dispose() 的结果替代其契约。原生 Feature 的 descriptors 每次冷编译只捕获一次，首次 selector 的校验及错误顺序保持；后续 selector 不再重复触发 Proxy reflection。
+
+auth() 的已完成请求 ID 仅在实际原生 owner 证明来源独占时立即释放；其他来源继续按有界 TTL 保留。活动请求与 stream 仍保留到实际业务及迭代器清理完成。
+
+配置 sign/verify 时，auth 在既有签名握手中交换并验证每个来源的新挑战；应用回调仍须签名和验证收到的完整输入。此过程不增加公开 discovery 或握手配置。
+
+verifyCredentials 可返回 { principalId: 非空字符串 }，把真实认证主体交给当前 Session；抛出或拒绝仍拒绝认证。void、字符串及其他原先被忽略的结果不会授予主体身份。

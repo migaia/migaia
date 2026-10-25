@@ -4,13 +4,13 @@ import assert from 'node:assert/strict'
 import { it, vi } from 'vitest'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { RpcCapability } from '@migaia/rpc-contract'
-import { RpcCoreErrorCode } from '../../../rpc-host/dist/core/errors.js'
+import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import {
   observeProcessListenerSessions,
   readObservedProcessSessionAdmission
 } from '../fixtures/process-diagnostics.js'
 import { createProcessResilience } from '../../../rpc-plugin-process/dist/process/resilience/index.js'
-import { RpcProcessErrorCode } from '../../../rpc-plugin-process/dist/process/error-code.js'
+import { RpcProcessErrorCode } from '@migaia/rpc-contract/error-code'
 import { createProcessError } from '../../../rpc-plugin-process/dist/process/error.js'
 import { createNativeProcessOffer } from '../../../rpc-plugin-process/dist/process/offer.js'
 import { createProcessTransport } from '../../../rpc-plugin-process/dist/process/handshake.js'

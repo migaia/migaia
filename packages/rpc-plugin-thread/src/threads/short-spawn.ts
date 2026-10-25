@@ -1,3 +1,7 @@
+/**
+ * Expands entry-only Worker recipes using shared entry resolution and runtime-flag retention.
+ * Caller-selected launcher, supervision budget and scheduler fields remain unchanged.
+ */
 import {
   isUrlObject,
   detectServerRuntime,
@@ -5,22 +9,30 @@ import {
   ServerRuntime,
   type IUrlLike
 } from '@migaia/utils'
-import { resolveAdapterEntry, retainAdapterRuntimeFlags } from '@migaia/rpc-host/plugin'
+import { resolveRpcEntry, retainRpcRuntimeFlags } from '@migaia/rpc-host/sdk'
+import type { IThreadSpawn } from './source.js'
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { invalidThreadConfig } from './error.js'
 import { ThreadErrorText } from './error-text.js'
 import type { IThreadRuntimeResource } from './runtime-types.js'
-import { threadRuntimeResource } from './runtime-resource.js'
-import type {
-  IRuntimeThreadPeerOptions,
-  IRuntimeThreadShortSpawn,
-  IRuntimeThreadSpawn
-} from './runtime-peer.js'
-import { defaultRpcReporter } from '@migaia/rpc-host'
+/** Entry-only recipes fill only missing native launcher, budget and clock fields. */
+export type IThreadShortSpawn = Readonly<{
+  entry: true | IUrlLike
+  base?: IUrlLike
+  name?: IThreadSpawn['spec']['name']
+  data?: IThreadSpawn['spec']['data']
+  limits?: IThreadSpawn['spec']['limits']
+}> &
+  Partial<Omit<IThreadSpawn, 'spec'>>
+/** Expansion borrows installation diagnostics without rebuilding caller-selected native policy. */
+type IThreadExpansionOptions = Readonly<{
+  spawn?: IThreadSpawn | IThreadShortSpawn | true | IUrlLike
+  report?(error: unknown): void
+}>
 
 /** Only entry shorthand is expanded; full deployment objects and callbacks keep their old path. */
-export function isShortThreadSpawn(spawn: IRuntimeThreadPeerOptions['spawn']): boolean {
+export function isShortThreadSpawn(spawn: IThreadExpansionOptions['spawn']): boolean {
   return (
     spawn === true ||
     typeof spawn === 'string' ||
@@ -35,13 +47,14 @@ export function isShortThreadSpawn(spawn: IRuntimeThreadPeerOptions['spawn']): b
  * adapter owns native bootstrap. The original Peer options object is never reconstructed.
  */
 export async function expandThreadSpawn(
-  options: IRuntimeThreadPeerOptions,
-  runtime: IThreadRuntimeResource
-): Promise<IRuntimeThreadSpawn> {
+  options: IThreadExpansionOptions,
+  runtime: IThreadRuntimeResource,
+  reportDefault: (error: unknown) => void
+): Promise<IThreadSpawn> {
   /** Caller-selected fields override defaults only for this one short source. */
-  const source: IRuntimeThreadShortSpawn =
+  const source: IThreadShortSpawn =
     typeof options.spawn === 'object' && !isUrlObject(options.spawn)
-      ? (options.spawn as IRuntimeThreadShortSpawn)
+      ? (options.spawn as IThreadShortSpawn)
       : { entry: options.spawn as true | IUrlLike }
   /** Canonical precedence prevents Bun's Node compatibility markers selecting Node mechanics. */
   const runtimeKind = detectServerRuntime()
@@ -84,7 +97,7 @@ export async function expandThreadSpawn(
     }
   }
   /** URL is exact; relative strings use mainEntry unless an explicit base was supplied. */
-  const entry = resolveAdapterEntry(selectedEntry, {
+  const entry = resolveRpcEntry(selectedEntry, {
     mainEntry,
     base: source.base,
     execArgv,
@@ -93,11 +106,11 @@ export async function expandThreadSpawn(
     selfAllowed: Boolean(bun || deno || node)
   })
   /** Background failures retain reporting even when the caller needs only an entry. */
-  const report = source.report ?? options.report ?? defaultRpcReporter
+  const report = source.report ?? options.report ?? reportDefault
   /** One scheduler owns budget timing and the default channel factory. */
   const scheduler = source.scheduler ?? systemScheduler
   /** Different entries retain loader/runtime flags while dropping the parent's entry controller. */
-  const runtimeFlags = source.entry === true ? execArgv : retainAdapterRuntimeFlags(execArgv ?? [])
+  const runtimeFlags = source.entry === true ? execArgv : retainRpcRuntimeFlags(execArgv ?? [])
   /** A supplied pair stays untouched; otherwise acquire only this runtime's missing operations. */
   let launcher = source.launcher
   /** Channel construction remains owned by the existing runtime adapter. */
@@ -105,19 +118,14 @@ export async function expandThreadSpawn(
   if (!launcher || !channelFactory) {
     if (bun || deno || !node) {
       /** The single Web owner declares each host's own exit capability; only Bun observes close. */
-      const adapter = await import('./adapters/web.js')
+      const adapter = await import('./web-launcher.js')
       launcher ??= adapter.createWebThreadLauncher({ report })
-      channelFactory ??= adapter.createWebThreadChannelFactory({ scheduler })
+      channelFactory ??= adapter.createWebThreadChannelFactory({ scheduler, report })
     } else {
       /** Node's public adapter keeps native Worker construction and exit observation canonical. */
-      const adapter = await import('./adapters/node.js')
-      launcher ??=
-        runtime === threadRuntimeResource
-          ? adapter.createNodeThreadLauncher({ execArgv: runtimeFlags })
-          : (await import('./node-launcher.js')).createAdapterNodeThreadLauncher(runtime, {
-              execArgv: runtimeFlags
-            })
-      channelFactory ??= adapter.createNodeThreadChannelFactory({ scheduler })
+      const adapter = await import('./node-launcher.js')
+      launcher ??= adapter.createNodeThreadLauncher({ execArgv: runtimeFlags, report }, runtime)
+      channelFactory ??= adapter.createNodeThreadChannelFactory({ scheduler, report })
     }
   }
   return {
@@ -128,8 +136,6 @@ export async function expandThreadSpawn(
     budget: source.budget ?? createUnitBudget({ kind: 'thread', maxUnits: 1, scheduler }),
     report,
     health: source.health,
-    supervisor: { ...source.supervisor, isolation: source.supervisor?.isolation ?? 'best-effort' },
-    keyFactory: source.keyFactory,
-    retryPort: source.retryPort
+    supervisor: { ...source.supervisor, isolation: source.supervisor?.isolation ?? 'best-effort' }
   }
 }

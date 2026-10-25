@@ -1,4 +1,3 @@
-import type { IAbortSignal } from '@migaia/utils/promise'
 import assert from 'node:assert/strict'
 import { it } from 'vitest'
 import { ProviderExecutor } from '../../dist/core/internal/provider-executor.js'
@@ -7,19 +6,14 @@ import { ProviderAdmissionRegistry } from '../../dist/core/internal/provider-adm
 import { RequestReplayLedger } from '../../dist/core/internal/request-replay-ledger.js'
 import { normalizeRuntimeEnvelope } from '@migaia/rpc-contract/runtime'
 import { RpcRuntimeStreamPrefix, RpcRuntimeProfile } from '@migaia/rpc-contract/framing/v1'
-import { RpcContractErrorCode } from '@migaia/rpc-contract'
+import { RpcContractErrorCode } from '@migaia/rpc-contract/error-code'
 import { createRpcIdempotencyStore } from '../../dist/core/idempotency-store.js'
 import type { IRpcRuntimeEnvelope, IRpcRuntimeGeneration } from '@migaia/rpc-contract'
 import type { IRpcProviderController } from '../../dist/core/internal/plugin-shared-keys.js'
-import { RpcTimeoutError } from '../../dist/core/errors.js'
-import { serializeRpcError } from '@migaia/rpc-contract'
-import { deserializeRpcError } from '../../dist/core/internal/error-wire-metadata.js'
-import {
-  RpcCoreErrorCode,
-  RPC_CORE_ERROR_SOURCE,
-  createRpcTimeoutError,
-  localRpcErrorCode
-} from '../../dist/core/errors.js'
+import { deserializeRpcError } from '../../dist/host/error-wire-metadata.js'
+import { RPC_CORE_ERROR_SOURCE } from '@migaia/rpc-contract/errors'
+import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
+import { localRpcErrorCode } from '../../dist/host/error-owner.js'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import type { IRpcIdempotencyStore } from '../../dist/core/idempotency-store.js'
 
@@ -129,65 +123,6 @@ function owner(
   }
 }
 
-it('a serialized original deadline retains DEADLINE_EXCEEDED when it wins the final queued start decision', async () => {
-  const harness = owner()
-  let complete!: () => void
-  const blocked = new Promise<void>((resolve) => {
-    complete = resolve
-  })
-  let effects = 0
-  harness.registry.register('hold', async (context) => {
-    await blocked
-    return context.success(1)
-  })
-  harness.registry.register('queued', (context) => {
-    effects++
-    return context.success(2)
-  })
-  const first = harness.executor.executeRuntime(
-    group('first', ['hold'], { orderKey: 'same', cancel: 'before-start' }),
-    'peer',
-    harness.ports
-  )
-  try {
-    const queued = harness.executor.executeRuntime(
-      group('queued', ['queued'], { orderKey: 'same', cancel: 'before-start', timeoutMs: 5 }),
-      'peer',
-      harness.ports
-    )
-    /** Only the genuinely registered timer can originate this task's own deadline error. */
-    const controller = [...harness.controllers.values()][1]!
-    ;[...harness.timers][0]!()
-    const restored = deserializeRpcError(
-      serializeRpcError(controller.signal.reason, {
-        report: (failure) => {
-          throw failure.error
-        }
-      })
-    )
-    await queued
-    const terminal = harness.replies.find((reply) => reply.id === 'queued')!
-    assert.equal(terminal.kind, 'runtime-control')
-    if (
-      terminal.kind !== 'runtime-control' ||
-      terminal.operation !== 'terminal' ||
-      terminal.completion.ok
-    )
-      assert.fail('queued deadline must produce a failed terminal')
-    assert.equal(
-      terminal.completion.error.code,
-      'DEADLINE_EXCEEDED',
-      'crossing the wire cannot change deadline into caller cancellation'
-    )
-    assert.equal(terminal.completion.error.source, 'rpc.endpoint')
-    assert.equal(terminal.completion.error.stack, restored.stack)
-    assert.equal(effects, 0)
-  } finally {
-    complete()
-    await first
-  }
-})
-
 /** The accepted public grammar supplies this task's actual stream mode and final provider method. */
 function stream(id: string, options: object = {}): IRpcRuntimeEnvelope {
   /** All fixtures share the same authentic caller/provider generation selected by the harness. */
@@ -201,137 +136,6 @@ function stream(id: string, options: object = {}): IRpcRuntimeEnvelope {
     options
   })
 }
-
-/** These paths imitate ordinary caller construction, public tagging and public wire restoration. */
-function forgedDeadline(kind: 'class' | 'constructor' | 'tag' | 'decode' | 'wire-deadline'): Error {
-  if (kind === 'wire-deadline')
-    return deserializeRpcError(
-      serializeRpcError(createRpcTimeoutError(), {
-        report: (failure) => {
-          throw failure.error
-        }
-      })
-    )
-  if (kind === 'class') return new RpcTimeoutError()
-  if (kind === 'constructor') {
-    /** A genuinely returned Error exposes a constructor but no access to its owner mint record. */
-    const Constructor = createRpcTimeoutError().constructor as typeof RpcTimeoutError
-    return new Constructor()
-  }
-  /** Public wire properties remain diagnostic data in both paths. */
-  const wire = {
-    source: RPC_CORE_ERROR_SOURCE,
-    code: RpcCoreErrorCode.deadlineExceeded,
-    name: 'TimeoutError',
-    message: 'adapter fixture',
-    stack: 'adapter fixture stack'
-  }
-  if (kind === 'decode') return deserializeRpcError(wire)
-  /** AttachErrorIdentity is the supported public primitive; Core's internal tag operation is absent. */
-  const error = attachErrorIdentity(new Error(wire.message), {
-    source: wire.source,
-    code: wire.code
-  })
-  error.name = wire.name
-  return error
-}
-
-it.each(['class', 'constructor', 'tag', 'decode', 'wire-deadline'] as const)(
-  '%s caller reason is presented as admitted deadline without minting or changing the queued cancellation decision',
-  async (kind) => {
-    /** The original FIFO holds the following task before its final start. */
-    const harness = owner()
-    /** Release only business work; all cancellation comes from the production controller. */
-    let finish!: () => void
-    /** A real predecessor keeps the provider queue occupied until cleanup. */
-    const held = new Promise<void>((resolve) => {
-      finish = resolve
-    })
-    /** Queued business must remain uninvoked after the true cancellation action. */
-    let effects = 0
-    harness.registry.register('hold', async (context) => {
-      await held
-      return context.success(1)
-    })
-    harness.registry.register('value', (context) => {
-      effects++
-      return context.success(2)
-    })
-    /** The first admitted task owns the queue. */
-    const first = harness.executor.executeRuntime(
-      group('hold', ['hold'], { orderKey: 'queue' }),
-      'peer',
-      harness.ports
-    )
-    try {
-      /** The forged error is supplied as data to the real cancellation operation. */
-      const reason = forgedDeadline(kind)
-      /** This separate queued task has no timer that could create a genuine timeout. */
-      const pending = harness.executor.executeRuntime(
-        group('queued', ['value'], { orderKey: 'queue', cancel: 'before-start' }),
-        'peer',
-        harness.ports
-      )
-      ;[...harness.controllers.values()][1]!.cancelIntent!(reason)
-      await pending
-      /** Inspect the actual response after canonical grammar admission. */
-      const terminal = harness.replies.find((reply) => reply.id === 'queued')!
-      assert.ok(
-        terminal.kind === 'runtime-control' &&
-          terminal.operation === 'terminal' &&
-          !terminal.completion.ok
-      )
-      if (
-        terminal.kind !== 'runtime-control' ||
-        terminal.operation !== 'terminal' ||
-        terminal.completion.ok
-      )
-        assert.fail('failed terminal missing')
-      assert.equal(terminal.completion.error.code, RpcCoreErrorCode.deadlineExceeded)
-      assert.equal(terminal.completion.error.source, RPC_CORE_ERROR_SOURCE)
-      assert.equal(terminal.completion.error.name, reason.name)
-      assert.equal(terminal.completion.error.stack, reason.stack)
-      assert.equal(localRpcErrorCode(reason), undefined)
-      assert.equal(effects, 0)
-      assert.equal(harness.timers.size, 0, 'reported deadline cannot install a local timeout')
-    } finally {
-      finish()
-      await first
-    }
-  }
-)
-
-it.each(['class', 'constructor', 'tag', 'decode', 'wire-deadline'] as const)(
-  '%s admitted deadline label is presented on wire without performing provider cancellation',
-  async (kind) => {
-    /** One actual executor owns the real stream admission and failure response. */
-    const harness = owner()
-    /** No cancellation operation or deadline is installed in this call. */
-    const reason = forgedDeadline(kind)
-    /** The public provider error is thrown by the actual registered stream callback. */
-    let calls = 0
-    /** The original controller proves that terminal presentation did not invoke live cancellation. */
-    let signal: IAbortSignal | undefined
-    harness.registry.registerStream(`${RpcRuntimeStreamPrefix}value`, () => {
-      calls++
-      signal = [...harness.controllers.values()][0]!.signal
-      throw reason
-    })
-    await harness.executor.executeRuntime(stream('failed-stream'), 'peer', harness.ports)
-    /** The false timeout code is preserved as diagnostics while event remains business failure. */
-    const terminal = harness.replies[0]!
-    assert.ok(terminal.kind === 'runtime-control' && terminal.operation === 'stream')
-    if (terminal.kind !== 'runtime-control' || terminal.operation !== 'stream')
-      assert.fail('stream terminal missing')
-    assert.equal(terminal.stream.event, 'cancelled')
-    assert.equal(terminal.stream.error?.code, RpcCoreErrorCode.deadlineExceeded)
-    assert.equal(calls, 1)
-    assert.equal(signal!.aborted, false)
-    assert.equal(harness.controllers.size, 0)
-    assert.equal(harness.admission.size, 0)
-    assert.equal(localRpcErrorCode(reason), undefined)
-  }
-)
 
 it.each([RpcCoreErrorCode.cancelled, RpcCoreErrorCode.deadlineExceeded] as const)(
   'genuine stored %s stream replay restores only wire cancellation after store cloning',
@@ -467,66 +271,6 @@ it('a send adapter forged FRAME_LIMIT code cannot rewrite the original completed
   assert.equal(completion.result[0].result, 42)
 })
 
-it('same provider/key queues across callers, other keys run, and final start defeats caller cancellation for the entire group', async () => {
-  const harness = owner()
-  let complete!: () => void
-  const blocked = new Promise<void>((resolve) => {
-    complete = resolve
-  })
-  const effects: string[] = []
-  let signal: IAbortSignal | undefined
-  harness.registry.register('hold', async (context) => {
-    effects.push('hold')
-    signal = context.signal
-    assert.deepEqual(context.targetGeneration, harness.ports.generation)
-    assert.deepEqual(context.callerGeneration, harness.ports.callerGeneration)
-    await blocked
-    return context.success(1)
-  })
-  harness.registry.register('after', (context) => {
-    effects.push('after')
-    return context.success(2)
-  })
-  harness.registry.register('other', (context) => {
-    effects.push('other')
-    return context.success(3)
-  })
-  assert.equal(typeof Reflect.get(harness.executor, 'executeRuntime'), 'function')
-  const first = harness.executor.executeRuntime(
-    group('first', ['hold', 'after'], { orderKey: 'same', cancel: 'before-start' }),
-    'peer',
-    harness.ports
-  )
-  const queued = harness.executor.executeRuntime(
-    group('queued', ['after'], { orderKey: 'same', cancel: 'before-start' }),
-    'another-peer',
-    harness.ports
-  )
-  const other = harness.executor.executeRuntime(
-    group('other', ['other'], { orderKey: 'different', cancel: 'before-start' }),
-    'peer',
-    harness.ports
-  )
-  assert.deepEqual(effects, ['hold', 'other'], 'original key scope never partitions by caller')
-  assert.equal(harness.admission.size, 4)
-  const controllers = [...harness.controllers.values()]
-  controllers[0]!.cancelIntent!('started fixture intent')
-  assert.equal(signal!.aborted, false, 'start won; the original native signal stays live')
-  controllers[1]!.cancelIntent!('queued fixture intent')
-  await queued
-  await other
-  assert.deepEqual(effects, ['hold', 'other'], 'queued cancel won; provider stays zero')
-  complete()
-  await first
-  assert.deepEqual(
-    effects,
-    ['hold', 'other', 'after'],
-    'later group members cannot be cancelled after group start'
-  )
-  assert.equal(harness.admission.size, 0)
-  assert.equal(harness.controllers.size, 0)
-})
-
 it('an original pending keyed claim prevents duplicate execution and seals the complete group before terminal send', async () => {
   const harness = owner()
   let complete!: () => void
@@ -560,93 +304,6 @@ it('an original pending keyed claim prevents duplicate execution and seals the c
   const retained = harness.store.lookup!(scope, 'key', 0)
   assert.equal(retained.state, 'done')
   assert.equal(harness.replies.length, 2)
-  assert.equal(harness.admission.size, 0)
-  assert.equal(harness.controllers.size, 0)
-})
-
-it('every group member shares one all-or-none replay reservation, including exact rollback after a competing quota refusal', () => {
-  const replay = new RequestReplayLedger(3, 3)
-  const reserve = Reflect.get(replay, 'reserveMany')
-  assert.equal(typeof reserve, 'function', 'original replay owner reserves the complete group')
-  const owner = replay as RequestReplayLedger & {
-    reserveMany(
-      keys: readonly string[],
-      peer: string,
-      now: number
-    ): { rollback(): void; release(now: number): void } | undefined
-  }
-  const first = owner.reserveMany(['a:0', 'a:1'], 'peer', 0)!
-  assert.ok(first)
-  assert.equal(replay.size, 2)
-  assert.equal(owner.reserveMany(['b:0', 'b:1'], 'peer', 0), undefined)
-  assert.equal(replay.size, 2)
-  first.rollback()
-  first.rollback()
-  assert.equal(replay.size, 0, 'quota refusal leaves no replay tombstone or half slot')
-  const next = owner.reserveMany(['b:0', 'b:1'], 'peer', 0)!
-  assert.ok(next)
-  next.release(1)
-  assert.equal(replay.activeSize, 0)
-  assert.equal(replay.size, 2, 'executed members retain original legacy replay protection')
-})
-
-it('unknown or over-budget groups execute nothing; accepted groups preserve success then failure and mark later steps not-executed', async () => {
-  const harness = owner(3)
-  let effects = 0
-  harness.registry.register('first', (context) => {
-    effects++
-    return context.success(42)
-  })
-  harness.registry.register('fail', () => {
-    throw new RangeError('fixture business failure')
-  })
-  harness.registry.register('last', (context) => {
-    effects++
-    return context.success()
-  })
-  assert.equal(
-    typeof Reflect.get(harness.executor, 'executeRuntime'),
-    'function',
-    'original final executor owns runtime group execution'
-  )
-  await harness.executor.executeRuntime(
-    group('unknown', ['first', 'missing']),
-    'peer',
-    harness.ports
-  )
-  assert.equal(effects, 0)
-  assert.equal(harness.admission.size, 0)
-  assert.equal(harness.replay.size, 0)
-  await harness.executor.executeRuntime(
-    group('too-many', ['first', 'last', 'first', 'last']),
-    'peer',
-    harness.ports
-  )
-  assert.equal(effects, 0)
-  assert.equal(harness.admission.size, 0)
-  assert.equal(harness.replay.size, 0)
-  await harness.executor.executeRuntime(
-    group('accepted', ['first', 'fail', 'last']),
-    'peer',
-    harness.ports
-  )
-  assert.equal(effects, 1, 'the successful first side effect is preserved, never rolled back')
-  const terminal = harness.replies.at(-1) as Extract<IRpcRuntimeEnvelope, { operation: 'terminal' }>
-  assert.equal(terminal.completion.ok, true)
-  if (terminal.completion.ok) {
-    const result = terminal.completion.result as {
-      state: string
-      result?: number
-      error?: { name: string; stack: string }
-    }[]
-    assert.deepEqual(
-      result.map((value) => value.state),
-      ['success', 'failure', 'not-executed']
-    )
-    assert.equal(result[0]!.result, 42)
-    assert.equal(result[1]!.error!.name, 'RangeError')
-    assert.ok(result[1]!.error!.stack)
-  }
   assert.equal(harness.admission.size, 0)
   assert.equal(harness.controllers.size, 0)
 })

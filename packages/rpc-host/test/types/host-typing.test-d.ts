@@ -1,9 +1,14 @@
+/**
+ * Compile the public namespace surface, preserving declared method, payload and result
+ * correlations.
+ */
 import { expectTypeOf } from 'vitest'
 import type { IRpcPortableValue } from '@migaia/rpc-contract'
-import type { IRpcRuntimeStepOutcome } from '@migaia/rpc-contract/runtime'
-import type { IRpcFanoutResult, IRpcRuntimeOutcomeResult } from '../../dist/core/typing.js'
+import type { IRpcStepOutcome, IRpcOutcomeLookupResult } from '@migaia/rpc-contract/protocol'
+import type { IRpcFanoutResult } from '@migaia/rpc-host'
 import { createRpcHost, type IRpcHost, type IRpcHostOptions } from '@migaia/rpc-host'
-import { defineFeaturePlugin } from '@migaia/rpc-host/plugin'
+import { idempotency } from '@migaia/rpc-host/plugins/idempotency'
+import type { IRpcTransportPlugin } from '@migaia/rpc-host/sdk'
 
 /** Client A owns one scalar route and one streaming route. */
 type IAApi = { resize(width: number): string; frames(count: number): AsyncIterableIterator<number> }
@@ -21,56 +26,65 @@ const dynamicCreation = createRpcHost(options)
 expectTypeOf(dynamicCreation).toEqualTypeOf<Promise<IRpcHost>>()
 /** Compile-time values do not acquire a transport. */
 declare const mapped: IRpcHost<IRemoteByName>
-expectTypeOf(mapped.send('client-a', 'resize', 800)).toEqualTypeOf<Promise<string>>()
-mapped.dispatch('client-b', 'save', 'text')
+expectTypeOf(mapped.memory.send('client-a', 'resize', 800)).toEqualTypeOf<Promise<string>>()
+mapped.memory.dispatch('client-b', 'save', 'text')
 // @ts-expect-error Client B's method cannot be invoked on client A.
-mapped.send('client-a', 'save', 'text')
+mapped.memory.send('client-a', 'save', 'text')
 // @ts-expect-error Unknown direct targets are not inferred from another argument.
-mapped.send('client-c', 'resize', 800)
+mapped.memory.send('client-c', 'resize', 800)
 // @ts-expect-error Payload type follows the selected target and method.
-mapped.send('client-a', 'resize', 'wrong')
+mapped.memory.send('client-a', 'resize', 'wrong')
 // @ts-expect-error Dispatch preserves method correlation too.
-mapped.dispatch('client-b', 'resize', 800)
+mapped.memory.dispatch('client-b', 'resize', 800)
 // @ts-expect-error Dispatch preserves payload correlation too.
-mapped.dispatch('client-b', 'save', 800)
-expectTypeOf(mapped.request('client-a.resize', 800)).toEqualTypeOf<
+mapped.memory.dispatch('client-b', 'save', 800)
+expectTypeOf(mapped.memory.request('client-a.resize', 800)).toEqualTypeOf<
   Promise<string | IRpcFanoutResult<string>>
 >()
 // @ts-expect-error Namespaced forwarding retains its exact payload.
-mapped.request('client-a.resize', 'wrong')
+mapped.memory.request('client-a.resize', 'wrong')
 // @ts-expect-error The namespace must contain a declared provider method.
-mapped.request('client-b.resize', 800)
-expectTypeOf(mapped.peers['client-a'].resize(800)).toEqualTypeOf<Promise<string>>()
+mapped.memory.request('client-b.resize', 800)
+expectTypeOf(mapped.memory.peers['client-a'].resize(800)).toEqualTypeOf<Promise<string>>()
 
 /** Single-remote APIs retain their own nested method namespace. */
-declare const single: IRpcHost<IAApi & { math: { add(pair: [number, number]): number } }>
-expectTypeOf(single.request('resize', 800)).toEqualTypeOf<
+declare const single: IRpcHost<
+  IAApi & { math: { add(pair: [number, number]): number } },
+  readonly [IRpcTransportPlugin<'memory'>, ReturnType<typeof idempotency>]
+>
+expectTypeOf(single.memory.request('resize', 800)).toEqualTypeOf<
   Promise<string | IRpcFanoutResult<string>>
 >()
-expectTypeOf(single.request('math.add', [20, 22])).toEqualTypeOf<
+expectTypeOf(single.memory.request('math.add', [20, 22])).toEqualTypeOf<
   Promise<number | IRpcFanoutResult<number>>
 >()
-expectTypeOf(single.notify('resize', 800)).toEqualTypeOf<Promise<void | IRpcFanoutResult<void>>>()
-expectTypeOf(single.stream('frames', 2)).toEqualTypeOf<
+// @ts-expect-error Nested method declarations still reject an unknown member after BC1.
+single.memory.request('math.missing', [20, 22])
+// @ts-expect-error The original declared pair cannot be replaced by an unrelated payload.
+single.memory.request('math.add', 'wrong')
+expectTypeOf(single.memory.notify('resize', 800)).toEqualTypeOf<
+  Promise<void | IRpcFanoutResult<void>>
+>()
+expectTypeOf(single.memory.stream('frames', 2)).toEqualTypeOf<
   AsyncIterableIterator<number> | IRpcFanoutResult<AsyncIterableIterator<number>>
 >()
-expectTypeOf(single.group([{ method: 'resize', payload: 800 }])).toEqualTypeOf<
-  Promise<readonly IRpcRuntimeStepOutcome[] | IRpcFanoutResult<readonly IRpcRuntimeStepOutcome[]>>
+expectTypeOf(single.memory.group([{ method: 'resize', payload: 800 }])).toEqualTypeOf<
+  Promise<readonly IRpcStepOutcome[] | IRpcFanoutResult<readonly IRpcStepOutcome[]>>
 >()
-expectTypeOf(single.outcome('key')).toEqualTypeOf<
-  Promise<IRpcRuntimeOutcomeResult | IRpcFanoutResult<IRpcRuntimeOutcomeResult>>
+expectTypeOf(single.memory.outcome('key')).toEqualTypeOf<
+  Promise<IRpcOutcomeLookupResult | IRpcFanoutResult<IRpcOutcomeLookupResult>>
 >()
 // @ts-expect-error Request does not accept generator routes as scalar results.
-single.request('frames', 2)
+single.memory.request('frames', 2)
 // @ts-expect-error Notification payload remains checked.
-single.notify('resize', 'wrong')
+single.memory.notify('resize', 'wrong')
 // @ts-expect-error Streaming cannot invoke scalar methods.
-single.stream('resize', 800)
+single.memory.stream('resize', 800)
 // @ts-expect-error Generator payload remains checked.
-single.stream('frames', 'wrong')
+single.memory.stream('frames', 'wrong')
 // @ts-expect-error Group payload is correlated to each scalar route.
-single.group([{ method: 'resize', payload: 'wrong' }])
-single.notify('resize', 800).then((result) => {
+single.memory.group([{ method: 'resize', payload: 'wrong' }])
+single.memory.notify('resize', 800).then((result) => {
   // @ts-expect-error Physical fanout records require narrowing away the scalar void result.
   void result.fulfilled
   if (result !== undefined)
@@ -79,28 +93,24 @@ single.notify('resize', 800).then((result) => {
 
 /** Untyped callers may send only the existing portable value domain. */
 declare const dynamic: IRpcHost
-expectTypeOf(dynamic.request('render', { width: 800 })).toEqualTypeOf<
+expectTypeOf(dynamic.memory.request('render', { width: 800 })).toEqualTypeOf<
   Promise<IRpcPortableValue | undefined | IRpcFanoutResult<IRpcPortableValue | undefined>>
 >()
-expectTypeOf(dynamic.send('peer', 'render', 800)).toEqualTypeOf<
+expectTypeOf(dynamic.memory.send('peer', 'render', 800)).toEqualTypeOf<
   Promise<IRpcPortableValue | undefined>
 >()
-dynamic.notify('render', 800)
-dynamic.dispatch('peer', 'render', 800)
-dynamic.stream('frames', 2)
+dynamic.memory.notify('render', 800)
+dynamic.memory.dispatch('peer', 'render', 800)
+dynamic.memory.stream('frames', 2)
 // @ts-expect-error A Date does not belong to the portable payload domain.
-dynamic.request('render', new Date())
+dynamic.memory.request('render', new Date())
 // @ts-expect-error Untyped dispatch also checks portable payloads.
-dynamic.dispatch('peer', 'render', () => 1)
+dynamic.memory.dispatch('peer', 'render', () => 1)
 
-/** Void configuration is ergonomic while configured factories retain their required payload. */
-const noOptionsFeature = defineFeaturePlugin((_options: void) => ({ name: 'optional' }))
-noOptionsFeature()
-/** Surface inference survives both factory and native definition admission. */
-const configuredFeature = defineFeaturePlugin((value: number) => ({
-  name: 'configured',
-  surface: { value }
-}))
-expectTypeOf(configuredFeature(1).value).toEqualTypeOf<number>()
-// @ts-expect-error A required feature configuration must still be provided.
-configuredFeature()
+/** BC3 removes arbitrary feature-surface factories; only installed complete plugins add methods. */
+// @ts-expect-error RPC calls require an installed namespace even when a remote API is declared.
+single.request('resize', 800)
+// @ts-expect-error The complete feature is required; numeric timeout configuration is not callable policy.
+single.memory.request('resize', 800, { timeout: 20 })
+// @ts-expect-error Only installed transports introduce namespaces.
+single.other.request('resize', 800)

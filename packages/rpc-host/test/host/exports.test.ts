@@ -1,146 +1,126 @@
+/** BC3/BC5 contract snapshots describe the actual supported authoring and capability boundaries. */
 import { readFileSync } from 'node:fs'
 import { expect, it } from 'vitest'
-import * as root from '../../dist/index.js'
-import * as sdk from '../../dist/plugin/index.js'
-import * as features from '../../dist/features/index.js'
+import * as root from '@migaia/rpc-host'
+import * as sdk from '@migaia/rpc-host/sdk'
+import * as features from '@migaia/rpc-host/features'
+import * as plugins from '@migaia/rpc-host/plugins'
 
-/** The final publication retains the Host, feature factories and explicit authoring tools. */
+/** These are the exact publication paths declared by core3.6, without legacy entry aliases. */
 const expectedEntries = [
   '.',
   './features',
-  './features/auth',
-  './features/chunk',
   './features/retry',
   './features/timeout',
-  './features/typegen',
-  './plugin',
-  './probe'
+  './plugins',
+  './plugins/auth',
+  './plugins/batch',
+  './plugins/chunk',
+  './plugins/idempotency',
+  './plugins/limits',
+  './plugins/link-policy',
+  './plugins/probe',
+  './plugins/schema',
+  './plugins/typegen',
+  './sdk'
 ]
-/** Application exports describe Host behavior and stable failures without lower-level factories. */
+
+/** Root owns construction, lifetime and public error diagnostics; code tables belong to Contract. */
 const expectedRoot = [
   'RPC_CORE_ERROR_SOURCE',
-  'RpcCoreErrorCode',
   'RpcLifecycleError',
-  'RpcProviderRejectionReason',
   'createRpcHost',
-  'createRpcIdempotencyStore',
   'defaultRpcReporter',
   'isRpcError',
   'isRpcErrorInstance',
   'isRpcRemoteError',
   'isRpcTimeoutError'
 ]
-/** Plugin authors receive the single joined authoring boundary, including canonical object I/O. */
+
+/** SDK owns native authoring, codecs and shared generations, without business Peer facades. */
 const expectedSdk = [
-  'DEFAULT_DRAIN_MS',
-  'IpcLogEventName',
+  'HostObservationKind',
   'IpcReporterContext',
-  'IpcSendClass',
-  'JSONRPC_ALLOWED_CAPABILITIES',
-  'JSONRPC_REQUIRED_CAPABILITIES',
-  'JSONRPC_REQUIRED_METHODS',
-  'JsonRpcErrorNumber',
-  'JsonRpcProfile',
-  'MessageResourceEvent',
-  'REMOTE_METHOD_MAX_LENGTH',
-  'REMOTE_METHOD_MODES',
-  'REMOTE_NAME_PATTERN',
-  'REMOTE_SCHEMA_VERSION',
-  'RPC_REMOTE_ERROR_SOURCE',
-  'RUNTIME_API_SCHEMA_VERSION',
-  'RemoteMethodMode',
-  'RemoteMethodName',
-  'RpcAdapterErrorText',
-  'RpcCandidateStatus',
-  'RpcCarrierDetailKey',
-  'RpcOperation',
-  'RpcPlatform',
-  'RpcRemoteLayerErrorCode',
-  'RpcTransportEncoding',
-  'RpcTransportMode',
-  'RpcTransportOwnership',
-  'RpcTransportTopology',
-  'RuntimeApiErrorText',
-  'RuntimeApiMode',
-  'RuntimeConnectionDirection',
-  'RuntimeEventName',
-  'RuntimePluginKey',
-  'RuntimeQueryStatus',
-  'RuntimeSourceKind',
-  'assertJsonRpcExtensions',
-  'carrierSizeBytes',
-  'collectListenerCleanupFailures',
-  'collectListenerFailure',
-  'createAdapterBindingDrain',
-  'createAdapterConfigurationError',
-  'createAdapterConfigurationTypeError',
-  'createAdapterDeployment',
-  'createAdapterId',
-  'createAdapterMessageHandshakeBudget',
-  'createAdapterSourceConfigurationError',
-  'createAdapterTransportError',
-  'createBrowserMessagePortTransport',
-  'createEventEmitterMessageResource',
-  'createEventTargetMessageResource',
-  'createIpcLogFeature',
-  'createIpcSendQueueFeature',
-  'createJsonRpcBridgeError',
-  'createListenerFailure',
-  'createListenerFailureState',
-  'createMessageListenerHub',
-  'createRemoteRetryPort',
-  'createRpcTransportError',
-  'createRuntimeByteConnection',
-  'createRuntimeEventByteIO',
-  'createRuntimeMessageConnection',
-  'createRuntimeProviderGovernor',
-  'createRuntimeProviderScope',
-  'createRuntimeWebByteStream',
-  'createWebWorkerTransport',
-  'defaultRpcReporter',
-  'defineByteAdapter',
-  'defineFeaturePlugin',
-  'defineMessageAdapter',
+  'RPC_STREAM_MAX_FRAME_BYTES',
+  'RpcBinaryProfile',
+  'RpcBinaryStorage',
+  'RpcBytePump',
+  'RpcCarrierObservation',
+  'RpcEventByteIO',
+  'RpcJsonCarrierCodec',
+  'RpcMemberConnectionDirection',
+  'RpcMemberEventName',
+  'RpcMemberGeneration',
+  'RpcMemberMetricScope',
+  'RpcMemberMetricUnit',
+  'RpcMemberQueryClock',
+  'RpcMemberQueryLimit',
+  'RpcMemberQueryReason',
+  'RpcMemberQueryStatus',
+  'RpcMemberRecentKind',
+  'RpcMemberResourceKind',
+  'RpcMemberSourceKind',
+  'RpcMemberStopSignal',
+  'RpcNativeFeatureKind',
+  'RpcNativeMemberKind',
+  'RpcNativeMembers',
+  'RpcNativePoolMember',
+  'RpcPortableCapture',
+  'RpcProtocolEvent',
+  'RpcUtf8',
+  'createRpcBackingDigest',
+  'createRpcByteCarrier',
+  'createRpcMessageCarrier',
+  'createRpcStreamFrameDecoder',
+  'createRpcStreamFrameDecoderWithLimit',
+  'defaultRpcId',
+  'defineFlowPlugin',
+  'defineLinkPolicy',
   'defineTransportPlugin',
-  'deserializeRpcError',
-  'drainListenerFailures',
-  'drainTerminalListenerFailures',
-  'holdAdapterByteBootstrapSource',
-  'holdAdapterLaunch',
-  'holdAdapterMessageBootstrapSource',
-  'holdAdapterObjectChannel',
-  'identifyRpcBoundaryFailure',
-  'materializeAdapterJson',
-  'normalizeRemoteContract',
-  'normalizeRemoteControlShape',
-  'normalizeRemoteHostCatalog',
-  'observeListener',
-  'prepareJsonRpcOffer',
-  'readAdapterAbortReason',
-  'readJsonRpcReply',
-  'readRuntimeByteBootstrap',
-  'registerListeners',
-  'releaseListenerRegistration',
-  'reportListenerFailure',
-  'resolveAdapterEntry',
-  'retainAdapterRuntimeFlags',
-  'runtimeQuery',
-  'safeRead',
-  'safeString',
-  'sameRemoteContract',
-  'serializeRpcError',
-  'validateJsonRpcDescription'
+  'encodeRpcStreamFrame',
+  'encodeRpcStreamTextFrame',
+  'hasRpcPortableBinary',
+  'joinRpcPreparedMetadata',
+  'portableBytes',
+  'prepareRpcBinary',
+  'readRpcLaunchFacts',
+  'resolveAbortReason',
+  'resolveRpcEntry',
+  'restoreRpcBinary',
+  'retainRpcRuntimeFlags',
+  'rpcMemberConnectionDetail',
+  'rpcMemberCounters',
+  'rpcMemberErrorIdentity',
+  'rpcMemberMetric',
+  'rpcMemberResources',
+  'rpcMemberUnavailable',
+  'splitRpcPreparedMetadata',
+  'withRpcLaunchFacts'
+]
+
+/** Optional flow behavior is published only through its actual owning plugin entry. */
+const expectedPlugins = [
+  'auth',
+  'batch',
+  'chunk',
+  'createRpcIdempotencyStore',
+  'defineProbe',
+  'idempotency',
+  'limits',
+  'linkPolicy',
+  'probe',
+  'schema',
+  'typegen'
 ]
 
 it('publishes exactly the final Host package entries and runtime symbols', () => {
-  /** This is the real package manifest, independent of the generated export registry. */
+  /** This real manifest is independent of generated export metadata. */
   const manifest = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8'))
   expect(new Set(Object.keys(manifest.exports))).toEqual(new Set(expectedEntries))
   expect(new Set(Object.keys(root))).toEqual(new Set(expectedRoot))
   expect(new Set(Object.keys(sdk))).toEqual(new Set(expectedSdk))
-  expect(new Set(Object.keys(features))).toEqual(
-    new Set(['authFeature', 'chunkFeature', 'retryFeature', 'timeoutFeature', 'typegenFeature'])
-  )
+  expect(new Set(Object.keys(features))).toEqual(new Set(['retry', 'timeout']))
+  expect(new Set(Object.keys(plugins))).toEqual(new Set(expectedPlugins))
   expect(sdk).not.toHaveProperty('registerJsonObjectPort')
   expect(sdk).not.toHaveProperty('registerBatchAgreement')
   for (const removed of [
@@ -153,9 +133,26 @@ it('publishes exactly the final Host package entries and runtime symbols', () =>
 })
 
 it('publishes the same feature factory through its named and default entry', async () => {
-  for (const name of ['auth', 'chunk', 'retry', 'timeout', 'typegen'] as const) {
-    /** A direct module import proves the actual default publication, not an alias table. */
-    const entry = await import(`../../dist/features/${name}.js`)
-    expect(entry.default).toBe(features[`${name}Feature`])
+  for (const name of ['retry', 'timeout'] as const) {
+    /** Resolve the actual package subpath rather than a test alias or source module. */
+    const entry = await import(`@migaia/rpc-host/features/${name}`)
+    expect(entry.default).toBe(features[name])
   }
+  for (const name of [
+    'auth',
+    'batch',
+    'chunk',
+    'idempotency',
+    'limits',
+    'probe',
+    'schema',
+    'typegen'
+  ] as const) {
+    /** Each complete optional capability has the same factory at both supported entries. */
+    const entry = await import(`@migaia/rpc-host/plugins/${name}`)
+    expect(entry.default).toBe(plugins[name])
+  }
+  /** Camel-case factory and stable hyphenated subpath belong to the same link policy owner. */
+  const entry = await import('@migaia/rpc-host/plugins/link-policy')
+  expect(entry.default).toBe(plugins.linkPolicy)
 })

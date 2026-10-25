@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it, vi } from 'vitest'
 import { createNativeDefaultAllocator } from '../../dist/core/internal/native-default-id.js'
-import { NativeDefaultIdText } from '../../dist/core/internal/native-default-id-text.js'
+import { NativeDefaultIdText } from '../../dist/call/id-text.js'
 import { NativeReplayReceipt } from '../../dist/core/internal/native-replay.js'
 import { allocateRpcId } from '../../dist/core/internal/id.js'
 

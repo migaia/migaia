@@ -1,12 +1,3 @@
-import { createRemoteRetryPort } from '@migaia/rpc-host/plugin'
-import { createManagedRuntimePeer } from '../../../rpc-host/dist/remote/runtime-api/managed-peer.js'
-import { readRuntimePeerConnection } from '../../../rpc-host/dist/remote/runtime-api/peer.js'
-import type { IRuntimePeer } from '@migaia/rpc-host/plugin'
-import type {
-  IProcessPluginEstablish,
-  ISpawnProcessPluginDeployment,
-  IConnectProcessPluginDeployment
-} from '../../../rpc-plugin-process/dist/process/plugin/types.js'
 import { spawn } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { once } from 'node:events'
@@ -16,88 +7,72 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import { createUnitBudget } from '@migaia/supervision'
-import { systemScheduler } from '@migaia/utils/scheduler'
 import { createManualScheduler } from '@migaia/utils/testing'
-import { createProcessTransport } from '../../../rpc-plugin-process/dist/process/handshake.js'
-import type { IProcessByteChannel } from '../../../rpc-plugin-process/dist/process/types.js'
-import { type IRemoteRetryPort, type IRemoteServeEndpoint } from '@migaia/rpc-host/plugin'
-import {
-  createSpawnProcessBinding,
-  createConnectProcessBinding,
-  type IProcessPluginBinding
-} from '../../../rpc-plugin-process/dist/process/plugin/binding.js'
+import { systemScheduler } from '@migaia/utils/scheduler'
+import type { IRpcRetryFeature, IRpcAttempt } from '@migaia/rpc-contract/interfaces'
+import { retry } from '@migaia/rpc-host/features/retry'
+import { timeout } from '@migaia/rpc-host/features/timeout'
+import { sendQueue } from '@migaia/rpc-plugin-process/features/send-queue'
+import { ipcLog } from '@migaia/rpc-plugin-process/features/log'
+import type {
+  ISpawnProcessPluginDeployment,
+  IConnectProcessPluginDeployment
+} from '@migaia/rpc-plugin-process'
 import {
   createRpcStreamFrameDecoder,
   encodeRpcStreamFrame,
   RPC_STREAM_MAX_FRAME_BYTES
-} from '@migaia/rpc-contract/framing/stream'
-import { encodeJsonRpcFrame } from '@migaia/rpc-contract/framing/jsonrpc'
-import { endpointFor, bridgeEndpointFor } from './peers/ts/runtime.js'
-import { RemoteMethodName } from '@migaia/rpc-host/plugin'
+} from '@migaia/rpc-host/sdk'
 import {
   peers,
   expected,
   assertWireGraph,
-  offer,
-  bridgeFrames,
   evidence,
   deployment,
-  wireFrames
+  wireFrames,
+  installBusinessClient
 } from './fixtures/conformance-business.js'
 
-/** Only the five admitted real executables participate; Node and Bun are separate TS runtimes. */
+/** Only the original admitted native language recipes participate in this matrix. */
 type IPeer = (typeof peers)[number]
-/** Test configuration changes deployment policy, never the production protocol or state machine. */
+/** Fault configuration changes real supervision and complete policies, never the semantic protocol. */
 type IFaultOptions = {
   host?: boolean
-  bridge?: boolean
   scheduler?: ReturnType<typeof createManualScheduler>
   restart?: ISpawnProcessPluginDeployment['supervision']['restart']
   maxPendingData?: number
   address?: string
   token?: string
-  retryPort?: IRemoteRetryPort
+  retry?: IRpcRetryFeature
 }
 
-/** Actual binding types are the only native lifetime resources this fixture may retain. */
-type IFaultBinding =
-  | ReturnType<typeof createSpawnProcessBinding>
-  | ReturnType<typeof createConnectProcessBinding>
-
-/** One fault run owns original native binding resources and passive physical observations. */
+/** Own the original native source and real public namespace across native replacement generations. */
 class FaultClient {
-  /** The actual native budget remains authoritative for process lease cleanup. */
+  /** The existing production unit budget remains authoritative for native lease cleanup. */
   readonly budget
-  /** Retain every actual OS handle for independent exit/ownership assertions. */
+  /** Exact launched OS handles preserve independent exit and PID observations. */
   readonly handles: ReturnType<typeof deployment>['handles']
-  /** Retain original native stderr chunks for failure evidence. */
+  /** Native stderr remains original evidence, separate from diagnostics returned by Host. */
   readonly output: ReturnType<typeof deployment>['output']
-  /** Retain original physical response bytes without decoding them on the live path. */
+  /** Actual raw response chunks remain available to the post-run frame assertions. */
   readonly stdout: ReturnType<typeof deployment>['stdout']
-  /** Retain exact original sent byte chunks for zero-write and retry identity assertions. */
+  /** Actual native outgoing chunks preserve the original zero-write and retry-count evidence. */
   readonly sent: ReturnType<typeof deployment>['sent']
-  /** Original report callbacks keep every failure object without synthesizing classifications. */
+  /** Every original report object remains held unchanged. */
   readonly reports: ReturnType<typeof deployment>['reports']
-  /** These are the actual canonical endpoints, one per accepted native generation. */
-  readonly runtimes: IRemoteServeEndpoint[] = []
-  /** Explicit raw fault injection borrows only this run's actual physical channels. */
-  readonly physical: IProcessByteChannel[] = []
-  /** Production IPC callbacks retain exact capacity transitions. */
+  /** Physical injections borrow exactly the acquired raw channels, independently of RPC shutdown. */
+  readonly physical: ReturnType<typeof deployment>['rawChannels']
+  /** The installed real process log feature reports original capacity transitions. */
   readonly backlog: unknown[] = []
-  /** Original native launcher/bootstrap and passive output arrays remain one existing fixture. */
-  #fixture: ReturnType<typeof deployment>
-  /** The existing source form, runtime clock, restart and gate policy are immutable per run. */
-  #options: IFaultOptions
-  /** The independently implemented peer owns its process executable and stable protocol identity. */
-  #remote: IPeer
-  /** Canonical managed calls retain current/leave/retry resources across native generations. */
-  #peer: IRuntimePeer | undefined
-  /** Actual native binding remains sole supervisor, health and physical drain authority. */
-  #binding: IFaultBinding | undefined
+  /** Native acquisition inputs and passive receipts belong to this fixture operation. */
+  readonly #fixture: ReturnType<typeof deployment>
+  /** One immutable test scenario selects original clocks, restart and complete policy instances. */
+  readonly #options: IFaultOptions
+  /** The canonical public Host remains the only request, stream, pending and provider owner. */
+  #installed: Awaited<ReturnType<typeof installBusinessClient>> | undefined
 
-  /** Build passive observations and cold source inputs before any native process starts. */
+  /** Prepare only the native recipe; the normal install transaction owns all actual execution. */
   constructor(peer: IPeer, options: IFaultOptions) {
-    this.#remote = peer
     this.#options = options
     this.budget = createUnitBudget({ kind: 'process', maxUnits: 1, scheduler: options.scheduler })
     this.#fixture = deployment(
@@ -105,7 +80,7 @@ class FaultClient {
       options.host ?? false,
       options.token ?? randomUUID(),
       options.address,
-      options.bridge,
+      false,
       this.budget
     )
     this.handles = this.#fixture.handles
@@ -113,141 +88,71 @@ class FaultClient {
     this.stdout = this.#fixture.stdout
     this.sent = this.#fixture.sent
     this.reports = this.#fixture.reports
+    this.physical = this.#fixture.rawChannels
+  }
+  /** Every business operation uses the same genuine namespace, including after native restart. */
+  get namespace() {
+    return this.#installed!.namespace
   }
 
-  /** Borrow the genuine canonical managed Peer rather than projecting an old feature facade. */
-  get peer(): IRuntimePeer {
-    return this.#peer!
-  }
-
-  /** Native state/health assertions read the actual binding owner directly. */
-  get binding() {
-    return this.#binding!
-  }
-
-  /** Retain native and bridge physical framing while exposing no extra runtime state machine. */
-  #establish: IProcessPluginEstablish = async (raw, context) => {
-    if (raw.kind !== 'byte') throw new TypeError('fault fixture requires bytes')
-    this.physical.push(raw)
-    if (this.#options.bridge) return this.#fixture.selected.establish(raw, context)
-    raw.onData((chunk) => this.stdout.push(chunk.slice()))
-    return createProcessTransport(
-      {
-        ...raw,
-        write: async (chunk) => {
-          this.sent.push(chunk.slice())
-          await raw.write(chunk)
-        }
-      },
-      {
-        role: 'initiator',
-        peerId: this.#remote.id,
-        offer: context.offer!,
-        scheduler: context.scheduler,
-        signal: context.signal as AbortSignal,
-        report: this.#report,
-        ipc: {
-          ...context.session,
-          maxPendingData: this.#options.maxPendingData,
-          log: (record) => {
-            this.backlog.push(record)
-          }
-        }
-      }
-    )
-  }
-
-  /** Diagnostics retain their original object identity in this run's passive report collection. */
-  #report = (error: unknown): void => {
-    this.reports.push(error)
-  }
-
-  /** Reuse the genuine endpoint owner with the accepted channel's codec/framer and exact clock. */
-  #endpoint = async (channel: Parameters<typeof endpointFor>[0]): Promise<IRemoteServeEndpoint> => {
-    const endpoint = await (this.#options.bridge ? bridgeEndpointFor : endpointFor)(
-      channel,
-      'caller'
-    )
-    this.runtimes.push(endpoint)
-    return endpoint
-  }
-
-  /** Start exactly one real native binding and let its canonical managed owner handle rebinding. */
+  /** Add only the original supervision overrides and complete executing features to the source. */
   async open(): Promise<this> {
-    /** Native supervision, health and endpoint deadlines retain this run's one original clock. */
+    const source = this.#fixture.selected
     const scheduler = this.#options.scheduler ?? systemScheduler
-    /** Only policy and passive establishment observation differ from the existing source fixture. */
     const selected: ISpawnProcessPluginDeployment | IConnectProcessPluginDeployment =
-      this.#fixture.selected.kind === 'spawn'
+      source.kind === 'spawn'
         ? {
-            ...this.#fixture.selected,
-            establish: this.#establish,
-            supervision: {
-              ...this.#fixture.selected.supervision,
-              scheduler,
-              restart: this.#options.restart
-            }
+            ...source,
+            supervision: { ...source.supervision, scheduler, restart: this.#options.restart }
           }
         : {
-            ...this.#fixture.selected,
-            establish: this.#establish,
-            supervision: {
-              ...this.#fixture.selected.supervision,
-              scheduler,
-              restart: this.#options.restart
-            }
+            ...source,
+            supervision: { ...source.supervision, scheduler, restart: this.#options.restart }
           }
     try {
-      if (selected.kind === 'spawn')
-        await this.#prepare(createSpawnProcessBinding(selected, this.#report, true))
-      else await this.#prepare(createConnectProcessBinding(selected, this.#report))
-      /** Foreign Host controls remain real wire operations over the same genuine managed Peer. */
-      if (this.#options.host) await this.peer.request(RemoteMethodName.hostUse, ['p'])
+      this.#installed = await installBusinessClient(this.#fixture, selected, [
+        this.#options.retry ?? retry({ scheduler, report: (error) => this.reports.push(error) }),
+        ...(this.#options.maxPendingData === undefined
+          ? []
+          : [
+              sendQueue({ maxPendingData: this.#options.maxPendingData }),
+              ipcLog({
+                report: (record) => {
+                  this.backlog.push(record)
+                }
+              })
+            ])
+      ])
       return this
     } catch (error) {
-      await this.#peer?.close()
+      await this.#installed?.close()
       await Promise.all(this.handles.map((handle) => handle.exited))
-      writeFileSync(
-        join(evidence, `hf-${this.#remote.language}-startup.stderr.log`),
-        Buffer.concat(this.output)
-      )
-      writeFileSync(
-        join(evidence, `hf-${this.#remote.language}-startup.stdout.bin`),
-        Buffer.concat(this.stdout)
-      )
+      writeFileSync(join(evidence, 'hf-startup.stderr.log'), Buffer.concat(this.output))
+      writeFileSync(join(evidence, 'hf-startup.stdout.bin'), Buffer.concat(this.stdout))
       throw error
     }
   }
-
-  /** The actual production managed owner supplies generation, retry, drain and cleanup semantics. */
-  async #prepare<TUnit extends object, TSpec>(
-    binding: IProcessPluginBinding<TUnit, TSpec>
-  ): Promise<void> {
-    this.#binding = binding as unknown as IFaultBinding
-    this.#peer = await createManagedRuntimePeer(
-      {
-        self: { name: 'caller', instanceId: 'caller' },
-        endpointFactory: this.#endpoint,
-        retryPort: this.#options.retryPort,
-        report: this.#report
-      },
-      binding,
-      (channel, endpoint) => binding.bindEndpoint(channel, endpoint),
-      undefined,
-      () => binding.drainCurrent()
-    )
+  /** Real public member queries sample the original supervisor state without retaining its object. */
+  async state(): Promise<string | undefined> {
+    const detail = await this.namespace.members.get('p')
+    return 'state' in detail.unit ? detail.unit.state : undefined
   }
-
-  /** Release through the same original managed holder, then settle only the explicit manual clock. */
+  /** The same Host close owns native drain/exit; only the explicit original manual clock is settled. */
   close = async (): Promise<void> => {
-    await this.#peer?.close()
+    await this.#installed?.close()
     if (this.#options.scheduler) await settleFaultTurn(this.#options.scheduler)
   }
 }
-
-/** Build one real native fault resource; all business/cleanup behavior stays in existing owners. */
+/** Open one original real language/native scenario through the public production entry. */
 async function faultClient(peer: IPeer, options: IFaultOptions = {}) {
   return new FaultClient(peer, options).open()
+}
+
+/** A one-peer native fixture must produce an actual iterator, never a fanout object. */
+function singleStream(stream: ReturnType<FaultClient['namespace']['stream']>) {
+  if (!(Symbol.asyncIterator in stream))
+    throw new TypeError('fault fixture requires one native stream')
+  return stream
 }
 
 /** Preserve complete stdout/stderr and outbound frames for every real fault run. */
@@ -282,7 +187,7 @@ describe('source domains error source domains', () => {
       let receivedError: unknown
       try {
         await expect(
-          active.runtimes[0]!.endpoint.send(peer.id, 'peer.error', []).catch((error) => {
+          active.namespace.request('peer.error', []).catch((error) => {
             receivedError = error
             throw error
           })
@@ -296,19 +201,23 @@ describe('source domains error source domains', () => {
         })
         /** Observe the actual provider bytes through the canonical stream decoder. */
         const failedWire = wireFrames(active.stdout).find(
-          (frame) =>
-            frame.kind === 'response' &&
-            frame.ok === false &&
-            frame.data.route.method === 'peer.error'
+          (frame) => frame.kind === 'error' && frame.task.method === 'peer.error'
         )?.error
         expect(failedWire).toBeDefined()
         /** Existing graph assertions prove exact code/name/message/stack and cause preservation. */
         assertWireGraph((receivedError as { cause: unknown }).cause, failedWire)
-        expect.soft(failedWire, 'SOURCE_DOMAIN_WIRE_DOMAIN_SOURCE').toMatchObject({
+        expect
+          .soft(failedWire.nodes[failedWire.root], 'SOURCE_DOMAIN_WIRE_DOMAIN_SOURCE')
+          .toMatchObject({
+            source: 'rpc.endpoint',
+            code: 'INTERNAL',
+            message: 'peer error',
+            cause: 1
+          })
+        expect.soft(failedWire.nodes[1], 'SOURCE_DOMAIN_WIRE_CAUSE_DOMAIN_SOURCE').toMatchObject({
           source: 'rpc.endpoint',
           code: 'INTERNAL',
-          message: 'peer error',
-          cause: { source: 'rpc.endpoint', code: 'INTERNAL', message: 'peer cause' }
+          message: 'peer cause'
         })
         expect.soft(receivedError, 'SOURCE_DOMAIN_RECEIVED_DOMAIN_SOURCE').toMatchObject({
           source: 'rpc.endpoint',
@@ -353,8 +262,21 @@ describe('source domains error source domains', () => {
               JSON.stringify({
                 kind: 'handshake',
                 step: 'hello',
-                protocol: 'migaia.rpc',
-                ...offer,
+                profile: 'migaia.rpc/2',
+                peer: { id: 'caller', runtime: 'node' },
+                versions: [{ major: 2, minor: 0 }],
+                codecs: ['json'],
+                extensions: [],
+                directory: {
+                  schemaVersion: 3,
+                  self: {
+                    name: 'caller',
+                    instanceId: 'caller',
+                    generation: { kind: 'connection', value: 0 },
+                    applicationVersion: '0.0.0'
+                  },
+                  methods: []
+                },
                 auth: 'source-domain-different-token'
               })
             )
@@ -366,13 +288,16 @@ describe('source domains error source domains', () => {
       const rejected = wireFrames(stdout).find(
         (frame) => frame.kind === 'handshake' && frame.step === 'reject'
       )
-      expect(rejected?.error).toMatchObject({
+      expect(rejected?.error.nodes[rejected.error.root]).toMatchObject({
         code: 'AUTH_REJECTED',
         name: 'Error',
         message: 'authentication rejected',
         stack: 'Error: authentication rejected'
       })
-      expect(rejected.error, 'SOURCE_DOMAIN_GENERIC_HANDSHAKE_SOURCE').toMatchObject({
+      expect(
+        rejected.error.nodes[rejected.error.root],
+        'SOURCE_DOMAIN_GENERIC_HANDSHAKE_SOURCE'
+      ).toMatchObject({
         source: 'rpc.transport.process'
       })
     } finally {
@@ -386,124 +311,6 @@ describe('source domains error source domains', () => {
         join(evidence, 'hf-go-source-domain-generic-handshake.stderr.log'),
         Buffer.concat(stderr)
       )
-    }
-  })
-
-  it('uses the remote domain for a real Go empty Host use rejection', async () => {
-    /** Host profile exposes the same control entry as the public TypeScript Host service. */
-    const peer = peers.find((candidate) => candidate.language === 'go')!
-    /** Reuse the existing authenticated deployment, raw byte observer and process release owner. */
-    const active = await faultClient(peer, { host: true })
-    /** The caller's actual error must retain the complete generic provider diagnostic. */
-    let receivedError: unknown
-    try {
-      await expect(
-        active.runtimes[0]!.endpoint.send(peer.id, RemoteMethodName.hostUse, []).catch((error) => {
-          receivedError = error
-          throw error
-        })
-      ).rejects.toBeInstanceOf(Error)
-      /** Empty parameters reach businessState.invoke's existing generic wireError branch. */
-      const failure = wireFrames(active.stdout).find(
-        (frame) =>
-          frame.kind === 'response' &&
-          frame.ok === false &&
-          frame.data.route.method === RemoteMethodName.hostUse
-      )?.error
-      expect(failure).toMatchObject({
-        code: 'REMOTE_CONTRACT_INVALID',
-        name: 'Error',
-        message: 'invalid Host use',
-        stack: 'Error: invalid Host use'
-      })
-      assertWireGraph((receivedError as { cause: unknown }).cause, failure)
-      expect(failure, 'SOURCE_DOMAIN_GENERIC_HOST_SOURCE').toMatchObject({ source: 'rpc.remote' })
-    } finally {
-      await active.close()
-      await Promise.all(active.handles.map((handle) => handle.exited))
-      receipt(active, 'go-source-domain-generic-host')
-    }
-  })
-
-  it('uses the remote domain for a real Go empty Host unUse rejection', async () => {
-    /** Host profile exposes the same control entry as the public TypeScript Host service. */
-    const peer = peers.find((candidate) => candidate.language === 'go')!
-    /** Reuse the existing authenticated deployment, raw byte observer and process release owner. */
-    const active = await faultClient(peer, { host: true })
-    /** The caller's actual error must retain the complete generic provider diagnostic. */
-    let receivedError: unknown
-    try {
-      await expect(
-        active.runtimes[0]!.endpoint.send(peer.id, RemoteMethodName.hostUnUse, []).catch(
-          (error) => {
-            receivedError = error
-            throw error
-          }
-        )
-      ).rejects.toBeInstanceOf(Error)
-      /** Empty parameters reach businessState.invoke's existing generic wireError branch. */
-      const failure = wireFrames(active.stdout).find(
-        (frame) =>
-          frame.kind === 'response' &&
-          frame.ok === false &&
-          frame.data.route.method === RemoteMethodName.hostUnUse
-      )?.error
-      expect(failure).toMatchObject({
-        code: 'REMOTE_CONTRACT_INVALID',
-        name: 'Error',
-        message: 'invalid Host unUse',
-        stack: 'Error: invalid Host unUse'
-      })
-      assertWireGraph((receivedError as { cause: unknown }).cause, failure)
-      expect(failure, 'SOURCE_DOMAIN_GENERIC_HOST_UNUSE_SOURCE').toMatchObject({
-        source: 'rpc.remote'
-      })
-    } finally {
-      await active.close()
-      await Promise.all(active.handles.map((handle) => handle.exited))
-      receipt(active, 'go-source-domain-generic-host-unuse')
-    }
-  })
-
-  it('uses the endpoint domain for a real Go unknown bridge method rejection', async () => {
-    /** The existing bridge deployment supplies authentication, fd bootstrap and byte observation. */
-    const peer = peers.find((candidate) => candidate.language === 'go')!
-    /** The production bridge owns the session while this one request exercises its foreign peer. */
-    const active = await faultClient(peer, { bridge: true })
-    try {
-      await active.physical[0]!.write(
-        encodeJsonRpcFrame({
-          jsonrpc: '2.0',
-          id: 'source-domain-generic-bridge',
-          method: 'source-domain.missing',
-          params: {}
-        })
-      )
-      await vi.waitFor(() =>
-        expect(
-          bridgeFrames(active.stdout).some((frame) => frame.id === 'source-domain-generic-bridge')
-        ).toBe(true)
-      )
-      /** The authenticated Go bridge default branch returns its generic wireError directly. */
-      const reply = bridgeFrames(active.stdout).find(
-        (frame) => frame.id === 'source-domain-generic-bridge'
-      )
-      expect(reply.error).toMatchObject({ code: -32000, message: 'bridge peer method unavailable' })
-      expect(reply.error.data.migaiaWireError).toMatchObject({
-        code: 'METHOD_NOT_FOUND',
-        name: 'Error',
-        message: 'bridge peer method unavailable',
-        stack: 'Error: bridge peer method unavailable'
-      })
-      expect(reply.error.data.migaiaWireError, 'SOURCE_DOMAIN_GENERIC_BRIDGE_SOURCE').toMatchObject(
-        {
-          source: 'rpc.endpoint'
-        }
-      )
-    } finally {
-      await active.close()
-      await Promise.all(active.handles.map((handle) => handle.exited))
-      receipt(active, 'go-source-domain-generic-bridge')
     }
   })
 })
@@ -624,11 +431,10 @@ describe('borrowed hang retains external process ownership', () => {
           scheduler,
           restart: { mode: 'on-failure', initialDelayMs: 1, maxDelayMs: 1, maxRestarts: 1 }
         })
-        expect(await active.peer.request('p.f.request', ['before-hang'])).toBe('before-hang')
+        expect(await active.namespace.request('p.f.request', ['before-hang'])).toBe('before-hang')
         expect({
-          health: active.binding.health,
-          state: active.binding.supervisor.state
-        }).toMatchObject({ health: 'ping', state: 'ready' })
+          state: await active.state()
+        }).toMatchObject({ state: 'ready' })
         let closed = false
         active.physical[0]!.onClose(() => {
           closed = true
@@ -650,16 +456,17 @@ describe('borrowed hang retains external process ownership', () => {
         expect(active.handles).toHaveLength(0)
         process.kill(child.pid!, 'SIGCONT')
         paused = false
-        await vi.waitFor(() =>
+        await vi.waitFor(async () =>
           expect({
-            health: active!.binding.health,
-            state: active!.binding.supervisor.state
+            state: await active!.state()
           }).toMatchObject({ state: 'backoff' })
         )
         scheduler.advance(1)
         await vi.waitFor(async () => {
           await settleFaultTurn(scheduler)
-          expect(await active!.peer.request('p.f.request', ['after-redial'])).toBe('after-redial')
+          expect(await active!.namespace.request('p.f.request', ['after-redial'])).toBe(
+            'after-redial'
+          )
         })
         expect(active.physical).toHaveLength(2)
         await active.close()
@@ -694,18 +501,22 @@ describe('real native business budget and independent session', () => {
          * string.
          */
         const payload = 'x'.repeat(RPC_STREAM_MAX_FRAME_BYTES - 4096)
-        expect(await active.peer.request('p.f.request', [payload], { timeoutMs: 10000 })).toBe(
-          payload
-        )
+        expect(
+          await active.namespace.request('p.f.request', [payload], {
+            timeout: timeout({ ms: 10000, scheduler: systemScheduler })
+          })
+        ).toBe(payload)
         const writes = active.sent.length
         await expect(
-          active.peer.request('p.f.request', ['x'.repeat(RPC_STREAM_MAX_FRAME_BYTES)], {
-            timeoutMs: 10000
+          active.namespace.request('p.f.request', ['x'.repeat(RPC_STREAM_MAX_FRAME_BYTES)], {
+            timeout: timeout({ ms: 10000, scheduler: systemScheduler })
           })
         ).rejects.toMatchObject({ cause: { code: 'FRAME_LIMIT_EXCEEDED' } })
         expect(active.sent).toHaveLength(writes)
-        expect(await healthy.peer.request('p.f.request', ['healthy'])).toBe('healthy')
-        expect(await active.peer.request('p.f.request', ['after-overflow'])).toBe('after-overflow')
+        expect(await healthy.namespace.request('p.f.request', ['healthy'])).toBe('healthy')
+        expect(await active.namespace.request('p.f.request', ['after-overflow'])).toBe(
+          'after-overflow'
+        )
       } finally {
         await active.close()
         await healthy.close()
@@ -755,12 +566,12 @@ describe('independent peer rejects raw malformed input', () => {
                   'PEER_ERROR DECODE_FAILED'
                 )
               )
-              expect(await active.peer.request('p.f.request', ['after-invalid-json'])).toBe(
+              expect(await active.namespace.request('p.f.request', ['after-invalid-json'])).toBe(
                 'after-invalid-json'
               )
             } else await vi.waitFor(() => expect(closed, label).toBe(true), { timeout: 2000 })
             expect(active.handles).toHaveLength(1)
-            expect(await healthy.peer.request('p.f.request', [label])).toBe(label)
+            expect(await healthy.namespace.request('p.f.request', [label])).toBe(label)
           } finally {
             unsubscribe()
             await active.close()
@@ -794,14 +605,14 @@ describe('real owned terminal guards', () => {
           const current = active.handles[0]!
           process.kill(current.identity.pid!, 'SIGKILL')
           await current.exited
-          await vi.waitFor(() =>
-            expect({ state: active.binding.supervisor.state }).toMatchObject({ state: 'terminal' })
+          await vi.waitFor(async () =>
+            expect({ state: await active.state() }).toMatchObject({ state: 'terminal' })
           )
           const writes = active.sent.length
           for (const operation of [
-            () => active.peer.request('p.f.request', []),
-            () => active.peer.notify('p.f.oneWay', []),
-            () => active.peer.stream('p.f.generator', [])[Symbol.asyncIterator]().next()
+            () => active.namespace.request('p.f.request', []),
+            () => active.namespace.notify('p.f.oneWay', []),
+            () => singleStream(active.namespace.stream('p.f.generator', [])).next()
           ])
             await expect(async () => operation()).rejects.toMatchObject({
               source: 'rpc.remote',
@@ -810,7 +621,7 @@ describe('real owned terminal guards', () => {
           expect(active.sent).toHaveLength(writes)
           expect(active.handles).toHaveLength(1)
           expect(
-            wireFrames(active.sent).filter((frame) => frame.kind === 'request').length
+            wireFrames(active.sent).filter((frame) => frame.kind === 'call').length
           ).toBeGreaterThan(0)
         } finally {
           await active.close()
@@ -820,7 +631,7 @@ describe('real owned terminal guards', () => {
         expect(active.budget.inUse).toBe(0)
         expect(active.budget.pending).toBe(0)
         expect(scheduler.pendingCount).toBe(0)
-        expect(active.binding.supervisor.state).toBe('disposed')
+        expect(await active.state()).toBe('disposed')
       }, 15000)
 })
 
@@ -846,8 +657,8 @@ describe('explicit persistent authenticated scope', () => {
         restart: { mode: 'on-failure', initialDelayMs: 1, maxDelayMs: 1, maxRestarts: 1 }
       })
       expect(
-        await active.peer.request('p.f.request', [], {
-          timeoutMs: 5000,
+        await active.namespace.request('p.f.request', [], {
+          timeout: timeout({ ms: 5000 }),
           idempotencyKey: 'hf-original-key'
         })
       ).toBe('committed')
@@ -855,14 +666,14 @@ describe('explicit persistent authenticated scope', () => {
       expect(active.handles).toHaveLength(2)
       expect((await active.handles[0]!.exited).code).toBe(17)
       const requests = wireFrames(active.sent).filter(
-        (frame) => frame.kind === 'request' && frame.method === 'p.f.request'
+        (frame) => frame.kind === 'call' && frame.task?.method === 'p.f.request'
       )
       expect(requests).toHaveLength(2)
-      expect(requests.map((frame) => frame.data.route.idempotencyKey)).toEqual([
+      expect(requests.map((frame) => frame.options.idempotencyKey)).toEqual([
         'hf-original-key',
         'hf-original-key'
       ])
-      expect(requests[1].data.route.timeoutMs).toBeLessThanOrEqual(requests[0].data.route.timeoutMs)
+      expect(requests[1].options.remainingMs).toBeLessThanOrEqual(requests[0].options.remainingMs)
     } finally {
       await active?.close()
       if (active) {
@@ -888,26 +699,25 @@ describe('physical departure before sendOnce admission', () => {
       const waiting = new Promise<void>((resolve) => {
         entered = resolve
       })
-      const retryPort: IRemoteRetryPort = {
-        dispatch: async (input) => {
-          entered()
-          await barrier
-          return createRemoteRetryPort({
-            events: input.events,
-            scheduler,
-            report: () => undefined
-          }).dispatch(input)
+      /** The original barrier surrounds the complete retry policy's one actual attempt. */
+      const admission = { entered, barrier, policy: retry({ scheduler, report: () => undefined }) }
+      const retryPort: IRpcRetryFeature = {
+        kind: 'retry',
+        async run<T>(attempt: IRpcAttempt<T>): Promise<T> {
+          admission.entered()
+          await admission.barrier
+          return admission.policy.run(attempt)
         }
       }
       const active = await faultClient(peer, {
         scheduler,
-        retryPort,
+        retry: retryPort,
         restart: { mode: 'on-failure', initialDelayMs: 100, maxDelayMs: 100, maxRestarts: 1 }
       })
       let call: Promise<unknown> | undefined
       try {
         const writes = active.sent.length
-        call = active.peer.request('p.f.request', ['blocked-before-sendOnce']).then(
+        call = active.namespace.request('p.f.request', ['blocked-before-sendOnce']).then(
           (value) => ({ value }),
           (error) => ({ error })
         )
@@ -915,10 +725,9 @@ describe('physical departure before sendOnce admission', () => {
         expect(active.sent).toHaveLength(writes)
         process.kill(active.handles[0]!.identity.pid!, 'SIGKILL')
         await active.handles[0]!.exited
-        await vi.waitFor(() =>
+        await vi.waitFor(async () =>
           expect({
-            health: active.binding.health,
-            state: active.binding.supervisor.state
+            state: await active.state()
           }).toMatchObject({ state: 'backoff' })
         )
         admit()
@@ -927,7 +736,7 @@ describe('physical departure before sendOnce admission', () => {
         })
         expect(
           wireFrames(active.sent).filter(
-            (frame) => frame.kind === 'request' && frame.method === 'p.f.request'
+            (frame) => frame.kind === 'call' && frame.task?.method === 'p.f.request'
           )
         ).toHaveLength(0)
       } finally {
@@ -962,10 +771,9 @@ describe('default native health detects real CPU loops', () => {
       try {
         const current = active.handles[0]!
         expect({
-          health: active.binding.health,
-          state: active.binding.supervisor.state
-        }).toMatchObject({ health: 'ping', state: 'ready' })
-        expect(await active.runtimes[0]!.endpoint.send(peer.id, 'peer.busy', [])).toBe('ACK')
+          state: await active.state()
+        }).toMatchObject({ state: 'ready' })
+        expect(await active.namespace.request('peer.busy', [])).toBe('ACK')
         let exited = false
         void current.exited.then(() => {
           exited = true
@@ -984,22 +792,21 @@ describe('default native health detects real CPU loops', () => {
         }
         expect(scheduler.now() - origin).toBe(17000)
         await current.exited
-        await vi.waitFor(() =>
+        await vi.waitFor(async () =>
           expect({
-            health: active.binding.health,
-            state: active.binding.supervisor.state
+            state: await active.state()
           }).toMatchObject({ state: 'backoff' })
         )
         scheduler.advance(1)
         await vi.waitFor(() => expect(active.handles).toHaveLength(2))
         await vi.waitFor(async () => {
           await settleFaultTurn(scheduler)
-          expect(await active.peer.request('p.f.request', ['after-busy'])).toBe('after-busy')
+          expect(await active.namespace.request('p.f.request', ['after-busy'])).toBe('after-busy')
         })
         expect(active.handles[1]!.identity.pid).not.toBe(current.identity.pid)
         expect(
           wireFrames(active.sent).filter(
-            (frame) => frame.kind === 'variation' && frame.data.route.variation === 'ping'
+            (frame) => frame.kind === 'control' && frame.operation === 'ping'
           )
         ).toHaveLength(3)
       } finally {
@@ -1020,15 +827,13 @@ describe('capacity one real stopped reader', () => {
       let paused = false
       let blocked: Promise<unknown> | undefined
       try {
-        expect(await active.runtimes[0]!.endpoint.send(peer.id, 'peer.pause', [])).toBe('ACK')
+        expect(await active.namespace.request('peer.pause', [])).toBe('ACK')
         paused = true
         /** This real pipe write exceeds the OS pipe buffer while remaining below the frame budget. */
-        blocked = active.runtimes[0]!.endpoint.send(
-          peer.id,
-          'p.f.request',
-          ['x'.repeat(2 * 1024 * 1024)],
-          { timeoutMs: 10000, trace: 'h-backlog-trace' }
-        )
+        blocked = active.namespace.request('p.f.request', ['x'.repeat(2 * 1024 * 1024)], {
+          timeout: timeout({ ms: 10000, scheduler: systemScheduler }),
+          trace: 'h-backlog-trace'
+        })
         let settled = false
         void blocked.then(
           () => {
@@ -1042,7 +847,7 @@ describe('capacity one real stopped reader', () => {
         expect(settled).toBe(false)
         const writes = active.sent.length
         await expect(
-          active.runtimes[0]!.endpoint.send(peer.id, 'p.f.request', ['overloaded'], {
+          active.namespace.request('p.f.request', ['overloaded'], {
             trace: 'h-rejected-trace'
           })
         ).rejects.toMatchObject({ source: 'rpc.endpoint', code: 'OVERLOADED' })
@@ -1054,13 +859,13 @@ describe('capacity one real stopped reader', () => {
             trace: 'h-rejected-trace'
           })
         )
-        expect(await healthy.peer.request('p.f.request', ['healthy-during-backlog'])).toBe(
+        expect(await healthy.namespace.request('p.f.request', ['healthy-during-backlog'])).toBe(
           'healthy-during-backlog'
         )
         process.kill(active.handles[0]!.identity.pid!, 'SIGCONT')
         paused = false
         expect(await blocked).toBe('x'.repeat(2 * 1024 * 1024))
-        expect(await active.peer.request('p.f.request', ['after-drain'])).toBe('after-drain')
+        expect(await active.namespace.request('p.f.request', ['after-drain'])).toBe('after-drain')
         expect(active.backlog).toContainEqual(
           expect.objectContaining({ name: 'ipc.backlog.low', pendingData: 0 })
         )
@@ -1096,10 +901,10 @@ describe('real owned crash retry eligibility', () => {
         const controller = new AbortController()
         let pending: Promise<unknown> | undefined
         try {
-          expect(await active.runtimes[0]!.endpoint.send(peer.id, 'peer.pause', [])).toBe('ACK')
-          pending = active.peer.request('p.f.request', ['replayed-value'], {
+          expect(await active.namespace.request('peer.pause', [])).toBe('ACK')
+          pending = active.namespace.request('p.f.request', ['replayed-value'], {
             idempotencyKey: 'hf-crash-original-key',
-            timeoutMs: 500,
+            timeout: timeout({ ms: 500, scheduler }),
             signal: controller.signal
           })
           /**
@@ -1112,7 +917,7 @@ describe('real owned crash retry eligibility', () => {
           )
           await vi.waitFor(() =>
             expect(
-              wireFrames(active.sent).filter((frame) => frame.method === 'p.f.request')
+              wireFrames(active.sent).filter((frame) => frame.task?.method === 'p.f.request')
             ).toHaveLength(1)
           )
           process.kill(active.handles[0]!.identity.pid!, 'SIGKILL')
@@ -1127,23 +932,22 @@ describe('real owned crash retry eligibility', () => {
             await vi.waitFor(async () => {
               await settleFaultTurn(scheduler)
               expect({
-                health: active.binding.health,
-                state: active.binding.supervisor.state
+                state: await active.state()
               }).toMatchObject({ state: 'ready' })
             })
           }
           const result = await observed
           const requests = wireFrames(active.sent).filter(
-            (frame) => frame.kind === 'request' && frame.method === 'p.f.request'
+            (frame) => frame.kind === 'call' && frame.task?.method === 'p.f.request'
           )
           expect(requests).toHaveLength(disposition === 'ready' ? 2 : 1)
           if (disposition === 'ready') {
             expect(result).toEqual({ value: 'replayed-value' })
-            expect(requests.map((frame) => frame.data.route.idempotencyKey)).toEqual([
+            expect(requests.map((frame) => frame.options.idempotencyKey)).toEqual([
               'hf-crash-original-key',
               'hf-crash-original-key'
             ])
-            expect(requests[1].data.route.timeoutMs).toBeLessThan(requests[0].data.route.timeoutMs)
+            expect(requests[1].options.remainingMs).toBeLessThan(requests[0].options.remainingMs)
           } else if (disposition === 'cancel') {
             expect(result).toMatchObject({ error: { name: 'AbortError', cause: 'hf-cancelled' } })
           } else if (disposition === 'deadline') {
@@ -1173,28 +977,27 @@ describe('real started streams do not resume after crash', () => {
         restart: { mode: 'on-failure', initialDelayMs: 1, maxDelayMs: 1, maxRestarts: 1 }
       })
       try {
-        const stream = active.peer
-          .stream('p.f.generator', [['first', 'second', 'third']])
-          [Symbol.asyncIterator]()
+        const stream = singleStream(
+          active.namespace.stream('p.f.generator', [['first', 'second', 'third']])
+        )
         expect(await stream.next()).toMatchObject({ done: false, value: 'first' })
-        expect(await active.runtimes[0]!.endpoint.send(peer.id, 'peer.pause', [])).toBe('ACK')
+        expect(await active.namespace.request('peer.pause', [])).toBe('ACK')
         const next = stream.next().then(
           (value) => ({ value }),
           (error) => ({ error })
         )
         process.kill(active.handles[0]!.identity.pid!, 'SIGKILL')
         await active.handles[0]!.exited
-        await vi.waitFor(() =>
+        await vi.waitFor(async () =>
           expect({
-            health: active.binding.health,
-            state: active.binding.supervisor.state
+            state: await active.state()
           }).toMatchObject({ state: 'backoff' })
         )
         scheduler.advance(1)
         await vi.waitFor(() => expect(active.handles).toHaveLength(2))
         await vi.waitFor(async () => {
           await settleFaultTurn(scheduler)
-          expect(await active.peer.request('p.f.request', ['after-stream-crash'])).toBe(
+          expect(await active.namespace.request('p.f.request', ['after-stream-crash'])).toBe(
             'after-stream-crash'
           )
         })
@@ -1202,8 +1005,9 @@ describe('real started streams do not resume after crash', () => {
         expect(
           wireFrames(active.sent).filter(
             (frame) =>
-              frame.kind === 'request' &&
-              frame.method === `${RemoteMethodName.runtimeStreamPrefix}p.f.generator`
+              frame.kind === 'call' &&
+              frame.task?.method === 'p.f.generator' &&
+              frame.task.mode === 'stream'
           )
         ).toHaveLength(1)
       } finally {
@@ -1213,89 +1017,6 @@ describe('real started streams do not resume after crash', () => {
       }
       expect(scheduler.pendingCount).toBe(0)
       expect(active.budget.inUse).toBe(0)
-    }, 15000)
-})
-
-describe('owned bridge hang has no default health detector', () => {
-  for (const peer of peers.slice(0, 3))
-    it(`${peer.language} settles only the call deadline and retains its hung PID`, async () => {
-      const scheduler = createManualScheduler()
-      const active = await faultClient(peer, { bridge: true, scheduler })
-      let paused = false
-      try {
-        expect({
-          health: active.binding.health,
-          state: active.binding.supervisor.state
-        }).toMatchObject({ health: 'none', state: 'ready' })
-        process.kill(active.handles[0]!.identity.pid!, 'SIGSTOP')
-        paused = true
-        const call = active.peer.request('p.f.request', ['bridge-hang'], { timeoutMs: 100 }).then(
-          (value) => ({ value }),
-          (error) => ({ error })
-        )
-        await settleFaultTurn(scheduler)
-        scheduler.advance(100)
-        await settleFaultTurn(scheduler)
-        expect(await call).toHaveProperty('error')
-        scheduler.advance(20000)
-        await settleFaultTurn(scheduler)
-        expect({
-          health: active.binding.health,
-          state: active.binding.supervisor.state
-        }).toMatchObject({ health: 'none', state: 'ready' })
-        expect(active.handles).toHaveLength(1)
-        process.kill(active.handles[0]!.identity.pid!, 0)
-      } finally {
-        if (paused) process.kill(active.handles[0]!.identity.pid!, 'SIGCONT')
-        await active.close()
-        await Promise.all(active.handles.map((handle) => handle.exited))
-        receipt(active, `${peer.language}-bridge-no-health`)
-      }
-      expect(active.budget.inUse).toBe(0)
-      expect(scheduler.pendingCount).toBe(0)
-    }, 15000)
-})
-
-describe('standalone Host restart keeps local ownership and does not replay use', () => {
-  for (const peer of peers)
-    it(`${peer.language} leaves the new remote catalog uninstalled until explicit use`, async () => {
-      const scheduler = createManualScheduler()
-      const active = await faultClient(peer, {
-        host: true,
-        scheduler,
-        restart: { mode: 'on-failure', initialDelayMs: 1, maxDelayMs: 1, maxRestarts: 1 }
-      })
-      try {
-        expect(await active.peer.request(RemoteMethodName.hostInspect, [])).toMatchObject({
-          plugins: [{ name: 'p' }]
-        })
-        process.kill(active.handles[0]!.identity.pid!, 'SIGKILL')
-        await active.handles[0]!.exited
-        /** Host governance uses an opaque candidate ID; observe its public new endpoint instead. */
-        await vi.waitFor(() => {
-          scheduler.advance(1)
-          expect(active.handles).toHaveLength(2)
-        })
-        await vi.waitFor(async () =>
-          expect(await active.peer.request(RemoteMethodName.hostInspect, [])).toMatchObject({
-            plugins: []
-          })
-        )
-        /** A fresh explicit remote installation, rather than old use replay, restores business. */
-        await active.peer.request(RemoteMethodName.hostUse, ['p'])
-        expect(await active.peer.request('p.f.request', ['new-explicit-use'])).toBe(
-          'new-explicit-use'
-        )
-        expect(await active.peer.request(RemoteMethodName.hostInspect, [])).toMatchObject({
-          plugins: [{ name: 'p' }]
-        })
-      } finally {
-        await active.close()
-        await Promise.all(active.handles.map((handle) => handle.exited))
-        receipt(active, `${peer.language}-host-no-use-replay`)
-      }
-      expect(active.budget.inUse).toBe(0)
-      expect(scheduler.pendingCount).toBe(0)
     }, 15000)
 })
 
@@ -1313,47 +1034,48 @@ describe('real non-idempotent request crash', () => {
           restart: { mode: 'on-failure', initialDelayMs: 1, maxDelayMs: 1, maxRestarts: 1 }
         })
         expect(
-          readRuntimePeerConnection(active.peer).description!.methods.find(
-            (method) => method.name === 'p.f.request'
-          )
+          wireFrames(active.stdout)
+            .filter((frame) => frame.directory)
+            .at(-1)
+            ?.directory.methods.find((method: { name: string }) => method.name === 'p.f.request')
         ).toMatchObject({ idempotent: false })
-        expect(await active.runtimes[0]!.endpoint.send(peer.id, 'peer.pause', [])).toBe('ACK')
-        call = active.peer.request('p.f.request', ['unknown-side-effect']).then(
+        expect(await active.namespace.request('peer.pause', [])).toBe('ACK')
+        call = active.namespace.request('p.f.request', ['unknown-side-effect']).then(
           (value) => ({ value }),
           (error) => ({ error })
         )
         await vi.waitFor(() =>
           expect(
-            wireFrames(active!.sent).filter((frame) => frame.method === 'p.f.request')
+            wireFrames(active!.sent).filter((frame) => frame.task?.method === 'p.f.request')
           ).toHaveLength(1)
         )
         process.kill(active.handles[0]!.identity.pid!, 'SIGKILL')
         await active.handles[0]!.exited
-        await vi.waitFor(() =>
+        await vi.waitFor(async () =>
           expect({
-            health: active!.binding.health,
-            state: active!.binding.supervisor.state
+            state: await active!.state()
           }).toMatchObject({ state: 'backoff' })
         )
         scheduler.advance(1)
-        await vi.waitFor(() =>
+        await vi.waitFor(async () =>
           expect({
-            health: active!.binding.health,
-            state: active!.binding.supervisor.state
+            state: await active!.state()
           }).toMatchObject({ state: 'ready' })
         )
         expect(await call).toMatchObject({
           error: { source: 'rpc.remote', code: 'REMOTE_RESULT_UNKNOWN' }
         })
         const requests = wireFrames(active.sent).filter(
-          (frame) => frame.kind === 'request' && frame.method === 'p.f.request'
+          (frame) => frame.kind === 'call' && frame.task?.method === 'p.f.request'
         )
         expect(requests).toHaveLength(1)
-        expect(requests[0].data.route).not.toHaveProperty('idempotencyKey')
+        expect(requests[0].options).not.toHaveProperty('idempotencyKey')
         /** Supervisor ready precedes remote describe publication; join the actual business gate. */
         await vi.waitFor(async () => {
           await settleFaultTurn(scheduler)
-          expect(await active!.peer.request('p.f.request', ['after-unknown'])).toBe('after-unknown')
+          expect(await active!.namespace.request('p.f.request', ['after-unknown'])).toBe(
+            'after-unknown'
+          )
         })
       } finally {
         await active?.close()

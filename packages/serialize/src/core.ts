@@ -39,6 +39,8 @@ export {
 } from './errors.js'
 
 export { base64ToBytes, bytesToBase64, streamBase64Chunks } from './base64.js'
+/** Portable policy consumers share the existing canonical alphabet and unused-bit checker. */
+export { isCanonicalBase64url } from './base64.js'
 
 export {
   collectStream,

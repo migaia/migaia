@@ -1,92 +1,62 @@
-import { execFileSync } from 'node:child_process'
 import { mkdirSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
-import { expect } from 'vitest'
-import { createRpcStreamFrameDecoder } from '@migaia/rpc-contract/framing/stream'
+import { expect, vi } from 'vitest'
+import { RpcProbeDirection } from '@migaia/rpc-contract/interfaces'
+import { createRpcHost } from '@migaia/rpc-host'
+import {
+  createRpcStreamFrameDecoder,
+  readRpcLaunchFacts,
+  withRpcLaunchFacts
+} from '@migaia/rpc-host/sdk'
+import { auth } from '@migaia/rpc-host/plugins/auth'
+import { timeout } from '@migaia/rpc-host/features/timeout'
 import { createUnitBudget, type IUnitBudget } from '@migaia/supervision'
 import type { IProcessHandle } from '@migaia/supervision/process'
-import { createProcessTransport } from '../../../../rpc-plugin-process/dist/process/handshake.js'
-import { createNativeProcessOffer } from '../../../../rpc-plugin-process/dist/process/offer.js'
-import type { IProcessByteChannel } from '../../../../rpc-plugin-process/dist/process/types.js'
-import { processPlugin } from '@migaia/rpc-plugin-process'
-import { PluginHost } from '@migaia/plugin-host'
-import type {
-  IProcessPluginEstablish,
-  ISpawnProcessPluginDeployment,
-  IConnectProcessPluginDeployment
-} from '../../../../rpc-plugin-process/dist/process/plugin/types.js'
-import { readRuntimeOutletConnection } from '../../../../rpc-host/dist/remote/runtime-api/outlet.js'
-import type { IRuntimeOutlet } from '../../../../rpc-host/dist/remote/runtime-api/outlet.js'
-import { createNodeProcessLauncher } from '../../../../rpc-plugin-process/dist/process/adapters/node-child-process.js'
-import { dialProcessByteChannel } from '../../../../rpc-plugin-process/dist/process/adapters/node-socket.js'
-import type { IRemoteContract, IRuntimePeer } from '@migaia/rpc-host/plugin'
-import { fdLauncher } from '../../bridge/fixtures/jsonrpc-process.js'
-import { createProcessJsonRpcChannel } from '../../../../rpc-plugin-process/dist/process/jsonrpc-channel.js'
 import {
-  readRuntimePeerConnection,
-  prepareRuntimePeerSourceContext
-} from '../../../../rpc-host/dist/remote/runtime-api/peer.js'
+  processPlugin,
+  type ISpawnProcessPluginDeployment,
+  type IProcessFeature,
+  type IConnectProcessPluginDeployment
+} from '@migaia/rpc-plugin-process'
+import type { IProcessByteChannel } from '../../../../rpc-plugin-process/dist/process/types.js'
+import {
+  createNodeProcessLauncher,
+  type INodeProcessHandle
+} from '../../../../rpc-plugin-process/dist/process/adapters/node-child-process.js'
+import { dialProcessByteChannel } from '../../../../rpc-plugin-process/dist/process/adapters/node-socket.js'
 
-/** Portable business outputs are observed on the provider, never inferred from send completion. */
+/** Original business expectations remain independent from the production protocol owners. */
 const expected = JSON.parse(
   await readFile(new URL('../peers/ts/public-behavior.json', import.meta.url), 'utf8')
 )
-/** Every failing run retains full process output and received frames outside ignored docs. */
+/** Failed native runs retain their original physical evidence outside ignored program documents. */
 const evidence = process.env.RPC_H_EVIDENCE ?? '/tmp/m2-h-evidence'
 mkdirSync(evidence, { recursive: true })
-/** Published vectors freeze actual facade deployments and ownership expectations. */
+/** Stable original scenario IDs remain available to each receiving suite. */
 const businessVectors = JSON.parse(
   await readFile(new URL('../../../schema/vectors/process-business.json', import.meta.url), 'utf8')
 )
-/** One published contract is shared by all independent producers and the public client facades. */
+/**
+ * Legacy declarations are fixture data; the native TS provider projects them into its new
+ * declaration.
+ */
 const contract = JSON.parse(
   await readFile(new URL('../../../schema/vectors/remote-contract.json', import.meta.url), 'utf8')
-).contracts[0].value as IRemoteContract
-/** The bridge's published contract deliberately contains only its two supported modes. */
-const bridgeContract: IRemoteContract = {
+).contracts[0].value
+/** Historical bridge schema data remains available only to receiving cases pending BC2 retirement. */
+const bridgeContract = {
   ...contract,
   features: {
     f: {
       methods: {
-        request: contract.features.f!.methods.request!,
-        oneWay: contract.features.f!.methods.oneWay!
+        request: contract.features.f.methods.request,
+        oneWay: contract.features.f.methods.oneWay
       }
     }
   }
 }
-/** Emit the public TS fixture before launch; Node and Bun execute the same JavaScript artifact. */
-const compiledTsPeer = execFileSync(
-  process.execPath,
-  [new URL('../peers/ts/node-runner.mjs', import.meta.url).pathname, '--executable'],
-  { encoding: 'utf8' }
-).trim()
-/** File-local executable paths keep every native and bridge launch free of repeated builds. */
-const nativePeerExecutables = new Map<string, string>()
 
-/**
- * Resolve and build each Go/Rust fixture once per test file with the real tool environment.
- * Per-launch cargo plus exec costs about 347 ms for Rust versus 4–10 ms for its direct binary; this
- * fixture overhead is not part of the language peer contract. Source changes still build through
- * the once-per-file --executable call, before bridge launches use an empty environment.
- */
-function resolveNativePeerExecutable(language: 'go' | 'rust'): string {
-  /** Reuse this test file's built peer without running its shell wrapper on another launch. */
-  const cached = nativePeerExecutables.get(language)
-  if (cached !== undefined) return cached
-  /** The peer-owned wrapper remains the canonical source-freshness and build entry point. */
-  const executable = execFileSync(
-    'sh',
-    [new URL(`../peers/${language}/run.sh`, import.meta.url).pathname, '--executable'],
-    { encoding: 'utf8' }
-  ).trim()
-  nativePeerExecutables.set(language, executable)
-  return executable
-}
-
-/**
- * Four public/independent executables run directly, without language wrapping or protocol
- * forwarding.
- */
+/** Peer-owned launch scripts prepare only the selected language, never the whole matrix at collect. */
 const peers = [
   {
     language: 'python',
@@ -96,46 +66,62 @@ const peers = [
   },
   {
     language: 'go',
-    command: resolveNativePeerExecutable('go'),
-    args: ['--business'],
+    command: 'sh',
+    args: [new URL('../peers/go/run.sh', import.meta.url).pathname, '--business'],
     id: 'go-peer'
   },
   {
     language: 'rust',
-    command: resolveNativePeerExecutable('rust'),
-    args: ['--business'],
+    command: 'sh',
+    args: [new URL('../peers/rust/run.sh', import.meta.url).pathname, '--business'],
     id: 'rust-peer'
   },
   {
     language: 'node',
     command: process.execPath,
-    args: [compiledTsPeer],
+    args: [new URL('../peers/ts/node-runner.mjs', import.meta.url).pathname],
     id: 'ts-peer'
   },
   {
     language: 'bun',
     command: 'bun',
-    args: [compiledTsPeer],
+    args: [new URL('../peers/ts/node-runner.mjs', import.meta.url).pathname],
     id: 'ts-peer'
   }
 ]
-/** Real feature calls use the public facade's contract-projected methods. */
-type IBusinessFeature = {
-  request(
-    params: unknown[],
-    options?: { signal?: AbortSignal; timeoutMs?: number; idempotencyKey?: string }
-  ): Promise<unknown>
-  oneWay(params: unknown[]): Promise<void>
-  generator(params: unknown[]): AsyncIterable<unknown>
-  asyncGenerator(params: unknown[]): AsyncIterable<unknown>
+
+/** Own only passive receipts around the same fixture-owned raw channel and original native writes. */
+class BusinessNativeObservations {
+  /** Original native process handles remain authoritative for exit and budget assertions. */
+  readonly handles: IProcessHandle[] = []
+  /** Original stderr bytes preserve the peer's readiness and cleanup receipts. */
+  readonly output: Uint8Array[] = []
+  /** Original inbound bytes permit protocol assertions after the live reader has admitted them. */
+  readonly stdout: Uint8Array[] = []
+  /** Original outbound chunks preserve native frame order, including final close before exit. */
+  readonly sent: Uint8Array[] = []
+  /** Original diagnostic objects are retained unchanged for source/cause assertions. */
+  readonly reports: unknown[] = []
+  /** Physical EOF assertions borrow the exact raw resources acquired by the native source. */
+  readonly rawChannels: IProcessByteChannel[] = []
+
+  /** Install passive observations once without replacing the channel, reader or framing owner. */
+  observe(raw: IProcessByteChannel): IProcessByteChannel {
+    this.rawChannels.push(raw)
+    if (raw.observation) {
+      /** Native IO publishes each original chunk at the real read/write point. */
+      const remove = raw.observation.subscribe((event) => {
+        if (!(event.content instanceof Uint8Array)) return
+        const chunks = event.direction === RpcProbeDirection.outbound ? this.sent : this.stdout
+        chunks.push(event.content.slice())
+      })
+      raw.onClose(remove)
+    } else raw.onData((chunk) => this.stdout.push(chunk.slice()))
+    return raw
+  }
 }
-/** Native proposal is produced by the package and includes every control exercised below. */
-const offer = createNativeProcessOffer({
-  peer: { id: 'caller', runtime: 'node' },
-  stream: true,
-  capabilities: ['runtime-api@1', 'abort@1', 'wire-error@1']
-})
-/** Deployment creation retains actual handles and raw outputs for release and error attribution. */
+
+/** Retain actual native launch/source ownership; removed semantic profiles never enter a live codec. */
 function deployment(
   peer: (typeof peers)[number],
   host: boolean,
@@ -144,181 +130,103 @@ function deployment(
   bridge = false,
   budget?: IUnitBudget<'process'>
 ) {
-  const handles: IProcessHandle[] = []
-  const output: Uint8Array[] = []
-  const stdout: Uint8Array[] = []
-  /** An observer retains emitted wire frames without implementing framing or changing backpressure. */
-  const sent: Uint8Array[] = []
-  const reports: unknown[] = []
-  /** Exact public byte ports permit a physical EOF independent of endpoint abort/close messages. */
-  const rawChannels: IProcessByteChannel[] = []
-  const launcher = bridge ? fdLauncher() : createNodeProcessLauncher()
-  const establish: IProcessPluginEstablish = (raw, context) => {
-    if (raw.kind !== 'byte') throw new TypeError('business peer requires bytes')
-    rawChannels.push(raw)
-    raw.onData((chunk) => stdout.push(chunk.slice()))
-    const observed = {
-      ...raw,
-      write: async (chunk: Uint8Array) => {
-        sent.push(chunk.slice())
-        await raw.write(chunk)
-      }
-    }
-    if (bridge)
-      return createProcessJsonRpcChannel({
-        byte: observed,
-        peerId: peer.id,
-        target: host
-          ? { kind: 'host', catalog: { p: bridgeContract } }
-          : { kind: 'plugin', contract: bridgeContract },
-        offer: {
-          versions: [{ major: 1, minor: 1 }],
-          capabilities: ['deadline@1', 'trace@1', 'idempotency@1'],
-          peer: { id: 'caller', runtime: 'node' }
-        },
-        token,
-        scheduler: context.scheduler,
-        wallClock: { timestamp: () => Date.now() },
-        signal: context.signal as AbortSignal,
-        report: (error) => reports.push(error),
-        ipc: { ...context.session, log: () => undefined }
-      }).then((channel) => {
-        return channel
-      })
-    return createProcessTransport(observed, {
-      role: 'initiator',
-      peerId: peer.id,
-      offer: context.offer!,
-      scheduler: context.scheduler,
-      signal: context.signal as AbortSignal,
-      report: (error) => reports.push(error),
-      ipc: { ...context.session, log: () => undefined }
-    })
-  }
-  const proposal = bridge
-    ? {
-        versions: [{ major: 1, minor: 1 }],
-        codecs: ['json'],
-        capabilities: [
-          'jsonrpc-bridge@1',
-          'runtime-api@1',
-          'batch@1',
-          'abort@1',
-          'wire-error@1',
-          'deadline@1',
-          'trace@1',
-          'idempotency@1'
-        ],
-        peer: { id: 'caller', runtime: 'node' },
-        auth: token
-      }
-    : { ...offer, auth: token }
+  if (bridge) throw new TypeError('JSON-RPC semantic profile retired by BC2')
+  /** One set of receipts belongs to this actual native deployment. */
+  const observed = new BusinessNativeObservations()
+  /** The production launcher still owns spawn, bootstrap, signals and the native exit receipt. */
+  const launcher = createNodeProcessLauncher()
+  /** Acquisition remains a real native recipe; Host alone owns semantic handshake and Sessions. */
   const selected: ISpawnProcessPluginDeployment | IConnectProcessPluginDeployment = address
     ? {
         kind: 'connect',
-        wire: bridge ? 'jsonrpc' : 'native',
         address,
         token,
-        offer: proposal,
-        dial: (target, signal) =>
-          dialProcessByteChannel({ address: target, signal: signal as AbortSignal }),
-        establish
+        dial: async (target, signal) =>
+          observed.observe(
+            await dialProcessByteChannel({ address: target, signal: signal as AbortSignal })
+          )
       }
     : {
         kind: 'spawn',
         channelKind: 'byte',
-        wire: bridge ? 'jsonrpc' : 'native',
         token,
-        offer: proposal,
         supervision: {
           id: `business-${peer.language}`,
           isolation: 'best-effort',
           budget: budget ?? createUnitBudget({ kind: 'process', maxUnits: 1 }),
-          report: (error) => reports.push(error),
+          report: (error) => observed.reports.push(error),
           spec: {
             command: peer.command,
-            args: [
-              ...peer.args,
-              '--stdio',
-              ...(bridge ? ['--jsonrpc', '--auth-fd', '3'] : ['--bootstrap', 'stdin']),
-              ...(host ? ['--host'] : [])
-            ],
+            args: [...peer.args, '--stdio', '--bootstrap', 'stdin', ...(host ? ['--host'] : [])],
             env: { inherit: ['PATH'], set: {} },
             stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' },
-            bootstrap: bridge
-              ? { via: 'fd', fd: 3, payload: new TextEncoder().encode(token) }
-              : { via: 'stdin', payload: new TextEncoder().encode(token) }
+            bootstrap: { via: 'stdin', payload: new TextEncoder().encode(token) }
           },
           launcher: {
             ...launcher,
             launch: async (spec, context) => {
-              const handle = await launcher.launch(spec, {
+              /** The original native launch context carries real bootstrap custody in the SDK. */
+              const facts = readRpcLaunchFacts(context)
+              /**
+               * Only the passive output callback changes; every launch fact stays with this native
+               * call.
+               */
+              const forwarded = {
                 ...context,
-                output: (stream, chunk) => {
-                  if (stream === 'stderr') output.push(chunk.slice())
+                output: (stream: 'stdout' | 'stderr', chunk: Uint8Array) => {
+                  if (stream === 'stderr') observed.output.push(chunk.slice())
                   context.output(stream, chunk)
                 }
-              })
-              handles.push(handle)
+              }
+              /** Explicit operation keeps the launch callback independent of three captured inputs. */
+              const operation = { launcher, spec, context: forwarded }
+              const handle = await (facts
+                ? withRpcLaunchFacts(forwarded, facts, () =>
+                    operation.launcher.launch(operation.spec, operation.context)
+                  )
+                : operation.launcher.launch(operation.spec, operation.context))
+              observed.handles.push(handle)
               return handle
             }
           }
         },
-        rawChannel: async (handle) => {
-          if (!('channel' in handle)) throw new TypeError('business handle requires channel')
-          return handle.channel as IProcessByteChannel
-        },
-        establish
+        rawChannel: async (handle) => observed.observe((handle as INodeProcessHandle).channel!)
       }
-  return { selected, handles, output, stdout, sent, reports, rawChannels }
+  return {
+    selected,
+    handles: observed.handles,
+    output: observed.output,
+    stdout: observed.stdout,
+    sent: observed.sent,
+    reports: observed.reports,
+    rawChannels: observed.rawChannels
+  }
 }
-/** Install the genuine native definition in an ordinary Host and retain its actual Peer receipt. */
+
+/** Install the exact native recipe; all public work uses the actual process namespace. */
 async function installBusinessClient(
   fixture: Pick<ReturnType<typeof deployment>, 'reports'>,
-  source: ISpawnProcessPluginDeployment | IConnectProcessPluginDeployment
+  source: ISpawnProcessPluginDeployment | IConnectProcessPluginDeployment,
+  features?: readonly IProcessFeature[]
 ) {
-  const host = new PluginHost<Record<string, never>>({
-    execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+  /** Credentials remain mandatory when the original foreign peer requires its inherited token. */
+  const host = await createRpcHost({
+    self: { name: 'caller', instanceId: 'caller' },
+    plugins: [
+      auth({ credentials: source.token }),
+      processPlugin({
+        name: 'p',
+        features,
+        ...(source.kind === 'spawn' ? { spawn: source } : { connect: { target: source } }),
+        report: (error) => fixture.reports.push(error)
+      })
+    ],
+    report: (error) => fixture.reports.push(error)
   })
-  const self = { name: 'caller', instanceId: 'caller' }
-  await host.use(
-    processPlugin({
-      name: 'p',
-      self,
-      ...(source.kind === 'spawn' ? { spawn: source } : { connect: { target: source } }),
-      report: (error) => {
-        fixture.reports.push(error)
-      }
-    })
-  )
-  const active = readRuntimeOutletConnection(
-    Reflect.get(host, 'process') as IRuntimeOutlet,
-    'p'
-  )!.peer
-  const accepted = readRuntimePeerConnection(active)
-  return {
-    host,
-    active,
-    runtime: {
-      endpoint: accepted.endpoint,
-      oneWay: accepted.endpoint,
-      stream: accepted.endpoint.stream
-    },
-    close: () => host.dispose()
-  }
+  return { host, namespace: host.process, close: host.close }
 }
 
-/** Project only this fixture's published application payloads onto the same actual Peer operations. */
-function businessFeature(active: IRuntimePeer): IBusinessFeature {
-  return {
-    request: (params, options) => active.request('p.f.request', params, options),
-    oneWay: (params) => active.notify('p.f.oneWay', params),
-    generator: (params) => active.stream('p.f.generator', params),
-    asyncGenerator: (params) => active.stream('p.f.asyncGenerator', params)
-  }
-}
-
-/** Prepare the native Host client and retain its original endpoint for independent wire oracles. */
+/** Both former Host profiles now expose the same explicit declared methods under one namespace. */
 async function client(
   peer: (typeof peers)[number],
   hostProfile: boolean,
@@ -328,107 +236,73 @@ async function client(
   budget?: IUnitBudget<'process'>
 ) {
   const fixture = deployment(peer, hostProfile, token, address, bridge, budget)
-  const self = { name: 'caller', instanceId: 'caller' }
-  const { offer: priorOffer, ...deploymentOptions } = fixture.selected
-  const source = bridge
-    ? deploymentOptions
-    : {
-        ...deploymentOptions,
-        offer: { ...priorOffer!, capabilities: prepareRuntimePeerSourceContext(self).capabilities }
-      }
-  const installed = await installBusinessClient(fixture, source)
-  const active = installed.active
-  const feature = businessFeature(active)
-  if (hostProfile) await active.request('migaia.remote.host.use', ['p', { local: 'value' }])
-  return {
-    ...fixture,
-    feature,
-    runtime: installed.runtime,
-    close: installed.close,
-    remove: hostProfile ? () => active.request('migaia.remote.host.unUse', ['p']) : undefined,
-    inspect: hostProfile ? () => active.request('migaia.remote.host.inspect', []) : undefined
+  const installed = await installBusinessClient(fixture, fixture.selected)
+  if (peer.language === 'node' || peer.language === 'bun') {
+    /** The TS fixture separately publishes its original peer.* methods through host.provide. */
+    await vi.waitFor(() =>
+      expect(
+        Object.values(installed.namespace.peers).some((entry) => {
+          const group = Reflect.get(entry, 'peer')
+          return (
+            group && typeof group === 'object' && typeof Reflect.get(group, 'wait') === 'function'
+          )
+        })
+      ).toBe(true)
+    )
   }
+  return { ...fixture, ...installed }
 }
-/**
- * Facade methods prove actual request/one-way/stream behavior; same endpoint observes error and
- * cancellation controls.
- */
+
+/** Original result/count/order/error/abort/trace assertions use the genuine namespace directly. */
 async function business(
   active: Awaited<ReturnType<typeof client>>,
-  peerId: string,
+  _peerId: string,
   bridge = false
 ) {
-  const { feature, runtime } = active
+  if (bridge) throw new TypeError('JSON-RPC semantic profile retired by BC2')
+  const namespace = active.namespace
   expect(
-    await feature.request(
-      [expected.request.input],
-      bridge ? { timeoutMs: 1000, idempotencyKey: 'h-bridge-key' } : undefined
-    )
+    await namespace.request('p.f.request', [expected.request.input], {
+      timeout: timeout({ ms: 1000 }),
+      idempotencyKey: 'h-bridge-key'
+    })
   ).toBe(expected.request.expected)
-  for (const input of expected.oneWay.inputs) await feature.oneWay([input])
-  expect(await runtime.endpoint.send(peerId, 'peer.received', [])).toEqual(expected.oneWay.expected)
-  for (const method of (bridge ? [] : ['generator', 'asyncGenerator']) as Array<
-    'generator' | 'asyncGenerator'
-  >) {
+  for (const input of expected.oneWay.inputs) await namespace.notify('p.f.oneWay', [input])
+  expect(await namespace.request('peer.received', [])).toEqual(expected.oneWay.expected)
+  for (const method of ['generator', 'asyncGenerator']) {
     const values: unknown[] = []
-    for await (const value of feature[method]([expected.generator.input])) values.push(value)
+    const stream = namespace.stream(`p.f.${method}`, [expected.generator.input])
+    if (!(Symbol.asyncIterator in stream)) throw new TypeError('single peer requires one stream')
+    for await (const value of stream) values.push(value)
     expect(values).toEqual(expected.generator.expected)
   }
   let receivedError: unknown
   await expect(
-    runtime.endpoint.send(peerId, 'peer.error', []).catch((error) => {
+    namespace.request('peer.error', []).catch((error) => {
       receivedError = error
       throw error
     })
   ).rejects.toMatchObject(expected.error)
-  expect((receivedError as { name: string }).name).toMatch(/^Rpc/)
-  const failedWire = bridge
-    ? bridgeFrames(active.stdout).find((frame) => frame.error)?.error.data.migaiaWireError
-    : wireFrames(active.stdout).find(
-        (frame) =>
-          frame.kind === 'response' &&
-          frame.ok === false &&
-          frame.data.route.method === 'peer.error'
-      )?.error
+  expect((receivedError as Error).name).toMatch(/^Rpc/)
+  const failedWire = wireFrames(active.stdout).find(
+    (frame) => frame.kind === 'error' && frame.task.method === 'peer.error'
+  )?.error
   expect(failedWire).toBeDefined()
   assertWireGraph((receivedError as { cause: unknown }).cause, failedWire)
   const controller = new AbortController()
-  const waiting = bridge
-    ? feature.request(['__wait'], { signal: controller.signal })
-    : runtime.endpoint.send(peerId, 'peer.wait', [], { signal: controller.signal })
+  const waiting = namespace.request('peer.wait', [], { signal: controller.signal })
   await new Promise((resolve) => setTimeout(resolve, 20))
   controller.abort(new RangeError(expected.cancel.reason))
   await expect(waiting).rejects.toMatchObject({ code: expected.cancel.expectedCode })
-  expect(await runtime.endpoint.send(peerId, 'peer.aborts', [])).toMatchObject([
-    expected.cancel.providerReason
-  ])
-  expect(await feature.request(['after-cancel'])).toBe('after-cancel')
-  if (bridge)
-    expect(
-      active.reports.filter(
-        (error) => (error as { source?: string }).source === 'rpc.contract.jsonrpc'
-      )
-    ).toEqual([
-      expect.objectContaining({
-        source: 'rpc.contract.jsonrpc',
-        code: 'JSONRPC_PROFILE_INVALID'
-      })
-    ])
-  /** Explicit core trace remains request-local; facade invocations above never gain a trace. */
+  expect(await namespace.request('peer.aborts', [])).toMatchObject([expected.cancel.providerReason])
+  expect(await namespace.request('p.f.request', ['after-cancel'])).toBe('after-cancel')
   expect(
     await Promise.all([
-      runtime.endpoint.send(peerId, 'peer.trace', [], { trace: 'h-trace-one' }),
-      runtime.endpoint.send(peerId, 'peer.trace', [], { trace: 'h-trace-two' }),
-      runtime.endpoint.send(peerId, 'peer.trace', [])
+      namespace.request('peer.trace', [], { trace: 'h-trace-one' }),
+      namespace.request('peer.trace', [], { trace: 'h-trace-two' }),
+      namespace.request('peer.trace', [])
     ])
   ).toEqual(['h-trace-one', 'h-trace-two', null])
-  if (!bridge)
-    expect(await runtime.endpoint.ping!(peerId, undefined, { timeoutMs: 1000 })).toBe(true)
-  if (active.remove) {
-    expect(await active.remove()).toEqual({ ok: true })
-    expect(await active.inspect!()).toMatchObject({ plugins: [] })
-    await expect(feature.request(['old'])).rejects.toMatchObject({ code: 'REMOTE_CLOSED' })
-  }
 }
 
 /** Decode observed bytes exclusively with the published framing owner. */
@@ -448,7 +322,7 @@ function bridgeFrames(chunks: readonly Uint8Array[]) {
   }
   return messages
 }
-/** Native receipts use the package's published frame decoder. */
+/** Decode retained native receipts with the same sole SDK framing owner used by Process. */
 function wireFrames(chunks: readonly Uint8Array[]) {
   const frames: any[] = []
   const decoder = createRpcStreamFrameDecoder({
@@ -463,20 +337,29 @@ function wireFrames(chunks: readonly Uint8Array[]) {
   return frames
 }
 
-/** Every received graph node keeps the exact remote stack and semantic identity, including causes. */
-function assertWireGraph(actual: unknown, wire: Record<string, any>) {
-  expect(actual).toMatchObject({
-    source: wire.source,
-    code: wire.code,
-    name: wire.name,
-    message: wire.message,
-    stack: wire.stack
-  })
-  expect(wire.stack.length).toBeGreaterThan(0)
-  if (wire.cause) assertWireGraph((actual as { cause: unknown }).cause, wire.cause)
-  if (wire.errors)
-    for (let index = 0; index < wire.errors.length; index++)
-      assertWireGraph((actual as { errors: unknown[] }).errors[index], wire.errors[index])
+/** Match every flat graph node's native fields and original cause/errors topology. */
+function assertWireGraph(
+  actual: unknown,
+  wire: { root: number; nodes: Array<Record<string, any>> }
+) {
+  /** This bounded assertion stack traverses only received test evidence, never live business data. */
+  const pending: Array<{ actual: any; index: number }> = [{ actual, index: wire.root }]
+  while (pending.length) {
+    const item = pending.pop()!
+    const node = wire.nodes[item.index]!
+    expect(item.actual).toMatchObject({
+      source: node.source,
+      code: node.code,
+      name: node.name,
+      message: node.message,
+      stack: node.stack
+    })
+    expect(node.stack.length).toBeGreaterThan(0)
+    if (node.cause !== undefined) pending.push({ actual: item.actual.cause, index: node.cause })
+    if (node.errors)
+      for (let index = 0; index < node.errors.length; index++)
+        pending.push({ actual: item.actual.errors[index], index: node.errors[index] })
+  }
 }
 export {
   peers,
@@ -485,12 +368,10 @@ export {
   evidence,
   bridgeContract,
   contract,
-  offer,
   client,
   business,
   deployment,
   installBusinessClient,
-  businessFeature,
   wireFrames,
   bridgeFrames,
   assertWireGraph

@@ -1,177 +1,169 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createMemoryTransportPair } from '../../../rpc-host/test/fixtures/memory-transport.js'
-import { createComposedEndpoint } from '../../../rpc-host/dist/core/composed.js'
-import { connect } from '../../../rpc-host/dist/core/middleware/connect.js'
-import { authentication } from '../../../rpc-host/dist/core/middleware/authentication.js'
-import type { IRpcHookEvent } from '../../../rpc-host/dist/core/typing.js'
-import type { IRpcProviderRejection } from '../../../rpc-host/dist/core/provider-admission.js'
-import { streamRoots } from '../../../rpc-host/test/streaming/fixture.js'
+import { createRpcHost } from '@migaia/rpc-host'
+import { auth } from '@migaia/rpc-host/plugins/auth'
+import { limits } from '@migaia/rpc-host/plugins/limits'
+import type { IRpcProviderRejection } from '@migaia/rpc-contract/errors'
+import { RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
+import { coreMemoryServer } from '../../../rpc-host/test/host/core-fixture.js'
 
 describe('stream replay custody through public endpoint behavior', () => {
   it.each([false, true])(
     'disconnect cleans the pending iterator and reports cleanup failure: authenticated=%s',
     async (authenticated) => {
-      /** Real composed endpoints retain separate physical, replay and stream settlement owners. */
-      const [clientTransport, serverTransport] = createMemoryTransportPair()
-      /** Canonical authentication selects active stream replay retention on the legacy transport. */
-      const middlewares = () =>
-        authenticated ? [authentication({ sign: (value) => value, verify: (value) => value })] : []
-      /** Owns provider admission and iterator cleanup on the receiving endpoint. */
-      const server = await createComposedEndpoint(
-        {
-          id: 'server',
-          transport: serverTransport,
-          middlewares: [connect({ transport: serverTransport }), ...middlewares()]
-        },
-        streamRoots()
-      )
-      /** Owns consumer completion independently of the producer lifetime. */
-      const client = await createComposedEndpoint(
-        {
-          id: 'client',
-          transport: clientTransport,
-          middlewares: [connect({ transport: clientTransport }), ...middlewares()]
-        },
-        streamRoots()
-      )
-      /** The original cleanup failure must survive diagnostic reporting unchanged. */
-      const cause = new Error('fixture iterator return failure')
-      /** Retains original diagnostic error identities for cleanup assertions. */
-      const failures: IRpcHookEvent[] = []
-      /** Releases the failure observer before endpoint disposal. */
-      const remove = server.hooks.on((event) => {
-        if (event.name === 'failure') failures.push(event)
+      /** This original physical pair lends the actual four-stage codec to the real Host owners. */
+      const source = coreMemoryServer('server', 'server', 'memory', [], [], {
+        create: () => new RpcJsonCarrierCodec(),
+        nativeBinary: false
       })
-      /** Held next remains an independent lifetime until it settles after transport disconnect. */
+      /** Original iterator cleanup failures remain exact objects on the genuine Host report path. */
+      const failures: unknown[] = []
+      const server = await createRpcHost({
+        ...source.options,
+        plugins: [
+          ...(authenticated ? [auth({ sign: (value) => value, verify: (value) => value })] : []),
+          source.transport
+        ],
+        report: (error) => failures.push(error)
+      })
+      const client = await source.connect('client', {
+        plugins: authenticated ? [auth({ sign: (value) => value, verify: (value) => value })] : []
+      })
+      /** The original native error must survive producer cleanup reporting unchanged. */
+      const cause = new Error('fixture iterator return failure')
+      /** Held pulls and cleanup retain their independent original lifetimes. */
       let release!: () => void
-      /** Counts actual pending iterator pulls before disconnection. */
+      /** Count actual pending pulls before physical EOF. */
       let pulls = 0
-      /** Counts cleanup attempts separately from the held pull. */
+      /** Count iterator cleanup separately from the unresolved pull. */
       let returns = 0
-      /** Keeps the underlying pull unresolved until the test releases its lifetime. */
       const held = new Promise<IteratorResult<never>>((resolve) => {
         release = () => resolve({ done: true, value: undefined })
       })
-      server.stream.provide('held', (_params, { context }) => {
-        expect(context.signal.aborted).toBe(false)
-        expect(context.success('admitted')).toMatchObject({ ok: true, data: 'admitted' })
-        /** Explicit iterator typing keeps its receiver narrower than the public iterable union. */
-        const iterator: AsyncIterableIterator<never> = {
-          [Symbol.asyncIterator]() {
-            return this
-          },
-          next() {
-            pulls += 1
-            return held
-          },
-          return() {
-            returns += 1
-            return Promise.reject(cause)
+      server.provide({
+        held: (_params, context) => {
+          expect(context.signal.aborted).toBe(false)
+          expect(context.success('admitted')).toMatchObject({ ok: true, data: 'admitted' })
+          /** Explicit receiver methods preserve the original held pull and rejecting return. */
+          const iterator: AsyncIterableIterator<never> = {
+            [Symbol.asyncIterator]() {
+              return this
+            },
+            next() {
+              pulls += 1
+              return held
+            },
+            return() {
+              returns += 1
+              return Promise.reject(cause)
+            }
           }
+          return iterator
         }
-        return iterator
       })
       try {
-        /** Tracks the first admitted consumer across disconnection. */
-        const iterator = client.stream.open('server', 'held', null)
-        /** Observes terminal rejection without leaving an unhandled pending pull. */
+        const iterator = client.host.memory.stream('held', null) as AsyncIterableIterator<never>
         const pending = iterator.next().catch((error: unknown) => error)
         await vi.waitFor(() => expect(pulls).toBe(1))
-        serverTransport.close()
-        /** Retains the consumer's sticky terminal error for future-pull identity assertions. */
+        await client.pair[0].close()
         const failure = await pending
         expect(failure).toMatchObject({ code: 'STREAM_RESULT_UNKNOWN' })
         await expect(iterator.next()).rejects.toBe(failure)
         await vi.waitFor(() => expect(returns).toBe(1))
-        await vi.waitFor(() => expect(failures.some((event) => event.error === cause)).toBe(true))
+        await vi.waitFor(() => expect(failures.some((error) => error === cause)).toBe(true))
         release()
         await Promise.resolve()
         expect(returns).toBe(1)
       } finally {
         release()
-        remove()
-        await client.dispose()
-        await server.dispose()
+        await client.host.close()
+        await server.close()
       }
     }
   )
 
   it('protected stream replay capacity rejects a second identity before provider entry', async () => {
-    /** Capacity belongs to the provider ledger, not the client stream budget. */
-    const [clientTransport, serverTransport] = createMemoryTransportPair()
-    /** Records the existing provider rejection channel without introducing diagnostics. */
+    /** Signed Auth owns the request-ID replay capacity for this original physical source. */
+    const source = coreMemoryServer('server', 'server', 'memory', [], [], {
+      create: () => new RpcJsonCarrierCodec(),
+      nativeBinary: false
+    })
+    /** Borrow Auth's real refusal channel without replacing replay capacity with concurrency. */
     const notices: IRpcProviderRejection[] = []
-    /** Owns provider admission and iterator cleanup on the receiving endpoint. */
-    const server = await createComposedEndpoint(
-      {
-        id: 'server',
-        transport: serverTransport,
-        providerLimits: {
+    const server = await createRpcHost({
+      ...source.options,
+      plugins: [
+        auth({
+          sign: (value) => value,
+          verify: (value) => value,
           maxReplayEntriesPerPeer: 1,
           onRejected: (notice) => {
             notices.push(notice)
           }
-        },
-        middlewares: [
-          connect({ transport: serverTransport }),
-          authentication({ sign: (value) => value, verify: (value) => value })
-        ]
-      },
-      streamRoots()
-    )
-    /** Owns consumer completion independently of the producer lifetime. */
-    const client = await createComposedEndpoint(
-      {
-        id: 'client',
-        transport: clientTransport,
-        middlewares: [
-          connect({ transport: clientTransport }),
-          authentication({ sign: (value) => value, verify: (value) => value })
-        ]
-      },
-      streamRoots()
-    )
-    /** Pending next keeps the first identity admitted until transport cleanup and settlement finish. */
+        }),
+        limits(),
+        source.transport
+      ]
+    })
+    const client = await source.connect('client', {
+      plugins: [auth({ sign: (value) => value, verify: (value) => value })]
+    })
+    /** Each original active pull retains its iterator until explicit cleanup. */
     let release!: () => void
-    /** Counts business entry to distinguish admission refusal from provider failure. */
+    /** Count true provider entry independently of physical reception. */
     let starts = 0
-    /** Keeps the underlying pull unresolved until the test releases its lifetime. */
+    /** A second provider entry is a decisive admission failure, not a timeout guess. */
+    let secondEntered!: () => void
+    const entered = new Promise<void>((resolve) => {
+      secondEntered = resolve
+    })
     const held = new Promise<IteratorResult<never>>((resolve) => {
       release = () => resolve({ done: true, value: undefined })
     })
-    server.stream.provide('held', () => {
-      starts += 1
-      /** The fixture owns one iterator, rather than returning a contextual iterable union. */
-      const iterator: AsyncIterableIterator<never> = {
-        [Symbol.asyncIterator]() {
-          return this
-        },
-        next: () => held,
-        return: async () => ({ done: true as const, value: undefined })
+    server.provide({
+      held: () => {
+        starts += 1
+        if (starts === 2) secondEntered()
+        const iterator: AsyncIterableIterator<never> = {
+          [Symbol.asyncIterator]() {
+            return this
+          },
+          next: () => held,
+          return: async () => ({ done: true as const, value: undefined })
+        }
+        return iterator
       }
-      return iterator
     })
+    /** Cleanup always joins both original consumer promises, including the known failed admission. */
+    const pending: Promise<unknown>[] = []
     try {
-      /** Keeps the first stream active while its replay slot is occupied. */
-      const first = client.stream.open('server', 'held', 'first')
-      /** Observes terminal rejection without leaving an unhandled pending pull. */
-      const pending = first.next().catch((error: unknown) => error)
+      const first = client.host.memory.stream('held', 'first') as AsyncIterableIterator<never>
+      pending.push(first.next().catch((error: unknown) => error))
       await vi.waitFor(() => expect(starts).toBe(1))
-      /** Attempts a distinct identity against the same occupied provider replay slot. */
-      const rejected = client.stream.open('server', 'held', 'second')
-      await expect(rejected.next()).rejects.toMatchObject({ code: 'OVERLOADED' })
+      const rejected = client.host.memory.stream('held', 'second') as AsyncIterableIterator<never>
+      const rejection = rejected.next()
+      pending.push(rejection.catch((error: unknown) => error))
+      /** Wait for either real refusal or real incorrect entry; never manufacture a policy error. */
+      await Promise.race([
+        entered,
+        rejection.then(
+          () => undefined,
+          () => undefined
+        )
+      ])
       expect(starts).toBe(1)
+      await expect(rejection).rejects.toMatchObject({ code: 'OVERLOADED' })
       expect(notices).toHaveLength(1)
       expect(notices[0]).toMatchObject({ method: 'held', reason: 'replayLedgerFull' })
       expect(Object.isFrozen(notices[0])).toBe(true)
       expect(notices[0]!.verifiedPeerKey).not.toBe('')
       expect(notices[0]!.controllerKey).not.toBe('')
-      serverTransport.close()
-      await pending
+      await client.pair[0].close()
+      await pending[0]
     } finally {
       release()
-      await client.dispose()
-      await server.dispose()
+      await client.host.close()
+      await server.close()
+      await Promise.all(pending)
     }
   })
 })

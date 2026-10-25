@@ -22,7 +22,7 @@ import {
 } from '../../../rpc-host/test/replay-window/native-telemetry.mjs'
 import { loadedModules } from './native-loaded.mjs'
 import { assertClosureFresh } from '../../../../scripts/dist-stamp.mjs'
-import { RpcCoreErrorCode } from '../../../rpc-host/dist/core/errors.js'
+import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { RpcProviderRejectionReason } from '../../../rpc-host/dist/core/semantic-constants.js'
 
 /** Each command owns one sustained cell; shorter duration is solely fixture preparation. */

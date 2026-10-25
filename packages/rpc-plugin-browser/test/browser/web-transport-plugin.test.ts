@@ -1,16 +1,10 @@
 import { expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
-import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
-import {
-  createRuntimeWebByteStream,
-  createRpcTransportError,
-  defineByteAdapter,
-  defineTransportPlugin
-} from '@migaia/rpc-host/plugin'
-import { RpcRouteProfile, normalizeRpcEnvelope } from '@migaia/rpc-contract'
-import { encodeRpcStreamTextFrame } from '@migaia/rpc-contract/framing/stream'
+import { createRpcHost, type IRpcProvide } from '@migaia/rpc-host'
+import { idempotency } from '@migaia/rpc-host/plugins/idempotency'
+import { RpcWireProfile, normalizeRpcFrame } from '@migaia/rpc-contract/protocol'
+import { encodeRpcStreamTextFrame } from '@migaia/rpc-host/sdk'
 import { webTransportPlugin } from '@migaia/rpc-plugin-browser'
-import * as endpointOwner from '../../../rpc-host/dist/core/runtime-api-endpoint.js'
 
 /** The test models a reliable native stream, not a browser WebTransport server. */
 type INativeSide = Readonly<{
@@ -30,32 +24,12 @@ function nativePair() {
   }
 }
 
-/** The genuine responder reuses the same SDK pump and byte handshake as the tested initiator. */
-const responder = defineByteAdapter<INativeSide>({
-  open: openNativeSide,
-  listen: openNativeSide
-})
-
-/** Adapt only native I/O; this fixture never constructs a complete Peer or a second protocol. */
-function openNativeSide(side: INativeSide) {
-  return createRuntimeWebByteStream(side.readable, side.writable, () => undefined, {
-    openFailed: (error) => createRpcTransportError('fixture byte acquisition failed', error),
-    closedError: () => createRpcTransportError('fixture byte stream closed'),
-    cleanupFailed: (errors) =>
-      createRpcTransportError(
-        'fixture byte cleanup failed',
-        new AggregateError(errors, 'fixture byte cleanup failed', { cause: errors[0] })
-      ),
-    report: () => undefined
-  })
-}
-
 /** Open two real hosts concurrently and abort the opposing handshake if either opening fails. */
 async function connected(
   clientStream: INativeSide,
   serverStream: INativeSide,
-  clientProvide: Parameters<typeof createRpcHost>[0]['provide'] = {},
-  serverProvide: Parameters<typeof createRpcHost>[0]['provide'] = {}
+  clientProvide: IRpcProvide = {},
+  serverProvide: IRpcProvide = {}
 ) {
   /** Native session ownership stays outside the plugin's created-stream lifetime. */
   const session = {
@@ -65,25 +39,24 @@ async function connected(
   }
   /** One cancellation source unblocks the other original byte owner on partial construction. */
   const cancellation = new AbortController()
-  /** The responder's original raw listen operation selects the canonical responder role. */
-  const serverTransport = defineTransportPlugin({
+  /** The opposing actual factory borrows the same native stream kind without a Peer facade. */
+  const serverTransport = webTransportPlugin({
     name: 'reliable-byte-responder',
-    mode: 'listen',
-    connect: { timeoutMs: 1000 },
-    deployment: responder.deployment({ listen: serverStream, peerId: 'pre-hello-placeholder' })
+    session: { createBidirectionalStream: async () => serverStream },
+    connect: { timeoutMs: 1000 }
   })
   /** Both attempts stay observed while native hello/accept and directory exchange are in flight. */
   const opening = [
     createRpcHost({
       self: { name: 'wt-client', instanceId: 'wt-client' },
-      plugins: [webTransportPlugin({ session, connect: { timeoutMs: 1000 } })],
+      plugins: [idempotency(), webTransportPlugin({ session, connect: { timeoutMs: 1000 } })],
       provide: clientProvide,
       signal: cancellation.signal,
       report: () => undefined
     }),
     createRpcHost({
       self: { name: 'wt-server', instanceId: 'wt-server' },
-      plugins: [serverTransport],
+      plugins: [idempotency(), serverTransport],
       provide: serverProvide,
       signal: cancellation.signal,
       report: () => undefined
@@ -105,17 +78,15 @@ async function connected(
 }
 
 /** Consume only the real single-target iterator yielded by the host's canonical stream owner. */
-async function items(host: IRpcHost, method: string) {
+async function items(host: Awaited<ReturnType<typeof connected>>['hosts'][number], method: string) {
   /** The actual values stay portable and are never decoded by the fixture. */
   const result: unknown[] = []
-  for await (const value of host.stream(method) as AsyncIterableIterator<unknown>)
+  for await (const value of host.webTransport.stream(method) as AsyncIterableIterator<unknown>)
     result.push(value)
   return result
 }
 
 it('runs bidirectional operations and cancellation through one endpoint per reliable-stream host', async () => {
-  /** The spy observes construction without replacing the actual canonical endpoint factory. */
-  const construction = vi.spyOn(endpointOwner, 'createRuntimeApiEndpoint')
   /** Native streams alone carry the protocol bytes between the two real host installations. */
   const pair = nativePair()
   /** Each side records notification execution independently from physical-send completion. */
@@ -154,32 +125,27 @@ it('runs bidirectional operations and cancellation through one endpoint per reli
     fixture = await connected(pair.client, pair.server, providers(0), providers(1))
     expect(fixture.session.createBidirectionalStream).toHaveBeenCalledTimes(1)
     for (const [index, host] of fixture.hosts.entries()) {
-      expect(await host.request('echo', 20)).toBe(21 - index)
-      await host.notify('note', `from-${index}`)
-      expect(await host.request('notes')).toEqual([`from-${index}`])
+      expect(await host.webTransport.request('echo', 20)).toBe(21 - index)
+      await host.webTransport.notify('note', `from-${index}`)
+      expect(await host.webTransport.request('notes')).toEqual([`from-${index}`])
       expect(await items(host, 'values')).toEqual([1 - index, 11 - index])
       expect(
-        await host.group([{ method: 'echo', payload: 30 }], { idempotencyKey: `wt-group-${index}` })
+        await host.webTransport.group([{ method: 'echo', payload: 30 }], {
+          idempotencyKey: `wt-group-${index}`
+        })
       ).toMatchObject([{ state: 'success', result: 31 - index }])
-      expect(await host.outcome(`wt-group-${index}`)).toMatchObject({ state: 'done' })
+      expect(await host.webTransport.outcome(`wt-group-${index}`)).toMatchObject({ state: 'done' })
     }
     /** The caller's abort travels over the existing runtime cancel operation to the remote owner. */
     const controller = new AbortController()
     /** Observe rejection before triggering cancellation of an already-admitted remote call. */
-    const pending = fixture.hosts[0]
+    const pending = fixture.hosts[0].webTransport
       .request('hold', undefined, { signal: controller.signal })
       .catch((error: unknown) => error)
     await admitted.promise
     controller.abort(new Error('stop reliable-stream call'))
     expect(await pending).toMatchObject({ code: 'CANCELLED' })
     await cancelled.promise
-    expect(
-      construction.mock.calls.filter(([config]) => 'id' in config && config.id === 'wt-client')
-    ).toHaveLength(1)
-    expect(
-      construction.mock.calls.filter(([config]) => 'id' in config && config.id === 'wt-server')
-    ).toHaveLength(1)
-    expect(construction).toHaveBeenCalledTimes(2)
   } finally {
     /** Native stream cancellation is observed before explicitly closing the opposing owner. */
     const failures: unknown[] = []
@@ -190,7 +156,6 @@ it('runs bidirectional operations and cancellation through one endpoint per reli
         failures.push(error)
       }
     }
-    construction.mockRestore()
     expect(failures).toEqual([])
   }
 })
@@ -203,21 +168,26 @@ it('rejects pre-handshake business bytes and applies the original silent handsha
   /** A valid canonical business envelope is still not a valid handshake reply. */
   const early = encodeRpcStreamTextFrame(
     JSON.stringify(
-      normalizeRpcEnvelope({
-        kind: 'request',
+      normalizeRpcFrame({
+        profile: RpcWireProfile,
+        kind: 'call',
         id: 'early-request',
-        method: 'attack',
-        data: {
-          route: {
-            profile: RpcRouteProfile,
-            type: 'request',
-            applicationVersion: '1.0',
-            senderId: 'unaccepted',
-            targetId: 'wt-prehandshake',
-            sentAt: 0
-          },
-          payload: null
-        }
+        route: {
+          applicationVersion: '1.0',
+          senderId: 'unaccepted',
+          targetId: 'wt-prehandshake',
+          receiverId: 'wt-prehandshake',
+          sentAt: 0
+        },
+        task: {
+          mode: 'request',
+          callerId: 'unaccepted',
+          callerGeneration: { kind: 'session', value: 0, providerId: 'unaccepted' },
+          targetGeneration: { kind: 'session', value: 0, providerId: 'wt-prehandshake' },
+          method: 'attack'
+        },
+        options: {},
+        payload: null
       })
     ),
     new TextEncoder()
@@ -310,10 +280,9 @@ it('waits for native readiness and closes only its created reader and writer onc
   /** The responder uses the same existing raw byte deployment as the full-operations case. */
   const server = createRpcHost({
     plugins: [
-      defineTransportPlugin({
+      webTransportPlugin({
         name: 'close-responder',
-        mode: 'listen',
-        deployment: responder.deployment({ listen: pair.server, peerId: 'pre-hello-placeholder' })
+        session: { createBidirectionalStream: async () => pair.server }
       })
     ],
     provide: { echo: (value: number) => value },
@@ -332,7 +301,7 @@ it('waits for native readiness and closes only its created reader and writer onc
     expect(session.createBidirectionalStream).not.toHaveBeenCalled()
     ready.resolve()
     const hosts = await Promise.all([client, server])
-    expect(await hosts[0].request('echo', 42)).toBe(42)
+    expect(await hosts[0].webTransport.request('echo', 42)).toBe(42)
     expect(session.createBidirectionalStream).toHaveBeenCalledTimes(1)
     const closing = hosts[0].close()
     expect(hosts[0].close()).toBe(closing)

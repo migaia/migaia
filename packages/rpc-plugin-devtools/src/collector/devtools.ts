@@ -1,3 +1,4 @@
+/** Owns collector retention, active watchers and service exposure over the shared probe feed. */
 import type { IRpcContext } from '@migaia/rpc-host'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import {
@@ -10,8 +11,8 @@ import {
   RpcProbeOutcome,
   type IRpcProbeDescriptor,
   type IRpcProbeEventView
-} from '@migaia/rpc-host/probe'
-import type { IRuntimePeerProvide } from '@migaia/rpc-host/plugin'
+} from '@migaia/rpc-host/plugins/probe'
+import type { IRpcProvide } from '@migaia/rpc-host'
 import { encodeRpcDevtoolsRecord, decodeRpcDevtoolsRecord } from '../contract/record-codec.js'
 import type { IRpcDevtools, IRpcDevtoolsOptions } from '../collector-types.js'
 import type {
@@ -20,7 +21,7 @@ import type {
   IRpcDevtoolsQuery
 } from '../contract/service.js'
 import type { IRpcDevtoolsWireEvent } from '../contract/wire.js'
-import { RpcDevtoolsErrorCode } from '../error-code.js'
+import { RpcDevtoolsErrorCode } from '@migaia/rpc-contract/error-code'
 import { identifyDevtoolsError } from '../errors.js'
 import { NameTable } from './intern.js'
 import { EventRing, readCarrierSequences } from './ring.js'
@@ -226,7 +227,7 @@ class RpcDevtoolsCollector {
       resume: this.#resume,
       clear: this.#clear,
       close: this.#close,
-      service: {} as IRuntimePeerProvide
+      service: {} as IRpcProvide
     }
     api.service = createCollectorService(
       {
@@ -255,7 +256,11 @@ class RpcDevtoolsCollector {
           sample: options.sample,
           onError: this.#state.onError,
           describe: (descriptor) => {
-            if (!this.#state.closed) this.#state.descriptors.set(descriptor.endpointId, descriptor)
+            if (!this.#state.closed)
+              this.#state.descriptors.set(
+                JSON.stringify([descriptor.endpointId, descriptor.carrierId]),
+                descriptor
+              )
           },
           emit: api.emit
         },
@@ -483,16 +488,21 @@ class RpcDevtoolsCollector {
   #close = (): void => {
     if (this.#state.closed) return
     this.#state.closed = true
-    this.#state.devtools.setStages([])
-    ;(0, this.#state.releaseStages)?.()
-    this.#state.ring.clear()
-    this.#state.statistics.clear()
-    this.#state.recording?.clear()
-    this.#state.watchPending?.clear()
-    this.#state.recording = undefined
-    for (let i = 0; i < this.#state.watchers.length; i++) this.#state.watchers[i]!.close()
-    this.#state.names.clear()
-    this.#state.descriptors.clear()
+    try {
+      this.#state.devtools.setStages([])
+    } finally {
+      ;(0, this.#state.releaseStages)?.()
+      this.#state.ring.clear()
+      this.#state.statistics.clear()
+      this.#state.recording?.clear()
+      this.#state.watchPending?.clear()
+      this.#state.recording = undefined
+      for (let i = 0; i < this.#state.watchers.length; i++) this.#state.watchers[i]!.close()
+      /** Close cannot wait for a consumer paused at yield to finalize its original iterator. */
+      this.#state.watchers.length = 0
+      this.#state.names.clear()
+      this.#state.descriptors.clear()
+    }
   }
 
   /** Consume a reusable probe view into the collector's current retention owners. */
@@ -514,7 +524,9 @@ class RpcDevtoolsCollector {
     this.#state.ingesting = true
     try {
       if (
-        (view.stage === RpcProbeStage.message || view.stage === RpcProbeStage.envelope) &&
+        (view.stage === RpcProbeStage.message ||
+          view.stage === RpcProbeStage.envelope ||
+          view.stage === RpcProbeStage.forward) &&
         this.#state.methods !== undefined &&
         view.method !== undefined &&
         !this.#state.methods.has(view.method)

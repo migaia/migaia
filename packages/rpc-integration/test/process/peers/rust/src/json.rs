@@ -53,7 +53,7 @@ impl Value {
         match self {
             Self::Null => out.push_str("null"),
             Self::Bool(value) => out.push_str(if *value { "true" } else { "false" }),
-            Self::Number(value) => out.push_str(value),
+            Self::Number(value) => out.push_str(&number_text(value)),
             Self::String(value) | Self::SurrogateString(value) => {
                 out.push('"');
                 for ch in value.chars() {
@@ -97,6 +97,59 @@ impl Value {
             }
         }
     }
+}
+
+/// Use the native shortest finite f64 digits with JSON.stringify's decimal/exponent thresholds.
+fn number_text(input: &str) -> String {
+    let value = input
+        .parse::<f64>()
+        .expect("JSON number was admitted before serialization");
+    if value == 0.0 {
+        return "0".to_owned();
+    }
+    let shortest = value.abs().to_string();
+    let (mantissa, explicit) = shortest
+        .split_once(['e', 'E'])
+        .map_or((shortest.as_str(), 0), |(a, b)| {
+            (a, b.parse::<i32>().unwrap())
+        });
+    let point = mantissa.find('.').unwrap_or(mantissa.len()) as i32;
+    let digits: String = mantissa.chars().filter(|ch| *ch != '.').collect();
+    let first = digits.find(|ch| ch != '0').unwrap();
+    let exponent = point + explicit - first as i32 - 1;
+    let significant = digits[first..].trim_end_matches('0');
+    let mut result = if value.is_sign_negative() {
+        "-".to_owned()
+    } else {
+        String::new()
+    };
+    if (1e-6..1e21).contains(&value.abs()) {
+        let position = exponent + 1;
+        if position <= 0 {
+            result.push_str("0.");
+            result.push_str(&"0".repeat((-position) as usize));
+            result.push_str(significant);
+        } else if position as usize >= significant.len() {
+            result.push_str(significant);
+            result.push_str(&"0".repeat(position as usize - significant.len()));
+        } else {
+            result.push_str(&significant[..position as usize]);
+            result.push('.');
+            result.push_str(&significant[position as usize..]);
+        }
+    } else {
+        result.push_str(&significant[..1]);
+        if significant.len() > 1 {
+            result.push('.');
+            result.push_str(&significant[1..]);
+        }
+        result.push('e');
+        if exponent >= 0 {
+            result.push('+');
+        }
+        result.push_str(&exponent.to_string());
+    }
+    result
 }
 
 pub fn parse(input: &[u8]) -> Result<Value, String> {
@@ -306,11 +359,12 @@ impl Parser<'_> {
                 return Err("invalid JSON exponent");
             }
         }
-        Ok(Value::Number(
-            std::str::from_utf8(&self.bytes[start..self.offset])
-                .map_err(|_| "invalid number bytes")?
-                .to_owned(),
-        ))
+        let text = std::str::from_utf8(&self.bytes[start..self.offset])
+            .map_err(|_| "invalid number bytes")?;
+        if !text.parse::<f64>().is_ok_and(f64::is_finite) {
+            return Err("nonfinite JSON number");
+        }
+        Ok(Value::Number(text.to_owned()))
     }
     fn array(&mut self, depth: usize) -> Result<Value, &'static str> {
         self.byte(b'[')?;

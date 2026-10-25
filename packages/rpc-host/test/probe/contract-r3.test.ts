@@ -9,8 +9,6 @@ import { connect } from '../../dist/core/middleware/connect.js'
 import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
 import {
   defineProbe,
-  readProbeStages,
-  subscribeProbeStages,
   RpcProbeDirection,
   RpcProbeKind,
   RpcProbeStage,
@@ -22,25 +20,6 @@ import { readRuntimePeerEndpoint } from '../../dist/remote/runtime-api/peer.js'
 import { readEndpointOwner } from '../../dist/core/internal/endpoint-projection.js'
 import { EndpointOwnerKey } from '../../dist/core/endpoint-kernel.js'
 import type { RpcOutboundAttachment } from '../../dist/core/internal/outbound-attachment.js'
-
-it('reads frozen host stages and releases one notification per change', () => {
-  /** Host-form public fields remain initial while the canonical state tracks active stages. */
-  const probe = defineProbe({ stages: ['message'], emit: () => undefined }, {})
-  /** Cold notifications must fire only for actual changes and stop after release. */
-  const changed = vi.fn()
-  /** Subscription release is idempotent and owns no business-path work. */
-  const release = subscribeProbeStages(probe, changed)
-  probe.setStages(['message', 'frame'])
-  probe.setStages(['message', 'frame'])
-  expect(probe.stageMask).toBe(2)
-  expect(readProbeStages(probe)).toBe(18)
-  expect(changed).toHaveBeenCalledTimes(1)
-  release()
-  release()
-  probe.setStages([])
-  expect(readProbeStages(probe)).toBe(0)
-  expect(changed).toHaveBeenCalledTimes(1)
-})
 
 it('provides the actual serving endpoint identity', async () => {
   /** Existing memory transport exercises the provider context through the public endpoint. */

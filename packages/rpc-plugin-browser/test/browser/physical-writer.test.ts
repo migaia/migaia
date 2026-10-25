@@ -1,76 +1,62 @@
-import { createComposedEndpoint } from '../../../rpc-host/dist/core/composed.js'
-import { createCanonicalChunkFeature } from '../../../rpc-host/dist/core/features/canonical-chunk.js'
-import { createOutboundFeature } from '../../../rpc-host/dist/core/features/outbound.js'
-import { createProviderFeature } from '../../../rpc-host/dist/core/internal/provider-feature.js'
-import { createDiscoveryFeature } from '../../../rpc-host/dist/core/features/discovery.js'
-import { createControlFeature } from '../../../rpc-host/dist/core/features/control.js'
 import assert from 'node:assert/strict'
 import { describe, it } from 'vitest'
-import { connect } from '../../../rpc-host/dist/core/middleware/connect.js'
-import { createWebWorkerTransport } from '@migaia/rpc-host/plugin'
-import { envelope } from '../../../rpc-host/test/core/fixtures/physical-batch-envelope.js'
+import { createRpcHost } from '@migaia/rpc-host'
+import { batch } from '@migaia/rpc-host/plugins/batch'
+import { dedicatedWorkerPlugin } from '@migaia/rpc-plugin-browser'
+import { RpcCarrierFrameKind } from '@migaia/rpc-contract/protocol'
+import { RpcBatchExtension } from '../../../rpc-host/dist/plugins/batch/constants.js'
+import { portPair } from './message-fixture.js'
 
 describe('optimal physical writer', () => {
   it('one bad member cannot block valid siblings or serialize provider execution', async () => {
-    /** Both canonical factories belong to the same explicit static deployment. */
-    const listeners = [
-      new Set<(event: MessageEvent) => void>(),
-      new Set<(event: MessageEvent) => void>()
-    ]
-    /** Physical frames and delivery are visible without replacing the core receiver. */
-    const ports = [0, 1].map((side) => ({
-      postMessage(value: unknown) {
-        queueMicrotask(() => {
-          for (const listener of listeners[1 - side]!) listener({ data: value } as MessageEvent)
-        })
-      },
-      addEventListener(type: string, listener: (event: MessageEvent) => void) {
-        if (type === 'message') listeners[side]!.add(listener)
-      },
-      removeEventListener(type: string, listener: (event: MessageEvent) => void) {
-        if (type === 'message') listeners[side]!.delete(listener)
-      }
-    }))
-    /** The actual canonical transport grants source/identity behavior on each endpoint. */
-    const transport = createWebWorkerTransport(ports[1] as never, { peerId: 'a' })
-    /** Provider work is held to distinguish admission order from completion order. */
-    /**
-     * This physical endpoint owns one outbound and discovery graph for its original business
-     * assertions.
-     */
-    const endpointOutbound = createOutboundFeature(createCanonicalChunkFeature())
-    /** Discovery shares the same sender and accepted target directory. */
-    const endpointDiscovery = createDiscoveryFeature(endpointOutbound)
-    const endpoint = await createComposedEndpoint(
-      {
-        id: 'b',
-        transport,
-        middlewares: [connect({ transport })]
-      },
-      {
-        'first-party-outbound': endpointOutbound,
-        'first-party-provider': createProviderFeature(endpointOutbound),
-        'first-party-discovery': endpointDiscovery,
-        'first-party-control': createControlFeature(endpointOutbound, endpointDiscovery)
-      }
-    )
-    /** Concurrent entries must be observable before either provider completes. */
+    /** Native delivery alone is paused; both real hosts retain their canonical codecs and sessions. */
+    const pair = portPair()
+    /** Concurrent entries must be observable before either original provider completes. */
     const seen: string[] = []
-    /** One business hold is released only after both semantic admissions are checked. */
+    /** One business hold is released only after both real semantic admissions are checked. */
     let release!: () => void
-    /** Ordinary asynchronous provider execution uses the existing provider owner. */
+    /** Actual provider promises remain unresolved while the original concurrency assertion runs. */
     const held = new Promise<void>((resolve) => {
       release = resolve
     })
-    endpoint.provide('echo', async (context) => {
-      seen.push(context.data as string)
-      await held
-      return context.success(context.data)
-    })
+    /** Keep original native/contract diagnostics intact without letting fixture logging alter work. */
+    const reports: unknown[] = []
+    /** Both genuine cold batch instances negotiate the extension before any business frame is sent. */
+    const hosts = await Promise.all([
+      createRpcHost({
+        plugins: [batch(), dedicatedWorkerPlugin({ worker: pair.left.target })],
+        report: (error) => reports.push(error)
+      }),
+      createRpcHost({
+        plugins: [batch(), dedicatedWorkerPlugin({ worker: pair.right.target })],
+        provide: {
+          echo: async (payload: string) => {
+            seen.push(payload)
+            await held
+            return payload
+          }
+        },
+        report: (error) => reports.push(error)
+      })
+    ])
     try {
-      ports[0]!.postMessage({
-        kind: 'batch',
-        envelopes: [envelope('good-one'), { kind: 'request', id: 'bad' }, envelope('good-two')]
+      pair.left.setDeliver(false)
+      await hosts[0].worker.notify('echo', 'good-one')
+      /** Capture this actual codec's frame without reconstructing metadata, task ids or routes. */
+      const first = pair.left.sent.at(-1)
+      await hosts[0].worker.notify('echo', 'good-two')
+      /** A second completed native handoff contributes its own original semantic frame. */
+      const second = pair.left.sent.at(-1)
+      pair.right.emit('message', {
+        kind: RpcCarrierFrameKind.extension,
+        extension: RpcBatchExtension,
+        data: {
+          frames: [
+            first,
+            { kind: RpcCarrierFrameKind.message, data: '{"kind":"call","id":"bad"}' },
+            second
+          ]
+        }
       })
       await new Promise<void>((resolve) => setTimeout(resolve, 10))
       assert.deepEqual(
@@ -80,7 +66,7 @@ describe('optimal physical writer', () => {
       )
     } finally {
       release()
-      await endpoint.dispose()
+      await Promise.all(hosts.map((host) => host.close()))
     }
   })
 })

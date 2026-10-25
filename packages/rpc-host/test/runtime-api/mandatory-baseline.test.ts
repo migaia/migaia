@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { it, vi } from 'vitest'
 import { RpcCapability } from '@migaia/rpc-contract'
-import { RpcCoreErrorCode } from '../../dist/core/errors.js'
+import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { createRuntimePeer } from '../../dist/remote/runtime-api/peer.js'
 import { readRuntimePeerConnection } from '../../dist/remote/runtime-api/peer.js'
 import { runtimeSources } from './fixture.js'

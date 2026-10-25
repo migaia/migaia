@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { createAdapterWebThreadLauncher as createWebThreadLauncher } from '../../../dist/threads/web-launcher.js'
+import { createWebThreadLauncher } from '../../../dist/threads/web-launcher.js'
 
 /** The fixture runs in each actual platform, with the normal runtime Worker constructor. */
 const deno = typeof Deno === 'object'
@@ -45,12 +45,11 @@ const launcher = createWebThreadLauncher({
   Worker: ObservedWorker,
   report: (error) => reported.push(error)
 })
-/** Native bootstrap acknowledgement precedes the worker's deliberately uncaught error. */
+/** Native bootstrap delivery precedes the worker's deliberately uncaught error. */
 const handle = await launcher.launch(
   { entry: new URL('./web-error-worker.mjs', import.meta.url).href },
   { signal: new AbortController().signal }
 )
-await handle.prepared
 /** A bounded native wait allows the error event to reach the production listener. */
 const until = Date.now() + 2000
 while (prevented.length === 0 && Date.now() < until)

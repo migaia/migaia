@@ -1,6 +1,7 @@
-import { RpcProbeStageName, RpcProbeOutcomeName } from '@migaia/rpc-host/probe'
+/** Compiles collector query filters and applies them to retained numeric event columns. */
+import { RpcProbeStageName, RpcProbeOutcomeName } from '@migaia/rpc-host/plugins/probe'
 import type { IRpcDevtoolsQuery } from '../contract/service.js'
-import { RpcDevtoolsErrorCode } from '../error-code.js'
+import { RpcDevtoolsErrorCode } from '@migaia/rpc-contract/error-code'
 import { identifyDevtoolsError } from '../errors.js'
 import { EventRing } from './ring.js'
 import { CollectorLimit, CollectorText } from './text.js'
@@ -49,7 +50,7 @@ export function compileQuery(input: IRpcDevtoolsQuery | undefined): ICollectorFi
     invalid()
   if (input?.trace !== undefined && typeof input.trace !== 'string') invalid()
   /** Empty stage selection intentionally matches no observations. */
-  let stages = 127
+  let stages = (1 << RpcProbeStageName.length) - 1
   /** Outcomes share the canonical numeric vocabulary; an empty filter selects no rows. */
   let outcomes = (1 << RpcProbeOutcomeName.length) - 1
   if (input?.outcomes !== undefined) {

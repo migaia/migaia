@@ -8,29 +8,22 @@ import sys
 # The existing real-process harness owns framing and terminal process observations.
 PEERS = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PEERS))
-from behavior_check import run_case
+from behavior_check import run_case, peer
 
 
 def request(identifier, method, notify=False):
     """Build one baseline request while keeping notification mode in route metadata."""
-    return {
-        "kind": "request", "id": identifier, "method": method,
-        "data": {"route": {
-            "profile": "migaia.rpc.route", "type": "request", "applicationVersion": "1.0",
-            "senderId": "notification-caller", "targetId": "ts-peer", "sentAt": 0,
-            **({"dispatchOnly": True} if notify else {}),
-        }, "payload": "receipt"},
-    }
+    return {"profile": peer.PROTOCOL, "kind": "call", "id": identifier,
+            "route": peer.route("notification-caller", "ts-peer"), "options": {}, "payload": "receipt",
+            "task": {"mode": "notify" if notify else "request", "method": method,
+                     "callerId": "notification-caller", "callerGeneration": {"kind": "session", "value": 0, "providerId": "notification-caller"},
+                     "targetGeneration": {"kind": "session", "value": 0, "providerId": "ts-peer"}}}
 
 
 def main():
     """Compare accepted counts after unknown, request-only, and valid echo notifications."""
-    hello = {
-        "kind": "handshake", "step": "hello", "protocol": "migaia.rpc",
-        "versions": [{"major": 1, "minor": 1}], "codecs": ["json"],
-        "capabilities": ["runtime-api@1", "batch@1"],
-        "peer": {"id": "notification-caller", "runtime": "python"},
-    }
+    hello = peer.own_offer("notification-caller")
+    hello["directory"]["methods"] = []
     case = {
         "id": "U36-reference-notification-admission",
         "steps": [{"frame": frame} for frame in [
@@ -44,13 +37,11 @@ def main():
         "expect": {
             "exit": 0,
             "frames": [
-                {"kind": "handshake", "step": "accept"},
-                {"kind": "response", "id": "receipt-query", "ok": True,
-                 "data": {"payload": 1}},
-                {"kind": "response", "id": "pending-request", "ok": True,
-                 "data": {"payload": None}},
-                {"kind": "response", "id": "valid-finish", "ok": True,
-                 "data": {"payload": None}},
+                {"profile": peer.PROTOCOL, "kind": "handshake", "step": "hello"},
+                {"profile": peer.PROTOCOL, "kind": "handshake", "step": "accept"},
+                {"kind": "result", "id": "receipt-query", "result": 1},
+                {"kind": "result", "id": "pending-request", "result": None},
+                {"kind": "result", "id": "valid-finish", "result": None},
             ],
             "stderr": {"PEER_ERROR PROVIDER_NOT_FOUND": 1,
                        "PEER_ERROR CAPABILITY_UNSUPPORTED": 1},

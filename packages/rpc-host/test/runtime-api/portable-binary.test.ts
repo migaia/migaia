@@ -4,7 +4,7 @@ import { connected } from './fixture.js'
 import { RUNTIME_API_CAPABILITIES } from '../../dist/remote/runtime-api/constants.js'
 import { readRuntimePeerConnection } from '../../dist/remote/runtime-api/peer.js'
 import { ProviderAdmissionRegistry } from '../../dist/core/internal/provider-admission.js'
-import { RpcCoreErrorCode } from '../../dist/core/errors.js'
+import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 
 /**
  * Both source offers explicitly request the normative profile, independently of unfinished

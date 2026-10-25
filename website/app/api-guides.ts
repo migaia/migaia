@@ -296,9 +296,6 @@ const configurationOptionDescriptions: readonly {
   },
   {
     keys: [
-      'rpc-contract:errors:deserializeRpcError:unknownFields',
-      'rpc-contract:errors:normalizeRpcSerializedError:unknownFields',
-
       'utils:error:deserializeErrorChain:unknownFields',
       'utils:error:normalizeSerializedErrorChain:unknownFields'
     ],
@@ -313,158 +310,11 @@ const configurationOptionDescriptions: readonly {
     en: 'Set this callback to record fields discarded by unknownFields: ignore. For each discarded field, it receives a pointer describing the object location and the field name before normalization continues. Omission discards those fields without this notification. The callback runs synchronously; if it throws, normalization stops with that error.',
     zh: '使用 unknownFields: ignore 丢弃未知字段、又需要记录这些输入时，设置此回调。每丢弃一个字段，都会先传入表示对象位置的路径和字段名，再继续整理数据。省略回调时，不会为丢弃的字段发出这类通知。回调同步执行；若它抛错，本次数据整理会停止，并交出该错误。'
   },
-  {
-    keys: [
-      'rpc-contract:errors:deserializeRpcError:onUnknownField',
-      'rpc-contract:errors:normalizeRpcSerializedError:onUnknownField',
-      'rpc-contract:handshake:acceptRpcHandshake:onUnknownField',
-      'rpc-contract:handshake:completeRpcHandshake:onUnknownField',
-      'rpc-contract:handshake:normalizeRpcHandshake:onUnknownField',
-      'rpc-contract:v1:normalizeRpcEnvelope:onUnknownField'
-    ],
-    en: 'Reports an unknown field when the ignore policy allows processing to continue. It receives the field name and a JSON pointer: a path locating that field in the data. Use it to log unexpected peer input. The callback runs synchronously; if it throws, processing stops. The reject policy refuses the data before calling this hook.',
-    zh: '使用 ignore 策略、允许继续处理数据时，报告遇到的未知字段。参数包含字段名和 JSON pointer，即字段在数据中的位置路径。需要记录对端的意外数据时，可提供此回调。回调同步执行，抛错会停止处理。reject 策略会直接拒绝数据，不会先调用此回调。'
-  },
-  {
-    keys: [
-      'rpc-contract:errors:reachRpcError:report',
-      'rpc-contract:errors:serializeRpcError:report'
-    ],
-    en: 'Reports a failure while reading a property of an error object. The callback receives the property name, its path in the data and the original read failure. Provide a synchronous logger when unreadable error data needs investigation. The logger should not throw another error.',
-    zh: '读取错误对象的属性失败时调用。参数包含属性名、属性在数据中的位置和原始读取错误。需要追查无法正常读取的错误数据时，可提供同步日志函数。日志函数应避免再次抛错。'
-  },
+
   {
     keys: ['utils:error:reachErrorChain:report', 'utils:error:serializeErrorChain:report'],
     en: 'An error chain links a failure to earlier failures through cause or an aggregate errors array. Set report to log failures encountered while reading those objects. Each notification contains the object location, field name and original read error. Without report, a read failure stops the operation with an error that retains the original cause. Reporting is synchronous; a reporter that throws stops the operation with its own error.',
     zh: '错误链通过 cause 或聚合错误的 errors 数组，把当前失败与更早的失败连接起来。需要记录读取这些对象时发生的错误时，设置 report。每次通知包含对象所在路径、字段名和原始读取错误。省略时，读取失败会停止当前操作，抛出的错误仍保留原始原因。报告同步执行；报告函数自身若抛错，会以该错误停止当前操作。'
-  },
-  {
-    keys: ['rpc-contract:index:createRpcUnknownFieldWarner:maxKeysPerConnection'],
-    en: 'Sets how many distinct unknown-field warning keys one connection can remember. Remembering a key prevents repeated warnings for the same field. Once full, the reporter emits one overflow warning instead of remembering more keys. Lower this limit to bound memory used by unexpected-field history.',
-    zh: '设置每条连接最多记住多少种未知字段警告标识。保存标识可以避免对同一字段反复告警。达到上限后，报告器只发出一次超限警告，不再保存新的标识。需要限制未知字段历史占用的内存时，可调低此项。'
-  },
-  {
-    keys: ['rpc-contract:index:createRpcUnknownFieldWarner:maxConnections'],
-    en: 'Sets how many connections retain unknown-field warning history. When another connection would exceed the limit, the least recently observed connection history is removed. Use this to bound history for a service that receives many connections over time; removing history does not close that connection.',
-    zh: '设置最多为多少条连接保留未知字段警告历史。新连接使数量超限时，会移除最久未观察到的连接历史。长期接收大量连接的服务可用它限制历史占用；移除历史不会关闭连接。'
-  },
-  {
-    keys: ['rpc-contract:index:createRpcUnknownFieldWarner:warn'],
-    en: 'Writes an unknown-field warning to your application logger. It receives the connection id and the field key used to suppress repeated warnings. The callback runs synchronously. If it throws, that failure reaches the caller rather than being hidden.',
-    zh: '把未知字段警告写入应用日志。回调会收到连接标识，以及用于避免重复告警的字段标识。它同步执行；如果抛错，错误会交给调用方，不会被隐藏。'
-  },
-  {
-    keys: [
-      'rpc-contract:framing:createBinaryFramer:chunkBytes',
-      'rpc-contract:framing:createStringFramer:chunkBytes'
-    ],
-    en: 'Sets the largest fragment produced when a message is split for transport. Use a positive safe integer: a whole number JavaScript can represent exactly. Binary framing counts bytes; string framing counts UTF-16 code units, the units used by string.length. Choose a size the underlying channel can carry.',
-    zh: '设置消息拆分后每片的最大大小。值必须是正安全整数，即 JavaScript 能精确表示的正整数。二进制分片按字节计数；字符串分片按 UTF-16 编码单元计数，与 string.length 的计数单位相同。应根据实际通道能承载的大小选择。'
-  },
-  {
-    keys: [
-      'rpc-contract:framing:createBinaryFramer:maxMessageBytes',
-      'rpc-contract:framing:createStringFramer:maxMessageBytes'
-    ],
-    en: 'Limits the size of one complete message and the data retained while collecting its fragments. Use a positive whole number JavaScript can represent exactly. Binary messages count bytes; strings count UTF-16 units, as string.length does. This value cannot exceed maxBufferedBytes, the total buffer limit.',
-    zh: '限制一条完整消息的大小，也限制收集分片时为该消息保留的数据。必须设置 JavaScript 能精确表示的正整数。二进制按字节计数，字符串按 string.length 使用的 UTF-16 编码单元计数。此值不能超过总缓冲上限 maxBufferedBytes。'
-  },
-  {
-    keys: [
-      'rpc-contract:framing:createBinaryFramer:maxChunks',
-      'rpc-contract:framing:createStringFramer:maxChunks'
-    ],
-    en: 'Limits how many fragments one message may declare. Use a positive whole number JavaScript can represent exactly. Set it when a peer must not make the receiver track an excessive number of fragments; messages declaring more fragments are rejected.',
-    zh: '限制一条消息可以声明的分片数量。必须是 JavaScript 能精确表示的正整数。需要防止对端让接收端追踪过多分片时设置；消息声明的分片数超过上限，就会被拒绝。'
-  },
-  {
-    keys: [
-      'rpc-contract:framing:createBinaryFramer:maxBufferedBytes',
-      'rpc-contract:framing:createStringFramer:maxBufferedBytes'
-    ],
-    en: 'Limits all data currently retained for messages that are missing fragments. Use a positive whole number JavaScript can represent exactly. Every source and message shares this allowance. Set it according to the total memory available for incomplete messages, rather than treating it as an allowance for each message.',
-    zh: '限制同时为尚未收齐的消息保留的数据总量。必须是 JavaScript 能精确表示的正整数。所有来源、所有消息共用这份额度。应按可用于暂存不完整消息的总内存设置，不能把它理解为每条消息各有一份。'
-  },
-  {
-    keys: [
-      'rpc-contract:framing:createBinaryFramer:maxConcurrentMessages',
-      'rpc-contract:framing:createStringFramer:maxConcurrentMessages'
-    ],
-    en: 'Limits how many messages may be waiting for missing fragments at once. Use a positive whole number JavaScript can represent exactly. Lower it when the receiver should track fewer partial messages, even if their combined data still fits the byte limit.',
-    zh: '限制同一时刻可以等待剩余分片的消息数量。必须是 JavaScript 能精确表示的正整数。即使数据总量尚未达到缓冲上限，也可以调低此项，让接收端只追踪较少的不完整消息。'
-  },
-  {
-    keys: [
-      'rpc-contract:framing:createBinaryFramer:assemblyTimeoutMs',
-      'rpc-contract:framing:createStringFramer:assemblyTimeoutMs'
-    ],
-    en: 'Sets how long the receiver waits to complete a message after its first fragment arrives. Supply a positive whole number of milliseconds that JavaScript can represent exactly. If fragments are still missing when the timer fires, the message is marked expired.',
-    zh: '设置收到第一片后，还能等待多久以收齐整条消息。单位为毫秒，必须是 JavaScript 能精确表示的正整数。计时器到期时仍有分片缺失，这条消息就会被标记为过期。'
-  },
-  {
-    keys: [
-      'rpc-contract:framing:createBinaryFramer:now',
-      'rpc-contract:framing:createStringFramer:now'
-    ],
-    en: 'An optional clock callback accepted when creating the framer. The current implementation stores it but does not call it, so you can omit it. Adding this callback does not control expiry or change timeouts. Configure schedule and cancel when you need to control timers.',
-    zh: '创建分帧器时可以传入的时钟回调。当前实现会保存它，但不会调用它，因此可以省略。提供此函数不会控制过期时刻，也不会改变超时行为。需要控制计时器时，应配置 schedule 和 cancel。'
-  },
-  {
-    keys: [
-      'rpc-contract:framing:createBinaryFramer:schedule',
-      'rpc-contract:framing:createStringFramer:schedule'
-    ],
-    en: 'Provides timers for expiring incomplete messages. Arrange for the callback to run after the requested delay in milliseconds, and return a timer handle that cancel can receive later. Supply this together with cancel when the application uses its own timers. If creating a timer fails, the framing operation fails too.',
-    zh: '提供让不完整消息过期的计时器。按收到的毫秒延迟安排回调，并返回之后能交给 cancel 的计时器对象。应用需要使用自己的计时器时，与 cancel 配套提供。创建计时器失败会使本次分帧操作失败。'
-  },
-  {
-    keys: [
-      'rpc-contract:framing:createBinaryFramer:cancel',
-      'rpc-contract:framing:createStringFramer:cancel'
-    ],
-    en: 'Stops a timer previously created by schedule. It receives the original timer handle, so pair it with the function that created that handle. If cancellation fails during cleanup, the host error reporter receives the failure while the frame result is preserved.',
-    zh: '停止 schedule 之前创建的计时器。接收的就是原计时器对象，因此必须与创建它的 schedule 配套。清理时取消失败，会交给运行环境的错误报告通道，本次帧处理结果仍会保留。'
-  },
-  {
-    keys: ['rpc-contract:framing/stream:createRpcHandshakeFrameReceiver:role'],
-    en: 'Identifies which side of the initial connection exchange this receiver handles. Choose initiator for the side starting the handshake, or responder for the side accepting it. Matching the actual role lets the receiver interpret each handshake frame correctly.',
-    zh: '说明此接收器处于连接建立过程中的哪一端。主动发起握手时选择 initiator，接收握手时选择 responder。必须与实际连接角色一致，接收器才能正确解释双方交换的握手帧。'
-  },
-  {
-    keys: [
-      'rpc-contract:framing/stream:createRpcStreamFrameDecoder:onFrame',
-      'rpc-contract:framing/stream:createRpcStreamFrameDecoderWithLimit:onFrame'
-    ],
-    en: 'Receives the bytes of each complete frame. A frame is one length-delimited message collected from the byte stream. The decoder releases its assembly state before calling this function synchronously. Process or copy the bytes in the callback when the application needs the completed message.',
-    zh: '收到一条完整帧后同步调用。帧是从连续字节流中按长度分出的完整消息。解码器会先释放这次组装的状态，再把消息字节交给回调。应用需要使用完整消息时，应在这里处理或复制字节。'
-  },
-  {
-    keys: [
-      'rpc-contract:framing/stream:createRpcStreamFrameDecoder:onError',
-      'rpc-contract:framing/stream:createRpcStreamFrameDecoderWithLimit:onError'
-    ],
-    en: 'Reports the first frame whose format is invalid. Before the callback runs synchronously, the decoder stops and releases buffered data. Handle or log the error here. The failed decoder cannot continue with another connection; create a new decoder for that connection.',
-    zh: '首次发现帧格式错误时同步调用。在调用回调前，解码器已经停止并释放暂存数据。可在这里处理或记录错误。失败的解码器不能继续处理另一条连接；新连接应使用新建的解码器。'
-  },
-  {
-    keys: [
-      'rpc-contract:runtime:runtimeOperationCapabilities:cancel',
-      'rpc-contract:stream:checkRpcRuntimeStreamFinish:cancel',
-      'rpc-contract:stream:checkRpcRuntimeStreamIntent:cancel',
-      'rpc-contract:stream:checkRpcRuntimeStreamTransition:cancel'
-    ],
-    en: 'Declares cancellation support with the only accepted value, before-start. This means the final method handler can decide a cancellation request before business execution starts. Use it when callers need that decision. It does not guarantee that already running business code can be stopped.',
-    zh: '声明取消能力，唯一允许的值是 before-start，即在开始执行前处理取消。最终的方法处理端会在业务开始前裁定取消请求。调用方需要这个裁定时使用；它不保证可以停止已经运行的业务代码。'
-  },
-  {
-    keys: ['rpc-contract:runtime:runtimeOperationCapabilities:orderKey'],
-    en: 'Assign the same application-issued key to operations whose arrival order the final handler must preserve. Different keys define independent ordering groups. Use a key for related updates that must stay in order, rather than sharing one key across unrelated work.',
-    zh: '最终处理端需要保持相关操作的到达顺序时，给这些操作分配同一个应用标识。不同标识表示互相独立的排序组。需要按顺序处理的更新使用同一标识，无关工作应使用不同标识。'
-  },
-  {
-    keys: ['rpc-contract:runtime:runtimeOperationCapabilities:idempotencyKey'],
-    en: 'Identifies one intended business operation so the final handler can recognize a retry. Keep this string stable across retries of that same operation. Give a new operation a different key; reusing a key means asking for the original operation again.',
-    zh: '为一次业务操作提供稳定标识，让最终处理端识别重试。同一操作的重试必须使用相同字符串。新的业务操作应使用不同标识；复用标识表示再次请求原操作。'
   },
 
   {
@@ -4429,11 +4279,7 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
   ...completionApiGuides,
   ...rpcApiGuides,
   ...rpcConstantGuides,
-  /** These two shared grammars require their explicit resource-boundary guidance. */
-  'rpc-contract:runtime:rpcMessageCapabilityControl':
-    rpcApiGuides['rpc-contract:runtime:rpcMessageCapabilityControl'],
-  'rpc-contract:runtime:rpcByteRuntimeBootstrap':
-    rpcApiGuides['rpc-contract:runtime:rpcByteRuntimeBootstrap'],
+
   ...utilsApiGuides,
   ...runtimeCompletionApiGuides,
   ...microHubApiGuides,

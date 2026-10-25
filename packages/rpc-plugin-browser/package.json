@@ -59,6 +59,7 @@
     "vitest": "^4.1.10"
   },
   "peerDependencies": {
+    "@migaia/rpc-contract": "workspace:*",
     "@migaia/rpc-host": "workspace:*"
   },
   "peerDependenciesMeta": {},

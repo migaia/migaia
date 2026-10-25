@@ -2,18 +2,13 @@ import { EventEmitter } from 'node:events'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { describe, expect, it } from 'vitest'
-import { createWebThreadChannelFactory } from '../../src/threads/adapters/web.js'
+import { createWebThreadChannelFactory } from '../../src/threads/web-launcher.js'
 import type { IThreadWebPort } from '../../src/threads/types.js'
-import { createRemoteRetryPort } from '@migaia/rpc-host/plugin'
+import { retry } from '@migaia/rpc-host/features/retry'
+import { timeout } from '@migaia/rpc-host/features/timeout'
+import { RpcCallMode, RpcWireKind } from '@migaia/rpc-contract/protocol'
+import { threadFrames } from './frame.js'
 import { nativeFixture, workerEntry } from './fixture.js'
-import {
-  RpcRuntimeKind,
-  RpcRuntimeMode,
-  RpcRuntimeProfile,
-  readRuntimeCarrier
-} from '@migaia/rpc-contract/runtime'
-import { readRpcBatchMembers } from '@migaia/rpc-contract/framing'
-
 /** Ordinary lifecycle regressions from archived audit receipts do not restart the interrupted audit. */
 describe('thread preparation and retry settlement', () => {
   it('preserves pre-aborted open priority before reading the local capability proposal', async () => {
@@ -42,7 +37,7 @@ describe('thread preparation and retry settlement', () => {
       createWebThreadChannelFactory({
         scheduler: systemScheduler,
         /** Reading configuration here would replace the original cancellation with a getter failure. */
-        get capabilities(): readonly string[] {
+        get report(): (error: unknown) => void {
           reads++
           throw new Error('capability getter must not run after cancellation')
         }
@@ -50,7 +45,6 @@ describe('thread preparation and retry settlement', () => {
         {
           identity: { fingerprint: 'cancelled-peer' },
           port,
-          prepared: pending,
           exited: pending,
           terminate: () => undefined
         },
@@ -58,50 +52,6 @@ describe('thread preparation and retry settlement', () => {
       )
     ).rejects.toBe(reason)
     expect(reads).toBe(0)
-    expect(target.listenerCount('message')).toBe(0)
-  })
-  it('withholds transport until private bootstrap preparation acknowledges', async () => {
-    /** Event subscriptions prove the factory has not installed transport before readiness. */
-    const target = new EventEmitter()
-    /** Structural Web port tests supported ownership without claiming browser actual-exit support. */
-    const port: IThreadWebPort = {
-      postMessage: () => undefined,
-      addEventListener: (type, listener) => {
-        target.on(type, listener)
-      },
-      removeEventListener: (type, listener) => {
-        target.off(type, listener)
-      }
-    }
-    /** Only explicit acknowledgement resolves the prepared candidate. */
-    let acknowledge!: () => void
-    /** Pending preparation models the existing public handle promise. */
-    const prepared = new Promise<void>((resolve) => {
-      acknowledge = resolve
-    })
-    /** Publication must remain false for every continuation before acknowledgement. */
-    let published = false
-    /** The production factory owns the eventual core channel and abort subscription. */
-    const opening = createWebThreadChannelFactory({ scheduler: systemScheduler })
-      .open(
-        {
-          identity: { fingerprint: 'prepared-peer' },
-          port,
-          prepared,
-          exited: new Promise(() => undefined),
-          terminate: () => undefined
-        },
-        new AbortController().signal
-      )
-      .then((channel) => {
-        published = true
-        return channel
-      })
-    for (let turn = 0; turn < 10; turn++) await Promise.resolve()
-    expect(published).toBe(false)
-    expect(target.listenerCount('message')).toBe(0)
-    acknowledge()
-    await (await opening).close()
     expect(target.listenerCount('message')).toBe(0)
   })
   it('settles caller cancellation while waiting for replacement readiness without replay', async () => {
@@ -131,16 +81,17 @@ describe('thread preparation and retry settlement', () => {
     /** Only the initial generation may receive the physical send. */
     let sends = 0
     /** Canonical retry owns cancellation and cleanup; this test adds no retry implementation. */
-    const result = createRemoteRetryPort({ events, scheduler, report: () => undefined })
-      .dispatch({
-        events,
-        generation: 1,
-        method: 'p.read',
-        mode: 'request',
-        idempotent: true,
-        key: 'readiness-key',
+    const result = retry({ scheduler, report: () => undefined })
+      .run({
+        facts: {
+          method: 'p.read',
+          idempotent: true,
+          idempotencyKey: 'readiness-key',
+          native: events
+        },
         signal: controller.signal,
-        sendOnce: () => {
+        invoke: (_signal, _budget, options) => {
+          options?.onWriteStart?.()
           sends++
           return new Promise(() => undefined)
         }
@@ -171,47 +122,21 @@ describe('thread preparation and retry settlement', () => {
       /** The only installed feature belongs to the real Worker. */
       const feature = await fixture.install()
       /** A held request remains physically pending so only its logical deadline may settle it. */
-      const result = feature.hold([], { timeoutMs: 200 }).catch((error: unknown) => {
-        outcome = error
-      })
-      for (
-        let turn = 0;
-        turn < 100 &&
-        !fixture.frames
-          .flatMap(({ message }) => {
-            /** Decode only the canonical physical carrier selector before batch grammar. */
-            const frame = readRuntimeCarrier(message)?.frame ?? message
-            return readRpcBatchMembers(frame) ?? [frame]
-          })
-          .some(
-            (message) =>
-              message !== null &&
-              typeof message === 'object' &&
-              Reflect.get(message, 'profile') === RpcRuntimeProfile &&
-              Reflect.get(message, 'kind') === RpcRuntimeKind.call &&
-              Reflect.get(message, 'task')?.mode === RpcRuntimeMode.request &&
-              Reflect.get(message, 'task')?.method === 'p.hold'
-          );
-        turn++
-      )
-        await new Promise((resolve) => setTimeout(resolve, 2))
-      expect(
-        fixture.frames
-          .flatMap(({ message }) => {
-            /** Decode only the canonical physical carrier selector before batch grammar. */
-            const frame = readRuntimeCarrier(message)?.frame ?? message
-            return readRpcBatchMembers(frame) ?? [frame]
-          })
-          .some(
-            (message) =>
-              message !== null &&
-              typeof message === 'object' &&
-              Reflect.get(message, 'profile') === RpcRuntimeProfile &&
-              Reflect.get(message, 'kind') === RpcRuntimeKind.call &&
-              Reflect.get(message, 'task')?.mode === RpcRuntimeMode.request &&
-              Reflect.get(message, 'task')?.method === 'p.hold'
+      const result = feature
+        .hold([], { timeout: timeout({ ms: 200, scheduler }) })
+        .catch((error: unknown) => {
+          outcome = error
+        })
+      await expect
+        .poll(async () =>
+          (await threadFrames(fixture.frames)).some(
+            (frame) =>
+              frame.kind === RpcWireKind.call &&
+              frame.task.mode === RpcCallMode.request &&
+              frame.task.method === 'p.hold'
           )
-      ).toBe(true)
+        )
+        .toBe(true)
       scheduler.advance(100)
       for (let turn = 0; turn < 40; turn++) await Promise.resolve()
       expect(outcome).toMatchObject({ code: 'DEADLINE_EXCEEDED' })

@@ -1,41 +1,39 @@
-import { RpcTransportMode } from '@migaia/rpc-host/plugin'
-import { RpcCapability } from '@migaia/rpc-contract'
-import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'
-import { systemScheduler } from '@migaia/utils/scheduler'
-import { hostRethrowReporter } from '@migaia/utils/promise'
+/** Owns native BroadcastChannel discovery and participant routes while Host owns RPC sessions. */
+import { BrowserPeerEvent } from './peer-text.js'
 import {
-  createAdapterDeployment,
-  createAdapterMessageHandshakeBudget,
-  createAdapterSourceConfigurationError,
-  createEventTargetMessageResource,
   defineTransportPlugin,
-  drainListenerFailures,
-  IpcReporterContext
-} from '@migaia/rpc-host/plugin'
-import type {
-  IAdapterDeploymentContext,
-  IAdapterDeploymentAccept,
-  IAdapterDeploymentAcceptedSession,
-  IAdapterMessageResource,
-  IRpcTransport,
-  IRpcTransportPlugin
-} from '@migaia/rpc-host/plugin'
-import { RpcCoreErrorCode } from '@migaia/rpc-host'
-import { createBroadcastChannelTransport } from './adapters/broadcast-channel.js'
-import { projectBrowserPeerPort } from './peer-port.js'
+  createRpcMessageCarrier,
+  createRpcBackingDigest,
+  defaultRpcId
+} from '@migaia/rpc-host/sdk'
+import type { IRpcTransportPlugin, IRpcTransportSetupContext } from '@migaia/rpc-host/sdk'
+import {
+  type IRpcCarrierWriteOptions,
+  type IRpcSessionHandle
+} from '@migaia/rpc-contract/interfaces'
+import {
+  RpcBrowserErrorCode,
+  RpcCoreErrorCode,
+  RPC_ENDPOINT_ERROR_SOURCE
+} from '@migaia/rpc-contract/error-code'
+import { attachErrorIdentity } from '@migaia/utils/error'
+import { BroadcastRouteIO } from './adapters/broadcast-channel.js'
 import { createBrowserPeerError } from './peer-error.js'
+import {
+  createBrowserTransportError,
+  rejectBrowserTransfer,
+  normalizeBrowserHandshakeFailure
+} from './error.js'
 import { BrowserPeerErrorText } from '../error-text.js'
-import { RpcBrowserErrorCode } from '../error-code.js'
+import { BrowserRpcErrorText } from './error-text.js'
 import type { IBrowserPluginOptions } from './plugin-types.js'
 import { BroadcastChannelControl } from './broadcast-channel-text.js'
+import { BrowserNamespace } from './peer-text.js'
 
-/** The caller owns the physical channel; plugin close withdraws only this listener's participation. */
+/** The caller retains ownership of this actual same-origin native channel. */
 export type IBroadcastChannelPluginOptions = IBrowserPluginOptions &
   Readonly<{ channel: BroadcastChannel }>
-/**
- * Necessary discovery addresses select a raw route; they grant no accepted capabilities or provider
- * data.
- */
+/** Native discovery addresses select physical pairs; payloads grant no accepted identity or methods. */
 type IBroadcastFrame = Readonly<{
   protocol: typeof BroadcastChannelControl.protocol
   kind:
@@ -46,18 +44,13 @@ type IBroadcastFrame = Readonly<{
   target?: string
   payload?: unknown
 }>
-/** A discovered physical route retains only its original resource operation and host accept receipt. */
-type IBroadcastSession = {
-  resource: IAdapterMessageResource
-  opening?: Promise<void>
-  accepted?: IAdapterDeploymentAcceptedSession
-}
-/** All physical participants of this transport kind share the same native ordinary-Host slot family. */
-const broadcastFamily = Object.freeze({})
+/** Original native membership holds only physical IO and its actual Host lifecycle handle. */
+type IBroadcastSession = Readonly<{ io: BroadcastRouteIO; handle: IRpcSessionHandle }>
 
-/** Ignore unrelated same-origin application traffic before selecting the exact raw pair. */
+/** Ignore unrelated native channel traffic before admitting a physical route. */
 function readFrame(value: unknown): IBroadcastFrame | undefined {
   if (value === null || typeof value !== 'object') return undefined
+  /** This discriminator is native discovery framing, separate from the new semantic protocol. */
   const frame = value as IBroadcastFrame
   return frame.protocol === BroadcastChannelControl.protocol &&
     (frame.kind === BroadcastChannelControl.join ||
@@ -70,227 +63,174 @@ function readFrame(value: unknown): IBroadcastFrame | undefined {
     : undefined
 }
 
-/**
- * Listen once on the actual native channel and adopt each discovered route into the shared
- * endpoint.
- */
-/** Allocate only the native listener's original membership and cleanup storage. */
-function broadcastChannelListenerState(
-  channel: BroadcastChannel,
-  context: IAdapterDeploymentContext,
-  accept: IAdapterDeploymentAccept
-) {
-  /** The existing BC adapter alone owns native subscription, clone, probe and I/O error behavior. */
-  const transport = createBroadcastChannelTransport(channel)
-  /** Only per-participant raw routes live here; accepted directories remain owned by the host. */
-  const sessions = new Map<string, IBroadcastSession>()
-  /** Explicit closure prevents new discovery and returns the same native cleanup completion. */
-  const closing = undefined as Promise<void> | undefined
-  /** Structured cloning supports native storage but never an ownership transfer list on BC. */
-  const capabilities = context.capabilities.filter(
-    (capability) => capability !== RpcCapability.transfer
-  )
-  /** Canonical clone control augments only the local proposal before its actual bilateral ACK. */
-  const offer = rpcMessageCapabilityControl.localOffer(capabilities) as Extract<
-    ReturnType<typeof rpcMessageCapabilityControl.localOffer>,
-    { valid: true }
-  >
-  /** Only the existing shared subscriber hub installs the single actual BC message callback. */
-  const remove = undefined as unknown as ReturnType<typeof transport.subscribe>
-  return { channel, context, accept, transport, sessions, closing, capabilities, offer, remove }
-}
-
-/** Own one native browser listener while the Host keeps accepted endpoint and directory ownership. */
+/** Original native discovery owns membership once; SDK and Host own all RPC execution and state. */
 class BroadcastChannelListener {
-  /** Native membership, pending preparation and the one close receipt belong to this listener. */
-  #state: ReturnType<typeof broadcastChannelListenerState>
-  /** Create storage before native callbacks can publish any accepted resource. */
-  constructor(
-    channel: BroadcastChannel,
-    context: IAdapterDeploymentContext,
-    accept: IAdapterDeploymentAccept
-  ) {
-    this.#state = broadcastChannelListenerState(channel, context, accept)
+  /** The one original native channel remains borrowed across every logical participant route. */
+  readonly #channel: BroadcastChannel
+  /** Host remains sole identity, namespace, directory, handshake and retirement authority. */
+  readonly #context: IRpcTransportSetupContext
+  /** Existing native sender routing is not another accepted peer/method directory. */
+  readonly #sessions = new Map<string, IBroadcastSession>()
+  /** Close is published before native leave or arbitrary remover callbacks can reenter. */
+  #closing: Promise<void> | undefined
+
+  /** Install one native listener pair and announce only this real host's current identity. */
+  constructor(channel: BroadcastChannel, context: IRpcTransportSetupContext) {
+    this.#channel = channel
+    this.#context = context
+    channel.addEventListener(BrowserPeerEvent.message, this.#message)
+    try {
+      channel.addEventListener(BrowserPeerEvent.messageError, this.#error)
+      this.#send(BroadcastChannelControl.join)
+    } catch (primary) {
+      try {
+        channel.removeEventListener(BrowserPeerEvent.message, this.#message)
+      } catch (cleanup) {
+        context.report(cleanup)
+      }
+      try {
+        channel.removeEventListener(BrowserPeerEvent.messageError, this.#error)
+      } catch (cleanup) {
+        context.report(cleanup)
+      }
+      throw primary
+    }
   }
-  /** Attach native acceptance and retain the original rollback and close semantics. */
-  open() {
-    this.#state.remove = this.#state.transport.subscribe((message) => {
-      const frame = readFrame(message.data)
+  /** All semantic frames remain opaque to the native discovery and physical routing owner. */
+  #send(
+    kind: IBroadcastFrame['kind'],
+    target?: string,
+    payload?: unknown,
+    options?: IRpcCarrierWriteOptions,
+    route?: BroadcastRouteIO
+  ): void {
+    options?.onWriteStart?.()
+    /** Observation borrows the one actual native wrapper, never a reconstructed semantic frame. */
+    const frame = {
+      protocol: BroadcastChannelControl.protocol,
+      kind,
+      sender: this.#context.self().instanceId,
+      ...(target === undefined ? {} : { target }),
+      ...(kind === BroadcastChannelControl.data ? { payload } : {})
+    }
+    route?.observeSend(frame)
+    this.#channel.postMessage(frame)
+  }
+  /** Real native framing selects one source route; no business metadata is read or reconstructed. */
+  readonly #message = (event: MessageEvent<unknown>): void => {
+    if (this.#closing) return
+    try {
+      /** Capture native discovery once; the inner semantic frame remains opaque. */
+      const data = event.data
+      /** Native routing inspects only its existing shell; its payload remains opaque. */
+      const frame = readFrame(data)
       if (
         !frame ||
-        frame.sender === this.#state.context.self.instanceId ||
-        (frame.target !== undefined && frame.target !== this.#state.context.self.instanceId) ||
-        this.#state.closing
+        frame.sender === this.#context.self().instanceId ||
+        (frame.target !== undefined && frame.target !== this.#context.self().instanceId)
       )
         return
       if (frame.kind === BroadcastChannelControl.join) {
         this.#discover(frame.sender)
         if (frame.target === undefined) this.#send(BroadcastChannelControl.join, frame.sender)
       } else if (frame.kind === BroadcastChannelControl.leave) {
-        /** This receipt holds no duplicate generation or reconnect policy. */
-        const session = this.#state.sessions.get(frame.sender)
-        this.#state.sessions.delete(frame.sender)
-        if (session) void this.#release(session).catch(this.#report)
-      }
+        /** Delete before retirement callbacks can reenter native discovery. */
+        const route = this.#sessions.get(frame.sender)
+        this.#sessions.delete(frame.sender)
+        route?.io.leave()
+      } else if (frame.target === this.#context.self().instanceId)
+        this.#sessions.get(frame.sender)?.io.receive(frame.payload, data)
+    } catch (cause) {
+      this.#context.report(
+        createBrowserTransportError(BrowserRpcErrorText.carrierOperationFailed, cause)
+      )
+    }
+  }
+  /** Native deserialization failure reaches current SDK physical owners without invented peers. */
+  readonly #error = (): void => {
+    /** One native failure keeps the same instance across this original observer snapshot. */
+    const error = createBrowserTransportError(BrowserRpcErrorText.carrierOperationFailed)
+    const routes = [...this.#sessions.values()]
+    for (const route of routes) route.io.fail(error)
+  }
+  /** Discovery creates precisely one SDK carrier per native route; Host owns its real handshake. */
+  #discover(id: string): void {
+    if (this.#sessions.has(id)) return
+    /** Only this exact original IO record may remove itself during native route retirement. */
+    const io = new BroadcastRouteIO(
+      (value, options) => this.#send(BroadcastChannelControl.data, id, value, options, io),
+      () => {
+        if (this.#sessions.get(id)?.io === io) this.#sessions.delete(id)
+      },
+      this.#context.report
+    )
+    /** Native BroadcastChannel can clone actual backings, although it cannot transfer ownership. */
+    const carrier = createRpcMessageCarrier({
+      id: defaultRpcId(),
+      nativeBinary: true,
+      assertTransfer: rejectBrowserTransfer,
+      digest: createRpcBackingDigest(),
+      io,
+      observation: io.observation,
+      report: this.#context.report
     })
     try {
-      this.#send(BroadcastChannelControl.join)
-    } catch (error) {
+      /** Host alone admits the semantic identity; native sender labels are not trusted source facts. */
+      const handle = this.#context.attach(carrier)
+      this.#sessions.set(id, { io, handle })
+      void handle.ready.catch((error: unknown) =>
+        this.#context.report(normalizeBrowserHandshakeFailure(error))
+      )
+    } catch (primary) {
+      void carrier.close(primary).catch(this.#context.report)
+      throw primary
+    }
+  }
+  /** Explicit leave precedes native unsubscribe; all accepted handles retire without channel.close. */
+  readonly close = (): Promise<void> =>
+    (this.#closing ??= Promise.resolve().then(async () => {
+      /** Native cleanup failures do not prevent sibling Session retirement. */
+      const failures: unknown[] = []
       try {
-        ;(0, this.#state.remove)()
-      } catch (cleanup) {
-        this.#report(cleanup)
+        this.#send(BroadcastChannelControl.leave)
+      } catch (error) {
+        failures.push(error)
       }
-      throw error
-    }
-    return {
-      close: (): Promise<void> =>
-        (this.#state.closing ??= (async () => {
-          /**
-           * Explicit leave is observable before subscriptions are removed; the channel stays
-           * borrowed.
-           */
-          const failures: unknown[] = []
-          try {
-            this.#send(BroadcastChannelControl.leave)
-          } catch (error) {
-            failures.push(error)
-          }
-          try {
-            ;(0, this.#state.remove)()
-          } catch (error) {
-            failures.push(error)
-          }
-          /**
-           * Closing resources cancels unfinished original captures before awaiting their
-           * preparation.
-           */
-          for (const session of this.#state.sessions.values())
-            try {
-              await this.#release(session)
-            } catch (error) {
-              failures.push(error)
-            }
-          await Promise.all([...this.#state.sessions.values()].map((session) => session.opening))
-          this.#state.sessions.clear()
-          drainListenerFailures(failures, { code: RpcCoreErrorCode.transport })
-        })())
-    }
-  }
-  /**
-   * Isolate reporter failures so discovery failures remain observable through the existing reporter
-   * owner.
-   */
-  #report = (error: unknown): void => {
-    try {
-      this.#state.context.report(error)
-    } catch (failure) {
-      hostRethrowReporter(failure, IpcReporterContext)
-    }
-  }
-  /**
-   * Send discovery control through the original adapter, keeping inner application frames
-   * unchanged.
-   */
-  #send = (kind: IBroadcastFrame['kind'], target?: string, payload?: unknown): void => {
-    void this.#state.transport.send({
-      protocol: BroadcastChannelControl.protocol,
-      kind,
-      sender: this.#state.context.self.instanceId,
-      ...(target === undefined ? {} : { target }),
-      ...(kind === BroadcastChannelControl.data ? { payload } : {})
-    })
-  }
-  /** Retire one physical route while leaving its borrowed native channel and sibling sessions open. */
-  #release = async (session: IBroadcastSession): Promise<void> => {
-    try {
-      await session.accepted?.peer.close()
-    } finally {
-      await session.resource.close()
-    }
-  }
-  /**
-   * Install a source-filtered raw receiver before discovery replies can trigger the held identity
-   * exchange.
-   */
-  #discover = (id: string): void => {
-    if (this.#state.closing || this.#state.sessions.has(id)) return
-    /** A pair is only a projection of the original BC adapter, never another native listener owner. */
-    const pair: IRpcTransport = {
-      ...this.#state.transport,
-      send: (payload) => this.#send(BroadcastChannelControl.data, id, payload),
-      subscribe: (listener) =>
-        this.#state.transport.subscribe((message) => {
-          const frame = readFrame(message.data)
-          if (
-            frame?.kind === BroadcastChannelControl.data &&
-            frame.sender === id &&
-            frame.target === this.#state.context.self.instanceId
-          )
-            listener({ ...message, data: frame.payload })
-        })
-    }
-    /** The canonical resource retains the only initial/ACK capture, replay and clone qualification. */
-    const resource = createEventTargetMessageResource(projectBrowserPeerPort(pair))
-    /** This receipt holds no duplicate generation or reconnect policy. */
-    const session: IBroadcastSession = { resource }
-    this.#state.sessions.set(id, session)
-    session.opening = (async () => {
-      /** One existing budget covers identity and ACK, without a discovery/retry timer. */
-      const budget = createAdapterMessageHandshakeBudget(
-        systemScheduler,
-        this.#state.context.connectTimeoutMs
-      )
-      const peerId = await resource.exchangeIdentity(
-        { ...this.#state.context, capabilities: this.#state.capabilities },
-        this.#state.context.signal,
-        budget
-      )
-      if (peerId !== id)
-        throw createBrowserPeerError(
-          RpcBrowserErrorCode.invalidPeerSource,
-          BrowserPeerErrorText.invalidPeerSource
+      try {
+        this.#channel.removeEventListener(BrowserPeerEvent.message, this.#message)
+      } catch (error) {
+        failures.push(error)
+      }
+      try {
+        this.#channel.removeEventListener(BrowserPeerEvent.messageError, this.#error)
+      } catch (error) {
+        failures.push(error)
+      }
+      /** Every route borrows the original Host close operation, never a Peer facade. */
+      const routes = [...this.#sessions.values()]
+      /** Original snapshot order and eager detach starts survive synchronous native retirement. */
+      const pending: Promise<void>[] = []
+      for (const route of routes) pending.push(this.#context.detach(route.handle))
+      /** Each exact original detach result keeps its position in cleanup error aggregation. */
+      const results = await Promise.allSettled(pending)
+      for (const result of results) if (result.status === 'rejected') failures.push(result.reason)
+      this.#sessions.clear()
+      if (failures.length === 1) throw failures[0]
+      if (failures.length > 1)
+        throw attachErrorIdentity(
+          new AggregateError(failures, BrowserPeerErrorText.listenerCleanupFailed, {
+            cause: failures[0]
+          }),
+          { source: RPC_ENDPOINT_ERROR_SOURCE, code: RpcCoreErrorCode.transport }
         )
-      const opened = await resource.open({
-        peerId,
-        scheduler: systemScheduler,
-        offer: this.#state.offer.value,
-        control: rpcMessageCapabilityControl,
-        signal: this.#state.context.signal,
-        handshakeBudget: budget
-      })
-      if (this.#state.closing || this.#state.sessions.get(id) !== session) {
-        await resource.close()
-        return
-      }
-      session.accepted = await (0, this.#state.accept)(opened)
-      if (this.#state.closing || this.#state.sessions.get(id) !== session)
-        await this.#release(session)
-    })().catch(async (error: unknown) => {
-      this.#report(error)
-      try {
-        await this.#release(session)
-      } catch (cleanup) {
-        this.#report(cleanup)
-      }
-    })
-  }
+    }))
 }
 
-/** Attach the one native listener without creating another Host or endpoint. */
-function listenBroadcast(
-  channel: BroadcastChannel,
-  context: IAdapterDeploymentContext,
-  accept: IAdapterDeploymentAccept
-) {
-  return new BroadcastChannelListener(channel, context, accept).open()
-}
-
-/** Define an inert reusable multiparty transport over one caller-owned same-origin channel. */
-export function broadcastChannelPlugin(
-  options: IBroadcastChannelPluginOptions
-): IRpcTransportPlugin {
-  /** Source shape admission precedes native subscription or any physical publication. */
+/** Capture a borrowed native channel; each real installation owns independent discovery membership. */
+export function broadcastChannelPlugin<const N extends string = 'broadcastChannel'>(
+  options: IBroadcastChannelPluginOptions & Readonly<{ namespace?: N }>
+): IRpcTransportPlugin<NoInfer<N>> {
+  /** Native source shape is admitted before subscribing or publishing any discovery frame. */
   const channel = options?.channel
   if (
     !channel ||
@@ -302,19 +242,16 @@ export function broadcastChannelPlugin(
       RpcBrowserErrorCode.invalidPeerSource,
       BrowserPeerErrorText.invalidPeerSource
     )
-  /** Every installation receives independent discovery/resources on the same borrowed channel. */
-  const deployment = createAdapterDeployment({
-    runtimeFamily: broadcastFamily,
-    open: async () => {
-      throw createAdapterSourceConfigurationError()
-    },
-    listen: async (context, accept) => listenBroadcast(channel, context, accept)
-  })
   return defineTransportPlugin({
     name: options.name ?? BroadcastChannelControl.plugin,
+    namespace: (options.namespace ?? BrowserNamespace.broadcast) as N,
     expose: options.expose,
-    connect: options.connect,
-    mode: RpcTransportMode.listen,
-    deployment
+    features: options.features,
+    handshakeTimeoutMs: options.connect?.timeoutMs,
+    open: (context) => {
+      /** This one actual native membership owner holds no request/provider/forwarding facade. */
+      const listener = new BroadcastChannelListener(channel, context)
+      return { dispose: listener.close }
+    }
   })
 }

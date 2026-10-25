@@ -2,8 +2,9 @@ import { RUNTIME_API_CAPABILITIES } from '../../dist/remote/runtime-api/constant
 import { createRuntimePeer } from '../../dist/remote/runtime-api/peer.js'
 import assert from 'node:assert/strict'
 import { it } from 'vitest'
-import { RpcError, RpcCoreErrorCode } from '../../dist/core/errors.js'
-import { RpcCoreErrorText } from '../../dist/core/error-text.js'
+import { RpcError } from '@migaia/rpc-contract/errors'
+import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
+import { RpcCoreErrorText } from '@migaia/rpc-contract/errors'
 import { runtimeSources } from './fixture.js'
 
 it('canonical peers use binary, group, outcome and provider errors with honest memory metadata', async () => {

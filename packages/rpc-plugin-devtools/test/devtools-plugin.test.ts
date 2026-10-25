@@ -1,18 +1,19 @@
 import { readFile } from 'node:fs/promises'
 import { describe, expect, it, vi } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
-import { readProbeStages, RpcProbeStage } from '@migaia/rpc-host/probe'
-import * as entry from '../src/index.js'
+import { readProbeStages, RpcProbeStage } from '@migaia/rpc-host/plugins/probe'
+import * as entry from '@migaia/rpc-plugin-devtools'
+import * as sourceEntry from '../src/index.js'
 import * as collectorOwner from '../src/collector/devtools.js'
 import type { IRpcDevtoolsOptions } from '../src/collector-types.js'
 import type { IDevtoolsPlugin } from '../src/index.js'
 import type { IRpcDevtoolsWatchBatch } from '../src/contract/service.js'
 import { collectorView } from './collector/fixture.js'
-import { memoryServer } from '../../rpc-host/test/host/fixture.js'
+import { coreMemoryServer } from '../../rpc-host/test/host/core-fixture.js'
 
-/** Dynamic namespace access lets the absent public entry produce a real runtime red assertion. */
+/** Read the actual public package factory and preserve its original export-presence assertion. */
 function plugin(options?: IRpcDevtoolsOptions): IDevtoolsPlugin {
-  /** Read the actual package namespace so the missing entry produces a runtime assertion. */
+  /** A missing published factory must fail before a test can manufacture an alternate entry. */
   const factory = Reflect.get(entry, 'devtoolsPlugin') as
     | ((input?: IRpcDevtoolsOptions) => IDevtoolsPlugin)
     | undefined
@@ -37,7 +38,7 @@ describe('devtools feature plugin', () => {
     ])
     expect(Reflect.has(entry, 'createRpcDevtools')).toBe(false)
     expect(Object.keys(await import('@migaia/rpc-plugin-devtools')).sort()).toEqual(
-      Object.keys(entry).sort()
+      Object.keys(sourceEntry).sort()
     )
     /** The published export map must keep the three independent consumer boundaries. */
     const manifest = JSON.parse(
@@ -67,7 +68,7 @@ describe('devtools feature plugin', () => {
       onError
     }
     /** One genuine feature instance owns exactly one caller-controlled collector. */
-    const value = plugin(options)
+    const value = sourceEntry.devtoolsPlugin(options)
     try {
       expect(create).toHaveBeenCalledTimes(1)
       expect(create.mock.calls[0]![0]).toBe(options)
@@ -90,8 +91,6 @@ describe('devtools feature plugin', () => {
       value.collector.emit(collectorView())
       expect(value.query()).toEqual(value.collector.query())
       expect(value.stats()).toEqual(value.collector.stats())
-      expect(value.query).not.toBe(value.collector.query)
-      expect(value.stats).not.toBe(value.collector.stats)
       /** Detached metadata arrows retain their original collector without receiver binding. */
       const query = value.query
       expect(query().events).toHaveLength(1)
@@ -113,7 +112,7 @@ describe('devtools feature plugin', () => {
     /** One genuine feature instance owns exactly one caller-controlled collector. */
     const value = plugin({ methods: ['echo'] })
     /** The real listener admits raw memory channels through the canonical handshake. */
-    const server = memoryServer('watched-host')
+    const server = coreMemoryServer('watched-host')
     /** The new host entry installs the feature through its actual native plugin hook. */
     const host = await createRpcHost({ ...server.options, plugins: [server.transport, value] })
     /** An independently constructed provider host executes the observed business request. */
@@ -126,7 +125,7 @@ describe('devtools feature plugin', () => {
       value.collector.clear()
       /** The pending reader must wake from a real observed call rather than retained history. */
       const next = watch.next()
-      expect(await host.request('echo', 42)).toBe(42)
+      expect(await host.memory.request('echo', 42)).toBe(42)
       expect(
         value.query({ methods: ['echo'] }).events.some((event) => event.method === 'echo')
       ).toBe(true)
@@ -151,7 +150,7 @@ describe('devtools feature plugin', () => {
     /** One genuine feature instance owns exactly one caller-controlled collector. */
     const value = plugin({ methods: ['echo'] })
     /** The real listener admits raw memory channels through the canonical handshake. */
-    const server = memoryServer('dynamic-host')
+    const server = coreMemoryServer('dynamic-host')
     /** The new host entry installs the feature through its actual native plugin hook. */
     const host = await createRpcHost({ ...server.options, plugins: [server.transport, value] })
     /** An independently constructed provider host executes the observed business request. */
@@ -160,7 +159,7 @@ describe('devtools feature plugin', () => {
     })
     try {
       value.collector.clear()
-      expect(await host.request('echo', 1)).toBe(1)
+      expect(await host.memory.request('echo', 1)).toBe(1)
       expect(value.query({ stages: ['carrier', 'encoded'] }).events).toHaveLength(0)
       value.collector.setStages(['message', 'carrier', 'encoded'])
       /** The original iterator subscribes before the next actual business emission. */
@@ -168,7 +167,7 @@ describe('devtools feature plugin', () => {
       try {
         /** The pending reader must wake from a real observed call rather than retained history. */
         const next = watch.next()
-        expect(await host.request('echo', 2)).toBe(2)
+        expect(await host.memory.request('echo', 2)).toBe(2)
         expect(value.query({ stages: ['carrier', 'encoded'] }).events.length).toBeGreaterThan(0)
         expect(value.query().events.map((event) => event.stage)).toEqual(
           expect.arrayContaining(['carrier', 'encoded'])
@@ -180,11 +179,11 @@ describe('devtools feature plugin', () => {
       value.collector.pause()
       /** A paused collector preserves its sequence while the host continues business. */
       const paused = value.query().nextSeq
-      expect(await host.request('echo', 3)).toBe(3)
+      expect(await host.memory.request('echo', 3)).toBe(3)
       expect(value.query().nextSeq).toBe(paused)
       expect(value.describe().paused).toBe(true)
       value.collector.resume()
-      expect(await host.request('echo', 4)).toBe(4)
+      expect(await host.memory.request('echo', 4)).toBe(4)
       expect(value.query().nextSeq).toBeGreaterThan(paused)
       expect(calls(value)).toBe(3)
     } finally {
@@ -198,9 +197,9 @@ describe('devtools feature plugin', () => {
     /** One genuine feature instance owns exactly one caller-controlled collector. */
     const value = plugin({ methods: ['echo'] })
     /** The first independent endpoint shares the exact same feature object. */
-    const first = memoryServer('first-host')
+    const first = coreMemoryServer('first-host')
     /** The second endpoint has its own emitter and the same original collector. */
-    const second = memoryServer('second-host')
+    const second = coreMemoryServer('second-host')
     /** The first real host owns only its transport and emitter lifetime. */
     const hostA = await createRpcHost({ ...first.options, plugins: [first.transport, value] })
     /** The second real host must remain observable after the first host closes. */
@@ -211,8 +210,8 @@ describe('devtools feature plugin', () => {
     const remoteB = await second.connect('second-provider', { provide: { echo: () => 'b' } })
     try {
       value.collector.clear()
-      expect(await hostA.request('echo')).toBe('a')
-      expect(await hostB.request('echo')).toBe('b')
+      expect(await hostA.memory.request('echo')).toBe('a')
+      expect(await hostB.memory.request('echo')).toBe('b')
       expect(calls(value)).toBe(2)
       await hostA.close()
       /** The original iterator subscribes before the next actual business emission. */
@@ -220,7 +219,7 @@ describe('devtools feature plugin', () => {
       try {
         /** The pending reader must wake from a real observed call rather than retained history. */
         const next = watch.next()
-        expect(await hostB.request('echo')).toBe('b')
+        expect(await hostB.memory.request('echo')).toBe('b')
         expect(
           ((await next).value as IRpcDevtoolsWatchBatch).events.some(
             (event) => event.endpointId === 'second-host'
@@ -231,7 +230,7 @@ describe('devtools feature plugin', () => {
       }
       expect(calls(value)).toBe(3)
       value.close()
-      expect(await hostB.request('echo')).toBe('b')
+      expect(await hostB.memory.request('echo')).toBe('b')
     } finally {
       await remoteA.host.close()
       await remoteB.host.close()

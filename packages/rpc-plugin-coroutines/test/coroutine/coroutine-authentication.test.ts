@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { defineHost } from '@migaia/plugin-host'
-import { coroutinePlugin } from '../../dist/index.js'
-import { normalizeRemoteContract } from '@migaia/rpc-host/plugin'
-import type { IRuntimeOutlet } from '../../../rpc-host/dist/remote/runtime-api/outlet.js'
-import type { IRpcAuthenticationConfig } from '@migaia/rpc-host'
+import { createRpcHost } from '@migaia/rpc-host'
+import { auth, type IRpcAuthenticationOptions } from '@migaia/rpc-host/plugins/auth'
+import { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'
 
 /** The string signature wraps encrypted frames exactly as a real application boundary does. */
 type ISignedFrame = Readonly<{ text: string; mac: number[] }>
@@ -12,7 +10,7 @@ type ISignedFrame = Readonly<{ text: string; mac: number[] }>
 type IEncryptedFrame = Readonly<{ iv: number[]; body: number[] }>
 
 /** Create actual WebCrypto transforms; verification rejects raw startup control objects. */
-async function protection(unprotected: unknown[]): Promise<IRpcAuthenticationConfig> {
+async function protection(unprotected: unknown[]): Promise<IRpcAuthenticationOptions> {
   /** Both peers intentionally share the same application keys in this same-realm coroutine. */
   const hmac = await crypto.subtle.generateKey({ name: 'HMAC', hash: 'SHA-256' }, false, [
     'sign',
@@ -83,54 +81,47 @@ describe('coroutine authentication cleanup', () => {
     const reports: unknown[] = []
     /** Parent and child use the exact same supported public authentication configuration. */
     const authentication = await protection(unprotected)
-    /** Parent mode owns supervision and child task cancellation through the existing family. */
+    /** Parent mode retains native supervision while Host owns identity, provider and auth. */
     const service = coroutinePlugin({
       name: 'math',
-      authentication,
-      self: { name: 'math-parent', instanceId: 'authenticated-parent' },
       report: (error) => reports.push(error),
       supervisor: { restart: { mode: 'never' }, startupTimeoutMs: 2000 },
       spawn: async ({ connect, signal }) => {
-        /** Child mode reuses the genuine opaque connection and the canonical message recipe. */
-        const parent = coroutinePlugin({
-          name: 'parent',
-          authentication,
+        /** The exact opaque native resource is admitted independently from Host configuration. */
+        const child = await createRpcHost({
           self: { name: 'math-child', instanceId: 'authenticated-child' },
           report: (error) => reports.push(error),
-          connectToParent: connect,
-          contract: normalizeRemoteContract({
+          plugins: [
+            auth(authentication),
+            coroutinePlugin({ name: 'parent', connectToParent: connect })
+          ],
+          contract: {
             schemaVersion: 1,
             plugin: 'math',
             features: { calc: { methods: { double: { mode: 'request', idempotent: true } } } }
-          }),
+          },
           provide: { math: { calc: { double: (value: number) => value * 2 } } }
         })
-        /** The child's installed plugin closes before its task releases the physical ports. */
-        const child = defineHost<Record<string, never>, never, readonly [typeof parent]>({
-          host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
-        })
         try {
-          await child.use(parent)
           await new Promise<void>((resolve) => {
             if (signal.aborted) resolve()
             else signal.addEventListener('abort', () => resolve(), { once: true })
           })
         } finally {
-          await child.dispose()
+          await child.close()
         }
       }
     })
-    /** The public Host boundary must preserve both the business value and clean shutdown. */
-    const host = defineHost<Record<string, never>, never, readonly [typeof service]>({
-      host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
+    /** The public Host boundary preserves both authenticated business value and actual shutdown. */
+    const host = await createRpcHost({
+      self: { name: 'math-parent', instanceId: 'authenticated-parent' },
+      report: (error) => reports.push(error),
+      plugins: [auth(authentication), service]
     })
     try {
-      await host.use(service)
-      /** The genuine ordinary Host publishes its canonical facade independently of transport typing. */
-      const outlet = Reflect.get(host, 'coroutine') as IRuntimeOutlet
-      expect(await outlet.request('math', 'math.calc.double', 21)).toBe(42)
+      expect(await host.coroutine.request('math.calc.double', 21)).toBe(42)
     } finally {
-      await host.dispose()
+      await host.close()
     }
     expect(unprotected).toEqual([])
     expect(reports).toEqual([])

@@ -2,15 +2,12 @@ import type { IAbortSignal } from '@migaia/utils/promise'
 import assert from 'node:assert/strict'
 import { it, vi } from 'vitest'
 import { RpcCapability } from '@migaia/rpc-contract'
-import { RpcCoreErrorCode } from '../../dist/core/errors.js'
+import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { readEndpointOwner } from '../../dist/core/internal/endpoint-projection.js'
 import type { ProviderAdmissionRegistry } from '../../dist/core/internal/provider-admission.js'
 import { readRuntimePeerConnection } from '../../dist/remote/runtime-api/peer.js'
-import {
-  connected,
-  RuntimeApiFixtureText,
-  RUNTIME_API_FIXTURE_BASE_CAPABILITIES
-} from './fixture.js'
+import { connected, RUNTIME_API_FIXTURE_BASE_CAPABILITIES } from './fixture.js'
+import { RuntimeApiFixtureText } from '../fixtures/runtime-api-text.js'
 
 /** Ordering and ordinary cancellation are genuinely selected on both original physical peers. */
 const capabilities = [

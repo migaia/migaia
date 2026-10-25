@@ -21,9 +21,9 @@ if (isProcessChild()) {
   try {
     process.stdout.write(
       JSON.stringify({
-        value: await peer.request('math.double', 21),
-        child: await peer.request('child'),
-        flags: await peer.request('flags')
+        value: await peer.process.request('math.double', 21),
+        child: await peer.process.request('child'),
+        flags: await peer.process.request('flags')
       })
     )
   } finally {

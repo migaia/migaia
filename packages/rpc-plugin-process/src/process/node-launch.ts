@@ -1,3 +1,7 @@
+/**
+ * Specializes the original launch operation for acquired Node/Bun child pipes. Native bootstrap
+ * preparation stays shared, while the receiving Host owns Session admission.
+ */
 import type { IProcessSpec } from '@migaia/supervision/process'
 import { AdapterProcessLaunch } from './launch.js'
 import type { IAdapterProcessLaunchContext, IAdapterProcessLaunchOptions } from './launch.js'

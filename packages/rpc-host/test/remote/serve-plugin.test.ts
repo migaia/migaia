@@ -1,11 +1,10 @@
-import { describe, expect, it, vi } from 'vitest'
-import type { IRpcContext } from '../../dist/core/typing.js'
-import { ProviderExecutor } from '../../dist/core/internal/provider-executor.js'
-import { RpcRemoteLayerErrorCode } from '../../dist/remote/error-code.js'
-import { createRemoteLayerError } from '../../dist/remote/error.js'
-import { connectedHosts } from '../host/fixture.js'
+import { expect, it } from 'vitest'
+import { createRpcHost, type IRpcContext } from '@migaia/rpc-host'
+import { RpcRemoteLayerErrorCode } from '@migaia/rpc-contract/error-code'
+import { createRemoteLayerError } from '../../dist/host/remote-error-owner.js'
+import { coreMemoryServer } from '../host/core-fixture.js'
 
-/** Actual provider operations expose the original scalar and stream payload contracts. */
+/** The actual remote method tree preserves scalar and stream call modes for held capabilities. */
 type IContextMethods = {
   p: {
     f: {
@@ -97,56 +96,48 @@ class ProviderContextFixture {
 }
 
 /** Context, hook failure identity and wire privacy remain on the real public Host provider path. */
-describe('runtime provider contexts', () => {
-  it('passes the stream-open context unchanged and invokes its hook once', async () => {
-    /** Observe the original Core context directly, rather than inserting another service wrapper. */
-    const contextCreation = vi.spyOn(ProviderExecutor.prototype, 'createContext')
-    /** The application fixture owns only provider observations and its original local hook error. */
-    const fixture = new ProviderContextFixture()
-    /** Both endpoints use the actual public Host entry and the existing genuine memory source. */
-    const pair = await connectedHosts<unknown, Record<string, IContextMethods>>({
-      a: { self: { name: 'client', instanceId: 'client' }, report: () => undefined },
-      b: {
-        self: { name: 'server', instanceId: 'server' },
-        provide: fixture.provide,
-        contract: fixture.contract,
-        report: () => undefined
-      }
-    })
-    /** The accepted peer projection is the actual direct target, with no test forwarding facade. */
-    const remote = pair.a.peers[pair.b.self.instanceId]!.p.f
-    try {
-      expect(await remote.request(['ordinary'])).toBe('ordinary')
-      const iterator = remote.generator(['stream'])
-      expect(await iterator.next()).toEqual({ done: false, value: 'stream' })
-      expect(await iterator.next()).toEqual({ done: true, value: 'done' })
-      const observed = fixture.observed
-      /** The original executor creates each admitted request/stream context exactly once. */
-      const streamProviderContext = contextCreation.mock.results
-        .map((result) => result.value as IRpcContext)
-        .find((context) => Array.isArray(context.data) && context.data[0] === 'stream')
-      expect(observed.hookCalls).toBe(2)
-      expect(observed.requestContext?.data).toEqual(['ordinary'])
-      expect(observed.streamContext?.data).toEqual(['stream'])
-      expect(observed.streamContext).not.toBe(observed.requestContext)
-      expect(observed.streamHookContext).toBe(observed.streamContext)
-      expect(observed.streamHookContext).toBe(streamProviderContext)
-      expect(observed.requestHookContext).toBe(observed.requestContext)
-      expect(typeof observed.streamContext?.dispatchTo).toBe('function')
-      /**
-       * The requester sees only the controlled public code/message, retaining the local exact
-       * cause.
-       */
-      const rejected = await remote.request(['reject']).catch((error: unknown) => error)
-      expect(rejected).toMatchObject({ code: 'REMOTE_CLOSED', message: fixture.hookError.message })
-      expect((rejected as Error).cause).toBeUndefined()
-      expect(fixture.hookError.cause).toBe(fixture.hookCause)
-      expect(fixture.observed.requestCalls).toBe(1)
-      expect(await remote.request(['after-hook-error'])).toBe('after-hook-error')
-    } finally {
-      await pair.a.close()
-      await pair.b.close()
-      contextCreation.mockRestore()
-    }
+it('passes the stream-open context unchanged and invokes its hook once', async () => {
+  /** The application fixture owns only provider observations and its original local hook error. */
+  const fixture = new ProviderContextFixture()
+  /** Actual server identity and declarations belong to this installed native listener. */
+  const listener = coreMemoryServer('server', 'server')
+  /** Provider construction is complete before the independent client starts its one handshake. */
+  const server = await createRpcHost({
+    ...listener.options,
+    provide: fixture.provide,
+    contract: fixture.contract
   })
+  /** The client's distinct native listener carries the original remote method declaration. */
+  const clientListener = coreMemoryServer('client', 'client')
+  /** The client remains the original caller, using the actual public namespace projection. */
+  const client = await createRpcHost<Record<string, IContextMethods>>(clientListener.options)
+  await listener.link(clientListener)
+  /** Held methods retain the real accepted Session identity and their scalar/stream modes. */
+  const remote = client.memory.peers.server!.p.f
+  try {
+    expect(await remote.request(['ordinary'])).toBe('ordinary')
+    /** The same held generator must return its real lazy stream owner directly. */
+    const iterator = remote.generator(['stream'])
+    expect(await iterator.next()).toEqual({ done: false, value: 'stream' })
+    expect(await iterator.next()).toEqual({ done: true, value: 'done' })
+    /** Passive application observations retain the actual provider context instances. */
+    const observed = fixture.observed
+    expect(observed.hookCalls).toBe(2)
+    expect(observed.requestContext?.data).toEqual(['ordinary'])
+    expect(observed.streamContext?.data).toEqual(['stream'])
+    expect(observed.streamContext).not.toBe(observed.requestContext)
+    expect(observed.streamHookContext).toBe(observed.streamContext)
+    expect(observed.requestHookContext).toBe(observed.requestContext)
+    expect(typeof observed.streamContext?.dispatchTo).toBe('function')
+    /** The requester sees only the controlled public code/message, retaining the local exact cause. */
+    const rejected = await remote.request(['reject']).catch((error: unknown) => error)
+    expect(rejected).toMatchObject({ code: 'REMOTE_CLOSED', message: fixture.hookError.message })
+    expect((rejected as Error).cause).toBeUndefined()
+    expect(fixture.hookError.cause).toBe(fixture.hookCause)
+    expect(fixture.observed.requestCalls).toBe(1)
+    expect(await remote.request(['after-hook-error'])).toBe('after-hook-error')
+  } finally {
+    await client.close()
+    await server.close()
+  }
 })

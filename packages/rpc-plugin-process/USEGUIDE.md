@@ -1,39 +1,12 @@
-# process plugin 使用指南
+# Process plugin 使用指南
 
 [README](./README.md) · [English](./USEGUIDE.en.md)
 
-先选择进程来源，再把实际 processPlugin 安装到 createRpcHost。host 拥有业务目录、调用和统一关闭，原进程 owner 保留启动、socket、认证、监督与 drain。
+一个 Host 通常选择一种传输。根对象管理 `self/provide/close`，业务调用在 namespace 下；Process 的默认 namespace 为 `process`。下面所有 TypeScript 模块按当前公开 dist 做类型检查，不代表真实环境和认证验收已完成。
 
-## 在真实子进程执行并完整关闭
+## 双向本机连接
 
-把下面内容保存为独立 ESM 入口；Node 24 可直接执行 TypeScript，其他工具链先编译。自派生入口必须先检查 isProcessChild，子端显式 connectToParent，避免再次启动子进程。
-
-```ts doc-test=check
-import { createRpcHost } from '@migaia/rpc-host'
-import { processPlugin, isProcessChild } from '@migaia/rpc-plugin-process'
-
-if (await isProcessChild()) {
-  await createRpcHost({
-    plugins: [processPlugin({ connectToParent: true })],
-    provide: { double: (value: number) => value * 2 }
-  })
-} else {
-  const host = await createRpcHost<{ double(value: number): number }>({
-    plugins: [processPlugin({ spawn: true, connect: { timeoutMs: 1500 } })]
-  })
-  try {
-    console.log(await host.request('double', 21))
-  } finally {
-    await host.close()
-  }
-}
-```
-
-父端输出 42。spawn:true 选择真实主入口；路径/URL 选择另一入口。短配置也支持 command/args、cwd、env、wrap、limits、permissions、supervision。显式 command 不经 shell；wrap 每次实际启动只改写原命令一次。stdio 的 stdout 是 RPC 通道，日志用 stderr。
-
-## 同一会话双向调用并接纳多个客户端
-
-以下 Node/POSIX 同用户命名服务例子在同一连接上交错调用父/子两端方法：
+同一个连接两端都可提供业务。下面是 Node/POSIX 本机命名服务的调用形态；它不证明该服务已配置认证。
 
 ```ts doc-test=check
 import { randomUUID } from 'node:crypto'
@@ -41,22 +14,19 @@ import { createRpcHost } from '@migaia/rpc-host'
 import { processPlugin } from '@migaia/rpc-plugin-process'
 
 const address = 'service-' + randomUUID()
-const server = await createRpcHost<{ clientValue(value: string): string }>({
+const server = await createRpcHost({
   plugins: [processPlugin({ listen: address })],
   provide: { double: (value: number) => value * 2 }
 })
 try {
-  const client = await createRpcHost<{ double(value: number): number }>({
+  const client = await createRpcHost({
     self: { name: 'client-a', instanceId: randomUUID() },
     plugins: [processPlugin({ connect: { target: address, timeoutMs: 1500 } })],
     provide: { clientValue: (value: string) => 'client:' + value }
   })
   try {
-    const values = await Promise.all([
-      client.request('double', 21),
-      server.send('client-a', 'clientValue', 'ready')
-    ])
-    console.log(values)
+    console.log(await client.process.request('double', 21))
+    console.log(await server.process.send('client-a', 'clientValue', 'ready'))
   } finally {
     await client.close()
   }
@@ -65,38 +35,63 @@ try {
 }
 ```
 
-再安装独立 client-b 后，server.request('clientValue', value) 会广播，结果按目标身份保留 fulfilled/rejected；send('client-a',...) 只到指定当前直连。stream 同样按目标提供独立迭代器。客户端关闭只撤自己的会话，不关闭服务或其他客户端；server.close 关闭自己的监听与会话。
+`request` 没有目标时使用当前 namespace 的直连集合，多个目标保留各自结果；`send(nameOrId, method, payload)` 只选择一个当前直连。业务流保留自己的迭代器与取消，不代表拥有整个原生进程。重启期间的零会话请求与旧 downtime 错误之间仍有未闭合差异，应用不能把空集合当作重启完成。
 
-## 凭据、地址与握手预算
+## 完整 feature 实例与 probe
 
-connect 来源写为 connect:{target:nameOrAddress,timeoutMs?}，不把 target 放在顶层。spawn/listen/connectToParent 来源也可用 timeout-only connect 配置握手。connect.timeoutMs 是本次真实握手预算；顶层 connectTimeoutMs 是命名本机地址查找等待。显式地址初次拨号不套用该等待循环，已建连接断开后的恢复仍由原监督器管理，包括显式 socket 服务重启。
-
-同用户命名端点使用原 OS 隔离与凭据边界。显式 socket/TCP 连接需匹配 token、协议和服务策略；不可把任意环境变量或伪造 bootstrap 对象当成可信来源。connectToParent 只在实际子端读取真实 stdin bootstrap，并在唯一调用端点创建前确定身份。
-
-wire:'jsonrpc' 使用 Content-Length 字节分帧，需要真实 contract 或 establish。跨语言服务必须实现匹配协议、认证、能力与方法描述；不是任意打印 JSON 的程序都能直接接入。
-
-## 原 IPC 功能与业务期限
+原生容量、FIFO 与日志属于 Process。下例只安装一个 flow，再让 queue 和 log 借用它；timeout 是该传输选择的业务 feature，probe 是启动前的 host 介入插件。
 
 ```ts doc-test=check
-import { sendQueueFeature, ipcLogFeature } from '@migaia/rpc-plugin-process/features'
-import timeoutFeature from '@migaia/rpc-host/features/timeout'
+import { createRpcHost } from '@migaia/rpc-host'
+import { processPlugin } from '@migaia/rpc-plugin-process'
+import { flowControl, sendQueue, ipcLog } from '@migaia/rpc-plugin-process/features'
+import { timeout } from '@migaia/rpc-host/features/timeout'
+import { probe } from '@migaia/rpc-host/plugins/probe'
 
-export const features = [
-  sendQueueFeature({ maxPendingData: 32, maxPendingControl: 8 }),
-  ipcLogFeature({
-    report: (record) => {
-      console.log(record)
+export async function openWorker(entry: URL) {
+  const flow = flowControl({ maxPendingData: 32, maxPendingControl: 8 })
+  const observer = probe({
+    stages: ['peer'],
+    emit(view) {
+      console.error(view.lifecycle)
     }
-  }),
-  timeoutFeature({ ms: 1500 })
-]
+  })
+  return createRpcHost({
+    plugins: [
+      observer,
+      processPlugin({
+        spawn: entry,
+        features: [
+          flow,
+          sendQueue({ flow }),
+          ipcLog({
+            report(record) {
+              console.error(record)
+            }
+          }),
+          timeout({ ms: 1500 })
+        ]
+      })
+    ]
+  })
+}
 ```
 
-将 features 展开到同一 host.plugins，并加入恰好一个 processPlugin。sendQueueFeature 覆盖原 maxPendingData/maxPendingControl；ipcLogFeature 提交原日志 sink；未提供字段保留原配置。flow-control 子路径导出原 lane/event 常量与类型，没有另一个 flow-control 工厂。每种定义每个 host 至多安装一次。
+调用者负责最终 `await host.close()`。也可单装 `flowControl`，或让 `sendQueue` 自建默认 flow；显式 `flow` 和重复的容量字段会在冷配置拒绝。不要把这些实例当作 host 根配置开关，也不要再提供已删除的 `ipc.log` fallback 字段。仅装 `ipcLog` 不会自动启用限流。
 
-业务调用可传 signal、timeoutMs、idempotencyKey。调用期限不同于握手与本机查找等待。取消是协作通知，断开不证明业务从未执行；使用重试功能前声明实际幂等性并确认所选存储/身份范围。相同认证 principal 的重连可以复用原 scope/store，不同 principal 隔离。
+`/features/send-queue`、`/features/flow-control`、`/features/log` 也提供对应工厂。排队取消和容量计数使用真实安装；与 batch 合用时的每逻辑调用计费仍未完成验收。容量拒绝保留 `OVERLOADED`，真实物理 I/O 失败使用 `TRANSPORT` 并保留原 cause。
 
-## 交给已有 PluginHost
+## 选项与期限
+
+`connect: { target, timeoutMs? }` 选择已有服务；timeout-only 的 `connect` 可修饰 spawn/listen/parent。协商阶段默认 10,000 ms；随后名字准入用 `connect.timeoutMs`，默认也为 10,000 ms，`pending` 传递尚未用完的协商时间与本次名字探测预算之和；只在首次通知延长期限，重复通知不会刷新。`connectTimeoutMs` 则是命名本机来源的查找等待。单次业务调用使用完整 `timeout(...)` feature 或 `timeout: false`，并可传 `signal`；这些期限相互独立。
+
+`spawn` 可选主入口、路径/URL、短启动配置或完整原生 recipe。主入口自派生写法见 README。原生 `supervision` 保留重启、健康检查和停止策略；恢复连接不重放未确认业务。stdio 的 stdout 属于 RPC，应用日志使用 stderr。
+
+自动 verifier/principal、跨重连 session/scope 与部分 native auth 接线尚有缺口。不要用 token、环境值、自报身份或客户端 ID 代替实际准入。需要业务认证、schema、分片、合批或类型生成时，选择实际的 `/plugins/auth`、`/plugins/schema`、`/plugins/chunk`、`/plugins/batch`、`/plugins/typegen`；它们不是 Contract 内部或传输配置字段。flow 插件必须在传输开始前安装，启动后追加会拒绝。
+
+## 原生成员与普通 PluginHost
+
+查询和控制使用 `host.process.members`；`list/get` 返回原生来源的安全描述，`on/watch` 观察真实事件。`stop/kill/restart/replace` 取决于实际成员归属；接入外部服务不会获得远程进程控制权。
 
 ```ts doc-test=check
 import { PluginHost } from '@migaia/plugin-host'
@@ -114,12 +109,14 @@ export async function installAndRelease(entry: URL) {
 }
 ```
 
-这是真实定义安装，不返回另一个完整调用对象充当 source。宿主 process outlet 保留 stop/restart/kill/replace、native exit、notice 与 generation；注册名 name 是本地安装名，不等于远端 self.name。服务和 tray 沿自己的原 outlet 使用这些能力，不绕过原替换事务或租约。
+同一冷定义可安装在原生 PluginHost 上，不另开第二个 Host。普通安装的 `expose` 必须指向真实已安装 Feature，并显式列白名单；业务仍通过 process namespace 调用。自定义载体使用 `@migaia/rpc-host/sdk`，不使用已删除的部署 assembler 或返回端点的 source。
 
-## 关闭、失败与平台
+## 关闭与错误
 
-先让原 drain 处理已接纳的 request/provider/stream，再释放监听或自有子进程。未接纳候选在关闭时不能晚到发布，cleanup 失败不能替换 primary；原 native/cause/errors 继续可追踪。借用服务只关闭本端会话，不杀服务进程。重复关闭共享原 Promise，不能把 terminate 请求当成已经 native exit。
+拥有的子进程由真实监督器停止；借用服务仅释放本端连接。关闭监听器不授予终止客户端进程的权限。`close()` 是清理请求，不应推断所有已接纳业务都能 drain 完成；Host 关闭顺序与原 drain 业务仍有真实未闭合项。
 
-同名客户端在旧会话仍响应时以 HOST_PEER_NAME_DUPLICATE 拒绝；旧会话已死或一次原 ping 失败/到期时正常退场再接纳。不会附加后台 heartbeat。业务缺少目标是 TARGET_UNKNOWN，未知结果先对账再重试。
+通道启动失败按真实阶段保留 `PROCESS_CHANNEL_CLOSED`、连接失败或原生 `EPIPE`，不保证固定两层同码错误壳。应沿 `cause/errors` 读取原生错误，不按固定深度取值。`timeout: false` 不添加 Process 业务调用期限；原生启动、health 与 stop 预算仍各归自己的 owner。
 
-原生错误 source 为 rpc.transport.process，host/调用和托管错误仍可能来自 rpc.endpoint/rpc.remote。按 source/code 判断，不按文本匹配；保留原生 TypeError/AbortError 等类型和完整原因链。Node/Bun/Deno 的能力取决于实际适配器；Electron 沿用 Node I/O 路径。权限或资源参数不创造原生不存在的隔离。
+当前同名准入的公开错误呈现也有保留的失败用例；不能把通用启动包装错误当作已完成原错误契约。为应用使用唯一身份，不用注册名推断远端 identity。按 `source/code/cause/errors` 保留错误链和原生类型；不要把未知结果当作从未执行，也不要从连接恢复推出幂等重放或持久 outcome 已建立。
+
+`@migaia/rpc-contract` 只负责纯数据、类型、错误与协议准入；业务 schema 和策略归实际 plugin/feature，原生资源归 Process，调用生命周期归 Host。完整迁移验收尚未闭合。

@@ -1,8 +1,130 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createServer, type Server } from 'node:net'
+import { createConnection, createServer, type Server } from 'node:net'
+import { deferred } from '@migaia/utils/promise'
 import { lstat, mkdir, mkdtemp, rename, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { listenProcessByteChannel } from '../../src/process/adapters/node-socket.js'
+import { listenProcessByteChannel } from '../../dist/process/adapters/node-socket.js'
+import type { IProcessPendingByteConnection } from '../../dist/process/types.js'
+
+/** Actual pending admission holds its native raw channel until listener cancellation wins. */
+type ICloseFailureOperation = Readonly<{
+  entered: ReturnType<typeof deferred<void>>
+  release: ReturnType<typeof deferred<void>>
+  failClose(): void
+}>
+
+/** The host's actual diagnostic task remains scheduled; only its expected fixture throw is received. */
+type INativeDiagnosticObservation = Readonly<{
+  expected: unknown
+  schedule(callback: () => void): void
+  observed: ReturnType<typeof deferred<void>>
+  callbacks: (() => void)[]
+}>
+
+/** Preserve native scheduling and let every unrelated diagnostic continue to its original host. */
+function enqueueObservedDiagnostic(
+  callback: () => void,
+  operation: INativeDiagnosticObservation
+): void {
+  operation.schedule(() => {
+    try {
+      callback()
+    } catch (error) {
+      if (error !== operation.expected) throw error
+      operation.callbacks.push(callback)
+      operation.observed.resolve()
+    }
+  })
+}
+
+/** Install the failure on the real raw lifecycle, without replacing socket or channel operations. */
+function admitWithCloseFailure(
+  pending: IProcessPendingByteConnection,
+  operation: ICloseFailureOperation
+): Promise<void> {
+  return pending.accept(async (raw) => {
+    raw.onClose(operation.failClose)
+    operation.entered.resolve()
+    await operation.release.promise
+  })
+}
+
+it('removes listener cancellation and reports its original pending native cleanup failure', async () => {
+  /** The caller signal outlives a failed close, so its exact listener must be removed. */
+  const controller = new AbortController()
+  /** Native subscription identities are observed without replacing AbortSignal behavior. */
+  const add = vi.spyOn(controller.signal, 'addEventListener')
+  const remove = vi.spyOn(controller.signal, 'removeEventListener')
+  /** This actual raw-close callback failure must remain the listener close rejection. */
+  const cleanup = new Error('pending native cleanup')
+  /** Native socket termination also reports its cached failed close through the existing host queue. */
+  const diagnostic: INativeDiagnosticObservation = {
+    expected: cleanup,
+    schedule: globalThis.queueMicrotask,
+    observed: deferred<void>(),
+    callbacks: []
+  }
+  /** This seam receives the expected scheduled throw without replacing the production reporter. */
+  const queue = vi
+    .spyOn(globalThis, 'queueMicrotask')
+    .mockImplementation((callback) => enqueueObservedDiagnostic(callback, diagnostic))
+  /** Real admission and its business wait belong only to this finite socket case. */
+  const operation: ICloseFailureOperation = {
+    entered: deferred<void>(),
+    release: deferred<void>(),
+    failClose: () => {
+      throw cleanup
+    }
+  }
+  /** Existing listener reporting observes detached cleanup rather than a new diagnostic channel. */
+  const report = vi.fn()
+  /** Only the original native socket acquisition supplies the pending raw channel. */
+  const listener = await listenProcessByteChannel({
+    address: 'tcp://127.0.0.1:0',
+    signal: controller.signal,
+    report,
+    onConnection: (pending) => admitWithCloseFailure(pending, operation)
+  })
+  /** A real loopback peer reaches the same pending admission as an ordinary process connection. */
+  const socket = createConnection({
+    host: '127.0.0.1',
+    port: Number(new URL(listener.address).port)
+  })
+  /** Restore the host seam only after this original native peer has really closed. */
+  const socketClosed = deferred<void>()
+  socket.once('close', () => socketClosed.resolve())
+  socket.on('error', () => undefined)
+  try {
+    await operation.entered.promise
+    /** This is the listener's original registered callback, not a synthetic abort subscriber. */
+    const abort = add.mock.calls.find(([type]) => type === 'abort')![1]
+    controller.abort()
+    /** Signal shutdown and explicit close join the same original failed cleanup transaction. */
+    const closing = listener.close()
+    await expect(closing).rejects.toBe(cleanup)
+    expect(listener.close()).toBe(closing)
+    expect(remove).toHaveBeenCalledExactlyOnceWith('abort', abort)
+    expect(report.mock.calls).toContainEqual([cleanup])
+    await diagnostic.observed.promise
+    expect(diagnostic.callbacks).toHaveLength(1)
+    /** Explicit invocation proves that the original host task still throws the exact raw failure. */
+    let reported: unknown
+    try {
+      diagnostic.callbacks[0]!()
+    } catch (error) {
+      reported = error
+    }
+    expect(reported).toBe(cleanup)
+  } finally {
+    operation.release.resolve()
+    socket.destroy()
+    await socketClosed.promise
+    await listener.close().catch(() => undefined)
+    queue.mockRestore()
+    add.mockRestore()
+    remove.mockRestore()
+  }
+})
 
 /** A separately owned listener never shares the predecessor's JS lifetime or socket inode. */
 async function replacementListener(address: string): Promise<Server> {
@@ -36,7 +158,6 @@ describe.skipIf(process.platform === 'win32')('Node Unix listener close limitati
       const listener = await listenProcessByteChannel({
         address,
         ...(managed ? { serviceId: 'close-owner' } : {}),
-        auth: { mode: 'required', verify: () => 'principal' },
         onConnection: (pending) => pending.close(),
         report
       })
@@ -84,7 +205,6 @@ describe.skipIf(process.platform === 'win32')('Node Unix listener close limitati
         expect(Buffer.byteLength(address)).toBe(104)
         const listener = await listenProcessByteChannel({
           address,
-          auth: { mode: 'required', verify: () => 'principal' },
           onConnection: (pending) => pending.close(),
           report
         })

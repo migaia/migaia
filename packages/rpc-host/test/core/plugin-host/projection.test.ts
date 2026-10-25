@@ -7,8 +7,9 @@ import { createWebRpcPluginHost } from '../../../dist/core/internal/web-rpc-plug
 
 import { defineFeature } from '../../../dist/core/feature.js'
 
-import { RpcCoreErrorCode, RpcLifecycleError } from '../../../dist/core/errors.js'
-import { RpcCoreErrorText } from '../../../dist/core/error-text.js'
+import { RpcLifecycleError } from '@migaia/rpc-contract/errors'
+import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
+import { RpcCoreErrorText } from '@migaia/rpc-contract/errors'
 import { connect } from '../../../dist/core/middleware/connect.js'
 import { createMemoryTransportPair } from '../../fixtures/memory-transport.js'
 import { createConstructionControl } from '../../../dist/core/internal/construction-install.js'

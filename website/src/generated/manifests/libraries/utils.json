@@ -2138,6 +2138,10 @@
                 "text": "当某个键在双方都存在、且不属于以上任何自动合并分支（例如两侧都是不可合并的原始值）时，若提供了 `onConflict`，会调用它并传入 `IConfigConflictContext`（`path`：当前键的完整路径；`left`：左侧/已有值；`right`：右侧/新值），其返回值 `IConfigConflictDecision` 决定最终结果：`{ kind: 'left' }` 保留左值、`{ kind: 'right' }` 采用右值、`{ kind: 'delete' }` 删除该键、`{ kind: 'value', value }` 采用自定义值。`onConflict` 必须同步返回（返回 Promise 会抛 `code: 'CONFIG_CONFLICT'`；返回值不是上述四种 `kind` 之一同样抛 `CONFIG_CONFLICT`）。未提供 `onConflict` 时右侧直接覆盖左侧（标准合并语义）。`right === CONFIG_DELETE` 会删除目标键（可用于合并阶段裁剪掉某个来源写入的默认值）。"
               },
               {
+                "type": "paragraph",
+                "text": "数组采用 concat 或 mergeByIndex 时，同一次合并使用私有累计数组；`onConflict` 当场读取当前累计内容，保留的引用会随后续合并更新。回调只读取累计值并返回决策；直接修改累计数组（包括写入、delete、修改 length 或 freeze）属于不支持的用法。需要替换时返回 `{ kind: 'value', value }`。实现不为直接修改增加运行时检查或拒绝逻辑。"
+              },
+              {
                 "type": "code",
                 "language": "ts",
                 "code": "const defaults = ownConfig({\n  retries: 1,\n  tags: ['default'],\n  transport: { timeoutMs: 1_000, keepAlive: true }\n})\nconst override = ownConfig({\n  retries: 3,\n  tags: ['custom'],\n  transport: { timeoutMs: 2_500 }\n})\n\nconst merged = combineConfig([defaults, override], {\n  strategies: { record: 'merge', array: 'concat' }\n})\n\n// merged 是新配置；defaults 和 override 都不会被修改。\nmerged\n// {\n//   retries: 3,\n//   tags: ['default', 'custom'],\n//   transport: { timeoutMs: 2500, keepAlive: true },\n// }\n\n// 这里的 diff 只是把结果变化写明，不是 combineConfig 的额外返回值。\nconst diff = {\n  retries: { before: defaults.retries, after: merged.retries },\n  tags: { before: defaults.tags, after: merged.tags },\n  timeoutMs: { before: defaults.transport.timeoutMs, after: merged.transport.timeoutMs }\n}"
@@ -5363,6 +5367,10 @@
                 {
                   "type": "paragraph",
                   "text": "When a key exists on both sides and falls outside every automatic merge case (for example two primitive values that cannot be merged), and `onConflict` is given, it is called with an `IConfigConflictContext` (`path`: the full path of the key; `left`: the existing value; `right`: the new value). Its `IConfigConflictDecision` decides the result: `{ kind: 'left' }` keeps the left value, `{ kind: 'right' }` takes the right value, `{ kind: 'delete' }` deletes the key, and `{ kind: 'value', value }` uses a custom value. `onConflict` must return synchronously: returning a Promise throws `code: 'CONFIG_CONFLICT'`, and so does a return value that is not one of the four kinds. Without `onConflict`, the right side simply overrides the left (standard merge semantics). `right === CONFIG_DELETE` deletes the target key, which lets a merge strip a default written by an earlier source."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "With concat or mergeByIndex, one combine operation uses private array accumulators. `onConflict` reads the current cumulative contents; a retained reference receives later merges. Callbacks only read the accumulated value and return a decision. Direct mutation of an accumulating array, including writes, deletion, length changes or freezing, is unsupported. Return `{ kind: 'value', value }` to replace a value. The implementation adds no runtime checks or rejection for direct mutation."
                 },
                 {
                   "type": "code",
@@ -10464,7 +10472,7 @@
           "name": "combineConfig",
           "kind": "function",
           "signature": "export declare function combineConfig(sources: readonly IOwnedConfig<IConfigRecord>[], options?: IConfigCombineOptions): IOwnedConfig<IConfigRecord>;",
-          "declarationLine": 139,
+          "declarationLine": 143,
           "source": "packages/utils/dist/config.d.ts",
           "purpose": "Merges several owned configurations in order (later wins) into an owned configuration, with configurable strategies for records, arrays, maps, sets and `undefined`, per-path overrides and a conflict resolver. Sources are not modified.",
           "core": "sources: Configurations created by `ownConfig()`, lowest priority first.\nAn owned configuration; a single source with no configured options is returned unchanged. Incompatible profiles throw `CONFIG_CONFLICT`.\nstrategies: How each value kind merges when both sides have it (record, array, map, set, undefined).\n`record: merge`, `array: replace`, `map: replace`, `set: replace`, `undefined: ignore`.\nstrategies.record: How two objects at the same path merge.\n`merge`.\nMerge keys recursively.\nThe later object replaces the earlier object.\nstrategies.array: How two arrays at the same path merge.\n`replace`: arrays use the later array as a whole.\nThe later array replaces the earlier array.\nConcatenate earlier then later.\nMerge element by element at the same index.\nstrategies.map: How two `Map` values merge.\n`replace`: Map values use the later Map as a whole.\nThe later Map replaces the earlier Map.\nMerge entries by key.\nstrategies.set: How two `Set` values merge.\n`replace`: Set values use the later Set as a whole.\nThe later Set replaces the earlier Set.\nUnion of both sets.\nstrategies.undefined: What a later `undefined` does.\n`ignore`.\nKeep the earlier value.\nWrite `undefined`.\npathRules: Strategy overrides for path prefixes; the longest matching prefix wins.\nNot set: global strategies apply everywhere.\nonConflict: Decides values that cannot be merged: return `{ kind: \"left\" | \"right\" | \"delete\" }` or `{ kind: \"value\", value }`, synchronously.\nNot set: the later (right) value wins.\nUse this hook for a domain rule when values cannot be merged. Return left to keep the earlier value, right to accept the later one, delete to remove the key, or value with a replacement. Omission takes the right value; a throw aborts the merge.\nprofile: Validation profile of the result; must match the sources.\nThe first source profile, or `data` when sources are empty.\nChoose data for portable values or richRuntime for local callbacks. Every owned source must use that same profile. Omission keeps the first source profile, or data for no sources.\nlimits: Tighter size limits for the result.\nThe per-field minimum across source limits and package defaults.",
@@ -10570,13 +10578,13 @@
               "name": "profile",
               "type": "IConfigProfile",
               "optional": true,
-              "description": ""
+              "description": "Admission retains the enclosing combine operation's selected profile."
             },
             {
               "name": "limits",
               "type": "Partial<IConfigLimits>",
               "optional": true,
-              "description": ""
+              "description": "Graph cloning uses the same existing resource limits as sibling values."
             }
           ],
           "identity": "packages/utils/dist/config.d.ts:combineConfig:export declare function combineConfig(sources: readonly IOwnedConfig<IConfigRecord>[], options?: IConfigCombineOptions): IOwnedConfig<IConfigRecord>;",
@@ -10710,6 +10718,10 @@
                   "text": "当某个键在双方都存在、且不属于以上任何自动合并分支（例如两侧都是不可合并的原始值）时，若提供了 `onConflict`，会调用它并传入 `IConfigConflictContext`（`path`：当前键的完整路径；`left`：左侧/已有值；`right`：右侧/新值），其返回值 `IConfigConflictDecision` 决定最终结果：`{ kind: 'left' }` 保留左值、`{ kind: 'right' }` 采用右值、`{ kind: 'delete' }` 删除该键、`{ kind: 'value', value }` 采用自定义值。`onConflict` 必须同步返回（返回 Promise 会抛 `code: 'CONFIG_CONFLICT'`；返回值不是上述四种 `kind` 之一同样抛 `CONFIG_CONFLICT`）。未提供 `onConflict` 时右侧直接覆盖左侧（标准合并语义）。`right === CONFIG_DELETE` 会删除目标键（可用于合并阶段裁剪掉某个来源写入的默认值）。"
                 },
                 {
+                  "type": "paragraph",
+                  "text": "数组采用 concat 或 mergeByIndex 时，同一次合并使用私有累计数组；`onConflict` 当场读取当前累计内容，保留的引用会随后续合并更新。回调只读取累计值并返回决策；直接修改累计数组（包括写入、delete、修改 length 或 freeze）属于不支持的用法。需要替换时返回 `{ kind: 'value', value }`。实现不为直接修改增加运行时检查或拒绝逻辑。"
+                },
+                {
                   "type": "code",
                   "language": "ts",
                   "code": "const defaults = ownConfig({\n  retries: 1,\n  tags: ['default'],\n  transport: { timeoutMs: 1_000, keepAlive: true }\n})\nconst override = ownConfig({\n  retries: 3,\n  tags: ['custom'],\n  transport: { timeoutMs: 2_500 }\n})\n\nconst merged = combineConfig([defaults, override], {\n  strategies: { record: 'merge', array: 'concat' }\n})\n\n// merged 是新配置；defaults 和 override 都不会被修改。\nmerged\n// {\n//   retries: 3,\n//   tags: ['default', 'custom'],\n//   transport: { timeoutMs: 2500, keepAlive: true },\n// }\n\n// 这里的 diff 只是把结果变化写明，不是 combineConfig 的额外返回值。\nconst diff = {\n  retries: { before: defaults.retries, after: merged.retries },\n  tags: { before: defaults.tags, after: merged.tags },\n  timeoutMs: { before: defaults.transport.timeoutMs, after: merged.transport.timeoutMs }\n}"
@@ -10805,7 +10817,7 @@
               "type": "IConfigProfile",
               "optional": true,
               "description": "若 `value` 已经是某次 `ownConfig` 的返回值（元数据匹配同一 `profile`/`limits`），直接原样返回（幂等）；若元数据不匹配（例如同一对象先后用不同 `profile` 调用），抛出 `code: 'CONFIG_CONFLICT'` 的 `TypeError`。",
-              "descriptionEn": "",
+              "descriptionEn": "Admission retains the enclosing combine operation's selected profile.",
               "descriptionZh": "若 `value` 已经是某次 `ownConfig` 的返回值（元数据匹配同一 `profile`/`limits`），直接原样返回（幂等）；若元数据不匹配（例如同一对象先后用不同 `profile` 调用），抛出 `code: 'CONFIG_CONFLICT'` 的 `TypeError`。"
             },
             {
@@ -10813,7 +10825,7 @@
               "type": "Partial<IConfigLimits>",
               "optional": true,
               "description": "超过 `limits`（见下）中的深度/节点数/键数会抛出 `code: 'CONFIG_LIMIT_EXCEEDED'` 的 `RangeError`。",
-              "descriptionEn": "",
+              "descriptionEn": "Graph cloning uses the same existing resource limits as sibling values.",
               "descriptionZh": "超过 `limits`（见下）中的深度/节点数/键数会抛出 `code: 'CONFIG_LIMIT_EXCEEDED'` 的 `RangeError`。"
             }
           ],
@@ -11049,6 +11061,10 @@
                 {
                   "type": "paragraph",
                   "text": "当某个键在双方都存在、且不属于以上任何自动合并分支（例如两侧都是不可合并的原始值）时，若提供了 `onConflict`，会调用它并传入 `IConfigConflictContext`（`path`：当前键的完整路径；`left`：左侧/已有值；`right`：右侧/新值），其返回值 `IConfigConflictDecision` 决定最终结果：`{ kind: 'left' }` 保留左值、`{ kind: 'right' }` 采用右值、`{ kind: 'delete' }` 删除该键、`{ kind: 'value', value }` 采用自定义值。`onConflict` 必须同步返回（返回 Promise 会抛 `code: 'CONFIG_CONFLICT'`；返回值不是上述四种 `kind` 之一同样抛 `CONFIG_CONFLICT`）。未提供 `onConflict` 时右侧直接覆盖左侧（标准合并语义）。`right === CONFIG_DELETE` 会删除目标键（可用于合并阶段裁剪掉某个来源写入的默认值）。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "数组采用 concat 或 mergeByIndex 时，同一次合并使用私有累计数组；`onConflict` 当场读取当前累计内容，保留的引用会随后续合并更新。回调只读取累计值并返回决策；直接修改累计数组（包括写入、delete、修改 length 或 freeze）属于不支持的用法。需要替换时返回 `{ kind: 'value', value }`。实现不为直接修改增加运行时检查或拒绝逻辑。"
                 },
                 {
                   "type": "code",
@@ -11613,13 +11629,13 @@
               "name": "profile",
               "type": "IConfigProfile",
               "optional": true,
-              "description": ""
+              "description": "Admission retains the enclosing combine operation's selected profile."
             },
             {
               "name": "limits",
               "type": "Partial<IConfigLimits>",
               "optional": true,
-              "description": ""
+              "description": "Graph cloning uses the same existing resource limits as sibling values."
             }
           ],
           "identity": "packages/utils/dist/config-owner.d.ts:ConfigOwner:export declare class ConfigOwner<T extends IConfigRecord = IConfigRecord> { #private; /** * Owns a copy of `value` (validated by `ownConfig`). Throws the `ownConfig` errors for invalid * roots and `CONFIG_VALIDATION_FAILED` when the validator rejects the initial value. */ constructor(value: T, options?: IConfigOwnerOptions<T>); /** * Parses JSON text into an owner. Non-string input or invalid JSON throws `CONFIG_PARSE_FAILED` * with the parser error on `cause`; a non-record root throws `CONFIG_UNSUPPORTED`. * * @example * ;```ts * const config = ConfigOwner.from<{ port: number }>('{\"port\":80}') * ``` */ static from<T extends IConfigRecord = IConfigRecord>(text: string, options?: IConfigOwnerParseOptions<T>): ConfigOwner<T>; /** * Builds an owner from an asynchronous source: a Promise, a value, or a factory that receives an * abort signal (pass it to `fetch`). Strings are parsed as JSON. * * Rejections and factory throws become `CONFIG_SOURCE_FAILED` (original on `cause`); `signal` and * `timeoutMs` reject with the standard abort/timeout errors. Pair with `createResource` to get a * reactive config resource. * * @example * ;```ts * const config = await ConfigOwner.fromAsync( * ({ signal }) => fetch('/config.json', { signal }).then((r) => r.text()), * { timeoutMs: 5000 } * ) * ``` */ static fromAsync<T extends IConfigRecord = IConfigRecord>(source: IConfigAsyncSource<T>, options?: IConfigOwnerAsyncOptions<T>): Promise<ConfigOwner<T>>; /** * Builds a nested config from flat environment variables. Pass `process.env`, * `Deno.env.toObject()` or any record; values stay strings unless `coerce` converts them. * Conflicting keys (`APP__DB=1` and `APP__DB__PORT=2`) throw `CONFIG_CONFLICT`. * * @example * ;```ts * ConfigOwner.fromEnv(process.env, { * prefix: 'APP__', * key: (s) => s.toLowerCase(), * coerce: Number * }) * ``` */ static fromEnv<T extends IConfigRecord = IConfigRecord>(env: Readonly<Record<string, string | undefined>>, options?: IConfigOwnerEnvOptions<T>): ConfigOwner<T>; /** * Merges sources left to right into a new owner (later sources win, records merge deeply). * * @example * ;```ts * const config = ConfigOwner.merge(defaults, fileConfig, envConfig) * ``` */ static merge<S extends readonly [IConfigSource, ...IConfigSource[]]>(...sources: S): ConfigOwner<IMergedConfig<S>>; /** Brand check: `true` only for real `ConfigOwner` instances. */ static is(value: unknown): value is ConfigOwner; /** Whether writes are rejected after `lock()`. */ get locked(): boolean; /** * Value at a typed path as a deep readonly view, or `undefined` when missing. * * @example * ;```ts * config.get('server.port') // number | undefined * ``` */ get<const P extends IConfigOwnerPath<T>>(path: P): IConfigView<IConfigOwnerPathValue<T, P>> | undefined; /** Value at a path, or `fallback` when the path is missing. */ getOr<const P extends IConfigOwnerPath<T>, D>(path: P, fallback: D): IConfigView<IConfigOwnerPathValue<T, P>> | D; /** Value at a path; throws `CONFIG_VALUE_MISSING` when missing. */ require<const P extends IConfigOwnerPath<T>>(path: P): IConfigView<IConfigOwnerPathValue<T, P>>; /** Discriminated read that tells a missing path from an own `undefined` value. */ read(path: IConfigOwnerPath<T>): IConfigReadResult; /** Whether the path has an own value (which may be `undefined`). */ has(path: IConfigOwnerPath<T>): boolean; /** Deep readonly view of the current snapshot; writes through it throw `CONFIG_READONLY`. */ view(): IConfigView<T>; /** * New owner for a record subtree, sharing options but not listeners or the validator. * * @example * ;```ts * const db = config.select('db') * ``` */ select<const P extends IConfigOwnerPath<T>>(path: P): ConfigOwner<IConfigOwnerPathValue<T, P> & IConfigRecord>; /** Paths that differ between this snapshot and `other` (`added` = only in `other`). */ diff(other: IConfigSource): readonly IConfigDiffEntry[]; /** Whether `other` has the same data (deep, own keys). */ equals(other: IConfigSource): boolean; /** * Sets one path with copy-on-write; missing intermediate records are created. Throws * `CONFIG_PATH_INVALID` when an intermediate is not a record or array. * * @example * ;```ts * config.set('server.port', 8080).set('server.host', 'localhost') * ``` */ set<const P extends IConfigOwnerPath<T>>(path: P, value: IConfigOwnerWriteValue<T, P>): this; /** Deletes one path; deleting a missing path is a no-op. Array items are removed by index. */ delete(path: IConfigOwnerPath<T>): this; /** Applies a root-level overlay through `patchConfig` (`CONFIG_DELETE` removes a key). */ patch(patch: IConfigPatch<T>, options?: IConfigPatchOptions): this; /** * Merges sources into this owner through `combineConfig` (later sources win). Pass a source list * plus options to control merge strategies. Returns `this`, retyped with the merged shape. * * @example * ;```ts * config.combine({ cache: { ttl: 60 } }).get('cache.ttl') * config.combine([override], { strategies: { array: 'concat' } }) * ``` */ combine<S extends readonly IConfigSource[]>(...sources: S): ConfigOwner<T & IMergedConfig<S>>; combine<S extends readonly IConfigSource[]>(sources: S, options: IConfigCombineOptions): ConfigOwner<T & IMergedConfig<S>>; /** * Runs several writes as one commit: the validator and watchers run once at the end. If `fn` * throws or validation fails, every write in the batch is rolled back. Nested batches join the * outer one. * * @example * ;```ts * config.batch((c) => c.set('a', 1).set('b', 2)) * ``` */ batch(fn: (owner: this) => void): this; /** Restores the snapshot captured at construction (watchers fire when it differs). */ reset(): this; /** Rejects every later write with `CONFIG_READONLY`. Irreversible. */ lock(): this; /** * Watches the whole snapshot, or only one path (fires only when that path's data changed). * Returns an idempotent unsubscribe. Listener throws go to `report`; writes from a listener throw * `REENTRANT_CALL`. * * @example * ;```ts * const stop = config.watch('server.port', (next, prev) => restart(next)) * ``` */ watch(listener: (next: IConfigView<T>, prev: IConfigView<T>) => void): () => void; watch<const P extends IConfigOwnerPath<T>>(path: P, listener: (next: IConfigView<IConfigOwnerPathValue<T, P>> | undefined, prev: IConfigView<IConfigOwnerPathValue<T, P>> | undefined) => void): () => void; /** New owner with the same snapshot and options; listeners and lock state are not copied. */ clone(): ConfigOwner<T>; /** JSON data of the current snapshot; non-JSON values throw `CONFIG_UNSUPPORTED`. */ toJSON(): IConfigRecord; /** JSON text of the current snapshot. */ toString(space?: number | string): string; }",
@@ -11712,16 +11728,16 @@
               "name": "profile",
               "type": "IConfigProfile",
               "optional": true,
-              "description": "若 `value` 已经是某次 `ownConfig` 的返回值（元数据匹配同一 `profile`/`limits`），直接原样返回（幂等）；若元数据不匹配（例如同一对象先后用不同 `profile` 调用），抛出 `code: 'CONFIG_CONFLICT'` 的 `TypeError`。",
-              "descriptionEn": "",
+              "description": "Admission retains the enclosing combine operation's selected profile.",
+              "descriptionEn": "Admission retains the enclosing combine operation's selected profile.",
               "descriptionZh": "若 `value` 已经是某次 `ownConfig` 的返回值（元数据匹配同一 `profile`/`limits`），直接原样返回（幂等）；若元数据不匹配（例如同一对象先后用不同 `profile` 调用），抛出 `code: 'CONFIG_CONFLICT'` 的 `TypeError`。"
             },
             {
               "name": "limits",
               "type": "Partial<IConfigLimits>",
               "optional": true,
-              "description": "超过 `limits`（见下）中的深度/节点数/键数会抛出 `code: 'CONFIG_LIMIT_EXCEEDED'` 的 `RangeError`。",
-              "descriptionEn": "",
+              "description": "Graph cloning uses the same existing resource limits as sibling values.",
+              "descriptionEn": "Graph cloning uses the same existing resource limits as sibling values.",
               "descriptionZh": "超过 `limits`（见下）中的深度/节点数/键数会抛出 `code: 'CONFIG_LIMIT_EXCEEDED'` 的 `RangeError`。"
             }
           ],
@@ -11937,6 +11953,10 @@
                   "text": "当某个键在双方都存在、且不属于以上任何自动合并分支（例如两侧都是不可合并的原始值）时，若提供了 `onConflict`，会调用它并传入 `IConfigConflictContext`（`path`：当前键的完整路径；`left`：左侧/已有值；`right`：右侧/新值），其返回值 `IConfigConflictDecision` 决定最终结果：`{ kind: 'left' }` 保留左值、`{ kind: 'right' }` 采用右值、`{ kind: 'delete' }` 删除该键、`{ kind: 'value', value }` 采用自定义值。`onConflict` 必须同步返回（返回 Promise 会抛 `code: 'CONFIG_CONFLICT'`；返回值不是上述四种 `kind` 之一同样抛 `CONFIG_CONFLICT`）。未提供 `onConflict` 时右侧直接覆盖左侧（标准合并语义）。`right === CONFIG_DELETE` 会删除目标键（可用于合并阶段裁剪掉某个来源写入的默认值）。"
                 },
                 {
+                  "type": "paragraph",
+                  "text": "数组采用 concat 或 mergeByIndex 时，同一次合并使用私有累计数组；`onConflict` 当场读取当前累计内容，保留的引用会随后续合并更新。回调只读取累计值并返回决策；直接修改累计数组（包括写入、delete、修改 length 或 freeze）属于不支持的用法。需要替换时返回 `{ kind: 'value', value }`。实现不为直接修改增加运行时检查或拒绝逻辑。"
+                },
+                {
                   "type": "code",
                   "language": "ts",
                   "code": "const defaults = ownConfig({\n  retries: 1,\n  tags: ['default'],\n  transport: { timeoutMs: 1_000, keepAlive: true }\n})\nconst override = ownConfig({\n  retries: 3,\n  tags: ['custom'],\n  transport: { timeoutMs: 2_500 }\n})\n\nconst merged = combineConfig([defaults, override], {\n  strategies: { record: 'merge', array: 'concat' }\n})\n\n// merged 是新配置；defaults 和 override 都不会被修改。\nmerged\n// {\n//   retries: 3,\n//   tags: ['default', 'custom'],\n//   transport: { timeoutMs: 2500, keepAlive: true },\n// }\n\n// 这里的 diff 只是把结果变化写明，不是 combineConfig 的额外返回值。\nconst diff = {\n  retries: { before: defaults.retries, after: merged.retries },\n  tags: { before: defaults.tags, after: merged.tags },\n  timeoutMs: { before: defaults.transport.timeoutMs, after: merged.transport.timeoutMs }\n}"
@@ -12017,7 +12037,7 @@
           "name": "IConfigCombineOptions",
           "kind": "type",
           "signature": "export type IConfigCombineOptions = IOwnConfigOptions & { readonly strategies?: Partial<IConfigMergeStrategies>; readonly pathRules?: readonly IConfigPathRule[]; readonly onConflict?: (context: IConfigConflictContext) => IConfigConflictDecision; };",
-          "declarationLine": 108,
+          "declarationLine": 112,
           "source": "packages/utils/dist/config.d.ts",
           "purpose": "Options of `combineConfig()`.",
           "core": "strategies: How each value kind merges when both sides have it (record, array, map, set, undefined).\n`record: merge`, `array: replace`, `map: replace`, `set: replace`, `undefined: ignore`.\nstrategies.record: How two objects at the same path merge.\n`merge`.\nMerge keys recursively.\nThe later object replaces the earlier object.\nstrategies.array: How two arrays at the same path merge.\n`replace`: arrays use the later array as a whole.\nThe later array replaces the earlier array.\nConcatenate earlier then later.\nMerge element by element at the same index.\nstrategies.map: How two `Map` values merge.\n`replace`: Map values use the later Map as a whole.\nThe later Map replaces the earlier Map.\nMerge entries by key.\nstrategies.set: How two `Set` values merge.\n`replace`: Set values use the later Set as a whole.\nThe later Set replaces the earlier Set.\nUnion of both sets.\nstrategies.undefined: What a later `undefined` does.\n`ignore`.\nKeep the earlier value.\nWrite `undefined`.\npathRules: Strategy overrides for path prefixes; the longest matching prefix wins.\nNot set: global strategies apply everywhere.\nonConflict: Decides values that cannot be merged: return `{ kind: \"left\" | \"right\" | \"delete\" }` or `{ kind: \"value\", value }`, synchronously.\nNot set: the later (right) value wins.\nUse this hook for a domain rule when values cannot be merged. Return left to keep the earlier value, right to accept the later one, delete to remove the key, or value with a replacement. Omission takes the right value; a throw aborts the merge.\nprofile: Validation profile of the result; must match the sources.\nThe first source profile, or `data` when sources are empty.\nChoose data for portable values or richRuntime for local callbacks. Every owned source must use that same profile. Omission keeps the first source profile, or data for no sources.\nlimits: Tighter size limits for the result.\nThe per-field minimum across source limits and package defaults.",
@@ -12325,6 +12345,10 @@
                   "text": "当某个键在双方都存在、且不属于以上任何自动合并分支（例如两侧都是不可合并的原始值）时，若提供了 `onConflict`，会调用它并传入 `IConfigConflictContext`（`path`：当前键的完整路径；`left`：左侧/已有值；`right`：右侧/新值），其返回值 `IConfigConflictDecision` 决定最终结果：`{ kind: 'left' }` 保留左值、`{ kind: 'right' }` 采用右值、`{ kind: 'delete' }` 删除该键、`{ kind: 'value', value }` 采用自定义值。`onConflict` 必须同步返回（返回 Promise 会抛 `code: 'CONFIG_CONFLICT'`；返回值不是上述四种 `kind` 之一同样抛 `CONFIG_CONFLICT`）。未提供 `onConflict` 时右侧直接覆盖左侧（标准合并语义）。`right === CONFIG_DELETE` 会删除目标键（可用于合并阶段裁剪掉某个来源写入的默认值）。"
                 },
                 {
+                  "type": "paragraph",
+                  "text": "数组采用 concat 或 mergeByIndex 时，同一次合并使用私有累计数组；`onConflict` 当场读取当前累计内容，保留的引用会随后续合并更新。回调只读取累计值并返回决策；直接修改累计数组（包括写入、delete、修改 length 或 freeze）属于不支持的用法。需要替换时返回 `{ kind: 'value', value }`。实现不为直接修改增加运行时检查或拒绝逻辑。"
+                },
+                {
                   "type": "code",
                   "language": "ts",
                   "code": "const defaults = ownConfig({\n  retries: 1,\n  tags: ['default'],\n  transport: { timeoutMs: 1_000, keepAlive: true }\n})\nconst override = ownConfig({\n  retries: 3,\n  tags: ['custom'],\n  transport: { timeoutMs: 2_500 }\n})\n\nconst merged = combineConfig([defaults, override], {\n  strategies: { record: 'merge', array: 'concat' }\n})\n\n// merged 是新配置；defaults 和 override 都不会被修改。\nmerged\n// {\n//   retries: 3,\n//   tags: ['default', 'custom'],\n//   transport: { timeoutMs: 2500, keepAlive: true },\n// }\n\n// 这里的 diff 只是把结果变化写明，不是 combineConfig 的额外返回值。\nconst diff = {\n  retries: { before: defaults.retries, after: merged.retries },\n  tags: { before: defaults.tags, after: merged.tags },\n  timeoutMs: { before: defaults.transport.timeoutMs, after: merged.transport.timeoutMs }\n}"
@@ -12572,6 +12596,10 @@
                 {
                   "type": "paragraph",
                   "text": "当某个键在双方都存在、且不属于以上任何自动合并分支（例如两侧都是不可合并的原始值）时，若提供了 `onConflict`，会调用它并传入 `IConfigConflictContext`（`path`：当前键的完整路径；`left`：左侧/已有值；`right`：右侧/新值），其返回值 `IConfigConflictDecision` 决定最终结果：`{ kind: 'left' }` 保留左值、`{ kind: 'right' }` 采用右值、`{ kind: 'delete' }` 删除该键、`{ kind: 'value', value }` 采用自定义值。`onConflict` 必须同步返回（返回 Promise 会抛 `code: 'CONFIG_CONFLICT'`；返回值不是上述四种 `kind` 之一同样抛 `CONFIG_CONFLICT`）。未提供 `onConflict` 时右侧直接覆盖左侧（标准合并语义）。`right === CONFIG_DELETE` 会删除目标键（可用于合并阶段裁剪掉某个来源写入的默认值）。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "数组采用 concat 或 mergeByIndex 时，同一次合并使用私有累计数组；`onConflict` 当场读取当前累计内容，保留的引用会随后续合并更新。回调只读取累计值并返回决策；直接修改累计数组（包括写入、delete、修改 length 或 freeze）属于不支持的用法。需要替换时返回 `{ kind: 'value', value }`。实现不为直接修改增加运行时检查或拒绝逻辑。"
                 },
                 {
                   "type": "code",
@@ -12910,6 +12938,10 @@
                   "text": "当某个键在双方都存在、且不属于以上任何自动合并分支（例如两侧都是不可合并的原始值）时，若提供了 `onConflict`，会调用它并传入 `IConfigConflictContext`（`path`：当前键的完整路径；`left`：左侧/已有值；`right`：右侧/新值），其返回值 `IConfigConflictDecision` 决定最终结果：`{ kind: 'left' }` 保留左值、`{ kind: 'right' }` 采用右值、`{ kind: 'delete' }` 删除该键、`{ kind: 'value', value }` 采用自定义值。`onConflict` 必须同步返回（返回 Promise 会抛 `code: 'CONFIG_CONFLICT'`；返回值不是上述四种 `kind` 之一同样抛 `CONFIG_CONFLICT`）。未提供 `onConflict` 时右侧直接覆盖左侧（标准合并语义）。`right === CONFIG_DELETE` 会删除目标键（可用于合并阶段裁剪掉某个来源写入的默认值）。"
                 },
                 {
+                  "type": "paragraph",
+                  "text": "数组采用 concat 或 mergeByIndex 时，同一次合并使用私有累计数组；`onConflict` 当场读取当前累计内容，保留的引用会随后续合并更新。回调只读取累计值并返回决策；直接修改累计数组（包括写入、delete、修改 length 或 freeze）属于不支持的用法。需要替换时返回 `{ kind: 'value', value }`。实现不为直接修改增加运行时检查或拒绝逻辑。"
+                },
+                {
                   "type": "code",
                   "language": "ts",
                   "code": "const defaults = ownConfig({\n  retries: 1,\n  tags: ['default'],\n  transport: { timeoutMs: 1_000, keepAlive: true }\n})\nconst override = ownConfig({\n  retries: 3,\n  tags: ['custom'],\n  transport: { timeoutMs: 2_500 }\n})\n\nconst merged = combineConfig([defaults, override], {\n  strategies: { record: 'merge', array: 'concat' }\n})\n\n// merged 是新配置；defaults 和 override 都不会被修改。\nmerged\n// {\n//   retries: 3,\n//   tags: ['default', 'custom'],\n//   transport: { timeoutMs: 2500, keepAlive: true },\n// }\n\n// 这里的 diff 只是把结果变化写明，不是 combineConfig 的额外返回值。\nconst diff = {\n  retries: { before: defaults.retries, after: merged.retries },\n  tags: { before: defaults.tags, after: merged.tags },\n  timeoutMs: { before: defaults.transport.timeoutMs, after: merged.transport.timeoutMs }\n}"
@@ -13157,6 +13189,10 @@
                 {
                   "type": "paragraph",
                   "text": "当某个键在双方都存在、且不属于以上任何自动合并分支（例如两侧都是不可合并的原始值）时，若提供了 `onConflict`，会调用它并传入 `IConfigConflictContext`（`path`：当前键的完整路径；`left`：左侧/已有值；`right`：右侧/新值），其返回值 `IConfigConflictDecision` 决定最终结果：`{ kind: 'left' }` 保留左值、`{ kind: 'right' }` 采用右值、`{ kind: 'delete' }` 删除该键、`{ kind: 'value', value }` 采用自定义值。`onConflict` 必须同步返回（返回 Promise 会抛 `code: 'CONFIG_CONFLICT'`；返回值不是上述四种 `kind` 之一同样抛 `CONFIG_CONFLICT`）。未提供 `onConflict` 时右侧直接覆盖左侧（标准合并语义）。`right === CONFIG_DELETE` 会删除目标键（可用于合并阶段裁剪掉某个来源写入的默认值）。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "数组采用 concat 或 mergeByIndex 时，同一次合并使用私有累计数组；`onConflict` 当场读取当前累计内容，保留的引用会随后续合并更新。回调只读取累计值并返回决策；直接修改累计数组（包括写入、delete、修改 length 或 freeze）属于不支持的用法。需要替换时返回 `{ kind: 'value', value }`。实现不为直接修改增加运行时检查或拒绝逻辑。"
                 },
                 {
                   "type": "code",
@@ -13901,6 +13937,10 @@
                   "text": "当某个键在双方都存在、且不属于以上任何自动合并分支（例如两侧都是不可合并的原始值）时，若提供了 `onConflict`，会调用它并传入 `IConfigConflictContext`（`path`：当前键的完整路径；`left`：左侧/已有值；`right`：右侧/新值），其返回值 `IConfigConflictDecision` 决定最终结果：`{ kind: 'left' }` 保留左值、`{ kind: 'right' }` 采用右值、`{ kind: 'delete' }` 删除该键、`{ kind: 'value', value }` 采用自定义值。`onConflict` 必须同步返回（返回 Promise 会抛 `code: 'CONFIG_CONFLICT'`；返回值不是上述四种 `kind` 之一同样抛 `CONFIG_CONFLICT`）。未提供 `onConflict` 时右侧直接覆盖左侧（标准合并语义）。`right === CONFIG_DELETE` 会删除目标键（可用于合并阶段裁剪掉某个来源写入的默认值）。"
                 },
                 {
+                  "type": "paragraph",
+                  "text": "数组采用 concat 或 mergeByIndex 时，同一次合并使用私有累计数组；`onConflict` 当场读取当前累计内容，保留的引用会随后续合并更新。回调只读取累计值并返回决策；直接修改累计数组（包括写入、delete、修改 length 或 freeze）属于不支持的用法。需要替换时返回 `{ kind: 'value', value }`。实现不为直接修改增加运行时检查或拒绝逻辑。"
+                },
+                {
                   "type": "code",
                   "language": "ts",
                   "code": "const defaults = ownConfig({\n  retries: 1,\n  tags: ['default'],\n  transport: { timeoutMs: 1_000, keepAlive: true }\n})\nconst override = ownConfig({\n  retries: 3,\n  tags: ['custom'],\n  transport: { timeoutMs: 2_500 }\n})\n\nconst merged = combineConfig([defaults, override], {\n  strategies: { record: 'merge', array: 'concat' }\n})\n\n// merged 是新配置；defaults 和 override 都不会被修改。\nmerged\n// {\n//   retries: 3,\n//   tags: ['default', 'custom'],\n//   transport: { timeoutMs: 2500, keepAlive: true },\n// }\n\n// 这里的 diff 只是把结果变化写明，不是 combineConfig 的额外返回值。\nconst diff = {\n  retries: { before: defaults.retries, after: merged.retries },\n  tags: { before: defaults.tags, after: merged.tags },\n  timeoutMs: { before: defaults.transport.timeoutMs, after: merged.transport.timeoutMs }\n}"
@@ -14197,6 +14237,10 @@
                   "text": "当某个键在双方都存在、且不属于以上任何自动合并分支（例如两侧都是不可合并的原始值）时，若提供了 `onConflict`，会调用它并传入 `IConfigConflictContext`（`path`：当前键的完整路径；`left`：左侧/已有值；`right`：右侧/新值），其返回值 `IConfigConflictDecision` 决定最终结果：`{ kind: 'left' }` 保留左值、`{ kind: 'right' }` 采用右值、`{ kind: 'delete' }` 删除该键、`{ kind: 'value', value }` 采用自定义值。`onConflict` 必须同步返回（返回 Promise 会抛 `code: 'CONFIG_CONFLICT'`；返回值不是上述四种 `kind` 之一同样抛 `CONFIG_CONFLICT`）。未提供 `onConflict` 时右侧直接覆盖左侧（标准合并语义）。`right === CONFIG_DELETE` 会删除目标键（可用于合并阶段裁剪掉某个来源写入的默认值）。"
                 },
                 {
+                  "type": "paragraph",
+                  "text": "数组采用 concat 或 mergeByIndex 时，同一次合并使用私有累计数组；`onConflict` 当场读取当前累计内容，保留的引用会随后续合并更新。回调只读取累计值并返回决策；直接修改累计数组（包括写入、delete、修改 length 或 freeze）属于不支持的用法。需要替换时返回 `{ kind: 'value', value }`。实现不为直接修改增加运行时检查或拒绝逻辑。"
+                },
+                {
                   "type": "code",
                   "language": "ts",
                   "code": "const defaults = ownConfig({\n  retries: 1,\n  tags: ['default'],\n  transport: { timeoutMs: 1_000, keepAlive: true }\n})\nconst override = ownConfig({\n  retries: 3,\n  tags: ['custom'],\n  transport: { timeoutMs: 2_500 }\n})\n\nconst merged = combineConfig([defaults, override], {\n  strategies: { record: 'merge', array: 'concat' }\n})\n\n// merged 是新配置；defaults 和 override 都不会被修改。\nmerged\n// {\n//   retries: 3,\n//   tags: ['default', 'custom'],\n//   transport: { timeoutMs: 2500, keepAlive: true },\n// }\n\n// 这里的 diff 只是把结果变化写明，不是 combineConfig 的额外返回值。\nconst diff = {\n  retries: { before: defaults.retries, after: merged.retries },\n  tags: { before: defaults.tags, after: merged.tags },\n  timeoutMs: { before: defaults.transport.timeoutMs, after: merged.transport.timeoutMs }\n}"
@@ -14400,6 +14444,10 @@
                 {
                   "type": "paragraph",
                   "text": "当某个键在双方都存在、且不属于以上任何自动合并分支（例如两侧都是不可合并的原始值）时，若提供了 `onConflict`，会调用它并传入 `IConfigConflictContext`（`path`：当前键的完整路径；`left`：左侧/已有值；`right`：右侧/新值），其返回值 `IConfigConflictDecision` 决定最终结果：`{ kind: 'left' }` 保留左值、`{ kind: 'right' }` 采用右值、`{ kind: 'delete' }` 删除该键、`{ kind: 'value', value }` 采用自定义值。`onConflict` 必须同步返回（返回 Promise 会抛 `code: 'CONFIG_CONFLICT'`；返回值不是上述四种 `kind` 之一同样抛 `CONFIG_CONFLICT`）。未提供 `onConflict` 时右侧直接覆盖左侧（标准合并语义）。`right === CONFIG_DELETE` 会删除目标键（可用于合并阶段裁剪掉某个来源写入的默认值）。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "数组采用 concat 或 mergeByIndex 时，同一次合并使用私有累计数组；`onConflict` 当场读取当前累计内容，保留的引用会随后续合并更新。回调只读取累计值并返回决策；直接修改累计数组（包括写入、delete、修改 length 或 freeze）属于不支持的用法。需要替换时返回 `{ kind: 'value', value }`。实现不为直接修改增加运行时检查或拒绝逻辑。"
                 },
                 {
                   "type": "code",
@@ -14632,6 +14680,10 @@
                   "text": "当某个键在双方都存在、且不属于以上任何自动合并分支（例如两侧都是不可合并的原始值）时，若提供了 `onConflict`，会调用它并传入 `IConfigConflictContext`（`path`：当前键的完整路径；`left`：左侧/已有值；`right`：右侧/新值），其返回值 `IConfigConflictDecision` 决定最终结果：`{ kind: 'left' }` 保留左值、`{ kind: 'right' }` 采用右值、`{ kind: 'delete' }` 删除该键、`{ kind: 'value', value }` 采用自定义值。`onConflict` 必须同步返回（返回 Promise 会抛 `code: 'CONFIG_CONFLICT'`；返回值不是上述四种 `kind` 之一同样抛 `CONFIG_CONFLICT`）。未提供 `onConflict` 时右侧直接覆盖左侧（标准合并语义）。`right === CONFIG_DELETE` 会删除目标键（可用于合并阶段裁剪掉某个来源写入的默认值）。"
                 },
                 {
+                  "type": "paragraph",
+                  "text": "数组采用 concat 或 mergeByIndex 时，同一次合并使用私有累计数组；`onConflict` 当场读取当前累计内容，保留的引用会随后续合并更新。回调只读取累计值并返回决策；直接修改累计数组（包括写入、delete、修改 length 或 freeze）属于不支持的用法。需要替换时返回 `{ kind: 'value', value }`。实现不为直接修改增加运行时检查或拒绝逻辑。"
+                },
+                {
                   "type": "code",
                   "language": "ts",
                   "code": "const defaults = ownConfig({\n  retries: 1,\n  tags: ['default'],\n  transport: { timeoutMs: 1_000, keepAlive: true }\n})\nconst override = ownConfig({\n  retries: 3,\n  tags: ['custom'],\n  transport: { timeoutMs: 2_500 }\n})\n\nconst merged = combineConfig([defaults, override], {\n  strategies: { record: 'merge', array: 'concat' }\n})\n\n// merged 是新配置；defaults 和 override 都不会被修改。\nmerged\n// {\n//   retries: 3,\n//   tags: ['default', 'custom'],\n//   transport: { timeoutMs: 2500, keepAlive: true },\n// }\n\n// 这里的 diff 只是把结果变化写明，不是 combineConfig 的额外返回值。\nconst diff = {\n  retries: { before: defaults.retries, after: merged.retries },\n  tags: { before: defaults.tags, after: merged.tags },\n  timeoutMs: { before: defaults.transport.timeoutMs, after: merged.transport.timeoutMs }\n}"
@@ -14834,6 +14886,10 @@
                 {
                   "type": "paragraph",
                   "text": "当某个键在双方都存在、且不属于以上任何自动合并分支（例如两侧都是不可合并的原始值）时，若提供了 `onConflict`，会调用它并传入 `IConfigConflictContext`（`path`：当前键的完整路径；`left`：左侧/已有值；`right`：右侧/新值），其返回值 `IConfigConflictDecision` 决定最终结果：`{ kind: 'left' }` 保留左值、`{ kind: 'right' }` 采用右值、`{ kind: 'delete' }` 删除该键、`{ kind: 'value', value }` 采用自定义值。`onConflict` 必须同步返回（返回 Promise 会抛 `code: 'CONFIG_CONFLICT'`；返回值不是上述四种 `kind` 之一同样抛 `CONFIG_CONFLICT`）。未提供 `onConflict` 时右侧直接覆盖左侧（标准合并语义）。`right === CONFIG_DELETE` 会删除目标键（可用于合并阶段裁剪掉某个来源写入的默认值）。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "数组采用 concat 或 mergeByIndex 时，同一次合并使用私有累计数组；`onConflict` 当场读取当前累计内容，保留的引用会随后续合并更新。回调只读取累计值并返回决策；直接修改累计数组（包括写入、delete、修改 length 或 freeze）属于不支持的用法。需要替换时返回 `{ kind: 'value', value }`。实现不为直接修改增加运行时检查或拒绝逻辑。"
                 },
                 {
                   "type": "code",
@@ -15383,6 +15439,10 @@
                   "text": "当某个键在双方都存在、且不属于以上任何自动合并分支（例如两侧都是不可合并的原始值）时，若提供了 `onConflict`，会调用它并传入 `IConfigConflictContext`（`path`：当前键的完整路径；`left`：左侧/已有值；`right`：右侧/新值），其返回值 `IConfigConflictDecision` 决定最终结果：`{ kind: 'left' }` 保留左值、`{ kind: 'right' }` 采用右值、`{ kind: 'delete' }` 删除该键、`{ kind: 'value', value }` 采用自定义值。`onConflict` 必须同步返回（返回 Promise 会抛 `code: 'CONFIG_CONFLICT'`；返回值不是上述四种 `kind` 之一同样抛 `CONFIG_CONFLICT`）。未提供 `onConflict` 时右侧直接覆盖左侧（标准合并语义）。`right === CONFIG_DELETE` 会删除目标键（可用于合并阶段裁剪掉某个来源写入的默认值）。"
                 },
                 {
+                  "type": "paragraph",
+                  "text": "数组采用 concat 或 mergeByIndex 时，同一次合并使用私有累计数组；`onConflict` 当场读取当前累计内容，保留的引用会随后续合并更新。回调只读取累计值并返回决策；直接修改累计数组（包括写入、delete、修改 length 或 freeze）属于不支持的用法。需要替换时返回 `{ kind: 'value', value }`。实现不为直接修改增加运行时检查或拒绝逻辑。"
+                },
+                {
                   "type": "code",
                   "language": "ts",
                   "code": "const defaults = ownConfig({\n  retries: 1,\n  tags: ['default'],\n  transport: { timeoutMs: 1_000, keepAlive: true }\n})\nconst override = ownConfig({\n  retries: 3,\n  tags: ['custom'],\n  transport: { timeoutMs: 2_500 }\n})\n\nconst merged = combineConfig([defaults, override], {\n  strategies: { record: 'merge', array: 'concat' }\n})\n\n// merged 是新配置；defaults 和 override 都不会被修改。\nmerged\n// {\n//   retries: 3,\n//   tags: ['default', 'custom'],\n//   transport: { timeoutMs: 2500, keepAlive: true },\n// }\n\n// 这里的 diff 只是把结果变化写明，不是 combineConfig 的额外返回值。\nconst diff = {\n  retries: { before: defaults.retries, after: merged.retries },\n  tags: { before: defaults.tags, after: merged.tags },\n  timeoutMs: { before: defaults.transport.timeoutMs, after: merged.transport.timeoutMs }\n}"
@@ -15398,7 +15458,7 @@
           "name": "ownConfig",
           "kind": "function",
           "signature": "export declare function ownConfig<T extends IConfigRecord>(value: T, options?: IOwnConfigOptions): IOwnedConfig<T>;",
-          "declarationLine": 120,
+          "declarationLine": 124,
           "source": "packages/utils/dist/config.d.ts",
           "purpose": "Accepts caller options at a boundary: validates the whole value graph, copies it (keeping cycles, shared nodes, `Date`, `RegExp`, `Map`, `Set`), and registers it as an owned configuration. Later changes by the caller do not affect it; the result is not frozen.",
           "core": "value: Plain configuration object.\nAn owned configuration accepted by the other config functions. Unsupported values throw `CONFIG_UNSUPPORTED`; oversized graphs throw `CONFIG_LIMIT_EXCEEDED`.\nprofile: `data` rejects functions; `richRuntime` allows functions and constructors (in-process only).\n`data`.\nChoose data for portable settings or richRuntime for in-process functions and classes. Omission uses data.\nlimits: Tighter limits (`maxDepth`, `maxNodes`, `maxKeys`, `maxPathLength`, `maxSegmentLength`).\nPackage defaults: 256, 100000, 1000000, 4096, 512.",
@@ -15490,13 +15550,13 @@
               "name": "profile",
               "type": "IConfigProfile",
               "optional": true,
-              "description": ""
+              "description": "Admission retains the enclosing combine operation's selected profile."
             },
             {
               "name": "limits",
               "type": "Partial<IConfigLimits>",
               "optional": true,
-              "description": ""
+              "description": "Graph cloning uses the same existing resource limits as sibling values."
             }
           ],
           "identity": "packages/utils/dist/config.d.ts:ownConfig:export declare function ownConfig<T extends IConfigRecord>(value: T, options?: IOwnConfigOptions): IOwnedConfig<T>;",
@@ -15670,6 +15730,10 @@
                   "text": "当某个键在双方都存在、且不属于以上任何自动合并分支（例如两侧都是不可合并的原始值）时，若提供了 `onConflict`，会调用它并传入 `IConfigConflictContext`（`path`：当前键的完整路径；`left`：左侧/已有值；`right`：右侧/新值），其返回值 `IConfigConflictDecision` 决定最终结果：`{ kind: 'left' }` 保留左值、`{ kind: 'right' }` 采用右值、`{ kind: 'delete' }` 删除该键、`{ kind: 'value', value }` 采用自定义值。`onConflict` 必须同步返回（返回 Promise 会抛 `code: 'CONFIG_CONFLICT'`；返回值不是上述四种 `kind` 之一同样抛 `CONFIG_CONFLICT`）。未提供 `onConflict` 时右侧直接覆盖左侧（标准合并语义）。`right === CONFIG_DELETE` 会删除目标键（可用于合并阶段裁剪掉某个来源写入的默认值）。"
                 },
                 {
+                  "type": "paragraph",
+                  "text": "数组采用 concat 或 mergeByIndex 时，同一次合并使用私有累计数组；`onConflict` 当场读取当前累计内容，保留的引用会随后续合并更新。回调只读取累计值并返回决策；直接修改累计数组（包括写入、delete、修改 length 或 freeze）属于不支持的用法。需要替换时返回 `{ kind: 'value', value }`。实现不为直接修改增加运行时检查或拒绝逻辑。"
+                },
+                {
                   "type": "code",
                   "language": "ts",
                   "code": "const defaults = ownConfig({\n  retries: 1,\n  tags: ['default'],\n  transport: { timeoutMs: 1_000, keepAlive: true }\n})\nconst override = ownConfig({\n  retries: 3,\n  tags: ['custom'],\n  transport: { timeoutMs: 2_500 }\n})\n\nconst merged = combineConfig([defaults, override], {\n  strategies: { record: 'merge', array: 'concat' }\n})\n\n// merged 是新配置；defaults 和 override 都不会被修改。\nmerged\n// {\n//   retries: 3,\n//   tags: ['default', 'custom'],\n//   transport: { timeoutMs: 2500, keepAlive: true },\n// }\n\n// 这里的 diff 只是把结果变化写明，不是 combineConfig 的额外返回值。\nconst diff = {\n  retries: { before: defaults.retries, after: merged.retries },\n  tags: { before: defaults.tags, after: merged.tags },\n  timeoutMs: { before: defaults.transport.timeoutMs, after: merged.transport.timeoutMs }\n}"
@@ -15771,7 +15835,7 @@
               "type": "IConfigProfile",
               "optional": true,
               "description": "若 `value` 已经是某次 `ownConfig` 的返回值（元数据匹配同一 `profile`/`limits`），直接原样返回（幂等）；若元数据不匹配（例如同一对象先后用不同 `profile` 调用），抛出 `code: 'CONFIG_CONFLICT'` 的 `TypeError`。",
-              "descriptionEn": "",
+              "descriptionEn": "Admission retains the enclosing combine operation's selected profile.",
               "descriptionZh": "若 `value` 已经是某次 `ownConfig` 的返回值（元数据匹配同一 `profile`/`limits`），直接原样返回（幂等）；若元数据不匹配（例如同一对象先后用不同 `profile` 调用），抛出 `code: 'CONFIG_CONFLICT'` 的 `TypeError`。"
             },
             {
@@ -15779,7 +15843,7 @@
               "type": "Partial<IConfigLimits>",
               "optional": true,
               "description": "超过 `limits`（见下）中的深度/节点数/键数会抛出 `code: 'CONFIG_LIMIT_EXCEEDED'` 的 `RangeError`。",
-              "descriptionEn": "",
+              "descriptionEn": "Graph cloning uses the same existing resource limits as sibling values.",
               "descriptionZh": "超过 `limits`（见下）中的深度/节点数/键数会抛出 `code: 'CONFIG_LIMIT_EXCEEDED'` 的 `RangeError`。"
             }
           ],
@@ -15789,7 +15853,7 @@
           "name": "parseConfigPath",
           "kind": "function",
           "signature": "export declare function parseConfigPath(path: string, limits?: Pick<IConfigLimits, 'maxPathLength' | 'maxSegmentLength'>): readonly string[];",
-          "declarationLine": 135,
+          "declarationLine": 139,
           "source": "packages/utils/dist/config.d.ts",
           "purpose": "Parses a dot path into safe segments, rejecting empty, oversized or dangerous segments (`CONFIG_PATH_INVALID`).",
           "core": "path: Dot path such as `a.b.c`.\nlimits: `maxPathLength` and `maxSegmentLength`; default 4096 and 512.\nThe segment array.",
@@ -16001,6 +16065,10 @@
                   "text": "当某个键在双方都存在、且不属于以上任何自动合并分支（例如两侧都是不可合并的原始值）时，若提供了 `onConflict`，会调用它并传入 `IConfigConflictContext`（`path`：当前键的完整路径；`left`：左侧/已有值；`right`：右侧/新值），其返回值 `IConfigConflictDecision` 决定最终结果：`{ kind: 'left' }` 保留左值、`{ kind: 'right' }` 采用右值、`{ kind: 'delete' }` 删除该键、`{ kind: 'value', value }` 采用自定义值。`onConflict` 必须同步返回（返回 Promise 会抛 `code: 'CONFIG_CONFLICT'`；返回值不是上述四种 `kind` 之一同样抛 `CONFIG_CONFLICT`）。未提供 `onConflict` 时右侧直接覆盖左侧（标准合并语义）。`right === CONFIG_DELETE` 会删除目标键（可用于合并阶段裁剪掉某个来源写入的默认值）。"
                 },
                 {
+                  "type": "paragraph",
+                  "text": "数组采用 concat 或 mergeByIndex 时，同一次合并使用私有累计数组；`onConflict` 当场读取当前累计内容，保留的引用会随后续合并更新。回调只读取累计值并返回决策；直接修改累计数组（包括写入、delete、修改 length 或 freeze）属于不支持的用法。需要替换时返回 `{ kind: 'value', value }`。实现不为直接修改增加运行时检查或拒绝逻辑。"
+                },
+                {
                   "type": "code",
                   "language": "ts",
                   "code": "const defaults = ownConfig({\n  retries: 1,\n  tags: ['default'],\n  transport: { timeoutMs: 1_000, keepAlive: true }\n})\nconst override = ownConfig({\n  retries: 3,\n  tags: ['custom'],\n  transport: { timeoutMs: 2_500 }\n})\n\nconst merged = combineConfig([defaults, override], {\n  strategies: { record: 'merge', array: 'concat' }\n})\n\n// merged 是新配置；defaults 和 override 都不会被修改。\nmerged\n// {\n//   retries: 3,\n//   tags: ['default', 'custom'],\n//   transport: { timeoutMs: 2500, keepAlive: true },\n// }\n\n// 这里的 diff 只是把结果变化写明，不是 combineConfig 的额外返回值。\nconst diff = {\n  retries: { before: defaults.retries, after: merged.retries },\n  tags: { before: defaults.tags, after: merged.tags },\n  timeoutMs: { before: defaults.transport.timeoutMs, after: merged.transport.timeoutMs }\n}"
@@ -16016,7 +16084,7 @@
           "name": "patchConfig",
           "kind": "function",
           "signature": "export declare function patchConfig<T extends IConfigRecord>(base: IOwnedConfig<T>, patch: IConfigPatch<T>, options?: IConfigPatchOptions): IOwnedConfig<T>;",
-          "declarationLine": 133,
+          "declarationLine": 137,
           "source": "packages/utils/dist/config.d.ts",
           "purpose": "Derives a new owned configuration by applying `patch` copy-on-write; `CONFIG_DELETE` removes a key. Unchanged branches are shared; `base` is not modified.",
           "core": "base: Owned configuration to start from.\npatch: Root fields to replace as whole values; nested objects are not merged. `CONFIG_DELETE` deletes a root field.\nA new owned configuration (or `base` itself for an empty patch).\nreuseUnchangedRoot: Return `base` itself when the patch is empty.\n`true`.\nprofile: Must equal the profile of `base`, otherwise `CONFIG_CONFLICT`.\nThe profile of `base`.\nSet a profile only to make the existing base profile explicit. data permits portable values; richRuntime also permits functions and classes. Omission keeps the base profile; a different value throws CONFIG_CONFLICT.\nlimits: May not be wider than the limits of `base`.\nThe limits of `base`.",
@@ -16124,13 +16192,13 @@
               "name": "profile",
               "type": "IConfigProfile",
               "optional": true,
-              "description": ""
+              "description": "Admission retains the enclosing combine operation's selected profile."
             },
             {
               "name": "limits",
               "type": "Partial<IConfigLimits>",
               "optional": true,
-              "description": ""
+              "description": "Graph cloning uses the same existing resource limits as sibling values."
             }
           ],
           "identity": "packages/utils/dist/config.d.ts:patchConfig:export declare function patchConfig<T extends IConfigRecord>(base: IOwnedConfig<T>, patch: IConfigPatch<T>, options?: IConfigPatchOptions): IOwnedConfig<T>;",
@@ -16304,6 +16372,10 @@
                   "text": "当某个键在双方都存在、且不属于以上任何自动合并分支（例如两侧都是不可合并的原始值）时，若提供了 `onConflict`，会调用它并传入 `IConfigConflictContext`（`path`：当前键的完整路径；`left`：左侧/已有值；`right`：右侧/新值），其返回值 `IConfigConflictDecision` 决定最终结果：`{ kind: 'left' }` 保留左值、`{ kind: 'right' }` 采用右值、`{ kind: 'delete' }` 删除该键、`{ kind: 'value', value }` 采用自定义值。`onConflict` 必须同步返回（返回 Promise 会抛 `code: 'CONFIG_CONFLICT'`；返回值不是上述四种 `kind` 之一同样抛 `CONFIG_CONFLICT`）。未提供 `onConflict` 时右侧直接覆盖左侧（标准合并语义）。`right === CONFIG_DELETE` 会删除目标键（可用于合并阶段裁剪掉某个来源写入的默认值）。"
                 },
                 {
+                  "type": "paragraph",
+                  "text": "数组采用 concat 或 mergeByIndex 时，同一次合并使用私有累计数组；`onConflict` 当场读取当前累计内容，保留的引用会随后续合并更新。回调只读取累计值并返回决策；直接修改累计数组（包括写入、delete、修改 length 或 freeze）属于不支持的用法。需要替换时返回 `{ kind: 'value', value }`。实现不为直接修改增加运行时检查或拒绝逻辑。"
+                },
+                {
                   "type": "code",
                   "language": "ts",
                   "code": "const defaults = ownConfig({\n  retries: 1,\n  tags: ['default'],\n  transport: { timeoutMs: 1_000, keepAlive: true }\n})\nconst override = ownConfig({\n  retries: 3,\n  tags: ['custom'],\n  transport: { timeoutMs: 2_500 }\n})\n\nconst merged = combineConfig([defaults, override], {\n  strategies: { record: 'merge', array: 'concat' }\n})\n\n// merged 是新配置；defaults 和 override 都不会被修改。\nmerged\n// {\n//   retries: 3,\n//   tags: ['default', 'custom'],\n//   transport: { timeoutMs: 2500, keepAlive: true },\n// }\n\n// 这里的 diff 只是把结果变化写明，不是 combineConfig 的额外返回值。\nconst diff = {\n  retries: { before: defaults.retries, after: merged.retries },\n  tags: { before: defaults.tags, after: merged.tags },\n  timeoutMs: { before: defaults.transport.timeoutMs, after: merged.transport.timeoutMs }\n}"
@@ -16413,7 +16485,7 @@
               "type": "IConfigProfile",
               "optional": true,
               "description": "若 `value` 已经是某次 `ownConfig` 的返回值（元数据匹配同一 `profile`/`limits`），直接原样返回（幂等）；若元数据不匹配（例如同一对象先后用不同 `profile` 调用），抛出 `code: 'CONFIG_CONFLICT'` 的 `TypeError`。",
-              "descriptionEn": "",
+              "descriptionEn": "Admission retains the enclosing combine operation's selected profile.",
               "descriptionZh": "若 `value` 已经是某次 `ownConfig` 的返回值（元数据匹配同一 `profile`/`limits`），直接原样返回（幂等）；若元数据不匹配（例如同一对象先后用不同 `profile` 调用），抛出 `code: 'CONFIG_CONFLICT'` 的 `TypeError`。"
             },
             {
@@ -16421,7 +16493,7 @@
               "type": "Partial<IConfigLimits>",
               "optional": true,
               "description": "超过 `limits`（见下）中的深度/节点数/键数会抛出 `code: 'CONFIG_LIMIT_EXCEEDED'` 的 `RangeError`。",
-              "descriptionEn": "",
+              "descriptionEn": "Graph cloning uses the same existing resource limits as sibling values.",
               "descriptionZh": "超过 `limits`（见下）中的深度/节点数/键数会抛出 `code: 'CONFIG_LIMIT_EXCEEDED'` 的 `RangeError`。"
             }
           ],
@@ -16431,7 +16503,7 @@
           "name": "readConfigPath",
           "kind": "function",
           "signature": "export declare function readConfigPath(config: IOwnedConfig<IConfigRecord>, path: string | readonly string[]): IConfigReadResult;",
-          "declarationLine": 137,
+          "declarationLine": 141,
           "source": "packages/utils/dist/config.d.ts",
           "purpose": "Reads a nested value of an owned configuration and tells a missing key apart from a value that is `undefined`. Objects come back as read-only views.",
           "core": "config: Owned configuration.\npath: Dot path or segment array.\n`{ kind: \"value\", value }` or `{ kind: \"missing\" }`.",
@@ -16642,6 +16714,10 @@
                   "text": "当某个键在双方都存在、且不属于以上任何自动合并分支（例如两侧都是不可合并的原始值）时，若提供了 `onConflict`，会调用它并传入 `IConfigConflictContext`（`path`：当前键的完整路径；`left`：左侧/已有值；`right`：右侧/新值），其返回值 `IConfigConflictDecision` 决定最终结果：`{ kind: 'left' }` 保留左值、`{ kind: 'right' }` 采用右值、`{ kind: 'delete' }` 删除该键、`{ kind: 'value', value }` 采用自定义值。`onConflict` 必须同步返回（返回 Promise 会抛 `code: 'CONFIG_CONFLICT'`；返回值不是上述四种 `kind` 之一同样抛 `CONFIG_CONFLICT`）。未提供 `onConflict` 时右侧直接覆盖左侧（标准合并语义）。`right === CONFIG_DELETE` 会删除目标键（可用于合并阶段裁剪掉某个来源写入的默认值）。"
                 },
                 {
+                  "type": "paragraph",
+                  "text": "数组采用 concat 或 mergeByIndex 时，同一次合并使用私有累计数组；`onConflict` 当场读取当前累计内容，保留的引用会随后续合并更新。回调只读取累计值并返回决策；直接修改累计数组（包括写入、delete、修改 length 或 freeze）属于不支持的用法。需要替换时返回 `{ kind: 'value', value }`。实现不为直接修改增加运行时检查或拒绝逻辑。"
+                },
+                {
                   "type": "code",
                   "language": "ts",
                   "code": "const defaults = ownConfig({\n  retries: 1,\n  tags: ['default'],\n  transport: { timeoutMs: 1_000, keepAlive: true }\n})\nconst override = ownConfig({\n  retries: 3,\n  tags: ['custom'],\n  transport: { timeoutMs: 2_500 }\n})\n\nconst merged = combineConfig([defaults, override], {\n  strategies: { record: 'merge', array: 'concat' }\n})\n\n// merged 是新配置；defaults 和 override 都不会被修改。\nmerged\n// {\n//   retries: 3,\n//   tags: ['default', 'custom'],\n//   transport: { timeoutMs: 2500, keepAlive: true },\n// }\n\n// 这里的 diff 只是把结果变化写明，不是 combineConfig 的额外返回值。\nconst diff = {\n  retries: { before: defaults.retries, after: merged.retries },\n  tags: { before: defaults.tags, after: merged.tags },\n  timeoutMs: { before: defaults.transport.timeoutMs, after: merged.transport.timeoutMs }\n}"
@@ -16714,7 +16790,7 @@
           "name": "readonlyConfig",
           "kind": "function",
           "signature": "export declare function readonlyConfig<T extends IConfigRecord>(value: IOwnedConfig<T>): T;",
-          "declarationLine": 126,
+          "declarationLine": 130,
           "source": "packages/utils/dist/config.d.ts",
           "purpose": "Returns a read-only view of an owned configuration: reading works, but any write at any depth (assignment, delete, `Map.set`, `Date.setFullYear`, ...) throws `CONFIG_READONLY`. The same view is returned for the same configuration.",
           "core": "value: Owned configuration.\nA read-only view; no copy is made.",
@@ -16955,6 +17031,10 @@
                 {
                   "type": "paragraph",
                   "text": "当某个键在双方都存在、且不属于以上任何自动合并分支（例如两侧都是不可合并的原始值）时，若提供了 `onConflict`，会调用它并传入 `IConfigConflictContext`（`path`：当前键的完整路径；`left`：左侧/已有值；`right`：右侧/新值），其返回值 `IConfigConflictDecision` 决定最终结果：`{ kind: 'left' }` 保留左值、`{ kind: 'right' }` 采用右值、`{ kind: 'delete' }` 删除该键、`{ kind: 'value', value }` 采用自定义值。`onConflict` 必须同步返回（返回 Promise 会抛 `code: 'CONFIG_CONFLICT'`；返回值不是上述四种 `kind` 之一同样抛 `CONFIG_CONFLICT`）。未提供 `onConflict` 时右侧直接覆盖左侧（标准合并语义）。`right === CONFIG_DELETE` 会删除目标键（可用于合并阶段裁剪掉某个来源写入的默认值）。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "数组采用 concat 或 mergeByIndex 时，同一次合并使用私有累计数组；`onConflict` 当场读取当前累计内容，保留的引用会随后续合并更新。回调只读取累计值并返回决策；直接修改累计数组（包括写入、delete、修改 length 或 freeze）属于不支持的用法。需要替换时返回 `{ kind: 'value', value }`。实现不为直接修改增加运行时检查或拒绝逻辑。"
                 },
                 {
                   "type": "code",
@@ -27116,6 +27196,10 @@
                   "text": "当某个键在双方都存在、且不属于以上任何自动合并分支（例如两侧都是不可合并的原始值）时，若提供了 `onConflict`，会调用它并传入 `IConfigConflictContext`（`path`：当前键的完整路径；`left`：左侧/已有值；`right`：右侧/新值），其返回值 `IConfigConflictDecision` 决定最终结果：`{ kind: 'left' }` 保留左值、`{ kind: 'right' }` 采用右值、`{ kind: 'delete' }` 删除该键、`{ kind: 'value', value }` 采用自定义值。`onConflict` 必须同步返回（返回 Promise 会抛 `code: 'CONFIG_CONFLICT'`；返回值不是上述四种 `kind` 之一同样抛 `CONFIG_CONFLICT`）。未提供 `onConflict` 时右侧直接覆盖左侧（标准合并语义）。`right === CONFIG_DELETE` 会删除目标键（可用于合并阶段裁剪掉某个来源写入的默认值）。"
                 },
                 {
+                  "type": "paragraph",
+                  "text": "数组采用 concat 或 mergeByIndex 时，同一次合并使用私有累计数组；`onConflict` 当场读取当前累计内容，保留的引用会随后续合并更新。回调只读取累计值并返回决策；直接修改累计数组（包括写入、delete、修改 length 或 freeze）属于不支持的用法。需要替换时返回 `{ kind: 'value', value }`。实现不为直接修改增加运行时检查或拒绝逻辑。"
+                },
+                {
                   "type": "code",
                   "language": "ts",
                   "code": "const defaults = ownConfig({\n  retries: 1,\n  tags: ['default'],\n  transport: { timeoutMs: 1_000, keepAlive: true }\n})\nconst override = ownConfig({\n  retries: 3,\n  tags: ['custom'],\n  transport: { timeoutMs: 2_500 }\n})\n\nconst merged = combineConfig([defaults, override], {\n  strategies: { record: 'merge', array: 'concat' }\n})\n\n// merged 是新配置；defaults 和 override 都不会被修改。\nmerged\n// {\n//   retries: 3,\n//   tags: ['default', 'custom'],\n//   transport: { timeoutMs: 2500, keepAlive: true },\n// }\n\n// 这里的 diff 只是把结果变化写明，不是 combineConfig 的额外返回值。\nconst diff = {\n  retries: { before: defaults.retries, after: merged.retries },\n  tags: { before: defaults.tags, after: merged.tags },\n  timeoutMs: { before: defaults.transport.timeoutMs, after: merged.transport.timeoutMs }\n}"
@@ -28971,6 +29055,10 @@
                   "text": "当某个键在双方都存在、且不属于以上任何自动合并分支（例如两侧都是不可合并的原始值）时，若提供了 `onConflict`，会调用它并传入 `IConfigConflictContext`（`path`：当前键的完整路径；`left`：左侧/已有值；`right`：右侧/新值），其返回值 `IConfigConflictDecision` 决定最终结果：`{ kind: 'left' }` 保留左值、`{ kind: 'right' }` 采用右值、`{ kind: 'delete' }` 删除该键、`{ kind: 'value', value }` 采用自定义值。`onConflict` 必须同步返回（返回 Promise 会抛 `code: 'CONFIG_CONFLICT'`；返回值不是上述四种 `kind` 之一同样抛 `CONFIG_CONFLICT`）。未提供 `onConflict` 时右侧直接覆盖左侧（标准合并语义）。`right === CONFIG_DELETE` 会删除目标键（可用于合并阶段裁剪掉某个来源写入的默认值）。"
                 },
                 {
+                  "type": "paragraph",
+                  "text": "数组采用 concat 或 mergeByIndex 时，同一次合并使用私有累计数组；`onConflict` 当场读取当前累计内容，保留的引用会随后续合并更新。回调只读取累计值并返回决策；直接修改累计数组（包括写入、delete、修改 length 或 freeze）属于不支持的用法。需要替换时返回 `{ kind: 'value', value }`。实现不为直接修改增加运行时检查或拒绝逻辑。"
+                },
+                {
                   "type": "code",
                   "language": "ts",
                   "code": "const defaults = ownConfig({\n  retries: 1,\n  tags: ['default'],\n  transport: { timeoutMs: 1_000, keepAlive: true }\n})\nconst override = ownConfig({\n  retries: 3,\n  tags: ['custom'],\n  transport: { timeoutMs: 2_500 }\n})\n\nconst merged = combineConfig([defaults, override], {\n  strategies: { record: 'merge', array: 'concat' }\n})\n\n// merged 是新配置；defaults 和 override 都不会被修改。\nmerged\n// {\n//   retries: 3,\n//   tags: ['default', 'custom'],\n//   transport: { timeoutMs: 2500, keepAlive: true },\n// }\n\n// 这里的 diff 只是把结果变化写明，不是 combineConfig 的额外返回值。\nconst diff = {\n  retries: { before: defaults.retries, after: merged.retries },\n  tags: { before: defaults.tags, after: merged.tags },\n  timeoutMs: { before: defaults.transport.timeoutMs, after: merged.transport.timeoutMs }\n}"
@@ -29432,6 +29520,10 @@
                 {
                   "type": "paragraph",
                   "text": "当某个键在双方都存在、且不属于以上任何自动合并分支（例如两侧都是不可合并的原始值）时，若提供了 `onConflict`，会调用它并传入 `IConfigConflictContext`（`path`：当前键的完整路径；`left`：左侧/已有值；`right`：右侧/新值），其返回值 `IConfigConflictDecision` 决定最终结果：`{ kind: 'left' }` 保留左值、`{ kind: 'right' }` 采用右值、`{ kind: 'delete' }` 删除该键、`{ kind: 'value', value }` 采用自定义值。`onConflict` 必须同步返回（返回 Promise 会抛 `code: 'CONFIG_CONFLICT'`；返回值不是上述四种 `kind` 之一同样抛 `CONFIG_CONFLICT`）。未提供 `onConflict` 时右侧直接覆盖左侧（标准合并语义）。`right === CONFIG_DELETE` 会删除目标键（可用于合并阶段裁剪掉某个来源写入的默认值）。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "数组采用 concat 或 mergeByIndex 时，同一次合并使用私有累计数组；`onConflict` 当场读取当前累计内容，保留的引用会随后续合并更新。回调只读取累计值并返回决策；直接修改累计数组（包括写入、delete、修改 length 或 freeze）属于不支持的用法。需要替换时返回 `{ kind: 'value', value }`。实现不为直接修改增加运行时检查或拒绝逻辑。"
                 },
                 {
                   "type": "code",

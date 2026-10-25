@@ -17,7 +17,6 @@ const coreFiles = [
   './src/core/composed.ts',
   './src/core/endpoint-kernel.ts',
   './src/core/errors.ts',
-  './src/core/error-code.ts',
   './src/core/error-text.ts',
   './src/core/transport.ts',
   './src/core/typing.ts',

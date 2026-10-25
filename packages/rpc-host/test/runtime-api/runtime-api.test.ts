@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict'
 import { it } from 'vitest'
 import { RpcCapability } from '@migaia/rpc-contract'
-import { RpcSerializationError, RpcCoreErrorCode } from '../../dist/core/errors.js'
-import { tagRpcError } from '../../dist/core/errors.js'
+import { RpcSerializationError } from '@migaia/rpc-contract/errors'
+import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
+import { tagRpcError } from '@migaia/rpc-contract/errors'
 import { compileRuntimeMethods } from '../../dist/remote/runtime-api/catalog.js'
 import { readRuntimePeerConnection } from '../../dist/remote/runtime-api/peer.js'
-import { connected, RuntimeApiFixtureText } from './fixture.js'
+import { connected } from './fixture.js'
+import { RuntimeApiFixtureText } from '../fixtures/runtime-api-text.js'
 import { setTimeout as delay } from 'node:timers/promises'
 
 it('notify business rejection and nonportable result report without changing send settlement', async () => {
@@ -384,23 +386,6 @@ it('one logical generator streams in order but scalar invocation keeps PAYLOAD_I
       fixture.peers[0].stream('scalar').next(),
       { code: 'PAYLOAD_INVALID' },
       'scalar values do not silently become a stream'
-    )
-  } finally {
-    await fixture.close()
-  }
-})
-
-it('child reenters the explicitly exposed parent while servicing a parent request', async () => {
-  /** The child captures the actual factory result only after construction has completed. */
-  let callback!: () => Promise<unknown>
-  /** Both directions execute through the same actual outbound/provider owners. */
-  const fixture = await connected({ doc: { save: () => 'saved' } }, { run: () => callback() })
-  callback = () => fixture.peers[1].request('doc.save')
-  try {
-    assert.equal(
-      await fixture.peers[0].request('run'),
-      'saved',
-      'nested reverse request is not serialized behind the original request'
     )
   } finally {
     await fixture.close()

@@ -1,20 +1,35 @@
-/**
- * Bilingual public reference for @migaia/rpc-plugin-thread; native and call ownership follow the
- * actual package API.
- */
-import { rpcPluginOptionDocs } from './rpc-runtime-shared.js'
+/** Bilingual public reference for the current thread transport and feature ownership. */
 import type { ILibraryReference } from './contract.js'
 
-/** Authored public modules, symbols, configuration and ownership contracts. */
+/** Concrete public package example with actual namespace and resource ownership. */
+const example1 =
+  "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\n\ntype IWorkerApi = { double(value: number): number }\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const plugins = [threadPlugin({ spawn: true })] as const\n  const host = await createRpcHost<IWorkerApi, typeof plugins>({ plugins })\n  try {\n    console.log(await host.thread.request('double', 21))\n  } finally {\n    await host.close()\n  }\n}"
+
+/** Concrete public package example with actual namespace and resource ownership. */
+const example2 =
+  "import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin } from '@migaia/rpc-plugin-thread'\nimport { timeout, retry } from '@migaia/rpc-host/features'\n\ntype IWorkerApi = {\n  values(end: number): AsyncIterable<number>\n  wait(value: number): number\n  bytes(value: Uint8Array<ArrayBuffer>): number\n}\n\nconst plugins = [\n  threadPlugin({\n    name: 'worker',\n    spawn: new URL('./worker.js', import.meta.url),\n    features: [timeout({ ms: 1500 }), retry({ attempts: 2 })]\n  })\n] as const\n\ntype IThreadHost = IRpcHost<IWorkerApi, typeof plugins>\n\nexport function open() {\n  return createRpcHost<IWorkerApi, typeof plugins>({ plugins })\n}\n\nexport async function firstValue(host: IThreadHost) {\n  const stream = host.thread.peers.worker.values(3)\n  try {\n    return await stream.next()\n  } finally {\n    await stream.return?.()\n  }\n}\n\nexport function work(host: IThreadHost, signal: AbortSignal) {\n  return host.thread.send('worker', 'wait', 21, {\n    signal,\n    timeout: timeout({ ms: 500 }),\n    retry: false\n  })\n}\n\nexport function sendBytes(host: IThreadHost, bytes: Uint8Array<ArrayBuffer>) {\n  return host.thread.send('worker', 'bytes', bytes, { transfer: [bytes.buffer] })\n}\n\nexport async function inspectAndRestart(host: IThreadHost) {\n  const before = await host.thread.members.get('worker')\n  await host.thread.members.restart('worker')\n  return before\n}"
+
+/** Public configuration example for this native capability. */
+const workerScopeExample =
+  "import { threadPlugin } from '@migaia/rpc-plugin-thread'\n\nexport function renderer(entry: URL) {\n  return threadPlugin({ spawn: entry, namespace: 'jobs', name: 'renderer' })\n}"
+
+/** Public configuration example for this native capability. */
+const workerExposureExample =
+  "import { threadPlugin } from '@migaia/rpc-plugin-thread'\n\nexport function exposeMath(entry: URL) {\n  return threadPlugin({ spawn: entry, expose: ['math.double'] })\n}"
+
+/** Public configuration example for this native capability. */
+const workerReportExample =
+  "import { threadPlugin } from '@migaia/rpc-plugin-thread'\n\nexport function monitoredWorker(entry: URL) {\n  return threadPlugin({\n    spawn: entry,\n    report(error) {\n      console.error('Worker background failure', error)\n    }\n  })\n}"
+
+/** Current public modules, configuration and installed capabilities. */
 export const rpcThreadsReference: ILibraryReference = {
   modules: {
     index: {
       summary: {
-        en: 'One cold native transport using original bootstrap, supervision, drain and native exit owners. Both sides provide methods over the same actual host endpoint. Node, Bun and Deno only; browser Workers belong to rpc-plugin-browser.',
-        zh: '一个使用原启动、监督、排空和原生退出所有者的冷传输，双方在同一实际宿主端点提供方法。仅承载服务端原生线程，浏览器工作程序归浏览器插件。'
+        en: 'Contract owns pure protocol, interfaces and errors. Host owns Sessions, calls and providers; this package owns native Node/Bun/Deno Worker sources. Flow plugins use fixed hooks, and complete features own optional policy. Call through the transport namespace. Separate Hosts are usual; deliberate multi-transport installation uses distinct namespaces.',
+        zh: '契约包拥有纯协议、接口及错误；宿主拥有会话、调用及提供方，本包拥有Node、Bun、Deno 原生工作线程来源。流程插件使用固定钩子，完整功能拥有可选策略。通过传输命名空间调用；通常使用独立宿主，也可用不同命名空间明确隔离多传输安装。'
       },
-      example:
-        "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const host = await createRpcHost<{ double(value: number): number }>({\n    plugins: [threadPlugin({ spawn: true, connect: { timeoutMs: 1500 } })]\n  })\n  try {\n    console.log(await host.request('double', 21))\n  } finally {\n    await host.close()\n  }\n}"
+      example: example1
     }
   },
   symbols: {
@@ -28,8 +43,7 @@ export const rpcThreadsReference: ILibraryReference = {
         en: 'Resolves `true` in a library-launched Worker; it does not authorise foreign Workers.',
         zh: '在由本库启动的 Worker 中 resolve 为 `true`；它不会为外部 Worker 授权。'
       },
-      example:
-        "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const host = await createRpcHost<{ double(value: number): number }>({\n    plugins: [threadPlugin({ spawn: true, connect: { timeoutMs: 1500 } })]\n  })\n  try {\n    console.log(await host.request('double', 21))\n  } finally {\n    await host.close()\n  }\n}",
+      example: example1,
       avoid: [
         {
           en: 'Self spawn is unsupported in browsers, Electron, REPL/eval sessions, bundled executables and entries controlled by a test runner; use an explicit built Worker URL.',
@@ -40,12 +54,12 @@ export const rpcThreadsReference: ILibraryReference = {
     RPC_THREAD_ERROR_SOURCE: {
       role: 'constant',
       purpose: {
-        en: 'The `source` value (`@migaia/rpc/threads`) of errors owned by this package; call errors come from `@migaia/rpc/core`.',
-        zh: '本包自有错误的 `source` 值（`@migaia/rpc/threads`）；超时、取消等调用层错误则来自 `@migaia/rpc/core`。'
+        en: 'Stable rpc.transport.thread source declared by @migaia/rpc-contract/error-code and re-exported here. Other RPC/native families retain their own source and code.',
+        zh: '由契约包错误码入口声明并在此重导出的稳定来源 rpc.transport.thread；其他远程调用及原生家族保留自身来源与错误码。'
       },
       example: {
-        en: "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const host = await createRpcHost<{ double(value: number): number }>({\n    plugins: [threadPlugin({ spawn: true, connect: { timeoutMs: 1500 } })]\n  })\n  try {\n    console.log(await host.request('double', 21))\n  } finally {\n    await host.close()\n  }\n}",
-        zh: "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const host = await createRpcHost<{ double(value: number): number }>({\n    plugins: [threadPlugin({ spawn: true, connect: { timeoutMs: 1500 } })]\n  })\n  try {\n    console.log(await host.request('double', 21))\n  } finally {\n    await host.close()\n  }\n}"
+        en: example1,
+        zh: example1
       }
     },
     RpcThreadErrorCode: {
@@ -55,11 +69,10 @@ export const rpcThreadsReference: ILibraryReference = {
         zh: '本包自有的错误码对照表；目前只有资源采样失败 `THREAD_USAGE_SAMPLE_FAILED` 一项。'
       },
       example: {
-        en: "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const host = await createRpcHost<{ double(value: number): number }>({\n    plugins: [threadPlugin({ spawn: true, connect: { timeoutMs: 1500 } })]\n  })\n  try {\n    console.log(await host.request('double', 21))\n  } finally {\n    await host.close()\n  }\n}",
-        zh: "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const host = await createRpcHost<{ double(value: number): number }>({\n    plugins: [threadPlugin({ spawn: true, connect: { timeoutMs: 1500 } })]\n  })\n  try {\n    console.log(await host.request('double', 21))\n  } finally {\n    await host.close()\n  }\n}"
+        en: example1,
+        zh: example1
       }
     },
-
     threadPlugin: {
       role: 'enhancer',
       purpose: {
@@ -68,11 +81,10 @@ export const rpcThreadsReference: ILibraryReference = {
       },
       options: 'IThreadPluginOptions',
       returns: {
-        en: 'Exact registered transport definition for createRpcHost.plugins or ordinary PluginHost.use; acquisition begins only on installation.',
-        zh: '返回供统一宿主或普通插件宿主安装的精确登记传输定义，仅安装时开始获取资源。'
+        en: 'Cold SDK transport definition. Installation publishes host.thread calls and actual native extensions; construction alone acquires no resource.',
+        zh: '返回冷 SDK 传输定义；安装后发布对应命名空间调用及实际原生扩展，仅构造定义不会获取资源。'
       },
-      example:
-        "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const host = await createRpcHost<{ double(value: number): number }>({\n    plugins: [threadPlugin({ spawn: true, connect: { timeoutMs: 1500 } })]\n  })\n  try {\n    console.log(await host.request('double', 21))\n  } finally {\n    await host.close()\n  }\n}"
+      example: example1
     }
   },
   types: {
@@ -85,341 +97,157 @@ export const rpcThreadsReference: ILibraryReference = {
     },
     IThreadCommonOptions: {
       summary: {
-        en: 'Cold native options borrowing original policy and reporter owners.',
-        zh: '借用原策略与报告所有者的冷原生选项。'
+        en: 'Cold native registration and scope; Host owns identity, providers and protocol execution.',
+        zh: '冷原生登记及作用域；身份、提供方及协议执行归宿主。'
       },
-      example:
-        "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const host = await createRpcHost<{ double(value: number): number }>({\n    plugins: [threadPlugin({ spawn: true, connect: { timeoutMs: 1500 } })]\n  })\n  try {\n    console.log(await host.request('double', 21))\n  } finally {\n    await host.close()\n  }\n}",
       members: {
-        self: {
+        name: {
           summary: {
-            en: 'Application-supplied safe identity with nonempty name and instanceId; neither credentials nor arbitrary properties are published.',
-            zh: '应用提供的安全身份，含非空名称与实例标识，不会发布凭据或任意额外属性。'
+            en: 'Local native registration name, separate from accepted remote identity.',
+            zh: '本地原生登记名称，与已接纳的远端身份分开。'
           },
           default: {
-            en: 'Omitted: the core uses RUNTIME_PEER_DEFAULT_NAME and a generated defaultRpcId; trusted platform bootstrap may supply its own identity.',
-            zh: '省略时核心使用默认连接名称常量与自动生成的实例标识，可信平台启动数据也可提供自身身份。'
-          }
+            en: 'Omitted: the native registration default.',
+            zh: '省略时使用原生登记默认名称。'
+          },
+          example: workerScopeExample
         },
-        provide: {
+        namespace: {
           summary: {
-            en: 'Application-provided local methods, descriptors or allowed runtime forwarding entries compiled into the accepted directory; methods receive the remote payload and preserve synchronous or async failures.',
-            zh: '应用提供的本端方法、描述符或获准运行时转发条目，会编译为已接受目录；方法接收远端载荷，同步或异步失败均保留。'
+            en: 'Unique Host property exposing this transport calls and extensions.',
+            zh: '宿主发布此传输调用及扩展的唯一属性名。'
           },
           default: {
-            en: 'Omitted: this side publishes no application methods.',
-            zh: '省略时本端不发布任何应用方法。'
-          }
+            en: 'Omitted: the factory namespace.',
+            zh: '省略时使用工厂默认命名空间。'
+          },
+          example: workerScopeExample
         },
-        providerLimits: {
+        expose: {
           summary: {
-            en: 'Provider admission policy forwarded to the canonical endpoint; it does not alter transport framing or acquire another provider registry.',
-            zh: '转交规范端点的提供方接纳策略，不改变传输分帧，也不另建提供方登记表。'
+            en: 'Feature output paths selected on an ordinary PluginHost; createRpcHost uses its own provide catalog.',
+            zh: '普通插件宿主选取的功能输出路径；远程调用宿主使用自身提供方目录。'
           },
           default: {
-            en: 'Omitted: the original endpoint or listener admission owner supplies its standard provider limits.',
-            zh: '省略时由原端点或监听接纳拥有者提供标准提供方限制。'
-          }
-        },
-        authentication: {
-          summary: {
-            en: 'Original signing, verification and optional encryption configuration installed into canonical endpoint assembly; invalid credentials reject construction before publication.',
-            zh: '安装到规范端点组装的原始签名、校验与可选加密配置，非法凭据会在发布前拒绝构造。'
+            en: 'Omitted: no ordinary Feature output selected.',
+            zh: '省略时不选取普通功能输出。'
           },
-          default: {
-            en: 'Omitted: no authentication middleware is added by these options.',
-            zh: '省略时不通过本选项增加认证中间件。'
-          },
-          whenToUse: {
-            en: 'Use the report session’s signing and verification policy when both channel ends require authenticated traffic. openSignedReportChannel supplies the matching remote configuration. Omission adds no authentication middleware.',
-            zh: '报表会话两端要求认证消息时，使用该会话已有的签名及校验策略。openSignedReportChannel 提供匹配的对端配置。省略时不增加认证中间件。'
-          },
-          example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const host = await createRpcHost<{ double(value: number): number }>({\n    plugins: [threadPlugin({ spawn: true, connect: { timeoutMs: 1500 } })]\n  })\n  try {\n    console.log(await host.request('double', 21))\n  } finally {\n    await host.close()\n  }\n}"
-        },
-        probe: {
-          summary: {
-            en: 'One IRpcProbe or an array of probes from the application, installed as endpoint-local synchronous observers without selecting a different pipeline.',
-            zh: '应用提供的一个或多个 `IRpcProbe`，安装为端点本地同步观察者，不会据此选择另一套管线。'
-          },
-          default: {
-            en: 'Omitted: no observer is added by this field.',
-            zh: '省略时不通过此字段增加观察者。'
-          }
-        },
-        defaultTimeoutMs: {
-          summary: {
-            en: 'Finite positive millisecond default for request and stream calls, validated before acquiring source resources; it does not extend the notify or group timeout scope.',
-            zh: '请求与流调用使用的有限正毫秒默认值，在取得来源资源前校验，不扩展通知或分组操作的超时作用域。'
-          },
-          default: {
-            en: '30000 ms for request and stream in the original timeout scope.',
-            zh: '默认三万毫秒，仅用于原有请求与流超时作用域。'
-          }
-        },
-        contract: {
-          summary: {
-            en: 'Optional IRemoteContract with explicit method schemas, supported modes and idempotency declarations, compiled by the original remote contract owner.',
-            zh: '可选的 `IRemoteContract`，提供显式方法模式、支持的调用方式与幂等声明，由原远端契约拥有者编译。'
-          },
-          default: {
-            en: 'Omitted: provided method definitions supply the normal inferred runtime directory.',
-            zh: '省略时根据已提供的方法定义推导通常的运行时目录。'
-          }
+          example: workerExposureExample
         },
         report: {
           summary: {
-            en: 'Receives background errors that no call can reject with.',
-            zh: '接收无法通过调用 reject 的后台错误。'
+            en: 'Receives native background and cleanup failures; operation rejections retain original causes.',
+            zh: '接收原生后台及清理失败；操作拒绝保留原始原因。'
           },
           default: {
-            en: '`defaultRpcReporter`.',
-            zh: '`defaultRpcReporter`，使用默认控制台报告路径。'
+            en: 'Omitted: configured Host reporter, then effective default.',
+            zh: '省略时使用宿主显式报告器，再使用有效默认报告器。'
+          },
+          params: {
+            error: {
+              en: 'Original background or cleanup failure supplied by the native owner; preserve the error and its cause when sending it to monitoring.',
+              zh: '原生所有者提供的原始后台或清理失败；交给监控时应保留错误对象及其原因链。'
+            }
+          },
+          returns: {
+            en: 'No return value is required. The callback reports the failure; it does not settle an application request or own native cleanup.',
+            zh: '无需返回值；回调负责报告失败，不结算应用请求，也不取得原生清理所有权。'
           },
           whenToUse: {
-            en: 'Set a sink when the application needs to collect background or contained failures separately from request rejections. Omitting it uses defaultRpcReporter and console.error; it does not make a failed request successful.',
-            zh: '应用需要把后台或隔离失败与请求拒绝分开记录时设置。省略时使用 defaultRpcReporter 和 console.error；它不会让失败请求成功。'
+            en: 'Set an application monitoring sink when Worker background and cleanup failures must join your existing incident reports. Omit it to inherit the configured Host reporter.',
+            zh: '需要将原生后台及清理失败汇入应用现有告警时配置；省略则继承宿主显式报告器。'
           },
-          example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const host = await createRpcHost<{ double(value: number): number }>({\n    plugins: [threadPlugin({ spawn: true, connect: { timeoutMs: 1500 } })]\n  })\n  try {\n    console.log(await host.request('double', 21))\n  } finally {\n    await host.close()\n  }\n}"
+          example: workerReportExample
         },
-        keyFactory: {
+        features: {
           summary: {
-            en: 'Advanced remote-proxy key callback returning an application string for automatically keyed retry paths. The direct createRpcHost assembly does not read this inherited field itself.',
-            zh: '高级远程代理键回调，返回应用字符串供自动分配键的重试路径使用；直接运行时连接组装本身不读取这个继承字段。'
+            en: 'Complete call and supported native feature definitions scoped to this transport. Per-call timeout and retry take instances or false.',
+            zh: '此传输作用域的完整调用及受支持原生功能定义；逐次调用的超时和重试使用完整实例或关闭值。'
           },
           default: {
-            en: 'Omitted: proxy paths use defaultRpcId when generating keys; direct peer call keys retain their own call-option semantics.',
-            zh: '省略时代理生成键使用默认标识工厂，直接连接调用仍按自身调用选项处理幂等键。'
+            en: 'Omitted: no optional policy installed by this field.',
+            zh: '省略时不通过此字段安装可选策略。'
           },
-          whenToUse: {
-            en: 'Use it on managed proxy paths that generate keys for retryable calls. A borrowed direct connect/listen peer does not read it. Omission uses defaultRpcId in proxy paths and leaves direct call-option keys unchanged.',
-            zh: '需要为可重试调用生成键的托管代理路径使用此项。借用的直接 connect/listen Peer 不读取它。省略时代理路径使用 defaultRpcId，直接调用选项中的键保持原语义。'
-          },
-          example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const host = await createRpcHost<{ double(value: number): number }>({\n    plugins: [threadPlugin({ spawn: true, connect: { timeoutMs: 1500 } })]\n  })\n  try {\n    console.log(await host.request('double', 21))\n  } finally {\n    await host.close()\n  }\n}"
-        },
-        retryPort: {
-          summary: {
-            en: 'Advanced application-supplied retry dispatch port for remote-proxy paths; it receives the original retry input and returns the selected dispatch result. Direct createRpcHost assembly does not read it itself.',
-            zh: '高级应用重试派发端口，供远程代理路径接收原始重试输入并返回所选派发结果；直接运行时连接组装本身不读取它。'
-          },
-          default: {
-            en: 'Omitted: the remote proxy keeps its original retry dispatch owner; no second retry policy is installed by a direct peer.',
-            zh: '省略时远程代理保留原重试派发拥有者，直接连接不会额外安装另一套重试策略。'
-          }
-        },
-        name: {
-          summary: {
-            en: 'Application-selected local registration name, independent of remote self.name.',
-            zh: '应用选择的本地登记名，与远端自身名称分开。'
-          },
-          default: {
-            en: 'Omitted: original family registration name.',
-            zh: '省略时使用原家族登记名。'
-          },
-          example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const host = await createRpcHost<{ double(value: number): number }>({\n    plugins: [threadPlugin({ spawn: true, connect: { timeoutMs: 1500 } })]\n  })\n  try {\n    console.log(await host.request('double', 21))\n  } finally {\n    await host.close()\n  }\n}"
-        },
-        expose: {
-          ...rpcPluginOptionDocs.expose,
-          default: {
-            en: 'Omitted: original exposure policy.',
-            zh: '省略时保留原公开策略。'
-          },
-          example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const host = await createRpcHost<{ double(value: number): number }>({\n    plugins: [threadPlugin({ spawn: true, connect: { timeoutMs: 1500 } })]\n  })\n  try {\n    console.log(await host.request('double', 21))\n  } finally {\n    await host.close()\n  }\n}"
-        },
-        connect: {
-          summary: {
-            en: 'SDK handshake preparation options, not a second physical source.',
-            zh: '作者工具的握手准备选项，不是第二个物理来源。'
-          },
-          default: {
-            en: 'Omitted: original handshake policy.',
-            zh: '省略时使用原握手策略。'
-          },
-          example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const host = await createRpcHost<{ double(value: number): number }>({\n    plugins: [threadPlugin({ spawn: true, connect: { timeoutMs: 1500 } })]\n  })\n  try {\n    console.log(await host.request('double', 21))\n  } finally {\n    await host.close()\n  }\n}"
-        },
-        'connect.timeoutMs': {
-          ...rpcPluginOptionDocs['connect.timeoutMs'],
-          default: {
-            en: 'Omitted: original source defaults.',
-            zh: '省略时使用原来源默认。'
-          },
-          example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const host = await createRpcHost<{ double(value: number): number }>({\n    plugins: [threadPlugin({ spawn: true, connect: { timeoutMs: 1500 } })]\n  })\n  try {\n    console.log(await host.request('double', 21))\n  } finally {\n    await host.close()\n  }\n}"
+          example: example2
         }
-      }
+      },
+      example: example1
     },
     IThreadPluginOptions: {
       summary: {
         en: 'Exactly one source plus shared options; invalid or conflicting sources reject before native acquisition.',
         zh: '一个来源加上共用选项，非法或冲突来源在获取原生资源前拒绝。'
       },
-      example:
-        "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const host = await createRpcHost<{ double(value: number): number }>({\n    plugins: [threadPlugin({ spawn: true, connect: { timeoutMs: 1500 } })]\n  })\n  try {\n    console.log(await host.request('double', 21))\n  } finally {\n    await host.close()\n  }\n}",
+      example: example1,
       members: {
-        self: {
+        name: {
           summary: {
-            en: 'Application-supplied safe identity with nonempty name and instanceId; neither credentials nor arbitrary properties are published.',
-            zh: '应用提供的安全身份，含非空名称与实例标识，不会发布凭据或任意额外属性。'
+            en: 'Local native registration name, separate from accepted remote identity.',
+            zh: '本地原生登记名称，与已接纳的远端身份分开。'
           },
           default: {
-            en: 'Omitted: the core uses RUNTIME_PEER_DEFAULT_NAME and a generated defaultRpcId; trusted platform bootstrap may supply its own identity.',
-            zh: '省略时核心使用默认连接名称常量与自动生成的实例标识，可信平台启动数据也可提供自身身份。'
-          }
+            en: 'Omitted: the native registration default.',
+            zh: '省略时使用原生登记默认名称。'
+          },
+          example: workerScopeExample
         },
-        provide: {
+        namespace: {
           summary: {
-            en: 'Application-provided local methods, descriptors or allowed runtime forwarding entries compiled into the accepted directory; methods receive the remote payload and preserve synchronous or async failures.',
-            zh: '应用提供的本端方法、描述符或获准运行时转发条目，会编译为已接受目录；方法接收远端载荷，同步或异步失败均保留。'
+            en: 'Unique Host property exposing this transport calls and extensions.',
+            zh: '宿主发布此传输调用及扩展的唯一属性名。'
           },
           default: {
-            en: 'Omitted: this side publishes no application methods.',
-            zh: '省略时本端不发布任何应用方法。'
-          }
+            en: 'Omitted: the factory namespace.',
+            zh: '省略时使用工厂默认命名空间。'
+          },
+          example: workerScopeExample
         },
-        providerLimits: {
+        expose: {
           summary: {
-            en: 'Provider admission policy forwarded to the canonical endpoint; it does not alter transport framing or acquire another provider registry.',
-            zh: '转交规范端点的提供方接纳策略，不改变传输分帧，也不另建提供方登记表。'
+            en: 'Feature output paths selected on an ordinary PluginHost; createRpcHost uses its own provide catalog.',
+            zh: '普通插件宿主选取的功能输出路径；远程调用宿主使用自身提供方目录。'
           },
           default: {
-            en: 'Omitted: the original endpoint or listener admission owner supplies its standard provider limits.',
-            zh: '省略时由原端点或监听接纳拥有者提供标准提供方限制。'
-          }
-        },
-        authentication: {
-          summary: {
-            en: 'Original signing, verification and optional encryption configuration installed into canonical endpoint assembly; invalid credentials reject construction before publication.',
-            zh: '安装到规范端点组装的原始签名、校验与可选加密配置，非法凭据会在发布前拒绝构造。'
+            en: 'Omitted: no ordinary Feature output selected.',
+            zh: '省略时不选取普通功能输出。'
           },
-          default: {
-            en: 'Omitted: no authentication middleware is added by these options.',
-            zh: '省略时不通过本选项增加认证中间件。'
-          },
-          whenToUse: {
-            en: 'Use the report session’s signing and verification policy when both channel ends require authenticated traffic. openSignedReportChannel supplies the matching remote configuration. Omission adds no authentication middleware.',
-            zh: '报表会话两端要求认证消息时，使用该会话已有的签名及校验策略。openSignedReportChannel 提供匹配的对端配置。省略时不增加认证中间件。'
-          },
-          example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const host = await createRpcHost<{ double(value: number): number }>({\n    plugins: [threadPlugin({ spawn: true, connect: { timeoutMs: 1500 } })]\n  })\n  try {\n    console.log(await host.request('double', 21))\n  } finally {\n    await host.close()\n  }\n}"
-        },
-        probe: {
-          summary: {
-            en: 'One IRpcProbe or an array of probes from the application, installed as endpoint-local synchronous observers without selecting a different pipeline.',
-            zh: '应用提供的一个或多个 `IRpcProbe`，安装为端点本地同步观察者，不会据此选择另一套管线。'
-          },
-          default: {
-            en: 'Omitted: no observer is added by this field.',
-            zh: '省略时不通过此字段增加观察者。'
-          }
-        },
-        defaultTimeoutMs: {
-          summary: {
-            en: 'Finite positive millisecond default for request and stream calls, validated before acquiring source resources; it does not extend the notify or group timeout scope.',
-            zh: '请求与流调用使用的有限正毫秒默认值，在取得来源资源前校验，不扩展通知或分组操作的超时作用域。'
-          },
-          default: {
-            en: '30000 ms for request and stream in the original timeout scope.',
-            zh: '默认三万毫秒，仅用于原有请求与流超时作用域。'
-          }
-        },
-        contract: {
-          summary: {
-            en: 'Optional IRemoteContract with explicit method schemas, supported modes and idempotency declarations, compiled by the original remote contract owner.',
-            zh: '可选的 `IRemoteContract`，提供显式方法模式、支持的调用方式与幂等声明，由原远端契约拥有者编译。'
-          },
-          default: {
-            en: 'Omitted: provided method definitions supply the normal inferred runtime directory.',
-            zh: '省略时根据已提供的方法定义推导通常的运行时目录。'
-          }
+          example: workerExposureExample
         },
         report: {
           summary: {
-            en: 'Receives background errors that no call can reject with.',
-            zh: '接收无法通过调用 reject 的后台错误。'
+            en: 'Receives native background and cleanup failures; operation rejections retain original causes.',
+            zh: '接收原生后台及清理失败；操作拒绝保留原始原因。'
           },
           default: {
-            en: '`defaultRpcReporter`.',
-            zh: '`defaultRpcReporter`，使用默认控制台报告路径。'
+            en: 'Omitted: configured Host reporter, then effective default.',
+            zh: '省略时使用宿主显式报告器，再使用有效默认报告器。'
+          },
+          params: {
+            error: {
+              en: 'Original background or cleanup failure supplied by the native owner; preserve the error and its cause when sending it to monitoring.',
+              zh: '原生所有者提供的原始后台或清理失败；交给监控时应保留错误对象及其原因链。'
+            }
+          },
+          returns: {
+            en: 'No return value is required. The callback reports the failure; it does not settle an application request or own native cleanup.',
+            zh: '无需返回值；回调负责报告失败，不结算应用请求，也不取得原生清理所有权。'
           },
           whenToUse: {
-            en: 'Set a sink when the application needs to collect background or contained failures separately from request rejections. Omitting it uses defaultRpcReporter and console.error; it does not make a failed request successful.',
-            zh: '应用需要把后台或隔离失败与请求拒绝分开记录时设置。省略时使用 defaultRpcReporter 和 console.error；它不会让失败请求成功。'
+            en: 'Set an application monitoring sink when Worker background and cleanup failures must join your existing incident reports. Omit it to inherit the configured Host reporter.',
+            zh: '需要将原生后台及清理失败汇入应用现有告警时配置；省略则继承宿主显式报告器。'
           },
-          example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const host = await createRpcHost<{ double(value: number): number }>({\n    plugins: [threadPlugin({ spawn: true, connect: { timeoutMs: 1500 } })]\n  })\n  try {\n    console.log(await host.request('double', 21))\n  } finally {\n    await host.close()\n  }\n}"
+          example: workerReportExample
         },
-        keyFactory: {
+        features: {
           summary: {
-            en: 'Advanced remote-proxy key callback returning an application string for automatically keyed retry paths. The direct createRpcHost assembly does not read this inherited field itself.',
-            zh: '高级远程代理键回调，返回应用字符串供自动分配键的重试路径使用；直接运行时连接组装本身不读取这个继承字段。'
+            en: 'Complete call and supported native feature definitions scoped to this transport. Per-call timeout and retry take instances or false.',
+            zh: '此传输作用域的完整调用及受支持原生功能定义；逐次调用的超时和重试使用完整实例或关闭值。'
           },
           default: {
-            en: 'Omitted: proxy paths use defaultRpcId when generating keys; direct peer call keys retain their own call-option semantics.',
-            zh: '省略时代理生成键使用默认标识工厂，直接连接调用仍按自身调用选项处理幂等键。'
+            en: 'Omitted: no optional policy installed by this field.',
+            zh: '省略时不通过此字段安装可选策略。'
           },
-          whenToUse: {
-            en: 'Use it on managed proxy paths that generate keys for retryable calls. A borrowed direct connect/listen peer does not read it. Omission uses defaultRpcId in proxy paths and leaves direct call-option keys unchanged.',
-            zh: '需要为可重试调用生成键的托管代理路径使用此项。借用的直接 connect/listen Peer 不读取它。省略时代理路径使用 defaultRpcId，直接调用选项中的键保持原语义。'
-          },
-          example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const host = await createRpcHost<{ double(value: number): number }>({\n    plugins: [threadPlugin({ spawn: true, connect: { timeoutMs: 1500 } })]\n  })\n  try {\n    console.log(await host.request('double', 21))\n  } finally {\n    await host.close()\n  }\n}"
-        },
-        retryPort: {
-          summary: {
-            en: 'Advanced application-supplied retry dispatch port for remote-proxy paths; it receives the original retry input and returns the selected dispatch result. Direct createRpcHost assembly does not read it itself.',
-            zh: '高级应用重试派发端口，供远程代理路径接收原始重试输入并返回所选派发结果；直接运行时连接组装本身不读取它。'
-          },
-          default: {
-            en: 'Omitted: the remote proxy keeps its original retry dispatch owner; no second retry policy is installed by a direct peer.',
-            zh: '省略时远程代理保留原重试派发拥有者，直接连接不会额外安装另一套重试策略。'
-          }
-        },
-        name: {
-          summary: {
-            en: 'Application-selected local registration name, independent of remote self.name.',
-            zh: '应用选择的本地登记名，与远端自身名称分开。'
-          },
-          default: {
-            en: 'Omitted: original family registration name.',
-            zh: '省略时使用原家族登记名。'
-          },
-          example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const host = await createRpcHost<{ double(value: number): number }>({\n    plugins: [threadPlugin({ spawn: true, connect: { timeoutMs: 1500 } })]\n  })\n  try {\n    console.log(await host.request('double', 21))\n  } finally {\n    await host.close()\n  }\n}"
-        },
-        expose: {
-          ...rpcPluginOptionDocs.expose,
-          default: {
-            en: 'Omitted: original exposure policy.',
-            zh: '省略时保留原公开策略。'
-          },
-          example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const host = await createRpcHost<{ double(value: number): number }>({\n    plugins: [threadPlugin({ spawn: true, connect: { timeoutMs: 1500 } })]\n  })\n  try {\n    console.log(await host.request('double', 21))\n  } finally {\n    await host.close()\n  }\n}"
-        },
-        connect: {
-          summary: {
-            en: 'SDK handshake preparation options, not a second physical source.',
-            zh: '作者工具的握手准备选项，不是第二个物理来源。'
-          },
-          default: {
-            en: 'Omitted: original handshake policy.',
-            zh: '省略时使用原握手策略。'
-          },
-          example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const host = await createRpcHost<{ double(value: number): number }>({\n    plugins: [threadPlugin({ spawn: true, connect: { timeoutMs: 1500 } })]\n  })\n  try {\n    console.log(await host.request('double', 21))\n  } finally {\n    await host.close()\n  }\n}"
-        },
-        'connect.timeoutMs': {
-          ...rpcPluginOptionDocs['connect.timeoutMs'],
-          default: {
-            en: 'Omitted: original source defaults.',
-            zh: '省略时使用原来源默认。'
-          },
-          example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const host = await createRpcHost<{ double(value: number): number }>({\n    plugins: [threadPlugin({ spawn: true, connect: { timeoutMs: 1500 } })]\n  })\n  try {\n    console.log(await host.request('double', 21))\n  } finally {\n    await host.close()\n  }\n}"
+          example: example2
         },
         spawn: {
           summary: {
@@ -430,8 +258,7 @@ export const rpcThreadsReference: ILibraryReference = {
             en: 'Absent in parent/connect/listen modes.',
             zh: '子端、连接或监听模式不提供。'
           },
-          example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const host = await createRpcHost<{ double(value: number): number }>({\n    plugins: [threadPlugin({ spawn: true, connect: { timeoutMs: 1500 } })]\n  })\n  try {\n    console.log(await host.request('double', 21))\n  } finally {\n    await host.close()\n  }\n}"
+          example: example1
         },
         connectToParent: {
           summary: {
@@ -442,13 +269,16 @@ export const rpcThreadsReference: ILibraryReference = {
             en: 'Absent outside parent connection mode.',
             zh: '非连接父端模式不提供。'
           },
-          example:
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const host = await createRpcHost<{ double(value: number): number }>({\n    plugins: [threadPlugin({ spawn: true, connect: { timeoutMs: 1500 } })]\n  })\n  try {\n    console.log(await host.request('double', 21))\n  } finally {\n    await host.close()\n  }\n}",
+          example: example1,
           values: {
             true: {
               en: 'Adopt the actual parent bootstrap source.',
               zh: '采用实际父端启动来源。'
             }
+          },
+          whenToUse: {
+            en: 'Choose this only inside the genuine Worker launched by threadPlugin; the native bootstrap supplies the parent identity and channel. Use spawn in the parent.',
+            zh: '仅在由 `threadPlugin` 启动的真实工作线程中选择，原生启动信息提供父端身份及通道；父端使用 `spawn`。'
           }
         }
       }
@@ -458,9 +288,221 @@ export const rpcThreadsReference: ILibraryReference = {
         en: 'Actual explicit plugin source union; short forms normalize through the original native owner.',
         zh: '插件的实际显式来源联合，简写通过原原生所有者归一化。'
       },
-      example:
-        "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const host = await createRpcHost<{ double(value: number): number }>({\n    plugins: [threadPlugin({ spawn: true, connect: { timeoutMs: 1500 } })]\n  })\n  try {\n    console.log(await host.request('double', 21))\n  } finally {\n    await host.close()\n  }\n}",
-      members: {}
+      example: example1,
+      members: {
+        report: {
+          summary: {
+            en: 'Report original native background and cleanup failures through the application diagnostic sink.',
+            zh: '通过应用诊断接收器报告原生后台及清理失败，不改变原错误身份。'
+          },
+          params: {
+            error: {
+              en: 'Original background or cleanup failure supplied by the native owner; preserve the error and its cause when sending it to monitoring.',
+              zh: '原生所有者提供的原始后台或清理失败；交给监控时应保留错误对象及其原因链。'
+            }
+          },
+          returns: {
+            en: 'No return value is required. The callback reports the failure; it does not settle an application request or own native cleanup.',
+            zh: '无需返回值；回调负责报告失败，不结算应用请求，也不取得原生清理所有权。'
+          },
+          whenToUse: {
+            en: 'Set an application monitoring sink when Worker background and cleanup failures must join your existing incident reports. Omit it to inherit the configured Host reporter.',
+            zh: '需要将原生后台及清理失败汇入应用现有告警时配置；省略则继承宿主显式报告器。'
+          },
+          example: workerReportExample
+        }
+      }
+    },
+    IThreadNamespaceExtensions: {
+      summary: {
+        en: 'Native controls contributed by this actual source installation.',
+        zh: '此实际来源安装提供的原生控制。'
+      },
+      members: {
+        members: {
+          summary: {
+            en: 'SDK member controls borrow the original source supervisor and generation.',
+            zh: 'SDK 成员控制借用原来源监督器及代次。'
+          }
+        }
+      },
+      example: example1
+    },
+    IThreadSpawn: {
+      summary: {
+        en: 'Full native source recipe; original launcher, budget, scheduler and carrier factory remain the owners.',
+        zh: '完整原生来源配方；原启动器、预算、调度器及载体工厂保持所有权。'
+      },
+      members: {
+        spec: {
+          summary: {
+            en: 'Native thread name, portable data and resource limits passed to supervision.',
+            zh: '转交监督器的原生线程名称、可移植数据及资源限制。'
+          }
+        },
+        launcher: {
+          summary: {
+            en: 'Actual supervision launcher preserving its original launch context and native exit receipt.',
+            zh: '实际监督启动器，保留原启动上下文及原生退出凭据。'
+          }
+        },
+        budget: {
+          summary: {
+            en: 'Original supervision budget for native acquisition and retained execution.',
+            zh: '原生获取及持有执行使用的原监督预算。'
+          }
+        },
+        scheduler: {
+          summary: {
+            en: 'Scheduler borrowed by the selected native supervision profile.',
+            zh: '所选原生监督策略借用的调度器。'
+          }
+        },
+        channelFactory: {
+          summary: {
+            en: 'Open a real carrier from the native handle and signal; Host alone creates Sessions.',
+            zh: '从原生句柄及信号打开真实载体；仅宿主创建会话。'
+          }
+        },
+        report: {
+          summary: {
+            en: 'Receives native background and cleanup failures; operation rejections retain original causes.',
+            zh: '接收原生后台及清理失败；操作拒绝保留原始原因。'
+          },
+          default: {
+            en: 'Omitted: configured Host reporter, then effective default.',
+            zh: '省略时使用宿主显式报告器，再使用有效默认报告器。'
+          },
+          params: {
+            error: {
+              en: 'Original background or cleanup failure supplied by the native owner; preserve the error and its cause when sending it to monitoring.',
+              zh: '原生所有者提供的原始后台或清理失败；交给监控时应保留错误对象及其原因链。'
+            }
+          },
+          returns: {
+            en: 'No return value is required. The callback reports the failure; it does not settle an application request or own native cleanup.',
+            zh: '无需返回值；回调负责报告失败，不结算应用请求，也不取得原生清理所有权。'
+          },
+          whenToUse: {
+            en: 'Set an application monitoring sink when Worker background and cleanup failures must join your existing incident reports. Omit it to inherit the configured Host reporter.',
+            zh: '需要将原生后台及清理失败汇入应用现有告警时配置；省略则继承宿主显式报告器。'
+          },
+          example: workerReportExample
+        },
+        health: {
+          summary: {
+            en: 'Optional native supervision health policy using the accepted Session ping.',
+            zh: '使用已接纳会话探活的可选原生监督健康策略。'
+          }
+        },
+        supervisor: {
+          summary: {
+            en: 'Original id, readiness, startup, restart, terminal, stop and isolation overrides.',
+            zh: '原监督标识、就绪、启动、重启、终态、停止及隔离策略覆盖。'
+          }
+        }
+      },
+      example: example1
+    },
+    IThreadShortSpawn: {
+      summary: {
+        en: 'Entry shorthand supplies only missing native source fields and preserves explicitly supplied policy objects.',
+        zh: '入口简写仅补齐缺失的原生来源字段，并保留显式提供的策略对象。'
+      },
+      members: {
+        launcher: {
+          summary: {
+            en: 'Actual supervision launcher preserving its original launch context and native exit receipt.',
+            zh: '实际监督启动器，保留原启动上下文及原生退出凭据。'
+          }
+        },
+        budget: {
+          summary: {
+            en: 'Original supervision budget for native acquisition and retained execution.',
+            zh: '原生获取及持有执行使用的原监督预算。'
+          }
+        },
+        scheduler: {
+          summary: {
+            en: 'Scheduler borrowed by the selected native supervision profile.',
+            zh: '所选原生监督策略借用的调度器。'
+          }
+        },
+        channelFactory: {
+          summary: {
+            en: 'Open a real carrier from the native handle and signal; Host alone creates Sessions.',
+            zh: '从原生句柄及信号打开真实载体；仅宿主创建会话。'
+          }
+        },
+        report: {
+          summary: {
+            en: 'Receives native background and cleanup failures; operation rejections retain original causes.',
+            zh: '接收原生后台及清理失败；操作拒绝保留原始原因。'
+          },
+          default: {
+            en: 'Omitted: configured Host reporter, then effective default.',
+            zh: '省略时使用宿主显式报告器，再使用有效默认报告器。'
+          },
+          params: {
+            error: {
+              en: 'Original background or cleanup failure supplied by the native owner; preserve the error and its cause when sending it to monitoring.',
+              zh: '原生所有者提供的原始后台或清理失败；交给监控时应保留错误对象及其原因链。'
+            }
+          },
+          returns: {
+            en: 'No return value is required. The callback reports the failure; it does not settle an application request or own native cleanup.',
+            zh: '无需返回值；回调负责报告失败，不结算应用请求，也不取得原生清理所有权。'
+          },
+          whenToUse: {
+            en: 'Set an application monitoring sink when Worker background and cleanup failures must join your existing incident reports. Omit it to inherit the configured Host reporter.',
+            zh: '需要将原生后台及清理失败汇入应用现有告警时配置；省略则继承宿主显式报告器。'
+          },
+          example: workerReportExample
+        },
+        health: {
+          summary: {
+            en: 'Optional native supervision health policy using the accepted Session ping.',
+            zh: '使用已接纳会话探活的可选原生监督健康策略。'
+          }
+        },
+        supervisor: {
+          summary: {
+            en: 'Original id, readiness, startup, restart, terminal, stop and isolation overrides.',
+            zh: '原监督标识、就绪、启动、重启、终态、停止及隔离策略覆盖。'
+          }
+        },
+        entry: {
+          summary: {
+            en: 'Actual Worker entry URL/path or true for a supported main module.',
+            zh: '实际工作线程入口地址、路径或受支持主模块选择值。'
+          }
+        },
+        base: {
+          summary: {
+            en: 'Base for resolving a relative entry.',
+            zh: '解析相对入口时使用的基准地址。'
+          }
+        },
+        name: {
+          summary: {
+            en: 'Native specification name, distinct from the top-level registration name.',
+            zh: '原生规范名称，与顶层登记名称分开。'
+          }
+        },
+        data: {
+          summary: {
+            en: 'Portable application input captured before native acquisition.',
+            zh: '原生获取前捕获的可移植应用输入。'
+          }
+        },
+        limits: {
+          summary: {
+            en: 'Native supervision limits for this execution unit.',
+            zh: '此执行单元使用的原生监督限制。'
+          }
+        }
+      },
+      example: example1
     }
   },
   enums: {
@@ -485,9 +527,22 @@ export const rpcThreadsReference: ILibraryReference = {
         en: 'One cold native transport using original bootstrap, supervision, drain and native exit owners. Both sides provide methods over the same actual host endpoint.',
         zh: '一个使用原启动、监督、排空和原生退出所有者的冷传输，双方在同一实际宿主端点提供方法。'
       },
-      install:
-        "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const host = await createRpcHost<{ double(value: number): number }>({\n    plugins: [threadPlugin({ spawn: true, connect: { timeoutMs: 1500 } })]\n  })\n  try {\n    console.log(await host.request('double', 21))\n  } finally {\n    await host.close()\n  }\n}",
-      grants: [],
+      install: example1,
+      grants: [
+        {
+          signature: 'host.thread.members',
+          summary: {
+            en: 'Borrow the actual native source member controls from this namespace.',
+            zh: '从此命名空间借用实际原生来源的成员控制。'
+          },
+          params: {},
+          returns: {
+            en: 'SDK native controls for real stop, restart, replacement, events and resource queries.',
+            zh: '返回用于真实停止、重启、替换、事件及资源查询的 SDK 原生控制。'
+          },
+          example: example2
+        }
+      ],
       behaviors: [
         {
           en: 'Original source ownership retains native control, generation, replacement and cleanup.',
@@ -500,8 +555,7 @@ export const rpcThreadsReference: ILibraryReference = {
           zh: '使用应用选定的实际原生运行时。'
         }
       ],
-      example:
-        "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const host = await createRpcHost<{ double(value: number): number }>({\n    plugins: [threadPlugin({ spawn: true, connect: { timeoutMs: 1500 } })]\n  })\n  try {\n    console.log(await host.request('double', 21))\n  } finally {\n    await host.close()\n  }\n}"
+      example: example1
     }
   }
 }

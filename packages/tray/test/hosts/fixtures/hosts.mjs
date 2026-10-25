@@ -2,7 +2,7 @@ import { appendFileSync, writeFileSync } from 'node:fs'
 import { resourceLimits, threadId } from 'node:worker_threads'
 import { defineFeature, definePlugin } from '@migaia/plugin-host'
 import { defineTrayHost, defineRoutingPolicy } from '@migaia/tray'
-import { defineProbe } from '@migaia/rpc-host/probe'
+import { defineProbe } from '@migaia/rpc-host/plugins/probe'
 import { FixtureText, fixtureError } from './fixture-text.mjs'
 
 /** Pick counts stay realm-local; native child never invokes its declared callback. */

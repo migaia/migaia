@@ -18,14 +18,19 @@
       "methods": [
         {
           "name": "doc.save",
-          "supportedModes": [
-            "request",
-            "notify",
-            "stream"
-          ],
+          "supportedModes": ["request", "notify", "stream"],
           "modeSource": "generated-routes"
         }
       ]
+    },
+    {
+      "schemaVersion": 2,
+      "self": {
+        "name": "child",
+        "instanceId": "child-1",
+        "token": "fixture-secret"
+      },
+      "methods": []
     }
   ],
   "invalid": [
@@ -41,24 +46,12 @@
       "schemaVersion": 2,
       "self": {
         "name": "child",
-        "instanceId": "child-1",
-        "token": "fixture-secret"
-      },
-      "methods": []
-    },
-    {
-      "schemaVersion": 2,
-      "self": {
-        "name": "child",
         "instanceId": "child-1"
       },
       "methods": [
         {
           "name": "doc.save",
-          "supportedModes": [
-            "request",
-            "request"
-          ],
+          "supportedModes": ["request", "request"],
           "modeSource": "generated-routes"
         }
       ]

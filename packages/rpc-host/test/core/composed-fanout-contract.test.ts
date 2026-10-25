@@ -5,12 +5,9 @@ import { describe, expect, it } from 'vitest'
 import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
 import { connect } from '../../dist/core/middleware/connect.js'
 import { ping } from '../../dist/core/middleware/ping.js'
-import {
-  RpcCoreErrorCode,
-  RpcLifecycleError,
-  RPC_CORE_ERROR_SOURCE
-} from '../../dist/core/errors.js'
-import { deserializeRpcError } from '../../dist/core/internal/error-wire-metadata.js'
+import { RpcLifecycleError, RPC_CORE_ERROR_SOURCE } from '@migaia/rpc-contract/errors'
+import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
+import { deserializeRpcError } from '../../dist/host/error-wire-metadata.js'
 import { attachErrorIdentity } from '@migaia/utils/error'
 
 /**

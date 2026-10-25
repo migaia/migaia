@@ -1,17 +1,10 @@
 # `@migaia/rpc-plugin-thread`
 
-Run `createRpcHost` application methods on real Node, Bun, or Deno threads while retaining native Worker supervision, generations, and cleanup.
+Run RPC on real Node, Bun, or Deno Workers.
+
+`rpc-contract` defines pure protocol rules and interfaces. `rpc-host` owns sessions, directories, providers, call settlement, and cancellation. This transport plugin acquires, supervises, and releases native Workers. Flow plugins such as auth, chunk, batch, and probe process message flow; features such as timeout, retry, and pool attach to their owning plugin.
 
 [中文](./README.md) · [Usage guide](./USEGUIDE.en.md)
-
-## Why use it
-
-- Both sides provide methods, call back, and stream results through the same connection.
-- Deadlines, cooperative cancellation, admission, and error causes follow the existing call path.
-- The original supervisor restores connections after crashes; held old-generation capabilities and uncertain results do not become new-generation results.
-- Closing a host releases its owned Worker, keeping a terminate request distinct from actual native exit.
-
-Use [rpc-plugin-browser](../rpc-plugin-browser/README.en.md) in browser pages and browser Workers. Choose [rpc-plugin-process](../rpc-plugin-process/README.en.md) for OS process isolation.
 
 ## Start here
 
@@ -19,11 +12,13 @@ Use [rpc-plugin-browser](../rpc-plugin-browser/README.en.md) in browser pages an
 pnpm add @migaia/rpc-host @migaia/rpc-contract @migaia/rpc-plugin-thread
 ```
 
-Save this as a standalone ESM TypeScript entry for Node 24's native TypeScript support, or compile it to ESM with your toolchain. The child reloads the same entry; the guard prevents recursive spawning.
+Save this as a standalone ESM TypeScript entry. Use Node 24 native TypeScript support, or compile it to ESM first. The child reloads the same entry; the guard prevents recursive spawning.
 
-```ts doc-test=run
+```ts doc-test=check
 import { createRpcHost } from '@migaia/rpc-host'
 import { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'
+
+type IWorkerApi = { double(value: number): number }
 
 if (await isThreadChild()) {
   await createRpcHost({
@@ -31,42 +26,40 @@ if (await isThreadChild()) {
     provide: { double: (value: number) => value * 2 }
   })
 } else {
-  const host = await createRpcHost<{ double(value: number): number }>({
-    plugins: [threadPlugin({ spawn: true, connect: { timeoutMs: 1500 } })]
-  })
+  const plugins = [threadPlugin({ spawn: true })] as const
+  const host = await createRpcHost<IWorkerApi, typeof plugins>({ plugins })
   try {
-    console.log(await host.request('double', 21))
+    console.log(await host.thread.request('double', 21))
   } finally {
     await host.close()
   }
 }
 ```
 
-It prints `42`. An explicit entry can use `spawn: new URL('./worker.js', import.meta.url)`; that entry joins with `connectToParent: true` using its actual parent bootstrap.
+One current direct Worker returns `42`. A separate child entry can use `spawn: new URL('./worker.js', import.meta.url)` and joins with `connectToParent: true` using its actual parent bootstrap.
 
-## Sources and calls
+## Sources and namespaces
 
-| API / option                              | Purpose                                                                         |
-| ----------------------------------------- | ------------------------------------------------------------------------------- |
-| `threadPlugin({ spawn })`                 | Current entry, path/URL, short configuration, or full native supervision recipe |
-| `threadPlugin({ connectToParent: true })` | Join the parent from an actual native child thread                              |
-| `isThreadChild()`                         | Asynchronously inspect native child-thread identity                             |
-| `connect: { timeoutMs }`                  | One shared budget for identity and capability preparation                       |
-| `createRpcHost({ provide, self, ... })`   | Application providers and local identity rather than inferred Worker identity   |
-| `host.request / notify / stream / send`   | The common host call interface                                                  |
+| Option                  | Purpose                                                                        |
+| ----------------------- | ------------------------------------------------------------------------------ |
+| `spawn`                 | `true`, path/URL, an `entry` shorthand, or a full native `IThreadSpawn` recipe |
+| `connectToParent: true` | Join the parent from a real child thread; mutually exclusive with `spawn`      |
+| `name`                  | Native installation/registration name; defaults to `thread`                    |
+| `namespace`             | Call namespace; defaults to `thread`                                           |
+| `features`              | Complete timeout, retry, or pool feature instances                             |
+| `expose`                | Select local Feature methods when installed on an ordinary PluginHost          |
+| `report`                | Native diagnostic callback                                                     |
 
-Choose either spawn or connectToParent. This plugin does not accept browser Window/SharedWorker sources or fabricated parent data. Child identity comes from the launcher's real bootstrap. A host uses one call endpoint; [poolPlugin](../rpc-plugin-pool/README.en.md) can manage multiple hidden native thread members on that same host.
+Call through `host.thread.request/notify/stream/group/send/dispatch`; use `host.thread.members` for member controls. One Host may install transports with distinct namespaces, which isolate their calls. Select the medium your application needs; using this package does not require another medium.
 
-## Deadlines, errors, and recovery
+Use [rpc-plugin-browser](../rpc-plugin-browser/README.en.md) in browser pages and browser Workers, or [rpc-plugin-process](../rpc-plugin-process/README.en.md) for OS process isolation. See [pool](../rpc-plugin-pool/README.en.md) for scheduling several members of this same transport.
 
-Pass `signal` and `timeoutMs` to calls. Transport `connect.timeoutMs` separately bounds handshake preparation. Cancellation is cooperative and cannot stop an arbitrary synchronous loop; use original supervision controls when native termination is required. Unconfirmed business work may already have executed, so automatic recovery is not automatic safe replay.
+## Policies and lifetime
 
-Native thread errors use `rpc.transport.thread`; calls can use `rpc.endpoint` or `rpc.remote`. Serialization preserves source/code/name/message/stack/cause and aggregate members. Branch on identity, not message text.
+Calls accept `signal`, complete `timeout({ ms })` and `retry({ attempts })` instances, or `false`. Selection precedence is per-call options, transport features, then link-policy plugin. An absent policy adds no automatic timeout or retry. Cancellation is cooperative and cannot preempt a synchronous loop.
 
-Structured clone and ownership transfer are separate capabilities. RPC transfer additionally requires actual negotiated support and supported authentication; a native `postMessage` method alone is insufficient. Inspect the original error chain on rejection. Native usage samples refer to the selected Worker, never process RSS presented as thread memory.
+The native Thread `spec.limits.callWallTimeMs` is a separate hard cap. Explicit `timeout: false` disables the optional business timeout without extending that cap. A complete timeout instance uses the actual launch spec and its original scheduler.
 
-## Native integration and lifetime
+`notify` waits for physical write; `request` waits for the business result. Native supervision owns restart and replacement. A restored connection does not establish that work can safely be replayed. Native, call, and remote errors retain their own source/code/cause; transferred error graphs preserve name/message/stack and aggregate members.
 
-The root provides `threadPlugin`, `isThreadChild`, public options, and error identity. Package-owned launchers and channels remain internal. Applications select short spawn or a full native supervision recipe; custom raw carriers use the deployment SDK in `@migaia/rpc-host/plugin`.
-
-Definitions also install on ordinary `PluginHost.use(...)`. Its thread outlet retains stop, restart, replacement, exit events, and generations. Close follows the existing native drain before releasing the owned Worker, without repeated terminate calls. See the [usage guide](./USEGUIDE.en.md).
+The root exports `threadPlugin`, `isThreadChild`, public options, and error identity. Custom raw carriers use `@migaia/rpc-host/sdk`; readonly observation uses `@migaia/rpc-host/plugins/probe`. Ending a stream, cancelling a call, closing a namespace, closing the Host, and terminating a Worker are different operations. See the [usage guide](./USEGUIDE.en.md).

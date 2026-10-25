@@ -3,7 +3,7 @@ import { RpcCapability } from '@migaia/rpc-contract'
 import { describe, expect, it, vi } from 'vitest'
 import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
 
-import { RpcError } from '../../dist/core/errors.js'
+import { RpcError } from '@migaia/rpc-contract/errors'
 import { connect } from '../../dist/core/middleware/connect.js'
 import { ping } from '../../dist/core/middleware/ping.js'
 import type { IRpcDiscoveryCandidate, IRpcEndpoint } from '../../dist/core/typing.js'

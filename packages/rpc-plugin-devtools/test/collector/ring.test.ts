@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { RpcProbeStage } from '@migaia/rpc-host/probe'
-import { devtoolsPlugin, RpcDevtoolsErrorCode, RPC_DEVTOOLS_SOURCE } from '../../src/index.js'
+import { RpcProbeOutcome, RpcProbeStage } from '@migaia/rpc-host/plugins/probe'
+import {
+  devtoolsPlugin,
+  RpcDevtoolsErrorCode,
+  RPC_DEVTOOLS_SOURCE
+} from '@migaia/rpc-plugin-devtools'
 import { CollectorFixture, collectorView } from './fixture.js'
 
 describe('collector ingestion and ring', () => {
@@ -137,4 +141,65 @@ describe('collector ingestion and ring', () => {
       expect(() => devtoolsPlugin({ maxEvents }).collector).toThrowError(TypeError)
     }
   })
+})
+
+it('retains ordered forward hops by default and snapshots borrowed routes through query and record', () => {
+  /** Default subscriptions include forwarding, while method selection remains exact. */
+  const devtools = devtoolsPlugin({ methods: [CollectorFixture.method], maxEvents: 2 }).collector
+  /** The independent recording must own its route snapshots after main-ring retirement. */
+  const recording = devtools.record()
+  /** One source route grows and is reused between synchronous observations. */
+  const route = ['a'.repeat(32), 'b'.repeat(32)]
+  /** Reusing one view must not rewrite either retained hop's scalar facts. */
+  const view = collectorView()
+  view.stage = RpcProbeStage.forward
+  view.messageId = 'forward-message'
+  view.outcome = RpcProbeOutcome.received
+  view.hop = 1
+  view.maxHops = 3
+  view.route = route
+  try {
+    devtools.emit(view)
+    route.push('c'.repeat(32))
+    view.outcome = RpcProbeOutcome.sent
+    view.hop = 2
+    view.maxHops = 2
+    devtools.emit(view)
+    route[0] = 'd'.repeat(32)
+    view.method = CollectorFixture.otherMethod
+    view.hop = 9
+    devtools.emit(view)
+    /** The default query mask includes forward; rows preserve the same-message timeline. */
+    const page = devtools.query()
+    expect(page.events).toHaveLength(2)
+    expect(page.events).toMatchObject([
+      {
+        stage: 'forward',
+        messageId: 'forward-message',
+        outcome: 'received',
+        hop: 1,
+        maxHops: 3,
+        route: ['a'.repeat(32), 'b'.repeat(32)]
+      },
+      {
+        stage: 'forward',
+        messageId: 'forward-message',
+        outcome: 'sent',
+        hop: 2,
+        maxHops: 2,
+        route: ['a'.repeat(32), 'b'.repeat(32), 'c'.repeat(32)]
+      }
+    ])
+    expect(page.events[0]!.route).not.toBe(route)
+    expect(Object.isFrozen(page.events[0]!.route)).toBe(true)
+    expect(
+      devtools.query({ stages: ['forward'], methods: [CollectorFixture.method] }).events
+    ).toEqual(page.events)
+    /** NDJSON carries retained hop fields after the main ring releases its references. */
+    const record = recording.stop()
+    devtools.clear()
+    expect(devtools.importRecord(devtools.exportRecord(record)).events).toEqual(page.events)
+  } finally {
+    devtools.close()
+  }
 })

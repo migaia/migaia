@@ -35,7 +35,7 @@ function sourceFiles(directory: string): string[] {
 
 /** Reads declared code values from a layer's single error-code table. */
 function declaredCodes(layer: 'contract' | 'core'): Map<string, string> {
-  const path = join(sourceRoots[layer], layer, 'error-code.ts')
+  const path = join(sourceRoots.contract, 'error-code.ts')
   const { program, textOf } = parseSourceTree(path, readFileSync(path, 'utf8'))
   const codes = new Map<string, string>()
   for (const item of program.body) {

@@ -371,7 +371,8 @@ export {
   deserializeErrorChain,
   normalizeSerializedErrorChain,
   reachErrorChain,
-  sanitizeErrorText
+  sanitizeErrorText,
+  countErrorDataText
 } from './error-chain.js'
 export type {
   IErrorChainStrategy,

@@ -1,43 +1,35 @@
 import { describe, expect, it } from 'vitest'
-import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
-import { createComposedEndpoint } from '../../dist/core/composed.js'
-import { connect } from '../../dist/core/middleware/connect.js'
-import { streamRoots } from './fixture.js'
+import { connectedCoreHosts } from '../host/core-fixture.js'
 
 /** Delivers no old item twice after the canonical transport reports disconnection. */
 describe('streaming disconnect', () => {
   it('ends the pending and future pulls with one sticky unknown-result error', async () => {
-    const [clientTransport, serverTransport] = createMemoryTransportPair()
-    const server = await createComposedEndpoint(
-      {
-        id: 'server',
-        transport: serverTransport,
-        middlewares: [connect({ transport: serverTransport })]
-      },
-      streamRoots()
-    )
-    const client = await createComposedEndpoint(
-      {
-        id: 'client',
-        transport: clientTransport,
-        middlewares: [connect({ transport: clientTransport })]
-      },
-      streamRoots()
-    )
+    /** The producer remains in its original next until the real carrier disconnects. */
     let resume!: () => void
+    /** Only business production is held; the fixture owns no alternate dispatcher. */
     const blocked = new Promise<void>((resolve) => {
       resume = resolve
     })
-    server.stream.provide('count', async function* () {
-      yield 'a'
-      await blocked
-      yield 'b'
-    })
+    /** Public namespace traffic uses the existing connected native carrier pair. */
+    const fixture = await connectedCoreHosts(
+      {
+        count: async function* () {
+          yield 'a'
+          await blocked
+          yield 'b'
+        }
+      },
+      {},
+      () => undefined
+    )
     try {
-      const iterator = client.stream.open('server', 'count', null)
+      /** One actual target returns the original lazy iterator. */
+      const iterator = fixture.b.memory.stream('count', null) as AsyncIterableIterator<unknown>
       expect(await iterator.next()).toEqual({ done: false, value: 'a' })
+      /** Disconnection interrupts a genuine outstanding pull. */
       const pending = iterator.next()
-      serverTransport.close()
+      await fixture.pair[0].close()
+      /** The first rejection must remain sticky by identity for later pulls. */
       let failure: unknown
       try {
         await pending
@@ -49,8 +41,7 @@ describe('streaming disconnect', () => {
       resume()
     } finally {
       resume()
-      await client.dispose()
-      await server.dispose()
+      await fixture.close()
     }
   })
 })

@@ -1,3 +1,7 @@
+/**
+ * Binds child pipes, current stdio and local sockets to the shared byte owner. Physical cleanup
+ * preserves their distinct destroy or pause/end behavior without terminating the process.
+ */
 import type { Readable, Writable, Duplex } from 'node:stream'
 import { nodeByteStream } from './node-byte-stream.js'
 
@@ -21,18 +25,28 @@ export type IAdapterProcessStdio = Readonly<{
  * separate.
  */
 export function createAdapterChildStdio(child: IAdapterChildStdio) {
-  return nodeByteStream(child.stdout, child.stdin, () => {
-    child.stdout?.destroy()
-    child.stdin?.destroy()
-  })
+  return nodeByteStream(
+    child.stdout,
+    child.stdin,
+    () => {
+      child.stdout?.destroy()
+      child.stdin?.destroy()
+    },
+    () => child.stdout.listenerCount('data') === 1
+  )
 }
 
 /** Construct current stdio without replacing native pause/end behavior. */
 export function createAdapterProcessStdio(io: IAdapterProcessStdio) {
-  return nodeByteStream(io.stdin, io.stdout, () => {
-    io.stdin.pause()
-    io.stdout.end()
-  })
+  return nodeByteStream(
+    io.stdin,
+    io.stdout,
+    () => {
+      io.stdin.pause()
+      io.stdout.end()
+    },
+    () => io.stdin.listenerCount('data') === 1
+  )
 }
 
 /**

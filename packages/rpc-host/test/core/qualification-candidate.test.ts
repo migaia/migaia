@@ -12,7 +12,7 @@ import { abort } from '../../dist/core/middleware/abort.js'
 import { OperationScope } from '../../dist/core/internal/operation-scope.js'
 import { RpcVariationCoordinator } from '../../dist/core/internal/variation-coordinator.js'
 import { messageFramerV1 } from '@migaia/rpc-contract/framing'
-import { RpcCoreErrorCode } from '../../dist/core/errors.js'
+import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import type { IRpcContext } from '../../dist/core/typing.js'
 
 /** Counts genuine native instances while preserving native signal and reason behavior. */

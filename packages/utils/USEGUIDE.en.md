@@ -1601,6 +1601,8 @@ Each `combineConfig` call reads every rule's `prefix` and `strategies` once and 
 
 When a key exists on both sides and falls outside every automatic merge case (for example two primitive values that cannot be merged), and `onConflict` is given, it is called with an `IConfigConflictContext` (`path`: the full path of the key; `left`: the existing value; `right`: the new value). Its `IConfigConflictDecision` decides the result: `{ kind: 'left' }` keeps the left value, `{ kind: 'right' }` takes the right value, `{ kind: 'delete' }` deletes the key, and `{ kind: 'value', value }` uses a custom value. `onConflict` must return **synchronously**: returning a Promise throws `code: 'CONFIG_CONFLICT'`, and so does a return value that is not one of the four kinds. Without `onConflict`, the right side simply overrides the left (standard merge semantics). `right === CONFIG_DELETE` deletes the target key, which lets a merge strip a default written by an earlier source.
 
+With concat or mergeByIndex, one combine operation uses private array accumulators. `onConflict` reads the current cumulative contents; a retained reference receives later merges. Callbacks only read the accumulated value and return a decision. Direct mutation of an accumulating array, including writes, deletion, length changes or freezing, is unsupported. Return `{ kind: 'value', value }` to replace a value. The implementation adds no runtime checks or rejection for direct mutation.
+
 ```ts doc-test=skip reason="Fragment that relies on illustrative outside functions or values"
 const defaults = ownConfig({
   retries: 1,

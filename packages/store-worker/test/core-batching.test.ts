@@ -1,12 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'vitest'
-import {
-  readRuntimeCarrier,
-  RpcRuntimeKind,
-  RpcRuntimeMode,
-  RpcRuntimeOperation,
-  type IRpcRuntimeEnvelope
-} from '@migaia/rpc-contract/runtime'
+import { RpcWireKind, RpcCallMode, type IRpcEnvelope } from '@migaia/rpc-contract/protocol'
+import { workerFrames } from './worker-frame.js'
 import { WorkerAdapter, createWorkerHandler } from '../src/index.js'
 import { createWorkerContractEndpoint } from '../src/worker-contract.js'
 
@@ -57,25 +52,19 @@ describe('store-worker existing APIs consume core batching', () => {
         inputs.map((value) => `result:${value}`)
       )
       /** Read the actual native runtime selector without introducing another framing owner. */
-      const runtimeFrames = frames.map((side) =>
-        side.flatMap((value) => {
-          const selected = readRuntimeCarrier(value)
-          return selected ? [selected.frame as IRpcRuntimeEnvelope] : []
-        })
-      )
+      const runtimeFrames = await Promise.all(frames.map((side) => workerFrames(side)))
       /** The native semantic profile retains one independent invocation for every old request. */
       const calls = runtimeFrames[0]!.filter(
-        (frame) =>
-          frame.kind === RpcRuntimeKind.call &&
-          frame.task.mode === RpcRuntimeMode.request &&
+        (frame): frame is IRpcEnvelope =>
+          frame.kind === RpcWireKind.call &&
+          frame.task.mode === RpcCallMode.request &&
           frame.task.method === 'call'
       )
       /** Terminal correlation proves every physical business invocation completed exactly once. */
       const terminals = runtimeFrames[1]!.filter(
-        (frame) =>
-          frame.kind === RpcRuntimeKind.control &&
-          frame.operation === RpcRuntimeOperation.terminal &&
-          frame.task.mode === RpcRuntimeMode.request &&
+        (frame): frame is IRpcEnvelope =>
+          frame.kind === RpcWireKind.result &&
+          frame.task.mode === RpcCallMode.request &&
           frame.task.method === 'call'
       )
       assert.equal(calls.length, inputs.length)

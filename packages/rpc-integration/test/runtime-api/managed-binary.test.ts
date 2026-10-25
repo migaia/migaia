@@ -30,7 +30,7 @@ import { abort } from '../../../rpc-host/dist/core/middleware/abort.js'
 import { timeout } from '../../../rpc-host/dist/core/middleware/timeout.js'
 import { authentication } from '../../../rpc-host/dist/core/middleware/authentication.js'
 import type { IRpcEndpoint } from '../../../rpc-host/dist/core/typing.js'
-import { RpcCoreErrorCode } from '../../../rpc-host/dist/core/errors.js'
+import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import fixture from './fixtures/managed-binary-key.json'
 
 /** Native data/auth profile is actually configured on both independent Worker endpoint owners. */

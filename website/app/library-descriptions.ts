@@ -28,13 +28,13 @@ export const LIBRARY_REFERENCE_DESCRIPTIONS_ZH = {
   resource: '随输入变化加载异步数据，取消过期请求、重试失败请求并刷新缓存。',
   'rpc-plugin-browser':
     '为窗口、浏览器 Worker、广播、ServiceWorker、可靠 WebRTC 与 WebTransport 安装对应传输插件。',
-  'rpc-contract': '为自定义 RPC 实现校验和编解码消息，让不同对端按同一协议通信。',
-  'rpc-host':
-    '用一个 createRpcHost 入口组合传输插件与功能，进行双向调用、直连选择、广播和流式处理。',
+  'rpc-contract': '定义并校验统一线上协议、可移植值与 RPC 家族的错误约定，供各载体共享。',
+  'rpc-host': '创建唯一插件宿主，在 host.<ns> 下提供双向调用、会话、转发、广播、流与取消。',
   'rpc-plugin-coroutines': '在同一事件循环中运行协作任务，通过代内连接句柄与宿主双向调用。',
-  'rpc-plugin-devtools': '采集、查询和录制 RPC 元数据，并查看多个宿主的时间线与调用统计。',
+  'rpc-plugin-devtools':
+    '通过统一 probe 观察消息流，采集、查询和录制多个 RPC 宿主的时间线与调用统计。',
   'rpc-plugin-pool':
-    '把真实传输成员组织成唯一逻辑目标 pool，每次调度一次并返回标量，使用有限队列与原扩缩容。',
+    '作为传输插件的 feature，把同载体成员组织为逻辑目标 pool，提供单次调度、有限队列与扩缩容。',
   'rpc-plugin-process': '在子进程或本机服务中运行隔离任务，并通过 RPC 调用和管理它们。',
   'rpc-plugin-thread': '把重计算移到 Worker，并通过 RPC 调用、管理和重启线程。',
   serialize: '把应用数据编码为可存储或传输的格式，并在读取时解码。',
@@ -99,15 +99,15 @@ export const LIBRARY_REFERENCE_DESCRIPTIONS_EN = {
   'rpc-plugin-browser':
     'Install carrier plugins for windows, browser Workers, broadcast, ServiceWorker, reliable WebRTC, and WebTransport.',
   'rpc-contract':
-    'Validate, encode, and decode messages for custom RPC implementations so peers can communicate through the same protocol.',
+    'Define and validate the shared wire protocol, portable values, and error contracts for the RPC family.',
   'rpc-host':
-    'Compose one createRpcHost entry with transport plugins and features for bidirectional calls, direct targets, broadcast, and streams.',
+    'Create one plugin host with bidirectional calls, sessions, forwarding, broadcast, streams, and cancellation under host.<ns>.',
   'rpc-plugin-coroutines':
     'Run cooperative tasks in one event loop and connect both hosts through a generation-local handle.',
   'rpc-plugin-devtools':
-    'Collect, query, and record RPC metadata and inspect timelines and call statistics across hosts.',
+    'Observe message flow through the shared probe and collect, query, and record timelines and call statistics across RPC hosts.',
   'rpc-plugin-pool':
-    'Expose one logical pool target, schedule each operation once, and retain bounded queueing, resize, and drain.',
+    'Install a transport feature that groups members of one carrier into a logical pool target with single-member scheduling, bounded queues, and resizing.',
   'rpc-plugin-process':
     'Run isolated work in child processes or local services and call and manage them through RPC.',
   'rpc-plugin-thread':

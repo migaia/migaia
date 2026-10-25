@@ -1,118 +1,112 @@
-# RPC 池使用指南
+# Pool 使用指南
 
-[English](./USEGUIDE.en.md) · [包概览](./README.md) · [统一调用规则](../rpc-host/USEGUIDE.md)
+[English](./USEGUIDE.en.md) · [包概览](./README.md) · [Host 调用规则](../rpc-host/USEGUIDE.md)
 
-`poolPlugin` 是 feature，与一个能重复打开独立成员的传输一起安装。原调度器拥有容量、有限 FIFO、租约、扩缩容和排空；成员仍由原进程、线程或协作任务 owner 监督。
+Contract 定义纯协议与接口，Host 拥有会话、provider 和调用结算，transport 获取并监管真实原生资源。flow plugin 通过消息介入点提供 auth、chunk、batch、probe。`pool` 是 transport 的完整 feature：只拥有同载体成员调度、FIFO、扩缩容和排空；timeout/retry feature 各自拥有调用策略。
 
-## 从三个真实线程开始
+## 安装在 transport 上
 
-保存为独立 ESM TypeScript 入口，使用支持该入口的 Node 工具链。子端与父端使用同一文件，但只有父端安装 pool。
+父端示例使用三个真实 Thread 成员。一个 Host 允许安装命名空间不同的 transport；本例只安装一个 `thread` namespace，pool 不混合不同载体。
 
 ```ts doc-test=check
-import { createRpcHost } from '@migaia/rpc-host'
-import { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'
-import { poolPlugin } from '@migaia/rpc-plugin-pool'
+import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
+import { threadPlugin } from '@migaia/rpc-plugin-thread'
+import { pool, RPC_POOL_PEER_ID } from '@migaia/rpc-plugin-pool'
+import { timeout, retry } from '@migaia/rpc-host/features'
 
-if (await isThreadChild()) {
-  await createRpcHost({
-    plugins: [threadPlugin({ connectToParent: true })],
-    provide: { double: (value: number) => value * 2 }
+type IWorkerApi = { work(value: number): number; values(end: number): AsyncIterable<number> }
+
+const plugins = [
+  threadPlugin({
+    spawn: new URL('./worker.js', import.meta.url),
+    features: [pool({ size: 3, maxQueue: 32 }), timeout({ ms: 1500 }), retry({ attempts: 2 })]
   })
-} else {
-  const pool = poolPlugin({ size: 3, maxQueue: 32 })
-  const host = await createRpcHost<{ double(value: number): number }>({
-    plugins: [threadPlugin({ spawn: true }), pool]
+] as const
+
+type IPoolHost = IRpcHost<IWorkerApi, typeof plugins>
+
+export function open() {
+  return createRpcHost<IWorkerApi, typeof plugins>({ plugins })
+}
+
+export function work(host: IPoolHost, signal: AbortSignal) {
+  return host.thread.send(RPC_POOL_PEER_ID, 'work', 21, {
+    signal,
+    timeout: timeout({ ms: 1000 }),
+    retry: false
   })
-  try {
-    console.log(await host.request('double', 21))
-    console.log(await host.send('pool', 'double', 21))
-    await pool.controls(host).resize(2)
-    console.log(pool.controls(host).stats().targetSize)
-  } finally {
-    await host.close()
-  }
 }
-```
 
-输出依次为 42、42、2。每次请求仅执行一次，返回标量。本 host 只有一个调用端点；三个成员各自保留真实原生寿命和监督租约。
-
-## 一个逻辑目标
-
-对外目标只有 `pool`，也可使用导出的 RPC_POOL_PEER_ID。隐藏成员不进入直连目标列表或 host.peers；不要按成员的原生 ID 发请求。
-
-无目标的 request、notify、stream、group、outcome 都只做一次原调度选择。`send('pool', method, payload)` 同样返回标量，不产生广播数组。group 的整批由同一成员处理；outcome 只选择一个成员，不替应用遍历全池的结果存储。
-
-spawn 的 process/thread/coroutine 以及可重复建立独立连接的 process connect 来源可组合。listen 与 connectToParent 来源会在任何成员打开前以 POOL_TRANSPORT_UNSUPPORTED 拒绝；它们不是独立成员工厂。
-
-## 容量与排队
-
-| 选项          | 规则                                                    |
-| ------------- | ------------------------------------------------------- |
-| size          | 必填正整数，安装等待目标数量成员就绪                    |
-| maxQueue      | 默认 256，非负整数；0 表示没有等待槽                    |
-| idleTimeoutMs | 省略关闭空闲回收；指定时为正有限毫秒且不超过 2147483647 |
-| scheduler     | 只用于原空闲计时，不接管原生监督或调用期限              |
-
-每个成员同一时刻只借出一个客户端槽。忙时操作进入有限 FIFO；queued 是尚未分配成员的已接纳项，inFlight 是客户端占槽，不等于 provider 或 CPU 并发。队列满在业务前拒绝，不偷偷扩容。
-
-调用选项 signal 可取消等待项。取消已开始业务则沿原调用取消语义，不能据此断言远端副作用从未发生。业务期限与排队/原连接准备的具体状态由原调用 owner 处理，不新增池专用超时。
-
-```ts doc-test=check
-import type { IRpcHost } from '@migaia/rpc-host'
-
-export async function cancellableWork(
-  host: IRpcHost<{ work(value: number): number }>,
-  signal: AbortSignal
-) {
-  return await host.send('pool', 'work', 21, { signal, timeoutMs: 1000 })
-}
-```
-
-## 流的槽归属
-
-流是惰性的，第一次 next 才申请成员。流结束、return、throw 或取消结算后才释放槽。保存但从未迭代的流不占一个成员；消费了一部分却既不继续也不 return，会阻止该槽排空。
-
-```ts doc-test=check
-import type { IRpcHost } from '@migaia/rpc-host'
-
-export async function firstPoolValue(
-  host: IRpcHost<{ pool: { values(end: number): AsyncIterable<number> } }>
-) {
-  const stream = host.peers.pool.values(10)
+export async function firstValue(host: IPoolHost) {
+  const stream = host.thread.peers.pool.values(10)
   try {
     return await stream.next()
   } finally {
     await stream.return?.()
   }
 }
-```
 
-提前 return 只释放流及所借槽，不关闭整个 pool。缩容不会强行中断已经占槽的流。
+export async function shrink(host: IPoolHost) {
+  await host.thread.pool.resize(1)
+  return { stats: host.thread.pool.stats(), members: await host.thread.members.list() }
+}
 
-## controls 绑定实际 host
-
-保留 `const pool = poolPlugin(...)` 的返回对象，然后用 `pool.controls(actualHost)`。controls 在该对象的安装之间按真实 host 隔离；不要传普通对象、另一 host 的代理或复制的 plugin。
-
-```ts doc-test=check
-import type { IRpcPoolControls } from '@migaia/rpc-plugin-pool'
-
-export async function shrink(controls: IRpcPoolControls) {
-  await controls.resize(1)
-  const snapshot = controls.stats()
-  return { target: snapshot.targetSize, busy: snapshot.inFlight, waiting: snapshot.queued }
+export async function closeIdlePool(host: IPoolHost) {
+  await host.thread.pool.close()
+  await host.close()
 }
 ```
 
-stats 返回新的冻结快照，含 targetSize、memberCount、inFlight、queued、state。memberCount 在成员仍被保留清理时包含退休/关闭成员；它不保证瞬间等于 targetSize。host.describe 的安全描述附带 pool 统计。
+相应 `worker.js` 使用独立子入口；只父端安装 pool，子端连接实际父端。
 
-resize 按调用顺序串行处理，先退休空闲成员，再等待忙成员完成。扩容仅打开缺少的成员；失败保留原 primary 并回滚目标容量。空闲回收不改变 targetSize，后续需求会通过原成员工厂补齐。
+```ts doc-test=check
+import { createRpcHost } from '@migaia/rpc-host'
+import { threadPlugin } from '@migaia/rpc-plugin-thread'
 
-## 排空与失败
+await createRpcHost({
+  plugins: [threadPlugin({ connectToParent: true })],
+  provide: {
+    work: (value: number) => value * 2,
+    values: async function* (end: number) {
+      for (let value = 0; value < end; value += 1) yield value
+    }
+  }
+})
+```
 
-controls.close 同步停止新接纳，排空此前已接纳操作与连接准备，然后关闭成员。重复调用共享同一个 Promise。没有额外池排空超时；应用应让活动流结束或 return，而不是等待 close 替它无限消费业务流。
+工厂是 `pool(options)`，控制入口是该安装的 `host.thread.pool` 和 `host.thread.members`，不是工厂对象上的宿主查询方法。`features` 同时接收完整 pool、timeout、retry 实例；单次调用 timeout/retry 可用完整实例或 `false` 覆盖。
 
-host.close 会先排空逻辑 pool，再释放隐藏成员。单独 controls.close 只关闭池；应用仍需最终关闭 host，撤回其余 feature 和自身资源。
+## 一个逻辑目标
 
-部分构造失败会尝试清理所有已打开成员，保留输入顺序的原 primary。后续清理失败不会替换它，仍可沿 errors/cause 或报告到达。close 尝试所有成员，失败以原 CLOSE_FAILED AggregateError 保留原始错误；终态不会重新开放。
+业务目录只呈现 `pool`（导出的 `RPC_POOL_PEER_ID`），不会把隐藏成员公开为直接调用目标。`host.thread.send('pool', ...)` 只借出一个成员；无目标 request/notify/stream/group 也只选择一次。`members` 管理实际原生资源，不是直接调用隐藏成员的业务捷径。
 
-池 source 为 rpc.pool：INVALID_OPTIONS、POOL_TRANSPORT_UNSUPPORTED、POOL_CLOSED、QUEUE_FULL、CALL_ABORTED、CLOSE_FAILED。业务与原生传输失败保留原 owner 的错误身份。池不自动重放请求；需要重试时使用 host 原 retry 策略并明确业务幂等性。
+group 的整组保持同一成员。只有安装 idempotency plugin 才能调用 outcome；它也选择一个成员，不在所有成员存储中搜索结果。pool 本身不提供去重、幂等保证或业务重试。
+
+来源必须可重复获取独立成员：Thread/Coroutine spawn，Process spawn 或 connect。listen/connectToParent 在原生成员获取前拒绝；pool 不把单条父连接复制成多个成员。自定义原生部署使用 `@migaia/rpc-host/sdk`。
+
+## 容量、队列与取消
+
+| 选项            | 规则                                         |
+| --------------- | -------------------------------------------- |
+| `size`          | 必填正整数，初次安装等待目标成员就绪         |
+| `maxQueue`      | 默认 256；非负整数；0 表示不排队             |
+| `idleTimeoutMs` | 省略则禁用；正有限毫秒，不超过 2147483647    |
+| `scheduler`     | 只拥有空闲回收计时，不接管原生监督或调用期限 |
+
+每成员同一时刻借出一个客户端槽。忙时操作进入有限 FIFO，满时拒绝为 QUEUE_FULL。`signal` 可取消等待项；开始后的取消沿原调用路径处理，不能据此断言远端没有副作用。
+
+stats 是新的冻结快照：targetSize、memberCount、inFlight、queued、state。`queued` 仅计尚未分配成员的等待项；`inFlight` 是客户端占槽，不是远端 provider 或 CPU 并发。memberCount 包含尚未完成清理的退休成员，可能暂不等于 targetSize。
+
+## 流、扩缩容与排空
+
+流在第一次 `next()` 时才申请槽。完成、提前 return 或 throw/取消结算后释放；应用持有未完成的流会阻止相应槽排空。结束流不关闭整个 pool。
+
+`resize` 按调用顺序串行处理，缩容优先退休空闲成员，等待忙成员完成。扩容只获取缺失成员；失败保留 primary 并在仍开放时恢复原目标。空闲回收不改变 targetSize，之后的需求会补齐成员。
+
+显式 `host.thread.pool.close()` 停止新接纳，等待此前接受的操作与成员获取，再尝试关闭成员；重复调用共享关闭 Promise。pool 不添加自己的排空超时。应用应结束持有的业务与流，显式等待 pool 关闭，再完成 Host 清理；`closeIdlePool` 展示没有持有业务时的顺序。
+
+## 错误与观察
+
+池 source 为 `rpc.pool`：INVALID_OPTIONS、POOL_TRANSPORT_UNSUPPORTED、POOL_CLOSED、QUEUE_FULL、CALL_ABORTED、CLOSE_FAILED。业务与原生错误保留其原 owner 的 source/code/cause；池不自动重放。
+
+部分构造失败会清理已获取成员并保留原 primary，次级清理错误继续从错误图或报告到达。成员关闭失败以 CLOSE_FAILED AggregateError 保留原 errors 和首个 cause，关闭后不重新开放。只读观察使用 `@migaia/rpc-host/plugins/probe`，不在 pool 中另装一套诊断或消息解析器。

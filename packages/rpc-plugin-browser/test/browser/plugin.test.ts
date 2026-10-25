@@ -2,7 +2,7 @@ import { expect, it } from 'vitest'
 import { PluginHost, definePlugin, defineFeature } from '@migaia/plugin-host'
 import { createRpcHost } from '@migaia/rpc-host'
 /** The existing ordinary thread outlet accepts a registration and its remote method. */
-type IOrdinaryOutlet = Readonly<{ request(name: string, method: string): Promise<unknown> }>
+type IOrdinaryOutlet = Readonly<{ request(method: string, data?: unknown): Promise<unknown> }>
 import * as browser from '@migaia/rpc-plugin-browser'
 import { windowPair, portPair, rtcChannel } from './message-fixture.js'
 
@@ -50,11 +50,11 @@ it('carries bidirectional Worker calls and streams while retaining borrowed nati
     })
   ])
   try {
-    expect(await hosts[0].request('right')).toBe('right')
-    expect(await hosts[1].request('left')).toBe('left')
+    expect(await hosts[0].worker.request('right')).toBe('right')
+    expect(await hosts[1].worker.request('left')).toBe('left')
     /** The canonical stream owner supplies both yielded values. */
     const values: unknown[] = []
-    for await (const value of hosts[0].stream('values') as AsyncIterableIterator<unknown>)
+    for await (const value of hosts[0].worker.stream('values') as AsyncIterableIterator<unknown>)
       values.push(value)
     expect(values).toEqual([3, 4])
     await Promise.all(hosts.map((host) => host.close()))
@@ -154,7 +154,11 @@ it.each(['window', 'worker', 'shared', 'rtc'] as const)(
     /** Original browser fixture carriers preserve actual source/origin and RTC string delivery. */
     const pair = carrier === 'worker' ? undefined : carrier === 'window' ? windowPair() : portPair()
     /** Explicit exposure is exercised through each exact frozen factory value. */
-    const options = { name: 'borrowed-worker', expose: ['app.increment'] }
+    const options = {
+      namespace: 'browser' as const,
+      name: 'borrowed-worker',
+      expose: ['app.increment']
+    }
     /** The same cold plugin is installed by both hosts without copying native metadata. */
     const plugin =
       carrier === 'worker'
@@ -167,27 +171,40 @@ it.each(['window', 'worker', 'shared', 'rtc'] as const)(
               origin: 'https://right.test'
             })
           : carrier === 'shared'
-            ? browser.sharedWorkerPlugin({ ...options, sharedWorker: { port: pair!.left.target } })
-            : browser.rtcDataChannelPlugin({ ...options, rtcDataChannel: rtcChannel(pair!.left) })
+            ? browser.sharedWorkerPlugin({
+                ...options,
+                sharedWorker: { port: pair!.left.target }
+              })
+            : browser.rtcDataChannelPlugin({
+                ...options,
+                rtcDataChannel: rtcChannel(pair!.left)
+              })
     /** The actual opposing resource supplies the remote endpoint for both installation styles. */
     const remotePlugin =
       carrier === 'worker'
-        ? browser.dedicatedWorkerPlugin({ worker: native!.port2 })
+        ? browser.dedicatedWorkerPlugin({ namespace: 'browser', worker: native!.port2 })
         : carrier === 'window'
           ? browser.windowPlugin({
+              namespace: 'browser',
               window: pair!.left.target,
               receiver: pair!.right.target,
               origin: 'https://left.test'
             })
           : carrier === 'shared'
-            ? browser.sharedWorkerPlugin({ sharedWorker: { port: pair!.right.target } })
-            : browser.rtcDataChannelPlugin({ rtcDataChannel: rtcChannel(pair!.right) })
+            ? browser.sharedWorkerPlugin({
+                namespace: 'browser',
+                sharedWorker: { port: pair!.right.target }
+              })
+            : browser.rtcDataChannelPlugin({
+                namespace: 'browser',
+                rtcDataChannel: rtcChannel(pair!.right)
+              })
     /** First prove the same cold object through the primary public entry. */
     const first = await Promise.all([
       createRpcHost({ plugins: [plugin] }),
       createRpcHost({ plugins: [remotePlugin], provide: { value: () => 17 } })
     ])
-    expect(await first[0].request('value')).toBe(17)
+    expect(await first[0].browser.request('value')).toBe(17)
     await Promise.all(first.map((host) => host.close()))
     /** Ordinary Host lifecycle remains the sole installation and disposal owner. */
     const host = new PluginHost({
@@ -204,10 +221,8 @@ it.each(['window', 'worker', 'shared', 'rtc'] as const)(
     try {
       await host.use(app, plugin)
       const remote = await opening
-      expect(
-        await (Reflect.get(host, 'thread') as IOrdinaryOutlet).request('borrowed-worker', 'value')
-      ).toBe(23)
-      expect(await remote.request('app.increment', 4)).toBe(5)
+      expect(await (Reflect.get(host, 'browser') as IOrdinaryOutlet).request('value')).toBe(23)
+      expect(await remote.browser.request('app.increment', 4)).toBe(5)
       await host.dispose()
       await remote.close()
     } finally {
@@ -229,11 +244,13 @@ it.each(['window', 'shared', 'rtc'] as const)(
       carrier === 'window'
         ? [
             browser.windowPlugin({
+              namespace: 'browser',
               window: pair.right.target,
               receiver: pair.left.target,
               origin: 'https://right.test'
             }),
             browser.windowPlugin({
+              namespace: 'browser',
               window: pair.left.target,
               receiver: pair.right.target,
               origin: 'https://left.test'
@@ -241,12 +258,24 @@ it.each(['window', 'shared', 'rtc'] as const)(
           ]
         : carrier === 'shared'
           ? [
-              browser.sharedWorkerPlugin({ sharedWorker: { port: pair.left.target } }),
-              browser.sharedWorkerPlugin({ sharedWorker: { port: pair.right.target } })
+              browser.sharedWorkerPlugin({
+                namespace: 'browser',
+                sharedWorker: { port: pair.left.target }
+              }),
+              browser.sharedWorkerPlugin({
+                namespace: 'browser',
+                sharedWorker: { port: pair.right.target }
+              })
             ]
           : [
-              browser.rtcDataChannelPlugin({ rtcDataChannel: rtcChannel(pair.left) }),
-              browser.rtcDataChannelPlugin({ rtcDataChannel: rtcChannel(pair.right) })
+              browser.rtcDataChannelPlugin({
+                namespace: 'browser',
+                rtcDataChannel: rtcChannel(pair.left)
+              }),
+              browser.rtcDataChannelPlugin({
+                namespace: 'browser',
+                rtcDataChannel: rtcChannel(pair.right)
+              })
             ]
     /** Providers are independent on the two actual endpoint assemblies. */
     const hosts = await Promise.all(
@@ -264,17 +293,24 @@ it.each(['window', 'shared', 'rtc'] as const)(
       )
     )
     try {
-      expect(await hosts[0]!.request('who')).toBe(1)
-      expect(await hosts[1]!.request('who')).toBe(0)
+      expect(await hosts[0]!.browser.request('who')).toBe(1)
+      expect(await hosts[1]!.browser.request('who')).toBe(0)
       for (const [index, host] of hosts.entries()) {
         /** Consumer iteration reaches the same opposing stream provider in each direction. */
         const values: unknown[] = []
-        for await (const value of host.stream('values') as AsyncIterableIterator<unknown>)
+        for await (const value of host.browser.stream('values') as AsyncIterableIterator<unknown>)
           values.push(value)
         expect(values).toEqual([1 - index, 11 - index])
       }
     } finally {
-      await Promise.all(hosts.map((host) => host.close()))
+      /** Each actual Host retains its own original close completion before terminal cleanup. */
+      const disposals = hosts.map((host) => host.close())
+      hosts.forEach((host, index) => expect(host.close()).toBe(disposals[index]))
+      await Promise.all(disposals)
+      expect(pair.left.closeCalls).toBe(0)
+      expect(pair.right.closeCalls).toBe(0)
+      /** Terminal repeated close borrows that same Promise and cannot acquire native ownership. */
+      hosts.forEach((host, index) => expect(host.close()).toBe(disposals[index]))
     }
     expect(pair.left.closeCalls).toBe(0)
     expect(pair.right.closeCalls).toBe(0)

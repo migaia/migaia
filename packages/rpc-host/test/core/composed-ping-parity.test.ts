@@ -7,7 +7,7 @@ import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
 import { connect } from '../../dist/core/middleware/connect.js'
 import { ping } from '../../dist/core/middleware/ping.js'
 import { uuid } from '../fixtures/core-role/uuid.js'
-import { RpcError, RpcContractError } from '../../dist/core/errors.js'
+import { RpcError, RpcContractError } from '@migaia/rpc-contract/errors'
 import {
   readEndpointDebugSnapshot,
   registerEndpointTimePortObserver,

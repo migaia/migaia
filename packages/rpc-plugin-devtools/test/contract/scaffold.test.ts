@@ -1,5 +1,9 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
-import { devtoolsPlugin, RpcDevtoolsErrorCode, RPC_DEVTOOLS_SOURCE } from '../../src/index.js'
+import {
+  devtoolsPlugin,
+  RpcDevtoolsErrorCode,
+  RPC_DEVTOOLS_SOURCE
+} from '@migaia/rpc-plugin-devtools'
 import {
   decodeRpcDevtoolsRecord,
   encodeRpcDevtoolsRecord
@@ -10,11 +14,13 @@ import type {
   IRpcDevtoolsServiceApi,
   IRpcDevtoolsStats
 } from '../../src/contract/service.js'
-import type { IRuntimeTypedPeer } from '@migaia/rpc-host/plugin'
+import type { IRpcNamespace } from '@migaia/rpc-host'
 
-/** A typed Peer call must preserve the service's concrete stats result across the public API. */
-function requestStats(peer: IRuntimeTypedPeer<IRpcDevtoolsServiceApi>): Promise<IRpcDevtoolsStats> {
-  return peer.request('stats')
+/** A typed namespace must preserve the service's concrete stats result across the public API. */
+function requestStats(
+  namespace: IRpcNamespace<IRpcDevtoolsServiceApi>
+): Promise<IRpcDevtoolsStats> {
+  return namespace.send('service', 'stats')
 }
 
 /** All counters required by the collector and contract exist in one declaration. */
@@ -68,7 +74,7 @@ describe('public scaffold', () => {
     })
   })
 
-  it('retains a typed service implementation and typed Peer stats request', () => {
+  it('retains a typed service implementation and typed namespace stats request', () => {
     expect(service.stats()).toEqual({ since: 0, methods: [] })
     expectTypeOf(requestStats).returns.toEqualTypeOf<Promise<IRpcDevtoolsStats>>()
   })

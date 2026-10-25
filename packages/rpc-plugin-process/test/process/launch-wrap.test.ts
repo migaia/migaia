@@ -15,12 +15,21 @@ import type {
 } from '@migaia/supervision/process'
 import { processPlugin } from '@migaia/rpc-plugin-process'
 import { type IProcessLaunchCommand, type IProcessShortSpawn } from '@migaia/rpc-plugin-process'
-import { type IRuntimeEvent } from '@migaia/rpc-host/plugin'
+import { defineHost } from '@migaia/plugin-host'
+import type { IRpcMemberEvent, IRpcNativeMemberControls } from '@migaia/rpc-host/sdk'
 import {
   createNodeProcessLauncher,
   type INodeProcessHandle
 } from '../../dist/process/adapters/node-child-process.js'
-import { runtimeTestHost } from '../../../rpc-host/test/runtime-api/public-host.js'
+
+/** Static view of the genuine Host extension; no replacement facade or callback is created. */
+type ILaunchWrapHost = ReturnType<typeof defineHost> &
+  Readonly<{
+    process: Readonly<{
+      send(address: string, method: string, payload?: unknown): Promise<unknown>
+      members: IRpcNativeMemberControls<'process'>
+    }>
+  }>
 
 /** An absolute TypeScript entry works with Node's native type stripping and no fixture loader. */
 const entry = fileURLToPath(new URL('./fixtures/launch-wrap-child.ts', import.meta.url))
@@ -87,9 +96,9 @@ function externalEnv(command: IProcessLaunchCommand): IProcessLaunchCommand {
 
 /** Create the existing public Host without imposing mutation deadlines on real child startup. */
 function createHost() {
-  return runtimeTestHost({
+  return defineHost({
     host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
-  })
+  }) as ILaunchWrapHost
 }
 
 /** Every scenario uses the same short source and leaves supervision's restart policy explicit. */
@@ -174,11 +183,11 @@ describe('launch-wrap revision 5', () => {
           }
         })
       )
-      expect(await host.process!.request('service', 'wrapped')).toBe('1')
-      expect(await host.process!.restart('service')).toMatchObject({ state: 'ready' })
-      expect(await host.process!.request('service', 'wrapped')).toBe('1')
-      expect(await host.process!.replace('service')).toMatchObject({ kind: 'replaced' })
-      expect(await host.process!.request('service', 'wrapped')).toBe('1')
+      expect(await host.process!.send('service', 'wrapped')).toBe('1')
+      expect(await host.process!.members.restart('service')).toMatchObject({ state: 'ready' })
+      expect(await host.process!.send('service', 'wrapped')).toBe('1')
+      expect(await host.process!.members.replace('service')).toMatchObject({ kind: 'replaced' })
+      expect(await host.process!.send('service', 'wrapped')).toBe('1')
       expect(calls).toBe(3)
       expect(extraReads).toBe(0)
     } finally {
@@ -191,7 +200,7 @@ describe('launch-wrap revision 5', () => {
     const host = createHost()
     try {
       await host.use(plugin({}))
-      expect(await host.process!.request('service', 'wrapped')).toBeNull()
+      expect(await host.process!.send('service', 'wrapped')).toBeNull()
     } finally {
       await host.dispose()
     }
@@ -237,7 +246,7 @@ describe('launch-wrap revision 5', () => {
           }
         })
       )
-      expect(await host.process!.request('service', 'wrapped')).toBe('1')
+      expect(await host.process!.send('service', 'wrapped')).toBe('1')
       expect(captured!.capabilities).toBe(launcher.capabilities)
       expect(Object.hasOwn(captured!, 'probe')).toBe(true)
       expect(Object.hasOwn(captured!, 'terminateRecord')).toBe(true)
@@ -455,11 +464,11 @@ describe('launch-wrap revision 5', () => {
         })
       )
       /** Subscribe after readiness but before the business call triggers the child's crash. */
-      const exits: IRuntimeEvent[] = []
-      host.process!.on('exit', (event) => {
+      const exits: IRpcMemberEvent[] = []
+      host.process!.members.on('exit', (event) => {
         exits.push(event)
       })
-      expect(await host.process!.request('service', 'wrapped')).toBe('1')
+      expect(await host.process!.send('service', 'wrapped')).toBe('1')
       await vi.waitFor(
         () =>
           expect(exits).toContainEqual(
@@ -477,17 +486,11 @@ describe('launch-wrap revision 5', () => {
   })
 
   it('records the immediately exiting wrapper phase without fixing a timing-dependent code', async () => {
-    /** A healthy connection publishes the Host outlet before the failing source is installed. */
+    /** BC1 gives this source its own real Host, without a duplicate default namespace. */
     const host = createHost()
     /** All original error layers remain available for the observed phase record. */
     const reports: unknown[] = []
     try {
-      await host.use(plugin({}))
-      /** A distinct registration can fail while the existing public outlet observes its exit. */
-      const exits: IRuntimeEvent[] = []
-      host.process!.on('exit', (event) => {
-        if (event.name === 'immediate') exits.push(event)
-      })
       /** Capture installation outcome independently from background exit publication. */
       const outcome = await host
         .use(
@@ -512,65 +515,53 @@ describe('launch-wrap revision 5', () => {
         JSON.stringify({
           installed: outcome.installed,
           chain: outcome.installed ? [] : diagnostic(outcome.error),
-          exits,
+          namespacePublished: Reflect.get(host, 'process') !== undefined,
           reports: reports.map(diagnostic)
         })
       )
-      if (outcome.installed) {
-        /** Bootstrap may complete before immediate native exit on a supported scheduling path. */
-        await vi.waitFor(() => expect(exits.length).toBeGreaterThan(0), { timeout: 2000 })
-        /** The original event retains the observed native exit phase. */
-        const event = exits[0]
-        expect(event).toMatchObject({
-          reason: 'crashed',
-          error: { source: 'supervision', code: 'EXIT_UNEXPECTED' }
+      /** A command that sends no protocol reply cannot complete the real Session handshake. */
+      expect(outcome.installed).toBe(false)
+      if (outcome.installed) return
+      expect(outcome.error).toMatchObject(hostFailure)
+      /**
+       * BC11 keeps the actual bootstrap phase and native cause without requiring a duplicate
+       * wrapper.
+       */
+      const failed = causes(outcome.error).find(
+        (error) => error.source === 'supervision' && error.code === 'LAUNCH_FAILED'
+      )
+      if (failed) {
+        expect(failed.cause).toMatchObject({
+          source: 'rpc.transport.process',
+          code: 'PROCESS_CHANNEL_CONNECT_FAILED',
+          cause: expect.any(Error)
         })
         console.info(
           '[immediate wrapper]',
-          JSON.stringify({ phase: 'EXIT_UNEXPECTED', event, reports: reports.map(diagnostic) })
+          JSON.stringify({
+            phase: 'LAUNCH_FAILED',
+            chain: diagnostic(outcome.error),
+            reports: reports.map(diagnostic)
+          })
         )
       } else {
-        expect(outcome.error).toMatchObject(hostFailure)
-        /** Bootstrap write failure and pre-commit channel closure retain distinct owner chains. */
-        const failed = causes(outcome.error).find(
-          (error) => error.source === 'supervision' && error.code === 'LAUNCH_FAILED'
+        /** A returned handle can lose its channel before Host installation commits. */
+        const start = layer(outcome.error, 'rpc.remote', 'REMOTE_START_FAILED')
+        expect(start.cause).toMatchObject({
+          source: 'rpc.transport.process',
+          code: 'PROCESS_CHANNEL_CLOSED'
+        })
+        console.info(
+          '[immediate wrapper]',
+          JSON.stringify({
+            phase: 'PROCESS_CHANNEL_CLOSED',
+            chain: diagnostic(outcome.error),
+            reports: reports.map(diagnostic)
+          })
         )
-        if (failed) {
-          expect(failed.cause).toMatchObject({
-            source: 'rpc.transport.process',
-            code: 'PROCESS_CHANNEL_CONNECT_FAILED',
-            cause: expect.any(Error)
-          })
-          console.info(
-            '[immediate wrapper]',
-            JSON.stringify({
-              phase: 'LAUNCH_FAILED',
-              chain: diagnostic(outcome.error),
-              reports: reports.map(diagnostic)
-            })
-          )
-        } else {
-          /** A returned handle can lose its channel before Host installation commits. */
-          const start = layer(outcome.error, 'rpc.remote', 'REMOTE_START_FAILED')
-          expect(start.cause).toMatchObject({
-            source: 'rpc.transport.process',
-            code: 'PROCESS_CHANNEL_CLOSED',
-            cause: {
-              source: 'rpc.transport.process',
-              code: 'PROCESS_CHANNEL_CLOSED'
-            }
-          })
-          expect(exits).toEqual([])
-          console.info(
-            '[immediate wrapper]',
-            JSON.stringify({
-              phase: 'PROCESS_CHANNEL_CLOSED',
-              chain: diagnostic(outcome.error),
-              reports: reports.map(diagnostic)
-            })
-          )
-        }
       }
+      /** BC1 replaces the old shared outlet event surface with uncommitted namespace absence. */
+      expect(Reflect.get(host, 'process')).toBeUndefined()
     } finally {
       await host.dispose()
     }
@@ -592,21 +583,21 @@ describe('launch-wrap revision 5', () => {
         })
       )
       /** Public detail identifies the old handle's supervisor generation before retirement. */
-      const started = await host.process!.get('service')
+      const started = await host.process!.members.get('service')
       /** Only this already launched generation may contribute a native stopped event. */
       const oldGeneration = 'generation' in started.unit ? started.unit.generation : undefined
       expect(oldGeneration).toBeTypeOf('number')
       /** Ignore retirement of the old handle and observe the restart's failed launch. */
-      const exits: IRuntimeEvent[] = []
-      host.process!.on('exit', (event) => {
+      const exits: IRpcMemberEvent[] = []
+      host.process!.members.on('exit', (event) => {
         exits.push(event)
       })
       /** The returned state and original report chain explain a failed restart's observed phase. */
-      const outcome = await host.process!.restart('service')
+      const outcome = await host.process!.members.restart('service')
       expect(outcome.state).not.toBe('ready')
       expect(calls).toBe(2)
       /** Lookup rejection is recorded separately so it cannot swallow a detail assertion failure. */
-      const detail = await host.process!.get('service').then(
+      const detail = await host.process!.members.get('service').then(
         (value) => ({ found: true as const, value }),
         (error: unknown) => ({ found: false as const, error })
       )
@@ -663,10 +654,11 @@ describe('launch-wrap revision 5', () => {
             })
           })
         )
-        expect(await host.process!.request('service', 'wrapped')).toBeNull()
-        expect(await host.process!.request('service', 'write', join(denied, 'denied.txt'))).toEqual(
-          { wrote: false, code: 'EPERM' }
-        )
+        expect(await host.process!.send('service', 'wrapped')).toBeNull()
+        expect(await host.process!.send('service', 'write', join(denied, 'denied.txt'))).toEqual({
+          wrote: false,
+          code: 'EPERM'
+        })
       } finally {
         await host.dispose()
         await rm(directory, { recursive: true, force: true })

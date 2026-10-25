@@ -1,127 +1,102 @@
-import { assert, describe, expect, it } from 'vitest'
+/** Native authoring identity and cold configuration retain their business boundaries under BC3. */
+import { describe, expect, it, vi } from 'vitest'
 import { isDefinedPlugin } from '@migaia/plugin-host'
-import { defineFeaturePlugin, defineTransportPlugin } from '@migaia/rpc-host/plugin'
-import { readRpcPluginMetadata } from '../../dist/plugin/metadata.js'
-import type { IAdapterDeployment } from '../../dist/runtime-adapter/deployment.js'
+import { createRpcHost } from '@migaia/rpc-host'
+import { defineFlowPlugin, defineTransportPlugin } from '@migaia/rpc-host/sdk'
+import { readRpcDefinition } from '../../dist/sdk/metadata.js'
 
 describe('RPC plugin definitions', () => {
   it('registers the final native frozen plugin and rejects copied metadata', () => {
-    /** Definition construction must not acquire the transport. */
-    const deployment = Object.freeze({}) as IAdapterDeployment
-    /** Registration metadata remains independent of remote peer identity. */
+    /** Construction captures a native acquisition callback but does not execute it. */
+    const open = vi.fn(() => ({ dispose: () => undefined }))
+    /** Namespace and expose configuration replace the deleted deployment grammar. */
     const plugin = defineTransportPlugin({
       name: 'transport',
+      namespace: 'memory',
       expose: ['app.render'],
-      mode: 'connect',
-      deployment
+      open
     })
     expect(isDefinedPlugin(plugin)).toBe(true)
     expect(Object.isFrozen(plugin)).toBe(true)
     expect(plugin.name).toBe('transport')
-    expect(plugin.expose).toEqual(['app.render'])
-    expect(readRpcPluginMetadata(plugin)).toMatchObject({
+    expect(readRpcDefinition(plugin)).toMatchObject({
       kind: 'transport',
-      definition: { deployment, mode: 'connect' }
+      definition: { namespace: 'memory', expose: ['app.render'], open }
     })
-    expect(readRpcPluginMetadata(Object.freeze({ ...plugin }))).toBeUndefined()
+    expect(readRpcDefinition(Object.freeze({ ...plugin }))).toBeUndefined()
+    expect(open).toHaveBeenCalledTimes(0)
   })
 
-  it('shares factory definition identity while preserving each final surface', () => {
-    /** One module-level factory defines one feature, regardless of its configuration instances. */
-    const feature = defineFeaturePlugin((value: number) => ({
-      name: 'feature',
-      surface: { value }
-    }))
-    /** Separate configuration objects must not bypass host duplicate admission. */
-    const first = feature(1)
-    /** Surface metadata is collected before the native definition is frozen. */
-    const second = feature(2)
-    /** The private token is available only to host admission. */
-    const firstMetadata = readRpcPluginMetadata(first)
-    /** Reading this receipt does not acquire install state. */
-    const secondMetadata = readRpcPluginMetadata(second)
-    expect(first).not.toBe(second)
-    expect(first.value).toBe(1)
-    expect(second.value).toBe(2)
-    expect(isDefinedPlugin(first)).toBe(true)
-    expect(Object.isFrozen(first)).toBe(true)
-    expect(firstMetadata?.kind).toBe('feature')
-    expect(secondMetadata?.kind).toBe('feature')
-    assert(firstMetadata?.kind === 'feature' && secondMetadata?.kind === 'feature')
-    expect(firstMetadata.identity).toBe(secondMetadata.identity)
-  })
-
-  it('uses each object definition final plugin as its own definition identity', () => {
-    /** Object definitions intentionally represent independent custom features. */
-    const first = defineFeaturePlugin({ name: 'first' })
-    /** Matching configuration cannot forge another feature definition. */
-    const second = defineFeaturePlugin({ name: 'second' })
-    expect(readRpcPluginMetadata(first)).toMatchObject({ identity: first })
-    expect(readRpcPluginMetadata(second)).toMatchObject({ identity: second })
-    expect(readRpcPluginMetadata(null)).toBeUndefined()
-  })
-
-  it('captures the shared connection budget once before any deployment work', () => {
-    /** Getter counts prove the SDK owns the option snapshot. */
+  it('captures the shared connection budget once before any native work', () => {
+    /** Getter count retains the original cold snapshot observation. */
     let reads = 0
-    /** A source token has no opportunity to run during definition construction. */
-    const deployment = Object.freeze({}) as IAdapterDeployment
-    /** The mutable caller option cannot alter a later installation. */
-    const connect = {
-      get timeoutMs() {
-        reads += 1
-        return 50
-      }
-    }
-    /** Native metadata retains the immutable option snapshot. */
+    /** Only actual installation may acquire the native source. */
+    const open = vi.fn(() => ({ dispose: () => undefined }))
+    /** BC3 places the physical handshake budget on the actual carrier definition. */
     const plugin = defineTransportPlugin({
       name: 'transport',
-      mode: 'connect',
-      deployment,
-      connect
+      namespace: 'memory',
+      open,
+      get handshakeTimeoutMs() {
+        reads++
+        return 50
+      }
     })
     expect(reads).toBe(1)
-    expect(readRpcPluginMetadata(plugin)).toMatchObject({
-      definition: { connect: { timeoutMs: 50 } }
+    expect(readRpcDefinition(plugin)).toMatchObject({
+      definition: { handshakeTimeoutMs: 50 }
     })
+    expect(open).toHaveBeenCalledTimes(0)
   })
 
-  it('lets native metadata admission reject surface getters without executing them', () => {
-    /** Accessors are not inert capability metadata and must never run during definition admission. */
+  it('lets native extension admission reject surface getters without executing them', async () => {
+    /** Accessors never become inert namespace capability metadata. */
     let reads = 0
-    expect(() =>
-      defineFeaturePlugin({
-        name: 'feature',
-        surface: {
+    /** BC3 contributes the surface through the actual installation's namespace extension port. */
+    const extension = defineFlowPlugin({
+      name: 'extension',
+      setup: () => ({
+        hooks: {},
+        namespaceExtensions: () => ({
           get value() {
-            reads += 1
+            reads++
             return 1
           }
-        }
+        })
       })
-    ).toThrow(TypeError)
+    })
+    /** The genuine transport supplies the namespace on which extensions are admitted. */
+    const transport = defineTransportPlugin({
+      name: 'transport',
+      namespace: 'memory',
+      open: () => ({ dispose: () => undefined })
+    })
+    await expect(
+      createRpcHost({ plugins: [extension, transport], report: () => undefined })
+    ).rejects.toBeInstanceOf(TypeError)
     expect(reads).toBe(0)
   })
 
   it.each([-1, Number.NaN, Number.POSITIVE_INFINITY])(
-    'rejects invalid shared handshake budget %s before native installation',
-    (timeoutMs) => {
-      /** No deployment method is read or executed by this cold option rejection. */
-      const deployment = Object.freeze({}) as IAdapterDeployment
-      expect(() =>
-        defineTransportPlugin({
-          name: 'transport',
-          mode: 'connect',
-          deployment,
-          connect: { timeoutMs }
-        })
-      ).toThrowError(
-        expect.objectContaining({
-          name: 'TypeError',
-          source: 'rpc.endpoint',
-          code: 'INVALID_CONFIG'
-        })
-      )
+    'rejects invalid shared handshake budget %s before native acquisition',
+    async (handshakeTimeoutMs) => {
+      /** The actual source must remain untouched by native configuration rejection. */
+      const open = vi.fn(() => ({ dispose: () => undefined }))
+      /** BC3 removes connect descriptors; the new definition lends its one budget to Session. */
+      const transport = defineTransportPlugin({
+        name: 'transport',
+        namespace: 'memory',
+        handshakeTimeoutMs,
+        open
+      })
+      await expect(
+        createRpcHost({ plugins: [transport], report: () => undefined })
+      ).rejects.toMatchObject({
+        name: 'TypeError',
+        source: 'rpc.endpoint',
+        code: 'INVALID_CONFIG'
+      })
+      expect(open).toHaveBeenCalledTimes(0)
     }
   )
 })

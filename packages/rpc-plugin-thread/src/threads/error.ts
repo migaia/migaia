@@ -1,12 +1,17 @@
-import { normalizePortable } from '@migaia/rpc-contract'
-import { createAdapterConfigurationTypeError } from '@migaia/rpc-host/plugin'
+/**
+ * Preserves native configuration failures while validating portable Worker data and absolute launch
+ * entries. Error code ownership remains centralized in Contract.
+ */
+import { normalizeRpcPortable } from '@migaia/rpc-contract/portable'
+import { tagRpcError } from '@migaia/rpc-contract/errors'
+import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import type { IThreadSpec } from '@migaia/supervision/threads'
 import { ThreadErrorText } from './error-text.js'
 
 /** Preserve native TypeError and original cause while naming the rejected field. */
 export function invalidThreadConfig(field: string, message: string, cause?: unknown): never {
   /** Error identity attaches to the original native error, including its stack. */
-  const error = createAdapterConfigurationTypeError(message, cause)
+  const error = tagRpcError(new TypeError(message, { cause }), RpcCoreErrorCode.invalidConfig)
   Object.defineProperty(error, 'detail', { value: Object.freeze({ field }), enumerable: true })
   throw error
 }
@@ -15,7 +20,7 @@ export function invalidThreadConfig(field: string, message: string, cause?: unkn
 export function portableThreadSpec(spec: IThreadSpec): IThreadSpec {
   if (spec?.data === undefined) return spec
   try {
-    return { ...spec, data: normalizePortable(spec.data) }
+    return { ...spec, data: normalizeRpcPortable(spec.data) }
   } catch (error) {
     return invalidThreadConfig('spec.data', ThreadErrorText.invalidData, error)
   }

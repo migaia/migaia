@@ -11,8 +11,9 @@ import { RpcCapability } from '@migaia/rpc-contract'
 import type { IRpcFactoryConfig } from '../../dist/core/typing.js'
 import type { IRpcPortableValue } from '@migaia/rpc-contract'
 import { defineFeature } from '../../dist/core/feature.js'
-import { RpcError, RpcCoreErrorCode } from '../../dist/core/errors.js'
-import { RpcCoreErrorText } from '../../dist/core/error-text.js'
+import { RpcError } from '@migaia/rpc-contract/errors'
+import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
+import { RpcCoreErrorText } from '@migaia/rpc-contract/errors'
 
 /** New resource operations run through the existing composition and real memory carrier. */
 function pair(capabilities: readonly string[] = []) {

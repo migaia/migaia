@@ -1,15 +1,26 @@
+/**
+ * Lends exact Node streams, Process error presentation and native observation facts to SDK
+ * EventByteIO. The caller retains the actual physical shutdown operation.
+ */
 import type { Readable, Writable } from 'node:stream'
-import { Buffer } from 'node:buffer'
-import { createRuntimeEventByteIO } from '@migaia/rpc-host/plugin'
-import { ProcessChannelDiagnostics } from './diagnostics.js'
+import { RpcEventByteIO, RpcCarrierObservation, IpcReporterContext } from '@migaia/rpc-host/sdk'
+import { hostRethrowReporter } from '@migaia/utils/promise'
+import { createProcessChannelClosedError } from './error.js'
+import { ProcessByteCarrierFacts } from './constants.js'
 
-/** Node glue supplies actual streams; Core constructs and observes the physical byte resource. */
-export function nodeByteStream(readable: Readable, writable: Writable, destroy: () => void) {
-  return createRuntimeEventByteIO(
-    readable,
-    writable,
-    { close: destroy },
-    ProcessChannelDiagnostics.closed,
-    Buffer
-  )
+/** Node acquisition borrows the unique SDK byte owner while retaining native stream cleanup. */
+export function nodeByteStream(
+  readable: Readable,
+  writable: Writable,
+  destroy: () => void,
+  isExclusive?: () => boolean
+) {
+  /** Physical observer failures use the original native resource's background error boundary. */
+  const report = (error: unknown) => hostRethrowReporter(error, IpcReporterContext)
+  return new RpcEventByteIO(readable, writable, destroy, {
+    closedError: createProcessChannelClosedError,
+    report,
+    isExclusive,
+    observation: new RpcCarrierObservation(ProcessByteCarrierFacts, report)
+  }).value
 }

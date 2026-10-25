@@ -1,37 +1,9 @@
 /** Shared canonical connection-detail prose consumed by Tray without legacy factory examples. */
-import type { IMemberDoc, ITypeDoc } from './contract.js'
-
-/** Transport option prose is shared only where the native plugin contracts are identical. */
-export const rpcPluginOptionDocs = {
-  name: {
-    summary: {
-      en: 'Application-selected local registration name in an ordinary PluginHost; it distinguishes installed entries and is independent of remote self.name or authentication identity.',
-      zh: '应用选择的普通插件宿主本地登记名，用于区分安装项，与远端 self.name 及对端认证身份无关。'
-    }
-  },
-  expose: {
-    summary: {
-      en: 'Explicit method exposure list for an ordinary PluginHost installation; selects which existing methods that entry publishes without creating a local business implementation.',
-      zh: '普通插件宿主的显式方法公开列表，仅选取该安装项需要向对端暴露的方法，不新增本地业务实现。'
-    }
-  },
-  connect: {
-    summary: {
-      en: 'Preparation policy for the original identity and capability handshake, executed by the current source; this record does not supply a second physical connection source.',
-      zh: '仅配置原身份及能力握手的准备策略，由当前来源执行；它本身不提供第二个物理连接来源。'
-    }
-  },
-  'connect.timeoutMs': {
-    summary: {
-      en: 'One finite nonnegative millisecond budget shared by identity and capability preparation; phases do not reset it, and it does not set business-call or task-stop deadlines.',
-      zh: '身份与能力准备共用的一次有限非负毫秒预算，各阶段不重置期限，也不作为业务调用或任务停止期限。'
-    }
-  }
-} satisfies Readonly<Record<string, IMemberDoc>>
+import type { ITypeDoc } from './contract.js'
 
 /** Connection facts remain owned by the original accepted session and native sampler. */
-export const runtimeSharedTypes: Readonly<Record<string, ITypeDoc>> = {
-  IRuntimeConnectionDetail: {
+export const rpcMemberSharedTypes: Readonly<Record<string, ITypeDoc>> = {
+  IRpcMemberConnectionDetail: {
     summary: {
       en: 'Safe connection detail projected by the original runtime owner; native unavailable facts remain explicit. Shared only with Tray documentation.',
       zh: '由原运行时所有者投影的安全连接详情，缺失原生事实明确保留不可用，仅与托盘文档共用。'
@@ -45,14 +17,14 @@ export const runtimeSharedTypes: Readonly<Record<string, ITypeDoc>> = {
       },
       counters: {
         summary: {
-          en: 'Call counters: `inFlight` (calls not yet finished) is measured; `sent`, `received`, `errors`, `lastActiveAt` are reported unavailable; or `{ status: "unavailable", reason }` when the owner cannot observe it.',
-          zh: '调用计数：`inFlight`（尚未结束的调用数）会被测量；`sent`、`received`、`errors`、`lastActiveAt` 报告为不可用；无法观察时为 `{ status: "unavailable", reason }`。'
+          en: 'The current native-member projection reports `{ status: "unavailable", reason: "canonical-counter-not-available" }`; it has no canonical pending-call counter input. A declared metric shape does not make a measurement available.',
+          zh: '当前原生成员投影返回 `{ status: "unavailable", reason: "canonical-counter-not-available" }`，尚未接入规范待决调用计数来源；声明了指标形状不代表已有实际测量值。'
         }
       },
       recent: {
         summary: {
-          en: 'Recent lifecycle records (`IRuntimeRecent`), newest last.',
-          zh: '最近的生命周期记录（`IRuntimeRecent`），最新的在最后。'
+          en: 'Recent lifecycle records (`IRpcMemberRecent`), newest last.',
+          zh: '最近的生命周期记录（`IRpcMemberRecent`），最新的在最后。'
         }
       },
       identity: {
@@ -73,7 +45,15 @@ export const runtimeSharedTypes: Readonly<Record<string, ITypeDoc>> = {
           zh: '该连接在本端的配置方式：`spawn`、`connect` 或 `listen`。'
         },
         values: {
-          enum: 'RuntimeSourceKind'
+          spawn: {
+            en: 'The local source launched the remote native unit.',
+            zh: '本地来源启动了远端原生单元。'
+          },
+          connect: {
+            en: 'The local source initiated the connection.',
+            zh: '本地来源主动建立连接。'
+          },
+          listen: { en: 'The local source accepted the connection.', zh: '本地来源接受了连接。' }
         }
       },
       direction: {
@@ -82,7 +62,13 @@ export const runtimeSharedTypes: Readonly<Record<string, ITypeDoc>> = {
           zh: '由哪一方发起：`spawned`、`spawned-by`（本端是子端）、`connect` 或 `listen`。'
         },
         values: {
-          enum: 'RuntimeConnectionDirection'
+          spawned: { en: 'This owner launched the remote unit.', zh: '当前所有者启动了远端单元。' },
+          'spawned-by': {
+            en: 'This side is the child of its bootstrap parent.',
+            zh: '本端是可信启动父端创建的子端。'
+          },
+          connect: { en: 'This side initiated the connection.', zh: '本端主动建立连接。' },
+          listen: { en: 'This side accepted the connection.', zh: '本端接受了连接。' }
         }
       },
       carrier: {
@@ -105,8 +91,8 @@ export const runtimeSharedTypes: Readonly<Record<string, ITypeDoc>> = {
       },
       health: {
         summary: {
-          en: 'Health check metric `{ state, failures }`, or `{ status: "unavailable", reason }` when the owner cannot observe it.',
-          zh: '健康检查指标 `{ state, failures }`；无法观察时为 `{ status: "unavailable", reason }`。'
+          en: 'Native health metric whose `value` is `{ state, failures }`, with explicit scope, unit and observation time; or `{ status: "unavailable", reason }` when the owner cannot observe it.',
+          zh: '原生健康指标的 `value` 为 `{ state, failures }`，并携带明确的范围、单位和观察时间；无法观察时为 `{ status: "unavailable", reason }`。'
         }
       },
       restartCount: {

@@ -1,4 +1,8 @@
-import { ERROR_SOURCE } from './error-code.js'
+/**
+ * Owns stable Contract diagnostic text shared by pure validators and native error construction.
+ * Protocol admission and error provenance remain with their respective owners.
+ */
+import { ERROR_SOURCE } from '../error-code.js'
 
 /** Contract-layer identity attached to every RPC contract boundary error. */
 export const RPC_CONTRACT_SOURCE = ERROR_SOURCE
@@ -23,5 +27,7 @@ export const RpcContractErrorText = {
   /** Public diagnostic when protocol identity or major versions cannot be negotiated. */
   handshakeIncompatible: 'rpc handshake is incompatible',
   /** Public diagnostic for a rejected remote handshake with its original cause retained. */
-  handshakeRejected: 'rpc handshake was rejected'
+  handshakeRejected: 'rpc handshake was rejected',
+  /** A locally required installed extension has no compatible accepted peer handler. */
+  extensionNegotiationFailed: 'rpc extension negotiation failed'
 } as const

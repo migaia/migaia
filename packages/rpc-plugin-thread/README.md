@@ -1,29 +1,24 @@
 # `@migaia/rpc-plugin-thread`
 
-把 `createRpcHost` 的业务调用交给 Node、Bun 或 Deno 的真实线程，复用原生 Worker 的监督、代次与清理。
+在 Node、Bun 或 Deno 的真实 Worker 上运行 RPC。
+
+`rpc-contract` 定义纯协议与接口；`rpc-host` 拥有会话、目录、provider、调用结算与取消；本包是负责原生 Worker 建立、监管和释放的 transport plugin。auth、chunk、batch、probe 等 flow plugin 处理消息流；timeout、retry、pool 等 feature 安装在所属 plugin 上。
 
 [English](./README.en.md) · [使用指南](./USEGUIDE.md)
 
-## 为什么选它
-
-- 父子两端都可提供方法、反向调用和逐项返回结果。
-- 期限、协作取消、资源准入和错误原因沿同一调用链处理。
-- Worker 崩溃后由原监督器恢复连接；旧代的能力和未确认结果不会冒充新代结果。
-- host 关闭时释放自己启动的 Worker，原生退出与 terminate 请求保持分开。
-
-浏览器页面和浏览器 Worker 使用 [rpc-plugin-browser](../rpc-plugin-browser/README.md)。需要操作系统进程隔离时使用 [rpc-plugin-process](../rpc-plugin-process/README.md)。
-
-## 从这里开始
+## 开始使用
 
 ```bash
 pnpm add @migaia/rpc-host @migaia/rpc-contract @migaia/rpc-plugin-thread
 ```
 
-保存为独立 ESM TypeScript 入口，在支持原生 TypeScript 的 Node 24 中执行；其他工具链先编译为 ESM。该文件会在子线程再次执行，guard 防止继续派生。
+下面是独立 ESM TypeScript 入口。Node 24 可使用原生 TypeScript 支持；也可先编译成 ESM。子线程重载同一文件，guard 防止递归派生。
 
-```ts doc-test=run
+```ts doc-test=check
 import { createRpcHost } from '@migaia/rpc-host'
 import { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'
+
+type IWorkerApi = { double(value: number): number }
 
 if (await isThreadChild()) {
   await createRpcHost({
@@ -31,42 +26,40 @@ if (await isThreadChild()) {
     provide: { double: (value: number) => value * 2 }
   })
 } else {
-  const host = await createRpcHost<{ double(value: number): number }>({
-    plugins: [threadPlugin({ spawn: true, connect: { timeoutMs: 1500 } })]
-  })
+  const plugins = [threadPlugin({ spawn: true })] as const
+  const host = await createRpcHost<IWorkerApi, typeof plugins>({ plugins })
   try {
-    console.log(await host.request('double', 21))
+    console.log(await host.thread.request('double', 21))
   } finally {
     await host.close()
   }
 }
 ```
 
-输出 `42`。显式入口也可使用 `spawn: new URL('./worker.js', import.meta.url)`；该入口用 `connectToParent: true` 接受实际父端 bootstrap。
+一个当前直连 Worker 返回 `42`。使用独立子入口时可写 `spawn: new URL('./worker.js', import.meta.url)`，子端仍以 `connectToParent: true` 接收真实父端 bootstrap。
 
-## 来源与调用
+## 来源与命名空间
 
-| API / 选项                                | 用途                                             |
-| ----------------------------------------- | ------------------------------------------------ |
-| `threadPlugin({ spawn })`                 | 选择当前入口、路径/URL、短配置或完整原生监督配置 |
-| `threadPlugin({ connectToParent: true })` | 仅在实际线程子端接父端                           |
-| `isThreadChild()`                         | 异步读取当前原生子线程身份                       |
-| `connect: { timeoutMs }`                  | 单次 identity/能力准备的共享预算                 |
-| `createRpcHost({ provide, self, ... })`   | 配置业务与本端身份，而非猜测原生 Worker 身份     |
-| `host.request / notify / stream / send`   | 使用 host 的统一调用语义                         |
+| 选项                    | 用途                                                                |
+| ----------------------- | ------------------------------------------------------------------- |
+| `spawn`                 | `true`、路径/URL、带 `entry` 的短配置或完整 `IThreadSpawn` 原生配方 |
+| `connectToParent: true` | 仅在真实线程子端连接父端，与 `spawn` 互斥                           |
+| `name`                  | 原生安装/注册名称；默认 `thread`                                    |
+| `namespace`             | 调用命名空间；默认 `thread`                                         |
+| `features`              | 完整 timeout、retry 或 pool feature 实例                            |
+| `expose`                | 普通 PluginHost 安装时选择公开的本地 Feature 方法                   |
+| `report`                | 原生诊断报告回调                                                    |
 
-只选 spawn 或 connectToParent 之一，不接收浏览器 Window、SharedWorker 或任意伪造父端。子端身份来自原 launcher 的真实 bootstrap。一个 host 使用一个调用端点；安装 [poolPlugin](../rpc-plugin-pool/README.md) 可由同一 host 管理多个隐藏线程成员。
+调用使用 `host.thread.request/notify/stream/group/send/dispatch`；成员控制使用 `host.thread.members`。一个 Host 可安装命名空间不同的多个 transport，业务按命名空间隔离。选择符合应用介质的 transport 即可，无需为了使用本包安装其他介质。
 
-## 期限、错误与恢复
+浏览器页面与浏览器 Worker 使用 [rpc-plugin-browser](../rpc-plugin-browser/README.md)；操作系统进程隔离使用 [rpc-plugin-process](../rpc-plugin-process/README.md)。同载体多成员调度见 [pool](../rpc-plugin-pool/README.md)。
 
-调用传 `signal` 和 `timeoutMs`；传输的 `connect.timeoutMs` 单独约束握手。取消是协作信号，不会自动终止任意同步循环；需要强制停止时使用原监督控制。断开后的未确认业务可能已执行，不能把自动恢复解释为自动安全重放。
+## 调用策略与生命周期
 
-原生线程错误 source 为 `rpc.transport.thread`，调用错误可能为 `rpc.endpoint` 或 `rpc.remote`。序列化保留错误的 source/code/name/message/stack/cause 与聚合成员；按身份处理，不按文本匹配。
+单次调用传 `signal`，以及完整的 `timeout({ ms })`、`retry({ attempts })` 实例或 `false`。策略优先级是单次调用、transport feature、链路策略 plugin；未选择策略时不自动加超时或重试。取消是协作信号，不会抢占同步死循环。
 
-结构化克隆与 ownership transfer 是不同能力。RPC transfer 还要求双方实际协商的能力和受支持认证配置，不能仅因底层支持 `postMessage` 就假设允许；失败时检查原错误链。原生资源读取来自当前实际 Worker，不把进程 RSS 冒充线程内存。
+Thread 的原生 `spec.limits.callWallTimeMs` 是独立硬上限；显式 `timeout: false` 只关闭可选业务 timeout，不能延长该上限。它由真实 launch spec 与同一 scheduler 创建的完整 timeout 实例执行。
 
-## 原生接入与生命周期
+`notify` 等物理写出，`request` 等业务结果。原生监管负责重启与替换；连接恢复不代表业务可安全重放。原生错误、调用错误和远端错误保留自己的 source/code/cause，跨线程传递的错误图保留 name/message/stack 与聚合成员。
 
-根入口提供 `threadPlugin`、`isThreadChild`、公开选项类型和错误身份。原生 launcher/channel 由包内对应 owner 使用；应用通过短 spawn 或完整原生监督配置选择来源。自定义原始载体使用 `@migaia/rpc-host/plugin` 的部署 SDK。
-
-传输定义可交给普通 `PluginHost.use(...)`，其 thread outlet 保留原停止、重启、替换、退出事件和代次语义。关闭先沿原生 drain 处理已接纳任务，再释放自己拥有的 Worker；同一次关闭不重复 terminate。更多示例见[使用指南](./USEGUIDE.md)。
+根入口公开 `threadPlugin`、`isThreadChild`、选项与错误身份。自定义原始载体使用 `@migaia/rpc-host/sdk`；只读观察使用 `@migaia/rpc-host/plugins/probe`。关闭流、取消调用、关闭 namespace、关闭 Host 和终止 Worker 是不同操作。资源与恢复示例见[使用指南](./USEGUIDE.md)。

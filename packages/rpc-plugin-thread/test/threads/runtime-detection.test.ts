@@ -4,13 +4,12 @@ import { fileURLToPath } from 'node:url'
 import { readFile } from 'node:fs/promises'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { walkErrorCauses } from '@migaia/utils/error'
-import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'
 import { createRpcHost } from '@migaia/rpc-host'
 import { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'
 import { expandThreadSpawn } from '../../dist/threads/short-spawn.js'
 import { threadRuntimeResource } from '../../dist/threads/runtime-resource.js'
-import * as web from '../../dist/threads/adapters/web.js'
-import * as node from '../../dist/threads/adapters/node.js'
+import * as web from '../../dist/threads/web-launcher.js'
+import * as node from '../../dist/threads/node-launcher.js'
 
 /** Runtime markers are restored after each actual source-selection case. */
 const nativeProcess = process
@@ -42,7 +41,8 @@ describe('native thread runtime selection', () => {
         const priorNode = nodeFactory.mock.calls.length
         const source = await expandThreadSpawn(
           { spawn: new URL('./fixtures/adapter-idle.mts', import.meta.url) },
-          threadRuntimeResource
+          threadRuntimeResource,
+          () => undefined
         )
         expect(webFactory.mock.calls.length - priorWeb).toBe(kind === 'node' ? 0 : 1)
         expect(nodeFactory.mock.calls.length - priorNode).toBe(kind === 'node' ? 1 : 0)
@@ -120,22 +120,20 @@ describe('native thread runtime selection', () => {
         return systemScheduler.schedule(callback, delay)
       }
     }
+    /** The original unsupported cold budget remains a real runtime pending assertion. */
+    const options = {
+      spawn: { entry: new URL('./fixtures/adapter-idle.mts', import.meta.url), scheduler },
+      connect: { timeoutMs: 20 }
+    }
     const failure = await createRpcHost({
-      plugins: [
-        threadPlugin({
-          spawn: { entry: new URL('./fixtures/adapter-idle.mts', import.meta.url), scheduler },
-          connect: { timeoutMs: 20 }
-        })
-      ],
+      plugins: [threadPlugin(options)],
       report: () => undefined
     }).catch((error: unknown) => error)
     expect(delays.filter((delay) => delay === 20)).toEqual([20])
     expect(walkErrorCauses(failure)).toContainEqual(
       expect.objectContaining({
         source: 'rpc.endpoint',
-        code: 'INVALID_CONFIG',
-        name: 'TypeError',
-        message: rpcMessageCapabilityControl.failureText
+        code: 'DEADLINE_EXCEEDED'
       })
     )
   }, 10000)

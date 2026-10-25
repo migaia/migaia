@@ -1,3 +1,7 @@
+/**
+ * Loads the actual Node worker_threads resource only after canonical runtime selection. Native pid
+ * and parent facts remain borrowed runtime values rather than inferred RPC metadata.
+ */
 import { detectServerRuntime, ServerRuntime } from '@migaia/utils'
 import type { IThreadRuntimeResource, IThreadNativeRuntimeModule } from './runtime-types.js'
 

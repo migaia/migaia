@@ -1,2 +1,6 @@
-/** Package error identity remains with its canonical semantic source owner. */
-export * from './core/error-code.js'
+/** RPC failure codes are declared by rpc-contract; this package owns no local codes. */
+export const RpcHostLocalErrorCode = {} as const
+
+/** No package-local semantic values exist; RPC code unions come from rpc-contract. */
+export type IRpcHostLocalErrorCode =
+  (typeof RpcHostLocalErrorCode)[keyof typeof RpcHostLocalErrorCode]

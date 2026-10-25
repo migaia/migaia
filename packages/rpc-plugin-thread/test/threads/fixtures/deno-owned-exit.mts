@@ -55,7 +55,7 @@ if (await isThreadChild()) {
     ]
   })
   /** Business output proves preparation and a genuine cross-realm request completed before close. */
-  const value = await peer.request('echo', 'actual-deno-owned-worker')
+  const value = await peer.thread.request('echo', 'actual-deno-owned-worker')
   assert.equal(value, 'actual-deno-owned-worker')
   /** Snapshot first, then clear only the phase boundary; no admission notice is hidden. */
   const admissionDiagnostics = diagnostics.splice(0).map((error) => classify(error))

@@ -5,32 +5,45 @@ import { deferred } from '@migaia/utils/promise'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { createUnitBudget } from '@migaia/supervision'
 import { createCoroutineSupervisor } from '@migaia/supervision/coroutine'
-import { createEventTargetMessageResource } from '../../../rpc-host/dist/runtime-adapter/message/resource.js'
-import { prepareRuntimePeerSourceContext } from '../../../rpc-host/dist/remote/runtime-api/peer.js'
-import { createRuntimePeer } from '../../../rpc-host/dist/remote/runtime-api/peer.js'
-import { createRpcHost } from '../../../rpc-host/dist/index.js'
-import { defineTransportPlugin } from '../../../rpc-host/dist/plugin/define.js'
-import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'
+import { createRpcHost } from '@migaia/rpc-host'
+import { defineTransportPlugin } from '@migaia/rpc-host/sdk'
+import { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'
+import { coroutineCarrier, CoroutinePort } from '../../dist/coroutine-port.js'
 import type { ICoroutineMessagePort } from '../../dist/coroutine-task.js'
+
+/** The actual coroutine carrier attaches through the public Host, with no Peer or ACK bridge. */
+function portHost(
+  port: ICoroutineMessagePort,
+  self: { name: string; instanceId: string },
+  report: (error: unknown) => void
+) {
+  return createRpcHost({
+    self,
+    report,
+    provide: { identity: () => self.instanceId },
+    plugins: [
+      defineTransportPlugin({
+        name: self.name,
+        namespace: 'coroutine',
+        async open(context) {
+          /** The sole original physical carrier is acquired by its real Session owner. */
+          const session = context.attach(coroutineCarrier(port, self.instanceId, context.report))
+          await session.ready
+          return { dispose: () => context.detach(session) }
+        }
+      })
+    ]
+  })
+}
 
 describe('coroutine runtime binding', () => {
   it('child recipe starts the genuine task port through EventTarget after capture', async () => {
-    /** The family wrapper supplies a genuine opaque token; no physical port is hand-passed. */
-    const { wrapCoroutineTask, portOf } = await import('../../dist/coroutine-task.js')
-    /** The child must reach the adapter definition's canonical peer constructor. */
-    const { getCoroutineMessageAdapter, startOnListen } =
-      await import('../../dist/coroutine-binding.js')
-    /** Task lifetime stays open while two real Peers complete their handshake. */
+    const { wrapCoroutineTask, connectionOf } = await import('../../dist/coroutine-task.js')
     const finish = deferred<void>()
-    /** Parent port publication comes from the supervisor's existing task context operation. */
     const exposed = deferred<ICoroutineMessagePort>()
-    /** The original task context supplies the sole opaque child connection. */
     const connected = deferred<import('../../dist/coroutine-task.js').ICoroutineConnect>()
-    /** Contained diagnostics remain visible during physical cleanup. */
     const reports: unknown[] = []
-    /** Cooperative cancellation belongs to the task context, not the transport facade. */
     const controller = new AbortController()
-    /** The wrapper owns both native ports until this user task settles. */
     const running = Promise.resolve(
       wrapCoroutineTask(
         async ({ connect }) => {
@@ -38,137 +51,127 @@ describe('coroutine runtime binding', () => {
           await finish.promise
         },
         (error) => reports.push(error)
-      )({
-        signal: controller.signal,
-        expose: (port) => exposed.resolve(port),
-        heartbeat: () => undefined
-      })
+      )({ signal: controller.signal, expose: exposed.resolve, heartbeat: () => undefined })
     )
-    /** The actual native child port has both listener APIs, so a wrong branch is observable. */
     const connect = await connected.promise
-    /** Node's native carrier can be inspected without changing the public opaque connection type. */
-    const native = portOf(connect) as unknown as import('node:worker_threads').MessagePort
-    /** Capture must attach through EventTarget before native start. */
+    const native = connectionOf(connect)
+      .port as unknown as import('node:worker_threads').MessagePort
     const attached = vi.spyOn(native, 'addEventListener')
-    /** EventEmitter invocation would violate the family's single message recipe. */
     const emitter = vi.spyOn(native, 'on')
-    /** The real native start still executes after asserting listener ordering. */
     const originalStart = native.start
-    /** Start count proves one activation even when resource preparation adds more listeners. */
     const start = vi.spyOn(native, 'start').mockImplementation(() => {
       expect(attached.mock.calls.some(([name]) => name === 'message')).toBe(true)
       Reflect.apply(originalStart, native, [])
     })
-    /** The parent uses the same existing resource handshake, without a second identity protocol. */
-    const resource = createEventTargetMessageResource(startOnListen(await exposed.promise))
-    /** Actual peer lifetimes close before task physical ownership settles. */
-    let peers: (
-      | Awaited<ReturnType<typeof createRuntimePeer>>
-      | Awaited<ReturnType<typeof createRpcHost>>
-    )[] = []
+    /** Both actual Hosts settle before the task's physical ports are released. */
+    const [parent, child] = await Promise.all([
+      portHost(
+        await exposed.promise,
+        { name: 'parent', instanceId: 'child-recipe-parent' },
+        (error) => reports.push(error)
+      ),
+      createRpcHost({
+        provide: { read: (value: unknown) => value },
+        report: (error) => reports.push(error),
+        plugins: [coroutinePlugin({ connectToParent: connect })]
+      })
+    ])
     try {
-      peers = await Promise.all([
-        createRuntimePeer({
-          self: { name: 'parent', instanceId: 'child-recipe-parent' },
-          provide: {},
-          report: (error) => reports.push(error),
-          connect: async (context) =>
-            resource.open({
-              peerId: await resource.exchangeIdentity(context),
-              scheduler: systemScheduler,
-              offer: context.capabilities,
-              control: rpcMessageCapabilityControl
-            })
-        }),
-        createRpcHost({
-          provide: { read: (value: unknown) => value },
-          report: (error) => reports.push(error),
-          plugins: [
-            defineTransportPlugin({
-              name: 'coroutine-child',
-              mode: 'connect',
-              deployment: getCoroutineMessageAdapter().deployment({ connect })
-            })
-          ]
-        })
-      ])
-      expect(await peers[0]!.request('read', 'child-recipe')).toBe('child-recipe')
+      expect(await parent.coroutine.request('read', 'child-recipe')).toBe('child-recipe')
       expect(emitter).not.toHaveBeenCalled()
       expect(start).toHaveBeenCalledTimes(1)
     } finally {
-      await Promise.all(peers.map((peer) => peer.close()))
-      await resource.close()
+      await Promise.all([parent.close(), child.close()])
       finish.resolve()
       await running
       vi.restoreAllMocks()
     }
   })
-  it('uses only EventTarget listeners and starts once after the first message listener', async () => {
-    /** The native Node port supplies both branches, making facade selection observable. */
+  it('uses only EventTarget listeners and starts once after the first message listener', () => {
     const native = new MessageChannel()
-    /** The new module is loaded inside the case so old main produces a genuine missing-owner red. */
-    const { startOnListen } = await import('../../dist/coroutine-binding.js')
-    /** Native spies establish ordering without inventing a transport or receiver. */
     const attached = vi.spyOn(native.port1, 'addEventListener')
-    /** Selecting EventEmitter would invoke this existing native operation. */
     const emitter = vi.spyOn(native.port1, 'on')
-    /** A started port must have its capture listener before queued frames become deliverable. */
     const start = vi.spyOn(native.port1, 'start').mockImplementation(() => {
       expect(attached.mock.calls.some(([name]) => name === 'message')).toBe(true)
     })
+    const port = new CoroutinePort(native.port1)
+    /** Exact acquired removers belong to the physical carrier, not a frozen compatibility facade. */
+    const remove: (() => void)[] = []
     try {
-      /** EventTarget-only shape forces the adapter's canonical branch. */
-      const facade = startOnListen(native.port1 as unknown as MessagePort)
-      expect(Object.isFrozen(facade)).toBe(true)
-      expect('on' in facade).toBe(false)
-      expect('off' in facade).toBe(false)
-      facade.addEventListener('close', () => undefined)
+      remove.push(port.onClose(() => undefined))
       expect(start).not.toHaveBeenCalled()
-      facade.addEventListener('message', () => undefined)
-      facade.addEventListener('message', () => undefined)
+      remove.push(
+        port.onMessage(() => undefined),
+        port.onMessage(() => undefined)
+      )
       expect(start).toHaveBeenCalledTimes(1)
       expect(emitter).not.toHaveBeenCalled()
     } finally {
+      for (const dispose of remove) dispose()
       vi.restoreAllMocks()
       native.port1.close()
       native.port2.close()
     }
   })
-
   it('exchanges independently prepared identities without changing either self', async () => {
-    /** Each real channel uses the resource's existing cold identity and ACK owners. */
-    const { startOnListen } = await import('../../dist/coroutine-binding.js')
     for (let index = 0; index < 2; index += 1) {
-      /** Independent unit channels cannot share an address or capture receipt. */
       const native = new MessageChannel()
-      /** Each preparation freezes its own canonical identity before communication. */
-      const left = prepareRuntimePeerSourceContext(
-        { name: 'parent', instanceId: `p-${index}` },
-        true
-      )
-      /** The child independently owns its address; no supervisor fingerprint is supplied. */
-      const right = prepareRuntimePeerSourceContext(
-        { name: 'child', instanceId: `c-${index}` },
-        true
-      )
-      /** Both held resources attach their actual capture listener through the facade. */
-      const resources = [native.port1, native.port2].map((port) =>
-        createEventTargetMessageResource(startOnListen(port as unknown as MessagePort))
-      )
+      const left = { name: 'parent', instanceId: `p-${index}` }
+      const right = { name: 'child', instanceId: `c-${index}` }
+      const hosts = await Promise.all([
+        portHost(native.port1, left, () => undefined),
+        portHost(native.port2, right, () => undefined)
+      ])
       try {
         expect(
           await Promise.all([
-            resources[0]!.exchangeIdentity(left),
-            resources[1]!.exchangeIdentity(right)
+            hosts[0].coroutine.send(right.instanceId, 'identity'),
+            hosts[1].coroutine.send(left.instanceId, 'identity')
           ])
-        ).toEqual([right.self.instanceId, left.self.instanceId])
-        expect(left.self).toEqual({ name: 'parent', instanceId: `p-${index}` })
-        expect(right.self).toEqual({ name: 'child', instanceId: `c-${index}` })
+        ).toEqual([right.instanceId, left.instanceId])
+        expect(left).toEqual({ name: 'parent', instanceId: `p-${index}` })
+        expect(right).toEqual({ name: 'child', instanceId: `c-${index}` })
       } finally {
-        await Promise.all(resources.map((resource) => resource.close()))
+        await Promise.all(hosts.map((host) => host.close()))
         native.port1.close()
         native.port2.close()
       }
+    }
+  })
+  it('retains the native heartbeat clock through the original task context', async () => {
+    const { wrapCoroutineTask } = await import('../../dist/coroutine-task.js')
+    const entered = deferred<import('../../dist/coroutine-task.js').ICoroutineTaskContext>()
+    const finish = deferred<void>()
+    const reports: unknown[] = []
+    const budget = createUnitBudget({ kind: 'coroutine', maxUnits: 1 })
+    const native = createCoroutineSupervisor<ICoroutineMessagePort>({
+      budget,
+      id: 'heartbeat-context',
+      spec: {
+        task: wrapCoroutineTask(
+          async (context) => {
+            entered.resolve(context)
+            await finish.promise
+          },
+          (error) => reports.push(error)
+        )
+      },
+      scheduler: systemScheduler,
+      report: (error) => reports.push(error)
+    })
+    try {
+      const ready = await native.start()
+      expect(ready.state).toBe('ready')
+      if (ready.state !== 'ready') return
+      const context = await entered.promise
+      const before = ready.unit.lastHeartbeatAt
+      await vi.waitFor(() => expect(systemScheduler.now()).toBeGreaterThan(before))
+      context.heartbeat()
+      expect(ready.unit.lastHeartbeatAt).toBeGreaterThan(before)
+    } finally {
+      finish.resolve()
+      await native.dispose()
+      budget.close()
     }
   })
 

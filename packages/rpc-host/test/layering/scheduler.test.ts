@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { createManualScheduler } from '@migaia/utils/testing'
 
-import { RpcConfigurationError, RpcTimeoutError } from '../../dist/core/errors.js'
+import { RpcConfigurationError, RpcTimeoutError } from '@migaia/rpc-contract/errors'
 import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
 import { abort } from '../../dist/core/middleware/abort.js'
 import { defineMiddleware } from '../../dist/core/middleware.js'

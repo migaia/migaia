@@ -1,3 +1,4 @@
+/** Defines the offline record header, byte-tag vocabulary and recording types shared by the codec. */
 import type { IRpcDevtoolsWireEvent, IRpcWireError } from './wire.js'
 
 /** Header identity freezes the v1 NDJSON grammar for collectors and offline hub imports. */

@@ -1,37 +1,13 @@
 import { MessageChannel } from 'node:worker_threads'
 import { describe, expect, it, vi } from 'vitest'
-import { systemScheduler } from '@migaia/utils/scheduler'
-import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'
 import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
-import {
-  createAdapterDeployment,
-  defineTransportPlugin,
-  createEventEmitterMessageResource,
-  holdAdapterMessageBootstrapSource
-} from '@migaia/rpc-host/plugin'
-import { createNodeThreadChannel } from '../../dist/threads/channel.js'
-import { THREAD_RUNTIME_API_VERSION } from '../../src/threads/constants.js'
+import { createThreadBootstrap, readThreadInitial } from '../../dist/threads/bootstrap.js'
+import { ThreadBootstrap } from '../../src/threads/constants.js'
+import { borrowedThreadPlugin } from './fixtures/borrowed-source.js'
 
-/**
- * Author a cold native bootstrap transport; the canonical SDK owns validation, capture and
- * adoption.
- */
+/** The real native initial reader supplies only trusted launch facts to the one Session owner. */
 function nativeChildSource(port: MessageChannel['port2'], bootstrap: unknown) {
-  return defineTransportPlugin({
-    name: 'native-child-port',
-    mode: 'connect-to-parent',
-    deployment: createAdapterDeployment({
-      open: async () => {
-        throw new Error('bootstrap-only fixture')
-      },
-      bootstrap: (context) =>
-        holdAdapterMessageBootstrapSource(createEventEmitterMessageResource(port), {
-          initial: { direction: 'inbound', read: () => bootstrap },
-          connectTimeoutMs: context.connectTimeoutMs,
-          report: context.report
-        })
-    })
-  })
+  return borrowedThreadPlugin(port, 'native-child-port', () => readThreadInitial(bootstrap).source)
 }
 
 describe('advanced native parent-port startup', () => {
@@ -41,37 +17,31 @@ describe('advanced native parent-port startup', () => {
     /** Keep all successfully opened peers available even if the opposite construction fails. */
     const peers: Pick<IRpcHost, 'close'>[] = []
     /** The advanced child consumes the same raw metadata a native Worker receives at construction. */
-    let child!: Promise<IRpcHost>
+    let child!: Promise<
+      IRpcHost<Record<never, never>, readonly [ReturnType<typeof borrowedThreadPlugin>]>
+    >
     try {
       /** The parent supplies its actual Core-selected identity and capability proposal. */
-      const parent = await createRpcHost<{ twice(value: number): number }>({
+      const parent = await createRpcHost<
+        { twice(value: number): number },
+        readonly [ReturnType<typeof borrowedThreadPlugin>]
+      >({
         self: { name: 'native-parent', instanceId: 'native-parent' },
         plugins: [
-          defineTransportPlugin({
-            name: 'parent-port',
-            mode: 'connect',
-            deployment: createAdapterDeployment({
-              open: async (context) => {
-                child = createRpcHost({
-                  provide: { twice: (value: number) => value * 2 },
-                  plugins: [
-                    nativeChildSource(ports.port2, {
-                      kind: rpcMessageCapabilityControl.data,
-                      peerId: 'native-child',
-                      runtimeApi: {
-                        version: THREAD_RUNTIME_API_VERSION,
-                        self: { name: 'native-child', instanceId: 'native-child' },
-                        parent: context.self,
-                        capabilities: context.capabilities
-                      }
-                    })
-                  ]
-                })
-                return createNodeThreadChannel(ports.port1, 'native-child', {
-                  scheduler: systemScheduler,
-                  capabilities: context.capabilities
-                })
-              }
+          borrowedThreadPlugin(ports.port1, 'parent-port', undefined, (context) => {
+            /** Native parent identity is the original closed two-field bootstrap record. */
+            const self = context.self()
+            child = createRpcHost({
+              provide: { twice: (value: number) => value * 2 },
+              plugins: [
+                nativeChildSource(
+                  ports.port2,
+                  createThreadBootstrap('native-child', 'native-child', undefined, {
+                    parent: { name: self.name, instanceId: self.instanceId },
+                    generation: { kind: 'restart', value: 0, providerId: 'native-startup' }
+                  })
+                )
+              ]
             })
           })
         ],
@@ -82,7 +52,7 @@ describe('advanced native parent-port startup', () => {
       const accepted = await child
       peers.push(accepted)
       expect(accepted.self).toEqual({ name: 'native-child', instanceId: 'native-child' })
-      expect(await parent.request('twice', 21)).toBe(42)
+      expect(await parent.thread.request('twice', 21)).toBe(42)
       await accepted.close()
       expect(ports.port2.listenerCount('message')).toBe(0)
     } finally {
@@ -106,8 +76,9 @@ describe('advanced native parent-port startup', () => {
           report,
           plugins: [
             nativeChildSource(ports.port2, {
-              kind: rpcMessageCapabilityControl.data,
-              peerId: 'native-child'
+              kind: ThreadBootstrap.data,
+              peerId: 'native-child',
+              source: {}
             })
           ]
         })

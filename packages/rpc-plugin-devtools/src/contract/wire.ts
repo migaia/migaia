@@ -1,3 +1,4 @@
+/** Defines service observation fields and their canonical Contract serialized-error representation. */
 import type { IRpcSerializedError } from '@migaia/rpc-contract/errors'
 
 /** Service errors use Contract's canonical serialized graph, including stacks and original causes. */
@@ -39,6 +40,12 @@ export type IRpcDevtoolsWireEvent = Readonly<{
   peerId?: string
   /** Explicit application trace; no trace is synthesized. */
   trace?: string
+  /** Observed forwarding ordinal; absent when this event has no forward fact. */
+  hop?: number
+  /** This forwarding host's configured ceiling, without inferring another host's policy. */
+  maxHops?: number
+  /** Traversed node ids snapshotted when the collector retained the borrowed observation. */
+  route?: readonly string[]
   /** Known bytes or the source's unknown-size sentinel for opaque values. */
   sizeBytes?: number
   /** Optional chunk index/count, without reconstructing missing chunks. */

@@ -1,7 +1,8 @@
 import { definePlugin, PluginHost } from '@migaia/plugin-host'
 import { describe, expect, it, vi } from 'vitest'
-import { RpcCoreErrorCode, RpcError } from '../../dist/core/errors.js'
-import { RpcCoreErrorText } from '../../dist/core/error-text.js'
+import { RpcError } from '@migaia/rpc-contract/errors'
+import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
+import { RpcCoreErrorText } from '@migaia/rpc-contract/errors'
 import {
   createRemoteGenerationHolder,
   createRemoteRuntimeRegistration

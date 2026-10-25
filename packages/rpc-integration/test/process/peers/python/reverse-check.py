@@ -1,63 +1,69 @@
 #!/usr/bin/env python3
-"""Check reverse RPC correlation, whitelist, concurrency and close on one real reader."""
+"""Original seven reverse-call checks through one real canonical child reader."""
 import json
 from pathlib import Path
 import sys
 
+sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from baseline_check import Session
+from baseline_check import Session, peer, frame
 
 
 def reply(request, value=None, error=None, method=None):
-    """Answer a Python outbound request using its exact method/id and authenticated identity."""
-    result = {"kind": "response", "id": request["id"], "ok": error is None, "data": {"route": {
-        "profile": "migaia.rpc.route", "type": "response", "applicationVersion": "1",
-        "senderId": "u36-caller", "targetId": "python-peer", "receiverId": "python-peer",
-        "sentAt": 1, "method": method or request["method"]}}}
-    if error is None:
-        result["data"]["payload"] = value
-    else:
-        result.update(code=error["code"], message=error["message"], error=error)
+    """Echo the exact task and native identities; a changed method must never settle it."""
+    task = {**request["task"]}
+    if method is not None:
+        task["method"] = method
+    result = {"profile": peer.PROTOCOL, "kind": "error" if error is not None else "result",
+              "id": request["id"], "task": task,
+              "route": peer.route(request["route"]["receiverId"], request["route"]["senderId"])}
+    result["error" if error is not None else "result"] = error if error is not None else value
     return result
 
 
+def error_code(message):
+    """Inspect the original semantic error node inside its canonical flat graph."""
+    graph = message["error"]
+    return graph["nodes"][graph["root"]]["code"]
+
+
 def check():
-    """Hold reverse replies while proving the same reader still dispatches regular calls."""
-    session = Session("python")
+    """Hold actual reverse replies while the same native reader serves ordinary calls and close."""
+    hello = peer.own_offer("baseline-caller")
+    hello["directory"]["methods"] = [{"name": "parentEcho", "supportedModes": ["request"], "modeSource": "declared"}]
+    session = Session("python", hello=hello)
     try:
         session.send(session.request("reverse-1", "peer.reverse", {"method": "parentEcho", "payload": "reverse"}))
-        describe = session.receive()
-        assert describe["kind"] == "request" and describe["method"] == "migaia.remote.runtime.describe"
+        called = session.receive()
+        # BC2 removed reserved directory discovery; the existing handshake directory supplies the same whitelist.
+        assert called["kind"] == "call" and called["task"]["method"] == "parentEcho" and called["payload"] == "reverse"
         session.send(session.request("forward-while-reverse", "echo", "reader-live"))
         forward = session.receive()
-        assert forward["id"] == "forward-while-reverse" and forward["data"]["payload"] == "reader-live"
-        session.send(reply(describe, {"schemaVersion": 2, "self": {"name": "parent", "instanceId": "u36-caller"},
-                    "methods": [{"name": "parentEcho", "supportedModes": ["request"], "modeSource": "declared"}]}))
-        called = session.receive()
-        assert called["method"] == "parentEcho" and called["data"]["payload"] == "reverse"
+        assert forward["id"] == "forward-while-reverse" and forward["result"] == "reader-live"
         session.send(reply(called, "ignored", method="wrongMethod"))
         session.send(session.request("still-live", "echo", "after-mismatch"))
         assert session.receive()["id"] == "still-live"
         session.send(reply(called, "reverse-result"))
         result = session.receive()
-        assert result["id"] == "reverse-1" and result["data"]["payload"] == "reverse-result"
+        assert result["id"] == "reverse-1" and result["result"] == "reverse-result"
         session.send(session.request("unknown", "peer.reverse", {"method": "notPublished", "payload": 0}))
         unknown = session.receive()
-        assert unknown["id"] == "unknown" and unknown["code"] == "PROVIDER_NOT_FOUND"
-        session.send({"kind": "batch", "envelopes": [session.request(f"pending-{n}", "peer.reverse", {"method": "parentEcho", "payload": n}) for n in range(3)]})
+        assert unknown["id"] == "unknown" and error_code(unknown) == "PROVIDER_NOT_FOUND"
+        session.process.stdin.write(b"".join(frame(session.request(f"pending-{n}", "peer.reverse", {"method": "parentEcho", "payload": n})) for n in range(3)))
+        session.process.stdin.flush()
         first, second, full = session.receive(), session.receive(), session.receive()
-        assert first["kind"] == second["kind"] == "request"
-        assert full["id"] == "pending-2" and full["code"] == "OVERLOADED"
+        assert first["kind"] == second["kind"] == "call"
+        assert full["id"] == "pending-2" and error_code(full) == "OVERLOADED"
         cause = {"source": "rpc.endpoint", "code": "INTERNAL", "name": "Error", "message": "cause", "stack": "Error: cause"}
-        failure = {**cause, "message": "reverse failure", "stack": "Error: reverse failure", "cause": cause}
+        failure = {"root": 0, "nodes": [{**cause, "message": "reverse failure", "stack": "Error: reverse failure", "cause": 1}, cause]}
         session.send(reply(second, error=failure))
         failed = session.receive()
         assert failed["id"] == "pending-1" and failed["error"] == failure
-        session.send({"kind": "variation", "id": "close", "data": {"route": {
-            "profile": "migaia.rpc.route", "type": "variation", "applicationVersion": "1", "senderId": "u36-caller",
-            "targetId": "python-peer", "sentAt": 1, "variation": "close"}, "payload": {"drainMs": 0}}})
+        route = peer.route(hello["peer"]["id"], session.remote)
+        route["remainingMs"] = 0
+        session.send({"profile": peer.PROTOCOL, "kind": "control", "id": "close", "route": route, "operation": "drain"})
         closed = session.receive()
-        assert closed["id"] == "pending-0" and closed["code"] == "TRANSPORT"
+        assert closed["id"] == "pending-0" and error_code(closed) == "TRANSPORT"
         return {"passed": 7, "total": 7}
     finally:
         session.close()

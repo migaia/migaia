@@ -2,19 +2,13 @@
 
 [README](./README.en.md) · [中文](./USEGUIDE.md)
 
-Configure one transport plugin with `createRpcHost`, then install features as needed. These scenarios use real public entries; existing owners retain transport preparation, directories, and native cleanup.
+Contract defines protocol, interfaces, portable values, and errors. Host owns RPC sessions, handshake, calls, providers, forwarding, cancellation, and deadline propagation. Transport plugins own native connections, generations, and codecs. Flow plugins and plugin-owned features implement optional capabilities.
 
-## Open and completely close a bidirectional connection
+A host supports multiple transport namespaces, but normally choose one transport kind; mixing kinds is not recommended. Calls live under `host.<ns>.*`; provider registration and whole-host closure remain on the root. See the [README](./README.en.md#start-here) for a complete runnable coroutine connection.
 
-This complete example needs host, contract, and coroutines. The parent installs a timeout feature; the child creates its host from the generation-local connect handle. It asserts the business result, prints 42, and closes both sides through finally.
+## Register functions and generators
 
-The complete runnable example appears under “Migrating from old packages”, covering parent/child hosts, the timeout feature, and finally cleanup.
-
-Coroutines share the event loop rather than Worker isolation. With processPlugin or threadPlugin, business providers and calls stay the same. Each host has one actual call endpoint, including a host with multiple sessions.
-
-## Provide functions, generators, and cooperative cancellation
-
-provide is a nested function object. Return values become results and thrown errors use the existing error boundary. Registering a duplicate method rejects without replacing the original.
+`provide` accepts nested function objects. Return values become business results and exceptions retain their error chain. Duplicate method names reject. Later registrations publish through the existing session directory update.
 
 ```ts doc-test=check
 import type { IRpcHost, IRpcContext } from '@migaia/rpc-host'
@@ -27,21 +21,21 @@ export function exposeWork(host: IRpcHost) {
     },
     wait: (_value: unknown, context: IRpcContext) => {
       if (context.signal.aborted) throw context.signal.reason
-      return new Promise<void>((_resolve, reject) => {
+      return new Promise<void>((_resolve, reject) =>
         context.signal.addEventListener('abort', () => reject(context.signal.reason), {
           once: true
         })
-      })
+      )
     }
   })
 }
 ```
 
-Callers cancel through options.signal; providers receive their own context.signal. Cancellation affects that call rather than killing a process or rolling back side effects. The wait example deliberately awaits cancellation; real work releases its own resources in finally.
+Callers cancel with `options.signal`; providers receive their own `context.signal`. The example deliberately waits for cancellation. Real tasks release their own resources in finally. Cancellation neither rolls back side effects nor automatically terminates a process. A one-way call can still propagate cancellation after physical sending completes.
 
-## Select a target and consume streams
+## Select targets and consume streams
 
-A declaration can describe one capability or map direct names to capabilities. This helper accepts an already connected host and preserves the relationship between target and method:
+A declaration can describe one capability or map direct names to several capabilities. The namespace selects a transport; names and instance IDs select targets within it.
 
 ```ts doc-test=check
 import type { IRpcHost } from '@migaia/rpc-host'
@@ -54,154 +48,130 @@ type IWorkers = {
 }
 
 export async function useWorker(host: IRpcHost<IWorkers>) {
-  const answer: number = await host.send('worker', 'double', 21)
+  const answer: number = await host.thread.send('worker', 'double', 21)
   const values: number[] = []
-  for await (const value of host.peers.worker.values(3)) values.push(value)
+  for await (const value of host.thread.peers.worker.values(3)) values.push(value)
   return { answer, values }
 }
 ```
 
-An ordinary untargeted request/notify/group/outcome returns empty fulfilled/rejected maps with zero targets, a scalar with one target (rejecting on failure), and per-target fulfilled/rejected maps with multiple targets. Multi-target stream returns independent iterators; one return/cancellation does not cancel others. A pool is one logical target and selects one member per operation.
+Untargeted `request/notify/group` broadcasts within that namespace: zero targets return empty `fulfilled/rejected` maps, one returns a scalar, and multiple retain independent successes and failures. Multi-target `stream` returns iterators indexed by instance identity, each with independent backpressure and cancellation.
 
-## Notifications, groups, and uncertainty
+A stream starts at the first `next()`. `return()` ends consumption and waits for corresponding cleanup. `throw(reason)` preserves the caller's thrown reason. Held capabilities remain bound to their original connection after it retires; they cannot target a same-name successor.
+
+## Install complete policies
+
+This example creates cold definitions only. Pass `policy` and `transport` to `createRpcHost({ plugins: [...] })`, and install the corresponding child source in the worker entry.
+
+```ts doc-test=check
+import { timeout, retry } from '@migaia/rpc-host/features'
+import { linkPolicy } from '@migaia/rpc-host/plugins'
+import { threadPlugin } from '@migaia/rpc-plugin-thread'
+
+export const policy = linkPolicy({ features: [timeout({ ms: 3000 }), retry({ attempts: 2 })] })
+export const transport = threadPlugin({
+  spawn: new URL('./worker.ts', import.meta.url),
+  features: [timeout({ ms: 1500 })]
+})
+
+export const callOptions = { timeout: timeout({ ms: 100 }), retry: false } as const
+```
+
+Selection has one order: complete per-call instance or `false`, then the transport plugin's feature, then the link-policy default. Pass `callOptions` to `host.thread.request(method, payload, callOptions)` to override one call. Numeric `{ timeout: 100 }`, `timeoutMs`, and `defaultTimeoutMs` are removed.
+
+`timeout: false` waits for the response without a feature timeout; an upstream remaining deadline still decreases. `retry: false` disables retry. Downstream hops receive only the remaining budget and cannot extend it. Only the origin retries scalar calls and groups; streams never replay and use timeout only. Timeout or disconnection does not prove that business work never executed; reconcile uncertain non-idempotent work first. Transport handshake preparation deadlines are separate from the business timeout feature.
+
+## Notifications, groups, and retained outcomes
 
 ```ts doc-test=check
 import type { IRpcHost } from '@migaia/rpc-host'
 
 type IApi = { update(value: number): number }
 export async function sendUpdates(host: IRpcHost<IApi>) {
-  await host.notify('update', 1, { targetId: 'worker' })
-  const outcomes = await host.group([
+  await host.thread.notify('update', 1, { targetId: 'worker' })
+  return host.thread.group([
     { method: 'update', payload: 2 },
     { method: 'update', payload: 3 }
   ])
-  return outcomes
 }
 ```
 
-A notify Promise means physical sending completed, not that business work acknowledged it. dispatch returns void synchronously and reports failures. Each selected target owns its group; there is no cross-target transaction. outcome(key) reads the existing retained idempotency result. Reconnection does not prove that uncertain work never executed.
+A `notify` Promise means physical sending completed, without business acknowledgement. `dispatch(target, method, payload, options)` returns `void` synchronously and reports failures. Each target executes its own ordered group; there is no cross-target transaction.
 
-Call timeoutMs overrides host.defaultTimeoutMs, which overrides the timeoutFeature default. Transport connect.timeoutMs independently bounds handshake preparation. Aggregate and individual feature imports identify the same definition; install one spelling:
+Install the `idempotency()` flow plugin to add `host.<ns>.outcome(key)` for retained results. Omitting it enables no store for retaining and querying results by idempotency key. `auth()` separately owns request-ID deduplication: active identities remain held through actual business and stream cleanup, then completed identities are released immediately only for a source the actual native owner proves exclusive; other sources follow the bounded TTL policy. A duplicate executes no provider and sends no additional terminal. `auth.maxReplayEntriesPerPeer` defaults to `1024` and must be a positive safe integer; full capacity refuses with `OVERLOADED`, while `auth.onRejected` receives a frozen `replayLedgerFull` or `groupReplayFull` notice. Callback failure is reported with the existing `INTERNAL` error and original cause. Installing `limits()` is recommended; omitting it enables no corresponding concurrency, rate, or payload quotas.
 
-```ts doc-test=check
-import timeoutFeature from '@migaia/rpc-host/features/timeout'
+## Forward and hold capabilities
 
-export const deadline = timeoutFeature({ ms: 1500 })
-```
-
-## Publish forwarding capabilities and automatic namespaces
-
-Let b connect to c, publish this capability, then let callers obtain the resulting directory:
+`host.process.send('b', 'c.render', value)` reaches b first. b reads its current directory and forwards through its own c session, including across carriers. A host can also publish an explicit held capability:
 
 ```ts doc-test=check
 import type { IRpcHost } from '@migaia/rpc-host'
 
 type INext = { c: { render(value: string): string } }
-export function publishHeldRender(b: IRpcHost<INext>) {
-  b.provide({ render: b.peers.c.render })
+export function publishHeldRender(host: IRpcHost<INext>) {
+  host.provide({ render: host.thread.peers.c.render })
 }
 ```
 
-A held function stays bound to c's original generation and rejects after retirement. It does not retarget a successor. Alternatively, a calls send('b', 'c.render', value): b first verifies c is a current live direct peer, then reads c's current directory. Disconnected/reconnecting targets reject with TARGET_UNKNOWN; missing methods retain the existing method error. Loops and a fourth forwarding hop reject before business execution. Names that cannot form a method segment remain usable through direct selection or explicit provide aliases, without changing method grammar.
+Held functions do not follow replacements. Retired targets reject; missing methods, loops, and excessive hops reject at their admission boundaries. Forwarding creates no second endpoint or per-session Peer facade.
 
-## Generate types from accepted directories
+Set `createRpcHost({ forward: { maxHops: 3 }, plugins: [...] })` on each forwarding host. Omission defaults to 3; only integers 1–16 are admitted. Each host compares the incoming forwarding ordinal with its own ceiling. Loop refusal takes priority over `FORWARD_HOP_LIMIT`.
 
-```ts doc-test=check
-import { typegenFeature } from '@migaia/rpc-host/features'
+The probe stage `forward` emits `received`, `sent` at physical handoff, or `rejected` with `loop`, `hop-limit`, `target-unknown`, or `method-unavailable`. `hop` is 1 at the first forwarding host; `maxHops` is that host’s ceiling. `route` is borrowed until the callback returns: copy it before retaining an event. The final target’s inbound message event carries the traversed `hop` and `route`. Without probe or Devtools, Forwarder skips event construction.
 
-export const declarations = typegenFeature({
-  out: {
-    write: (fileName, text) => {
-      console.log(fileName, text)
-    }
-  }
-})
-```
+## Observe and generate types
 
-Install declarations in plugins. write is application-owned output; this example displays filename and text, while the application chooses actual file I/O. Generation follows accepted directories regardless of peer language. Method input/output/yield schemas come from the real contract description; a new generation writes only after acceptance. Uninstall stops further writes, and output failures reach host.report.
-
-## Observe the same host
-
-Install an observation definition through a genuine feature, borrowing the host’s existing endpoint. Keep only needed fields. Event views are valid during `emit`; copy fields before retaining them for later use.
+Install the `probe` flow plugin on the same host. Type generation consumes accepted directories. Event views are valid only during `emit`; copy required fields before retaining them.
 
 ```ts doc-test=check
-import { defineProbe } from '@migaia/rpc-host/probe'
-import { defineFeaturePlugin } from '@migaia/rpc-host/plugin'
+import { probe, typegen } from '@migaia/rpc-host/plugins'
 
-export const observation = defineFeaturePlugin({
-  name: 'application-observer',
-  probe: defineProbe({
-    stages: ['message', 'peer'],
-    emit: (view) => console.log({ ...view })
-  })
+export const observation = probe({
+  stages: ['message', 'peer'],
+  emit: (view) => console.log({ ...view })
+})
+export const declarations = typegen({
+  out: { write: (fileName, text) => console.log(fileName, text) }
 })
 ```
 
-Include observation alongside the transport in the host’s plugins. Host closure releases its observation subscriptions. Observer failures use the existing report channel without taking ownership of business resources.
+Include both definitions alongside the transport in `plugins`. The application owns `typegen.out.write`, including any file I/O; failures reach the reporter. Host closure or plugin removal releases the corresponding subscriptions.
 
-## Migrating from old packages
+## Migrate entries
 
-Rename packages first: rpc-core→rpc-host, rpc-process→rpc-plugin-process, rpc-threads→rpc-plugin-thread, rpc-browser→rpc-plugin-browser, rpc-pool→rpc-plugin-pool, rpc-devtools→rpc-plugin-devtools. Coroutines live in rpc-plugin-coroutines. Old names below identify migrations rather than compatibility entries.
+| Retired usage                                         | Replacement                                                             |
+| ----------------------------------------------------- | ----------------------------------------------------------------------- |
+| Root `host.request/send/notify/stream/dispatch/group` | The corresponding `host.<ns>` call                                      |
+| `@migaia/rpc-host/plugin`                             | `@migaia/rpc-host/sdk`                                                  |
+| `/probe` plus `defineFeaturePlugin`                   | `probe` / `defineProbe` from `/plugins/probe`                           |
+| `authFeature/chunkFeature/typegenFeature`             | `auth/chunk/typegen` from `/plugins`                                    |
+| Root `defaultTimeoutMs` or numeric call timeout       | Plugin `features` and complete timeout instances                        |
+| `poolPlugin` or pool assembler                        | Transport `features: [pool({ size })]`                                  |
+| Endpoint, RuntimePeer, v1, JSON-RPC profile           | One Host call owner and one new protocol, without compatibility entries |
+| Root `outcome` or idempotency store                   | Install `/plugins/idempotency`; query its namespace extension           |
 
-| Retired API family                                                                  | Replacement                                                                           |
-| ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| `createEndpoint` / `createFullEndpoint`                                             | `createRpcHost` + one transport; local `provide`, direct `send`, untargeted `request` |
-| `createClientEndpoint` / `createProviderEndpoint`                                   | Same host entry; omit or supply local `provide`                                       |
-| `createComposedEndpoint` / old outbound/provider/discovery/control presets          | Install supported public features on the host; no preset or root graph                |
-| `createFullOneWayEndpoint` / `sendOneWay`                                           | `host.notify` for physical-send completion; `dispatch` for fire-and-report            |
-| `createRuntimeApiEndpoint`                                                          | Host owns the one call endpoint; authors supply raw deployment through `/plugin`      |
-| `createRuntimePeer` / `createManagedRuntimePeer` / `createRuntimePlugin`            | Host plus transport; original native supervision owns generations                     |
-| `createRemoteHost` / `createRemotePlugin` / `serveRemoteHost` / `serveRemotePlugin` | Host + transport + provide, or native plugin-host installation                        |
-| `createProcessPeer`                                                                 | `createRpcHost` + `processPlugin`; explicit parent child source                       |
-| `createThreadPeer`                                                                  | `createRpcHost` + `threadPlugin`; browser Worker uses browser plugin                  |
-| `createBrowserPeer` / old web adapter user setup                                    | Host plus one of the seven browser carrier plugins                                    |
-| `createProcessPlugin` / `createThreadPlugin`                                        | `processPlugin` / `threadPlugin` installed on host or ordinary PluginHost             |
-| old coroutine host/plugin factories                                                 | `coroutinePlugin` from its own package; child receives opaque connect handle          |
-| `createPool` / `createThreadPool` / `createProcessPool`                             | Transport + `poolPlugin`; logical target pool, one scalar execution                   |
-| `createRpcDevtools`                                                                 | `devtoolsPlugin().collector`; install that same definition for observation            |
+Aggregate and individual default subpaths support tree-shaking. Import codes from `@migaia/rpc-contract/error-code` and error classes/contracts from `/errors`. Transport authors supply native carriers and codecs; Host owns handshake, Sessions, pending calls, and provider execution.
 
-This complete replacement uses only new public entries. It runs the parent, child, and timeout feature, then closes them in finally.
+## Close and retain errors
 
-```ts doc-test=run
-import assert from 'node:assert/strict'
-import { createRpcHost } from '@migaia/rpc-host'
-import { timeoutFeature } from '@migaia/rpc-host/features'
-import { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'
+`host.close()` and `host[Symbol.asyncDispose]()` share the original close Promise. `host.<ns>.close()` closes only that namespace. Original owners release owned native resources, while borrowed resources retain their native ownership policy.
 
-const host = await createRpcHost<{ double(value: number): number }>({
-  plugins: [
-    coroutinePlugin({
-      spawn: async ({ connect, signal }) => {
-        const child = await createRpcHost({
-          plugins: [coroutinePlugin({ connectToParent: connect })],
-          provide: { double: (value: number) => value * 2 }
-        })
-        try {
-          if (!signal.aborted)
-            await new Promise<void>((resolve) => {
-              signal.addEventListener('abort', () => resolve(), { once: true })
-            })
-        } finally {
-          await child.close()
-        }
-      }
-    }),
-    timeoutFeature({ ms: 1500 })
-  ]
-})
-try {
-  const value = await host.request('double', 21)
-  assert.equal(value, 42)
-  console.log(value)
-} finally {
-  await host.close()
-}
-```
+Branch on `source/code`; preserve native classes, stack, cause, and errors. Timeout, cancellation, or an unknown result is not proof that work never executed. Native controls live under transport-owned `host.<ns>.members`; Pool controls live under feature-owned `host.<ns>.pool`. These controls do not replace RPC calls.
 
-Each host accepts one transport and one member assembler, with each feature definition appearing at most once. Keep the factory's actual registered object; copying/spreading it does not preserve registration authority. connect options configure preparation at installation, not repeated installation or hot replacement.
+## C6 public behavior changes
 
-## Errors and closure
+Unhandled provider exceptions use `INTERNAL` and retain the native exception in the error graph. Scalar calls reject with the restored remote Error directly, without an extra `RpcRemoteError`; callers must inspect the actual error's `source/code`. A coroutine provider receives the original abort reason through `context.signal.reason`, without an invented cancellation code. `stream.return(value)` returns the runtime's actual terminal result rather than echoing the caller's `value`.
 
-Branch on source/code: rpc.endpoint owns host/call errors, rpc.remote managed uncertainty, and rpc.transport.* native carriers. Keep native types, stack, cause, and errors. Do not match messages or assume unknown results are safely retryable. close/asyncDispose share the original close Promise and release owned resources; applications retain borrowed native ownership.
+Untargeted calls select the sessions accepted at call time. Functions saved from `peers` remain bound to their original generation and reject after departure rather than switching to a replacement. Immediate process startup failure has one `PROCESS_CHANNEL_CLOSED` boundary with native EPIPE reachable through its cause graph. A thread closure with no native error does not invent a message-port cause.
 
-Ordinary PluginHost installs the same genuine definitions, retaining original replacement and reverse cleanup. Source authors use cold raw deployments and scope capabilities from @migaia/rpc-host/plugin, never a complete legacy call object as a source. Individual transport, pool, and observation guides explain their native ownership.
+The old RPC scope rollback AggregateError shell and native host dispose translation have retired. Native host dispose returns its actual outcome; cleanup leaf identity, order, once-only release, and the shared completion Promise remain intact. `RpcRoot.close` has its own error contract and does not substitute for native dispose.
+
+Idempotency fingerprints follow the object's own key order. Changing key order creates a different request; reuse of the same key conflicts with `CONTRACT_INVALID`. The store's string fingerprint ABI is unchanged.
+
+An ordinary NativeHost retains its native dispose() cleanup summary and shared Promise instead of RPC disposal translation. Installation rollback borrows native cleanup entries without the former RPC resource-scope AggregateError shell. Original failure leaves, errors order, cause reachability and once-only disposal remain intact. RpcRoot.close() is a separate public close owner; NativeHost.dispose() is not a substitute. Native Feature descriptors are captured once per cold compilation while preserving the first selector validation and error order; later selectors do not repeat Proxy reflection.
+
+auth() releases a completed request ID immediately only when the actual native owner proves exclusive source custody; other sources retain the bounded completed TTL. Active requests and streams remain held through actual business and iterator cleanup.
+
+With sign/verify configured, auth exchanges and validates a fresh source challenge inside the existing signed handshake. Application callbacks must still sign and verify the complete input they receive. No public discovery or handshake option is added.
+
+verifyCredentials may return { principalId: nonemptyString } to lend the authenticated principal to the current Session. Throwing or rejection still refuses authentication. Void, string, and other formerly ignored results do not grant a principal.

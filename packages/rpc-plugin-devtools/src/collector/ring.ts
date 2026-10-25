@@ -1,3 +1,4 @@
+/** Owns bounded event columns, reference retirement and query or recording representations. */
 import { orderStringKeys } from '@migaia/utils/string'
 import {
   RpcProbeDirectionName,
@@ -7,14 +8,17 @@ import {
   RpcProbeOutcomeName,
   RpcProbeStageName,
   type IRpcProbeEventView
-} from '@migaia/rpc-host/probe'
+} from '@migaia/rpc-host/plugins/probe'
 import { serializeRpcError, type IRpcSerializeErrorOptions } from '@migaia/rpc-contract/errors'
 import type { IRpcDevtoolsWireEvent } from '../contract/wire.js'
 import type { IRpcDevtoolsRecordEvent } from '../contract/record.js'
 import { CarrierTable, NameTable } from './intern.js'
 import { reportFailure } from './report.js'
 
-/** Numeric columns snapshot the reusable view; sparse arrays retain caller-owned references. */
+/**
+ * Numeric columns snapshot the view; routes are owned snapshots and other sparse values are
+ * borrowed.
+ */
 type IRingColumns = {
   seq: Float64Array
   carrierSeq: Float64Array
@@ -32,6 +36,9 @@ type IRingColumns = {
   receiver: (string | undefined)[]
   peer: (string | undefined)[]
   trace: (string | undefined)[]
+  hop: Int32Array
+  maxHops: Int32Array
+  route: (readonly string[] | undefined)[]
   carrier: (string | undefined)[]
   rejection: (string | undefined)[]
   lifecycle: (string | undefined)[]
@@ -100,6 +107,9 @@ export class EventRing {
       receiver: Array.from<string | undefined>({ length: capacity }),
       peer: Array.from<string | undefined>({ length: capacity }),
       trace: Array.from<string | undefined>({ length: capacity }),
+      hop: new Int32Array(capacity),
+      maxHops: new Int32Array(capacity),
+      route: Array.from<readonly string[] | undefined>({ length: capacity }),
       carrier: Array.from<string | undefined>({ length: capacity }),
       rejection: Array.from<string | undefined>({ length: capacity }),
       lifecycle: Array.from<string | undefined>({ length: capacity }),
@@ -136,6 +146,7 @@ export class EventRing {
     this.columns.receiver[slot] = undefined
     this.columns.peer[slot] = undefined
     this.columns.trace[slot] = undefined
+    this.columns.route[slot] = undefined
     this.columns.carrier[slot] = undefined
     this.columns.rejection[slot] = undefined
     this.columns.lifecycle[slot] = undefined
@@ -148,7 +159,7 @@ export class EventRing {
     this.count--
   }
 
-  /** Snapshot primitives immediately; content/detail/error remain references without cloning. */
+  /** Snapshot primitives and the bounded borrowed route; content/detail/error remain references. */
   write(view: IRpcProbeEventView, seq: number, content: unknown, contentBytes: number): number {
     if (this.count === this.capacity) this.drop()
     /** All writes share one physical slot, calculated without allocating a row. */
@@ -171,6 +182,9 @@ export class EventRing {
     c.receiver[slot] = view.receiverId
     c.peer[slot] = view.peerId
     c.trace[slot] = view.trace
+    c.hop[slot] = view.hop
+    c.maxHops[slot] = view.maxHops
+    c.route[slot] = view.route === undefined ? undefined : Object.freeze([...view.route])
     c.carrier[slot] = view.carrier
     c.rejection[slot] = view.rejection
     c.lifecycle[slot] = view.lifecycle
@@ -230,6 +244,9 @@ export class EventRing {
       result.receiverId = this.#names.name(this.#names.id(c.receiver[slot]))
     if (c.peer[slot] !== undefined) result.peerId = this.#names.name(this.#names.id(c.peer[slot]))
     if (c.trace[slot] !== undefined) result.trace = this.#names.name(this.#names.id(c.trace[slot]))
+    if (c.hop[slot]! >= 0) result.hop = c.hop[slot]
+    if (c.maxHops[slot]! >= 0) result.maxHops = c.maxHops[slot]
+    if (c.route[slot] !== undefined) result.route = c.route[slot]
     if (c.carrier[slot] !== undefined)
       result.carrier = this.#names.name(this.#names.id(c.carrier[slot]))
     if (c.rejection[slot] !== undefined)
@@ -276,6 +293,9 @@ export class EventRing {
       receiverId: c.receiver[slot],
       peerId: c.peer[slot],
       trace: c.trace[slot],
+      hop: c.hop[slot]!,
+      maxHops: c.maxHops[slot]!,
+      route: c.route[slot],
       carrier: c.carrier[slot],
       rejection: c.rejection[slot],
       lifecycle: c.lifecycle[slot],

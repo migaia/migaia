@@ -1,0 +1,101 @@
+/**
+ * Own the host's single identity and trusted native bootstrap reconciliation, independent from
+ * optional authentication.
+ */
+import type { IRpcDirectory, IRpcGeneration } from '@migaia/rpc-contract/protocol'
+import type { IRpcLocalSourceFacts } from '@migaia/rpc-contract/interfaces'
+import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
+import { RpcCoreErrorText, RuntimeApiErrorText } from '@migaia/rpc-contract/errors'
+import { createRpcError } from './error-owner.js'
+import { sameGeneration } from '../call/envelope.js'
+
+/** Public identity is global to the host; a transport never creates a second public self. */
+export type IRpcSelf = Readonly<{ name: string; instanceId: string }>
+
+/** Preserve the original secure fallback allocator without depending on an authentication plugin. */
+export function defaultRpcId(): string {
+  /** Native crypto is optional only when an explicit identity was supplied. */
+  const cryptoApi = globalThis.crypto as
+    | { randomUUID?: () => string; getRandomValues?: (array: Uint8Array) => Uint8Array }
+    | undefined
+  if (cryptoApi?.randomUUID) return cryptoApi.randomUUID()
+  if (cryptoApi?.getRandomValues) {
+    /** Fixed 16-byte entropy preserves the existing identifier domain. */
+    const bytes = cryptoApi.getRandomValues(new Uint8Array(16))
+    return [...bytes].map((value) => value.toString(16).padStart(2, '0')).join('')
+  }
+  throw createRpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.uuidUnavailable)
+}
+
+/** Validate the supported public identity domain before any carrier can acquire resources. */
+function captureSelf(value: IRpcSelf): IRpcSelf {
+  if (
+    !value ||
+    typeof value.name !== 'string' ||
+    !value.name ||
+    value.name.length > 256 ||
+    typeof value.instanceId !== 'string' ||
+    !value.instanceId ||
+    value.instanceId.length > 256
+  )
+    throw createRpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.identityInvalid)
+  return Object.freeze({ name: value.name, instanceId: value.instanceId })
+}
+
+/** The real native source may replace only an unconfigured initial identity, before first use. */
+export class HostIdentity {
+  /** Explicit public configuration is authoritative against native bootstrap mismatch. */
+  readonly #configured: boolean
+  /** The one immutable accepted identity is borrowed by every namespace directory. */
+  #self: IRpcSelf
+  /** Native restart/session facts belong to the same global identity owner. */
+  #generation: IRpcGeneration
+  /** Once traffic starts, later transports cannot change identities already published on the wire. */
+  #started = false
+
+  /** Capture caller configuration once; ordinary native hosts provide their original identity. */
+  constructor(self?: IRpcSelf, configured = self !== undefined) {
+    this.#configured = configured
+    /** Default name matches its generated instance address, preserving direct host behavior. */
+    const instanceId = self?.instanceId ?? defaultRpcId()
+    this.#self = captureSelf(self ?? { name: instanceId, instanceId })
+    this.#generation = Object.freeze({
+      kind: 'session',
+      value: 0,
+      providerId: this.#self.instanceId
+    })
+  }
+
+  /** Global public metadata remains immutable and never includes native launch credentials. */
+  get self(): IRpcSelf {
+    return this.#self
+  }
+
+  /** Directories and outgoing task tuples borrow the exact admitted generation fact. */
+  get directorySelf(): IRpcDirectory['self'] {
+    return { ...this.#self, generation: this.#generation }
+  }
+
+  /** Reconcile trusted bootstrap facts before constructing this source's first handshake. */
+  admit(facts: IRpcLocalSourceFacts): void {
+    if (facts.self !== undefined) {
+      /** Capture before mutation so a mismatching source cannot partially replace global identity. */
+      const incoming = captureSelf(facts.self)
+      if (
+        (this.#configured || this.#started) &&
+        (incoming.name !== this.#self.name || incoming.instanceId !== this.#self.instanceId)
+      )
+        throw createRpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.identityInvalid)
+      if (!this.#configured && !this.#started) {
+        this.#self = incoming
+        this.#generation = Object.freeze({ ...this.#generation, providerId: incoming.instanceId })
+      }
+    }
+    if (facts.generation !== undefined) {
+      if (this.#started && !sameGeneration(facts.generation, this.#generation))
+        throw createRpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.identityInvalid)
+      this.#generation = Object.freeze({ ...facts.generation })
+    }
+    this.#started = true
+  }
+}

@@ -32,6 +32,21 @@ function request(value) {
   return value
 }
 
+/**
+ * Holds this real business stream until its actual provider signal is cancelled.
+ *
+ * @param {unknown} value The original first yielded business value.
+ * @param {{ signal: AbortSignal }} context The real provider cancellation context.
+ * @returns {AsyncGenerator<unknown>} A live stream ending only after the caller's native deadline.
+ */
+async function* heldStream(value, context) {
+  yield value
+  if (!context.signal.aborted)
+    await new Promise((resolve) =>
+      context.signal.addEventListener('abort', resolve, { once: true })
+    )
+}
+
 /** One actual public Host owns the native child bootstrap and original business providers. */
 await createRpcHost({
   plugins: [threadPlugin({ connectToParent: true })],
@@ -42,10 +57,12 @@ await createRpcHost({
       write: request,
       hold: () => new Promise(() => undefined),
       bad: () => () => undefined,
-      stream: function* (value) {
-        yield value
-        yield value
-      },
+      stream: workerData.holdStream
+        ? heldStream
+        : function* (value) {
+            yield value
+            yield value
+          },
       notify: () => undefined
     }
   },

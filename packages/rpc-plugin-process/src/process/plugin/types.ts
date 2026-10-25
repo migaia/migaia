@@ -1,136 +1,78 @@
-import type { INativeAbortSignal } from '@migaia/utils/promise'
+/**
+ * Defines complete Process features and full spawn, connect, child and listener acquisition
+ * recipes. Native supervision and handshake-verifier inputs remain distinct from Host provider
+ * execution.
+ */
+import type { IAbortSignal } from '@migaia/utils/promise'
 import type { IProcessHandle, IProcessSupervisorOptions } from '@migaia/supervision/process'
 import type { ISupervisorBaseOptions } from '@migaia/supervision'
 import type { IScheduler } from '@migaia/utils/scheduler'
-import type { IRemoteChannel } from '@migaia/rpc-host/plugin'
-import type { IProcessByteChannel, IProcessMessageChannel } from '../types.js'
+import type { IRpcCallFeature } from '@migaia/rpc-contract/interfaces'
+import type { IRpcNativeTransportFeature } from '@migaia/rpc-host/sdk'
+import type { IRpcPeerInfo, IRpcPortableValue } from '@migaia/rpc-contract/protocol'
+import type { sendQueue } from '../../features/send-queue.js'
+import type { flowControl } from '../../features/flow-control.js'
+import type { ipcLog } from '../../features/log.js'
 import type {
+  IProcessByteChannel,
+  IProcessMessageChannel,
   IListenProcessByteChannel,
   IProcessCommonOptions,
   IProcessPendingByteConnection
 } from '../types.js'
-import type { IRpcHandshakeOffer, IRpcPeerInfo } from '@migaia/rpc-contract'
-import type { IRpcPortableValue } from '@migaia/rpc-contract'
-import type { ProcessPluginChannelKind, ProcessPluginWire } from './constants.js'
-import type { IProcessSessionIdentity } from '../resilience/types.js'
-import type { IRpcIdempotencyConfig, IRpcProviderLimits } from '@migaia/rpc-host'
-import type { IRemoteServeEndpoint } from '@migaia/rpc-host/plugin'
-/** Session labels are created once per generation and forwarded unchanged to the channel adapter. */
-export type IProcessPluginSession = Readonly<{
-  /** Per-connection diagnostic identity, unrelated to authentication credentials. */
-  connectionId: string
-  /** Logical session identity retained through channel establishment. */
-  sessionId: string
-  /** Optional supervised process identity; borrowed sessions need not have one. */
-  processId?: string
-}>
 
-/** The caller-owned adapter completes authentication and hands over one ready remote channel. */
-export type IProcessPluginEstablish = (
-  raw: IProcessByteChannel | IProcessMessageChannel,
-  options: Readonly<{
-    /** Generation cancellation; the establish operation must release acquisitions on failure. */
-    signal: INativeAbortSignal
-    /** Initiators send the first offer; responders verify the remote offer. */
-    role: 'initiator' | 'responder'
-    /** Stable labels allocated for this generation's actual connection. */
-    session: IProcessPluginSession
-    /** Borrowed scheduler shared with the binding's supervision. */
-    scheduler: IScheduler
-    /** Optional secret for the selected handshake; never copy it into diagnostic metadata. */
-    token?: string
-    /** The client deployment's exact native proposal; responders may omit it. */
-    offer?: IRpcHandshakeOffer
-    /** Optional bootstrap verifier supplied by child ingress. */
-    verify?: (value: unknown) => void | Promise<void>
-    /** Optional borrowed stderr subscription, independent of business-frame reads. */
-    stderr?: (listener: (chunk: Uint8Array) => void) => () => void
-    /** The SDK's one handshake budget reaches the original native negotiation owner. */
-    handshakeTimeoutMs?: number
-    /** Explicit process features override only these original IPC configuration fields. */
-    ipc?: Partial<
-      Pick<IProcessCommonOptions['ipc'], 'maxPendingData' | 'maxPendingControl' | 'log'>
-    >
-  }>
-) => Promise<IRemoteChannel>
+/** Installed process behavior is complete execution; call features remain selected by Host. */
+export type IProcessFeature =
+  | IRpcCallFeature
+  | IRpcNativeTransportFeature
+  | ReturnType<typeof sendQueue>
+  | ReturnType<typeof flowControl>
+  | ReturnType<typeof ipcLog>
 
-/** Spawn retains ownership of the supervised child and its exact spec, budget, and launcher. */
+/** Spawn retains its exact native specification, budget, launcher and physical IO acquisition. */
 export type ISpawnProcessPluginDeployment<THandle extends IProcessHandle = IProcessHandle> =
   Readonly<{
-    /** Select supervised child ownership, including stop/restart and whole-process replacement. */
     kind: 'spawn'
-    /** Original process specification, launcher, budget, and lifecycle policy. */
     supervision: IProcessSupervisorOptions<THandle>
-    /** Obtain the raw carrier from this actual handle; do not create a second reader. */
     rawChannel(
       handle: THandle,
-      signal: INativeAbortSignal
+      signal: IAbortSignal
     ): Promise<IProcessByteChannel | IProcessMessageChannel>
-    /** 'byte' requires bootstrap/negotiation; 'message' already has native message boundaries. */
-    channelKind: ProcessPluginChannelKind
-    /** Byte deployments require 'native' or 'jsonrpc'; message deployments omit this field. */
-    wire?: ProcessPluginWire
+    channelKind: 'byte' | 'message'
     /**
-     * Byte deployments require a nonempty credential matching bootstrap; custom message
-     * establishment may use it.
+     * The original private launch token is retained for the installed auth owner, never source
+     * facts.
      */
     token?: string
-    /** An optional native proposal shared with every establish call for this deployment. */
-    offer?: IRpcHandshakeOffer
-    /** Authenticate and return the channel adopted by this generation. */
-    establish: IProcessPluginEstablish
   }>
 
-/** Connect owns a socket session while the target process and rendezvous remain borrowed. */
+/** Connect supervises only the local socket while the external process remains borrowed. */
 export type IConnectProcessPluginDeployment = Readonly<{
-  /** Select borrowed external-process ownership; only the local connection is supervised. */
   kind: 'connect'
-  /** Native is the default; JSON-RPC disables default ping while preserving custom health. */
-  wire?: ProcessPluginWire
-  /** Exact address forwarded to dial and later reconnection attempts. */
   address: string
-  /** Required credential for establishment, separate from the address and principal identity. */
   token: string
-  /** An optional native proposal shared with every establish call for this deployment. */
-  offer?: IRpcHandshakeOffer
-  /** Open one raw connection under the current generation's abort signal. */
-  dial(address: string, signal: INativeAbortSignal): Promise<IProcessByteChannel>
-  /** Negotiate the ready connection; failures remain inside generation rollback. */
-  establish: IProcessPluginEstablish
-  /** Optional reconnect/startup/stop/health policy for the local session, not the target process. */
+  dial(address: string, signal: IAbortSignal): Promise<IProcessByteChannel>
   supervision?: Pick<
     ISupervisorBaseOptions<IProcessConnectionHandle>,
     'restart' | 'startupTimeoutMs' | 'stop' | 'terminalPolicy' | 'scheduler' | 'health'
   >
 }>
 
-/** A local session settles only when its physical byte channel closes. */
+/** A local connection's original physical close is its execution-unit exit receipt. */
 export type IProcessConnectionHandle = Readonly<{
-  /** Local connection fingerprint, not a claim about a remote native PID. */
   identity: Readonly<{ fingerprint: string }>
-  /** Settles when the physical connection closes and retains its terminal reason. */
   exited: Promise<Readonly<{ reason: unknown }>>
-  /** Owned local byte connection; the target process remains borrowed. */
   channel: IProcessByteChannel
-  /** Close only this connection, sharing its original release operation. */
   close(): Promise<void>
 }>
 
-/** Child ingress reads bootstrap before any responder handshake or provider installation. */
+/** Child bootstrap discovery retains the actual native streams and native parent-loss policy. */
 export type IProcessServeChildIngress = Readonly<{
-  /** Child ingress consumes its parent bootstrap before providing an endpoint. */
   kind: 'child'
-  /** Physical carrier kind; bytes and whole messages have different bootstrap paths. */
-  channelKind: ProcessPluginChannelKind
-  /** Open the original carrier once; byte ingress returns the already-read bootstrap separately. */
+  channelKind: 'byte' | 'message'
   openRaw(
-    signal: INativeAbortSignal
+    signal: IAbortSignal
   ): Promise<IProcessMessageChannel | Readonly<{ raw: IProcessByteChannel; bootstrap: Uint8Array }>>
-  /** Optional verifier derived from the original bootstrap bytes. */
-  createVerifier?(bootstrap: Uint8Array): (value: unknown) => void | Promise<void>
-  /** Complete authentication and return one ready remote channel. */
-  establish: IProcessPluginEstablish
-  /** Parent-loss exit/probe policy; process exit remains owned by this platform port. */
   parentLoss: Readonly<{
     exit(code: 0 | 1): void
     graceMs?: number
@@ -138,37 +80,15 @@ export type IProcessServeChildIngress = Readonly<{
   }>
 }>
 
-/** Listener ingress owns pending authentication and gives each session its own IPC identity. */
+/** A listener owns pending sockets; accepted Session handles remain with its native serve owner. */
 export type IProcessServeListenerIngress = Readonly<{
-  /** Listener ingress accepts independent authenticated sessions without launching a child. */
   kind: 'listener'
-  /** Borrowed platform bind/accept implementation. */
   listen: IListenProcessByteChannel
-  /** Address passed unchanged to the platform listener. */
   address: string
-  /** Verify the credential and return a nonempty principal, not the peer's claimed routing name. */
   verify(auth: IRpcPortableValue | undefined, peer: IRpcPeerInfo): string | Promise<string>
-  /** Local proposal shared by responder handshakes. */
-  offer: IRpcHandshakeOffer
-  /** Optional session clock; omission selects systemScheduler. */
   scheduler?: IScheduler
-  /** Create independent nonsecret routing and IPC labels for each pending physical connection. */
   createConnectionContext(pending: IProcessPendingByteConnection): Readonly<{
     peerId: string
     ipc: IProcessCommonOptions['ipc']
   }>
 }>
-
-/** Session configuration is supplied after authentication and before endpoint construction. */
-export type IProcessServeEndpointFactory = (
-  channel: IRemoteChannel,
-  signal: INativeAbortSignal,
-  session: Readonly<{
-    /** Authenticated principal and physical-session labels. */
-    identity: IProcessSessionIdentity
-    /** Governor-owned replay scope shared by this principal across sessions. */
-    idempotency: IRpcIdempotencyConfig
-    /** Per-connection concurrency limits supplied by the governor. */
-    limits: IRpcProviderLimits
-  }>
-) => Promise<IRemoteServeEndpoint>

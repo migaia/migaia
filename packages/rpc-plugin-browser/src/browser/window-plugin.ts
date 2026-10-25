@@ -1,16 +1,20 @@
-import type { IRpcTransportPlugin } from '@migaia/rpc-host/plugin'
-import { defineTransportPlugin, RpcTransportMode } from '@migaia/rpc-host/plugin'
+/** Builds the Window transport definition from a borrowed target and explicit origin policy. */
+import { defineTransportPlugin } from '@migaia/rpc-host/sdk'
+import type { IRpcTransportPlugin } from '@migaia/rpc-host/sdk'
 import { BrowserPeerErrorText } from '../error-text.js'
-import { RpcBrowserErrorCode } from '../error-code.js'
+import { RpcBrowserErrorCode } from '@migaia/rpc-contract/error-code'
 import { createBrowserPeerError } from './peer-error.js'
 import { createBrowserConfigurationError } from './error.js'
 import { BrowserRpcErrorText } from './error-text.js'
-import { BrowserPluginName } from './peer-text.js'
-import { getBrowserMessageAdapter } from './peer-adapter.js'
+import { BrowserPluginName, BrowserNamespace } from './peer-text.js'
+import { attachBrowserCarrier } from './native-message.js'
+import { createWindowCarrier } from './adapters/window.js'
 import type { IWindowPluginOptions } from './peer-types.js'
 
-/** Capture a borrowed Window source after synchronous origin and carrier admission. */
-export function windowPlugin(options: IWindowPluginOptions): IRpcTransportPlugin {
+/** Capture the exact borrowed Window and required origin before installation can touch native IO. */
+export function windowPlugin<const N extends string = 'window'>(
+  options: IWindowPluginOptions & Readonly<{ namespace?: N }>
+): IRpcTransportPlugin<NoInfer<N>> {
   if (!options?.window || typeof options.window.postMessage !== 'function')
     throw createBrowserPeerError(
       RpcBrowserErrorCode.invalidPeerSource,
@@ -27,16 +31,22 @@ export function windowPlugin(options: IWindowPluginOptions): IRpcTransportPlugin
     )
   return defineTransportPlugin({
     name: options.name ?? BrowserPluginName.window,
+    namespace: (options.namespace ?? BrowserNamespace.window) as N,
     expose: options.expose,
-    connect: options.connect,
-    mode: RpcTransportMode.connect,
-    deployment: getBrowserMessageAdapter().deployment({
-      connect: {
-        window: options.window,
-        origin: options.origin,
-        receiver: options.receiver,
-        allowUnsafeTargetOrigin: options.allowUnsafeTargetOrigin
-      }
-    })
+    features: options.features,
+    handshakeTimeoutMs: options.connect?.timeoutMs,
+    open: (context) =>
+      attachBrowserCarrier(
+        createWindowCarrier(
+          {
+            target: options.window,
+            receiver: options.receiver,
+            targetOrigin: options.origin,
+            allowUnsafeTargetOrigin: options.allowUnsafeTargetOrigin
+          },
+          context
+        ),
+        context
+      )
   })
 }

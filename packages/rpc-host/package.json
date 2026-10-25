@@ -24,25 +24,9 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
-    "./probe": {
-      "types": "./dist/core/probe/index.d.ts",
-      "default": "./dist/core/probe/index.js"
-    },
-    "./plugin": {
-      "types": "./dist/plugin/index.d.ts",
-      "default": "./dist/plugin/index.js"
-    },
     "./features": {
       "types": "./dist/features/index.d.ts",
       "default": "./dist/features/index.js"
-    },
-    "./features/auth": {
-      "types": "./dist/features/auth.d.ts",
-      "default": "./dist/features/auth.js"
-    },
-    "./features/chunk": {
-      "types": "./dist/features/chunk.d.ts",
-      "default": "./dist/features/chunk.js"
     },
     "./features/retry": {
       "types": "./dist/features/retry.d.ts",
@@ -52,9 +36,49 @@
       "types": "./dist/features/timeout.d.ts",
       "default": "./dist/features/timeout.js"
     },
-    "./features/typegen": {
-      "types": "./dist/features/typegen.d.ts",
-      "default": "./dist/features/typegen.js"
+    "./sdk": {
+      "types": "./dist/sdk/index.d.ts",
+      "default": "./dist/sdk/index.js"
+    },
+    "./plugins": {
+      "types": "./dist/plugins/index.d.ts",
+      "default": "./dist/plugins/index.js"
+    },
+    "./plugins/typegen": {
+      "types": "./dist/plugins/typegen/index.d.ts",
+      "default": "./dist/plugins/typegen/index.js"
+    },
+    "./plugins/schema": {
+      "types": "./dist/plugins/schema/index.d.ts",
+      "default": "./dist/plugins/schema/index.js"
+    },
+    "./plugins/auth": {
+      "types": "./dist/plugins/auth/index.d.ts",
+      "default": "./dist/plugins/auth/index.js"
+    },
+    "./plugins/chunk": {
+      "types": "./dist/plugins/chunk/index.d.ts",
+      "default": "./dist/plugins/chunk/index.js"
+    },
+    "./plugins/batch": {
+      "types": "./dist/plugins/batch/index.d.ts",
+      "default": "./dist/plugins/batch/index.js"
+    },
+    "./plugins/limits": {
+      "types": "./dist/plugins/limits/index.d.ts",
+      "default": "./dist/plugins/limits/index.js"
+    },
+    "./plugins/link-policy": {
+      "types": "./dist/plugins/link-policy/index.d.ts",
+      "default": "./dist/plugins/link-policy/index.js"
+    },
+    "./plugins/idempotency": {
+      "types": "./dist/plugins/idempotency/index.d.ts",
+      "default": "./dist/plugins/idempotency/index.js"
+    },
+    "./plugins/probe": {
+      "types": "./dist/plugins/probe/index.d.ts",
+      "default": "./dist/plugins/probe/index.js"
     }
   },
   "publishConfig": {
@@ -73,9 +97,9 @@
     "typecheck:core": "bun check -p tsconfig.core.json"
   },
   "dependencies": {
-    "@migaia/event-subscriber": "workspace:^",
     "@migaia/lifecycle": "workspace:^",
     "@migaia/plugin-host": "workspace:^",
+    "@migaia/rpc-contract": "workspace:*",
     "@migaia/serialize": "workspace:^",
     "@migaia/supervision": "workspace:^",
     "@migaia/utils": "workspace:^"
@@ -83,7 +107,6 @@
   "devDependencies": {
     "@migaia/capability": "workspace:^",
     "@migaia/middleware-pipeline": "workspace:^",
-    "@migaia/rpc-contract": "workspace:*",
     "@types/node": "24.13.2",
     "cborg": "6.1.1",
     "elysia": "1.4.30",
@@ -92,10 +115,6 @@
     "typescript": "^7.0.2",
     "vitest": "^4.1.10"
   },
-  "peerDependencies": {
-    "@migaia/rpc-contract": "workspace:*"
-  },
-  "peerDependenciesMeta": {},
   "engines": {
     "node": ">=18"
   }

@@ -1,9 +1,13 @@
-import { ERROR_SOURCE as RPC_PROCESS_ERROR_SOURCE } from '../error-code.js'
+/**
+ * Executes the actual local dependency-removal plan or standalone-owner release. Affected
+ * dependants retain bounded diagnostic snapshots rather than a second execution lifecycle.
+ */
+import { RPC_PROCESS_ERROR_SOURCE } from '@migaia/rpc-contract/error-code'
 import { RpcProcessErrorText } from '../error-text.js'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import type { IPluginDependencyPlan } from '@migaia/plugin-host'
 import type { IScheduledTask, IScheduler } from '@migaia/utils/scheduler'
-import { RpcProcessErrorCode } from '../error-code.js'
+import { RpcProcessErrorCode } from '@migaia/rpc-contract/error-code'
 
 import type { IProcessLiquidationOwner, IProcessResilienceSnapshot } from './types.js'
 import { scheduleProcessDiagnostic } from './terminal.js'

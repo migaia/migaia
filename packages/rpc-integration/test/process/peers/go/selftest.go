@@ -5,26 +5,16 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
-	"reflect"
-	"regexp"
-	"slices"
-	"sort"
 	"strconv"
 	"strings"
-	"unicode/utf8"
 )
 
-// vectorSuite prints one result per case and never prints fixture payloads or credentials.
-type vectorSuite struct {
-	passed  int
-	failed  int
-	pending int
-}
+// vectorSuite retains the original exact per-case PASS/FAIL/PENDING receipt channel.
+type vectorSuite struct{ passed, failed, pending int }
 
 func (suite *vectorSuite) check(name string, ok bool) {
 	if ok {
@@ -35,792 +25,304 @@ func (suite *vectorSuite) check(name string, ok bool) {
 		fmt.Printf("FAIL %s\n", name)
 	}
 }
+func (suite *vectorSuite) unavailable(name string) { suite.pending++; fmt.Printf("PENDING %s\n", name) }
 
-func (suite *vectorSuite) unavailable(name string) {
-	suite.pending++
-	fmt.Printf("PENDING %s\n", name)
-}
-
-// loadVector uses JSON numbers rather than float64 so safe-integer rules stay testable.
-func loadVector(path string) (record, error) {
+// loadVector shares the real peer's sole ordered JSON parser, not a second accepted grammar.
+func loadVector(path string) (*orderedRecord, error) {
 	content, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
-	decoder := json.NewDecoder(bytes.NewReader(content))
-	decoder.UseNumber()
-	var value record
-	if err := decoder.Decode(&value); err != nil || value == nil {
-		return nil, errors.New("invalid vector file")
+	value, err := readJSON(content)
+	result, ok := value.(*orderedRecord)
+	if err != nil || !ok {
+		return nil, errProtocol
 	}
-	return value, nil
+	return result, nil
 }
 
-func entries(value any) []any {
-	items, _ := value.([]any)
-	return items
-}
-
-func field(value any) record {
-	result, _ := value.(record)
-	return result
-}
-
-func stringField(value record, key string) string {
-	result, _ := value[key].(string)
-	return result
-}
-
-func integerField(value record, key string) int {
-	result, _ := asInt(value[key])
-	return result
-}
-
-// handshakeVectors checks every agreement, malformed hello, and out-of-offer accept.
-func handshakeVectors(suite *vectorSuite, prefix string, vector record) {
-	for _, item := range entries(vector["agreement"]) {
-		entry := field(item)
-		left, leftErr := parseHello(field(entry["initiator"]))
-		right, rightErr := parseHello(field(entry["responder"]))
-		chosen, compatible := negotiate(left, right)
-		expected := field(entry["expected"])
-		ok := leftErr == nil && rightErr == nil && compatible && chosen.Major == integerField(expected, "major") && chosen.Minor == integerField(expected, "minor") && chosen.Codec == stringField(expected, "codec") && reflect.DeepEqual(chosen.Capabilities, stringSlice(expected["capabilities"]))
-		suite.check(prefix+"/agreement/"+stringField(entry, "id"), ok)
+// coreVectors executes every canonical case through the same parser used by actual native dispatch.
+func coreVectors(suite *vectorSuite, directory string) {
+	vector, err := loadVector(filepath.Join(directory, "core-profile.json"))
+	if err != nil {
+		suite.unavailable("core-profile")
+		return
 	}
-	for _, item := range entries(vector["invalid"]) {
-		entry := field(item)
-		name := prefix + "/invalid/" + stringField(entry, "id")
-		if value := field(entry["value"]); value != nil {
-			_, err := parseHello(value)
-			suite.check(name, err != nil)
-		} else {
-			left, leftErr := parseHello(field(entry["initiator"]))
-			right, rightErr := parseHello(field(entry["responder"]))
-			_, compatible := negotiate(left, right)
-			suite.check(name, leftErr == nil && rightErr == nil && !compatible)
-		}
-	}
-	for _, item := range entries(vector["mismatch"]) {
-		entry := field(item)
-		local := offer{Versions: []version{{1, 4}}, Codecs: []string{"cbor", "json"}, Capabilities: []string{"abort@1"}, Peer: record{"id": "caller", "runtime": "go"}}
-		accept := field(entry["accept"])
-		encoded, _ := json.Marshal(accept)
-		var decoded record
-		decoder := json.NewDecoder(bytes.NewReader(encoded))
-		decoder.UseNumber()
-		_ = decoder.Decode(&decoded)
-		suite.check(prefix+"/mismatch/"+stringField(entry, "id"), parseAccept(decoded, local) != nil)
-	}
-}
-
-func stringSlice(value any) []string {
-	result := []string{}
-	for _, item := range entries(value) {
-		text, ok := item.(string)
-		if !ok {
-			return nil
-		}
-		result = append(result, text)
-	}
-	return result
-}
-
-// envelopeError holds the first stable violation and JSON Pointer.
-type envelopeError struct {
-	violation string
-	pointer   string
-}
-
-// normalizeEnvelope covers the frozen first-failure order and 1.1 stream registration.
-func normalizeEnvelope(value record) (record, [][2]string, *envelopeError) {
-	if value == nil {
-		return nil, nil, &envelopeError{"type", ""}
-	}
-	kind, ok := value["kind"].(string)
-	if !ok || !slices.Contains([]string{"request", "response", "discovery", "variation", "stream"}, kind) {
-		return nil, nil, &envelopeError{"unknownKind", "/kind"}
-	}
-	allowed := map[string][]string{
-		"request":   {"kind", "id", "method", "data"},
-		"response":  {"kind", "id", "ok", "code", "message", "error", "data"},
-		"discovery": {"kind", "id", "version", "acceptVersions", "data"},
-		"variation": {"kind", "id", "data"},
-		"stream":    {"kind", "id", "data"},
-	}[kind]
-	for _, required := range []string{"id", "data"} {
-		if _, present := value[required]; !present {
-			return nil, nil, &envelopeError{"required", "/" + required}
-		}
-	}
-	if kind == "request" {
-		if _, present := value["method"]; !present {
-			return nil, nil, &envelopeError{"required", "/method"}
-		}
-	}
-	data, ok := value["data"].(record)
-	if !ok {
-		return nil, nil, &envelopeError{"route", "/data"}
-	}
-	routing, ok := data["route"].(record)
-	if !ok {
-		return nil, nil, &envelopeError{"required", "/data/route"}
-	}
-	types := map[string][]string{"request": {"request"}, "response": {"response"}, "discovery": {"discovery-query", "discovery-response"}, "variation": {"variation"}, "stream": {"stream"}}
-	if routing["profile"] != "migaia.rpc.route" {
-		return nil, nil, &envelopeError{"route", "/data/route/profile"}
-	}
-	if !slices.Contains(types[kind], stringField(routing, "type")) {
-		return nil, nil, &envelopeError{"route", "/data/route/type"}
-	}
-	for _, required := range []string{"applicationVersion", "senderId", "targetId"} {
-		text, ok := routing[required].(string)
-		if !ok || text == "" || len(text) > 128 {
-			return nil, nil, &envelopeError{"route", "/data/route/" + required}
-		}
-	}
-	if _, ok := asInt(routing["sentAt"]); !ok {
-		return nil, nil, &envelopeError{"route", "/data/route/sentAt"}
-	}
-	if _, ok := value["id"].(string); !ok {
-		return nil, nil, &envelopeError{"type", "/id"}
-	}
-	if kind == "request" {
-		if _, ok := value["method"].(string); !ok {
-			return nil, nil, &envelopeError{"type", "/method"}
-		}
-	}
-	var warnings [][2]string
-	clean := record{}
-	for _, key := range allowed {
-		if part, present := value[key]; present {
-			clean[key] = part
-		}
-	}
-	var unknownTop []string
-	for key := range value {
-		if !slices.Contains(allowed, key) {
-			unknownTop = append(unknownTop, key)
-		}
-	}
-	// Test-oracle exception: n counts this envelope's unknown keys; preserve exact cross-language report order.
-	sort.Strings(unknownTop)
-	for _, key := range unknownTop {
-		warnings = append(warnings, [2]string{"", key})
-	}
-	routeAllowed := []string{"profile", "type", "applicationVersion", "senderId", "targetId", "sentAt"}
-	switch stringField(routing, "type") {
-	case "request":
-		routeAllowed = append(routeAllowed, "receiverId", "dispatchOnly", "timeoutMs", "idempotencyKey", "trace")
-	case "response":
-		routeAllowed = append(routeAllowed, "receiverId", "method", "message")
-	case "variation":
-		routeAllowed = append(routeAllowed, "receiverId", "variation")
-	case "stream":
-		routeAllowed = append(routeAllowed, "receiverId")
-	case "discovery-query":
-		routeAllowed = append(routeAllowed, "manual")
-	case "discovery-response":
-		routeAllowed = append(routeAllowed, "receiverId", "manual", "resolvedTargetId", "platform", "accepted", "message", "operation")
-	}
-	var unknownRoute []string
-	cleanRoute := record{}
-	for key, part := range routing {
-		if slices.Contains(routeAllowed, key) {
-			cleanRoute[key] = part
-		} else {
-			unknownRoute = append(unknownRoute, key)
-		}
-	}
-	// Test-oracle exception: n counts this route's unknown keys; preserve exact cross-language report order.
-	sort.Strings(unknownRoute)
-	for _, key := range unknownRoute {
-		warnings = append(warnings, [2]string{"/data/route", key})
-	}
-	cleanData := record{"route": cleanRoute}
-	if payload, present := data["payload"]; present {
-		cleanData["payload"] = payload
-	}
-	clean["data"] = cleanData
-	return clean, warnings, nil
-}
-
-// envelopeVectors checks frozen and live semantic cases, including the reclassified stream kind.
-func envelopeVectors(suite *vectorSuite, prefix string, vector record) {
-	for _, item := range entries(vector["valid"]) {
-		entry := field(item)
-		_, _, err := normalizeEnvelope(field(entry["value"]))
-		suite.check(prefix+"/valid/"+stringField(entry, "id"), err == nil)
-	}
-	for _, group := range []string{"invalid", "order"} {
-		for _, item := range entries(vector[group]) {
-			entry := field(item)
-			_, _, err := normalizeEnvelope(field(entry["value"]))
-			expectedViolation := stringField(entry, "violation")
-			expectedPointer := stringField(entry, "pointer")
-			if group == "invalid" && entry["evolvable"] == true && stringField(entry, "id") == "unknown-kind" {
-				expectedViolation, expectedPointer = "route", "/data/route/type"
-			}
-			suite.check(prefix+"/"+group+"/"+stringField(entry, "id"), err != nil && err.violation == expectedViolation && err.pointer == expectedPointer)
-		}
-	}
-	for _, item := range entries(vector["unknownFields"]) {
-		entry := field(item)
-		clean, warnings, err := normalizeEnvelope(field(entry["value"]))
-		var expected [][2]string
-		for _, pair := range entries(entry["expected"]) {
-			parts := entries(pair)
-			if len(parts) == 2 {
-				expected = append(expected, [2]string{parts[0].(string), parts[1].(string)})
-			}
-		}
-		_, hasA := clean["a"]
-		_, hasZ := clean["z"]
-		_, hasX := field(field(clean["data"])["route"])["x"]
-		suite.check(prefix+"/unknownFields/"+stringField(entry, "id"), err == nil && reflect.DeepEqual(warnings, expected) && !hasA && !hasZ && !hasX)
-	}
-	// Evaluate the actual sequence with a connection-local, normalized warning identity.
-	warnings := field(vector["warnings"])
-	seen := map[[2]string]bool{}
-	observed := [][2]string{}
-	bounded := func(value string, maximum int) string {
-		runes := []rune(value)
-		if len(runes) <= maximum {
-			return value
-		}
-		return string(runes[:maximum]) + "…"
-	}
-	for _, item := range entries(warnings["sequence"]) {
-		note := field(item)
-		parts := strings.Split(stringField(note, "pointer"), "/")
-		for index, part := range parts {
-			if part != "" {
-				if _, err := strconv.ParseUint(part, 10, 64); err == nil {
-					parts[index] = "*"
-				}
-			}
-		}
-		key := bounded(stringField(note, "kind"), 32) + bounded(strings.Join(parts, "/"), 128) + "#" + bounded(stringField(note, "field"), 64)
-		identity := [2]string{stringField(note, "connection"), key}
-		if !seen[identity] {
-			seen[identity] = true
-			observed = append(observed, identity)
-		}
-	}
-	expected := [][2]string{}
-	for _, item := range entries(warnings["expected"]) {
-		pair := entries(item)
-		expected = append(expected, [2]string{pair[0].(string), pair[1].(string)})
-	}
-	suite.check(prefix+"/warnings/sequence", reflect.DeepEqual(observed, expected))
-}
-
-// controlVectors exercises each fixed control action, including invalid close and evolvable unknown controls.
-func controlVectors(suite *vectorSuite, prefix string, vector record) {
-	for _, item := range entries(vector["cases"]) {
-		entry := field(item)
-		variation := stringField(entry, "variation")
-		got := "warn"
-		switch variation {
-		case "abort":
-			got = "abort"
-		case "ping":
-			got = "ping"
-		case "pong":
-			got = "pong"
-		case "close":
-			payload := field(entry["payload"])
-			if duration, ok := asInt(payload["drainMs"]); ok && duration <= 2147483647 {
-				got = "close"
-			} else {
-				got = "report"
-			}
-		}
-		suite.check(prefix+"/control/"+stringField(entry, "id"), got == stringField(entry, "action"))
-	}
-}
-
-// streamError records the first payload violation and pointer.
-type streamError struct {
-	violation string
-	pointer   string
-}
-
-func normalizeStreamPayload(value record) *streamError {
-	event, ok := value["event"].(string)
-	if !ok || !slices.Contains([]string{"open", "pull", "item", "end", "fail", "cancel", "cancelled"}, event) {
-		return &streamError{"event", "/event"}
-	}
-	seq, ok := asInt(value["seq"])
-	if !ok || seq < 0 {
-		return &streamError{"field", "/seq"}
-	}
-	if event == "item" || event == "end" {
-		if _, present := value["value"]; !present {
-			return &streamError{"field", "/value"}
-		}
-	}
-	return nil
-}
-
-// portableBytes implements stream-contract's conservative number charge and JSON text escaping.
-func portableBytes(value any) int {
-	switch item := value.(type) {
-	case nil:
-		return 4
-	case bool:
-		if item {
-			return 4
-		}
-		return 5
-	case json.Number, float64, int:
-		return 24
-	case string:
-		count := 2
-		for _, char := range item {
-			switch {
-			case char == '"' || char == '\\':
-				count += 2
-			case char <= 0x1f:
-				count += 6
-			default:
-				count += utf8.RuneLen(char)
-			}
-		}
-		return count
-	case []any:
-		count := 2
-		for index, member := range item {
-			if index > 0 {
-				count++
-			}
-			count += portableBytes(member)
-		}
-		return count
-	case record:
-		count, index := 2, 0
-		for key, member := range item {
-			if index > 0 {
-				count++
-			}
-			count += portableBytes(key) + 1 + portableBytes(member)
-			index++
-		}
-		return count
-	}
-	return -1
-}
-
-// streamVectors checks each payload, sequence, byte-accounting, envelope, and handshake vector.
-func streamVectors(suite *vectorSuite, vector record) {
-	for _, item := range entries(vector["payload"]) {
-		entry := field(item)
-		err := normalizeStreamPayload(field(entry["value"]))
-		valid, _ := entry["valid"].(bool)
-		ok := valid && err == nil || !valid && err != nil && err.violation == stringField(entry, "violation") && err.pointer == stringField(entry, "pointer")
-		suite.check("stream/payload/"+stringField(entry, "id"), ok)
-	}
-	for _, item := range entries(vector["measure"]) {
-		entry := field(item)
-		suite.check("stream/measure/"+stringField(entry, "id"), portableBytes(entry["value"]) == integerField(entry, "bytes"))
-	}
-	for _, item := range entries(vector["sequences"]) {
-		entry := field(item)
-		id := stringField(entry, "id")
-		ok := false
-		switch id {
-		case "three-items":
-			frames := entries(entry["onPull"])
-			expected := entries(entry["expectNext"])
-			ok = len(frames) == len(expected)
-			for index, frame := range frames {
-				if !ok {
-					break
-				}
-				part := field(frame)
-				expect := field(expected[index])
-				ok = integerField(part, "seq") == index && reflect.DeepEqual(part["value"], expect["value"]) && (part["event"] == "end") == expect["done"]
-			}
-		case "wrong-credit":
-			frames := entries(entry["onPull"])
-			expect := field(field(entries(entry["expectNext"])[0])["error"])
-			ok = len(frames) == 1 && integerField(field(frames[0]), "seq") != 0 && stringField(expect, "code") == "INVALID_STREAM" && stringField(expect, "violation") == "seq"
-		case "cancel":
-			ok = reflect.DeepEqual(stringSlice(entry["actions"]), []string{"next", "return"}) && integerField(entry, "cleanupCount") == 1 && reflect.DeepEqual(stringSlice(entry["clientFrames"]), []string{"request", "pull", "cancel"})
-		}
-		suite.check("stream/sequences/"+id, ok)
-	}
-	envelope := field(vector["envelope"])
-	_, _, validErr := normalizeEnvelope(field(envelope["valid"]))
-	suite.check("stream/envelope/valid", validErr == nil)
-	reclassified := field(envelope["reclassified"])
-	_, _, classifiedErr := normalizeEnvelope(field(reclassified["value"]))
-	suite.check("stream/envelope/"+stringField(reclassified, "id"), classifiedErr != nil && classifiedErr.violation == stringField(reclassified, "violation") && classifiedErr.pointer == stringField(reclassified, "pointer"))
-	handshake := field(vector["handshake"])
-	newVersion, oldVersion := field(handshake["newVersion"]), field(handshake["oldVersion"])
-	newOffer := localOffer()
-	newOffer.Versions = []version{{integerField(newVersion, "major"), integerField(newVersion, "minor")}}
-	oldOffer := localOffer()
-	oldOffer.Versions = []version{{integerField(oldVersion, "major"), integerField(oldVersion, "minor")}}
-	oldOffer.Capabilities = []string{"ping@1", "close@1"}
-	chosen, compatible := negotiate(newOffer, oldOffer)
-	suite.check("stream/handshake/minor", compatible && chosen.Minor == integerField(handshake, "negotiatedMinor") && !slices.Contains(chosen.Capabilities, "stream@1"))
-}
-
-// runSelftest executes the current wire vectors and the runtime baseline without obsolete v1 contracts.
-func runSelftest(directory string) int {
-	suite := &vectorSuite{}
-	if directory == "" {
-		fmt.Fprintln(os.Stderr, "ERROR --vectors is required")
-		return 2
-	}
-	runtimeChecks(suite)
-	u36BaselineChecks(suite)
-	u41BridgeChecks(suite)
-	entryVectorChecks(suite, directory)
-	for _, generation := range []string{"."} {
-		prefix := generation
-		if generation == "." {
-			prefix = "current"
-		}
-		for _, name := range []string{"handshake", "control", "envelope"} {
-			vector, err := loadVector(filepath.Join(directory, generation, name+".json"))
-			if err != nil {
-				suite.unavailable(prefix + "/" + name)
-				continue
-			}
-			switch name {
-			case "handshake":
-				handshakeVectors(suite, prefix, vector)
-			case "control":
-				controlVectors(suite, prefix, vector)
-			case "envelope":
-				envelopeVectors(suite, prefix, vector)
-			}
-		}
-	}
-	if vector, err := loadVector(filepath.Join(directory, "stream.json")); err == nil {
-		streamVectors(suite, vector)
-	} else {
-		suite.unavailable("stream")
-	}
-	if content, err := os.ReadFile(filepath.Join(directory, "stream-framing.json")); err == nil {
-		decoder := json.NewDecoder(bytes.NewReader(content))
-		decoder.UseNumber()
-		var vectors []any
-		if decoder.Decode(&vectors) == nil {
-			framingVectors(suite, vectors)
-		} else {
-			suite.unavailable("stream-framing")
-		}
-	} else {
-		suite.unavailable("stream-framing")
-	}
-
-	// Wire-error cases are checked by the dedicated validator in this same binary.
-	if vector, err := loadVector(filepath.Join(directory, "error-chain.json")); err == nil {
-		rawFile, readErr := os.ReadFile(filepath.Join(directory, "error-chain.json"))
-		if readErr == nil {
-			wireErrorVectors(suite, vector, rawFile)
-		} else {
-			suite.unavailable("error-chain")
-		}
-	} else {
-		suite.unavailable("error-chain")
-	}
-	fmt.Printf("SUMMARY passed=%d failed=%d pending=%d\n", suite.passed, suite.failed+suite.pending, suite.pending)
-	if suite.failed != 0 || suite.pending != 0 {
-		return 1
-	}
-	return 0
-}
-
-// entryVectorChecks restores live Host controls and checks real directory/batch admission.
-func entryVectorChecks(suite *vectorSuite, directory string) {
-	host, hostErr := loadVector(filepath.Join(directory, "remote-host-control.json"))
-	schema, schemaErr := loadVector(filepath.Join(directory, "..", "..", "..", "rpc-contract", "schema", "remote-contract.schema.json"))
-	if hostErr != nil || schemaErr != nil {
-		suite.unavailable("remote-host-control")
-	} else {
-		hostVectors(suite, host, field(schema["$defs"]))
-	}
-	if vector, err := loadVector(filepath.Join(directory, "runtime-description.json")); err != nil {
-		suite.unavailable("runtime-description")
-	} else {
-		for _, section := range []string{"valid", "invalid"} {
-			for index, raw := range entries(vector[section]) {
-				value := field(raw)
-				checkDescriptionCase(suite, value, section == "valid", fmt.Sprintf("runtime-description.json/%s/%d", section, index))
-			}
-		}
-	}
-	if vector, err := loadVector(filepath.Join(directory, "description-schema.json")); err != nil {
-		suite.unavailable("description-schema")
-	} else {
-		for _, raw := range entries(vector["cases"]) {
+	for _, section := range []string{"valid", "invalid"} {
+		for _, raw := range entries(field(vector)[section]) {
 			entry := field(raw)
-			expected, _ := entry["valid"].(bool)
-			checkDescriptionCase(suite, field(entry["value"]), expected, "description-schema.json/"+stringField(entry, "id"))
+			suite.check(stringField(entry, "id"), validFrame(entry["frame"]) == (section == "valid"))
 		}
 	}
-	if vector, err := loadVector(filepath.Join(directory, "batch.json")); err != nil {
-		suite.unavailable("batch")
-	} else {
-		for _, section := range []string{"valid", "invalid", "isolated"} {
-			for _, raw := range entries(vector[section]) {
-				entry := field(raw)
-				members, batched, err := baselineMembers(field(entry["value"]))
-				good := batched && (err == nil) == (section != "invalid")
-				if err == nil {
-					actual := []int{}
-					for index, member := range members {
-						if validateBaselineMember(member) == nil {
-							actual = append(actual, index)
-						}
-					}
-					expected := []int{}
-					if section == "isolated" {
-						for _, value := range entries(entry["validMembers"]) {
-							index, _ := asInt(value)
-							expected = append(expected, index)
-						}
-					} else {
-						for index := range members {
-							expected = append(expected, index)
-						}
-					}
-					good = good && reflect.DeepEqual(actual, expected)
-				}
-				suite.check("batch/"+stringField(entry, "id"), good)
+	for _, raw := range entries(field(vector)["unknownIgnored"]) {
+		entry := field(raw)
+		frame := entry["frame"]
+		accepted := validFrame(frame) && validFrame(entry["baseline"])
+		target := frame
+		for _, key := range strings.Split(stringField(entry, "pointer"), "/")[1:] {
+			if members, ok := target.([]any); ok {
+				index, _ := strconv.Atoi(key)
+				target = members[index]
+			} else {
+				target = field(target)[key]
 			}
 		}
+		fields := field(target)
+		_, first := fields["futureA"]
+		_, second := fields["futureB"]
+		delete(fields, "futureA")
+		delete(fields, "futureB")
+		suite.check(stringField(entry, "id"), accepted && first && second && runtimeSchemaEqual(frame, entry["baseline"]))
 	}
+
 }
 
-// checkDescriptionCase sends a directory over the actual initiator's framing and admission path.
-func checkDescriptionCase(suite *vectorSuite, value record, expected bool, label string) {
-	remoteID := stringField(field(value["self"]), "instanceId")
-	remote := localOffer()
-	remote.Peer = record{"id": remoteID, "runtime": "go"}
-	var input, output bytes.Buffer
-	_ = send(&input, acceptRecord(agreement{Major: 1, Minor: 1, Codec: "json", Capabilities: []string{runtimeCapability, batchCapability, "close@1"}}, remote))
-	_ = send(&input, record{"kind": "response", "id": "go-describe-1", "ok": true, "data": record{"payload": value}})
-	_ = send(&input, record{"kind": "response", "id": "go-echo-1", "ok": true, "data": record{"payload": record{"probe": "go"}}})
-	suite.check(label, (initiator(&input, &output) == nil) == expected)
+// requestFor authors actual direct task/generation headers for the original independent runtime checks.
+func requestFor(id, method, mode string, payload any, local, remote *orderedRecord) *orderedRecord {
+	caller, target := field(remote), field(local)
+	task := object("mode", mode, "callerId", caller["instanceId"], "callerGeneration", caller["generation"], "targetGeneration", target["generation"], "method", method)
+	return object("profile", protocol, "kind", "call", "id", id, "route", route(stringField(caller, "instanceId"), stringField(target, "instanceId"), nil), "task", task, "options", object(), "payload", payload)
+}
+func remoteIdentity() *orderedRecord {
+	return object("name", "baseline-checker", "instanceId", "baseline-checker", "generation", object("kind", "session", "value", 0, "providerId", "baseline-checker"))
+}
+func errorRoot(value any) record {
+	graph := field(value)
+	nodes := entries(graph["nodes"])
+	index, ok := asInt(graph["root"])
+	if !ok || index >= len(nodes) {
+		return nil
+	}
+	return field(nodes[index])
 }
 
-// u36Request creates a selected-receiver request for the new baseline's real session checks.
-func u36Request(id, method string, payload any) record {
-	header := route("request", "baseline-checker", "go-peer")
-	header["receiverId"] = "go-peer"
-	return record{"kind": "request", "id": id, "method": method, "data": record{"route": header, "payload": payload}}
-}
-
-// u36Replies consumes real framed session output after its accept, preserving the emitted reply order.
-func u36Replies(output *bytes.Buffer) ([]record, error) {
-	accepted, err := receive(output, true)
-	if err != nil || accepted["step"] != "accept" {
-		return nil, errors.New("runtime baseline session did not accept")
-	}
-	var replies []record
-	for {
-		value, err := receive(output, false)
-		if errors.Is(err, io.EOF) {
-			return replies, nil
-		}
-		if err != nil {
-			return nil, err
-		}
-		replies = append(replies, value)
-	}
-}
-
-// u36BaselineChecks proves advertised support, v2 directories, removed v1 routes and batch isolation.
-func u36BaselineChecks(suite *vectorSuite) {
-	capabilities := localOffer().Capabilities
-	suite.check("u36/capabilities/runtime-and-batch", slices.Contains(capabilities, "runtime-api@1") && slices.Contains(capabilities, "batch@1"))
-	suite.check("u36/capabilities/stream-business-only", !slices.Contains(capabilities, "stream@1") && slices.Contains(businessOffer().Capabilities, "stream@1"))
-	optional := false
-	for _, capability := range []string{"generation@1", "order@1", "group@1", "cancel-before-start@1", "outcome@1", "portable-binary@1", "native-binary-authenticated-manifest@1", "transfer@1"} {
-		optional = optional || slices.Contains(capabilities, capability)
-	}
-	suite.check("u36/capabilities/no-unimplemented-options", !optional)
-	for _, host := range []bool{false, true} {
-		business := businessState{host: host, installed: !host, received: []any{}, aborts: []any{}, waiting: map[string]record{}, streams: map[string]*businessStream{}}
-		value, failure := business.invoke("migaia.remote.runtime.describe", nil, nil)
-		// JSON roundtrip checks the actual public field shape without sharing the new directory builder.
-		encoded, encodeErr := json.Marshal(value)
-		var description record
-		decodeErr := json.Unmarshal(encoded, &description)
-		self := field(description["self"])
-		directoryOK := failure == nil && encodeErr == nil && decodeErr == nil && len(description) == 3 && description["schemaVersion"] == float64(2) && len(self) == 2 && self["name"] == "go-peer" && self["instanceId"] == "go-peer"
-		methods := entries(description["methods"])
-		echoPresent := false
-		waitRequestOnly := false
-		for _, raw := range methods {
-			method := field(raw)
-			modes := stringSlice(method["supportedModes"])
-			directoryOK = directoryOK && (len(method) == 3 || len(method) == 4 && method["name"] == "p.f.request" && method["idempotent"] == true) && method["modeSource"] == "declared" && stringField(method, "name") != "" && len(modes) > 0
-			if method["name"] == "echo" {
-				echoPresent = slices.Contains(modes, "request") && slices.Contains(modes, "notify")
-			}
-			if method["name"] == "peer.wait" {
-				waitRequestOnly = reflect.DeepEqual(modes, []string{"request"})
-			}
-		}
-		suite.check(fmt.Sprintf("u36/describe/business-host-%t", host), directoryOK && echoPresent && waitRequestOnly)
-		waitNotify := u36Request("wait-notify", "peer.wait", nil)
-		field(field(waitNotify["data"])["route"])["dispatchOnly"] = true
-		waitReplies, waitErr := business.native(waitNotify)
-		suite.check(fmt.Sprintf("u36/modes/wait-notify-no-pending-host-%t", host), waitErr == nil && len(waitReplies) == 0 && len(business.waiting) == 0)
-		_, oldFailure := business.invoke("migaia.remote.describe", nil, nil)
-		suite.check(fmt.Sprintf("u36/describe/v1-removed-host-%t", host), oldFailure != nil && oldFailure["code"] == "PROVIDER_NOT_FOUND")
-	}
-	for _, business := range []bool{false, true} {
-		var input, output bytes.Buffer
-		peerOffer := localOffer()
-		if business {
-			peerOffer = businessOffer()
-		}
-		_ = send(&input, helloRecord(peerOffer))
-		_ = send(&input, u36Request("describe", "migaia.remote.runtime.describe", nil))
-		if business {
-			_ = serveBusiness(&input, &output, false, "", false, false)
-		} else {
-			_ = responder(&input, &output)
-		}
-		replies, err := u36Replies(&output)
-		singleOK := err == nil && len(replies) == 1 && replies[0]["ok"] == true && integerField(field(field(replies[0]["data"])["payload"]), "schemaVersion") == 2
-		suite.check(fmt.Sprintf("u36/describe/live-business-%t", business), singleOK)
-
-		input.Reset()
-		output.Reset()
-		_ = send(&input, helloRecord(peerOffer))
-		_ = send(&input, record{"kind": "batch", "envelopes": []any{u36Request("first", "echo", "one"), json.Number("7"), u36Request("missing", "not-provided", nil), u36Request("last", "echo", "two")}})
-		var sessionErr error
-		if business {
-			sessionErr = serveBusiness(&input, &output, false, "", false, false)
-		} else {
-			sessionErr = responder(&input, &output)
-		}
-		replies, err = u36Replies(&output)
-		batchOK := sessionErr == nil && err == nil && len(replies) == 3
-		if batchOK {
-			batchOK = replies[0]["id"] == "first" && field(replies[0]["data"])["payload"] == "one" && replies[1]["id"] == "missing" && replies[1]["ok"] == false && replies[2]["id"] == "last" && field(replies[2]["data"])["payload"] == "two"
-		}
-		suite.check(fmt.Sprintf("u36/batch/member-isolation-business-%t", business), batchOK)
-	}
-	// A supported baseline session may omit stream; neither directory nor dispatch may re-enable it.
-	var noStreamInput, noStreamOutput bytes.Buffer
-	noStreamOffer := localOffer()
-	_ = send(&noStreamInput, helloRecord(noStreamOffer))
-	_ = send(&noStreamInput, u36Request("describe", "migaia.remote.runtime.describe", nil))
-	_ = send(&noStreamInput, u36Request("stream", "migaia.remote.runtime.stream.p.f.generator", []any{[]any{"one"}}))
-	noStreamErr := serveBusiness(&noStreamInput, &noStreamOutput, false, "", false, false)
-	noStreamReplies, noStreamReadErr := u36Replies(&noStreamOutput)
-	noStreamOK := noStreamErr == nil && noStreamReadErr == nil && len(noStreamReplies) == 2
-	if noStreamOK {
-		description := field(field(noStreamReplies[0]["data"])["payload"])
-		for _, raw := range entries(description["methods"]) {
-			name := field(raw)["name"]
-			noStreamOK = noStreamOK && name != "p.f.generator" && name != "p.f.asyncGenerator"
-		}
-		noStreamOK = noStreamOK && noStreamReplies[1]["kind"] == "response" && noStreamReplies[1]["ok"] == false && noStreamReplies[1]["code"] == "CAPABILITY_UNSUPPORTED"
-	}
-	suite.check("u36/stream/unnegotiated-directory-and-dispatch", noStreamOK)
-	// Ordered-pair interop must exchange v2 before sending one echo inside a real batch frame.
-	var input, output bytes.Buffer
-	remote := localOffer()
-	remote.Peer = record{"id": "other-peer", "runtime": "go"}
-	_ = send(&input, acceptRecord(agreement{Major: 1, Minor: 1, Codec: "json", Capabilities: []string{"runtime-api@1", "batch@1", "close@1"}}, remote))
-	description := record{"schemaVersion": 2, "self": record{"name": "other-peer", "instanceId": "other-peer"}, "methods": []any{record{"name": "echo", "supportedModes": []any{"request", "notify"}, "modeSource": "declared"}}}
-	_ = send(&input, record{"kind": "response", "id": "go-describe-1", "ok": true, "data": record{"route": route("response", "other-peer", "go-peer"), "payload": description}})
-	_ = send(&input, record{"kind": "response", "id": "go-echo-1", "ok": true, "data": record{"route": route("response", "other-peer", "go-peer"), "payload": record{"probe": "go"}}})
-	initiateErr := initiator(&input, &output)
-	_, helloErr := receive(&output, true)
-	describeCall, describeErr := receive(&output, false)
-	batchCall, batchErr := receive(&output, false)
-	closeCall, closeErr := receive(&output, false)
-	suite.check("u36/initiator/v2-then-batch", initiateErr == nil && helloErr == nil && describeErr == nil && batchErr == nil && closeErr == nil && describeCall["method"] == "migaia.remote.runtime.describe" && batchCall["kind"] == "batch" && len(entries(batchCall["envelopes"])) == 1 && closeCall["kind"] == "variation")
-}
-
-// runtimeChecks guards framing, UTF-8, control, one-way, error, and credential boundaries.
+// runtimeChecks keeps original frame, scalar, no-reply, error, cancel, finish, health and privacy assertions.
 func runtimeChecks(suite *vectorSuite) {
+	var baseline bytes.Buffer
+	baselineErr := runJSONBaseline(strings.NewReader("Content-Length: 25\r\n\r\n [ 1, \"baseline\", null ] "), &baseline)
+	suite.check("runtime/pure-json-baseline", baselineErr == nil && baseline.String() == "Content-Length: 19\r\n\r\n[1,\"baseline\",null]")
 	var framed bytes.Buffer
 	writeErr := writeFrame(&framed, []byte("x"))
-	payload, readErr := readFrame(&framed)
+	payload, readErr := readFrame(&framed, maxFrameBytes)
 	suite.check("runtime/framing/roundtrip", writeErr == nil && readErr == nil && bytes.Equal(payload, []byte("x")))
-	_, zeroErr := readFrame(bytes.NewReader([]byte{0, 0, 0, 0}))
+	_, zeroErr := readFrame(bytes.NewReader([]byte{0, 0, 0, 0}), maxFrameBytes)
 	suite.check("runtime/framing/zero", zeroErr != nil)
-	_, oversizedErr := readFrame(bytes.NewReader([]byte{1, 0, 0, 1}))
+	_, oversizedErr := readFrame(bytes.NewReader([]byte{1, 0, 0, 1}), maxFrameBytes)
 	suite.check("runtime/framing/oversized-header", oversizedErr != nil)
 	suite.check("runtime/framing/empty-write", writeFrame(&bytes.Buffer{}, nil) != nil)
 	var malformed bytes.Buffer
 	_ = writeFrame(&malformed, []byte{0xff})
 	_, utf8Err := receive(&malformed, false)
 	suite.check("runtime/framing/invalid-utf8", utf8Err != nil)
-	requestRoute := route("request", "a", "b")
-	request := record{"kind": "request", "id": "one", "method": "peer.echo", "data": record{"route": requestRoute, "payload": "x"}}
-	replies, err := response(request, map[string]record{})
-	suite.check("runtime/request/echo", err == nil && len(replies) == 1 && replies[0]["ok"] == true && field(replies[0]["data"])["payload"] == "x")
-	requestRoute["dispatchOnly"] = true
-	oneWay, oneWayErr := response(request, map[string]record{})
+	local, remote := localIdentity(), remoteIdentity()
+	state := newBusiness(local, runtimeDescription(remote, false), false)
+	request := requestFor("one", "peer.echo", "request", "x", local, remote)
+	replies, err := state.native(request)
+	suite.check("runtime/request/echo", err == nil && len(replies) == 1 && field(replies[0])["kind"] == "result" && field(replies[0])["result"] == "x")
+	field(field(request)["task"])["mode"] = "notify"
+	oneWay, oneWayErr := state.native(request)
 	suite.check("runtime/request/one-way", oneWayErr == nil && oneWay == nil)
-	delete(requestRoute, "dispatchOnly")
-	request["method"] = "peer.error"
-	failures, errorErr := response(request, map[string]record{})
+	request = requestFor("one", "peer.error", "request", nil, local, remote)
+	failures, errorErr := state.native(request)
 	wire := record(nil)
 	if len(failures) == 1 {
-		wire = field(failures[0]["error"])
+		wire = errorRoot(field(failures[0])["error"])
 	}
-	suite.check("runtime/request/wire-error", errorErr == nil && len(failures) == 1 && failures[0]["ok"] == false && wire["code"] == "PEER_ERROR" && wire["stack"] != "")
-	request["method"] = "missing-method"
-	missing, missingErr := response(request, map[string]record{})
-	suite.check("runtime/request/method-not-found", missingErr == nil && len(missing) == 1 && missing[0]["code"] == "PROVIDER_NOT_FOUND" && field(missing[0]["error"])["code"] == "PROVIDER_NOT_FOUND")
-	pending := map[string]record{"one": requestRoute}
-	abortRoute := route("variation", "a", "b")
-	abortRoute["variation"] = "abort"
-	abort := record{"kind": "variation", "id": "one", "data": record{"route": abortRoute}}
-	_, _, abortErr := control(abort, pending, localOffer().Capabilities)
-	_, stillPending := pending["one"]
+	suite.check("runtime/request/wire-error", errorErr == nil && len(failures) == 1 && field(failures[0])["kind"] == "error" && wire["code"] == "PEER_ERROR" && wire["stack"] != "")
+	missing, missingErr := state.native(requestFor("missing", "missing-method", "request", nil, local, remote))
+	suite.check("runtime/request/method-not-found", missingErr == nil && len(missing) == 1 && errorRoot(field(missing[0])["error"])["code"] == "PROVIDER_NOT_FOUND")
+	wait := requestFor("one", "peer.wait", "request", nil, local, remote)
+	_, _ = state.native(wait)
+	cancel := object("profile", protocol, "kind", "cancel", "id", "one", "route", field(wait)["route"], "task", field(wait)["task"], "reason", wireError("CANCELLED", "stop", "rpc.endpoint"))
+	_, abortErr := state.native(cancel)
+	_, stillPending := state.waiting["one"]
 	suite.check("runtime/control/abort", abortErr == nil && !stillPending)
-	pending["one"] = requestRoute
-	_, _, ignoredAbortErr := control(abort, pending, []string{})
-	_, stillPending = pending["one"]
-	suite.check("runtime/control/unnegotiated-abort", ignoredAbortErr == nil && stillPending)
-	finish := record{"kind": "request", "id": "finish", "method": "peer.finish", "data": record{"route": requestRoute}}
-	finished, finishErr := response(finish, pending)
-	suite.check("runtime/request/finish-wait", finishErr == nil && len(finished) == 2 && finished[0]["id"] == "one" && finished[0]["ok"] == true && finished[1]["id"] == "finish" && finished[1]["ok"] == true)
-	pingRoute := route("variation", "a", "b")
-	pingRoute["variation"] = "ping"
-	pong, _, pingErr := control(record{"kind": "variation", "id": "ping-1", "data": record{"route": pingRoute}}, pending, localOffer().Capabilities)
-	suite.check("runtime/control/ping", pingErr == nil && pong["id"] == "ping-1" && field(field(pong["data"])["route"])["variation"] == "pong")
-	ignoredPong, _, ignoredPingErr := control(record{"kind": "variation", "id": "ping-2", "data": record{"route": pingRoute}}, pending, []string{})
-	suite.check("runtime/control/unnegotiated-ping", ignoredPingErr == nil && ignoredPong == nil)
-	closeRoute := route("variation", "a", "b")
-	closeRoute["variation"] = "close"
-	closeFrame := record{"kind": "variation", "id": "close-1", "data": record{"route": closeRoute, "payload": record{"drainMs": json.Number("0")}}}
-	_, closeMs, closeErr := control(closeFrame, pending, localOffer().Capabilities)
-	suite.check("runtime/control/close", closeErr == nil && closeMs != nil && *closeMs == 0)
-	_, ignoredClose, ignoredCloseErr := control(closeFrame, pending, []string{})
-	suite.check("runtime/control/unnegotiated-close", ignoredCloseErr == nil && ignoredClose == nil)
-	closeFrame["data"] = record{"route": closeRoute, "payload": record{"drainMs": "invalid"}}
-	_, _, invalidCloseErr := control(closeFrame, pending, localOffer().Capabilities)
-	suite.check("runtime/control/invalid-close", errors.Is(invalidCloseErr, errInvalidClose))
+	_, _ = state.native(wait)
+	finished, finishErr := state.native(requestFor("finish", "peer.finish", "request", nil, local, remote))
+	suite.check("runtime/request/finish-wait", finishErr == nil && len(finished) == 2 && field(finished[0])["id"] == "one" && field(finished[0])["kind"] == "result" && field(finished[1])["id"] == "finish" && field(finished[1])["kind"] == "result")
+	ping := object("profile", protocol, "kind", "control", "id", "ping-1", "route", field(wait)["route"], "operation", "ping")
+	pong, pingErr := state.native(ping)
+	suite.check("runtime/control/ping", pingErr == nil && len(pong) == 1 && field(pong[0])["id"] == "ping-1" && field(pong[0])["operation"] == "pong")
+	drain := object("profile", protocol, "kind", "control", "id", "close-1", "route", field(wait)["route"], "operation", "drain")
+	_, closeErr := state.native(drain)
+	suite.check("runtime/control/close", closeErr == nil && state.closing && state.closes == 1)
+	field(field(drain)["route"])["remainingMs"] = float64(-1)
+	suite.check("runtime/control/invalid-close", !validFrame(drain))
 	secret := "SENTINEL_NATIVE_PEER_AUTH_9D8C"
-	hello := helloRecord(localOffer())
-	hello["protocol"] = "other-protocol"
-	hello["auth"] = record{"token": secret}
+	hello := localOffer(remote, false)
+	hello.set("profile", "other-protocol")
+	hello.set("auth", object("token", secret))
 	var inbound, outbound bytes.Buffer
 	_ = send(&inbound, hello)
 	_ = responder(&inbound, &outbound)
 	suite.check("runtime/secret/incompatible-hello", !bytes.Contains(outbound.Bytes(), []byte(secret)))
-	malformedHello := helloRecord(localOffer())
-	malformedHello["versions"] = []any{}
-	malformedHello["auth"] = record{"token": secret}
-	var badInput, badOutput bytes.Buffer
-	_ = send(&badInput, malformedHello)
-	badErr := responder(&badInput, &badOutput)
-	suite.check("runtime/secret/malformed-hello", badErr != nil && !strings.Contains(badErr.Error(), secret) && !bytes.Contains(badOutput.Bytes(), []byte(secret)))
+	malformedHello := localOffer(remote, false)
+	malformedHello.set("versions", []any{})
+	malformedHello.set("auth", object("token", secret))
+	inbound.Reset()
+	outbound.Reset()
+	_ = send(&inbound, malformedHello)
+	badErr := responder(&inbound, &outbound)
+	suite.check("runtime/secret/malformed-hello", badErr != nil && !strings.Contains(badErr.Error(), secret) && !bytes.Contains(outbound.Bytes(), []byte(secret)))
+}
+
+// nativeBusinessChecks moves original ordered notification/missing-provider/receipt assertions off JSON-RPC.
+func nativeBusinessChecks(suite *vectorSuite) {
+	local, remote := localIdentity(), remoteIdentity()
+	var input, output bytes.Buffer
+	_ = send(&input, localOffer(remote, false))
+	_ = send(&input, acceptance(localOffer(remote, false)))
+	notify := requestFor("notify", "p.f.oneWay", "notify", []any{"receipt"}, local, remote)
+	_ = send(&input, notify)
+	_ = send(&input, requestFor("missing", "absent", "request", []any{}, local, remote))
+	_ = send(&input, requestFor("received", "peer.received", "request", []any{}, local, remote))
+	err := serveBusiness(&input, &output, local, "", "", true)
+	hello, helloErr := receive(&output, true)
+	accept, acceptErr := receive(&output, true)
+	description := field(field(hello)["directory"])
+	identity := field(description["self"])
+	suite.check("u36/describe/business-host-false", err == nil && helloErr == nil && integerField(description, "schemaVersion") == 3 && identity["name"] == "go-peer" && identity["instanceId"] == "go-peer" && validRuntimeDescription(field(hello)["directory"], "go-peer"))
+	suite.check("u41/bridge/baseline", acceptErr == nil && field(accept)["step"] == "accept" && field(accept)["profile"] == protocol)
+	first, firstErr := receive(&output, false)
+	second, secondErr := receive(&output, false)
+	_, eof := receive(&output, false)
+	received := field(field(second)["result"])
+	suite.check("u41/bridge/v2-batch-notification-isolation", err == nil && firstErr == nil && secondErr == nil && eof == io.EOF && field(first)["id"] == "missing" && errorRoot(field(first)["error"])["code"] == "PROVIDER_NOT_FOUND" && field(second)["id"] == "received" && integerField(received, "count") == 1 && runtimeSchemaEqual(received["values"], []any{"receipt"}))
+	// Both old directories advertised echo request/notify and peer.wait request-only; schema3 preserves that rule.
+	echo, wait := false, false
+	for _, raw := range entries(description["methods"]) {
+		method := field(raw)
+		if method["name"] == "echo" {
+			echo = runtimeSchemaEqual(method["supportedModes"], []any{"request", "notify"})
+		}
+		if method["name"] == "peer.wait" {
+			wait = runtimeSchemaEqual(method["supportedModes"], []any{"request"})
+		}
+	}
+	suite.check("u36/describe/modes", echo && wait)
+	state := newBusiness(local, runtimeDescription(remote, false), true)
+	replies, waitErr := state.native(requestFor("wait-notify", "peer.wait", "notify", nil, local, remote))
+	suite.check("u36/modes/wait-notify-no-pending-host-false", waitErr == nil && len(replies) == 0 && len(state.waiting) == 0)
+	_, oldFailure := state.invoke("migaia.remote.describe", nil, nil)
+	suite.check("u36/describe/v1-removed-host-false", oldFailure != nil && errorRoot(oldFailure)["code"] == "PROVIDER_NOT_FOUND")
+}
+
+// siblingChecks preserves first/missing/last business reply values and order in coalesced canonical frames.
+func siblingChecks(suite *vectorSuite) {
+	for _, business := range []bool{false, true} {
+		local, remote := localIdentity(), remoteIdentity()
+		var input, output bytes.Buffer
+		_ = send(&input, localOffer(remote, false))
+		_ = send(&input, acceptance(localOffer(remote, false)))
+		_ = send(&input, requestFor("first", "echo", "request", "one", local, remote))
+		_ = send(&input, requestFor("missing", "not-provided", "request", nil, local, remote))
+		_ = send(&input, requestFor("last", "echo", "request", "two", local, remote))
+		sessionErr := serveBusiness(&input, &output, local, "", "", business)
+		hello, helloErr := receive(&output, true)
+		_, acceptErr := receive(&output, true)
+		suite.check(fmt.Sprintf("u36/describe/live-business-%t", business), sessionErr == nil && helloErr == nil && acceptErr == nil && validRuntimeDescription(field(hello)["directory"], "go-peer"))
+		first, firstErr := receive(&output, false)
+		missing, missingErr := receive(&output, false)
+		last, lastErr := receive(&output, false)
+		_, eof := receive(&output, false)
+		suite.check(fmt.Sprintf("u36/batch/member-isolation-business-%t", business), sessionErr == nil && firstErr == nil && missingErr == nil && lastErr == nil && eof == io.EOF && field(first)["id"] == "first" && field(first)["result"] == "one" && field(missing)["id"] == "missing" && errorRoot(field(missing)["error"])["code"] == "PROVIDER_NOT_FOUND" && field(last)["id"] == "last" && field(last)["result"] == "two")
+	}
+}
+
+// upgradeDirectoryFixture changes only retired schema2 authoring metadata, never production admission.
+func upgradeDirectoryFixture(value *orderedRecord) {
+	if field(value)["schemaVersion"] == float64(2) {
+		value.set("schemaVersion", 3)
+	}
+	if identity, ok := field(value)["self"].(*orderedRecord); ok {
+		identity.set("generation", object("kind", "session", "value", 0, "providerId", field(identity)["instanceId"]))
+	}
+}
+
+// schemaVectors keeps every method-schema assertion; only the enclosing retired directory version changes.
+func schemaVectors(suite *vectorSuite, directory string) {
+	vector, err := loadVector(filepath.Join(directory, "description-schema.json"))
+	if err != nil {
+		suite.unavailable("description-schema")
+		return
+	}
+	for _, raw := range entries(field(vector)["cases"]) {
+		entry := field(raw)
+		value, ok := entry["value"].(*orderedRecord)
+		if !ok {
+			suite.unavailable("description-schema/" + stringField(entry, "id"))
+			continue
+		}
+		identity, ok := field(value)["self"].(*orderedRecord)
+		if !ok {
+			suite.check("description-schema.json/"+stringField(entry, "id"), entry["valid"] == false)
+			continue
+		}
+		upgradeDirectoryFixture(value)
+		suite.check("description-schema.json/"+stringField(entry, "id"), validRuntimeDescription(value, stringField(field(identity), "instanceId")) == (entry["valid"] == true))
+	}
+	baseline, err := loadVector(filepath.Join(directory, "runtime-description.json"))
+	if err != nil {
+		suite.unavailable("runtime-description")
+		return
+	}
+	for _, section := range []string{"valid", "invalid"} {
+		for index, raw := range entries(field(baseline)[section]) {
+			value := raw.(*orderedRecord)
+			upgradeDirectoryFixture(value)
+			suite.check(fmt.Sprintf("runtime-description.json/%s/%d", section, index), validRuntimeDescription(value, stringField(field(field(value)["self"]), "instanceId")) == (section == "valid"))
+		}
+	}
+}
+
+// canonicalVectors retains real bytes for comparison with the existing serialize JSON owner.
+func canonicalVectors(suite *vectorSuite, directory string) {
+	vector, err := loadVector(filepath.Join(directory, "canonical.json"))
+	if err != nil {
+		suite.unavailable("canonical")
+		return
+	}
+	for _, raw := range entries(field(vector)["cases"]) {
+		entry := field(raw)
+		value, present := entry["value"]
+		id := stringField(entry, "id")
+		if !present {
+			suite.unavailable("canonical/" + id)
+			continue
+		}
+		encoded, err := appendJSON(nil, value)
+		suite.check("canonical/"+id, err == nil)
+		if err == nil {
+			fmt.Printf("CANONICAL %s %s\n", id, hex.EncodeToString(encoded))
+		}
+	}
+	// These real wire objects specifically expose the previous map-sorting/HTML-escaping regression.
+	encoded, err := appendJSON(nil, object("z", 1, "a", "<>&\u2028\u2029", "nested", object("second", 2, "first", 1)))
+	suite.check("canonical/own-order-and-no-html-escape", err == nil && string(encoded) == "{\"z\":1,\"a\":\"<>&\u2028\u2029\",\"nested\":{\"second\":2,\"first\":1}}")
+}
+
+// runSelftest keeps the original entry point and fails any missing/failed canonical case.
+func runSelftest(directory string) int {
+	suite := &vectorSuite{}
+	if directory == "" {
+		fmt.Fprintln(os.Stderr, "ERROR --vectors is required")
+		return 2
+	}
+	coreVectors(suite, directory)
+	runtimeChecks(suite)
+	nativeBusinessChecks(suite)
+	siblingChecks(suite)
+	schemaVectors(suite, directory)
+	canonicalVectors(suite, directory)
+	streamVectorChecks(suite, directory)
+	framingVectorChecks(suite, directory)
+	flatErrorPolicyChecks(suite)
+	originalErrorVectors(suite, directory)
+	fmt.Printf("SUMMARY passed=%d failed=%d pending=%d\n", suite.passed, suite.failed, suite.pending)
+	if suite.failed != 0 || suite.pending != 0 {
+		return 1
+	}
+	return 0
 }
 
 // expandFrame expands binary vector specifications independently of JSON wire encoding.
@@ -860,7 +362,7 @@ func framingVectors(suite *vectorSuite, vectors []any) {
 		actual := [][]byte{}
 		code := ""
 		for {
-			frame, err := readFrame(reader)
+			frame, err := readFrame(reader, maxFrameBytes)
 			if err == io.EOF {
 				break
 			}
@@ -885,7 +387,7 @@ func framingVectors(suite *vectorSuite, vectors []any) {
 		for _, frame := range frames {
 			expected = append(expected, expandFrame(frame))
 		}
-		good := reflect.DeepEqual(actual, expected) && code == stringField(field(entry["error"]), "code")
+		good := equalFrames(actual, expected) && code == stringField(field(entry["error"]), "code")
 		if prefix := stringField(entry, "encodedPrefixHex"); prefix != "" {
 			payload := entry["payloadHex"]
 			if payload == nil {
@@ -899,220 +401,342 @@ func framingVectors(suite *vectorSuite, vectors []any) {
 	}
 }
 
-// u41BridgeChecks exercises the real reader, v2 response, notification state and failed-member siblings.
-func u41BridgeChecks(suite *vectorSuite) {
-	var input, output bytes.Buffer
-	hello := helloRecord(localOffer())
-	hello["auth"] = "unit-token"
-	hello["capabilities"] = []string{runtimeCapability, batchCapability, "jsonrpc-bridge@1", "abort@1", "wire-error@1"}
-	encoded, _ := json.Marshal(hello)
-	_ = bridgeSend(&input, record{"jsonrpc": "2.0", "id": "hello", "method": "migaia.hello", "params": record{"hello": string(encoded)}})
-	_ = bridgeSend(&input, []any{
-		record{"jsonrpc": "2.0", "id": "directory", "method": "migaia.describe", "params": record{"args": []any{}}},
-		record{"jsonrpc": "2.0", "method": "migaia.invoke", "params": record{"method": "p.f.oneWay", "args": []any{"receipt"}}},
-		record{"jsonrpc": "2.0", "id": "missing", "method": "migaia.invoke", "params": record{"method": "absent", "args": []any{}}},
-		record{"jsonrpc": "2.0", "id": "received", "method": "migaia.invoke", "params": record{"method": "peer.received", "args": []any{}}},
-	})
-	err := serveBridge(&input, &output, false, "unit-token")
-	helloReply, helloErr := bridgeReceive(&output)
-	var accepted record
-	decodeErr := json.Unmarshal([]byte(stringField(field(field(helloReply)["result"]), "reply")), &accepted)
-	suite.check("u41/bridge/baseline", err == nil && helloErr == nil && decodeErr == nil && accepted["step"] == "accept" && slices.Contains(stringSlice(accepted["capabilities"]), runtimeCapability) && slices.Contains(stringSlice(accepted["capabilities"]), batchCapability))
-	batch, batchErr := bridgeReceive(&output)
-	replies := entries(batch)
-	good := batchErr == nil && len(replies) == 3
-	if good {
-		description := field(field(replies[0])["result"])
-		good = field(replies[0])["id"] == "directory" && integerField(description, "schemaVersion") == 2 && field(description["self"])["instanceId"] == "go-peer"
-		for _, method := range entries(description["methods"]) {
-			good = good && !slices.Contains(stringSlice(field(method)["supportedModes"]), "stream")
-		}
-		missing := field(field(field(field(replies[1])["error"])["data"])["migaiaWireError"])
-		received := field(field(replies[2])["result"])
-		good = good && field(replies[1])["id"] == "missing" && missing["code"] == "PROVIDER_NOT_FOUND" && field(replies[2])["id"] == "received" && integerField(received, "count") == 1 && reflect.DeepEqual(received["values"], []any{"receipt"})
-	}
-	suite.check("u41/bridge/v2-batch-notification-isolation", good)
-}
-
-// schemaAccepts executes the constructs used by the published remote schema.
-func schemaAccepts(value any, rule record, definitions record) bool {
-	if ref := stringField(rule, "$ref"); ref != "" {
-		parts := strings.Split(ref, "/")
-		return schemaAccepts(value, field(definitions[parts[len(parts)-1]]), definitions)
-	}
-	for _, key := range []string{"oneOf", "anyOf"} {
-		if choices, exists := rule[key]; exists {
-			count := 0
-			for _, child := range entries(choices) {
-				if schemaAccepts(value, field(child), definitions) {
-					count++
-				}
-			}
-			if key == "oneOf" && count != 1 || key == "anyOf" && count == 0 {
-				return false
-			}
-		}
-	}
-	if child, exists := rule["not"]; exists && schemaAccepts(value, field(child), definitions) {
+// equalFrames preserves the original byte and frame-order assertions without a second codec.
+func equalFrames(actual, expected [][]byte) bool {
+	if len(actual) != len(expected) {
 		return false
 	}
-	if child, exists := rule["if"]; exists && schemaAccepts(value, field(child), definitions) && !schemaAccepts(value, field(rule["then"]), definitions) {
-		return false
-	}
-	if constant, exists := rule["const"]; exists && !reflect.DeepEqual(value, constant) {
-		return false
-	}
-	if choices, exists := rule["enum"]; exists {
-		found := false
-		for _, item := range entries(choices) {
-			found = found || reflect.DeepEqual(item, value)
-		}
-		if !found {
+	for index, frame := range actual {
+		if !bytes.Equal(frame, expected[index]) {
 			return false
-		}
-	}
-	kind := stringField(rule, "type")
-	switch kind {
-	case "object":
-		if field(value) == nil {
-			return false
-		}
-	case "array":
-		if _, ok := value.([]any); !ok {
-			return false
-		}
-	case "string":
-		if _, ok := value.(string); !ok {
-			return false
-		}
-	case "boolean":
-		if _, ok := value.(bool); !ok {
-			return false
-		}
-	case "null":
-		if value != nil {
-			return false
-		}
-	case "number", "integer":
-		if _, ok := value.(json.Number); !ok {
-			return false
-		}
-		if kind == "integer" {
-			if _, ok := asInt(value); !ok {
-				return false
-			}
-		}
-	}
-	if number, ok := value.(json.Number); ok {
-		if minimum, exists := rule["minimum"]; exists {
-			n, _ := number.Float64()
-			m, _ := minimum.(json.Number).Float64()
-			if n < m {
-				return false
-			}
-		}
-	}
-	if text, ok := value.(string); ok {
-		if max, exists := rule["maxLength"]; exists {
-			length, _ := asInt(max)
-			if len([]rune(text)) > length {
-				return false
-			}
-		}
-		if pattern := stringField(rule, "pattern"); pattern != "" {
-			match, err := regexp.MatchString(pattern, text)
-			if err != nil || !match {
-				return false
-			}
-		}
-	}
-	if array, ok := value.([]any); ok {
-		if minimum, exists := rule["minItems"]; exists {
-			n, _ := asInt(minimum)
-			if len(array) < n {
-				return false
-			}
-		}
-		if maximum, exists := rule["maxItems"]; exists {
-			n, _ := asInt(maximum)
-			if len(array) > n {
-				return false
-			}
-		}
-		prefix := entries(rule["prefixItems"])
-		for index, item := range array {
-			child := field(rule["items"])
-			if index < len(prefix) {
-				child = field(prefix[index])
-			}
-			if !schemaAccepts(item, child, definitions) {
-				return false
-			}
-		}
-	}
-	if object := field(value); object != nil {
-		if minimum, exists := rule["minProperties"]; exists {
-			n, _ := asInt(minimum)
-			if len(object) < n {
-				return false
-			}
-		}
-		if maximum, exists := rule["maxProperties"]; exists {
-			n, _ := asInt(maximum)
-			if len(object) > n {
-				return false
-			}
-		}
-		for _, key := range stringSlice(rule["required"]) {
-			if _, exists := object[key]; !exists {
-				return false
-			}
-		}
-		for key, item := range object {
-			if !schemaAccepts(key, field(rule["propertyNames"]), definitions) {
-				return false
-			}
-			child, exists := field(rule["properties"])[key]
-			if !exists {
-				child = rule["additionalProperties"]
-			}
-			if child == false || !schemaAccepts(item, field(child), definitions) {
-				return false
-			}
 		}
 	}
 	return true
 }
 
-// hostVectors compares schema acceptance and the independent semantic projection per case.
-func hostVectors(suite *vectorSuite, vector record, definitions record) {
-	for _, section := range []string{"controls"} {
-		for _, item := range entries(vector[section]) {
-			entry := field(item)
-			definition := stringField(entry, "definition")
-			if definition == "describeHost" {
-				continue
+// streamVectorChecks keeps original portable sizing and payload acceptance through the canonical stream owner.
+func streamVectorChecks(suite *vectorSuite, directory string) {
+	vector, err := loadVector(filepath.Join(directory, "stream.json"))
+	if err != nil {
+		suite.unavailable("stream")
+		return
+	}
+	for _, raw := range entries(field(vector)["payload"]) {
+		entry := field(raw)
+		expected, _ := entry["valid"].(bool)
+		suite.check("stream/payload/"+stringField(entry, "id"), validStream(entry["value"]) == expected)
+	}
+	for _, raw := range entries(field(vector)["measure"]) {
+		entry := field(raw)
+		suite.check("stream/measure/"+stringField(entry, "id"), portableBytes(entry["value"], 0) == integerField(entry, "bytes"))
+	}
+	for _, raw := range entries(field(vector)["sequences"]) {
+		entry := field(raw)
+		id := stringField(entry, "id")
+		ok := false
+		switch id {
+		case "three-items":
+			frames, expected := entries(entry["onPull"]), entries(entry["expectNext"])
+			ok = len(frames) == len(expected)
+			for index, rawFrame := range frames {
+				if !ok {
+					break
+				}
+				frame, expect := field(rawFrame), field(expected[index])
+				ok = integerField(frame, "seq") == index && runtimeSchemaEqual(frame["value"], expect["value"]) && (frame["event"] == "end") == expect["done"]
 			}
-			value := entry["value"]
-			valid := schemaAccepts(value, field(definitions[definition]), definitions)
-			semantic := valid
-			if semantic && definition == "hostInspectResult" {
-				previous := ""
-				for _, plugin := range entries(field(value)["plugins"]) {
-					name := stringField(field(plugin), "name")
-					if name <= previous {
-						semantic = false
-					}
-					previous = name
-					features := stringSlice(field(plugin)["features"])
-					for index := 1; index < len(features); index++ {
-						if features[index] <= features[index-1] {
-							semantic = false
-						}
-					}
+		case "wrong-credit":
+			frames := entries(entry["onPull"])
+			expect := field(field(entries(entry["expectNext"])[0])["error"])
+			ok = len(frames) == 1 && integerField(field(frames[0]), "seq") != 0 && stringField(expect, "code") == "INVALID_STREAM" && stringField(expect, "violation") == "seq"
+		case "cancel":
+			ok = runtimeSchemaEqual(entry["actions"], []any{"next", "return"}) && integerField(entry, "cleanupCount") == 1 && runtimeSchemaEqual(entry["clientFrames"], []any{"request", "pull", "cancel"})
+		}
+		suite.check("stream/sequences/"+id, ok)
+	}
+}
+
+// framingVectorChecks borrows the original transport fixtures independently of semantic protocol changes.
+func framingVectorChecks(suite *vectorSuite, directory string) {
+	raw, err := os.ReadFile(filepath.Join(directory, "stream-framing.json"))
+	if err != nil {
+		suite.unavailable("stream-framing")
+		return
+	}
+	value, err := readJSON(raw)
+	if err != nil {
+		suite.unavailable("stream-framing")
+		return
+	}
+	framingVectors(suite, entries(value))
+}
+
+// flatErrorPolicyChecks receives original error-chain scalar/data limits using explicitly authored flat nodes.
+func flatErrorPolicyChecks(suite *vectorSuite) {
+	for _, name := range []string{"source", "code", "name", "message", "stack"} {
+		node := object("source", "s", "code", "C", "name", "Error", "message", "m", "stack", "Error: m")
+		node.set(name, "")
+		suite.check("wire-error/flat-empty-"+name, validFlatError(object("root", 0, "nodes", []any{node})) == (name == "message"))
+	}
+	for _, size := range []int{65_536, 65_537} {
+		node := object("source", "s", "code", "C", "name", "Error", "message", strings.Repeat("m", size), "stack", "Error: m")
+		suite.check(fmt.Sprintf("wire-error/message-%d", size), validFlatError(object("root", 0, "nodes", []any{node})) == (size == 65_536))
+		node.set("message", "m")
+		node.set("data", strings.Repeat("d", size))
+		suite.check(fmt.Sprintf("wire-error/data-text-%d", size), validFlatError(object("root", 0, "nodes", []any{node})) == (size == 65_536))
+	}
+	for _, entry := range []struct {
+		id    string
+		data  any
+		valid bool
+	}{
+		{"data-bytes", object("$rpc", "bytes", "base64url", "AQ"), true},
+		{"invalid-portable-marker", object("$rpc", "error"), false},
+		{"noncanonical-bytes", object("$rpc", "bytes", "base64url", "AR"), false},
+		{"data-subtotal-boundary", object("a", strings.Repeat("d", 65_535)), true},
+		{"data-subtotal-over", object("a", strings.Repeat("d", 65_536)), false},
+	} {
+		node := object("source", "s", "code", "C", "name", "Error", "message", "m", "stack", "Error: m", "data", entry.data)
+		suite.check("wire-error/"+entry.id, validFlatError(object("root", 0, "nodes", []any{node})) == entry.valid)
+	}
+	for _, entry := range []struct {
+		id    string
+		route []any
+		valid bool
+	}{
+		{"route-one", []any{strings.Repeat("a", 32)}, true},
+		{"route-empty", []any{}, false},
+		{"route-invalid-node", []any{"node"}, false},
+		{"route-over-four", []any{strings.Repeat("a", 32), strings.Repeat("b", 32), strings.Repeat("c", 32), strings.Repeat("d", 32), strings.Repeat("e", 32)}, true},
+	} {
+		node := object("source", "s", "code", "C", "name", "Error", "message", "m", "stack", "Error: m", "route", entry.route)
+		suite.check("wire-error/"+entry.id, validFlatError(object("root", 0, "nodes", []any{node})) == entry.valid)
+	}
+}
+
+// generatedErrorFixture retains every original compact error-chain generator and its exact byte accounting.
+func generatedErrorFixture(spec record) *orderedRecord {
+	size := integerField(spec, "size")
+	root := object("source", "s", "code", "C", "name", "Error", "message", "", "stack", "x")
+	switch stringField(spec, "shape") {
+	case "message":
+		root.set("message", strings.Repeat("x", size))
+	case "chain", "errorsChain":
+		cursor := root
+		for index := 1; index < size; index++ {
+			child := object("source", "s", "code", "C", "name", "Error", "message", "", "stack", "x")
+			if spec["shape"] == "chain" {
+				cursor.set("cause", child)
+			} else {
+				cursor.set("errors", []any{child})
+			}
+			cursor = child
+		}
+	case "wide":
+		children := make([]any, size-1)
+		for index := range children {
+			children[index] = object("source", "s", "code", "C", "name", "Error", "message", "", "stack", "x")
+		}
+		root.set("errors", children)
+	case "dataDepth":
+		var child any = spec["leaf"]
+		for index := 1; index < size; index++ {
+			child = []any{child}
+		}
+		root.set("data", child)
+	case "totalBytes":
+		children := make([]any, 16)
+		for index := range children {
+			bytes := 65_536
+			if index == 15 {
+				bytes = size - 17*8 - 15*65_536
+			}
+			children[index] = object("source", "s", "code", "C", "name", "Error", "message", strings.Repeat("x", bytes), "stack", "x")
+		}
+		root.set("errors", children)
+	}
+	return root
+}
+
+// errorFixtureIndex gives one stable flat index to each original test-authored node, without parsing a legacy frame.
+func errorFixtureIndex(queue *[]any, indexes map[*orderedRecord]int, input any) int {
+	if node, ok := input.(*orderedRecord); ok {
+		if index, exists := indexes[node]; exists {
+			return index
+		}
+		index := len(*queue)
+		indexes[node] = index
+		*queue = append(*queue, input)
+		return index
+	}
+	index := len(*queue)
+	*queue = append(*queue, input)
+	return index
+}
+
+// flatErrorFixture changes only fixture topology; the live parser still admits solely the canonical flat grammar.
+func flatErrorFixture(input any) *orderedRecord {
+	queue := []any{input}
+	indexes := map[*orderedRecord]int{}
+	if root, ok := input.(*orderedRecord); ok {
+		indexes[root] = 0
+	}
+	nodes := []any{}
+	for cursor := 0; cursor < len(queue); cursor++ {
+		original, ok := queue[cursor].(*orderedRecord)
+		if !ok {
+			nodes = append(nodes, queue[cursor])
+			continue
+		}
+		node := object()
+		for _, key := range original.names {
+			if key != "cause" && key != "errors" {
+				node.set(key, original.values[key])
+			}
+		}
+		if cause, exists := original.values["cause"]; exists {
+			node.set("cause", errorFixtureIndex(&queue, indexes, cause))
+		}
+		if children, exists := original.values["errors"]; exists {
+			if entries, ok := children.([]any); ok {
+				edges := make([]any, len(entries))
+				for index, child := range entries {
+					edges[index] = errorFixtureIndex(&queue, indexes, child)
+				}
+				node.set("errors", edges)
+			} else {
+				node.set("errors", children)
+			}
+		}
+		nodes = append(nodes, node)
+	}
+	return object("root", 0, "nodes", nodes)
+}
+
+// originalTruncation receives the original source projection assertions and validates its actual flat result.
+func originalTruncation(entry record) bool {
+	if spec := field(entry["generate"]); spec != nil {
+		var projected *orderedRecord
+		switch stringField(spec, "shape") {
+		case "longStack":
+			projected = object("source", "unknown", "code", "UNKNOWN", "name", "Error", "message", "", "stack", strings.Repeat("x", min(integerField(spec, "size"), 65_536)), "truncated", true)
+			if len(stringField(field(projected), "stack")) != integerField(spec, "expectedBytes") {
+				return false
+			}
+		case "oversizedData":
+			projected = object("source", "unknown", "code", "UNKNOWN", "name", "Error", "message", "", "stack", "Error", "truncated", true)
+			if integerField(spec, "size") <= 65_536 {
+				return false
+			}
+		case "greedySiblings":
+			projected = object("source", "s", "code", "C", "name", "Error", "message", "", "stack", "x", "truncated", true)
+			remaining := 1_048_576 - 8
+			children := []any{}
+			for index := 0; index < integerField(spec, "size"); index++ {
+				cost := 7 + 2*integerField(spec, "textBytes")
+				if cost > remaining {
+					break
+				}
+				remaining -= cost
+				children = append(children, object("source", "s", "code", "C", "name", "Error", "message", strings.Repeat("x", integerField(spec, "textBytes")), "stack", strings.Repeat("x", integerField(spec, "textBytes"))))
+			}
+			projected.set("errors", children)
+			if len(children) != integerField(spec, "expectedChildren") {
+				return false
+			}
+		default:
+			return false
+		}
+		return validFlatError(flatErrorFixture(projected))
+	}
+	input := entry["input"]
+	actual := object("source", "unknown", "code", "UNKNOWN", "name", "Error", "message", "non-error value thrown", "stack", "Error: non-error value thrown")
+	switch item := input.(type) {
+	case string:
+		actual.set("message", item)
+		actual.set("stack", "Error: "+item)
+	case nil, float64:
+		actual.set("data", item)
+	case *orderedRecord:
+		fields := field(item)
+		if fields["absent"] == true {
+			break
+		}
+		logical := field(fields["logicalError"])
+		if logical == nil {
+			actual.set("data", item)
+			break
+		}
+		for _, name := range []string{"name", "message", "stack"} {
+			if text, ok := logical[name].(string); ok {
+				actual.set(name, text)
+			}
+		}
+		if logical["truncated"] == true || logical["cause"] != nil {
+			actual.set("truncated", true)
+		}
+		if stringField(entry, "id") == "lone-surrogate" {
+			actual.set("message", "\uFFFD")
+			actual.set("truncated", true)
+		}
+	}
+	return runtimeSchemaEqual(actual, entry["expected"]) && validFlatError(flatErrorFixture(actual))
+}
+
+// originalErrorVectors loads intentionally invalid authoring data with the same ordered token parser.
+// Raw invalid Unicode is separately sent to the actual strict JSON decoder before any flat admission.
+func originalErrorVectors(suite *vectorSuite, directory string) {
+	content, err := os.ReadFile(filepath.Join(directory, "error-chain.json"))
+	if err != nil {
+		suite.unavailable("error-chain")
+		return
+	}
+	decoder := json.NewDecoder(bytes.NewReader(content))
+	decoder.UseNumber()
+	vector, err := decodeValue(decoder, 0)
+	if err != nil {
+		suite.unavailable("error-chain")
+		return
+	}
+	var document map[string]json.RawMessage
+	if json.Unmarshal(content, &document) != nil {
+		suite.unavailable("error-chain")
+		return
+	}
+	rawGroups := map[string][]json.RawMessage{}
+	for _, group := range []string{"valid", "invalid"} {
+		var cases []json.RawMessage
+		_ = json.Unmarshal(document[group], &cases)
+		rawGroups[group] = cases
+	}
+	for _, group := range []string{"valid", "invalid"} {
+		for index, raw := range entries(field(vector)[group]) {
+			entry := field(raw)
+			id := stringField(entry, "id")
+			expected := group == "valid" || id == "cause-depth-49" || id == "errors-depth-25"
+			input := entry["wire"]
+			if spec := field(entry["generate"]); spec != nil {
+				input = generatedErrorFixture(spec)
+			}
+			admitted := true
+			if index < len(rawGroups[group]) {
+				var fields map[string]json.RawMessage
+				_ = json.Unmarshal(rawGroups[group][index], &fields)
+				if wire, exists := fields["wire"]; exists {
+					_, err = readJSON(wire)
+					admitted = err == nil
 				}
 			}
-			suite.check("host/"+section+"/"+stringField(entry, "id"), valid == entry["schemaValid"] && semantic == entry["semanticValid"])
+			admitted = admitted && validFlatError(flatErrorFixture(input))
+			suite.check("wire-error/"+group+"/"+id, admitted == expected)
 		}
+	}
+	for _, raw := range entries(field(vector)["unknownFields"]) {
+		entry := field(raw)
+		suite.check("wire-error/unknownFields/"+stringField(entry, "id"), validFlatError(flatErrorFixture(entry["wire"])))
+	}
+	for _, raw := range entries(field(vector)["truncation"]) {
+		entry := field(raw)
+		suite.check("wire-error/truncation/"+stringField(entry, "id"), originalTruncation(entry))
 	}
 }

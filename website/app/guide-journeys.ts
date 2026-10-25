@@ -12,38 +12,28 @@ export type IGuideJourney = {
 const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IGuideJourney>>>>> = {
   'rpc-host:index': {
     en: {
-      title: 'One host, transport plugins, and features',
-      lede: 'Install exactly one transport plugin and optional features. The host owns real calls, providers, directories, and closure.',
+      title: 'Calls live under transport namespaces',
+      lede: 'Create one native host. The root owns self, provide and close; calls live under each installed transport namespace. Multiple namespaces are supported, but normally choose one transport kind per host.',
       document: {
         sections: [
           {
-            id: 'model',
-            heading: 'Entry and ownership',
+            id: 'ownership',
+            heading: 'Contract and ownership',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'The parent below calls double on its cooperative child. Add the provider at the child, install its exact connection handle, and join both close paths when the task is stopped.'
+                text: 'The root identity/provider lifetime is global. Request, notify, stream, group, send and dispatch operate only under an installed namespace; zero targets return empty maps, one yields a scalar and multiple yield independent target maps.'
               }
             ]
           },
           {
             id: 'example',
-            heading: 'Use the public entries',
+            heading: 'Use the actual public entry',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    })\n  ]\n})\ntry {\n  console.log(await host.request('double', 21))\n} finally {\n  await host.close()\n}"
-              }
-            ]
-          },
-          {
-            id: 'failure',
-            heading: 'Calls, failures, and closure',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: 'Retain source, code, native type, stack, and cause. A call signal cancels that call; connection recovery does not prove old work never executed. Await host.close() in finally; borrowed carriers stay with their original owner.'
+                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { timeout } from '@migaia/rpc-host/features'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [coroutinePlugin({\n    features: [timeout({ ms: 1500 })],\n    spawn: async ({ connect, signal }) => {\n      const child = await createRpcHost({\n        plugins: [coroutinePlugin({ connectToParent: connect })],\n        provide: { double: (value: number) => value * 2 }\n      })\n      try {\n        if (!signal.aborted) await new Promise<void>((resolve) =>\n          signal.addEventListener('abort', () => resolve(), { once: true }))\n      } finally { await child.close() }\n    }\n  })]\n})\ntry { console.log(await host.coroutine.request('double', 21)) }\nfinally { await host.close() }"
               }
             ]
           }
@@ -51,23 +41,23 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'Host and features',
+          label: 'Host namespaces and plugins',
           path: '../rpc-host/host-and-plugins'
         }
       ]
     },
     zh: {
-      title: '一个 host、传输 plugins 与 features',
-      lede: '安装恰好一个传输 plugin 和可选 features，由 host 管理实际调用、provider、目录与关闭。',
+      title: '调用位于传输命名空间',
+      lede: '创建一个原生宿主。根拥有身份、提供方法与关闭，调用位于各已安装传输命名空间。支持多个命名空间，但通常每个宿主选择一种传输。',
       document: {
         sections: [
           {
-            id: 'model',
-            heading: '实际入口与所有权',
+            id: 'ownership',
+            heading: '契约与所有权',
             blocks: [
               {
                 type: 'paragraph',
-                text: '下面由父端调用协作子端的 double：子端登记 provider，安装实际连接句柄，并在任务停止时等待双方关闭。'
+                text: '根身份及提供方生命周期是全局的。请求、通知、流、分组、定向调用及派发只位于已安装命名空间；零目标返回空字典，一个返回标量，多个返回独立目标字典。'
               }
             ]
           },
@@ -78,17 +68,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    })\n  ]\n})\ntry {\n  console.log(await host.request('double', 21))\n} finally {\n  await host.close()\n}"
-              }
-            ]
-          },
-          {
-            id: 'failure',
-            heading: '调用、失败与关闭',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: '保留 source、code、原生类型、stack 与 cause。调用 signal 只取消该调用；连接恢复不证明旧业务没有执行。应用在 finally 中等待 host.close()，借用载体仍由原所有者释放。'
+                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { timeout } from '@migaia/rpc-host/features'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [coroutinePlugin({\n    features: [timeout({ ms: 1500 })],\n    spawn: async ({ connect, signal }) => {\n      const child = await createRpcHost({\n        plugins: [coroutinePlugin({ connectToParent: connect })],\n        provide: { double: (value: number) => value * 2 }\n      })\n      try {\n        if (!signal.aborted) await new Promise<void>((resolve) =>\n          signal.addEventListener('abort', () => resolve(), { once: true }))\n      } finally { await child.close() }\n    }\n  })]\n})\ntry { console.log(await host.coroutine.request('double', 21)) }\nfinally { await host.close() }"
               }
             ]
           }
@@ -96,7 +76,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'Host 入口与 features',
+          label: '宿主命名空间与插件',
           path: '../rpc-host/host-and-plugins'
         }
       ]
@@ -104,38 +84,32 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
   },
   'rpc-host:getting-started': {
     en: {
-      title: 'One host, transport plugins, and features',
-      lede: 'Install exactly one transport plugin and optional features. The host owns real calls, providers, directories, and closure.',
+      title: 'Connect a cooperative child',
+      lede: 'Use a real coroutine source and its generation-local connect handle, then call host.coroutine.request.',
       document: {
         sections: [
           {
-            id: 'model',
-            heading: 'Entry and ownership',
+            id: 'ownership',
+            heading: 'Contract and ownership',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'The parent below calls double on its cooperative child. Add the provider at the child, install its exact connection handle, and join both close paths when the task is stopped.'
+                text: 'The child announces its own double method and the parent installs timeout on the owning transport. The task must honor cancellation and close the child; the parent joins Host closure in finally.'
+              },
+              {
+                type: 'paragraph',
+                text: 'Coroutines share one event loop and provide no Worker or process crash isolation. Choose an actual thread, process or browser native transport when that isolation is required.'
               }
             ]
           },
           {
             id: 'example',
-            heading: 'Use the public entries',
+            heading: 'Use the actual public entry',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    })\n  ]\n})\ntry {\n  console.log(await host.request('double', 21))\n} finally {\n  await host.close()\n}"
-              }
-            ]
-          },
-          {
-            id: 'failure',
-            heading: 'Calls, failures, and closure',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: 'Retain source, code, native type, stack, and cause. A call signal cancels that call; connection recovery does not prove old work never executed. Await host.close() in finally; borrowed carriers stay with their original owner.'
+                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { timeout } from '@migaia/rpc-host/features'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [coroutinePlugin({\n    features: [timeout({ ms: 1500 })],\n    spawn: async ({ connect, signal }) => {\n      const child = await createRpcHost({\n        plugins: [coroutinePlugin({ connectToParent: connect })],\n        provide: { double: (value: number) => value * 2 }\n      })\n      try {\n        if (!signal.aborted) await new Promise<void>((resolve) =>\n          signal.addEventListener('abort', () => resolve(), { once: true }))\n      } finally { await child.close() }\n    }\n  })]\n})\ntry { console.log(await host.coroutine.request('double', 21)) }\nfinally { await host.close() }"
               }
             ]
           }
@@ -143,23 +117,27 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'Host and features',
+          label: 'Host namespaces and plugins',
           path: '../rpc-host/host-and-plugins'
         }
       ]
     },
     zh: {
-      title: '一个 host、传输 plugins 与 features',
-      lede: '安装恰好一个传输 plugin 和可选 features，由 host 管理实际调用、provider、目录与关闭。',
+      title: '连接协作子端',
+      lede: '使用真实协作来源及其代际局部连接句柄，再通过 `host.coroutine.request` 调用。',
       document: {
         sections: [
           {
-            id: 'model',
-            heading: '实际入口与所有权',
+            id: 'ownership',
+            heading: '契约与所有权',
             blocks: [
               {
                 type: 'paragraph',
-                text: '下面由父端调用协作子端的 double：子端登记 provider，安装实际连接句柄，并在任务停止时等待双方关闭。'
+                text: '子端公告自己的倍增方法，父端在所属传输安装超时。任务必须响应取消并关闭子端，父端在最终清理中等待宿主关闭。'
+              },
+              {
+                type: 'paragraph',
+                text: '协作任务共享事件循环，不提供线程或进程崩溃隔离。需要隔离时应选择实际线程、进程或浏览器原生传输。'
               }
             ]
           },
@@ -170,17 +148,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    })\n  ]\n})\ntry {\n  console.log(await host.request('double', 21))\n} finally {\n  await host.close()\n}"
-              }
-            ]
-          },
-          {
-            id: 'failure',
-            heading: '调用、失败与关闭',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: '保留 source、code、原生类型、stack 与 cause。调用 signal 只取消该调用；连接恢复不证明旧业务没有执行。应用在 finally 中等待 host.close()，借用载体仍由原所有者释放。'
+                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { timeout } from '@migaia/rpc-host/features'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [coroutinePlugin({\n    features: [timeout({ ms: 1500 })],\n    spawn: async ({ connect, signal }) => {\n      const child = await createRpcHost({\n        plugins: [coroutinePlugin({ connectToParent: connect })],\n        provide: { double: (value: number) => value * 2 }\n      })\n      try {\n        if (!signal.aborted) await new Promise<void>((resolve) =>\n          signal.addEventListener('abort', () => resolve(), { once: true }))\n      } finally { await child.close() }\n    }\n  })]\n})\ntry { console.log(await host.coroutine.request('double', 21)) }\nfinally { await host.close() }"
               }
             ]
           }
@@ -188,7 +156,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'Host 入口与 features',
+          label: '宿主命名空间与插件',
           path: '../rpc-host/host-and-plugins'
         }
       ]
@@ -196,38 +164,28 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
   },
   'rpc-plugin-process:index': {
     en: {
-      title: 'Connect a real process service',
-      lede: 'Choose spawn, connect, listen, or connectToParent on processPlugin. Existing native supervisors retain restart, authentication, and physical release.',
+      title: 'Connect a native process service',
+      lede: 'Contract owns pure protocol, interfaces and errors. Host owns Sessions, calls and providers; this package owns native child processes and local sockets. Flow plugins use fixed hooks, and complete features own optional policy. Call through the transport namespace. Separate Hosts are usual; deliberate multi-transport installation uses distinct namespaces.',
       document: {
         sections: [
           {
-            id: 'model',
-            heading: 'Entry and ownership',
+            id: 'ownership',
+            heading: 'Contract and ownership',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'Start the service listener before dialing its name. The client makes a typed double request, then closes only its own connection before the service is retired.'
+                text: 'One cold native transport using original bootstrap, supervision, drain and native exit owners. Both sides provide methods over the same actual host endpoint.'
               }
             ]
           },
           {
             id: 'example',
-            heading: 'Use the public entries',
+            heading: 'Use the actual public entry',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { randomUUID } from 'node:crypto'\nimport { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\n\nconst name = 'orders-' + randomUUID()\nconst server = await createRpcHost({\n  plugins: [processPlugin({ listen: name })],\n  provide: { double: (value: number) => value * 2 }\n})\ntry {\n  const client = await createRpcHost<{ double(value: number): number }>({\n    self: { name: 'dashboard', instanceId: randomUUID() },\n    plugins: [processPlugin({ connectTimeoutMs: 1500, connect: { target: name, timeoutMs: 1000 } })],\n    provide: { label: () => 'orders-dashboard' }\n  })\n  try {\n    console.log(await client.request('double', 21))\n    console.log(await server.send('dashboard', 'label'))\n  } finally {\n    await client.close()\n  }\n} finally {\n  await server.close()\n}\n// connectTimeoutMs bounds rendezvous; connect.timeoutMs independently bounds the handshake."
-              }
-            ]
-          },
-          {
-            id: 'failure',
-            heading: 'Calls, failures, and closure',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: 'Retain source, code, native type, stack, and cause. A call signal cancels that call; connection recovery does not prove old work never executed. Await host.close() in finally; borrowed carriers stay with their original owner.'
+                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin, isProcessChild } from '@migaia/rpc-plugin-process'\n\nif (await isProcessChild()) {\n  await createRpcHost({\n    plugins: [processPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const host = await createRpcHost({\n    plugins: [processPlugin({ spawn: true, connect: { timeoutMs: 1500 } })]\n  })\n  try {\n    console.log(await host.process.request('double', 21))\n  } finally {\n    await host.close()\n  }\n}"
               }
             ]
           }
@@ -235,23 +193,23 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'Host and features',
+          label: 'Host namespaces and plugins',
           path: '../rpc-host/host-and-plugins'
         }
       ]
     },
     zh: {
-      title: '连接真实进程服务',
-      lede: 'processPlugin 选择 spawn、connect、listen 或 connectToParent；原生 supervisor 保留重启、认证与物理释放。',
+      title: '连接原生进程服务',
+      lede: '契约包拥有纯协议、接口及错误；宿主拥有会话、调用及提供方，本包拥有原生子进程及本地套接字。流程插件使用固定钩子，完整功能拥有可选策略。通过传输命名空间调用；通常使用独立宿主，也可用不同命名空间明确隔离多传输安装。',
       document: {
         sections: [
           {
-            id: 'model',
-            heading: '实际入口与所有权',
+            id: 'ownership',
+            heading: '契约与所有权',
             blocks: [
               {
                 type: 'paragraph',
-                text: '先启动服务 listener，再按名字接入；客户端调用有类型的 double，先关闭自己的连接，最后结束服务。'
+                text: '一个使用原启动、监督、排空和原生退出所有者的冷传输，双方在同一实际宿主端点提供方法。'
               }
             ]
           },
@@ -262,17 +220,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { randomUUID } from 'node:crypto'\nimport { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\n\nconst name = 'orders-' + randomUUID()\nconst server = await createRpcHost({\n  plugins: [processPlugin({ listen: name })],\n  provide: { double: (value: number) => value * 2 }\n})\ntry {\n  const client = await createRpcHost<{ double(value: number): number }>({\n    self: { name: 'dashboard', instanceId: randomUUID() },\n    plugins: [processPlugin({ connectTimeoutMs: 1500, connect: { target: name, timeoutMs: 1000 } })],\n    provide: { label: () => 'orders-dashboard' }\n  })\n  try {\n    console.log(await client.request('double', 21))\n    console.log(await server.send('dashboard', 'label'))\n  } finally {\n    await client.close()\n  }\n} finally {\n  await server.close()\n}\n// connectTimeoutMs bounds rendezvous; connect.timeoutMs independently bounds the handshake."
-              }
-            ]
-          },
-          {
-            id: 'failure',
-            heading: '调用、失败与关闭',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: '保留 source、code、原生类型、stack 与 cause。调用 signal 只取消该调用；连接恢复不证明旧业务没有执行。应用在 finally 中等待 host.close()，借用载体仍由原所有者释放。'
+                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin, isProcessChild } from '@migaia/rpc-plugin-process'\n\nif (await isProcessChild()) {\n  await createRpcHost({\n    plugins: [processPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const host = await createRpcHost({\n    plugins: [processPlugin({ spawn: true, connect: { timeoutMs: 1500 } })]\n  })\n  try {\n    console.log(await host.process.request('double', 21))\n  } finally {\n    await host.close()\n  }\n}"
               }
             ]
           }
@@ -280,7 +228,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'Host 入口与 features',
+          label: '宿主命名空间与插件',
           path: '../rpc-host/host-and-plugins'
         }
       ]
@@ -288,38 +236,28 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
   },
   'rpc-plugin-process:getting-started': {
     en: {
-      title: 'Connect a real process service',
-      lede: 'Choose spawn, connect, listen, or connectToParent on processPlugin. Existing native supervisors retain restart, authentication, and physical release.',
+      title: 'Connect a native process service',
+      lede: 'Contract owns pure protocol, interfaces and errors. Host owns Sessions, calls and providers; this package owns native child processes and local sockets. Flow plugins use fixed hooks, and complete features own optional policy. Call through the transport namespace. Separate Hosts are usual; deliberate multi-transport installation uses distinct namespaces.',
       document: {
         sections: [
           {
-            id: 'model',
-            heading: 'Entry and ownership',
+            id: 'ownership',
+            heading: 'Contract and ownership',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'Start the service listener before dialing its name. The client makes a typed double request, then closes only its own connection before the service is retired.'
+                text: 'One cold native transport using original bootstrap, supervision, drain and native exit owners. Both sides provide methods over the same actual host endpoint.'
               }
             ]
           },
           {
             id: 'example',
-            heading: 'Use the public entries',
+            heading: 'Use the actual public entry',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { randomUUID } from 'node:crypto'\nimport { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\n\nconst name = 'orders-' + randomUUID()\nconst server = await createRpcHost({\n  plugins: [processPlugin({ listen: name })],\n  provide: { double: (value: number) => value * 2 }\n})\ntry {\n  const client = await createRpcHost<{ double(value: number): number }>({\n    self: { name: 'dashboard', instanceId: randomUUID() },\n    plugins: [processPlugin({ connectTimeoutMs: 1500, connect: { target: name, timeoutMs: 1000 } })],\n    provide: { label: () => 'orders-dashboard' }\n  })\n  try {\n    console.log(await client.request('double', 21))\n    console.log(await server.send('dashboard', 'label'))\n  } finally {\n    await client.close()\n  }\n} finally {\n  await server.close()\n}\n// connectTimeoutMs bounds rendezvous; connect.timeoutMs independently bounds the handshake."
-              }
-            ]
-          },
-          {
-            id: 'failure',
-            heading: 'Calls, failures, and closure',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: 'Retain source, code, native type, stack, and cause. A call signal cancels that call; connection recovery does not prove old work never executed. Await host.close() in finally; borrowed carriers stay with their original owner.'
+                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin, isProcessChild } from '@migaia/rpc-plugin-process'\n\nif (await isProcessChild()) {\n  await createRpcHost({\n    plugins: [processPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const host = await createRpcHost({\n    plugins: [processPlugin({ spawn: true, connect: { timeoutMs: 1500 } })]\n  })\n  try {\n    console.log(await host.process.request('double', 21))\n  } finally {\n    await host.close()\n  }\n}"
               }
             ]
           }
@@ -327,23 +265,23 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'Host and features',
+          label: 'Host namespaces and plugins',
           path: '../rpc-host/host-and-plugins'
         }
       ]
     },
     zh: {
-      title: '连接真实进程服务',
-      lede: 'processPlugin 选择 spawn、connect、listen 或 connectToParent；原生 supervisor 保留重启、认证与物理释放。',
+      title: '连接原生进程服务',
+      lede: '契约包拥有纯协议、接口及错误；宿主拥有会话、调用及提供方，本包拥有原生子进程及本地套接字。流程插件使用固定钩子，完整功能拥有可选策略。通过传输命名空间调用；通常使用独立宿主，也可用不同命名空间明确隔离多传输安装。',
       document: {
         sections: [
           {
-            id: 'model',
-            heading: '实际入口与所有权',
+            id: 'ownership',
+            heading: '契约与所有权',
             blocks: [
               {
                 type: 'paragraph',
-                text: '先启动服务 listener，再按名字接入；客户端调用有类型的 double，先关闭自己的连接，最后结束服务。'
+                text: '一个使用原启动、监督、排空和原生退出所有者的冷传输，双方在同一实际宿主端点提供方法。'
               }
             ]
           },
@@ -354,17 +292,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { randomUUID } from 'node:crypto'\nimport { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin } from '@migaia/rpc-plugin-process'\n\nconst name = 'orders-' + randomUUID()\nconst server = await createRpcHost({\n  plugins: [processPlugin({ listen: name })],\n  provide: { double: (value: number) => value * 2 }\n})\ntry {\n  const client = await createRpcHost<{ double(value: number): number }>({\n    self: { name: 'dashboard', instanceId: randomUUID() },\n    plugins: [processPlugin({ connectTimeoutMs: 1500, connect: { target: name, timeoutMs: 1000 } })],\n    provide: { label: () => 'orders-dashboard' }\n  })\n  try {\n    console.log(await client.request('double', 21))\n    console.log(await server.send('dashboard', 'label'))\n  } finally {\n    await client.close()\n  }\n} finally {\n  await server.close()\n}\n// connectTimeoutMs bounds rendezvous; connect.timeoutMs independently bounds the handshake."
-              }
-            ]
-          },
-          {
-            id: 'failure',
-            heading: '调用、失败与关闭',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: '保留 source、code、原生类型、stack 与 cause。调用 signal 只取消该调用；连接恢复不证明旧业务没有执行。应用在 finally 中等待 host.close()，借用载体仍由原所有者释放。'
+                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin, isProcessChild } from '@migaia/rpc-plugin-process'\n\nif (await isProcessChild()) {\n  await createRpcHost({\n    plugins: [processPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const host = await createRpcHost({\n    plugins: [processPlugin({ spawn: true, connect: { timeoutMs: 1500 } })]\n  })\n  try {\n    console.log(await host.process.request('double', 21))\n  } finally {\n    await host.close()\n  }\n}"
               }
             ]
           }
@@ -372,7 +300,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'Host 入口与 features',
+          label: '宿主命名空间与插件',
           path: '../rpc-host/host-and-plugins'
         }
       ]
@@ -380,38 +308,28 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
   },
   'rpc-plugin-thread:index': {
     en: {
-      title: 'Run methods on a native thread',
-      lede: 'A real Node, Bun, or Deno child joins with connectToParent: true. The parent uses spawn and the host call interface. Browser Workers use the browser plugin.',
+      title: 'Use a native thread source',
+      lede: 'Contract owns pure protocol, interfaces and errors. Host owns Sessions, calls and providers; this package owns native Node/Bun/Deno Worker sources. Flow plugins use fixed hooks, and complete features own optional policy. Call through the transport namespace. Separate Hosts are usual; deliberate multi-transport installation uses distinct namespaces.',
       document: {
         sections: [
           {
-            id: 'model',
-            heading: 'Entry and ownership',
+            id: 'ownership',
+            heading: 'Contract and ownership',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'Keep the child branch in the actual Worker entry and expose double there. The parent awaits the result and then releases the native worker through its host.'
+                text: 'One cold native transport using original bootstrap, supervision, drain and native exit owners. Both sides provide methods over the same actual host endpoint.'
               }
             ]
           },
           {
             id: 'example',
-            heading: 'Use the public entries',
+            heading: 'Use the actual public entry',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin } from '@migaia/rpc-plugin-thread'\n\n// Parent module: entry names the real worker module for the selected native runtime.\nexport async function runThread(entry: string) {\n  const host = await createRpcHost<{ double(value: number): number }>({\n    plugins: [threadPlugin({ spawn: entry, connect: { timeoutMs: 1500 } })],\n    provide: { label: () => 'orders-parent' }\n  })\n  try { return await host.request('double', 21) }\n  finally { await host.close() }\n}\n\n// Worker module: its application supplies its shutdown Promise; use true only inside a real child.\nexport async function serveThread(shutdown: Promise<void>) {\n  const host = await createRpcHost<{ label(): string }>({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n  try { console.log(await host.request('label')); await shutdown }\n  finally { await host.close() }\n}\n// threadPlugin supports Node/Bun/Deno workers; browser Worker sources use rpc-plugin-browser."
-              }
-            ]
-          },
-          {
-            id: 'failure',
-            heading: 'Calls, failures, and closure',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: 'Retain source, code, native type, stack, and cause. A call signal cancels that call; connection recovery does not prove old work never executed. Await host.close() in finally; borrowed carriers stay with their original owner.'
+                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\n\ntype IWorkerApi = { double(value: number): number }\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const plugins = [threadPlugin({ spawn: true })] as const\n  const host = await createRpcHost<IWorkerApi, typeof plugins>({ plugins })\n  try {\n    console.log(await host.thread.request('double', 21))\n  } finally {\n    await host.close()\n  }\n}"
               }
             ]
           }
@@ -419,23 +337,23 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'Host and features',
+          label: 'Host namespaces and plugins',
           path: '../rpc-host/host-and-plugins'
         }
       ]
     },
     zh: {
-      title: '在原生线程执行方法',
-      lede: '实际 Node、Bun 或 Deno 子线程用 connectToParent: true 接入，父端配置 spawn 并通过 host 调用；浏览器 Worker 使用 browser plugin。',
+      title: '使用原生线程来源',
+      lede: '契约包拥有纯协议、接口及错误；宿主拥有会话、调用及提供方，本包拥有Node、Bun、Deno 原生工作线程来源。流程插件使用固定钩子，完整功能拥有可选策略。通过传输命名空间调用；通常使用独立宿主，也可用不同命名空间明确隔离多传输安装。',
       document: {
         sections: [
           {
-            id: 'model',
-            heading: '实际入口与所有权',
+            id: 'ownership',
+            heading: '契约与所有权',
             blocks: [
               {
                 type: 'paragraph',
-                text: '在真实 Worker 入口的子端分支提供 double，父端等待结果后通过自己的 host 释放原生 Worker。'
+                text: '一个使用原启动、监督、排空和原生退出所有者的冷传输，双方在同一实际宿主端点提供方法。'
               }
             ]
           },
@@ -446,17 +364,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin } from '@migaia/rpc-plugin-thread'\n\n// Parent module: entry names the real worker module for the selected native runtime.\nexport async function runThread(entry: string) {\n  const host = await createRpcHost<{ double(value: number): number }>({\n    plugins: [threadPlugin({ spawn: entry, connect: { timeoutMs: 1500 } })],\n    provide: { label: () => 'orders-parent' }\n  })\n  try { return await host.request('double', 21) }\n  finally { await host.close() }\n}\n\n// Worker module: its application supplies its shutdown Promise; use true only inside a real child.\nexport async function serveThread(shutdown: Promise<void>) {\n  const host = await createRpcHost<{ label(): string }>({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n  try { console.log(await host.request('label')); await shutdown }\n  finally { await host.close() }\n}\n// threadPlugin supports Node/Bun/Deno workers; browser Worker sources use rpc-plugin-browser."
-              }
-            ]
-          },
-          {
-            id: 'failure',
-            heading: '调用、失败与关闭',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: '保留 source、code、原生类型、stack 与 cause。调用 signal 只取消该调用；连接恢复不证明旧业务没有执行。应用在 finally 中等待 host.close()，借用载体仍由原所有者释放。'
+                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\n\ntype IWorkerApi = { double(value: number): number }\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const plugins = [threadPlugin({ spawn: true })] as const\n  const host = await createRpcHost<IWorkerApi, typeof plugins>({ plugins })\n  try {\n    console.log(await host.thread.request('double', 21))\n  } finally {\n    await host.close()\n  }\n}"
               }
             ]
           }
@@ -464,7 +372,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'Host 入口与 features',
+          label: '宿主命名空间与插件',
           path: '../rpc-host/host-and-plugins'
         }
       ]
@@ -472,38 +380,28 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
   },
   'rpc-plugin-thread:getting-started': {
     en: {
-      title: 'Run methods on a native thread',
-      lede: 'A real Node, Bun, or Deno child joins with connectToParent: true. The parent uses spawn and the host call interface. Browser Workers use the browser plugin.',
+      title: 'Use a native thread source',
+      lede: 'Contract owns pure protocol, interfaces and errors. Host owns Sessions, calls and providers; this package owns native Node/Bun/Deno Worker sources. Flow plugins use fixed hooks, and complete features own optional policy. Call through the transport namespace. Separate Hosts are usual; deliberate multi-transport installation uses distinct namespaces.',
       document: {
         sections: [
           {
-            id: 'model',
-            heading: 'Entry and ownership',
+            id: 'ownership',
+            heading: 'Contract and ownership',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'Keep the child branch in the actual Worker entry and expose double there. The parent awaits the result and then releases the native worker through its host.'
+                text: 'One cold native transport using original bootstrap, supervision, drain and native exit owners. Both sides provide methods over the same actual host endpoint.'
               }
             ]
           },
           {
             id: 'example',
-            heading: 'Use the public entries',
+            heading: 'Use the actual public entry',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin } from '@migaia/rpc-plugin-thread'\n\n// Parent module: entry names the real worker module for the selected native runtime.\nexport async function runThread(entry: string) {\n  const host = await createRpcHost<{ double(value: number): number }>({\n    plugins: [threadPlugin({ spawn: entry, connect: { timeoutMs: 1500 } })],\n    provide: { label: () => 'orders-parent' }\n  })\n  try { return await host.request('double', 21) }\n  finally { await host.close() }\n}\n\n// Worker module: its application supplies its shutdown Promise; use true only inside a real child.\nexport async function serveThread(shutdown: Promise<void>) {\n  const host = await createRpcHost<{ label(): string }>({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n  try { console.log(await host.request('label')); await shutdown }\n  finally { await host.close() }\n}\n// threadPlugin supports Node/Bun/Deno workers; browser Worker sources use rpc-plugin-browser."
-              }
-            ]
-          },
-          {
-            id: 'failure',
-            heading: 'Calls, failures, and closure',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: 'Retain source, code, native type, stack, and cause. A call signal cancels that call; connection recovery does not prove old work never executed. Await host.close() in finally; borrowed carriers stay with their original owner.'
+                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\n\ntype IWorkerApi = { double(value: number): number }\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const plugins = [threadPlugin({ spawn: true })] as const\n  const host = await createRpcHost<IWorkerApi, typeof plugins>({ plugins })\n  try {\n    console.log(await host.thread.request('double', 21))\n  } finally {\n    await host.close()\n  }\n}"
               }
             ]
           }
@@ -511,23 +409,23 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'Host and features',
+          label: 'Host namespaces and plugins',
           path: '../rpc-host/host-and-plugins'
         }
       ]
     },
     zh: {
-      title: '在原生线程执行方法',
-      lede: '实际 Node、Bun 或 Deno 子线程用 connectToParent: true 接入，父端配置 spawn 并通过 host 调用；浏览器 Worker 使用 browser plugin。',
+      title: '使用原生线程来源',
+      lede: '契约包拥有纯协议、接口及错误；宿主拥有会话、调用及提供方，本包拥有Node、Bun、Deno 原生工作线程来源。流程插件使用固定钩子，完整功能拥有可选策略。通过传输命名空间调用；通常使用独立宿主，也可用不同命名空间明确隔离多传输安装。',
       document: {
         sections: [
           {
-            id: 'model',
-            heading: '实际入口与所有权',
+            id: 'ownership',
+            heading: '契约与所有权',
             blocks: [
               {
                 type: 'paragraph',
-                text: '在真实 Worker 入口的子端分支提供 double，父端等待结果后通过自己的 host 释放原生 Worker。'
+                text: '一个使用原启动、监督、排空和原生退出所有者的冷传输，双方在同一实际宿主端点提供方法。'
               }
             ]
           },
@@ -538,17 +436,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin } from '@migaia/rpc-plugin-thread'\n\n// Parent module: entry names the real worker module for the selected native runtime.\nexport async function runThread(entry: string) {\n  const host = await createRpcHost<{ double(value: number): number }>({\n    plugins: [threadPlugin({ spawn: entry, connect: { timeoutMs: 1500 } })],\n    provide: { label: () => 'orders-parent' }\n  })\n  try { return await host.request('double', 21) }\n  finally { await host.close() }\n}\n\n// Worker module: its application supplies its shutdown Promise; use true only inside a real child.\nexport async function serveThread(shutdown: Promise<void>) {\n  const host = await createRpcHost<{ label(): string }>({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n  try { console.log(await host.request('label')); await shutdown }\n  finally { await host.close() }\n}\n// threadPlugin supports Node/Bun/Deno workers; browser Worker sources use rpc-plugin-browser."
-              }
-            ]
-          },
-          {
-            id: 'failure',
-            heading: '调用、失败与关闭',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: '保留 source、code、原生类型、stack 与 cause。调用 signal 只取消该调用；连接恢复不证明旧业务没有执行。应用在 finally 中等待 host.close()，借用载体仍由原所有者释放。'
+                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\n\ntype IWorkerApi = { double(value: number): number }\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const plugins = [threadPlugin({ spawn: true })] as const\n  const host = await createRpcHost<IWorkerApi, typeof plugins>({ plugins })\n  try {\n    console.log(await host.thread.request('double', 21))\n  } finally {\n    await host.close()\n  }\n}"
               }
             ]
           }
@@ -556,7 +444,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'Host 入口与 features',
+          label: '宿主命名空间与插件',
           path: '../rpc-host/host-and-plugins'
         }
       ]
@@ -564,38 +452,28 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
   },
   'rpc-plugin-browser:index': {
     en: {
-      title: 'Connect borrowed browser carriers',
-      lede: 'Choose one of seven carrier plugins. The application creates and releases Workers, ports, channels, and sessions; RPC removes its own subscriptions.',
+      title: 'Choose one actual browser medium',
+      lede: 'Contract owns pure protocol, interfaces and errors. Host owns Sessions, calls and providers; this package owns borrowed browser messaging sources and reliable streams. Flow plugins use fixed hooks, and complete features own optional policy. Call through the transport namespace. Separate Hosts are usual; deliberate multi-transport installation uses distinct namespaces.',
       document: {
         sections: [
           {
-            id: 'model',
-            heading: 'Entry and ownership',
+            id: 'ownership',
+            heading: 'Contract and ownership',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'Choose the native browser carrier that actually exists in your realm. The page borrows its Worker, invokes the worker provider, and removes RPC listeners before the creator terminates the Worker.'
+                text: 'Validate both explicit origin and the actual native event.source.'
               }
             ]
           },
           {
             id: 'example',
-            heading: 'Use the public entries',
+            heading: 'Use the actual public entry',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { dedicatedWorkerPlugin, type IWorkerPluginOptions } from '@migaia/rpc-plugin-browser'\n\nexport async function doubleInWorker(worker: Worker) {\n  const host = await createRpcHost<{ double(value: number): number }>({\n    plugins: [dedicatedWorkerPlugin({ worker, connect: { timeoutMs: 1500 } })],\n    provide: { label: () => 'page' }\n  })\n  try { return await host.request('double', 21) }\n  finally { await host.close() }\n}\n\n// Worker module: scope is self; its creator supplies the eventual shutdown signal.\nexport async function serveDedicated(scope: IWorkerPluginOptions['worker'], shutdown: Promise<void>) {\n  const host = await createRpcHost<{ label(): string }>({\n    plugins: [dedicatedWorkerPlugin({ worker: scope })],\n    provide: { double: (value: number) => value * 2 }\n  })\n  try { console.log(await host.request('label')); await shutdown }\n  finally { await host.close() }\n}\n// The creator, not host.close(), eventually calls worker.terminate()."
-              }
-            ]
-          },
-          {
-            id: 'failure',
-            heading: 'Calls, failures, and closure',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: 'Retain source, code, native type, stack, and cause. A call signal cancels that call; connection recovery does not prove old work never executed. Await host.close() in finally; borrowed carriers stay with their original owner.'
+                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { dedicatedWorkerPlugin } from '@migaia/rpc-plugin-browser'\n\nexport async function doubleInWorker(worker: Worker) {\n  const host = await createRpcHost({\n    plugins: [dedicatedWorkerPlugin({ worker, connect: { timeoutMs: 1500 } })]\n  })\n  try {\n    return await host.worker.request('double', 21)\n  } finally {\n    await host.close()\n  }\n}"
               }
             ]
           }
@@ -603,23 +481,23 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'Host and features',
+          label: 'Host namespaces and plugins',
           path: '../rpc-host/host-and-plugins'
         }
       ]
     },
     zh: {
-      title: '连接借用的浏览器载体',
-      lede: '选择七种载体 plugin 之一。应用创建并释放 Worker、port、channel 与 session，RPC 只移除自己的订阅。',
+      title: '选择一种实际浏览器媒介',
+      lede: '契约包拥有纯协议、接口及错误；宿主拥有会话、调用及提供方，本包拥有借用的浏览器消息来源及可靠流。流程插件使用固定钩子，完整功能拥有可选策略。通过传输命名空间调用；通常使用独立宿主，也可用不同命名空间明确隔离多传输安装。',
       document: {
         sections: [
           {
-            id: 'model',
-            heading: '实际入口与所有权',
+            id: 'ownership',
+            heading: '契约与所有权',
             blocks: [
               {
                 type: 'paragraph',
-                text: '按当前作用域真实存在的浏览器载体选插件；页面借用 Worker 调用其 provider，创建者终止 Worker 前先移除 RPC 监听。'
+                text: '同时验证显式来源域及实际原生事件来源。'
               }
             ]
           },
@@ -630,17 +508,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { dedicatedWorkerPlugin, type IWorkerPluginOptions } from '@migaia/rpc-plugin-browser'\n\nexport async function doubleInWorker(worker: Worker) {\n  const host = await createRpcHost<{ double(value: number): number }>({\n    plugins: [dedicatedWorkerPlugin({ worker, connect: { timeoutMs: 1500 } })],\n    provide: { label: () => 'page' }\n  })\n  try { return await host.request('double', 21) }\n  finally { await host.close() }\n}\n\n// Worker module: scope is self; its creator supplies the eventual shutdown signal.\nexport async function serveDedicated(scope: IWorkerPluginOptions['worker'], shutdown: Promise<void>) {\n  const host = await createRpcHost<{ label(): string }>({\n    plugins: [dedicatedWorkerPlugin({ worker: scope })],\n    provide: { double: (value: number) => value * 2 }\n  })\n  try { console.log(await host.request('label')); await shutdown }\n  finally { await host.close() }\n}\n// The creator, not host.close(), eventually calls worker.terminate()."
-              }
-            ]
-          },
-          {
-            id: 'failure',
-            heading: '调用、失败与关闭',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: '保留 source、code、原生类型、stack 与 cause。调用 signal 只取消该调用；连接恢复不证明旧业务没有执行。应用在 finally 中等待 host.close()，借用载体仍由原所有者释放。'
+                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { dedicatedWorkerPlugin } from '@migaia/rpc-plugin-browser'\n\nexport async function doubleInWorker(worker: Worker) {\n  const host = await createRpcHost({\n    plugins: [dedicatedWorkerPlugin({ worker, connect: { timeoutMs: 1500 } })]\n  })\n  try {\n    return await host.worker.request('double', 21)\n  } finally {\n    await host.close()\n  }\n}"
               }
             ]
           }
@@ -648,7 +516,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'Host 入口与 features',
+          label: '宿主命名空间与插件',
           path: '../rpc-host/host-and-plugins'
         }
       ]
@@ -656,38 +524,28 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
   },
   'rpc-plugin-browser:getting-started': {
     en: {
-      title: 'Connect borrowed browser carriers',
-      lede: 'Choose one of seven carrier plugins. The application creates and releases Workers, ports, channels, and sessions; RPC removes its own subscriptions.',
+      title: 'Choose one actual browser medium',
+      lede: 'Contract owns pure protocol, interfaces and errors. Host owns Sessions, calls and providers; this package owns borrowed browser messaging sources and reliable streams. Flow plugins use fixed hooks, and complete features own optional policy. Call through the transport namespace. Separate Hosts are usual; deliberate multi-transport installation uses distinct namespaces.',
       document: {
         sections: [
           {
-            id: 'model',
-            heading: 'Entry and ownership',
+            id: 'ownership',
+            heading: 'Contract and ownership',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'Choose the native browser carrier that actually exists in your realm. The page borrows its Worker, invokes the worker provider, and removes RPC listeners before the creator terminates the Worker.'
+                text: 'Validate both explicit origin and the actual native event.source.'
               }
             ]
           },
           {
             id: 'example',
-            heading: 'Use the public entries',
+            heading: 'Use the actual public entry',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { dedicatedWorkerPlugin, type IWorkerPluginOptions } from '@migaia/rpc-plugin-browser'\n\nexport async function doubleInWorker(worker: Worker) {\n  const host = await createRpcHost<{ double(value: number): number }>({\n    plugins: [dedicatedWorkerPlugin({ worker, connect: { timeoutMs: 1500 } })],\n    provide: { label: () => 'page' }\n  })\n  try { return await host.request('double', 21) }\n  finally { await host.close() }\n}\n\n// Worker module: scope is self; its creator supplies the eventual shutdown signal.\nexport async function serveDedicated(scope: IWorkerPluginOptions['worker'], shutdown: Promise<void>) {\n  const host = await createRpcHost<{ label(): string }>({\n    plugins: [dedicatedWorkerPlugin({ worker: scope })],\n    provide: { double: (value: number) => value * 2 }\n  })\n  try { console.log(await host.request('label')); await shutdown }\n  finally { await host.close() }\n}\n// The creator, not host.close(), eventually calls worker.terminate()."
-              }
-            ]
-          },
-          {
-            id: 'failure',
-            heading: 'Calls, failures, and closure',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: 'Retain source, code, native type, stack, and cause. A call signal cancels that call; connection recovery does not prove old work never executed. Await host.close() in finally; borrowed carriers stay with their original owner.'
+                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { dedicatedWorkerPlugin } from '@migaia/rpc-plugin-browser'\n\nexport async function doubleInWorker(worker: Worker) {\n  const host = await createRpcHost({\n    plugins: [dedicatedWorkerPlugin({ worker, connect: { timeoutMs: 1500 } })]\n  })\n  try {\n    return await host.worker.request('double', 21)\n  } finally {\n    await host.close()\n  }\n}"
               }
             ]
           }
@@ -695,23 +553,23 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'Host and features',
+          label: 'Host namespaces and plugins',
           path: '../rpc-host/host-and-plugins'
         }
       ]
     },
     zh: {
-      title: '连接借用的浏览器载体',
-      lede: '选择七种载体 plugin 之一。应用创建并释放 Worker、port、channel 与 session，RPC 只移除自己的订阅。',
+      title: '选择一种实际浏览器媒介',
+      lede: '契约包拥有纯协议、接口及错误；宿主拥有会话、调用及提供方，本包拥有借用的浏览器消息来源及可靠流。流程插件使用固定钩子，完整功能拥有可选策略。通过传输命名空间调用；通常使用独立宿主，也可用不同命名空间明确隔离多传输安装。',
       document: {
         sections: [
           {
-            id: 'model',
-            heading: '实际入口与所有权',
+            id: 'ownership',
+            heading: '契约与所有权',
             blocks: [
               {
                 type: 'paragraph',
-                text: '按当前作用域真实存在的浏览器载体选插件；页面借用 Worker 调用其 provider，创建者终止 Worker 前先移除 RPC 监听。'
+                text: '同时验证显式来源域及实际原生事件来源。'
               }
             ]
           },
@@ -722,17 +580,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { dedicatedWorkerPlugin, type IWorkerPluginOptions } from '@migaia/rpc-plugin-browser'\n\nexport async function doubleInWorker(worker: Worker) {\n  const host = await createRpcHost<{ double(value: number): number }>({\n    plugins: [dedicatedWorkerPlugin({ worker, connect: { timeoutMs: 1500 } })],\n    provide: { label: () => 'page' }\n  })\n  try { return await host.request('double', 21) }\n  finally { await host.close() }\n}\n\n// Worker module: scope is self; its creator supplies the eventual shutdown signal.\nexport async function serveDedicated(scope: IWorkerPluginOptions['worker'], shutdown: Promise<void>) {\n  const host = await createRpcHost<{ label(): string }>({\n    plugins: [dedicatedWorkerPlugin({ worker: scope })],\n    provide: { double: (value: number) => value * 2 }\n  })\n  try { console.log(await host.request('label')); await shutdown }\n  finally { await host.close() }\n}\n// The creator, not host.close(), eventually calls worker.terminate()."
-              }
-            ]
-          },
-          {
-            id: 'failure',
-            heading: '调用、失败与关闭',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: '保留 source、code、原生类型、stack 与 cause。调用 signal 只取消该调用；连接恢复不证明旧业务没有执行。应用在 finally 中等待 host.close()，借用载体仍由原所有者释放。'
+                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { dedicatedWorkerPlugin } from '@migaia/rpc-plugin-browser'\n\nexport async function doubleInWorker(worker: Worker) {\n  const host = await createRpcHost({\n    plugins: [dedicatedWorkerPlugin({ worker, connect: { timeoutMs: 1500 } })]\n  })\n  try {\n    return await host.worker.request('double', 21)\n  } finally {\n    await host.close()\n  }\n}"
               }
             ]
           }
@@ -740,7 +588,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'Host 入口与 features',
+          label: '宿主命名空间与插件',
           path: '../rpc-host/host-and-plugins'
         }
       ]
@@ -748,38 +596,28 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
   },
   'rpc-plugin-coroutines:index': {
     en: {
-      title: 'Connect a cooperative task',
-      lede: 'spawn receives the real task connect handle. The child passes that opaque handle to connectToParent; it is not true. Task lifetime follows the existing supervisor.',
+      title: 'Run a cooperative child',
+      lede: 'Contract owns pure protocol, interfaces and errors. Host owns Sessions, calls and providers; this package owns cooperative tasks using real MessageChannels. Flow plugins use fixed hooks, and complete features own optional policy. Call through the transport namespace. Separate Hosts are usual; deliberate multi-transport installation uses distinct namespaces.',
       document: {
         sections: [
           {
-            id: 'model',
-            heading: 'Entry and ownership',
+            id: 'ownership',
+            heading: 'Contract and ownership',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'The task receives its generation-local connect token from supervision. It creates the child host with that token and stays alive until the original task signal is aborted.'
+                text: 'Run a cooperative task on real MessageChannel; original supervision owns generations, budget, stop and replacement. Same-loop tasks provide no process or Worker isolation and cannot preempt synchronous blocking.'
               }
             ]
           },
           {
             id: 'example',
-            heading: 'Use the public entries',
+            heading: 'Use the actual public entry',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst parent = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal, heartbeat }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        heartbeat()\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    })\n  ]\n})\ntry {\n  console.log(await parent.request('double', 21))\n} finally {\n  await parent.close()\n}"
-              }
-            ]
-          },
-          {
-            id: 'failure',
-            heading: 'Calls, failures, and closure',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: 'Retain source, code, native type, stack, and cause. A call signal cancels that call; connection recovery does not prove old work never executed. Await host.close() in finally; borrowed carriers stay with their original owner.'
+                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'\n\nasync function untilStopped(signal: AbortSignal): Promise<void> {\n  let complete!: () => void\n  const stopped = new Promise<void>((resolve) => {\n    complete = resolve\n  })\n  signal.addEventListener('abort', complete, { once: true })\n  if (signal.aborted) complete()\n  try {\n    await stopped\n  } finally {\n    signal.removeEventListener('abort', complete)\n  }\n}\n\nconst task: ICoroutineUserTask = async ({ connect, signal, heartbeat }) => {\n  const child = await createRpcHost({\n    plugins: [coroutinePlugin({ connectToParent: connect })],\n    provide: { double: (value: number) => value * 2 }\n  })\n  heartbeat()\n  try {\n    await untilStopped(signal)\n  } finally {\n    await child.close()\n  }\n}\n\ntype IWorkerApi = { double(value: number): number }\nconst plugins = [coroutinePlugin({ spawn: task })] as const\nconst parent = await createRpcHost<IWorkerApi, typeof plugins>({ plugins })\ntry {\n  console.log(await parent.coroutine.request('double', 21))\n} finally {\n  await parent.close()\n}"
               }
             ]
           }
@@ -787,23 +625,23 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'Host and features',
+          label: 'Host namespaces and plugins',
           path: '../rpc-host/host-and-plugins'
         }
       ]
     },
     zh: {
-      title: '连接协作任务',
-      lede: 'spawn 接收真实任务 connect 句柄，子端把该 opaque 句柄传给 connectToParent，不能传 true；任务生命周期沿用原 supervisor。',
+      title: '运行协作子端',
+      lede: '契约包拥有纯协议、接口及错误；宿主拥有会话、调用及提供方，本包拥有使用真实消息通道的协作任务。流程插件使用固定钩子，完整功能拥有可选策略。通过传输命名空间调用；通常使用独立宿主，也可用不同命名空间明确隔离多传输安装。',
       document: {
         sections: [
           {
-            id: 'model',
-            heading: '实际入口与所有权',
+            id: 'ownership',
+            heading: '契约与所有权',
             blocks: [
               {
                 type: 'paragraph',
-                text: '任务从监督器取得本代 connect token，用该 token 创建子端 host，并等待原任务 signal 中止后退出。'
+                text: '经真实消息通道运行协作任务，原监督器拥有代次、预算、停止和替换。同事件循环任务不提供进程或线程隔离，不能抢占同步阻塞。'
               }
             ]
           },
@@ -814,17 +652,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst parent = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal, heartbeat }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        heartbeat()\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    })\n  ]\n})\ntry {\n  console.log(await parent.request('double', 21))\n} finally {\n  await parent.close()\n}"
-              }
-            ]
-          },
-          {
-            id: 'failure',
-            heading: '调用、失败与关闭',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: '保留 source、code、原生类型、stack 与 cause。调用 signal 只取消该调用；连接恢复不证明旧业务没有执行。应用在 finally 中等待 host.close()，借用载体仍由原所有者释放。'
+                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'\n\nasync function untilStopped(signal: AbortSignal): Promise<void> {\n  let complete!: () => void\n  const stopped = new Promise<void>((resolve) => {\n    complete = resolve\n  })\n  signal.addEventListener('abort', complete, { once: true })\n  if (signal.aborted) complete()\n  try {\n    await stopped\n  } finally {\n    signal.removeEventListener('abort', complete)\n  }\n}\n\nconst task: ICoroutineUserTask = async ({ connect, signal, heartbeat }) => {\n  const child = await createRpcHost({\n    plugins: [coroutinePlugin({ connectToParent: connect })],\n    provide: { double: (value: number) => value * 2 }\n  })\n  heartbeat()\n  try {\n    await untilStopped(signal)\n  } finally {\n    await child.close()\n  }\n}\n\ntype IWorkerApi = { double(value: number): number }\nconst plugins = [coroutinePlugin({ spawn: task })] as const\nconst parent = await createRpcHost<IWorkerApi, typeof plugins>({ plugins })\ntry {\n  console.log(await parent.coroutine.request('double', 21))\n} finally {\n  await parent.close()\n}"
               }
             ]
           }
@@ -832,7 +660,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'Host 入口与 features',
+          label: '宿主命名空间与插件',
           path: '../rpc-host/host-and-plugins'
         }
       ]
@@ -840,38 +668,28 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
   },
   'rpc-plugin-coroutines:getting-started': {
     en: {
-      title: 'Connect a cooperative task',
-      lede: 'spawn receives the real task connect handle. The child passes that opaque handle to connectToParent; it is not true. Task lifetime follows the existing supervisor.',
+      title: 'Run a cooperative child',
+      lede: 'Contract owns pure protocol, interfaces and errors. Host owns Sessions, calls and providers; this package owns cooperative tasks using real MessageChannels. Flow plugins use fixed hooks, and complete features own optional policy. Call through the transport namespace. Separate Hosts are usual; deliberate multi-transport installation uses distinct namespaces.',
       document: {
         sections: [
           {
-            id: 'model',
-            heading: 'Entry and ownership',
+            id: 'ownership',
+            heading: 'Contract and ownership',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'The task receives its generation-local connect token from supervision. It creates the child host with that token and stays alive until the original task signal is aborted.'
+                text: 'Run a cooperative task on real MessageChannel; original supervision owns generations, budget, stop and replacement. Same-loop tasks provide no process or Worker isolation and cannot preempt synchronous blocking.'
               }
             ]
           },
           {
             id: 'example',
-            heading: 'Use the public entries',
+            heading: 'Use the actual public entry',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst parent = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal, heartbeat }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        heartbeat()\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    })\n  ]\n})\ntry {\n  console.log(await parent.request('double', 21))\n} finally {\n  await parent.close()\n}"
-              }
-            ]
-          },
-          {
-            id: 'failure',
-            heading: 'Calls, failures, and closure',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: 'Retain source, code, native type, stack, and cause. A call signal cancels that call; connection recovery does not prove old work never executed. Await host.close() in finally; borrowed carriers stay with their original owner.'
+                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'\n\nasync function untilStopped(signal: AbortSignal): Promise<void> {\n  let complete!: () => void\n  const stopped = new Promise<void>((resolve) => {\n    complete = resolve\n  })\n  signal.addEventListener('abort', complete, { once: true })\n  if (signal.aborted) complete()\n  try {\n    await stopped\n  } finally {\n    signal.removeEventListener('abort', complete)\n  }\n}\n\nconst task: ICoroutineUserTask = async ({ connect, signal, heartbeat }) => {\n  const child = await createRpcHost({\n    plugins: [coroutinePlugin({ connectToParent: connect })],\n    provide: { double: (value: number) => value * 2 }\n  })\n  heartbeat()\n  try {\n    await untilStopped(signal)\n  } finally {\n    await child.close()\n  }\n}\n\ntype IWorkerApi = { double(value: number): number }\nconst plugins = [coroutinePlugin({ spawn: task })] as const\nconst parent = await createRpcHost<IWorkerApi, typeof plugins>({ plugins })\ntry {\n  console.log(await parent.coroutine.request('double', 21))\n} finally {\n  await parent.close()\n}"
               }
             ]
           }
@@ -879,23 +697,23 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'Host and features',
+          label: 'Host namespaces and plugins',
           path: '../rpc-host/host-and-plugins'
         }
       ]
     },
     zh: {
-      title: '连接协作任务',
-      lede: 'spawn 接收真实任务 connect 句柄，子端把该 opaque 句柄传给 connectToParent，不能传 true；任务生命周期沿用原 supervisor。',
+      title: '运行协作子端',
+      lede: '契约包拥有纯协议、接口及错误；宿主拥有会话、调用及提供方，本包拥有使用真实消息通道的协作任务。流程插件使用固定钩子，完整功能拥有可选策略。通过传输命名空间调用；通常使用独立宿主，也可用不同命名空间明确隔离多传输安装。',
       document: {
         sections: [
           {
-            id: 'model',
-            heading: '实际入口与所有权',
+            id: 'ownership',
+            heading: '契约与所有权',
             blocks: [
               {
                 type: 'paragraph',
-                text: '任务从监督器取得本代 connect token，用该 token 创建子端 host，并等待原任务 signal 中止后退出。'
+                text: '经真实消息通道运行协作任务，原监督器拥有代次、预算、停止和替换。同事件循环任务不提供进程或线程隔离，不能抢占同步阻塞。'
               }
             ]
           },
@@ -906,17 +724,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst parent = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal, heartbeat }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        heartbeat()\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    })\n  ]\n})\ntry {\n  console.log(await parent.request('double', 21))\n} finally {\n  await parent.close()\n}"
-              }
-            ]
-          },
-          {
-            id: 'failure',
-            heading: '调用、失败与关闭',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: '保留 source、code、原生类型、stack 与 cause。调用 signal 只取消该调用；连接恢复不证明旧业务没有执行。应用在 finally 中等待 host.close()，借用载体仍由原所有者释放。'
+                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'\n\nasync function untilStopped(signal: AbortSignal): Promise<void> {\n  let complete!: () => void\n  const stopped = new Promise<void>((resolve) => {\n    complete = resolve\n  })\n  signal.addEventListener('abort', complete, { once: true })\n  if (signal.aborted) complete()\n  try {\n    await stopped\n  } finally {\n    signal.removeEventListener('abort', complete)\n  }\n}\n\nconst task: ICoroutineUserTask = async ({ connect, signal, heartbeat }) => {\n  const child = await createRpcHost({\n    plugins: [coroutinePlugin({ connectToParent: connect })],\n    provide: { double: (value: number) => value * 2 }\n  })\n  heartbeat()\n  try {\n    await untilStopped(signal)\n  } finally {\n    await child.close()\n  }\n}\n\ntype IWorkerApi = { double(value: number): number }\nconst plugins = [coroutinePlugin({ spawn: task })] as const\nconst parent = await createRpcHost<IWorkerApi, typeof plugins>({ plugins })\ntry {\n  console.log(await parent.coroutine.request('double', 21))\n} finally {\n  await parent.close()\n}"
               }
             ]
           }
@@ -924,7 +732,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'Host 入口与 features',
+          label: '宿主命名空间与插件',
           path: '../rpc-host/host-and-plugins'
         }
       ]
@@ -932,38 +740,28 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
   },
   'rpc-plugin-pool:index': {
     en: {
-      title: 'Schedule one operation on one member',
-      lede: 'Install poolPlugin beside a repeatedly openable transport. Only pool is a public direct target; requests return a scalar and execute once.',
+      title: 'Schedule same-medium native members',
+      lede: 'Contract owns pure protocol, interfaces and errors. Host owns Sessions, calls and providers; this package owns one logical target backed by privately acquired native members. Flow plugins use fixed hooks, and complete features own optional policy. Call through the transport namespace. Separate Hosts are usual; deliberate multi-transport installation uses distinct namespaces.',
       document: {
         sections: [
           {
-            id: 'model',
-            heading: 'Entry and ownership',
+            id: 'ownership',
+            heading: 'Contract and ownership',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'The parent submits one logical operation to pool. Its existing bounded scheduler leases one member; callers do not broadcast over or directly address the hidden workers.'
+                text: 'Create a complete native pool feature for a repeatable Thread, Process or Coroutine source. Install it in that transport features array; one logical pool is public.'
               }
             ]
           },
           {
             id: 'example',
-            heading: 'Use the public entries',
+            heading: 'Use the actual public entry',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\nimport { poolPlugin } from '@migaia/rpc-plugin-pool'\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const pool = poolPlugin({ size: 3, maxQueue: 32 })\n  const host = await createRpcHost<{ double(value: number): number }>({\n    plugins: [threadPlugin({ spawn: true }), pool]\n  })\n  try {\n    console.log(await host.request('double', 21))\n    console.log(await host.send('pool', 'double', 21))\n    await pool.controls(host).resize(2)\n    console.log(pool.controls(host).stats().targetSize)\n  } finally {\n    await host.close()\n  }\n}"
-              }
-            ]
-          },
-          {
-            id: 'failure',
-            heading: 'Calls, failures, and closure',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: 'Retain source, code, native type, stack, and cause. A call signal cancels that call; connection recovery does not prove old work never executed. Await host.close() in finally; borrowed carriers stay with their original owner.'
+                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\nimport { pool } from '@migaia/rpc-plugin-pool'\n\ntype IWorkerApi = { double(value: number): number }\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const plugins = [\n    threadPlugin({ spawn: true, features: [pool({ size: 3, maxQueue: 32 })] })\n  ] as const\n  const host = await createRpcHost<IWorkerApi, typeof plugins>({ plugins })\n  try {\n    console.log(await host.thread.send('pool', 'double', 21))\n    await host.thread.pool.resize(2)\n    console.log(host.thread.pool.stats().targetSize)\n  } finally {\n    await host.close()\n  }\n}"
               }
             ]
           }
@@ -971,23 +769,23 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'Host and features',
+          label: 'Host namespaces and plugins',
           path: '../rpc-host/host-and-plugins'
         }
       ]
     },
     zh: {
-      title: '一次操作选择一个成员',
-      lede: '在可重复打开成员的传输旁安装 poolPlugin；仅 pool 是公开直连目标，请求返回单值且只执行一次。',
+      title: '调度同媒介原生成员',
+      lede: '契约包拥有纯协议、接口及错误；宿主拥有会话、调用及提供方，本包拥有以私有原生成员支撑的单个逻辑目标。流程插件使用固定钩子，完整功能拥有可选策略。通过传输命名空间调用；通常使用独立宿主，也可用不同命名空间明确隔离多传输安装。',
       document: {
         sections: [
           {
-            id: 'model',
-            heading: '实际入口与所有权',
+            id: 'ownership',
+            heading: '契约与所有权',
             blocks: [
               {
                 type: 'paragraph',
-                text: '父端把一次逻辑操作交给 pool，由原有界调度器租用一个成员；调用方不广播或直连隐藏 Worker。'
+                text: '为可重复打开的线程、进程或协程来源创建完整原生池功能。安装到该传输功能数组，对外仅发布一个逻辑池。'
               }
             ]
           },
@@ -998,17 +796,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\nimport { poolPlugin } from '@migaia/rpc-plugin-pool'\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const pool = poolPlugin({ size: 3, maxQueue: 32 })\n  const host = await createRpcHost<{ double(value: number): number }>({\n    plugins: [threadPlugin({ spawn: true }), pool]\n  })\n  try {\n    console.log(await host.request('double', 21))\n    console.log(await host.send('pool', 'double', 21))\n    await pool.controls(host).resize(2)\n    console.log(pool.controls(host).stats().targetSize)\n  } finally {\n    await host.close()\n  }\n}"
-              }
-            ]
-          },
-          {
-            id: 'failure',
-            heading: '调用、失败与关闭',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: '保留 source、code、原生类型、stack 与 cause。调用 signal 只取消该调用；连接恢复不证明旧业务没有执行。应用在 finally 中等待 host.close()，借用载体仍由原所有者释放。'
+                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\nimport { pool } from '@migaia/rpc-plugin-pool'\n\ntype IWorkerApi = { double(value: number): number }\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const plugins = [\n    threadPlugin({ spawn: true, features: [pool({ size: 3, maxQueue: 32 })] })\n  ] as const\n  const host = await createRpcHost<IWorkerApi, typeof plugins>({ plugins })\n  try {\n    console.log(await host.thread.send('pool', 'double', 21))\n    await host.thread.pool.resize(2)\n    console.log(host.thread.pool.stats().targetSize)\n  } finally {\n    await host.close()\n  }\n}"
               }
             ]
           }
@@ -1016,7 +804,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'Host 入口与 features',
+          label: '宿主命名空间与插件',
           path: '../rpc-host/host-and-plugins'
         }
       ]
@@ -1024,38 +812,28 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
   },
   'rpc-plugin-pool:getting-started': {
     en: {
-      title: 'Schedule one operation on one member',
-      lede: 'Install poolPlugin beside a repeatedly openable transport. Only pool is a public direct target; requests return a scalar and execute once.',
+      title: 'Schedule same-medium native members',
+      lede: 'Contract owns pure protocol, interfaces and errors. Host owns Sessions, calls and providers; this package owns one logical target backed by privately acquired native members. Flow plugins use fixed hooks, and complete features own optional policy. Call through the transport namespace. Separate Hosts are usual; deliberate multi-transport installation uses distinct namespaces.',
       document: {
         sections: [
           {
-            id: 'model',
-            heading: 'Entry and ownership',
+            id: 'ownership',
+            heading: 'Contract and ownership',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'The parent submits one logical operation to pool. Its existing bounded scheduler leases one member; callers do not broadcast over or directly address the hidden workers.'
+                text: 'Create a complete native pool feature for a repeatable Thread, Process or Coroutine source. Install it in that transport features array; one logical pool is public.'
               }
             ]
           },
           {
             id: 'example',
-            heading: 'Use the public entries',
+            heading: 'Use the actual public entry',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\nimport { poolPlugin } from '@migaia/rpc-plugin-pool'\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const pool = poolPlugin({ size: 3, maxQueue: 32 })\n  const host = await createRpcHost<{ double(value: number): number }>({\n    plugins: [threadPlugin({ spawn: true }), pool]\n  })\n  try {\n    console.log(await host.request('double', 21))\n    console.log(await host.send('pool', 'double', 21))\n    await pool.controls(host).resize(2)\n    console.log(pool.controls(host).stats().targetSize)\n  } finally {\n    await host.close()\n  }\n}"
-              }
-            ]
-          },
-          {
-            id: 'failure',
-            heading: 'Calls, failures, and closure',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: 'Retain source, code, native type, stack, and cause. A call signal cancels that call; connection recovery does not prove old work never executed. Await host.close() in finally; borrowed carriers stay with their original owner.'
+                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\nimport { pool } from '@migaia/rpc-plugin-pool'\n\ntype IWorkerApi = { double(value: number): number }\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const plugins = [\n    threadPlugin({ spawn: true, features: [pool({ size: 3, maxQueue: 32 })] })\n  ] as const\n  const host = await createRpcHost<IWorkerApi, typeof plugins>({ plugins })\n  try {\n    console.log(await host.thread.send('pool', 'double', 21))\n    await host.thread.pool.resize(2)\n    console.log(host.thread.pool.stats().targetSize)\n  } finally {\n    await host.close()\n  }\n}"
               }
             ]
           }
@@ -1063,23 +841,23 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'Host and features',
+          label: 'Host namespaces and plugins',
           path: '../rpc-host/host-and-plugins'
         }
       ]
     },
     zh: {
-      title: '一次操作选择一个成员',
-      lede: '在可重复打开成员的传输旁安装 poolPlugin；仅 pool 是公开直连目标，请求返回单值且只执行一次。',
+      title: '调度同媒介原生成员',
+      lede: '契约包拥有纯协议、接口及错误；宿主拥有会话、调用及提供方，本包拥有以私有原生成员支撑的单个逻辑目标。流程插件使用固定钩子，完整功能拥有可选策略。通过传输命名空间调用；通常使用独立宿主，也可用不同命名空间明确隔离多传输安装。',
       document: {
         sections: [
           {
-            id: 'model',
-            heading: '实际入口与所有权',
+            id: 'ownership',
+            heading: '契约与所有权',
             blocks: [
               {
                 type: 'paragraph',
-                text: '父端把一次逻辑操作交给 pool，由原有界调度器租用一个成员；调用方不广播或直连隐藏 Worker。'
+                text: '为可重复打开的线程、进程或协程来源创建完整原生池功能。安装到该传输功能数组，对外仅发布一个逻辑池。'
               }
             ]
           },
@@ -1090,17 +868,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\nimport { poolPlugin } from '@migaia/rpc-plugin-pool'\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const pool = poolPlugin({ size: 3, maxQueue: 32 })\n  const host = await createRpcHost<{ double(value: number): number }>({\n    plugins: [threadPlugin({ spawn: true }), pool]\n  })\n  try {\n    console.log(await host.request('double', 21))\n    console.log(await host.send('pool', 'double', 21))\n    await pool.controls(host).resize(2)\n    console.log(pool.controls(host).stats().targetSize)\n  } finally {\n    await host.close()\n  }\n}"
-              }
-            ]
-          },
-          {
-            id: 'failure',
-            heading: '调用、失败与关闭',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: '保留 source、code、原生类型、stack 与 cause。调用 signal 只取消该调用；连接恢复不证明旧业务没有执行。应用在 finally 中等待 host.close()，借用载体仍由原所有者释放。'
+                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\nimport { pool } from '@migaia/rpc-plugin-pool'\n\ntype IWorkerApi = { double(value: number): number }\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const plugins = [\n    threadPlugin({ spawn: true, features: [pool({ size: 3, maxQueue: 32 })] })\n  ] as const\n  const host = await createRpcHost<IWorkerApi, typeof plugins>({ plugins })\n  try {\n    console.log(await host.thread.send('pool', 'double', 21))\n    await host.thread.pool.resize(2)\n    console.log(host.thread.pool.stats().targetSize)\n  } finally {\n    await host.close()\n  }\n}"
               }
             ]
           }
@@ -1108,7 +876,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'Host 入口与 features',
+          label: '宿主命名空间与插件',
           path: '../rpc-host/host-and-plugins'
         }
       ]
@@ -1116,38 +884,28 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
   },
   'rpc-plugin-devtools:index': {
     en: {
-      title: 'Observe calls through the original collector',
-      lede: 'Install devtoolsPlugin beside the business transport. It exposes the same collector, with explicit stages, capture, redaction, recording, and application-owned closure.',
+      title: 'Observe an installed RPC Host',
+      lede: 'Contract owns pure protocol, interfaces and errors. Host owns Sessions, calls and providers; this package owns caller-owned observation, bounded collection and recording. Flow plugins use fixed hooks, and complete features own optional policy. Call through the transport namespace. Separate Hosts are usual; deliberate multi-transport installation uses distinct namespaces.',
       document: {
         sections: [
           {
-            id: 'model',
-            heading: 'Entry and ownership',
+            id: 'ownership',
+            heading: 'Contract and ownership',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'Create one collector before installing its feature. Read the records produced by business calls, release the host subscriptions, then close the collector when no other host uses it.'
+                text: 'Install the original bounded collector directly into real host observation. Same feature object may observe multiple hosts; closing one host withdraws only its observation and never closes the collector.'
               }
             ]
           },
           {
             id: 'example',
-            heading: 'Use the public entries',
+            heading: 'Use the actual public entry',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport type { IRpcTransportPlugin } from '@migaia/rpc-host/plugin'\nimport { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'\n\n// transport connects to an application peer providing readBalance.\nexport async function inspectBalance(transport: IRpcTransportPlugin) {\n  const tools = devtoolsPlugin({ maxEvents: 1000 })\n  const collector = tools.collector\n  const host = await createRpcHost<{ readBalance(): number }>({ plugins: [transport, tools] })\n  const recording = collector.record({ maxEvents: 2000 })\n  try {\n    console.log(await host.request('readBalance'))\n    collector.pause()\n    console.log(collector.describe().paused)\n    collector.resume()\n    console.log(collector.describe().paused)\n    return collector.exportRecord(recording.stop())\n  } finally {\n    recording.stop()\n    await host.close() // removes only this host's observation\n    collector.close() // the application owns the collector\n  }\n}"
-              }
-            ]
-          },
-          {
-            id: 'failure',
-            heading: 'Calls, failures, and closure',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: 'Retain source, code, native type, stack, and cause. A call signal cancels that call; connection recovery does not prove old work never executed. Await host.close() in finally; borrowed carriers stay with their original owner.'
+                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'\nimport { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'\n\nasync function untilStopped(signal: AbortSignal): Promise<void> {\n  let complete!: () => void\n  const stopped = new Promise<void>((resolve) => {\n    complete = resolve\n  })\n  signal.addEventListener('abort', complete, { once: true })\n  if (signal.aborted) complete()\n  try {\n    await stopped\n  } finally {\n    signal.removeEventListener('abort', complete)\n  }\n}\n\nconst tools = devtoolsPlugin({ maxEvents: 1000, methods: ['double'] })\nconst task: ICoroutineUserTask = async ({ connect, signal }) => {\n  const child = await createRpcHost({\n    plugins: [tools, coroutinePlugin({ connectToParent: connect })],\n    provide: { double: (value: number) => value * 2 }\n  })\n  try {\n    await untilStopped(signal)\n  } finally {\n    await child.close()\n  }\n}\n\ntype IWorkerApi = { double(value: number): number }\nconst plugins = [tools, coroutinePlugin({ spawn: task })] as const\nconst parent = await createRpcHost<IWorkerApi, typeof plugins>({ plugins })\nconst watch = tools.watch({ stages: ['message'] })\ntry {\n  const next = watch.next()\n  console.log(await parent.coroutine.request('double', 21))\n  console.log((await next).value?.events.length)\n  console.log(tools.stats().methods)\n} finally {\n  await watch.return(undefined)\n  await parent.close()\n  tools.close()\n}"
               }
             ]
           }
@@ -1155,23 +913,23 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'Host and features',
+          label: 'Host namespaces and plugins',
           path: '../rpc-host/host-and-plugins'
         }
       ]
     },
     zh: {
-      title: '通过原 collector 观察调用',
-      lede: '在业务传输旁安装 devtoolsPlugin，持有同一 collector；显式配置 stages、capture、redact、录制，并由应用关闭 collector。',
+      title: '观察已安装远程调用宿主',
+      lede: '契约包拥有纯协议、接口及错误；宿主拥有会话、调用及提供方，本包拥有调用方拥有的观察、有界收集及记录。流程插件使用固定钩子，完整功能拥有可选策略。通过传输命名空间调用；通常使用独立宿主，也可用不同命名空间明确隔离多传输安装。',
       document: {
         sections: [
           {
-            id: 'model',
-            heading: '实际入口与所有权',
+            id: 'ownership',
+            heading: '契约与所有权',
             blocks: [
               {
                 type: 'paragraph',
-                text: '先创建一个 collector 再安装其功能，读取业务调用产生的记录，释放 host 订阅，最后在没有其他 host 使用时关闭 collector。'
+                text: '将原有界采集器直接安装到真实宿主观察。同一功能对象可观察多个宿主，关闭一个宿主仅撤回其观察，不关闭采集器。'
               }
             ]
           },
@@ -1182,17 +940,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport type { IRpcTransportPlugin } from '@migaia/rpc-host/plugin'\nimport { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'\n\n// transport connects to an application peer providing readBalance.\nexport async function inspectBalance(transport: IRpcTransportPlugin) {\n  const tools = devtoolsPlugin({ maxEvents: 1000 })\n  const collector = tools.collector\n  const host = await createRpcHost<{ readBalance(): number }>({ plugins: [transport, tools] })\n  const recording = collector.record({ maxEvents: 2000 })\n  try {\n    console.log(await host.request('readBalance'))\n    collector.pause()\n    console.log(collector.describe().paused)\n    collector.resume()\n    console.log(collector.describe().paused)\n    return collector.exportRecord(recording.stop())\n  } finally {\n    recording.stop()\n    await host.close() // removes only this host's observation\n    collector.close() // the application owns the collector\n  }\n}"
-              }
-            ]
-          },
-          {
-            id: 'failure',
-            heading: '调用、失败与关闭',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: '保留 source、code、原生类型、stack 与 cause。调用 signal 只取消该调用；连接恢复不证明旧业务没有执行。应用在 finally 中等待 host.close()，借用载体仍由原所有者释放。'
+                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'\nimport { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'\n\nasync function untilStopped(signal: AbortSignal): Promise<void> {\n  let complete!: () => void\n  const stopped = new Promise<void>((resolve) => {\n    complete = resolve\n  })\n  signal.addEventListener('abort', complete, { once: true })\n  if (signal.aborted) complete()\n  try {\n    await stopped\n  } finally {\n    signal.removeEventListener('abort', complete)\n  }\n}\n\nconst tools = devtoolsPlugin({ maxEvents: 1000, methods: ['double'] })\nconst task: ICoroutineUserTask = async ({ connect, signal }) => {\n  const child = await createRpcHost({\n    plugins: [tools, coroutinePlugin({ connectToParent: connect })],\n    provide: { double: (value: number) => value * 2 }\n  })\n  try {\n    await untilStopped(signal)\n  } finally {\n    await child.close()\n  }\n}\n\ntype IWorkerApi = { double(value: number): number }\nconst plugins = [tools, coroutinePlugin({ spawn: task })] as const\nconst parent = await createRpcHost<IWorkerApi, typeof plugins>({ plugins })\nconst watch = tools.watch({ stages: ['message'] })\ntry {\n  const next = watch.next()\n  console.log(await parent.coroutine.request('double', 21))\n  console.log((await next).value?.events.length)\n  console.log(tools.stats().methods)\n} finally {\n  await watch.return(undefined)\n  await parent.close()\n  tools.close()\n}"
               }
             ]
           }
@@ -1200,7 +948,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'Host 入口与 features',
+          label: '宿主命名空间与插件',
           path: '../rpc-host/host-and-plugins'
         }
       ]
@@ -1208,38 +956,28 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
   },
   'rpc-plugin-devtools:getting-started': {
     en: {
-      title: 'Observe calls through the original collector',
-      lede: 'Install devtoolsPlugin beside the business transport. It exposes the same collector, with explicit stages, capture, redaction, recording, and application-owned closure.',
+      title: 'Observe an installed RPC Host',
+      lede: 'Contract owns pure protocol, interfaces and errors. Host owns Sessions, calls and providers; this package owns caller-owned observation, bounded collection and recording. Flow plugins use fixed hooks, and complete features own optional policy. Call through the transport namespace. Separate Hosts are usual; deliberate multi-transport installation uses distinct namespaces.',
       document: {
         sections: [
           {
-            id: 'model',
-            heading: 'Entry and ownership',
+            id: 'ownership',
+            heading: 'Contract and ownership',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'Create one collector before installing its feature. Read the records produced by business calls, release the host subscriptions, then close the collector when no other host uses it.'
+                text: 'Install the original bounded collector directly into real host observation. Same feature object may observe multiple hosts; closing one host withdraws only its observation and never closes the collector.'
               }
             ]
           },
           {
             id: 'example',
-            heading: 'Use the public entries',
+            heading: 'Use the actual public entry',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport type { IRpcTransportPlugin } from '@migaia/rpc-host/plugin'\nimport { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'\n\n// transport connects to an application peer providing readBalance.\nexport async function inspectBalance(transport: IRpcTransportPlugin) {\n  const tools = devtoolsPlugin({ maxEvents: 1000 })\n  const collector = tools.collector\n  const host = await createRpcHost<{ readBalance(): number }>({ plugins: [transport, tools] })\n  const recording = collector.record({ maxEvents: 2000 })\n  try {\n    console.log(await host.request('readBalance'))\n    collector.pause()\n    console.log(collector.describe().paused)\n    collector.resume()\n    console.log(collector.describe().paused)\n    return collector.exportRecord(recording.stop())\n  } finally {\n    recording.stop()\n    await host.close() // removes only this host's observation\n    collector.close() // the application owns the collector\n  }\n}"
-              }
-            ]
-          },
-          {
-            id: 'failure',
-            heading: 'Calls, failures, and closure',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: 'Retain source, code, native type, stack, and cause. A call signal cancels that call; connection recovery does not prove old work never executed. Await host.close() in finally; borrowed carriers stay with their original owner.'
+                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'\nimport { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'\n\nasync function untilStopped(signal: AbortSignal): Promise<void> {\n  let complete!: () => void\n  const stopped = new Promise<void>((resolve) => {\n    complete = resolve\n  })\n  signal.addEventListener('abort', complete, { once: true })\n  if (signal.aborted) complete()\n  try {\n    await stopped\n  } finally {\n    signal.removeEventListener('abort', complete)\n  }\n}\n\nconst tools = devtoolsPlugin({ maxEvents: 1000, methods: ['double'] })\nconst task: ICoroutineUserTask = async ({ connect, signal }) => {\n  const child = await createRpcHost({\n    plugins: [tools, coroutinePlugin({ connectToParent: connect })],\n    provide: { double: (value: number) => value * 2 }\n  })\n  try {\n    await untilStopped(signal)\n  } finally {\n    await child.close()\n  }\n}\n\ntype IWorkerApi = { double(value: number): number }\nconst plugins = [tools, coroutinePlugin({ spawn: task })] as const\nconst parent = await createRpcHost<IWorkerApi, typeof plugins>({ plugins })\nconst watch = tools.watch({ stages: ['message'] })\ntry {\n  const next = watch.next()\n  console.log(await parent.coroutine.request('double', 21))\n  console.log((await next).value?.events.length)\n  console.log(tools.stats().methods)\n} finally {\n  await watch.return(undefined)\n  await parent.close()\n  tools.close()\n}"
               }
             ]
           }
@@ -1247,23 +985,23 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'Host and features',
+          label: 'Host namespaces and plugins',
           path: '../rpc-host/host-and-plugins'
         }
       ]
     },
     zh: {
-      title: '通过原 collector 观察调用',
-      lede: '在业务传输旁安装 devtoolsPlugin，持有同一 collector；显式配置 stages、capture、redact、录制，并由应用关闭 collector。',
+      title: '观察已安装远程调用宿主',
+      lede: '契约包拥有纯协议、接口及错误；宿主拥有会话、调用及提供方，本包拥有调用方拥有的观察、有界收集及记录。流程插件使用固定钩子，完整功能拥有可选策略。通过传输命名空间调用；通常使用独立宿主，也可用不同命名空间明确隔离多传输安装。',
       document: {
         sections: [
           {
-            id: 'model',
-            heading: '实际入口与所有权',
+            id: 'ownership',
+            heading: '契约与所有权',
             blocks: [
               {
                 type: 'paragraph',
-                text: '先创建一个 collector 再安装其功能，读取业务调用产生的记录，释放 host 订阅，最后在没有其他 host 使用时关闭 collector。'
+                text: '将原有界采集器直接安装到真实宿主观察。同一功能对象可观察多个宿主，关闭一个宿主仅撤回其观察，不关闭采集器。'
               }
             ]
           },
@@ -1274,17 +1012,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport type { IRpcTransportPlugin } from '@migaia/rpc-host/plugin'\nimport { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'\n\n// transport connects to an application peer providing readBalance.\nexport async function inspectBalance(transport: IRpcTransportPlugin) {\n  const tools = devtoolsPlugin({ maxEvents: 1000 })\n  const collector = tools.collector\n  const host = await createRpcHost<{ readBalance(): number }>({ plugins: [transport, tools] })\n  const recording = collector.record({ maxEvents: 2000 })\n  try {\n    console.log(await host.request('readBalance'))\n    collector.pause()\n    console.log(collector.describe().paused)\n    collector.resume()\n    console.log(collector.describe().paused)\n    return collector.exportRecord(recording.stop())\n  } finally {\n    recording.stop()\n    await host.close() // removes only this host's observation\n    collector.close() // the application owns the collector\n  }\n}"
-              }
-            ]
-          },
-          {
-            id: 'failure',
-            heading: '调用、失败与关闭',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: '保留 source、code、原生类型、stack 与 cause。调用 signal 只取消该调用；连接恢复不证明旧业务没有执行。应用在 finally 中等待 host.close()，借用载体仍由原所有者释放。'
+                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'\nimport { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'\n\nasync function untilStopped(signal: AbortSignal): Promise<void> {\n  let complete!: () => void\n  const stopped = new Promise<void>((resolve) => {\n    complete = resolve\n  })\n  signal.addEventListener('abort', complete, { once: true })\n  if (signal.aborted) complete()\n  try {\n    await stopped\n  } finally {\n    signal.removeEventListener('abort', complete)\n  }\n}\n\nconst tools = devtoolsPlugin({ maxEvents: 1000, methods: ['double'] })\nconst task: ICoroutineUserTask = async ({ connect, signal }) => {\n  const child = await createRpcHost({\n    plugins: [tools, coroutinePlugin({ connectToParent: connect })],\n    provide: { double: (value: number) => value * 2 }\n  })\n  try {\n    await untilStopped(signal)\n  } finally {\n    await child.close()\n  }\n}\n\ntype IWorkerApi = { double(value: number): number }\nconst plugins = [tools, coroutinePlugin({ spawn: task })] as const\nconst parent = await createRpcHost<IWorkerApi, typeof plugins>({ plugins })\nconst watch = tools.watch({ stages: ['message'] })\ntry {\n  const next = watch.next()\n  console.log(await parent.coroutine.request('double', 21))\n  console.log((await next).value?.events.length)\n  console.log(tools.stats().methods)\n} finally {\n  await watch.return(undefined)\n  await parent.close()\n  tools.close()\n}"
               }
             ]
           }
@@ -1292,7 +1020,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'Host 入口与 features',
+          label: '宿主命名空间与插件',
           path: '../rpc-host/host-and-plugins'
         }
       ]
@@ -1300,46 +1028,32 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
   },
   'rpc-host:host-and-plugins': {
     en: {
-      title: 'One host, transport plugins, and features',
-      lede: 'Install exactly one transport plugin and optional features. The host owns real calls, providers, directories, and closure.',
+      title: 'Install behavior at its real owner',
+      lede: 'Install optional flow implementations before transport startup: auth, chunk, batch, idempotency, limits, schema, probe, typegen and linkPolicy. Omission leaves the capability absent. Namespace filters scope installed hooks; extensions cannot replace built-in calls.',
       document: {
         sections: [
           {
-            id: 'model',
-            heading: 'Entry and ownership',
+            id: 'ownership',
+            heading: 'Contract and ownership',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'The parent below calls double on its cooperative child. Add the provider at the child, install its exact connection handle, and join both close paths when the task is stopped.'
+                text: 'Import complete timeout and retry implementations. Install them in a transport features list or linkPolicy; one call may override a policy with a complete instance or false, never a number or plain configuration.'
               },
               {
                 type: 'paragraph',
-                text: 'A host constructs one endpoint even when a listener accepts many sessions. Plugin identity comes from defineTransportPlugin / defineFeaturePlugin, never a hand-written kind field. The same real plugin installs on an ordinary PluginHost with its original outlet and cleanup.'
-              },
-              {
-                type: 'paragraph',
-                text: 'Shared features use @migaia/rpc-host/features or the matching /features/<name> default import. Choose one spelling for each definition: duplicate feature definitions reject before I/O. Pool and devtools are features; process, thread, browser, and coroutines provide transports.'
+                text: 'Pool is a same-carrier feature installed by a concrete native transport, not a separate logical transport or second Host. Native members controls belong under that transport namespace.'
               }
             ]
           },
           {
             id: 'example',
-            heading: 'Use the public entries',
+            heading: 'Use the actual public entry',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    })\n  ]\n})\ntry {\n  console.log(await host.request('double', 21))\n} finally {\n  await host.close()\n}"
-              }
-            ]
-          },
-          {
-            id: 'failure',
-            heading: 'Calls, failures, and closure',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: 'Retain source, code, native type, stack, and cause. A call signal cancels that call; connection recovery does not prove old work never executed. Await host.close() in finally; borrowed carriers stay with their original owner.'
+                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { timeout } from '@migaia/rpc-host/features'\nimport linkPolicy from '@migaia/rpc-host/plugins/link-policy'\n\nconst host = await createRpcHost({\n  plugins: [\n    linkPolicy({ features: [timeout({ ms: 1500 })] }),\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted) await new Promise<void>((resolve) =>\n            signal.addEventListener('abort', () => resolve(), { once: true }))\n        } finally { await child.close() }\n      }\n    })\n  ]\n})\ntry {\n  console.log(await host.coroutine.request('double', 21, {\n    timeout: timeout({ ms: 100 }), retry: false\n  }))\n} finally { await host.close() }"
               }
             ]
           }
@@ -1347,31 +1061,27 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'Host and features',
+          label: 'Host namespaces and plugins',
           path: '../rpc-host/host-and-plugins'
         }
       ]
     },
     zh: {
-      title: '一个 host、传输 plugins 与 features',
-      lede: '安装恰好一个传输 plugin 和可选 features，由 host 管理实际调用、provider、目录与关闭。',
+      title: '在真实所有者安装行为',
+      lede: '在传输启动前安装可选信息流实现：认证、分片、合帧、幂等、限流、模式校验、探针、类型生成及链路策略。省略即没有对应能力。命名空间过滤限定介入范围，扩展不能覆盖内建调用。',
       document: {
         sections: [
           {
-            id: 'model',
-            heading: '实际入口与所有权',
+            id: 'ownership',
+            heading: '契约与所有权',
             blocks: [
               {
                 type: 'paragraph',
-                text: '下面由父端调用协作子端的 double：子端登记 provider，安装实际连接句柄，并在任务停止时等待双方关闭。'
+                text: '导入包含完整算法的超时与重试实例。安装到传输功能列表或链路策略；单次调用可用完整实例或 `false` 覆盖，不能传数字或普通配置。'
               },
               {
                 type: 'paragraph',
-                text: '即使 listener 接纳多会话，一个 host 仍只构造一个 endpoint。plugin 身份来自 defineTransportPlugin / defineFeaturePlugin，不能手写 kind 字段冒充；同一真实 plugin 可安装到普通 PluginHost，保留原 outlet 与清理。'
-              },
-              {
-                type: 'paragraph',
-                text: '公用 features 从 @migaia/rpc-host/features 或对应 /features/<name> 默认入口导入。每个定义只选一种写法，重复 feature 定义在 I/O 前拒绝；pool 与 devtools 是 features，process、thread、browser 和 coroutines 提供传输。'
+                text: '池是具体原生传输安装的同载体功能，不是独立逻辑传输或第二个宿主。原生成员控制位于该传输命名空间。'
               }
             ]
           },
@@ -1382,17 +1092,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    })\n  ]\n})\ntry {\n  console.log(await host.request('double', 21))\n} finally {\n  await host.close()\n}"
-              }
-            ]
-          },
-          {
-            id: 'failure',
-            heading: '调用、失败与关闭',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: '保留 source、code、原生类型、stack 与 cause。调用 signal 只取消该调用；连接恢复不证明旧业务没有执行。应用在 finally 中等待 host.close()，借用载体仍由原所有者释放。'
+                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { timeout } from '@migaia/rpc-host/features'\nimport linkPolicy from '@migaia/rpc-host/plugins/link-policy'\n\nconst host = await createRpcHost({\n  plugins: [\n    linkPolicy({ features: [timeout({ ms: 1500 })] }),\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted) await new Promise<void>((resolve) =>\n            signal.addEventListener('abort', () => resolve(), { once: true }))\n        } finally { await child.close() }\n      }\n    })\n  ]\n})\ntry {\n  console.log(await host.coroutine.request('double', 21, {\n    timeout: timeout({ ms: 100 }), retry: false\n  }))\n} finally { await host.close() }"
               }
             ]
           }
@@ -1400,7 +1100,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'Host 入口与 features',
+          label: '宿主命名空间与插件',
           path: '../rpc-host/host-and-plugins'
         }
       ]
@@ -1408,46 +1108,36 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
   },
   'rpc-host:transports-and-security': {
     en: {
-      title: 'One host, transport plugins, and features',
-      lede: 'Install exactly one transport plugin and optional features. The host owns real calls, providers, directories, and closure.',
+      title: 'Keep native identity and protection separate',
+      lede: 'Native acquisition supplies actual source/transfer facts; auth protects admitted handshake and envelope representations.',
       document: {
         sections: [
           {
-            id: 'model',
-            heading: 'Entry and ownership',
+            id: 'ownership',
+            heading: 'Contract and ownership',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'The parent below calls double on its cooperative child. Add the provider at the child, install its exact connection handle, and join both close paths when the task is stopped.'
+                text: 'Authentication transforms protect admitted handshake/envelope data. Supply complete sign/verify and encrypt/decrypt pairs. Credentials are explicit application/native capabilities; transport identity is not inferred from payload metadata.'
               },
               {
                 type: 'paragraph',
-                text: 'Use processPlugin for OS processes, threadPlugin for native Node/Bun/Deno Workers, coroutinePlugin for cooperative tasks, and carrier-specific browser plugins for browser realms. Each host has exactly one transport; do not assemble a second standalone peer.'
+                text: 'Do not treat peer names, generations, error codes or payload fields as authentication authority. Explicit credentials/verifiers are application capabilities; a missing native verifier is not an implemented guarantee.'
               },
               {
                 type: 'paragraph',
-                text: 'connect.timeoutMs bounds actual handshake preparation. Provider authentication and actual negotiated capabilities remain with their original owners. Native postMessage support alone does not authorize RPC transfer. Window checks source and origin; ServiceWorker checks the native Client source. WebTransport uses reliable bytes, not datagrams.'
+                text: 'Borrowed native resources remain with their original owner. Transfer admission uses the actual carrier capability; native binary representation alone does not imply transferable media.'
               }
             ]
           },
           {
             id: 'example',
-            heading: 'Use the public entries',
+            heading: 'Use the actual public entry',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    })\n  ]\n})\ntry {\n  console.log(await host.request('double', 21))\n} finally {\n  await host.close()\n}"
-              }
-            ]
-          },
-          {
-            id: 'failure',
-            heading: 'Calls, failures, and closure',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: 'Retain source, code, native type, stack, and cause. A call signal cancels that call; connection recovery does not prove old work never executed. Await host.close() in finally; borrowed carriers stay with their original owner.'
+                code: "import auth from '@migaia/rpc-host/plugins/auth'\nimport type { IRpcAuthenticationTransform } from '@migaia/rpc-host/plugins/auth'\n\nexport function signed(sign: IRpcAuthenticationTransform, verify: IRpcAuthenticationTransform) {\n  return auth({ sign, verify, encodedType: 'string' })\n}"
               }
             ]
           }
@@ -1455,31 +1145,31 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'Host and features',
+          label: 'Host namespaces and plugins',
           path: '../rpc-host/host-and-plugins'
         }
       ]
     },
     zh: {
-      title: '一个 host、传输 plugins 与 features',
-      lede: '安装恰好一个传输 plugin 和可选 features，由 host 管理实际调用、provider、目录与关闭。',
+      title: '区分原生身份与保护',
+      lede: '原生获取提供实际来源及转移事实，认证插件保护已接纳握手及信封表示。',
       document: {
         sections: [
           {
-            id: 'model',
-            heading: '实际入口与所有权',
+            id: 'ownership',
+            heading: '契约与所有权',
             blocks: [
               {
                 type: 'paragraph',
-                text: '下面由父端调用协作子端的 double：子端登记 provider，安装实际连接句柄，并在任务停止时等待双方关闭。'
+                text: '认证转换保护已接纳的握手及信封数据。签名与验证、加密与解密分别成对提供。凭据来自显式应用或原生能力，不能从载荷元数据推断传输身份。'
               },
               {
                 type: 'paragraph',
-                text: 'OS 进程使用 processPlugin，原生 Node/Bun/Deno Worker 使用 threadPlugin，协作任务使用 coroutinePlugin，浏览器 realm 使用对应 browser 载体 plugin。每个 host 恰好一个传输，不另装完整 peer。'
+                text: '不把对端名、代际、错误码或载荷字段作为认证权限。显式凭据及验证器是应用能力，缺失的原生验证器不能写成已实现保证。'
               },
               {
                 type: 'paragraph',
-                text: 'connect.timeoutMs 约束实际握手准备；provider 认证与真实协商能力仍归原 owner。存在原生 postMessage 不等于获得 RPC transfer 授权。Window 检查 source 与 origin，ServiceWorker 检查原生 Client 来源，WebTransport 使用可靠字节而非 datagram。'
+                text: '借用原生资源仍归原所有者。转移准入使用实际载体能力，仅有原生二进制表示不等于媒介支持转移。'
               }
             ]
           },
@@ -1490,17 +1180,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    })\n  ]\n})\ntry {\n  console.log(await host.request('double', 21))\n} finally {\n  await host.close()\n}"
-              }
-            ]
-          },
-          {
-            id: 'failure',
-            heading: '调用、失败与关闭',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: '保留 source、code、原生类型、stack 与 cause。调用 signal 只取消该调用；连接恢复不证明旧业务没有执行。应用在 finally 中等待 host.close()，借用载体仍由原所有者释放。'
+                code: "import auth from '@migaia/rpc-host/plugins/auth'\nimport type { IRpcAuthenticationTransform } from '@migaia/rpc-host/plugins/auth'\n\nexport function signed(sign: IRpcAuthenticationTransform, verify: IRpcAuthenticationTransform) {\n  return auth({ sign, verify, encodedType: 'string' })\n}"
               }
             ]
           }
@@ -1508,7 +1188,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'Host 入口与 features',
+          label: '宿主命名空间与插件',
           path: '../rpc-host/host-and-plugins'
         }
       ]
@@ -1516,50 +1196,36 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
   },
   'rpc-host:calls-and-cancellation': {
     en: {
-      title: 'One host, transport plugins, and features',
-      lede: 'Install exactly one transport plugin and optional features. The host owns real calls, providers, directories, and closure.',
+      title: 'Budget and cancel one originating call',
+      lede: 'Complete call overrides precede transport features and link defaults; inherited remaining time can only shrink.',
       document: {
         sections: [
           {
-            id: 'model',
-            heading: 'Entry and ownership',
+            id: 'ownership',
+            heading: 'Contract and ownership',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'The parent below calls double on its cooperative child. Add the provider at the child, install its exact connection handle, and join both close paths when the task is stopped.'
+                text: 'Default export timeout captures a finite nonnegative attempt budget. The instance owns its actual timer and removes timer/abort subscriptions on settlement; an inherited deadline can only shorten the budget.'
               },
               {
                 type: 'paragraph',
-                text: 'request, notify, stream, group, and outcome snapshot direct peers. Zero peers return empty target records; one peer returns its scalar; many return independent fulfilled/rejected records. send and dispatch only select live direct targets. notify waits for physical sending, not a business reply.'
+                text: 'Default export retry owns origin replay and backoff, borrowing genuine accepted-Session replacement or native-generation readiness. Method idempotency and physical handoff determine recovery; transit forwarding does not retry.'
               },
               {
                 type: 'paragraph',
-                text: 'Call timeoutMs overrides host defaultTimeoutMs, then timeoutFeature, then the original default. Cancellation preserves its original reason/cause and does not roll back business effects. Declared idempotent calls may opt into retryFeature; uncertain non-idempotent results must be reconciled.'
-              },
-              {
-                type: 'paragraph',
-                text: "To forward a call, use send('b', 'c.method', payload) through direct b, or let b provide a held b.peers.c capability. b first checks c is live, then resolves its current directory. A held capability never silently retargets a replacement generation."
+                text: 'Every call mode has an id and cancellation path, including notify after physical send. Cancelling does not kill a process, roll back side effects or prove that uncertain work never executed. Preserve original error class, source/code, stack and cause before deciding whether reconciliation or retry is safe.'
               }
             ]
           },
           {
             id: 'example',
-            heading: 'Use the public entries',
+            heading: 'Use the actual public entry',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    })\n  ]\n})\ntry {\n  console.log(await host.request('double', 21))\n} finally {\n  await host.close()\n}"
-              }
-            ]
-          },
-          {
-            id: 'failure',
-            heading: 'Calls, failures, and closure',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: 'Retain source, code, native type, stack, and cause. A call signal cancels that call; connection recovery does not prove old work never executed. Await host.close() in finally; borrowed carriers stay with their original owner.'
+                code: "import { timeout } from '@migaia/rpc-host/features'\nimport type { IRpcNamespace } from '@migaia/rpc-host'\n\nexport function call(remote: IRpcNamespace<{ double(value: number): number }>, signal: AbortSignal) {\n  return remote.request('double', 21, { signal, timeout: timeout({ ms: 1500 }) })\n}"
               }
             ]
           }
@@ -1567,35 +1233,31 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'Host and features',
+          label: 'Host namespaces and plugins',
           path: '../rpc-host/host-and-plugins'
         }
       ]
     },
     zh: {
-      title: '一个 host、传输 plugins 与 features',
-      lede: '安装恰好一个传输 plugin 和可选 features，由 host 管理实际调用、provider、目录与关闭。',
+      title: '限制并取消一次发起调用',
+      lede: '完整调用覆盖优先于传输功能及链路默认值，继承剩余时间只能缩短。',
       document: {
         sections: [
           {
-            id: 'model',
-            heading: '实际入口与所有权',
+            id: 'ownership',
+            heading: '契约与所有权',
             blocks: [
               {
                 type: 'paragraph',
-                text: '下面由父端调用协作子端的 double：子端登记 provider，安装实际连接句柄，并在任务停止时等待双方关闭。'
+                text: '默认导出的 `timeout` 捕获有限非负尝试预算。实例拥有实际计时器，结算后移除计时及取消订阅；继承截止时间只能缩短预算。'
               },
               {
                 type: 'paragraph',
-                text: 'request、notify、stream、group 与 outcome 快照直连集合。零对端返回空目标记录，一对端返回单值，多对端返回独立 fulfilled/rejected 记录；send 与 dispatch 只选择存活直连目标。notify 等待物理发送，不等待业务回复。'
+                text: '默认导出的 `retry` 拥有发起方重放与退避，借用真实接纳会话替换或原生代际就绪。方法幂等性及物理交接决定恢复，中继转发不重试。'
               },
               {
                 type: 'paragraph',
-                text: '调用 timeoutMs 优先于 host defaultTimeoutMs，其次 timeoutFeature，最后原默认值。取消保留原 reason/cause，不回滚业务副作用；已声明幂等调用可选择 retryFeature，非幂等未知结果必须对账。'
-              },
-              {
-                type: 'paragraph',
-                text: "转发可通过直连 b 调用 send('b', 'c.method', payload)，或由 b provide 已持有的 b.peers.c 能力。b 先检查 c 存活，再解析当前目录；持有能力不会静默转向后继代。"
+                text: '每种调用形式都有标识及取消路径，包括物理发送之后的通知。取消不会杀死进程、回滚副作用，也不证明不确定工作从未执行。决定核对或重试之前应保留原错误类型、来源及错误码、堆栈与原因。'
               }
             ]
           },
@@ -1606,17 +1268,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    })\n  ]\n})\ntry {\n  console.log(await host.request('double', 21))\n} finally {\n  await host.close()\n}"
-              }
-            ]
-          },
-          {
-            id: 'failure',
-            heading: '调用、失败与关闭',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: '保留 source、code、原生类型、stack 与 cause。调用 signal 只取消该调用；连接恢复不证明旧业务没有执行。应用在 finally 中等待 host.close()，借用载体仍由原所有者释放。'
+                code: "import { timeout } from '@migaia/rpc-host/features'\nimport type { IRpcNamespace } from '@migaia/rpc-host'\n\nexport function call(remote: IRpcNamespace<{ double(value: number): number }>, signal: AbortSignal) {\n  return remote.request('double', 21, { signal, timeout: timeout({ ms: 1500 }) })\n}"
               }
             ]
           }
@@ -1624,7 +1276,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'Host 入口与 features',
+          label: '宿主命名空间与插件',
           path: '../rpc-host/host-and-plugins'
         }
       ]
@@ -43148,167 +42800,33 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
     }
   },
   'rpc-contract:real-world-bindings': {
-    zh: {
-      title: '同一份消息定义接入不同宿主',
-      lede: '为订单读取共享格式与版本，再交给真实宿主传输。',
+    en: {
+      title: 'Bind pure data to an actual media owner',
+      lede: 'A binding acquires native IO and lends one real carrier to Host; Contract supplies no independent connection or lifecycle.',
       document: {
         sections: [
           {
-            id: 'application-format',
-            heading: '让订单读取使用同一份消息定义',
+            id: 'ownership',
+            heading: 'Contract and ownership',
             blocks: [
               {
                 type: 'paragraph',
-                text: '订单面板从不同宿主读取金额，仍需要知道双方说的是哪种数据和哪个版本。本包负责构造描述符、检查可传输的值与协议数据。HTTP、WebSocket、SSE 和 IPC 的启动、收发、关闭由下面展示的真实宿主代码负责。'
+                text: 'Use the existing process, thread, browser or coroutine transport for those environments. A custom binding owns source filtering, actual write completion, transfer and physical cleanup; the common codec stages remain prepare, encode, decode and restore.'
               },
               {
                 type: 'paragraph',
-                text: '以下四个宿主页复用这里展示的 order.ts，先把它保存到各例子的同一目录。read-order 是本例应用消息格式的名字，不会自动注册 RPC 方法。'
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import assert from 'node:assert/strict'\nimport { createDescriptor, normalizePortable } from '@migaia/rpc-contract'\n\nexport const readOrder = createDescriptor('read-order', 1)\nexport const orderRequest = { descriptor: readOrder, orderId: 'ord-7' }\nexport function orderReply(value: unknown) {\n  const request = normalizePortable(value) as typeof orderRequest\n  assert.equal(request.descriptor.id, readOrder.id)\n  assert.equal(request.descriptor.version, readOrder.version)\n  return normalizePortable({ descriptor: readOrder, orderId: request.orderId, total: 25 })\n}\nexport function orderTotal(value: unknown) {\n  const reply = normalizePortable(value) as { descriptor: typeof readOrder; total: number }\n  assert.equal(reply.descriptor.id, readOrder.id)\n  assert.equal(reply.descriptor.version, readOrder.version)\n  assert.equal(typeof reply.total, 'number')\n  return reply.total\n}"
-              },
-              {
-                type: 'paragraph',
-                text: '这里的 { descriptor, orderId, total } 是应用自己定义的 JSON，不是 normalizeRpcEnvelope 的原生 V1 消息。createDescriptor 只构造 { id, version }；normalizePortable 只检查允许传输的值种类。本例业务函数另按字段检查版本和金额。'
-              },
-              {
-                type: 'table',
-                headers: ['成员与参数', '说明'],
-                rows: [
-                  [
-                    'orderRequest / orderReply(value) / orderTotal(value)',
-                    '这些是本例函数。共享请求携带格式描述符和订单号；服务端回传描述符及金额，客户端检查字段后读取金额。'
-                  ],
-                  [
-                    'descriptor.id / descriptor.version',
-                    '按公开字段比较。normalizePortable 会创建无原型副本，不能靠原对象的原型或对象本身比较来验证跨端消息。'
-                  ]
-                ]
+                text: 'HTTP, WebSocket and SSE guides describe pure admission boundaries, not built-in transport plugins. Never manufacture identity codecs, fake acknowledgements or a second host to emulate the deleted runtime API.'
               }
             ]
           },
           {
-            id: 'offers',
-            heading: '先交换可用的消息格式',
+            id: 'example',
+            heading: 'Use the actual public entry',
             blocks: [
-              {
-                type: 'paragraph',
-                text: '握手是双方先交换版本、编码格式和能力，再选择共同支持的组合。offer.ts 保存本机支持的选项；这一步只处理数据，不会自己打开连接。'
-              },
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { RpcCapability, RpcCodecId, RpcPeerRuntime, RpcProtocol } from '@migaia/rpc-contract'\n\nexport function offer(id: string) {\n  return {\n    peer: { id, runtime: RpcPeerRuntime.node },\n    versions: [{ major: RpcProtocol.major, minor: RpcProtocol.minor }],\n    codecs: [RpcCodecId.json],\n    capabilities: [RpcCapability.batch]\n  }\n}"
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { createRpcHello } from '@migaia/rpc-contract/handshake'\nimport { acceptRpcHandshake, completeRpcHandshake } from '@migaia/rpc-contract/handshake'\nimport { offer } from './offer.ts'\n\nconst checkout = offer('checkout')\nconst warehouse = offer('warehouse')\nconst accepted = acceptRpcHandshake(warehouse, createRpcHello(checkout))\nconst agreement = completeRpcHandshake(checkout, accepted.reply)\nconsole.log('确认的格式:', agreement.codec)\nconsole.log('服务端:', agreement.peer.id)"
-              },
-              {
-                type: 'paragraph',
-                text: '输出：'
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: '确认的格式: json\n服务端: warehouse'
-              },
-              {
-                type: 'table',
-                headers: ['成员与参数', '说明'],
-                rows: [
-                  [
-                    'createRpcHello(offer): string',
-                    '检查本地配置并返回首条 JSON 文本。它不是普通请求消息。'
-                  ],
-                  [
-                    'normalizeRpcHandshake(text, options?): IRpcHandshakeMessage',
-                    '检查收到的 string 或 UTF-8 Uint8Array，返回 hello/accept/reject 消息快照。'
-                  ],
-                  [
-                    'acceptRpcHandshake(local, hello, options?)',
-                    '响应方选择共同版本、首个共同 codec 和能力交集。成功返回 { ok:true, reply, agreement }；选择失败返回 { ok:false, reply, error }。'
-                  ],
-                  [
-                    'completeRpcHandshake(local, reply, options?): IRpcHandshakeAgreement',
-                    '发起方检查响应是否属于本地支持的范围并返回结果；收到失败响应或不匹配选择会抛错。'
-                  ],
-                  [
-                    'options.onUnknownField?: (pointer, field) => void',
-                    '省略不接收未知字段提示。配置后可记录后续协议版本新增字段的位置与名称。'
-                  ]
-                ]
-              }
-            ]
-          },
-          {
-            id: 'handshake-options',
-            heading: '握手配置与返回字段',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['成员与参数', '说明'],
-                rows: [
-                  [
-                    'offer.versions: readonly { major:number, minor:number }[]',
-                    '列出支持的版本；选择双方共同的最高主版本，再采用双方支持的较小次版本。'
-                  ],
-                  [
-                    'offer.codecs: readonly string[]',
-                    '编码格式按发起方顺序选择首个共同项，不能省略成空列表。'
-                  ],
-                  [
-                    'offer.capabilities: readonly string[]',
-                    '结果取交集并保留发起方顺序。声明 runtime-api 时还要求协议 1.1 和共同 runtime-api/batch 能力，不能降级。'
-                  ],
-                  [
-                    'offer.peer.id / runtime / runtimeVersion?',
-                    '记录端点名、运行时和可选版本，仅供连接策略与报告，不自动完成认证。'
-                  ],
-                  [
-                    'offer.peer.implementation?: { name:string, version:string }',
-                    '记录实现名称和版本；省略不发送实现信息。'
-                  ],
-                  [
-                    'offer.auth?: IRpcPortableValue',
-                    '携带应用自己的认证数据；省略不添加数据，业务验证仍由上层完成。'
-                  ],
-                  [
-                    'agreement.major / minor / codec / capabilities',
-                    '是本次选择的版本、格式和能力，不是本机全部支持列表。'
-                  ],
-                  [
-                    'agreement.peer / auth?',
-                    'peer 是远端。accept 的 agreement 可保留 hello.auth；complete 的结果不带 auth，因为 accept 响应不传该字段。'
-                  ],
-                  [
-                    'HANDSHAKE_INVALID / HANDSHAKE_INCOMPATIBLE / HANDSHAKE_REJECTED',
-                    '分别检查输入格式、共同版本/codec，以及对端返回的失败响应。保留错误 source/code 交给连接层处理。'
-                  ]
-                ]
-              }
-            ]
-          },
-          {
-            id: 'host-pages',
-            heading: '选择实际宿主',
-            blocks: [
-              {
-                type: 'list',
-                items: [
-                  '[HTTP 读取订单](/zh/docs/rpc-contract/fetch)',
-                  '[WebSocket 读取订单](/zh/docs/rpc-contract/websocket)',
-                  '[SSE 接收订单金额](/zh/docs/rpc-contract/sse)',
-                  '[子进程读取订单](/zh/docs/rpc-contract/process)'
-                ]
-              },
-              {
-                type: 'paragraph',
-                text: '四页演示同一份业务消息通过真实连接往返。它们没有实现通用 RPC 调度、重试、认证或多请求管理；需要这些能力时使用 createRpcHost 与对应传输 plugin。'
+                code: "import type { IRpcCarrier, IRpcCarrierCodec } from '@migaia/rpc-contract/interfaces'\nimport { createRpcMessageCarrier } from '@migaia/rpc-host/sdk'\nimport type { IRpcMessageCarrierOptions } from '@migaia/rpc-host/sdk'\n\nexport type ICarrierParts = { carrier: IRpcCarrier; codec: IRpcCarrierCodec }\nexport function acquired(options: IRpcMessageCarrierOptions) {\n  return createRpcMessageCarrier(options)\n}"
               }
             ]
           }
@@ -43316,176 +42834,38 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: '消息格式与版本',
-          path: 'descriptors-and-envelopes'
-        },
-        {
-          label: '可移植数据',
-          path: 'portable-values'
+          label: 'Host namespaces and plugins',
+          path: '../rpc-host/host-and-plugins'
         }
       ]
     },
-    en: {
-      title: 'Share message definitions across hosts',
-      lede: 'Share order formats and versions, then use the native host for delivery.',
+    zh: {
+      title: '将纯数据接到实际媒介所有者',
+      lede: '绑定获取原生读写资源，并向宿主借出一个真实载体；契约不提供独立连接或生命周期。',
       document: {
         sections: [
           {
-            id: 'application-format',
-            heading: 'Share one order-message definition',
+            id: 'ownership',
+            heading: '契约与所有权',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'An order panel needs the same data format and version across hosts. This package constructs descriptors and validates transferable values and protocol data. The native host files below own HTTP, WebSocket, SSE, and IPC startup, delivery, and closure.'
+                text: '这些环境使用现有进程、线程、浏览器或协作传输。自定义绑定拥有来源过滤、实际写入完成、转移及物理清理；共同编解码阶段仍是准备、编码、解码及恢复。'
               },
               {
                 type: 'paragraph',
-                text: 'The four host examples reuse order.ts below. Save it beside each example. Read-order names this application’s message format; it does not automatically register an RPC method.'
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import assert from 'node:assert/strict'\nimport { createDescriptor, normalizePortable } from '@migaia/rpc-contract'\n\nexport const readOrder = createDescriptor('read-order', 1)\nexport const orderRequest = { descriptor: readOrder, orderId: 'ord-7' }\nexport function orderReply(value: unknown) {\n  const request = normalizePortable(value) as typeof orderRequest\n  assert.equal(request.descriptor.id, readOrder.id)\n  assert.equal(request.descriptor.version, readOrder.version)\n  return normalizePortable({ descriptor: readOrder, orderId: request.orderId, total: 25 })\n}\nexport function orderTotal(value: unknown) {\n  const reply = normalizePortable(value) as { descriptor: typeof readOrder; total: number }\n  assert.equal(reply.descriptor.id, readOrder.id)\n  assert.equal(reply.descriptor.version, readOrder.version)\n  assert.equal(typeof reply.total, 'number')\n  return reply.total\n}"
-              },
-              {
-                type: 'paragraph',
-                text: 'The { descriptor, orderId, total } JSON is application-defined, not the native V1 envelope accepted by normalizeRpcEnvelope. CreateDescriptor builds { id, version }; normalizePortable checks transferable value kinds. The example’s application functions separately check descriptor fields and the amount.'
-              },
-              {
-                type: 'table',
-                headers: ['Member or parameter', 'Description'],
-                rows: [
-                  [
-                    'orderRequest / orderReply(value) / orderTotal(value)',
-                    'These are example-owned functions. The request carries its format and order id; the server returns the descriptor and amount, which the client checks and reads.'
-                  ],
-                  [
-                    'descriptor.id / descriptor.version',
-                    'Compare public fields. NormalizePortable creates a null-prototype copy, so comparing the original prototype or object reference does not validate a received message.'
-                  ]
-                ]
+                text: '请求响应、双向套接字及服务端事件指南描述纯准入边界，不代表内建传输插件。不得制造恒等编解码器、虚假确认或第二宿主以模拟已删除运行接口。'
               }
             ]
           },
           {
-            id: 'offers',
-            heading: 'Exchange supported connection formats',
+            id: 'example',
+            heading: '使用实际公开入口',
             blocks: [
-              {
-                type: 'paragraph',
-                text: 'A handshake exchanges versions, codecs, and capabilities to select a common combination. Offer.ts describes local support; these functions process data without opening a connection.'
-              },
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { RpcCapability, RpcCodecId, RpcPeerRuntime, RpcProtocol } from '@migaia/rpc-contract'\n\nexport function offer(id: string) {\n  return {\n    peer: { id, runtime: RpcPeerRuntime.node },\n    versions: [{ major: RpcProtocol.major, minor: RpcProtocol.minor }],\n    codecs: [RpcCodecId.json],\n    capabilities: [RpcCapability.batch]\n  }\n}"
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { createRpcHello } from '@migaia/rpc-contract/handshake'\nimport { acceptRpcHandshake, completeRpcHandshake } from '@migaia/rpc-contract/handshake'\nimport { offer } from './offer.ts'\n\nconst checkout = offer('checkout')\nconst warehouse = offer('warehouse')\nconst accepted = acceptRpcHandshake(warehouse, createRpcHello(checkout))\nconst agreement = completeRpcHandshake(checkout, accepted.reply)\nconsole.log('Agreed format:', agreement.codec)\nconsole.log('Server:', agreement.peer.id)"
-              },
-              {
-                type: 'paragraph',
-                text: 'Output:'
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: 'Agreed format: json\nServer: warehouse'
-              },
-              {
-                type: 'table',
-                headers: ['Member or parameter', 'Description'],
-                rows: [
-                  [
-                    'createRpcHello(offer): string',
-                    'Validates local configuration and returns the first JSON text message, rather than an ordinary request.'
-                  ],
-                  [
-                    'normalizeRpcHandshake(text, options?): IRpcHandshakeMessage',
-                    'Validates a received string or UTF-8 Uint8Array and returns a hello/accept/reject snapshot.'
-                  ],
-                  [
-                    'acceptRpcHandshake(local, hello, options?)',
-                    'The responder selects a common version, first common codec, and capability intersection. Returns { ok:true, reply, agreement } or { ok:false, reply, error }.'
-                  ],
-                  [
-                    'completeRpcHandshake(local, reply, options?): IRpcHandshakeAgreement',
-                    'The initiator verifies the selection against local support and returns the agreement. Failure responses or unsupported choices throw.'
-                  ],
-                  [
-                    'options.onUnknownField?: (pointer, field) => void',
-                    'Omission ignores unknown-field notices. A callback records paths and names added by later protocol versions.'
-                  ]
-                ]
-              }
-            ]
-          },
-          {
-            id: 'handshake-options',
-            heading: 'Handshake configuration and results',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['Member or parameter', 'Description'],
-                rows: [
-                  [
-                    'offer.versions: readonly { major:number, minor:number }[]',
-                    'Lists supported versions. Select the highest common major and the smaller mutually supported minor.'
-                  ],
-                  [
-                    'offer.codecs: readonly string[]',
-                    'Selects the first shared codec in initiator order; supply a nonempty list.'
-                  ],
-                  [
-                    'offer.capabilities: readonly string[]',
-                    'Takes the intersection in initiator order. Declaring runtime-api additionally requires protocol 1.1 and shared runtime-api/batch capabilities, without downgrade.'
-                  ],
-                  [
-                    'offer.peer.id / runtime / runtimeVersion?',
-                    'Records peer name, runtime, and optional runtime version for policy and reporting, without authenticating the peer.'
-                  ],
-                  [
-                    'offer.peer.implementation?: { name:string, version:string }',
-                    'Identifies the implementation and version; omission sends no implementation information.'
-                  ],
-                  [
-                    'offer.auth?: IRpcPortableValue',
-                    'Carries application-owned authentication data. Omission adds none; the application still verifies it.'
-                  ],
-                  [
-                    'agreement.major / minor / codec / capabilities',
-                    'Contains the negotiated version, codec, and capabilities, rather than all local support.'
-                  ],
-                  [
-                    'agreement.peer / auth?',
-                    'Peer is the remote party. Accept may retain hello.auth in its agreement; complete has no auth because the accept reply does not carry it.'
-                  ],
-                  [
-                    'HANDSHAKE_INVALID / HANDSHAKE_INCOMPATIBLE / HANDSHAKE_REJECTED',
-                    'Distinguish invalid input, incompatible versions/codecs, and a peer failure response. Preserve source/code for the connection owner.'
-                  ]
-                ]
-              }
-            ]
-          },
-          {
-            id: 'host-pages',
-            heading: 'Choose the actual host',
-            blocks: [
-              {
-                type: 'list',
-                items: [
-                  '[Read an order over HTTP](/en/docs/rpc-contract/fetch)',
-                  '[Read an order over WebSocket](/en/docs/rpc-contract/websocket)',
-                  '[Receive an amount over SSE](/en/docs/rpc-contract/sse)',
-                  '[Read an order in a child process](/en/docs/rpc-contract/process)'
-                ]
-              },
-              {
-                type: 'paragraph',
-                text: 'The four pages move the same application message through native connections. For RPC dispatch, retry, authentication, and concurrent request management, use createRpcHost and the corresponding transport plugin.'
+                code: "import type { IRpcCarrier, IRpcCarrierCodec } from '@migaia/rpc-contract/interfaces'\nimport { createRpcMessageCarrier } from '@migaia/rpc-host/sdk'\nimport type { IRpcMessageCarrierOptions } from '@migaia/rpc-host/sdk'\n\nexport type ICarrierParts = { carrier: IRpcCarrier; codec: IRpcCarrierCodec }\nexport function acquired(options: IRpcMessageCarrierOptions) {\n  return createRpcMessageCarrier(options)\n}"
               }
             ]
           }
@@ -43493,12 +42873,8 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'Message formats and versions',
-          path: 'descriptors-and-envelopes'
-        },
-        {
-          label: 'Portable values',
-          path: 'portable-values'
+          label: '宿主命名空间与插件',
+          path: '../rpc-host/host-and-plugins'
         }
       ]
     }
@@ -69904,104 +69280,33 @@ class CheckoutElement extends HTMLElement {
     }
   },
   'rpc-contract:index': {
-    zh: {
-      title: 'RPC Contract：确定线上数据与接收边界',
-      lede: '为协议实现与载体适配器提供数据规范化、错误树及分帧工具，连接与业务执行由上层负责。',
+    en: {
+      title: 'Pure protocol, interfaces and errors',
+      lede: 'Contract owns migaia.rpc/2 data and pure checks, without connections, timers, pending calls or IO.',
       document: {
         sections: [
           {
-            id: 'pain',
-            heading: '你可能遇到过',
-            blocks: [
-              {
-                type: 'list',
-                items: [
-                  '载荷校验后原对象再次被修改，发出去的值与检查时不同，见 [在调用者修改前捕获数据](/zh/docs/rpc-contract/api/portable/normalizePortable#rpc-contract-portable--normalizePortable--case-1)。',
-                  '非有限计量值被保存成 `null`，失去原始含义，见 [拒绝在线上传输时会失去原意的值](/zh/docs/rpc-contract/api/portable/normalizePortable#rpc-contract-portable--normalizePortable--case-2)。',
-                  '远端只发回消息文字，原生错误类型和原因堆栈丢失，见 [保留原生错误类型与远端原因堆栈](/zh/docs/rpc-contract/api/errors/serializeRpcError#rpc-contract-errors--serializeRpcError--case-1)。',
-                  '错误消息访问器再次抛错，整条诊断无法生成，见 [报告不可读字段并继续生成线上错误](/zh/docs/rpc-contract/api/errors/serializeRpcError#rpc-contract-errors--serializeRpcError--case-2)。',
-                  '不同对端复用了相同消息标识，接收缓冲把分片拼在一起，见 [隔离不同对端的相同消息标识](/zh/docs/rpc-contract/api/framing/createStringFramer#rpc-contract-framing--createStringFramer--case-1)。'
-                ]
-              }
-            ]
-          },
-          {
-            id: 'why',
-            heading: '为什么选它',
-            blocks: [
-              {
-                type: 'list',
-                items: [
-                  '冻结的可移植快照隔离后续修改，并把字节转换成规范标签，见 [在调用者修改前捕获数据](/zh/docs/rpc-contract/api/portable/normalizePortable#rpc-contract-portable--normalizePortable--case-1)。',
-                  '递归接纳在发送前拒绝非有限数与环，而不悄悄替换值，见 [拒绝在线上传输时会失去原意的值](/zh/docs/rpc-contract/api/portable/normalizePortable#rpc-contract-portable--normalizePortable--case-2)。',
-                  '有界错误树往返保留原生类型、语义码和远端原因堆栈，见 [保留原生错误类型与远端原因堆栈](/zh/docs/rpc-contract/api/errors/serializeRpcError#rpc-contract-errors--serializeRpcError--case-1)。',
-                  '不可读错误字段经必填 `report` 留下原始失败，同时继续生成线上错误，见 [报告不可读字段并继续生成线上错误](/zh/docs/rpc-contract/api/errors/serializeRpcError#rpc-contract-errors--serializeRpcError--case-2)。',
-                  '重组以来源和消息标识共同隔离，允许不同对端的分片交错，见 [隔离不同对端的相同消息标识](/zh/docs/rpc-contract/api/framing/createStringFramer#rpc-contract-framing--createStringFramer--case-1)。'
-                ]
-              }
-            ]
-          },
-          {
-            id: 'start',
-            heading: '从这里开始',
+            id: 'ownership',
+            heading: 'Contract and ownership',
             blocks: [
               {
                 type: 'paragraph',
-                text: '安装 `@migaia/rpc-contract`，把完整代码保存为 `overview.ts` 并以 Node 24 运行；先捕获载荷，再修改原对象，观察稳定的线上快照。'
+                text: 'Use protocol for semantic shape admission, interfaces for host/plugin/carrier contracts, portable for value rules, errors for native diagnostics and error-code for independent code tables. Actual calls belong to Host namespaces.'
               },
+              {
+                type: 'paragraph',
+                text: 'Root and narrow imports support tree-shaking. Importing only error-code must not retain protocol, portable traversal or executing codecs. No v1, JSON-RPC, runtime endpoint or legacy framing entry remains.'
+              }
+            ]
+          },
+          {
+            id: 'example',
+            heading: 'Use the actual public entry',
+            blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { normalizePortable } from '@migaia/rpc-contract/portable'\n\nconst source = { profile: { name: 'Ada' }, bytes: new Uint8Array([1, 2, 3]) }\nconst snapshot = normalizePortable(source)\nsource.profile.name = 'Grace'\nsource.bytes[0] = 99\nconsole.log(JSON.stringify(snapshot))\nconsole.log(Object.isFrozen(snapshot))"
-              },
-              {
-                type: 'paragraph',
-                text: '输出：'
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: '{"profile":{"name":"Ada"},"bytes":{"$rpc":"bytes","base64url":"AQID"}}\ntrue'
-              },
-              {
-                type: 'paragraph',
-                text: '这里只生成并校验数据，不建立连接或执行远端调用；默认字节结果是可移植标签，原生二进制传输另需相应协商契约。'
-              }
-            ]
-          },
-          {
-            id: 'api-map',
-            heading: '按问题找 API',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['问题', 'API 与边界'],
-                rows: [
-                  [
-                    '在编码前捕获并校验业务值',
-                    '[normalizePortable](/zh/docs/rpc-contract/api/portable/normalizePortable)：冻结快照，拒绝非有限数、环及不支持对象。'
-                  ],
-                  [
-                    '把错误原因树跨边界发送并恢复',
-                    '[serializeRpcError](/zh/docs/rpc-contract/api/errors/serializeRpcError) / [deserializeRpcError](/zh/docs/rpc-contract/api/errors/deserializeRpcError)：上报不可读字段，校验后恢复原生类型与远端堆栈。'
-                  ],
-                  [
-                    '消息载体需要有序切片和接收重组',
-                    '[createStringFramer](/zh/docs/rpc-contract/api/framing/createStringFramer)：按来源和消息标识隔离，字符串按 UTF-16 码元计量。'
-                  ],
-                  [
-                    '双方先确认版本、编码及可用能力',
-                    '[createRpcHello](/zh/docs/rpc-contract/api/handshake/createRpcHello) / [acceptRpcHandshake](/zh/docs/rpc-contract/api/handshake/acceptRpcHandshake) / [completeRpcHandshake](/zh/docs/rpc-contract/api/handshake/completeRpcHandshake)：只生成或验证握手数据，上层负责传递。'
-                  ],
-                  [
-                    '收到不可信的运行时调用信封',
-                    '[normalizeRuntimeEnvelope](/zh/docs/rpc-contract/api/runtime/normalizeRuntimeEnvelope)：严格自有数据属性接纳，区别只用于本库编解码结果的 `Decoded` 入口。'
-                  ],
-                  [
-                    '底层传递连续字节而不保留消息边界',
-                    '[createJsonRpcFrameDecoder](/zh/docs/rpc-contract/api/framing/jsonrpc/createJsonRpcFrameDecoder) / [createRpcStreamFrameDecoder](/zh/docs/rpc-contract/api/framing/stream/createRpcStreamFrameDecoder)：分别接收 Content-Length 和四字节长度前缀，两者终结规则不同。'
-                  ]
-                ]
+                code: "import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'\nimport type {\n  IRpcCarrier,\n  IRpcFlowHooks,\n  IRpcTimeoutFeature\n} from '@migaia/rpc-contract/interfaces'\n\nexport const cancelled = RpcCoreErrorCode.cancelled\nexport type ITransportParts = Readonly<{\n  carrier: IRpcCarrier\n  hooks: IRpcFlowHooks\n  timeout: IRpcTimeoutFeature\n}>"
               }
             ]
           }
@@ -70009,117 +69314,38 @@ class CheckoutElement extends HTMLElement {
       },
       next: [
         {
-          path: 'getting-started',
-          label: '从协议数据开始'
-        },
-        {
-          path: 'portable-values',
-          label: '可移植值边界'
-        },
-        {
-          path: 'framing-and-streams',
-          label: '分帧与流'
+          label: 'Host namespaces and plugins',
+          path: '../rpc-host/host-and-plugins'
         }
       ]
     },
-    en: {
-      title: 'RPC Contract: define wire data and receiving boundaries',
-      lede: 'Give protocol implementations and carrier adapters portable data, error trees and framing tools while higher layers own connections and execution.',
+    zh: {
+      title: '纯协议、接口与错误',
+      lede: '契约拥有第二版协议数据及纯检查，不拥有连接、计时器、待决调用或读写。',
       document: {
         sections: [
           {
-            id: 'pain',
-            heading: 'Sound familiar?',
-            blocks: [
-              {
-                type: 'list',
-                items: [
-                  'A payload changes after validation because the caller mutates the original object; see [Capture data before the caller changes it](/en/docs/rpc-contract/api/portable/normalizePortable#rpc-contract-portable--normalizePortable--case-1).',
-                  'A nonfinite measurement becomes null and loses its meaning; see [Reject values that cannot preserve their meaning on the wire](/en/docs/rpc-contract/api/portable/normalizePortable#rpc-contract-portable--normalizePortable--case-2).',
-                  'A remote error sends only its message and loses native classes and cause stacks; see [Preserve native error classes and remote cause stacks](/en/docs/rpc-contract/api/errors/serializeRpcError#rpc-contract-errors--serializeRpcError--case-1).',
-                  'An error message getter throws and prevents a diagnostic from being produced; see [Report unreadable error fields without losing the wire error](/en/docs/rpc-contract/api/errors/serializeRpcError#rpc-contract-errors--serializeRpcError--case-2).',
-                  'Different peers reuse a message identifier and their fragments share one assembly buffer; see [Keep equal message identifiers from different peers separate](/en/docs/rpc-contract/api/framing/createStringFramer#rpc-contract-framing--createStringFramer--case-1).'
-                ]
-              }
-            ]
-          },
-          {
-            id: 'why',
-            heading: 'Why choose it',
-            blocks: [
-              {
-                type: 'list',
-                items: [
-                  'Frozen portable snapshots isolate later mutations and turn bytes into canonical tags; see [Capture data before the caller changes it](/en/docs/rpc-contract/api/portable/normalizePortable#rpc-contract-portable--normalizePortable--case-1).',
-                  'Recursive admission rejects nonfinite numbers and cycles before sending instead of silently replacing their meaning; see [Reject values that cannot preserve their meaning on the wire](/en/docs/rpc-contract/api/portable/normalizePortable#rpc-contract-portable--normalizePortable--case-2).',
-                  'Bounded error-tree round trips preserve native classes, semantic codes and remote cause stacks; see [Preserve native error classes and remote cause stacks](/en/docs/rpc-contract/api/errors/serializeRpcError#rpc-contract-errors--serializeRpcError--case-1).',
-                  'Unreadable error fields reach the required report callback while a wire error is still produced; see [Report unreadable error fields without losing the wire error](/en/docs/rpc-contract/api/errors/serializeRpcError#rpc-contract-errors--serializeRpcError--case-2).',
-                  'Assembly state uses both source and message identifiers, allowing fragments from different peers to interleave; see [Keep equal message identifiers from different peers separate](/en/docs/rpc-contract/api/framing/createStringFramer#rpc-contract-framing--createStringFramer--case-1).'
-                ]
-              }
-            ]
-          },
-          {
-            id: 'start',
-            heading: 'Start here',
+            id: 'ownership',
+            heading: '契约与所有权',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'Install @migaia/rpc-contract, save this complete example as overview.ts, and run it with Node 24; capture a payload, then modify the original object and inspect the stable wire snapshot.'
+                text: '语义形状准入使用协议入口，宿主、插件及载体约定使用接口入口，可移植值使用规则入口，原生诊断使用错误入口，独立码表使用错误码入口。实际调用属于宿主命名空间。'
               },
+              {
+                type: 'paragraph',
+                text: '根及窄入口支持按需裁剪。仅导入错误码不能保留协议、可移植遍历或执行编解码器。不再保留旧版、独立 JSON-RPC、运行端点或旧分帧入口。'
+              }
+            ]
+          },
+          {
+            id: 'example',
+            heading: '使用实际公开入口',
+            blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { normalizePortable } from '@migaia/rpc-contract/portable'\n\nconst source = { profile: { name: 'Ada' }, bytes: new Uint8Array([1, 2, 3]) }\nconst snapshot = normalizePortable(source)\nsource.profile.name = 'Grace'\nsource.bytes[0] = 99\nconsole.log(JSON.stringify(snapshot))\nconsole.log(Object.isFrozen(snapshot))"
-              },
-              {
-                type: 'paragraph',
-                text: 'Output:'
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: '{"profile":{"name":"Ada"},"bytes":{"$rpc":"bytes","base64url":"AQID"}}\ntrue'
-              },
-              {
-                type: 'paragraph',
-                text: 'These functions construct and validate data without establishing a connection or executing a remote call; default bytes become a portable tag, while native binary transfer requires its separate negotiated contract.'
-              }
-            ]
-          },
-          {
-            id: 'api-map',
-            heading: 'Find an API by problem',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['Problem', 'API and boundary'],
-                rows: [
-                  [
-                    'Capture and validate business values before encoding',
-                    '[normalizePortable](/en/docs/rpc-contract/api/portable/normalizePortable): produces frozen snapshots and rejects nonfinite numbers, cycles and unsupported objects.'
-                  ],
-                  [
-                    'Send an error cause tree across a boundary and restore it',
-                    '[serializeRpcError](/en/docs/rpc-contract/api/errors/serializeRpcError) / [deserializeRpcError](/en/docs/rpc-contract/api/errors/deserializeRpcError): reports unreadable fields and restores native classes and remote stacks after validation.'
-                  ],
-                  [
-                    'Split message carriers and reassemble ordered fragments',
-                    '[createStringFramer](/en/docs/rpc-contract/api/framing/createStringFramer): isolates source/message pairs and measures strings in UTF-16 code units.'
-                  ],
-                  [
-                    'Agree on versions, encoding and capabilities before use',
-                    '[createRpcHello](/en/docs/rpc-contract/api/handshake/createRpcHello) / [acceptRpcHandshake](/en/docs/rpc-contract/api/handshake/acceptRpcHandshake) / [completeRpcHandshake](/en/docs/rpc-contract/api/handshake/completeRpcHandshake): constructs or validates handshake data; the caller delivers it.'
-                  ],
-                  [
-                    'Receive an untrusted runtime call envelope',
-                    '[normalizeRuntimeEnvelope](/en/docs/rpc-contract/api/runtime/normalizeRuntimeEnvelope): admits own data properties strictly; Decoded entries are reserved for untouched output from codecs shipped by this library.'
-                  ],
-                  [
-                    'Receive continuous bytes without message boundaries',
-                    '[createJsonRpcFrameDecoder](/en/docs/rpc-contract/api/framing/jsonrpc/createJsonRpcFrameDecoder) / [createRpcStreamFrameDecoder](/en/docs/rpc-contract/api/framing/stream/createRpcStreamFrameDecoder): handles Content-Length or four-byte length prefixes with distinct completion rules.'
-                  ]
-                ]
+                code: "import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'\nimport type {\n  IRpcCarrier,\n  IRpcFlowHooks,\n  IRpcTimeoutFeature\n} from '@migaia/rpc-contract/interfaces'\n\nexport const cancelled = RpcCoreErrorCode.cancelled\nexport type ITransportParts = Readonly<{\n  carrier: IRpcCarrier\n  hooks: IRpcFlowHooks\n  timeout: IRpcTimeoutFeature\n}>"
               }
             ]
           }
@@ -70127,143 +69353,40 @@ class CheckoutElement extends HTMLElement {
       },
       next: [
         {
-          path: 'getting-started',
-          label: 'Start with protocol data'
-        },
-        {
-          path: 'portable-values',
-          label: 'Portable value boundaries'
-        },
-        {
-          path: 'framing-and-streams',
-          label: 'Framing and streams'
+          label: '宿主命名空间与插件',
+          path: '../rpc-host/host-and-plugins'
         }
       ]
     }
   },
   'rpc-contract:getting-started': {
-    zh: {
-      title: '安装并检查库存查询消息',
-      lede: '先检查一条准备发送的库存查询，了解本包如何处理数据，随后再连接 HTTP、Worker 或进程。',
+    en: {
+      title: 'Admit a semantic frame without opening a connection',
+      lede: 'A TypeScript assertion is not wire admission; normalize the actual received shape through protocol.',
       document: {
         sections: [
           {
-            id: 'install',
-            heading: '安装',
+            id: 'ownership',
+            heading: 'Contract and ownership',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'migaia 的包发布在 GitHub Packages，不在公共 npm。第一次安装前，在项目根目录的 .npmrc 中加入 @migaia:registry=https://npm.pkg.github.com，并用带 read:packages 权限的 GitHub 令牌登录，否则会报 404。'
-              },
-              {
-                type: 'code',
-                language: 'bash',
-                code: 'pnpm add @migaia/rpc-contract'
+                text: 'The example constructs a complete call with profile, kind, id, route, task and options. It checks only data; it does not create a Session, negotiate a peer or send the request.'
               },
               {
                 type: 'paragraph',
-                text: '本包没有 peer 依赖。下面只检查对象，不需要启动服务。'
+                text: 'Strict protocol records reject accessors and unknown fields. Payload portable rules and method-schema execution are distinct boundaries; schema validation is an optional Host plugin.'
               }
             ]
           },
           {
-            id: 'first',
-            heading: '准备仓库要接收的数据',
+            id: 'example',
+            heading: 'Use the actual public entry',
             blocks: [
-              {
-                type: 'paragraph',
-                text: '使用 Node 24，在 `package.json` 中设置 `"type": "module"`。保存为 `stock.ts`，安装依赖后运行 `node stock.ts`。'
-              },
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { RpcRouteProfile, RpcRouteType } from '@migaia/rpc-contract'\nimport { normalizeRpcEnvelope } from '@migaia/rpc-contract/v1'\n\nconst route = {\n  profile: RpcRouteProfile,\n  type: RpcRouteType.request,\n  applicationVersion: 'shop-v1',\n  senderId: 'checkout',\n  targetId: 'warehouse',\n  sentAt: 1_728_000_000_000\n}\nconst request = normalizeRpcEnvelope({\n  kind: 'request',\n  id: 'stock-1',\n  method: 'stock',\n  data: { route, payload: { sku: 'mug-12' } }\n})\nconsole.log('查询方法:', request.kind === 'request' ? request.method : '')\nconsole.log('查询数据:', JSON.stringify(request.data.payload))"
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: '查询方法: stock\n查询数据: {"sku":"mug-12"}'
-              }
-            ]
-          },
-          {
-            id: 'inputs',
-            heading: '理解这条消息',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['入口或字段', '说明'],
-                rows: [
-                  ['`kind: request`', '标明这条数据是 V1 请求消息。'],
-                  [
-                    '`id` / `method`',
-                    '`id` 用来关联请求与回复，`method` 指向库存查询。检查器不会运行这个方法。'
-                  ],
-                  [
-                    '`data.route`',
-                    '保存业务版本、双方名称、路由种类和时间戳，完整字段见描述符页。'
-                  ],
-                  ['`data.payload`', '保存真正交给库存方法的商品参数，检查后得到可传递的副本。'],
-                  [
-                    '`sentAt`',
-                    '示例使用固定的毫秒时间戳。应用生成消息时提供自己的时间值，本包不会补当前时间。'
-                  ]
-                ]
-              }
-            ]
-          },
-          {
-            id: 'calls',
-            heading: '这一步用到的 API',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['签名', '返回', '作用'],
-                rows: [
-                  [
-                    '`normalizeRpcEnvelope(value: unknown, options?: IRpcEnvelopeOptions)`',
-                    '`IRpcEnvelope`',
-                    '同步检查并复制 V1 消息。输入对象不会被修改，失败时抛出 `INVALID_ENVELOPE`。'
-                  ],
-                  [
-                    '`options.onUnknownField?: (pointer: string, field: string) => void`',
-                    '`void`',
-                    '接收被省略字段的位置和名称。省略此回调时仍丢弃未知字段，当前消息允许的已知字段值非法仍会报错。'
-                  ],
-                  [
-                    '`rpcProtocol.normalize(value, options?)`',
-                    '`IRpcEnvelope`',
-                    '`./v1` 的协议对象复用同一检查器，适合把协议处理器交给上层端点。'
-                  ]
-                ]
-              },
-              {
-                type: 'paragraph',
-                text: '返回的消息、data 和 route 都已冻结。普通 payload 被复制并检查；控制消息 variation 的 payload 由对应控制处理器继续解释。'
-              }
-            ]
-          },
-          {
-            id: 'next-step',
-            heading: '把检查后的值交给连接层',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['入口或字段', '说明'],
-                rows: [
-                  [
-                    '应用自定义 JSON 请求',
-                    '只需要业务数据时可使用 normalizePortable，HTTP 路径和请求格式由应用决定。'
-                  ],
-                  [
-                    '原生 RPC 消息',
-                    '使用上述 V1 格式或已协商的 runtime 格式，并接入正确握手和分帧。两者不是同一个消息结构。'
-                  ],
-                  [
-                    '连接与执行',
-                    '需要自动关联请求、取消和释放时使用 RPC 端点。这个包单独不会创建这些功能。'
-                  ]
-                ]
+                code: "import { normalizeRpcFrame, RpcWireProfile, type IRpcEnvelope } from '@migaia/rpc-contract/protocol'\n\nexport const call: IRpcEnvelope = {\n  profile: RpcWireProfile,\n  kind: 'call',\n  id: 'call-1',\n  route: {\n    applicationVersion: '1',\n    senderId: 'caller',\n    receiverId: 'provider',\n    targetId: 'provider',\n    sentAt: 0,\n    remainingMs: 1000\n  },\n  task: {\n    mode: 'request',\n    callerId: 'caller',\n    callerGeneration: { kind: 'session', value: 1, providerId: 'caller' },\n    targetGeneration: { kind: 'session', value: 1, providerId: 'provider' },\n    method: 'math.add'\n  },\n  options: {},\n  payload: [20, 22]\n}\nexport const admitted = normalizeRpcFrame(call)"
               }
             ]
           }
@@ -70271,144 +69394,38 @@ class CheckoutElement extends HTMLElement {
       },
       next: [
         {
-          path: 'descriptors-and-envelopes',
-          label: '查看所有消息与路由字段'
-        },
-        {
-          path: 'portable-values',
-          label: '准备业务值'
-        },
-        {
-          path: 'real-world-bindings',
-          label: '连接到实际应用'
+          label: 'Host namespaces and plugins',
+          path: '../rpc-host/host-and-plugins'
         }
       ]
     },
-    en: {
-      title: 'Install and check a stock-query message',
-      lede: 'Check a stock query before sending it, then connect the data to HTTP, a Worker or a process.',
+    zh: {
+      title: '不打开连接地接纳语义帧',
+      lede: '类型断言不是线上准入，应通过协议规范化实际接收形状。',
       document: {
         sections: [
           {
-            id: 'install',
-            heading: 'Install',
+            id: 'ownership',
+            heading: '契约与所有权',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'migaia packages are published to GitHub Packages, not the public npm registry. Before the first install, add @migaia:registry=https://npm.pkg.github.com to the .npmrc in your project root and authenticate with a GitHub token that has read:packages; otherwise the install fails with 404.'
-              },
-              {
-                type: 'code',
-                language: 'bash',
-                code: 'pnpm add @migaia/rpc-contract'
+                text: '示例构造含协议、种类、标识、路由、任务及选项的完整调用。它只检查数据，不创建会话、不协商对端，也不发送请求。'
               },
               {
                 type: 'paragraph',
-                text: 'This package has no peer dependencies. The example checks an object without starting a service.'
+                text: '严格协议记录拒绝访问器及未知字段。载荷可移植规则与方法模式执行是不同边界；模式校验由可选宿主插件提供。'
               }
             ]
           },
           {
-            id: 'first',
-            heading: 'Prepare input for the warehouse',
+            id: 'example',
+            heading: '使用实际公开入口',
             blocks: [
-              {
-                type: 'paragraph',
-                text: 'Use Node 24 and set `"type": "module"` in package.json. Save as `stock.ts`, install dependencies, then run `node stock.ts`.'
-              },
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { RpcRouteProfile, RpcRouteType } from '@migaia/rpc-contract'\nimport { normalizeRpcEnvelope } from '@migaia/rpc-contract/v1'\n\nconst route = {\n  profile: RpcRouteProfile,\n  type: RpcRouteType.request,\n  applicationVersion: 'shop-v1',\n  senderId: 'checkout',\n  targetId: 'warehouse',\n  sentAt: 1_728_000_000_000\n}\nconst request = normalizeRpcEnvelope({\n  kind: 'request',\n  id: 'stock-1',\n  method: 'stock',\n  data: { route, payload: { sku: 'mug-12' } }\n})\nconsole.log('Lookup method:', request.kind === 'request' ? request.method : '')\nconsole.log('Lookup data:', JSON.stringify(request.data.payload))"
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: 'Lookup method: stock\nLookup data: {"sku":"mug-12"}'
-              }
-            ]
-          },
-          {
-            id: 'inputs',
-            heading: 'Understand the message',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['Entry or field', 'Behavior'],
-                rows: [
-                  ['`kind: request`', 'Mark this value as a V1 request envelope.'],
-                  [
-                    '`id` / `method`',
-                    'Use id to correlate requests and replies, and method to select the stock lookup. The normalizer does not execute it.'
-                  ],
-                  [
-                    '`data.route`',
-                    'Carry the application version, endpoint names, route kind and timestamp; the descriptor page lists all fields.'
-                  ],
-                  [
-                    '`data.payload`',
-                    'Hold the SKU input for the stock method and return a portable snapshot after validation.'
-                  ],
-                  [
-                    '`sentAt`',
-                    'The example uses a fixed millisecond timestamp. Applications supply the timestamp; the library does not fill in the current time.'
-                  ]
-                ]
-              }
-            ]
-          },
-          {
-            id: 'calls',
-            heading: 'APIs used for this step',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['Signature', 'Returns', 'Effect'],
-                rows: [
-                  [
-                    '`normalizeRpcEnvelope(value: unknown, options?: IRpcEnvelopeOptions)`',
-                    '`IRpcEnvelope`',
-                    'Synchronously validate and snapshot a V1 envelope without modifying its input; failures throw INVALID_ENVELOPE.'
-                  ],
-                  [
-                    '`options.onUnknownField?: (pointer: string, field: string) => void`',
-                    '`void`',
-                    'Observe omitted field positions and names. Without a callback, unknown fields are still dropped; invalid values of fields admitted by the current message still fail.'
-                  ],
-                  [
-                    '`rpcProtocol.normalize(value, options?)`',
-                    '`IRpcEnvelope`',
-                    'The v1 protocol object uses the same normalizer and can be supplied to a higher-level endpoint.'
-                  ]
-                ]
-              },
-              {
-                type: 'paragraph',
-                text: 'The returned envelope, data and route are frozen. Ordinary payloads are copied and checked; a variation payload is left to its control handler.'
-              }
-            ]
-          },
-          {
-            id: 'next-step',
-            heading: 'Pass the checked value to a connection',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['Entry or field', 'Behavior'],
-                rows: [
-                  [
-                    'Application JSON requests',
-                    'Use normalizePortable when the application only needs portable data; it owns the HTTP path and request shape.'
-                  ],
-                  [
-                    'Native RPC messages',
-                    'Use V1 or negotiated runtime envelopes with the matching handshake and framing; their message shapes differ.'
-                  ],
-                  [
-                    'Connections and execution',
-                    'Use an RPC endpoint for request correlation, cancellation and cleanup; this package alone does not create them.'
-                  ]
-                ]
+                code: "import { normalizeRpcFrame, RpcWireProfile, type IRpcEnvelope } from '@migaia/rpc-contract/protocol'\n\nexport const call: IRpcEnvelope = {\n  profile: RpcWireProfile,\n  kind: 'call',\n  id: 'call-1',\n  route: {\n    applicationVersion: '1',\n    senderId: 'caller',\n    receiverId: 'provider',\n    targetId: 'provider',\n    sentAt: 0,\n    remainingMs: 1000\n  },\n  task: {\n    mode: 'request',\n    callerId: 'caller',\n    callerGeneration: { kind: 'session', value: 1, providerId: 'caller' },\n    targetGeneration: { kind: 'session', value: 1, providerId: 'provider' },\n    method: 'math.add'\n  },\n  options: {},\n  payload: [20, 22]\n}\nexport const admitted = normalizeRpcFrame(call)"
               }
             ]
           }
@@ -70416,270 +69433,40 @@ class CheckoutElement extends HTMLElement {
       },
       next: [
         {
-          path: 'descriptors-and-envelopes',
-          label: 'Read envelope and route fields'
-        },
-        {
-          path: 'portable-values',
-          label: 'Prepare application values'
-        },
-        {
-          path: 'real-world-bindings',
-          label: 'Connect application transports'
+          label: '宿主命名空间与插件',
+          path: '../rpc-host/host-and-plugins'
         }
       ]
     }
   },
   'rpc-contract:descriptors-and-envelopes': {
-    zh: {
-      title: '说明组件版本与消息字段',
-      lede: '描述符标记组件版本，信封保存 RPC 消息字段。自定义业务包装与原生 V1 消息使用不同的结构。',
+    en: {
+      title: 'Correlate route, task and directory',
+      lede: 'Accepted directory schemaVersion3 and exact task/generation tuples replace the retired descriptor/runtime grammar.',
       document: {
         sections: [
           {
-            id: 'archive',
-            heading: '给库存归档标记格式',
+            id: 'ownership',
+            heading: 'Contract and ownership',
             blocks: [
               {
                 type: 'paragraph',
-                text: '下面是应用自己的归档对象，`format` 和 `items` 由应用决定。`createDescriptor()` 只生成版本标记，不把整个对象变成原生 RPC 消息。'
+                text: 'A directory contains self name/instanceId/generation and actual methods with supportedModes, modeSource and optional schema/idempotency metadata. Local advanced declarations may still have their own version; they are not a wire protocol fallback.'
               },
+              {
+                type: 'paragraph',
+                text: 'Results, errors, cancellation and streams must match the selected route/task generations. Same-name replacement cannot settle an old call, and directory updates do not create another describe RPC.'
+              }
+            ]
+          },
+          {
+            id: 'example',
+            heading: 'Use the actual public entry',
+            blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createDescriptor } from '@migaia/rpc-contract'\nimport { normalizePortable } from '@migaia/rpc-contract/portable'\n\nconst format = createDescriptor('catalog.snapshot', 2)\nconst archive = {\n  format,\n  items: normalizePortable([{ sku: 'mug-12', available: 18 }])\n}\nconsole.log('导出格式:', `${format.id}@${format.version}`)\nconsole.log('库存记录:', JSON.stringify(archive.items))"
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: '导出格式: catalog.snapshot@2\n库存记录: [{"sku":"mug-12","available":18}]'
-              }
-            ]
-          },
-          {
-            id: 'descriptor',
-            heading: '描述符与版本',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['签名', '返回', '作用'],
-                rows: [
-                  [
-                    '`createDescriptor<const TId extends string, const TVersion extends number>(id, version)`',
-                    '`IRpcDescriptor<TId, TVersion>`',
-                    '同步创建冻结的 `{ id, version }`，保留输入的字面量类型，不会增加编码方法。'
-                  ],
-                  [
-                    '`id: TId`',
-                    '`string`',
-                    '组件名以小写字母开头，后续使用小写字母、数字、点或连字符，例如 `catalog.snapshot`。'
-                  ],
-                  [
-                    '`version: TVersion`',
-                    '`number`',
-                    '记录组件格式的正安全整数版本，不使用小数或零。输入不符合规则时抛出 `INVALID_DESCRIPTOR`。'
-                  ],
-                  [
-                    '`rpcProtocol.id` / `rpcProtocol.version` / `rpcProtocol.normalize(value, options?)`',
-                    '`migaia.rpc` / `1` / `IRpcEnvelope`',
-                    '`./v1` 提供冻结的 V1 协议对象，normalize 复用消息检查器。根入口用名称 `rpcProtocolV1` 公开它。'
-                  ]
-                ]
-              },
-              {
-                type: 'table',
-                headers: ['入口或字段', '说明'],
-                rows: [
-                  [
-                    '`RpcProtocol.major` / `RpcProtocol.minor`',
-                    '线上协议当前为 1.1，供双方握手比较，不能从 npm 包版本推断。'
-                  ],
-                  ['`IRpcDescriptor.version`', '标识一个组件格式的整数版本，V1 协议对象这里是 1。'],
-                  [
-                    '`route.applicationVersion`',
-                    '由应用给业务消息选择版本文本，不会自动替应用完成升级或兼容。'
-                  ]
-                ]
-              }
-            ]
-          },
-          {
-            id: 'envelopes',
-            heading: 'V1 消息的所有形式',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: '消息都包含 `kind`、字符串 `id` 和 `data`。`data.route` 使用下一节的路由字段；`payload` 没有出现时不会补成 `null`。'
-              },
-              {
-                type: 'table',
-                headers: ['入口或字段', '说明'],
-                rows: [
-                  [
-                    '`request: { kind, id, method, data }`',
-                    '`method` 指定业务方法，route.type 使用 request。id 用来关联回复。'
-                  ],
-                  [
-                    '`response: { kind, ok: true, id, data }`',
-                    '表示成功回复，route.type 使用 response，并包含 route.method。code、message、error 不是成功回复字段。'
-                  ],
-                  [
-                    '`response: { kind, ok: false, id, code, message, data, error? }`',
-                    '表示失败回复，code 与 message 为失败信息，error 可以携带完整错误树。'
-                  ],
-                  [
-                    '`discovery: { kind, id, version, acceptVersions, data }`',
-                    'version 与 acceptVersions 是业务版本文本，路由使用 discovery-query 或 discovery-response。'
-                  ],
-                  [
-                    '`variation: { kind, id, data }`',
-                    '保存控制消息，route.type 使用 variation。payload 原值留给具体控制类型继续检查。'
-                  ],
-                  [
-                    '`stream: { kind, id, data }`',
-                    '保存流消息，route.type 使用 stream。事件内容还要交给流检查器。'
-                  ]
-                ]
-              },
-              {
-                type: 'table',
-                headers: ['签名', '返回', '作用'],
-                rows: [
-                  [
-                    '`normalizeRpcEnvelope(value, options?)`',
-                    '`IRpcEnvelope`',
-                    '检查普通对象或无原型对象，复制其自有可枚举字段。结构、路由或普通 payload 不合法时抛出 `TypeError` / `INVALID_ENVELOPE`。'
-                  ],
-                  [
-                    '`options.onUnknownField?(pointer, field)`',
-                    '`void`',
-                    '报告被省略字段的 JSON 路径和名称。回调抛错会中断检查，库不会把它当作可忽略报告错误。'
-                  ],
-                  [
-                    '返回的消息 / `data` / `route`',
-                    '冻结的新对象',
-                    '不会修改输入。普通 payload 经可传递数据检查后复制，variation payload 保留原值。'
-                  ]
-                ]
-              },
-              {
-                type: 'paragraph',
-                text: '普通对象的 getter 可能在读取字段时运行，源对象不必先冻结。它与 runtime 的严格数据属性检查器不同；不要把 V1 normalizer 当作不执行 getter 的工具。'
-              }
-            ]
-          },
-          {
-            id: 'route',
-            heading: '路由字段与限制',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['入口或字段', '说明'],
-                rows: [
-                  [
-                    '`profile: RpcRouteProfile`',
-                    '使用固定值 migaia.rpc.route，区别于应用 payload 中恰好叫 route 的对象。'
-                  ],
-                  [
-                    '`type: RpcRouteType`',
-                    '与消息种类一致，选用 request、response、discovery-query、discovery-response、variation 或 stream。'
-                  ],
-                  ['`applicationVersion: string`', '提供非空业务版本，最多 128 字符。'],
-                  [
-                    '`senderId: string` / `targetId: string`',
-                    '标记双方端点，各使用最多 128 字符的非空名称。'
-                  ],
-                  ['`sentAt: number`', '提供非负安全整数毫秒时间戳，没有自动默认时间。'],
-                  [
-                    '`receiverId?: string`',
-                    '在 request、response、discovery-response、variation 和 stream 中指定接收实例，使用非空且不超过 128 字符的名称。'
-                  ],
-                  ['`dispatchOnly?: boolean`', '只在 request 中标记单向业务派发，省略时不填充值。'],
-                  [
-                    '`timeoutMs?: number`',
-                    'request 使用 0 到 2147483647 的整数等待时长，省略时消息中没有此字段。'
-                  ],
-                  [
-                    '`idempotencyKey?: string`',
-                    'request 用它关联同一次业务执行。长度为 1 到 128，字符来自字母、数字、点、下划线、冒号、波浪号和连字符。'
-                  ],
-                  [
-                    '`trace?: string`',
-                    'request 携带 1 到 256 个可打印 ASCII 字符，供应用跟踪请求。'
-                  ],
-                  [
-                    '`forwardRoute?: readonly string[]`',
-                    'request 保存 2 到 4 个节点，节点是 32 位小写十六进制文本。检查后复制并冻结这份列表。'
-                  ],
-                  [
-                    '`method?: string`',
-                    'response 路由中必须出现，使用非空且不超过 128 字符的方法名。其他路由不接收此字段。'
-                  ],
-                  [
-                    '`manual?: boolean`',
-                    'discovery-query 和 discovery-response 用它表示手动发现。'
-                  ],
-                  [
-                    '`resolvedTargetId?: string`',
-                    'discovery-response 路由中必须出现，使用非空且不超过 128 字符的已选目标名称。'
-                  ],
-                  [
-                    '`platform?: string`',
-                    'discovery-response 标记对端平台，使用非空且不超过 128 字符的文本。'
-                  ],
-                  ['`accepted?: boolean`', 'discovery-response 说明目标是否接受发现结果。'],
-                  [
-                    '`message?: string`',
-                    'response 或 discovery-response 附加说明文本，可以是空字符串。'
-                  ],
-                  ['`operation?: unregister`', 'discovery-response 只接受 unregister 操作。'],
-                  [
-                    '`variation?: string`',
-                    'variation 路由中必须出现。以小写字母开头，后续为小写字母、数字或连字符，总长最多 32。'
-                  ]
-                ]
-              },
-              {
-                type: 'paragraph',
-                text: '当前路由允许的字段如果值非法就报错。未知字段和只属于其他路由的可选字段会被省略，并在配置回调时发出提示；省略不代表原始值已被接受。'
-              }
-            ]
-          },
-          {
-            id: 'warnings',
-            heading: '避免重复提示未知字段',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['签名', '返回', '作用'],
-                rows: [
-                  [
-                    '`createRpcUnknownFieldWarner(options)`',
-                    '`IRpcUnknownFieldWarner`',
-                    '建立按连接去重的提示缓存，不会自动安装到端点。'
-                  ],
-                  [
-                    '`options.warn(connection: string, fieldKey: string): void`',
-                    '`void`',
-                    '交付连接名称和组合后的字段键，回调抛错会传回调用方。'
-                  ],
-                  [
-                    '`options.maxKeysPerConnection?: number`',
-                    '默认 256',
-                    '限制每条连接记住的不同字段键，超出后对该连接提示一次 `*`。'
-                  ],
-                  [
-                    '`options.maxConnections?: number`',
-                    '默认 1024',
-                    '限制连接缓存数量，超出时移除最久没有使用的连接记录。'
-                  ],
-                  [
-                    '`note(connection, kind, pointer, field)`',
-                    '`void`',
-                    '记录一处未知字段，相同字段不重复提示。数组路径中的数字索引归成 `/*`。'
-                  ],
-                  ['`clear()`', '`void`', '清空记住的字段和连接，之后可以再次提示。']
-                ]
+                code: "import { normalizeRpcFrame, RpcWireProfile, type IRpcEnvelope } from '@migaia/rpc-contract/protocol'\n\nexport const call: IRpcEnvelope = {\n  profile: RpcWireProfile,\n  kind: 'call',\n  id: 'call-1',\n  route: {\n    applicationVersion: '1',\n    senderId: 'caller',\n    receiverId: 'provider',\n    targetId: 'provider',\n    sentAt: 0,\n    remainingMs: 1000\n  },\n  task: {\n    mode: 'request',\n    callerId: 'caller',\n    callerGeneration: { kind: 'session', value: 1, providerId: 'caller' },\n    targetGeneration: { kind: 'session', value: 1, providerId: 'provider' },\n    method: 'math.add'\n  },\n  options: {},\n  payload: [20, 22]\n}\nexport const admitted = normalizeRpcFrame(call)"
               }
             ]
           }
@@ -70687,290 +69474,38 @@ class CheckoutElement extends HTMLElement {
       },
       next: [
         {
-          path: 'portable-values',
-          label: '检查业务 payload'
-        },
-        {
-          path: 'runtime-bindings',
-          label: '查看 runtime 消息差异'
-        },
-        {
-          path: 'real-world-bindings',
-          label: '连接实际传输'
+          label: 'Host namespaces and plugins',
+          path: '../rpc-host/host-and-plugins'
         }
       ]
     },
-    en: {
-      title: 'Describe component versions and message fields',
-      lede: 'Descriptors identify component versions; envelopes contain RPC message fields. An application wrapper and a native V1 envelope have different shapes.',
+    zh: {
+      title: '关联路由、任务与目录',
+      lede: '已接纳第三版目录及精确任务、代际元组取代已退休描述符及运行语法。',
       document: {
         sections: [
           {
-            id: 'archive',
-            heading: 'Label an inventory archive format',
+            id: 'ownership',
+            heading: '契约与所有权',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'This archive is an application object whose format and items fields belong to the application. createDescriptor only makes its version label; it does not turn the wrapper into a native RPC envelope.'
+                text: '目录包含自身名称、实例身份、代际及实际方法，方法记录支持形式、形式来源及可选模式与幂等元数据。本地高级声明可有自己的版本，但不是线上协议回退。'
               },
+              {
+                type: 'paragraph',
+                text: '结果、错误、取消及流必须匹配所选路由、任务及代际。同名替换不能结算旧调用，目录更新不创建另一个描述调用。'
+              }
+            ]
+          },
+          {
+            id: 'example',
+            heading: '使用实际公开入口',
+            blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createDescriptor } from '@migaia/rpc-contract'\nimport { normalizePortable } from '@migaia/rpc-contract/portable'\n\nconst format = createDescriptor('catalog.snapshot', 2)\nconst archive = {\n  format,\n  items: normalizePortable([{ sku: 'mug-12', available: 18 }])\n}\nconsole.log('Export format:', `${format.id}@${format.version}`)\nconsole.log('Stock records:', JSON.stringify(archive.items))"
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: 'Export format: catalog.snapshot@2\nStock records: [{"sku":"mug-12","available":18}]'
-              }
-            ]
-          },
-          {
-            id: 'descriptor',
-            heading: 'Descriptors and versions',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['Signature', 'Returns', 'Effect'],
-                rows: [
-                  [
-                    '`createDescriptor<const TId extends string, const TVersion extends number>(id, version)`',
-                    '`IRpcDescriptor<TId, TVersion>`',
-                    'Synchronously create a frozen id/version record with literal input types, without adding encoding methods.'
-                  ],
-                  [
-                    '`id: TId`',
-                    '`string`',
-                    'Start component names with a lowercase letter, followed by lowercase letters, digits, dots or hyphens, such as catalog.snapshot.'
-                  ],
-                  [
-                    '`version: TVersion`',
-                    '`number`',
-                    'Record a positive safe integer component version rather than a fraction or zero. Invalid inputs throw INVALID_DESCRIPTOR.'
-                  ],
-                  [
-                    '`rpcProtocol.id` / `rpcProtocol.version` / `rpcProtocol.normalize(value, options?)`',
-                    '`migaia.rpc` / `1` / `IRpcEnvelope`',
-                    'The v1 entry provides a frozen V1 protocol object whose normalize method uses the envelope checker. The root exports it as rpcProtocolV1.'
-                  ]
-                ]
-              },
-              {
-                type: 'table',
-                headers: ['Entry or field', 'Behavior'],
-                rows: [
-                  [
-                    '`RpcProtocol.major` / `RpcProtocol.minor`',
-                    'The wire protocol is currently 1.1 for handshake comparison, independent of the npm package version.'
-                  ],
-                  [
-                    '`IRpcDescriptor.version`',
-                    'Identify an integer component-format version, which is 1 on the V1 protocol object.'
-                  ],
-                  [
-                    '`route.applicationVersion`',
-                    'Let the application select its business-message version string without automatically upgrading or making it compatible.'
-                  ]
-                ]
-              }
-            ]
-          },
-          {
-            id: 'envelopes',
-            heading: 'All V1 envelope forms',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: 'All envelopes contain kind, a string id and data. data.route uses the routing fields below; an absent payload is not replaced with null.'
-              },
-              {
-                type: 'table',
-                headers: ['Entry or field', 'Behavior'],
-                rows: [
-                  [
-                    '`request: { kind, id, method, data }`',
-                    'method selects the application method; route.type is request, and id correlates the response.'
-                  ],
-                  [
-                    '`response: { kind, ok: true, id, data }`',
-                    'Represent success with route.type response and route.method. code, message and error are not successful-response fields.'
-                  ],
-                  [
-                    '`response: { kind, ok: false, id, code, message, data, error? }`',
-                    'Represent failure through code and message, with an optional full wire error tree in error.'
-                  ],
-                  [
-                    '`discovery: { kind, id, version, acceptVersions, data }`',
-                    'version and acceptVersions contain application-version strings; the route uses discovery-query or discovery-response.'
-                  ],
-                  [
-                    '`variation: { kind, id, data }`',
-                    'Carry control data with route.type variation; the payload remains for the control subtype to check.'
-                  ],
-                  [
-                    '`stream: { kind, id, data }`',
-                    'Carry stream data with route.type stream; event content also needs the stream validator.'
-                  ]
-                ]
-              },
-              {
-                type: 'table',
-                headers: ['Signature', 'Returns', 'Effect'],
-                rows: [
-                  [
-                    '`normalizeRpcEnvelope(value, options?)`',
-                    '`IRpcEnvelope`',
-                    'Validate plain or null-prototype objects and snapshot their enumerable own fields. Invalid structure, routes or ordinary payloads throw TypeError / INVALID_ENVELOPE.'
-                  ],
-                  [
-                    '`options.onUnknownField?(pointer, field)`',
-                    '`void`',
-                    'Report omitted fields with their JSON pointer and name. A thrown callback error interrupts validation rather than being contained as a diagnostic.'
-                  ],
-                  [
-                    'Returned envelope / `data` / `route`',
-                    'New frozen records',
-                    'Do not modify the input. Ordinary payloads are portable snapshots; variation payloads retain their original value.'
-                  ]
-                ]
-              },
-              {
-                type: 'paragraph',
-                text: 'Reading ordinary object fields may execute getters, and the input need not be frozen. This differs from the strict runtime data-descriptor normalizer; the V1 normalizer is not an accessor-free inspection tool.'
-              }
-            ]
-          },
-          {
-            id: 'route',
-            heading: 'Routing fields and limits',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['Entry or field', 'Behavior'],
-                rows: [
-                  [
-                    '`profile: RpcRouteProfile`',
-                    'Use migaia.rpc.route to distinguish RPC routing from an application object also called route.'
-                  ],
-                  [
-                    '`type: RpcRouteType`',
-                    'Match the envelope using request, response, discovery-query, discovery-response, variation or stream.'
-                  ],
-                  [
-                    '`applicationVersion: string`',
-                    'Provide a nonempty application version of at most 128 characters.'
-                  ],
-                  [
-                    '`senderId: string` / `targetId: string`',
-                    'Identify the sender and target using nonempty names of at most 128 characters each.'
-                  ],
-                  [
-                    '`sentAt: number`',
-                    'Supply a nonnegative safe integer millisecond timestamp without an automatic current-time default.'
-                  ],
-                  [
-                    '`receiverId?: string`',
-                    'Name a receiver instance in request, response, discovery-response, variation or stream, with a nonempty identifier of at most 128 characters.'
-                  ],
-                  [
-                    '`dispatchOnly?: boolean`',
-                    'Mark one-way dispatch on request routes; omission does not insert a value.'
-                  ],
-                  [
-                    '`timeoutMs?: number`',
-                    'Supply an integer request deadline from 0 to 2147483647 ms; omission leaves the field absent.'
-                  ],
-                  [
-                    '`idempotencyKey?: string`',
-                    'Associate one logical request execution with 1–128 letters, digits, dots, underscores, colons, tildes or hyphens.'
-                  ],
-                  [
-                    '`trace?: string`',
-                    'Carry 1–256 printable ASCII characters for request tracing.'
-                  ],
-                  [
-                    '`forwardRoute?: readonly string[]`',
-                    'Retain 2–4 request forwarding nodes, each a 32-character lowercase hexadecimal string; normalization copies and freezes the list.'
-                  ],
-                  [
-                    '`method?: string`',
-                    'Appear on every response route as a nonempty method name of at most 128 characters; other route types do not admit it.'
-                  ],
-                  [
-                    '`manual?: boolean`',
-                    'Mark manual discovery on discovery-query and discovery-response routes.'
-                  ],
-                  [
-                    '`resolvedTargetId?: string`',
-                    'Appear on every discovery-response route as the selected nonempty target identifier of at most 128 characters.'
-                  ],
-                  [
-                    '`platform?: string`',
-                    'Name the peer platform on discovery-response routes with 1–128 characters.'
-                  ],
-                  [
-                    '`accepted?: boolean`',
-                    'Indicate whether the discovery-response result was accepted.'
-                  ],
-                  [
-                    '`message?: string`',
-                    'Add text to response or discovery-response routes, including an empty string.'
-                  ],
-                  [
-                    '`operation?: unregister`',
-                    'Only unregister is admitted as a discovery-response operation.'
-                  ],
-                  [
-                    '`variation?: string`',
-                    'Appear on every variation route. Start with a lowercase letter and use up to 32 lowercase letters, digits or hyphens in total.'
-                  ]
-                ]
-              },
-              {
-                type: 'paragraph',
-                text: 'Invalid values fail for fields admitted by the current route. Unknown fields and optional fields belonging to other route types are omitted and can trigger the warning callback; omission does not validate their original values.'
-              }
-            ]
-          },
-          {
-            id: 'warnings',
-            heading: 'Avoid repeated unknown-field warnings',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['Signature', 'Returns', 'Effect'],
-                rows: [
-                  [
-                    '`createRpcUnknownFieldWarner(options)`',
-                    '`IRpcUnknownFieldWarner`',
-                    'Create a per-connection warning cache without automatically attaching it to an endpoint.'
-                  ],
-                  [
-                    '`options.warn(connection: string, fieldKey: string): void`',
-                    '`void`',
-                    'Deliver the connection name and combined field key; thrown callback errors propagate.'
-                  ],
-                  [
-                    '`options.maxKeysPerConnection?: number`',
-                    'Default 256',
-                    'Bound remembered distinct keys per connection; after the cap, emit one * warning for that connection.'
-                  ],
-                  [
-                    '`options.maxConnections?: number`',
-                    'Default 1024',
-                    'Bound cached connections and evict the least recently used record when full.'
-                  ],
-                  [
-                    '`note(connection, kind, pointer, field)`',
-                    '`void`',
-                    'Record an unknown field without repeating the same warning; numeric array indexes collapse to /*.'
-                  ],
-                  [
-                    '`clear()`',
-                    '`void`',
-                    'Forget stored fields and connections so later occurrences can warn again.'
-                  ]
-                ]
+                code: "import { normalizeRpcFrame, RpcWireProfile, type IRpcEnvelope } from '@migaia/rpc-contract/protocol'\n\nexport const call: IRpcEnvelope = {\n  profile: RpcWireProfile,\n  kind: 'call',\n  id: 'call-1',\n  route: {\n    applicationVersion: '1',\n    senderId: 'caller',\n    receiverId: 'provider',\n    targetId: 'provider',\n    sentAt: 0,\n    remainingMs: 1000\n  },\n  task: {\n    mode: 'request',\n    callerId: 'caller',\n    callerGeneration: { kind: 'session', value: 1, providerId: 'caller' },\n    targetGeneration: { kind: 'session', value: 1, providerId: 'provider' },\n    method: 'math.add'\n  },\n  options: {},\n  payload: [20, 22]\n}\nexport const admitted = normalizeRpcFrame(call)"
               }
             ]
           }
@@ -70978,190 +69513,40 @@ class CheckoutElement extends HTMLElement {
       },
       next: [
         {
-          path: 'portable-values',
-          label: 'Check application payloads'
-        },
-        {
-          path: 'runtime-bindings',
-          label: 'Read runtime message formats'
-        },
-        {
-          path: 'real-world-bindings',
-          label: 'Connect actual transports'
+          label: '宿主命名空间与插件',
+          path: '../rpc-host/host-and-plugins'
         }
       ]
     }
   },
   'rpc-contract:portable-values': {
-    zh: {
-      title: '准备能传给对端的业务值',
-      lede: '把日期转换成文本，把字节转换成标准标签，再编码订单或预约数据。',
+    en: {
+      title: 'Capture portable values in the correct domain',
+      lede: 'Default normalizePortable snapshots ordinary data; negotiated native binary is a separate admitted capability.',
       document: {
         sections: [
           {
-            id: 'attachment',
-            heading: '订单附带字节数据',
+            id: 'ownership',
+            heading: 'Contract and ownership',
             blocks: [
               {
                 type: 'paragraph',
-                text: '普通模式把 Uint8Array 的可见字节转换为 base64url 标签，不会把一个 JavaScript 字节视图直接放进 JSON。'
+                text: 'Default normalization copies/freezes records and arrays, reads each enumerable business getter at most once and encodes Uint8Array as an unpadded base64url tag. Unsupported objects, cycles, undefined and nonfinite numbers reject; maximum depth is64.'
               },
+              {
+                type: 'paragraph',
+                text: 'Strict protocol-field checks reject accessors rather than executing them. Negotiated native backing retention still requires actual carrier capability, whole-backing limits and integrity checks.'
+              }
+            ]
+          },
+          {
+            id: 'example',
+            heading: 'Use the actual public entry',
+            blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { normalizePortable } from '@migaia/rpc-contract/portable'\n\nconst message = normalizePortable({\n  orderId: 'order-7',\n  attachment: new Uint8Array([72, 105])\n})\nconsole.log('订单附件:', JSON.stringify(message))"
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: '订单附件: {"orderId":"order-7","attachment":{"$rpc":"bytes","base64url":"SGk"}}'
-              }
-            ]
-          },
-          {
-            id: 'dates',
-            heading: '发送预约时间',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: 'Date 不属于普通可传递值。先选择业务使用的时间格式，再把文本交给检查器。'
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { normalizePortable } from '@migaia/rpc-contract/portable'\n\nconst booking = normalizePortable({\n  customer: 'Ada',\n  startsAt: new Date('2026-10-16T09:00:00Z').toISOString()\n})\nconsole.log('预约数据:', JSON.stringify(booking))"
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: '预约数据: {"customer":"Ada","startsAt":"2026-10-16T09:00:00.000Z"}'
-              }
-            ]
-          },
-          {
-            id: 'api',
-            heading: '参数与返回值',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['签名', '返回', '作用'],
-                rows: [
-                  [
-                    '`normalizePortable(value: unknown, depth?: number, active?: Set<object>)`',
-                    '`IRpcWirePortableValue`',
-                    '检查并复制普通线上数据。depth 默认 0，active 省略时自动管理祖先对象。'
-                  ],
-                  [
-                    '`normalizePortable(value, depth, active, nativeBinary: boolean | (() => never))`',
-                    '`IRpcPortableValue`',
-                    '第四参数只给已有协商结果的运行时实现使用，不会进行握手或开启对端能力。'
-                  ],
-                  [
-                    '`value: unknown`',
-                    '业务值',
-                    '传入准备编码的原始数据，普通对象字段读取一次，输入对象不被修改。'
-                  ],
-                  [
-                    '`depth?: number`',
-                    '默认 0',
-                    '从指定层数开始计算嵌套深度，超过 64 时失败。普通应用省略它。'
-                  ],
-                  [
-                    '`active?: Set<object>`',
-                    '遍历中的祖先集合',
-                    '由嵌入式检查器传入，检测仍在访问中的循环引用，不用它保存全局已访问对象。'
-                  ],
-                  [
-                    '`nativeBinary: false`',
-                    '普通线上值',
-                    '与省略第四参数相同，Uint8Array 转为标签，不接受直接 ArrayBuffer。'
-                  ],
-                  [
-                    '`nativeBinary: true`',
-                    '含原生二进制的值',
-                    '保留真实 ArrayBuffer 与 Uint8Array 对象，其他容器仍做快照。它们没有被复制，释放和转移由上层处理。'
-                  ],
-                  [
-                    '`nativeBinary: () => never`',
-                    '不返回的检查回调',
-                    '仍使用普通数据模式，在遇到原生二进制时调用，保留它抛出的原始失败供上层处理。'
-                  ]
-                ]
-              }
-            ]
-          },
-          {
-            id: 'values',
-            heading: '哪些值可以发送',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['入口或字段', '说明'],
-                rows: [
-                  ['`null` / `boolean` / `string`', '保持原值，空字符串也可以。'],
-                  ['有限 `number`', '保持数值，包括 -0；NaN 与正负 Infinity 不通过检查。'],
-                  [
-                    '普通对象 / 无原型对象',
-                    '复制自有可枚举字符串字段，返回冻结的无原型对象。循环引用失败，共享子对象在各处分别复制。'
-                  ],
-                  ['数组', '逐项检查并复制，数组结果也被冻结。'],
-                  [
-                    '`Uint8Array`',
-                    '普通模式返回 `{ $rpc: bytes, base64url }`，base64url 不带填充字符。'
-                  ],
-                  [
-                    '已有 bytes 标签',
-                    '只接受恰好含 `$rpc: bytes` 与合法规范 base64url 的标签对象。其他使用保留字段 $rpc 的普通对象失败。'
-                  ],
-                  [
-                    '`undefined` / 函数 / `symbol` / `bigint`',
-                    '不能作为普通值，也不能作为对象字段值；先转换成应用选择的表示。'
-                  ],
-                  [
-                    '`Date` / `Map` / `Set` / 类实例',
-                    '普通模式不接收这些对象。日期可转 ISO 文本，集合可转数组或普通对象。'
-                  ],
-                  [
-                    '原生模式的对象与数组',
-                    '只接受自有可枚举数据属性，不能含 getter、隐藏属性或 symbol 属性，数组使用完整连续索引。'
-                  ],
-                  [
-                    '原生模式的共享缓冲区',
-                    '不把 SharedArrayBuffer 或以其为底层存储的视图当作可转移的原生 ArrayBuffer。'
-                  ]
-                ]
-              },
-              {
-                type: 'paragraph',
-                text: '普通模式检查失败通常是 `TypeError` / `INVALID_ENVELOPE`。第四参数检查回调的原始失败会继续传给上层，不要把它重写成检查成功。'
-              }
-            ]
-          },
-          {
-            id: 'wire-native',
-            heading: '普通 JSON 与原生二进制',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['入口或字段', '说明'],
-                rows: [
-                  [
-                    '`IRpcWirePortableValue`',
-                    '适合 codec 普通编码路径，不含原始 ArrayBuffer 或 Uint8Array。'
-                  ],
-                  [
-                    '`IRpcPortableValue`',
-                    '类型包含原生二进制，不表示任意连接都能发送。只有相应运行时分支才使用这些值。'
-                  ],
-                  [
-                    'HTTP / JSON 场景',
-                    '保留标签对象，或者由应用选择专门的附件格式，不用一个 true 参数伪造连接能力。'
-                  ],
-                  [
-                    '已协商二进制的连接',
-                    '把规范化结果交给 binary 清单与还原工具，按完整底层缓冲区计算相关配额。'
-                  ]
-                ]
+                code: 'import assert from \'node:assert/strict\'\nimport { normalizePortable } from \'@migaia/rpc-contract/portable\'\n\nconst source = { profile: { name: \'Ada\' }, bytes: new Uint8Array([1, 2, 3]) }\nconst snapshot = normalizePortable(source)\nsource.profile.name = \'Grace\'\nsource.bytes[0] = 99\nassert.equal(\n  JSON.stringify(snapshot),\n  \'{"profile":{"name":"Ada"},"bytes":{"$rpc":"bytes","base64url":"AQID"}}\'\n)\nassert.equal(Object.isFrozen(snapshot), true)\nconsole.log(\'portable snapshot preserved\')'
               }
             ]
           }
@@ -71169,194 +69554,38 @@ class CheckoutElement extends HTMLElement {
       },
       next: [
         {
-          path: 'descriptors-and-envelopes',
-          label: '把业务值放进消息'
-        },
-        {
-          path: 'binary-messages',
-          label: '处理原生二进制'
-        },
-        {
-          path: 'wire-errors-and-metadata',
-          label: '保留检查失败信息'
+          label: 'Host namespaces and plugins',
+          path: '../rpc-host/host-and-plugins'
         }
       ]
     },
-    en: {
-      title: 'Prepare values the receiver can represent',
-      lede: 'Represent dates as text and bytes as standard tags before encoding orders or bookings.',
+    zh: {
+      title: '在正确值域捕获可移植数据',
+      lede: '默认可移植规范化捕获普通数据快照，协商原生二进制是独立接纳能力。',
       document: {
         sections: [
           {
-            id: 'attachment',
-            heading: 'Attach bytes to an order',
+            id: 'ownership',
+            heading: '契约与所有权',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'Ordinary mode converts the visible bytes of a Uint8Array to a base64url tag instead of putting a JavaScript byte view directly in JSON.'
+                text: '默认规范化复制并冻结记录及数组，对可枚举业务访问器至多读取一次，将字节视图编码为无填充字节标签。不支持的对象、循环、`undefined` 及非有限数字会拒绝，最大深度为六十四。'
               },
+              {
+                type: 'paragraph',
+                text: '严格协议字段检查拒绝访问器而不执行它们。协商原生缓冲区保留仍需要实际载体能力、完整缓冲区上限及完整性检查。'
+              }
+            ]
+          },
+          {
+            id: 'example',
+            heading: '使用实际公开入口',
+            blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { normalizePortable } from '@migaia/rpc-contract/portable'\n\nconst message = normalizePortable({\n  orderId: 'order-7',\n  attachment: new Uint8Array([72, 105])\n})\nconsole.log('Order attachment:', JSON.stringify(message))"
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: 'Order attachment: {"orderId":"order-7","attachment":{"$rpc":"bytes","base64url":"SGk"}}'
-              }
-            ]
-          },
-          {
-            id: 'dates',
-            heading: 'Send a booking time',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: 'A Date is not an ordinary portable value. Choose the application time format before normalizing its text representation.'
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { normalizePortable } from '@migaia/rpc-contract/portable'\n\nconst booking = normalizePortable({\n  customer: 'Ada',\n  startsAt: new Date('2026-10-16T09:00:00Z').toISOString()\n})\nconsole.log('Booking data:', JSON.stringify(booking))"
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: 'Booking data: {"customer":"Ada","startsAt":"2026-10-16T09:00:00.000Z"}'
-              }
-            ]
-          },
-          {
-            id: 'api',
-            heading: 'Parameters and return values',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['Signature', 'Returns', 'Effect'],
-                rows: [
-                  [
-                    '`normalizePortable(value: unknown, depth?: number, active?: Set<object>)`',
-                    '`IRpcWirePortableValue`',
-                    'Check and snapshot ordinary wire data. depth defaults to 0; omission of active automatically manages ancestors.'
-                  ],
-                  [
-                    '`normalizePortable(value, depth, active, nativeBinary: boolean | (() => never))`',
-                    '`IRpcPortableValue`',
-                    'Reserve the fourth argument for runtime implementations holding an actual agreement; it performs no handshake or capability activation.'
-                  ],
-                  [
-                    '`value: unknown`',
-                    'Application value',
-                    'Supply the input to encode. Ordinary record fields are read once without modifying the source object.'
-                  ],
-                  [
-                    '`depth?: number`',
-                    'Default 0',
-                    'Start depth accounting at this value and fail beyond 64. Ordinary applications omit it.'
-                  ],
-                  [
-                    '`active?: Set<object>`',
-                    'Current ancestors',
-                    'Let an embedding validator supply current ancestors for cycle detection rather than a global visited-object cache.'
-                  ],
-                  [
-                    '`nativeBinary: false`',
-                    'Ordinary wire value',
-                    'Match the ordinary mode: Uint8Array becomes a tag and a direct ArrayBuffer is not accepted.'
-                  ],
-                  [
-                    '`nativeBinary: true`',
-                    'Native-capable value',
-                    'Retain actual ArrayBuffer and Uint8Array objects while snapshotting containers. The native objects are not copied; higher layers handle transfer and release.'
-                  ],
-                  [
-                    '`nativeBinary: () => never`',
-                    'Never-returning guard',
-                    'Retain ordinary data mode and call the guard at native binary input, preserving the guard’s original thrown failure for its caller.'
-                  ]
-                ]
-              }
-            ]
-          },
-          {
-            id: 'values',
-            heading: 'Which values are accepted',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['Entry or field', 'Behavior'],
-                rows: [
-                  [
-                    '`null` / `boolean` / `string`',
-                    'Preserve the original scalar value, including an empty string.'
-                  ],
-                  [
-                    'Finite `number`',
-                    'Preserve finite numbers including -0, while NaN and either Infinity fail validation.'
-                  ],
-                  [
-                    'Plain / null-prototype records',
-                    'Snapshot enumerable own string fields into frozen null-prototype records. Cycles fail; repeated shared children become independent copies.'
-                  ],
-                  ['Arrays', 'Check and copy array elements and freeze the resulting array.'],
-                  [
-                    '`Uint8Array`',
-                    'Return a bytes/base64url tag in ordinary mode, using unpadded base64url text.'
-                  ],
-                  [
-                    'Existing bytes tags',
-                    'Accept a tag with exactly $rpc: bytes and canonical base64url. Other ordinary records using the reserved $rpc field fail.'
-                  ],
-                  [
-                    '`undefined` / functions / `symbol` / `bigint`',
-                    'Do not use these as values or record field values; choose an application representation first.'
-                  ],
-                  [
-                    '`Date` / `Map` / `Set` / class instances',
-                    'Ordinary mode does not accept these objects. Dates can become ISO text; collections can become arrays or plain records.'
-                  ],
-                  [
-                    'Native-mode records and arrays',
-                    'Require enumerable own data properties without accessors, hidden or symbol properties; arrays use dense own indexes.'
-                  ],
-                  [
-                    'Shared backing in native mode',
-                    'Do not treat SharedArrayBuffer or its views as native transferable ArrayBuffer values.'
-                  ]
-                ]
-              },
-              {
-                type: 'paragraph',
-                text: 'Ordinary validation failures use TypeError / INVALID_ENVELOPE. A fourth-argument guard’s original failure propagates to the caller rather than becoming successful normalization.'
-              }
-            ]
-          },
-          {
-            id: 'wire-native',
-            heading: 'Ordinary JSON and native binary',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['Entry or field', 'Behavior'],
-                rows: [
-                  [
-                    '`IRpcWirePortableValue`',
-                    'Describe ordinary codec input without raw ArrayBuffer or Uint8Array objects.'
-                  ],
-                  [
-                    '`IRpcPortableValue`',
-                    'The type includes native binary without proving a connection can send it; only its negotiated runtime branch uses it.'
-                  ],
-                  [
-                    'HTTP / JSON messages',
-                    'Keep tagged values or choose a dedicated application attachment format; a true argument cannot establish a connection capability.'
-                  ],
-                  [
-                    'Negotiated binary connections',
-                    'Pass snapshots to the binary manifest and restoration tools, using complete backing sizes for their quotas.'
-                  ]
-                ]
+                code: 'import assert from \'node:assert/strict\'\nimport { normalizePortable } from \'@migaia/rpc-contract/portable\'\n\nconst source = { profile: { name: \'Ada\' }, bytes: new Uint8Array([1, 2, 3]) }\nconst snapshot = normalizePortable(source)\nsource.profile.name = \'Grace\'\nsource.bytes[0] = 99\nassert.equal(\n  JSON.stringify(snapshot),\n  \'{"profile":{"name":"Ada"},"bytes":{"$rpc":"bytes","base64url":"AQID"}}\'\n)\nassert.equal(Object.isFrozen(snapshot), true)\nconsole.log(\'portable snapshot preserved\')'
               }
             ]
           }
@@ -71364,82 +69593,36 @@ class CheckoutElement extends HTMLElement {
       },
       next: [
         {
-          path: 'descriptors-and-envelopes',
-          label: 'Put values into envelopes'
-        },
-        {
-          path: 'binary-messages',
-          label: 'Handle native binary'
-        },
-        {
-          path: 'wire-errors-and-metadata',
-          label: 'Retain validation failures'
+          label: '宿主命名空间与插件',
+          path: '../rpc-host/host-and-plugins'
         }
       ]
     }
   },
   'rpc-contract:fetch': {
-    zh: {
-      title: '用 HTTP 读取共享格式的订单',
-      lede: '用真实 Node HTTP 服务器和 fetch 往返一份订单消息。',
+    en: {
+      title: 'Admit a received HTTP document',
+      lede: 'Fetch owns HTTP acquisition. Contract can validate its parsed semantic data without becoming an HTTP RPC client.',
       document: {
         sections: [
           {
-            id: 'fetch',
-            heading: '从 HTTP 接口读取订单金额',
+            id: 'ownership',
+            heading: 'Contract and ownership',
             blocks: [
               {
                 type: 'paragraph',
-                text: '先保存[共享消息页](/zh/docs/rpc-contract/real-world-bindings)的 order.ts。本页使用应用自定义 JSON，服务器和客户端都检查描述符字段；它不使用原生 V1 Envelope。'
-              },
-              {
-                type: 'paragraph',
-                text: '把三个文件与 order.ts 放在同一目录，用 Node 24 ESM 运行 node fetch.ts。HTTP 接口只做订单读取；请求数据放在查询参数中。'
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { once } from 'node:events'\nimport type { Server } from 'node:http'\nimport type { AddressInfo } from 'node:net'\n\nexport async function listenHttp(server: Server) {\n  server.listen(0, '127.0.0.1')\n  await once(server, 'listening')\n  const { port } = server.address() as AddressInfo\n  return {\n    url: `http://127.0.0.1:${port}`,\n    close: () => new Promise<void>((resolve) => server.close(() => resolve()))\n  }\n}"
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { createServer } from 'node:http'\nimport { orderReply } from './order.ts'\nimport { listenHttp } from './listen-http.ts'\n\nconst server = createServer((request, response) => {\n  const query = new URL(request.url!, 'http://localhost').searchParams\n  const input: unknown = JSON.parse(query.get('request')!)\n  response.setHeader('Content-Type', 'application/json')\n  response.end(JSON.stringify(orderReply(input)))\n})\nexport const http = await listenHttp(server)"
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { http } from './fetch-server.ts'\nimport { orderRequest, orderTotal } from './order.ts'\n\nconst query = new URLSearchParams({ request: JSON.stringify(orderRequest) })\nconst response = await fetch(`${http.url}/?${query}`)\nconst total = orderTotal(await response.json())\nconsole.log('订单总额:', total)\nawait http.close()"
-              },
-              {
-                type: 'paragraph',
-                text: '输出：'
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: '订单总额: 25'
+                text: 'The application selects URL, credentials, status and body limits before admission. normalizeRpcFrame checks the actual parsed value; it supplies no Session, retry, timeout or pending correlation.'
               }
             ]
           },
           {
-            id: 'http-work',
-            heading: '格式检查与 HTTP 各负责什么',
+            id: 'example',
+            heading: 'Use the actual public entry',
             blocks: [
               {
-                type: 'table',
-                headers: ['成员与参数', '说明'],
-                rows: [
-                  [
-                    'fetch(url) / response.json()',
-                    '真实 HTTP 客户端发送 GET 并读取 JSON；本包不会替你发送请求或处理 HTTP 状态码。'
-                  ],
-                  [
-                    'orderReply / orderTotal',
-                    '是共享页展示的应用函数。描述符随响应返回，金额来自服务器实际响应。'
-                  ],
-                  ['http.close()', '本例辅助函数等待自己创建的 HTTP 服务器关闭，避免留下监听端口。']
-                ]
+                type: 'code',
+                language: 'ts',
+                code: "import { normalizeRpcFrame } from '@migaia/rpc-contract/protocol'\n\nexport async function readFrame(response: Response) {\n  if (!response.ok) throw new Error(response.statusText)\n  return normalizeRpcFrame(await response.json())\n}"
               }
             ]
           }
@@ -71447,79 +69630,34 @@ class CheckoutElement extends HTMLElement {
       },
       next: [
         {
-          label: '共享消息与版本',
-          path: 'real-world-bindings'
-        },
-        {
-          label: 'WebSocket',
-          path: 'websocket'
+          label: 'Host namespaces and plugins',
+          path: '../rpc-host/host-and-plugins'
         }
       ]
     },
-    en: {
-      title: 'Read an order with shared JSON over HTTP',
-      lede: 'Send an order message through a native Node HTTP server and fetch.',
+    zh: {
+      title: '接纳接收的请求响应文档',
+      lede: '网络请求能力拥有请求获取，契约可校验解析后的语义数据，但不会变成请求客户端。',
       document: {
         sections: [
           {
-            id: 'fetch',
-            heading: 'Read an amount from an HTTP endpoint',
+            id: 'ownership',
+            heading: '契约与所有权',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'First save order.ts from [shared messages](/en/docs/rpc-contract/real-world-bindings). This page uses application JSON and checks descriptor fields on both sides; it does not use a native V1 envelope.'
-              },
-              {
-                type: 'paragraph',
-                text: 'Save these three files beside order.ts and run node fetch.ts with Node 24 ESM. The HTTP endpoint reads order data, with the request in a query parameter.'
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { once } from 'node:events'\nimport type { Server } from 'node:http'\nimport type { AddressInfo } from 'node:net'\n\nexport async function listenHttp(server: Server) {\n  server.listen(0, '127.0.0.1')\n  await once(server, 'listening')\n  const { port } = server.address() as AddressInfo\n  return {\n    url: `http://127.0.0.1:${port}`,\n    close: () => new Promise<void>((resolve) => server.close(() => resolve()))\n  }\n}"
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { createServer } from 'node:http'\nimport { orderReply } from './order.ts'\nimport { listenHttp } from './listen-http.ts'\n\nconst server = createServer((request, response) => {\n  const query = new URL(request.url!, 'http://localhost').searchParams\n  const input: unknown = JSON.parse(query.get('request')!)\n  response.setHeader('Content-Type', 'application/json')\n  response.end(JSON.stringify(orderReply(input)))\n})\nexport const http = await listenHttp(server)"
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { http } from './fetch-server.ts'\nimport { orderRequest, orderTotal } from './order.ts'\n\nconst query = new URLSearchParams({ request: JSON.stringify(orderRequest) })\nconst response = await fetch(`${http.url}/?${query}`)\nconst total = orderTotal(await response.json())\nconsole.log('Order total:', total)\nawait http.close()"
-              },
-              {
-                type: 'paragraph',
-                text: 'Output:'
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: 'Order total: 25'
+                text: '应用在准入前选择地址、凭据、状态及正文上限。协议规范化检查实际解析值，不提供会话、重试、超时或待决关联。'
               }
             ]
           },
           {
-            id: 'http-work',
-            heading: 'Responsibilities of formatting and HTTP',
+            id: 'example',
+            heading: '使用实际公开入口',
             blocks: [
               {
-                type: 'table',
-                headers: ['Member or parameter', 'Description'],
-                rows: [
-                  [
-                    'fetch(url) / response.json()',
-                    'Native fetch sends GET and reads JSON. The package does not send HTTP requests or handle HTTP status codes.'
-                  ],
-                  [
-                    'orderReply / orderTotal',
-                    'Are the application functions shown on the shared page. The response carries its descriptor, and the amount comes from that actual response.'
-                  ],
-                  [
-                    'http.close()',
-                    'The shown helper waits for its own HTTP server to close, leaving no listening port.'
-                  ]
-                ]
+                type: 'code',
+                language: 'ts',
+                code: "import { normalizeRpcFrame } from '@migaia/rpc-contract/protocol'\n\nexport async function readFrame(response: Response) {\n  if (!response.ok) throw new Error(response.statusText)\n  return normalizeRpcFrame(await response.json())\n}"
               }
             ]
           }
@@ -71527,76 +69665,36 @@ class CheckoutElement extends HTMLElement {
       },
       next: [
         {
-          label: 'Shared messages and versions',
-          path: 'real-world-bindings'
-        },
-        {
-          label: 'WebSocket',
-          path: 'websocket'
+          label: '宿主命名空间与插件',
+          path: '../rpc-host/host-and-plugins'
         }
       ]
     }
   },
   'rpc-contract:websocket': {
-    zh: {
-      title: '用 WebSocket 读取共享订单',
-      lede: '让真实服务器和 Node WebSocket 客户端使用同一份消息定义。',
+    en: {
+      title: 'Admit one complete WebSocket message',
+      lede: 'The native socket owns framing, close and ordering; a pure normalizer admits the decoded semantic record.',
       document: {
         sections: [
           {
-            id: 'websocket',
-            heading: '在已连接的 WebSocket 上读取订单',
+            id: 'ownership',
+            heading: 'Contract and ownership',
             blocks: [
               {
                 type: 'paragraph',
-                text: '先保存[共享消息页](/zh/docs/rpc-contract/real-world-bindings)的 order.ts。本页使用应用自定义 JSON，服务器和客户端都检查描述符字段；它不使用原生 V1 Envelope。'
-              },
-              {
-                type: 'paragraph',
-                text: '服务端使用 ws，客户端使用 Node 24 自带 WebSocket。先安装 pnpm add ws 和开发类型 pnpm add -D @types/ws。保存两个文件并运行 node websocket.ts；package.json 使用 type:module。'
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { WebSocketServer } from 'ws'\nimport { once } from 'node:events'\nimport type { AddressInfo } from 'node:net'\nimport { orderReply } from './order.ts'\n\nconst server = new WebSocketServer({ host: '127.0.0.1', port: 0 })\nserver.on('connection', (socket) => {\n  socket.once('message', (data) => {\n    socket.send(JSON.stringify(orderReply(JSON.parse(data.toString()))))\n  })\n})\nawait once(server, 'listening')\nconst { port } = server.address() as AddressInfo\nexport const channel = {\n  url: `ws://127.0.0.1:${port}`,\n  close: () => new Promise<void>((resolve) => server.close(() => resolve()))\n}"
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { once } from 'node:events'\nimport { channel } from './ws-server.ts'\nimport { orderRequest, orderTotal } from './order.ts'\n\nconst socket = new WebSocket(channel.url)\nconst replied = once(socket, 'message')\nawait once(socket, 'open')\nsocket.send(JSON.stringify(orderRequest))\nconst [message] = await replied\nconsole.log('订单总额:', orderTotal(JSON.parse(String(message.data))))\nconst closed = once(socket, 'close')\nsocket.close()\nawait closed\nawait channel.close()"
-              },
-              {
-                type: 'paragraph',
-                text: '输出：'
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: '订单总额: 25'
+                text: 'Parse native text once and pass the resulting value to the protocol check. This helper does not install native listeners, authenticate a peer or create a second message queue. Use Host SDK for a real custom carrier.'
               }
             ]
           },
           {
-            id: 'websocket-work',
-            heading: '一条业务消息的处理次序',
+            id: 'example',
+            heading: 'Use the actual public entry',
             blocks: [
               {
-                type: 'table',
-                headers: ['成员与参数', '说明'],
-                rows: [
-                  [
-                    'await open → send → message',
-                    '连接建立后发送这份订单请求，服务端用 orderReply 回传，客户端用 orderTotal 检查并读取金额。'
-                  ],
-                  [
-                    'socket.close() / channel.close()',
-                    '先等待本例客户端连接关闭，再关闭自己创建的服务器。ws 不属于 rpc-contract 依赖，页面已给出安装命令。'
-                  ],
-                  [
-                    '多请求与断线',
-                    '本例只有一条订单读取。真实多请求匹配与断线处理交给业务已有的连接层或 RPC Endpoint。'
-                  ]
-                ]
+                type: 'code',
+                language: 'ts',
+                code: "import { normalizeRpcFrame } from '@migaia/rpc-contract/protocol'\n\nexport function readMessage(event: MessageEvent<string>) {\n  return normalizeRpcFrame(JSON.parse(event.data))\n}"
               }
             ]
           }
@@ -71604,74 +69702,34 @@ class CheckoutElement extends HTMLElement {
       },
       next: [
         {
-          label: 'HTTP',
-          path: 'fetch'
-        },
-        {
-          label: 'SSE',
-          path: 'sse'
+          label: 'Host namespaces and plugins',
+          path: '../rpc-host/host-and-plugins'
         }
       ]
     },
-    en: {
-      title: 'Read a shared order over WebSocket',
-      lede: 'Use one message definition with a real server and native Node WebSocket client.',
+    zh: {
+      title: '接纳一条完整双向套接字消息',
+      lede: '原生套接字拥有分帧、关闭及排序，纯规范化器接纳解码语义记录。',
       document: {
         sections: [
           {
-            id: 'websocket',
-            heading: 'Read an order over an open WebSocket',
+            id: 'ownership',
+            heading: '契约与所有权',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'First save order.ts from [shared messages](/en/docs/rpc-contract/real-world-bindings). This page uses application JSON and checks descriptor fields on both sides; it does not use a native V1 envelope.'
-              },
-              {
-                type: 'paragraph',
-                text: 'The server uses ws and the client uses Node 24’s native WebSocket. Install pnpm add ws and pnpm add -D @types/ws. Save both files and run node websocket.ts with type:module.'
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { WebSocketServer } from 'ws'\nimport { once } from 'node:events'\nimport type { AddressInfo } from 'node:net'\nimport { orderReply } from './order.ts'\n\nconst server = new WebSocketServer({ host: '127.0.0.1', port: 0 })\nserver.on('connection', (socket) => {\n  socket.once('message', (data) => {\n    socket.send(JSON.stringify(orderReply(JSON.parse(data.toString()))))\n  })\n})\nawait once(server, 'listening')\nconst { port } = server.address() as AddressInfo\nexport const channel = {\n  url: `ws://127.0.0.1:${port}`,\n  close: () => new Promise<void>((resolve) => server.close(() => resolve()))\n}"
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { once } from 'node:events'\nimport { channel } from './ws-server.ts'\nimport { orderRequest, orderTotal } from './order.ts'\n\nconst socket = new WebSocket(channel.url)\nconst replied = once(socket, 'message')\nawait once(socket, 'open')\nsocket.send(JSON.stringify(orderRequest))\nconst [message] = await replied\nconsole.log('Order total:', orderTotal(JSON.parse(String(message.data))))\nconst closed = once(socket, 'close')\nsocket.close()\nawait closed\nawait channel.close()"
-              },
-              {
-                type: 'paragraph',
-                text: 'Output:'
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: 'Order total: 25'
+                text: '原生文本只解析一次，再将值交给协议检查。本工具不安装原生监听、不认证对端，也不创建第二消息队列。实际自定义载体应使用宿主作者工具。'
               }
             ]
           },
           {
-            id: 'websocket-work',
-            heading: 'Handle one business message',
+            id: 'example',
+            heading: '使用实际公开入口',
             blocks: [
               {
-                type: 'table',
-                headers: ['Member or parameter', 'Description'],
-                rows: [
-                  [
-                    'await open → send → message',
-                    'After opening, send this order request. The server replies through orderReply and the client checks and reads it through orderTotal.'
-                  ],
-                  [
-                    'socket.close() / channel.close()',
-                    'Wait for the client socket to close, then close its server. Ws is not a rpc-contract dependency; install it as shown.'
-                  ],
-                  [
-                    '多请求与断线',
-                    'This example performs one order read. Existing connection management or an RPC endpoint owns concurrent matching and disconnect handling.'
-                  ]
-                ]
+                type: 'code',
+                language: 'ts',
+                code: "import { normalizeRpcFrame } from '@migaia/rpc-contract/protocol'\n\nexport function readMessage(event: MessageEvent<string>) {\n  return normalizeRpcFrame(JSON.parse(event.data))\n}"
               }
             ]
           }
@@ -71679,76 +69737,36 @@ class CheckoutElement extends HTMLElement {
       },
       next: [
         {
-          label: 'HTTP',
-          path: 'fetch'
-        },
-        {
-          label: 'SSE',
-          path: 'sse'
+          label: '宿主命名空间与插件',
+          path: '../rpc-host/host-and-plugins'
         }
       ]
     }
   },
   'rpc-contract:sse': {
-    zh: {
-      title: '用 SSE 接收订单金额',
-      lede: '在 Node 24 中运行真实 EventSource 与 HTTP 事件流。',
+    en: {
+      title: 'Admit an application-selected server event',
+      lede: 'EventSource owns reconnection and event framing; Contract does not turn one-way events into request/reply sessions.',
       document: {
         sections: [
           {
-            id: 'sse',
-            heading: '接收服务端发送的订单金额',
+            id: 'ownership',
+            heading: 'Contract and ownership',
             blocks: [
               {
                 type: 'paragraph',
-                text: '先保存[共享消息页](/zh/docs/rpc-contract/real-world-bindings)的 order.ts。本页使用应用自定义 JSON，服务器和客户端都检查描述符字段；它不使用原生 V1 Envelope。'
-              },
-              {
-                type: 'paragraph',
-                text: '复用[HTTP 页](/zh/docs/rpc-contract/fetch)展示的 listen-http.ts。本页运行命令是 node --experimental-eventsource sse.ts；Node 24 的 EventSource 仍会输出实验功能告警，下面输出块只列 stdout。'
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { createServer } from 'node:http'\nimport { orderReply } from './order.ts'\nimport { listenHttp } from './listen-http.ts'\n\nconst server = createServer((request, response) => {\n  const query = new URL(request.url!, 'http://localhost').searchParams\n  const input: unknown = JSON.parse(query.get('request')!)\n  response.setHeader('Content-Type', 'text/event-stream')\n  response.end(`data: ${JSON.stringify(orderReply(input))}\\n\\n`)\n})\nexport const sse = await listenHttp(server)"
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { sse } from './sse-server.ts'\nimport { orderRequest, orderTotal } from './order.ts'\n\nconst query = new URLSearchParams({ request: JSON.stringify(orderRequest) })\nconst source = new EventSource(`${sse.url}/?${query}`)\nconst reply = await new Promise<string>((resolve) => {\n  source.addEventListener('message', (event) => resolve(event.data), { once: true })\n})\nconsole.log('订单总额:', orderTotal(JSON.parse(reply)))\nsource.close()\nawait sse.close()"
-              },
-              {
-                type: 'paragraph',
-                text: '输出：'
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: '订单总额: 25'
+                text: 'The application selects the event type and reads each native event value once. Validate decoded protocol data separately from application delivery and keep credentials/close with their original owner.'
               }
             ]
           },
           {
-            id: 'sse-work',
-            heading: '事件流与上行请求分开',
+            id: 'example',
+            heading: 'Use the actual public entry',
             blocks: [
               {
-                type: 'table',
-                headers: ['成员与参数', '说明'],
-                rows: [
-                  [
-                    'Content-Type: text/event-stream / data:',
-                    '服务器使用真实 SSE 文本响应，不把普通 JSON 响应伪装成事件流。'
-                  ],
-                  [
-                    'EventSource(url)',
-                    '这里只从查询参数带入一份订单读取请求，再接收服务端事件。SSE 发送方向是服务端到客户端。'
-                  ],
-                  [
-                    'source.close() / sse.close()',
-                    '收到所需金额后停止自动重连，再关闭本例服务器。长期事件流的请求提交与恢复策略由应用管理。'
-                  ]
-                ]
+                type: 'code',
+                language: 'ts',
+                code: "import { normalizeRpcFrame } from '@migaia/rpc-contract/protocol'\n\nexport function readEvent(event: MessageEvent<string>) {\n  return normalizeRpcFrame(JSON.parse(event.data))\n}"
               }
             ]
           }
@@ -71756,74 +69774,34 @@ class CheckoutElement extends HTMLElement {
       },
       next: [
         {
-          label: 'WebSocket',
-          path: 'websocket'
-        },
-        {
-          label: '子进程 IPC',
-          path: 'process'
+          label: 'Host namespaces and plugins',
+          path: '../rpc-host/host-and-plugins'
         }
       ]
     },
-    en: {
-      title: 'Receive an order amount through SSE',
-      lede: 'Run native EventSource and an HTTP event stream with Node 24.',
+    zh: {
+      title: '接纳应用选择的服务端事件',
+      lede: '原生事件来源拥有重连及事件分帧，契约不会把单向事件变成请求响应会话。',
       document: {
         sections: [
           {
-            id: 'sse',
-            heading: 'Receive a server-sent order amount',
+            id: 'ownership',
+            heading: '契约与所有权',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'First save order.ts from [shared messages](/en/docs/rpc-contract/real-world-bindings). This page uses application JSON and checks descriptor fields on both sides; it does not use a native V1 envelope.'
-              },
-              {
-                type: 'paragraph',
-                text: 'Reuse listen-http.ts from [HTTP](/en/docs/rpc-contract/fetch). Run node --experimental-eventsource sse.ts. Node 24 emits an experimental EventSource warning on stderr; the output block lists stdout.'
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { createServer } from 'node:http'\nimport { orderReply } from './order.ts'\nimport { listenHttp } from './listen-http.ts'\n\nconst server = createServer((request, response) => {\n  const query = new URL(request.url!, 'http://localhost').searchParams\n  const input: unknown = JSON.parse(query.get('request')!)\n  response.setHeader('Content-Type', 'text/event-stream')\n  response.end(`data: ${JSON.stringify(orderReply(input))}\\n\\n`)\n})\nexport const sse = await listenHttp(server)"
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { sse } from './sse-server.ts'\nimport { orderRequest, orderTotal } from './order.ts'\n\nconst query = new URLSearchParams({ request: JSON.stringify(orderRequest) })\nconst source = new EventSource(`${sse.url}/?${query}`)\nconst reply = await new Promise<string>((resolve) => {\n  source.addEventListener('message', (event) => resolve(event.data), { once: true })\n})\nconsole.log('Order total:', orderTotal(JSON.parse(reply)))\nsource.close()\nawait sse.close()"
-              },
-              {
-                type: 'paragraph',
-                text: 'Output:'
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: 'Order total: 25'
+                text: '应用选择事件类型并只读取一次原生事件值。协议数据校验与应用交付分开，凭据及关闭仍归原所有者。'
               }
             ]
           },
           {
-            id: 'sse-work',
-            heading: 'Separate server events from upstream requests',
+            id: 'example',
+            heading: '使用实际公开入口',
             blocks: [
               {
-                type: 'table',
-                headers: ['Member or parameter', 'Description'],
-                rows: [
-                  [
-                    'Content-Type: text/event-stream / data:',
-                    'The server sends a native SSE text response instead of treating ordinary JSON as an event stream.'
-                  ],
-                  [
-                    'EventSource(url)',
-                    'This read-only example carries the order request in the URL and receives a server event. SSE delivery is server to client.'
-                  ],
-                  [
-                    'source.close() / sse.close()',
-                    'After receiving the amount, stop reconnection and close this server. The application owns submission and recovery for long-lived streams.'
-                  ]
-                ]
+                type: 'code',
+                language: 'ts',
+                code: "import { normalizeRpcFrame } from '@migaia/rpc-contract/protocol'\n\nexport function readEvent(event: MessageEvent<string>) {\n  return normalizeRpcFrame(JSON.parse(event.data))\n}"
               }
             ]
           }
@@ -71831,73 +69809,40 @@ class CheckoutElement extends HTMLElement {
       },
       next: [
         {
-          label: 'WebSocket',
-          path: 'websocket'
-        },
-        {
-          label: 'Child-process IPC',
-          path: 'process'
+          label: '宿主命名空间与插件',
+          path: '../rpc-host/host-and-plugins'
         }
       ]
     }
   },
   'rpc-contract:process': {
-    zh: {
-      title: '用 Node IPC 读取订单',
-      lede: '父子进程共享描述符，并实际等待子进程退出。',
+    en: {
+      title: 'Use the actual process transport',
+      lede: 'Process native launch/connect/listen and parent-loss ownership belong to rpc-plugin-process, not Contract.',
       document: {
         sections: [
           {
-            id: 'process',
-            heading: '在子进程读取订单',
+            id: 'ownership',
+            heading: 'Contract and ownership',
             blocks: [
               {
                 type: 'paragraph',
-                text: '先保存[共享消息页](/zh/docs/rpc-contract/real-world-bindings)的 order.ts。本页使用应用自定义 JSON，服务器和客户端都检查描述符字段；它不使用原生 V1 Envelope。'
+                text: 'Contract owns pure protocol, interfaces and errors. Host owns Sessions, calls and providers; rpc-plugin-process owns native child processes and local sockets. Flow plugins use fixed hooks, and complete features own optional policy. Call through the transport namespace. Separate Hosts are usual; deliberate multi-transport installation uses distinct namespaces.'
               },
               {
                 type: 'paragraph',
-                text: '保存 order.child.ts 和 process.ts，与 order.ts 放在一起。Node 24 原生运行 TS：node process.ts。child 只处理一次消息，父进程读到结果后关闭 IPC 并等待真实退出。'
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { orderReply } from './order.ts'\n\nprocess.once('message', (message) => {\n  process.send!(orderReply(message))\n})"
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { fork } from 'node:child_process'\nimport { once } from 'node:events'\nimport { orderRequest, orderTotal } from './order.ts'\n\nconst child = fork(\n  new URL('./order.child.ts', import.meta.url),\n  { stdio: ['ignore', 'inherit', 'inherit', 'ipc'] }\n)\nconst replied = once(child, 'message')\nconst exited = once(child, 'exit')\nchild.send(orderRequest)\nconst [reply] = await replied\nconsole.log('订单总额:', orderTotal(reply))\nchild.disconnect()\nawait exited"
-              },
-              {
-                type: 'paragraph',
-                text: '输出：'
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: '订单总额: 25'
+                text: 'Contract only describes the same semantic protocol and safe error data. Actual native bootstrap, auth acquisition limits and shutdown are provided by the native source, never by decoded peer claims.'
               }
             ]
           },
           {
-            id: 'ipc-work',
-            heading: '进程由创建它的一方关闭',
+            id: 'example',
+            heading: 'Use the actual public entry',
             blocks: [
               {
-                type: 'table',
-                headers: ['成员与参数', '说明'],
-                rows: [
-                  ['fork(URL, options)', '真实创建 Node 子进程，stdio 里的 ipc 打开父子消息通道。'],
-                  [
-                    'process.send / child.send',
-                    '只负责本例的 JSON 消息传递。格式检查来自共享函数，进程启动不属于 rpc-contract。'
-                  ],
-                  [
-                    'child.disconnect() / exit',
-                    '父进程结束自己创建的 IPC，再等 child 真实退出。长期服务的启动、重启和并发调用使用 rpc-plugin-process。'
-                  ]
-                ]
+                type: 'code',
+                language: 'ts',
+                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin, isProcessChild } from '@migaia/rpc-plugin-process'\n\nif (await isProcessChild()) {\n  await createRpcHost({\n    plugins: [processPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const host = await createRpcHost({\n    plugins: [processPlugin({ spawn: true, connect: { timeoutMs: 1500 } })]\n  })\n  try {\n    console.log(await host.process.request('double', 21))\n  } finally {\n    await host.close()\n  }\n}"
               }
             ]
           }
@@ -71905,74 +69850,38 @@ class CheckoutElement extends HTMLElement {
       },
       next: [
         {
-          label: '消息格式与版本',
-          path: 'descriptors-and-envelopes'
-        },
-        {
-          label: '可移植数据',
-          path: 'portable-values'
+          label: 'Host namespaces and plugins',
+          path: '../rpc-host/host-and-plugins'
         }
       ]
     },
-    en: {
-      title: 'Read an order through Node IPC',
-      lede: 'Share descriptors across parent and child, then await actual process exit.',
+    zh: {
+      title: '使用实际进程传输',
+      lede: '原生进程启动、连接、监听及父端失联所有权属于进程传输包，不属于契约。',
       document: {
         sections: [
           {
-            id: 'process',
-            heading: 'Read the order in a child process',
+            id: 'ownership',
+            heading: '契约与所有权',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'First save order.ts from [shared messages](/en/docs/rpc-contract/real-world-bindings). This page uses application JSON and checks descriptor fields on both sides; it does not use a native V1 envelope.'
+                text: '契约包拥有纯协议、接口及错误；宿主拥有会话、调用及提供方，进程传输包拥有原生子进程及本地套接字。流程插件使用固定钩子，完整功能拥有可选策略。通过传输命名空间调用；通常使用独立宿主，也可用不同命名空间明确隔离多传输安装。'
               },
               {
                 type: 'paragraph',
-                text: 'Save order.child.ts and process.ts beside order.ts and run node process.ts with Node 24. The child handles one message; the parent disconnects IPC after reading it and waits for the actual exit.'
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { orderReply } from './order.ts'\n\nprocess.once('message', (message) => {\n  process.send!(orderReply(message))\n})"
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { fork } from 'node:child_process'\nimport { once } from 'node:events'\nimport { orderRequest, orderTotal } from './order.ts'\n\nconst child = fork(\n  new URL('./order.child.ts', import.meta.url),\n  { stdio: ['ignore', 'inherit', 'inherit', 'ipc'] }\n)\nconst replied = once(child, 'message')\nconst exited = once(child, 'exit')\nchild.send(orderRequest)\nconst [reply] = await replied\nconsole.log('Order total:', orderTotal(reply))\nchild.disconnect()\nawait exited"
-              },
-              {
-                type: 'paragraph',
-                text: 'Output:'
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: 'Order total: 25'
+                text: '契约只描述同一语义协议及安全错误数据。实际原生启动、认证获取限制及关闭由原生来源提供，不能由解码对端声明提供。'
               }
             ]
           },
           {
-            id: 'ipc-work',
-            heading: 'The creating parent closes the process',
+            id: 'example',
+            heading: '使用实际公开入口',
             blocks: [
               {
-                type: 'table',
-                headers: ['Member or parameter', 'Description'],
-                rows: [
-                  [
-                    'fork(URL, options)',
-                    'Creates a native Node child; the ipc stdio entry opens its parent channel.'
-                  ],
-                  [
-                    'process.send / child.send',
-                    'Carry this example’s JSON messages. The shared functions check data; rpc-contract does not start the process.'
-                  ],
-                  [
-                    'child.disconnect() / exit',
-                    'The parent disconnects its own IPC and waits for the child’s actual exit. Use rpc-plugin-process for long-lived startup, restart, and concurrent calls.'
-                  ]
-                ]
+                type: 'code',
+                language: 'ts',
+                code: "import { createRpcHost } from '@migaia/rpc-host'\nimport { processPlugin, isProcessChild } from '@migaia/rpc-plugin-process'\n\nif (await isProcessChild()) {\n  await createRpcHost({\n    plugins: [processPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const host = await createRpcHost({\n    plugins: [processPlugin({ spawn: true, connect: { timeoutMs: 1500 } })]\n  })\n  try {\n    console.log(await host.process.request('double', 21))\n  } finally {\n    await host.close()\n  }\n}"
               }
             ]
           }
@@ -71980,243 +69889,40 @@ class CheckoutElement extends HTMLElement {
       },
       next: [
         {
-          label: 'Message formats and versions',
-          path: 'descriptors-and-envelopes'
-        },
-        {
-          label: 'Portable values',
-          path: 'portable-values'
+          label: '宿主命名空间与插件',
+          path: '../rpc-host/host-and-plugins'
         }
       ]
     }
   },
   'rpc-contract:framing-and-streams': {
-    zh: {
-      title: '还原完整消息，再读取流项目',
-      lede: '字节流切块、消息分片和 RPC 流项目是三个层次。先恢复消息边界，再校验项目与已有读取额度。',
+    en: {
+      title: 'Separate physical framing from stream semantics',
+      lede: 'Stateful byte framing is an executing SDK owner; Contract stream checks remain pure.',
       document: {
         sections: [
           {
-            id: 'byte-stream',
-            heading: '从真实字节流读出商品请求',
+            id: 'ownership',
+            heading: 'Contract and ownership',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'byte-stream.ts 把一条请求编码成长度前缀帧，再通过 Node Readable 分两块交付。解码器经 onFrame 交出完整负载，push 本身不返回消息数组。'
+                text: 'A physical frame uses four-byte big-endian length plus nonempty UTF-8 JSON, with a16MiB payload bound. The decoder reports partial EOF and returns consumed offsets so native bootstrap can hand off a same-chunk tail.'
               },
+              {
+                type: 'paragraph',
+                text: 'StreamChannel owns demand credits, sequence and iterator cleanup. Contract defines open/pull/item/end/fail/cancelled/finish-without-items and pure transition/budget checks; it does not allocate a second stream.'
+              }
+            ]
+          },
+          {
+            id: 'example',
+            heading: 'Use the actual public entry',
+            blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { Readable } from 'node:stream'\nimport {\n  createRpcStreamFrameDecoder,\n  encodeRpcStreamTextFrame\n} from '@migaia/rpc-contract/framing/stream'\nconst frame = encodeRpcStreamTextFrame(JSON.stringify({ sku: 'pen' }), new TextEncoder())\nconst products: unknown[] = []\nconst decoder = createRpcStreamFrameDecoder({\n  onFrame: (bytes) => products.push(JSON.parse(new TextDecoder().decode(bytes))),\n  onError: console.error\n})\nfor await (const chunk of Readable.from([frame.subarray(0, 3), frame.subarray(3)])) {\n  decoder.push(chunk)\n}\ndecoder.finish()\nconsole.log(JSON.stringify(products))"
-              },
-              {
-                type: 'code',
-                language: 'json',
-                code: '[{"sku":"pen"}]'
-              },
-              {
-                type: 'table',
-                headers: ['成员 / 配置', '用途与默认处理'],
-                rows: [
-                  [
-                    '[encodeRpcStreamFrame](/zh/docs/rpc-contract/api/framing/stream/encodeRpcStreamFrame)(payload: Uint8Array)',
-                    '返回四字节大端长度加非空负载；最大负载为 RPC_STREAM_MAX_FRAME_BYTES，即 16777216 字节。'
-                  ],
-                  [
-                    '[encodeRpcStreamTextFrame](/zh/docs/rpc-contract/api/framing/stream/encodeRpcStreamTextFrame)(text, encoder, storage?)',
-                    'encoder 提供 encode 与 encodeInto；storage 省略或容量不足时分配新空间。复用空间前需等原发送完成，返回视图不代表独立副本。'
-                  ],
-                  [
-                    '[createRpcStreamFrameDecoder](/zh/docs/rpc-contract/api/framing/stream/createRpcStreamFrameDecoder)({ onFrame, onError })',
-                    'onFrame 接收完整 Uint8Array；onError 收到首个分帧错误。默认上限 16777216 字节，回调应由连接所有者接收并处理。'
-                  ],
-                  [
-                    '[createRpcStreamFrameDecoderWithLimit](/zh/docs/rpc-contract/api/framing/stream/createRpcStreamFrameDecoderWithLimit)(options, maxFrameBytes)',
-                    '每次分配完整负载前调用 maxFrameBytes()；可在启动阶段采用更小上限，而不是先分配再检查。'
-                  ],
-                  [
-                    'decoder.push(chunk): void / finish(): void / close(): void',
-                    'push 接受任意字节切块；连接读完调用 finish 检查残帧；close 放弃当前残帧。错误后不继续把数据送入该解码器。'
-                  ],
-                  [
-                    '[encodeJsonRpcFrame](/zh/docs/rpc-contract/api/framing/jsonrpc/encodeJsonRpcFrame)(value) / [createJsonRpcFrameDecoder](/zh/docs/rpc-contract/api/framing/jsonrpc/createJsonRpcFrameDecoder)()',
-                    'Content-Length 方式用于 JSON-RPC，和四字节前缀不能混用。编码返回字节；decoder.push(chunk) 返回本次完整消息数组，finish/close 结束读取或丢弃状态。'
-                  ],
-                  [
-                    'JsonRpcLimit / decoder.bufferedBytes',
-                    'JSON-RPC 头最多 1024 字节、正文最多 16777216 字节；bufferedBytes 读取当前缓存量。handshakeMs 为 10000，计时仍由宿主负责。'
-                  ]
-                ]
-              },
-              {
-                type: 'paragraph',
-                text: 'Content-Length 编解码与错误常量由本包 `/framing/jsonrpc` 提供。应用已有字节通道时，使用 [Process 连接入口](/zh/docs/rpc-plugin-process/getting-started)完成握手；无需安装旧桥接包。'
-              }
-            ]
-          },
-          {
-            id: 'message-fragments',
-            heading: '组装一段商品说明',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: 'fragments.ts 中发送端和接收端分别持有一个分帧器。context 的 source 与 messageId 用于区分组装记录，只是本例的数据标签，不证明对端身份。'
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { createStringFramer } from '@migaia/rpc-contract/framing'\nconst sender = createStringFramer({ chunkBytes: 8 })\nconst receiver = createStringFramer()\nconst context = { source: 'catalog', messageId: 'description-42' }\nconst frames = sender.frame('A refillable black pen', context)\nconst descriptions: string[] = []\nfor (const frame of frames) {\n  const result = receiver.accept(frame, context)\n  if (result.status === 'complete') descriptions.push(result.value)\n}\nconsole.log(JSON.stringify({ descriptions, fragments: frames.length }))\nsender.close()\nreceiver.close()"
-              },
-              {
-                type: 'code',
-                language: 'json',
-                code: '{"descriptions":["A refillable black pen"],"fragments":3}'
-              },
-              {
-                type: 'table',
-                headers: ['成员 / 配置', '用途与默认处理'],
-                rows: [
-                  [
-                    '[createStringFramer](/zh/docs/rpc-contract/api/framing/createStringFramer)(options?) / [createBinaryFramer](/zh/docs/rpc-contract/api/framing/createBinaryFramer)(options?)',
-                    '字符串按 UTF-16 长度计量，二进制按字节计量。两端应选择兼容的格式和组装预算。'
-                  ],
-                  [
-                    'chunkBytes?: number / maxMessageBytes?: number',
-                    '默认 16384 和 16777216；分别限制单片与完整消息。正安全整数，且单片不能大于完整消息。'
-                  ],
-                  [
-                    'maxChunks?: number / maxBufferedBytes?: number',
-                    '默认 4096 和 67108864；分别限制每条消息片数与全部未完成组装内容，消息上限不能大于总缓存上限。'
-                  ],
-                  [
-                    'maxConcurrentMessages?: number / assemblyTimeoutMs?: number',
-                    '默认 256 和 30000；限制未完成消息数与每条组装的等待时间。没有每对端的独立并发配置。'
-                  ],
-                  [
-                    'now?: () => number / schedule?: (callback, delayMs) => unknown / cancel?: (handle) => void',
-                    '省略时使用平台时刻与定时器；自定义时提供互相配套的时刻、安排和取消操作。'
-                  ],
-                  [
-                    'framer.frame(value, { source, messageId }) / accept(frame, context)',
-                    'frame 返回帧数组；accept 返回 pending、complete/value 或 rejected/error。需要按片序到达，不负责补发。'
-                  ],
-                  [
-                    'messageFramerV1 / remoteProcessStringFramer',
-                    '分别保留完整任意消息或完整字符串边界，不再次拆片；remoteProcessStringFramer 对非字符串输入抛出带 INVALID_FRAME 的 TypeError。'
-                  ],
-                  [
-                    '[bindRpcFrameIngress](/zh/docs/rpc-contract/api/framing/bindRpcFrameIngress)(accept, frame?)',
-                    '把接收前准备操作绑定到实际 callable；返回 { frame, messageId }，原生分帧器可带 nativeOutputDomain/singleFrameLimits。自定义 callable 保留原帧，不由描述字段得到额外能力。'
-                  ]
-                ]
-              }
-            ]
-          },
-          {
-            id: 'physical-size',
-            heading: '检查已经编码的物理帧',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['成员 / 配置', '用途与默认处理'],
-                rows: [
-                  [
-                    '[measureRpcPhysicalFrame](/zh/docs/rpc-contract/api/framing/measureRpcPhysicalFrame)(value): number',
-                    '字符串计 UTF-8 字节，Uint8Array 计 byteLength，普通对象按 JSON.stringify 后计字节；不是业务对象的递归内存大小。'
-                  ],
-                  [
-                    '[assertRpcPhysicalFrameSize](/zh/docs/rpc-contract/api/framing/assertRpcPhysicalFrameSize)(value, limit): void',
-                    '检查编码后物理大小，超限抛出带 FRAME_LIMIT_EXCEEDED 的 RangeError。'
-                  ],
-                  [
-                    '[inspectRpcPhysicalFrame](/zh/docs/rpc-contract/api/framing/inspectRpcPhysicalFrame)(value, limit)',
-                    '返回 bytes 与 splitBatch(members)。超限批次按成员数对半拆一次，调用方仍需重新编码各半并检查；单个超大成员不能靠拆分解决。'
-                  ],
-                  [
-                    '[readRpcBatchMembers](/zh/docs/rpc-contract/api/framing/readRpcBatchMembers)(value)',
-                    '从已解码的批量包装中读取成员副本；非批量返回 undefined。各成员仍须分别校验，不因批量外壳通过就视为有效消息。'
-                  ]
-                ]
-              }
-            ]
-          },
-          {
-            id: 'startup-receivers',
-            heading: '让原宿主控制启动和激活',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['成员 / 配置', '用途与默认处理'],
-                rows: [
-                  [
-                    '[createRpcBootstrapFrameReceiver](/zh/docs/rpc-contract/api/framing/stream/createRpcBootstrapFrameReceiver)()',
-                    '接收第一条 bootstrap，并在交接前最多保留下一条握手帧；不创建连接或计时器。'
-                  ],
-                  [
-                    'bootstrap.bootstrap / receivedBootstrap / ready',
-                    'bootstrap 是首次负载 Promise；receivedBootstrap 表示已收到，ready 只由 activate() 改变。'
-                  ],
-                  [
-                    'bootstrap.accept(frame) / fail(error) / attach(onFrame,onError) / activate()',
-                    'accept 可返回格式错误；fail 交出原错误。attach 转交暂存帧或错误并返回解除函数；activate 只切换本接收器阶段，不代表认证成功。'
-                  ],
-                  [
-                    '[createRpcHandshakeFrameReceiver](/zh/docs/rpc-contract/api/framing/stream/createRpcHandshakeFrameReceiver)({ role? })',
-                    'role 选择 initiator 或 responder 的接收规则；省略时不加发起方的提前业务帧分支。接收器本身不校验协商是否成功。'
-                  ],
-                  [
-                    'handshake.accept(frame) / readHandshakeFrame(): Promise<string>',
-                    'accept 返回业务文本、Error 或 undefined；首条握手交给唯一的 readHandshakeFrame 等待者，不允许第二次握手读取。'
-                  ],
-                  [
-                    'deferActivation() / beginAccept() / activate() / close(reason) / ready',
-                    '分别延后交付、记录响应方开始接受、激活业务读取、用原原因结束读取、读取当前阶段；宿主负责按真实收发顺序调用。'
-                  ]
-                ]
-              }
-            ]
-          },
-          {
-            id: 'rpc-stream-items',
-            heading: '检查流项目与已经持有的额度',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: '应用层流项目不同于字节切块。下面的检查函数读取调用方已有的 seq、pending、busy，不生成额度、不执行迭代器；有效时返回 undefined，违规时返回 Error，调用方决定如何结束该流。'
-              },
-              {
-                type: 'table',
-                headers: ['成员 / 配置', '用途与默认处理'],
-                rows: [
-                  [
-                    '[normalizeStreamPayload](/zh/docs/rpc-contract/api/stream/normalizeStreamPayload)(value, portableValue?)',
-                    '校验 event、非负安全整数 seq、允许的 value/error/reason 组合；value 默认按可移植值处理。项目内容上限为 16384 字节。'
-                  ],
-                  [
-                    'RpcStreamEvent / RpcStreamLimit / RpcStreamViolation / RpcStreamPointer',
-                    '事件为 open/pull/item/end/fail/cancel/cancelled；每对端流上限常量为 256，由实际运行时执行限制。Violation 与 Pointer 用于定位格式、方向、字段、序号或容量错误。'
-                  ],
-                  [
-                    '[measurePortableStreamValue](/zh/docs/rpc-contract/api/stream/measurePortableStreamValue)(value): number',
-                    '计算 JSON 兼容内容大小，不依赖某个 codec，也不包含整个路由和物理帧开销。'
-                  ],
-                  [
-                    '[checkRpcStreamInitialSequence](/zh/docs/rpc-contract/api/stream/checkRpcStreamInitialSequence)(payload, pointer?) / [checkRpcStreamSequence](/zh/docs/rpc-contract/api/stream/checkRpcStreamSequence)(payload, expected, pointer?)',
-                    '前者要求起始 seq 为 0；后者要求与已有 expected.seq 相同，缺少 expected 不能通过。pointer 默认 /seq。'
-                  ],
-                  [
-                    '[checkRpcStreamProgress](/zh/docs/rpc-contract/api/stream/checkRpcStreamProgress)(payload, state, pointer?)',
-                    '要求新 seq 不小于已持有 seq；用于已经丢弃中间项后的完成通知，不意味着每项都已交付。'
-                  ],
-                  [
-                    '[checkRpcStreamConsumerCredit](/zh/docs/rpc-contract/api/stream/checkRpcStreamConsumerCredit)(payload, state, pointer?) / [checkRpcStreamProducerCredit](/zh/docs/rpc-contract/api/stream/checkRpcStreamProducerCredit)(payload, state, pointer?)',
-                    '消费者要求 seq 相同且 pending 为真；生产者要求 seq 相同且 busy 为假。它们不修改传入状态，pointer 默认 /seq。'
-                  ],
-                  [
-                    '[checkRpcRuntimeStreamTransition](/zh/docs/rpc-contract/api/stream/checkRpcRuntimeStreamTransition)(control, options) / [checkRpcRuntimeStreamIntent](/zh/docs/rpc-contract/api/stream/checkRpcRuntimeStreamIntent)(intent, options) / [checkRpcRuntimeStreamFinish](/zh/docs/rpc-contract/api/stream/checkRpcRuntimeStreamFinish)(options)',
-                    'finish-without-items 或 finish:true 只在原 options.cancel 为 before-start 时允许；非法返回 INVALID_STREAM，不会替调用方更新生产者。'
-                  ]
-                ]
+                code: "import { encodeRpcStreamFrame, createRpcStreamFrameDecoder } from '@migaia/rpc-host/sdk'\n\nconst decoder = createRpcStreamFrameDecoder({\n  onFrame: (payload) => console.log(payload),\n  onError: console.error\n})\nconst frame = encodeRpcStreamFrame(new Uint8Array([1, 2, 3]))\ndecoder.push(frame.subarray(0, 2))\ndecoder.push(frame.subarray(2))\ndecoder.finish()\ndecoder.close()"
               }
             ]
           }
@@ -72224,237 +69930,38 @@ class CheckoutElement extends HTMLElement {
       },
       next: [
         {
-          label: '继续运行时消息',
-          path: 'runtime-bindings'
+          label: 'Host namespaces and plugins',
+          path: '../rpc-host/host-and-plugins'
         }
       ]
     },
-    en: {
-      title: 'Reassemble messages before reading stream items',
-      lede: 'Byte chunks, message fragments, and RPC stream items are separate layers. Restore message boundaries before validating items against held demand.',
+    zh: {
+      title: '区分物理分帧与流语义',
+      lede: '有状态字节分帧属于执行作者工具所有者，契约流检查保持纯操作。',
       document: {
         sections: [
           {
-            id: 'byte-stream',
-            heading: 'Read a product request from a real byte stream',
+            id: 'ownership',
+            heading: '契约与所有权',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'byte-stream.ts encodes a length-prefixed request and delivers it in two chunks through Node Readable. The decoder delivers complete payloads through onFrame; push does not return an array.'
+                text: '物理帧使用四字节大端长度及非空文本正文，载荷上限十六兆字节。解码器报告不完整输入结束，并返回消费偏移，使原生启动可以移交同块尾部。'
               },
+              {
+                type: 'paragraph',
+                text: '流所有者拥有需求额度、序号及迭代器清理。契约定义打开、拉取、项目、结束、失败、取消及无项目结束等事件和纯转换及预算检查，不分配第二个流。'
+              }
+            ]
+          },
+          {
+            id: 'example',
+            heading: '使用实际公开入口',
+            blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { Readable } from 'node:stream'\nimport {\n  createRpcStreamFrameDecoder,\n  encodeRpcStreamTextFrame\n} from '@migaia/rpc-contract/framing/stream'\nconst frame = encodeRpcStreamTextFrame(JSON.stringify({ sku: 'pen' }), new TextEncoder())\nconst products: unknown[] = []\nconst decoder = createRpcStreamFrameDecoder({\n  onFrame: (bytes) => products.push(JSON.parse(new TextDecoder().decode(bytes))),\n  onError: console.error\n})\nfor await (const chunk of Readable.from([frame.subarray(0, 3), frame.subarray(3)])) {\n  decoder.push(chunk)\n}\ndecoder.finish()\nconsole.log(JSON.stringify(products))"
-              },
-              {
-                type: 'code',
-                language: 'json',
-                code: '[{"sku":"pen"}]'
-              },
-              {
-                type: 'table',
-                headers: ['Member / setting', 'Purpose and default behavior'],
-                rows: [
-                  [
-                    '[encodeRpcStreamFrame](/en/docs/rpc-contract/api/framing/stream/encodeRpcStreamFrame)(payload: Uint8Array)',
-                    'Return a four-byte big-endian length and nonempty payload; RPC_STREAM_MAX_FRAME_BYTES is 16777216 bytes.'
-                  ],
-                  [
-                    '[encodeRpcStreamTextFrame](/en/docs/rpc-contract/api/framing/stream/encodeRpcStreamTextFrame)(text, encoder, storage?)',
-                    'encoder supplies encode and encodeInto. Missing or undersized storage allocates a backing; wait for the previous send before reusing storage. The returned view is not necessarily independent.'
-                  ],
-                  [
-                    '[createRpcStreamFrameDecoder](/en/docs/rpc-contract/api/framing/stream/createRpcStreamFrameDecoder)({ onFrame, onError })',
-                    'onFrame receives complete Uint8Arrays; onError receives the first framing error. The default limit is 16777216 bytes; the connection owner handles these callbacks.'
-                  ],
-                  [
-                    '[createRpcStreamFrameDecoderWithLimit](/en/docs/rpc-contract/api/framing/stream/createRpcStreamFrameDecoderWithLimit)(options, maxFrameBytes)',
-                    'Call maxFrameBytes() before each payload allocation, allowing a smaller startup cap before allocating.'
-                  ],
-                  [
-                    'decoder.push(chunk): void / finish(): void / close(): void',
-                    'push accepts arbitrary byte chunks; finish checks incomplete framing at EOF, while close discards partial state. Stop feeding this decoder after failure.'
-                  ],
-                  [
-                    '[encodeJsonRpcFrame](/en/docs/rpc-contract/api/framing/jsonrpc/encodeJsonRpcFrame)(value) / [createJsonRpcFrameDecoder](/en/docs/rpc-contract/api/framing/jsonrpc/createJsonRpcFrameDecoder)()',
-                    'Content-Length framing is for JSON-RPC and is incompatible with the four-byte prefix. Encoding returns bytes; decoder.push(chunk) returns complete messages, with finish/close ending input or discarding state.'
-                  ],
-                  [
-                    'JsonRpcLimit / decoder.bufferedBytes',
-                    'JSON-RPC headers are limited to 1024 bytes and bodies to 16777216 bytes; bufferedBytes reads current buffering. handshakeMs is 10000, but the host owns the timer.'
-                  ]
-                ]
-              },
-              {
-                type: 'paragraph',
-                text: 'This package’s `/framing/jsonrpc` entry owns Content-Length framing and error constants. Use the [Process binding](/en/docs/rpc-plugin-process/getting-started) to negotiate an application-owned byte channel; the retired bridge package is no longer required.'
-              }
-            ]
-          },
-          {
-            id: 'message-fragments',
-            heading: 'Reassemble a product description',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: 'The sender and receiver in fragments.ts each own a framer. context.source and messageId separate reassembly records; these example labels do not authenticate the sender.'
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { createStringFramer } from '@migaia/rpc-contract/framing'\nconst sender = createStringFramer({ chunkBytes: 8 })\nconst receiver = createStringFramer()\nconst context = { source: 'catalog', messageId: 'description-42' }\nconst frames = sender.frame('A refillable black pen', context)\nconst descriptions: string[] = []\nfor (const frame of frames) {\n  const result = receiver.accept(frame, context)\n  if (result.status === 'complete') descriptions.push(result.value)\n}\nconsole.log(JSON.stringify({ descriptions, fragments: frames.length }))\nsender.close()\nreceiver.close()"
-              },
-              {
-                type: 'code',
-                language: 'json',
-                code: '{"descriptions":["A refillable black pen"],"fragments":3}'
-              },
-              {
-                type: 'table',
-                headers: ['Member / setting', 'Purpose and default behavior'],
-                rows: [
-                  [
-                    '[createStringFramer](/en/docs/rpc-contract/api/framing/createStringFramer)(options?) / [createBinaryFramer](/en/docs/rpc-contract/api/framing/createBinaryFramer)(options?)',
-                    'Strings count UTF-16 units and binary counts bytes. Both ends need compatible framing and budgets.'
-                  ],
-                  [
-                    'chunkBytes?: number / maxMessageBytes?: number',
-                    'Default to 16384 and 16777216, bounding fragments and complete messages. Positive safe integers; fragments cannot exceed the message limit.'
-                  ],
-                  [
-                    'maxChunks?: number / maxBufferedBytes?: number',
-                    'Default to 4096 and 67108864, bounding fragments per message and total incomplete assembly; the message limit cannot exceed the buffer limit.'
-                  ],
-                  [
-                    'maxConcurrentMessages?: number / assemblyTimeoutMs?: number',
-                    'Default to 256 and 30000, bounding incomplete messages and assembly duration. No separate per-peer concurrency setting exists.'
-                  ],
-                  [
-                    'now?: () => number / schedule?: (callback, delayMs) => unknown / cancel?: (handle) => void',
-                    'Omission uses platform time and timers; custom time, scheduling, and cancellation operations should be consistent.'
-                  ],
-                  [
-                    'framer.frame(value, { source, messageId }) / accept(frame, context)',
-                    'frame returns physical frames; accept returns pending, complete/value, or rejected/error. Fragments must arrive in order; retransmission is not provided.'
-                  ],
-                  [
-                    'messageFramerV1 / remoteProcessStringFramer',
-                    'Preserve whole arbitrary-message or string boundaries without splitting again; remoteProcessStringFramer throws TypeError with INVALID_FRAME for non-string input.'
-                  ],
-                  [
-                    '[bindRpcFrameIngress](/en/docs/rpc-contract/api/framing/bindRpcFrameIngress)(accept, frame?)',
-                    'Bind ingress preparation to the actual callable, returning frame and messageId. Native framers may expose nativeOutputDomain/singleFrameLimits; custom callables retain the original frame without gaining capabilities from metadata.'
-                  ]
-                ]
-              }
-            ]
-          },
-          {
-            id: 'physical-size',
-            heading: 'Inspect the encoded physical frame',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['Member / setting', 'Purpose and default behavior'],
-                rows: [
-                  [
-                    '[measureRpcPhysicalFrame](/en/docs/rpc-contract/api/framing/measureRpcPhysicalFrame)(value): number',
-                    'Measure string UTF-8 bytes, Uint8Array.byteLength, or JSON.stringify output for objects; this is not recursive heap size.'
-                  ],
-                  [
-                    '[assertRpcPhysicalFrameSize](/en/docs/rpc-contract/api/framing/assertRpcPhysicalFrameSize)(value, limit): void',
-                    'Check physical encoded size; excess throws a RangeError coded FRAME_LIMIT_EXCEEDED.'
-                  ],
-                  [
-                    '[inspectRpcPhysicalFrame](/en/docs/rpc-contract/api/framing/inspectRpcPhysicalFrame)(value, limit)',
-                    'Return bytes and splitBatch(members). An oversized batch is bisected once by member count; callers must encode and check each half again. An oversized singleton cannot be split.'
-                  ],
-                  [
-                    '[readRpcBatchMembers](/en/docs/rpc-contract/api/framing/readRpcBatchMembers)(value)',
-                    'Read a copied member list from a decoded batch wrapper, returning undefined for other values. Validate each member separately; a valid wrapper does not admit its contents.'
-                  ]
-                ]
-              }
-            ]
-          },
-          {
-            id: 'startup-receivers',
-            heading: 'Let the host control startup and activation',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['Member / setting', 'Purpose and default behavior'],
-                rows: [
-                  [
-                    '[createRpcBootstrapFrameReceiver](/en/docs/rpc-contract/api/framing/stream/createRpcBootstrapFrameReceiver)()',
-                    'Receive the first bootstrap and retain at most one following handshake frame before handoff; create neither connections nor timers.'
-                  ],
-                  [
-                    'bootstrap.bootstrap / receivedBootstrap / ready',
-                    'bootstrap is the first-payload Promise; receivedBootstrap records receipt, while only activate() changes ready.'
-                  ],
-                  [
-                    'bootstrap.accept(frame) / fail(error) / attach(onFrame,onError) / activate()',
-                    'accept may return a grammar error; fail forwards the original error. attach hands off queued data/error and returns an unsubscribe function; activate only changes this receiver’s phase, without authenticating the peer.'
-                  ],
-                  [
-                    '[createRpcHandshakeFrameReceiver](/en/docs/rpc-contract/api/framing/stream/createRpcHandshakeFrameReceiver)({ role? })',
-                    'role selects initiator or responder receive rules; omission adds no initiator early-business branch. This receiver does not validate the negotiated agreement.'
-                  ],
-                  [
-                    'handshake.accept(frame) / readHandshakeFrame(): Promise<string>',
-                    'accept returns business text, Error, or undefined. The first handshake feeds the single readHandshakeFrame reader; another handshake read is not allowed.'
-                  ],
-                  [
-                    'deferActivation() / beginAccept() / activate() / close(reason) / ready',
-                    'Defer delivery, record responder acceptance, activate business reads, close with the original reason, or read the phase; the host calls these in its actual I/O order.'
-                  ]
-                ]
-              }
-            ]
-          },
-          {
-            id: 'rpc-stream-items',
-            heading: 'Check stream items against held demand',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: 'Application stream items differ from byte chunks. These checks read the caller’s existing seq, pending, and busy state without creating credits or driving iterators. They return undefined when valid or an Error for the owner to handle.'
-              },
-              {
-                type: 'table',
-                headers: ['Member / setting', 'Purpose and default behavior'],
-                rows: [
-                  [
-                    '[normalizeStreamPayload](/en/docs/rpc-contract/api/stream/normalizeStreamPayload)(value, portableValue?)',
-                    'Validate event, nonnegative safe-integer seq, and permitted value/error/reason combinations. value uses portable validation by default and has a 16384-byte item budget.'
-                  ],
-                  [
-                    'RpcStreamEvent / RpcStreamLimit / RpcStreamViolation / RpcStreamPointer',
-                    'Events are open/pull/item/end/fail/cancel/cancelled. The 256-stream per-peer constant is enforced by a runtime owner. Violation and Pointer locate grammar, direction, field, sequence, or budget errors.'
-                  ],
-                  [
-                    '[measurePortableStreamValue](/en/docs/rpc-contract/api/stream/measurePortableStreamValue)(value): number',
-                    'Count JSON-compatible content without depending on a codec or including routing and physical-frame overhead.'
-                  ],
-                  [
-                    '[checkRpcStreamInitialSequence](/en/docs/rpc-contract/api/stream/checkRpcStreamInitialSequence)(payload, pointer?) / [checkRpcStreamSequence](/en/docs/rpc-contract/api/stream/checkRpcStreamSequence)(payload, expected, pointer?)',
-                    'Require initial seq 0 or equality with held expected.seq; absent expected does not pass. pointer defaults to /seq.'
-                  ],
-                  [
-                    '[checkRpcStreamProgress](/en/docs/rpc-contract/api/stream/checkRpcStreamProgress)(payload, state, pointer?)',
-                    'Require nondecreasing seq for completion after discarded intermediate items; this does not establish delivery of every item.'
-                  ],
-                  [
-                    '[checkRpcStreamConsumerCredit](/en/docs/rpc-contract/api/stream/checkRpcStreamConsumerCredit)(payload, state, pointer?) / [checkRpcStreamProducerCredit](/en/docs/rpc-contract/api/stream/checkRpcStreamProducerCredit)(payload, state, pointer?)',
-                    'Consumer checks require matching seq and truthy pending; producer checks require matching seq and false busy. Neither mutates state; pointer defaults to /seq.'
-                  ],
-                  [
-                    '[checkRpcRuntimeStreamTransition](/en/docs/rpc-contract/api/stream/checkRpcRuntimeStreamTransition)(control, options) / [checkRpcRuntimeStreamIntent](/en/docs/rpc-contract/api/stream/checkRpcRuntimeStreamIntent)(intent, options) / [checkRpcRuntimeStreamFinish](/en/docs/rpc-contract/api/stream/checkRpcRuntimeStreamFinish)(options)',
-                    'finish-without-items or finish:true requires original options.cancel before-start; invalid input returns INVALID_STREAM without updating the producer.'
-                  ]
-                ]
+                code: "import { encodeRpcStreamFrame, createRpcStreamFrameDecoder } from '@migaia/rpc-host/sdk'\n\nconst decoder = createRpcStreamFrameDecoder({\n  onFrame: (payload) => console.log(payload),\n  onError: console.error\n})\nconst frame = encodeRpcStreamFrame(new Uint8Array([1, 2, 3]))\ndecoder.push(frame.subarray(0, 2))\ndecoder.push(frame.subarray(2))\ndecoder.finish()\ndecoder.close()"
               }
             ]
           }
@@ -72462,163 +69969,40 @@ class CheckoutElement extends HTMLElement {
       },
       next: [
         {
-          label: 'Continue to runtime messages',
-          path: 'runtime-bindings'
+          label: '宿主命名空间与插件',
+          path: '../rpc-host/host-and-plugins'
         }
       ]
     }
   },
   'rpc-contract:wire-errors-and-metadata': {
-    zh: {
-      title: '传递错误链，并选择对外内容',
-      lede: '序列化保留错误类别与错误链，metadata 选择可公开的摘要和路由。还原出的错误用于诊断，不授予本地调用权限。',
+    en: {
+      title: 'Preserve native error graphs',
+      lede: 'The single wire format is a flat root/nodes graph with indexed cause/errors edges and original sender stacks.',
       document: {
         sections: [
           {
-            id: 'error-chain',
-            heading: '把库存失败传到另一端',
+            id: 'ownership',
+            heading: 'Contract and ownership',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'wire-error.ts 把原生 RangeError 经 JSON 发送并还原；输出包含最外层错误名、业务消息和链中节点数。序列化不会打印 stack，接收方仍可保留发送方的 stack 数据。'
+                text: 'Cross-realm restoration creates new objects while retaining supported native classes, source/code/name/message/stack and graph relationships. It cannot preserve cross-process object identity. Standalone tree helpers under errors are pure diagnostics, not a second business protocol.'
               },
               {
-                type: 'code',
-                language: 'ts',
-                code: "import {\n  deserializeRpcError, reachRpcError, serializeRpcError\n} from '@migaia/rpc-contract/errors'\nconst original = new RangeError('stock limit exceeded', { cause: new Error('stock is 2') })\nconst wire = serializeRpcError(original, { report: console.error })\nconst received: unknown = JSON.parse(JSON.stringify(wire))\nconst restored = deserializeRpcError(received)\nconst failures = [...reachRpcError(restored, { report: console.error })]\nconsole.log(JSON.stringify({\n  name: restored.name,\n  message: restored.message,\n  chainLength: failures.length\n}))"
-              },
-              {
-                type: 'code',
-                language: 'json',
-                code: '{"name":"RangeError","message":"stock limit exceeded","chainLength":2}'
-              },
-              {
-                type: 'table',
-                headers: ['成员 / 配置', '用途与默认处理'],
-                rows: [
-                  [
-                    '[serializeRpcError](/zh/docs/rpc-contract/api/errors/serializeRpcError)(value, { report }, metadata?): IRpcSerializedError',
-                    '处理任意抛出值，生成有上限的错误树。report(failure) 接收 pointer、field、error，处理不可读取或无法投影的字段；没有此回调不能省略成静默降级。'
-                  ],
-                  [
-                    'IRpcSerializedError',
-                    'source/code/name/message/stack 为基础字段；cause、errors、data、route、truncated 按实际内容出现。普通无错误码 Error 使用 unknown/UNKNOWN，不冒用本包来源。'
-                  ],
-                  [
-                    '[normalizeRpcSerializedError](/zh/docs/rpc-contract/api/errors/normalizeRpcSerializedError)(value, options?)',
-                    '校验收到的完整错误树并返回冻结副本，不用未经校验的远端 data 当作本地错误对象。'
-                  ],
-                  [
-                    '[deserializeRpcError](/zh/docs/rpc-contract/api/errors/deserializeRpcError)(value, options?, routes?): Error',
-                    '先校验再恢复原生错误类别，保留远端 stack 和嵌套错误；不会把远端对象变成本包在本地抛出的原实例。'
-                  ],
-                  [
-                    "options.unknownFields?: 'reject' | 'ignore' / onUnknownField?(pointer, field)",
-                    '默认 reject，遇到未知字段直接抛错且不通知；ignore 跳过扩展字段，并调用 onUnknownField(pointer,field)，不把它们加入错误树。'
-                  ],
-                  [
-                    '[reachRpcError](/zh/docs/rpc-contract/api/errors/reachRpcError)(value, { report }): Generator<unknown>',
-                    '遍历 cause、AggregateError.errors 及清理错误，按对象引用去重；report 接收遍历中字段读取失败，最多访问 4096 个对象。'
-                  ],
-                  [
-                    'RpcWireErrorLimit / RpcErrorReachLimit',
-                    '线上限制为嵌套 48、嵌入深度 16、节点 1024、单字符串 65536 字节、总量 1048576 字节；超出序列化预算会裁剪。遍历对象上限是独立的 4096。'
-                  ],
-                  [
-                    '@migaia/rpc-contract/schema/wire-error',
-                    '发布的 JSON Schema 用于其它语言校验线上错误格式；它不执行本地错误恢复或决定重试。'
-                  ]
-                ]
+                type: 'paragraph',
+                text: 'Error metadata maps are explicit caller-owned presentation authority for actual local errors. Received source/code never grants retry, retirement or native resource authority. Schemas cannot independently prove graph indices, total budgets or IO lifetime.'
               }
             ]
           },
           {
-            id: 'public-summary',
-            heading: '对外只展示缺货摘要',
+            id: 'example',
+            heading: 'Use the actual public entry',
             blocks: [
-              {
-                type: 'paragraph',
-                text: 'error-summary.ts 为同一个 Error 选择公开 code 与 message，再放进 JSON-RPC 扩展。原错误仍由本地业务持有；默认摘要不带出原 cause。'
-              },
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { fromJsonRpcError, serializeRpcError, toJsonRpcError } from '@migaia/rpc-contract/errors'\nconst original = new Error('internal stock row 42', { cause: new Error('warehouse database') })\nconst summaries = new WeakMap([\n  [original, { code: 'OUT_OF_STOCK', message: 'Item unavailable' }]\n])\nconst wire = serializeRpcError(original, { report: console.error }, { summaries })\nconst response = toJsonRpcError(wire, -32000)\nconst visible = fromJsonRpcError(JSON.parse(JSON.stringify(response)))\nconsole.log(JSON.stringify({\n  code: visible.code,\n  message: visible.message,\n  includesCause: 'cause' in visible\n}))"
-              },
-              {
-                type: 'code',
-                language: 'json',
-                code: '{"code":"OUT_OF_STOCK","message":"Item unavailable","includesCause":false}'
-              },
-              {
-                type: 'table',
-                headers: ['成员 / 配置', '用途与默认处理'],
-                rows: [
-                  [
-                    "metadata.summaries?: Pick<WeakMap<Error, IRpcErrorWireSummary>, 'get'>",
-                    '按实际 Error 引用选择 code/message。省略时读取普通错误及本包已有摘要；preserveSerializedError:true 保留已有序列化后代，默认摘要隐藏它们。'
-                  ],
-                  [
-                    "metadata.routes?: Pick<WeakMap<Error, readonly string[]>, 'get'>",
-                    '给指定错误附诊断路由；省略时用原错误已登记的路由。路线为 1–4 个 32 位小写十六进制节点编号，不是可执行路径。'
-                  ],
-                  [
-                    "deserialize routes?: Pick<WeakMap<Error, readonly string[]>, 'set'>",
-                    '接收还原后 Error 与已校验路由的对应关系；省略时不写入调用方自己的映射。'
-                  ],
-                  [
-                    '[toJsonRpcError](/zh/docs/rpc-contract/api/errors/toJsonRpcError)(wireError, code): IRpcJsonRpcErrorObject',
-                    'code 使用调用方选定的安全整数；完整错误树放在 data.migaiaWireError，message 来自已校验的错误树。'
-                  ],
-                  [
-                    '[fromJsonRpcError](/zh/docs/rpc-contract/api/errors/fromJsonRpcError)(value): IRpcSerializedError',
-                    '读取扩展错误树；没有扩展时用 jsonrpc-2.0 来源及整数 code 的字符串表示生成记录，不伪造对方的原错误链。'
-                  ],
-                  [
-                    '[classifyRpcContractError](/zh/docs/rpc-contract/api/errors/classifyRpcContractError)(error)',
-                    '只识别本包在当前环境记录过的原错误引用，返回 code/message 摘要；复制或反序列化的同形对象返回 undefined。'
-                  ]
-                ]
-              }
-            ]
-          },
-          {
-            id: 'error-codes',
-            heading: '按来源与错误码定位',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['成员 / 配置', '用途与默认处理'],
-                rows: [
-                  [
-                    'RPC_CONTRACT_SOURCE / RpcContractErrorCode',
-                    '来源为 `rpc.contract`。按 source 与 code 判断，不以可变的 message 文本选择业务恢复。'
-                  ],
-                  [
-                    'INVALID_DESCRIPTOR / INVALID_ENVELOPE / INVALID_STREAM',
-                    '分别检查描述、信封或流项目输入；同样的无效内容不应原样重发。'
-                  ],
-                  [
-                    'INVALID_FRAME / FRAME_LIMIT_EXCEEDED / FRAME_ASSEMBLY_EXPIRED',
-                    '修正物理格式、减小消息或处理未完成组装；它们不说明远端业务是否已经运行。'
-                  ],
-                  [
-                    'INVALID_WIRE_ERROR',
-                    '收到的错误树不符合格式；保留本地诊断，不把它误作可信的远端业务错误。'
-                  ],
-                  [
-                    'HANDSHAKE_INVALID / HANDSHAKE_INCOMPATIBLE / HANDSHAKE_REJECTED',
-                    '分别修复握手内容、双方版本/能力组合或上层校验；建新连接前处理原失败。'
-                  ],
-                  [
-                    '`JSONRPC_BRIDGE_ERROR_SOURCE` / `JsonRpcBridgeErrorCode` / `IJsonRpcBridgeErrorCode`',
-                    '从 `@migaia/rpc-contract/framing/jsonrpc` 导入。稳定的 source 仍为 `rpc.contract.jsonrpc`；五个码覆盖帧、扩展、配置、调用模式与握手超时，Process 连接页列出处理方式。'
-                  ],
-                  [
-                    'RpcWireErrorViolation / RpcWireErrorUnknownFieldMode / RpcWireErrorField / RpcWireErrorFallback / RpcJsonRpcWireError',
-                    '分别提供违规类别、扩展字段策略、固定字段次序、无错误码值的默认展示与 JSON-RPC 扩展键；常量本身不处理失败或授予权限。'
-                  ]
-                ]
+                code: "import assert from 'node:assert/strict'\nimport { serializeRpcWireError, deserializeRpcWireError } from '@migaia/rpc-contract/protocol'\n\nconst cause = new RangeError('sample limit')\nconst primary = new TypeError('sample operation', { cause })\nconst reports: unknown[] = []\nconst wire = serializeRpcWireError(primary, { report: (failure) => reports.push(failure) })\nconst restored = deserializeRpcWireError(wire)\nassert(restored instanceof TypeError)\nassert(restored.cause instanceof RangeError)\nassert.equal(restored.stack, primary.stack)\nassert.equal((restored.cause as Error).stack, cause.stack)\nassert.equal(reports.length, 0)\nconsole.log('native error graph preserved')"
               }
             ]
           }
@@ -72626,161 +70010,38 @@ class CheckoutElement extends HTMLElement {
       },
       next: [
         {
-          label: '继续二进制消息',
-          path: 'binary-messages'
+          label: 'Host namespaces and plugins',
+          path: '../rpc-host/host-and-plugins'
         }
       ]
     },
-    en: {
-      title: 'Transfer error chains and select public details',
-      lede: 'Serialization retains error classes and chains; metadata selects public summaries and routes. Restored errors are diagnostics and confer no local call rights.',
+    zh: {
+      title: '保留原生错误图',
+      lede: '唯一线上错误格式是根及节点平面图，原因及聚合边使用索引，并保留原发送方堆栈。',
       document: {
         sections: [
           {
-            id: 'error-chain',
-            heading: 'Transfer an inventory failure',
+            id: 'ownership',
+            heading: '契约与所有权',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'wire-error.ts transfers a native RangeError through JSON and restores it. Output shows its class, business message, and chain length. Serialization does not print the stack; the receiver can retain the sender’s stack data.'
+                text: '跨域恢复创建新对象，并保留受支持原生类型、来源、错误码、名称、消息、堆栈及图关系；它不能保留跨进程对象身份。错误入口的独立树工具属于纯诊断，不是第二业务协议。'
               },
               {
-                type: 'code',
-                language: 'ts',
-                code: "import {\n  deserializeRpcError, reachRpcError, serializeRpcError\n} from '@migaia/rpc-contract/errors'\nconst original = new RangeError('stock limit exceeded', { cause: new Error('stock is 2') })\nconst wire = serializeRpcError(original, { report: console.error })\nconst received: unknown = JSON.parse(JSON.stringify(wire))\nconst restored = deserializeRpcError(received)\nconst failures = [...reachRpcError(restored, { report: console.error })]\nconsole.log(JSON.stringify({\n  name: restored.name,\n  message: restored.message,\n  chainLength: failures.length\n}))"
-              },
-              {
-                type: 'code',
-                language: 'json',
-                code: '{"name":"RangeError","message":"stock limit exceeded","chainLength":2}'
-              },
-              {
-                type: 'table',
-                headers: ['Member / setting', 'Purpose and default behavior'],
-                rows: [
-                  [
-                    '[serializeRpcError](/en/docs/rpc-contract/api/errors/serializeRpcError)(value, { report }, metadata?): IRpcSerializedError',
-                    'Project any thrown value into a bounded tree. report(failure) receives pointer, field, and error for unreadable/unprojectable fields; do not omit this callback as silent degradation.'
-                  ],
-                  [
-                    'IRpcSerializedError',
-                    'Base fields are source/code/name/message/stack; cause, errors, data, route, and truncated appear when applicable. An ordinary uncoded Error uses unknown/UNKNOWN, not this package’s source.'
-                  ],
-                  [
-                    '[normalizeRpcSerializedError](/en/docs/rpc-contract/api/errors/normalizeRpcSerializedError)(value, options?)',
-                    'Validate the full received tree and return a frozen copy rather than treating unvalidated remote data as a local Error.'
-                  ],
-                  [
-                    '[deserializeRpcError](/en/docs/rpc-contract/api/errors/deserializeRpcError)(value, options?, routes?): Error',
-                    'Validate before restoring native error classes, remote stacks, and nested errors; this does not create the package’s original locally-thrown instance.'
-                  ],
-                  [
-                    "options.unknownFields?: 'reject' | 'ignore' / onUnknownField?(pointer, field)",
-                    'Defaults to reject, throwing on unknown fields without notification. ignore skips extensions and invokes onUnknownField(pointer,field), without adding them to the tree.'
-                  ],
-                  [
-                    '[reachRpcError](/en/docs/rpc-contract/api/errors/reachRpcError)(value, { report }): Generator<unknown>',
-                    'Walk causes, AggregateError.errors, and cleanup failures with reference deduplication. report handles unreadable fields; at most 4096 objects are visited.'
-                  ],
-                  [
-                    'RpcWireErrorLimit / RpcErrorReachLimit',
-                    'Wire limits are nesting 48, embedding depth 16, 1024 nodes, 65536 bytes per string, and 1048576 bytes total; serialization trims excess. The separate graph walk limit is 4096 objects.'
-                  ],
-                  [
-                    '@migaia/rpc-contract/schema/wire-error',
-                    'Published JSON Schema lets other languages validate wire errors; it neither restores local Errors nor decides retries.'
-                  ]
-                ]
+                type: 'paragraph',
+                text: '错误元数据映射是实际本地错误的显式调用方展示权限。接收来源及错误码不授予重试、退场或原生资源权限。模式文件不能独立证明图索引、总预算或读写生命周期。'
               }
             ]
           },
           {
-            id: 'public-summary',
-            heading: 'Expose only the stock summary',
+            id: 'example',
+            heading: '使用实际公开入口',
             blocks: [
-              {
-                type: 'paragraph',
-                text: 'error-summary.ts selects a public code and message for the same Error before embedding it in JSON-RPC. Business code retains the original local error; a default summary omits its cause.'
-              },
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { fromJsonRpcError, serializeRpcError, toJsonRpcError } from '@migaia/rpc-contract/errors'\nconst original = new Error('internal stock row 42', { cause: new Error('warehouse database') })\nconst summaries = new WeakMap([\n  [original, { code: 'OUT_OF_STOCK', message: 'Item unavailable' }]\n])\nconst wire = serializeRpcError(original, { report: console.error }, { summaries })\nconst response = toJsonRpcError(wire, -32000)\nconst visible = fromJsonRpcError(JSON.parse(JSON.stringify(response)))\nconsole.log(JSON.stringify({\n  code: visible.code,\n  message: visible.message,\n  includesCause: 'cause' in visible\n}))"
-              },
-              {
-                type: 'code',
-                language: 'json',
-                code: '{"code":"OUT_OF_STOCK","message":"Item unavailable","includesCause":false}'
-              },
-              {
-                type: 'table',
-                headers: ['Member / setting', 'Purpose and default behavior'],
-                rows: [
-                  [
-                    "metadata.summaries?: Pick<WeakMap<Error, IRpcErrorWireSummary>, 'get'>",
-                    'Select code/message by the actual Error reference. Omission reads ordinary fields and package summaries; preserveSerializedError:true retains existing serialized descendants, while the default summary hides them.'
-                  ],
-                  [
-                    "metadata.routes?: Pick<WeakMap<Error, readonly string[]>, 'get'>",
-                    'Attach diagnostic routes to selected Errors; omission uses already registered routes. Routes contain 1–4 lowercase 32-character hex node IDs, not executable paths.'
-                  ],
-                  [
-                    "deserialize routes?: Pick<WeakMap<Error, readonly string[]>, 'set'>",
-                    'Receive restored Error-to-validated-route mappings; omission does not write a caller-owned map.'
-                  ],
-                  [
-                    '[toJsonRpcError](/en/docs/rpc-contract/api/errors/toJsonRpcError)(wireError, code): IRpcJsonRpcErrorObject',
-                    'Use a caller-selected safe-integer code; data.migaiaWireError carries the full tree and message comes from that validated tree.'
-                  ],
-                  [
-                    '[fromJsonRpcError](/en/docs/rpc-contract/api/errors/fromJsonRpcError)(value): IRpcSerializedError',
-                    'Read the extended tree; without it, create a record with source jsonrpc-2.0 and stringified integer code, without inventing the peer’s original chain.'
-                  ],
-                  [
-                    '[classifyRpcContractError](/en/docs/rpc-contract/api/errors/classifyRpcContractError)(error)',
-                    'Recognize only an original Error reference registered by this package in this realm, returning a code/message summary; copied or deserialized lookalikes return undefined.'
-                  ]
-                ]
-              }
-            ]
-          },
-          {
-            id: 'error-codes',
-            heading: 'Locate failures by source and code',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['Member / setting', 'Purpose and default behavior'],
-                rows: [
-                  [
-                    'RPC_CONTRACT_SOURCE / RpcContractErrorCode',
-                    'Source is `rpc.contract`. Branch on source and code rather than mutable message text.'
-                  ],
-                  [
-                    'INVALID_DESCRIPTOR / INVALID_ENVELOPE / INVALID_STREAM',
-                    'Fix descriptor, envelope, or stream-item input rather than resending unchanged invalid data.'
-                  ],
-                  [
-                    'INVALID_FRAME / FRAME_LIMIT_EXCEEDED / FRAME_ASSEMBLY_EXPIRED',
-                    'Fix framing, reduce message size, or handle expired assembly; these do not establish whether remote business execution occurred.'
-                  ],
-                  [
-                    'INVALID_WIRE_ERROR',
-                    'A received error tree is invalid; retain local diagnostics rather than treating it as a trusted remote business failure.'
-                  ],
-                  [
-                    'HANDSHAKE_INVALID / HANDSHAKE_INCOMPATIBLE / HANDSHAKE_REJECTED',
-                    'Fix handshake content, incompatible version/capability selection, or upper-layer input checks before establishing another connection.'
-                  ],
-                  [
-                    '`JSONRPC_BRIDGE_ERROR_SOURCE` / `JsonRpcBridgeErrorCode` / `IJsonRpcBridgeErrorCode`',
-                    'Import from `@migaia/rpc-contract/framing/jsonrpc`. The stable source remains `rpc.contract.jsonrpc`. Its five codes cover frames, extensions, profiles, call modes and handshake timeout; see Process connection guidance for recovery.'
-                  ],
-                  [
-                    'RpcWireErrorViolation / RpcWireErrorUnknownFieldMode / RpcWireErrorField / RpcWireErrorFallback / RpcJsonRpcWireError',
-                    'Provide violation categories, extension policy, field order, fallback presentation, and JSON-RPC extension keys; constants neither handle failures nor grant rights.'
-                  ]
-                ]
+                code: "import assert from 'node:assert/strict'\nimport { serializeRpcWireError, deserializeRpcWireError } from '@migaia/rpc-contract/protocol'\n\nconst cause = new RangeError('sample limit')\nconst primary = new TypeError('sample operation', { cause })\nconst reports: unknown[] = []\nconst wire = serializeRpcWireError(primary, { report: (failure) => reports.push(failure) })\nconst restored = deserializeRpcWireError(wire)\nassert(restored instanceof TypeError)\nassert(restored.cause instanceof RangeError)\nassert.equal(restored.stack, primary.stack)\nassert.equal((restored.cause as Error).stack, cause.stack)\nassert.equal(reports.length, 0)\nconsole.log('native error graph preserved')"
               }
             ]
           }
@@ -72788,208 +70049,40 @@ class CheckoutElement extends HTMLElement {
       },
       next: [
         {
-          label: 'Continue to binary messages',
-          path: 'binary-messages'
+          label: '宿主命名空间与插件',
+          path: '../rpc-host/host-and-plugins'
         }
       ]
     }
   },
   'rpc-contract:runtime-bindings': {
-    zh: {
-      title: '构造运行时消息，并检查启动数据',
-      lede: '本页只处理运行时调用的线上数据。构造或通过校验不会打开连接、创建服务额度，也不证明发送方已有执行权限。',
+    en: {
+      title: 'Implement the carrier boundary once',
+      lede: 'Pure interfaces describe the contract; real SDK carriers own the executing codec and native lifetime.',
       document: {
         sections: [
           {
-            id: 'call-envelope',
-            heading: '通过实际 JSON codec 传递价格请求',
+            id: 'ownership',
+            heading: 'Contract and ownership',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'runtime-header.ts 与 runtime-call.ts 组成第一个场景。地址与代次是本地示例数据；真实适配器应从已建立的连接取得这些字段。本例先编码再解码，所以接收点使用 Decoded 入口。'
+                text: 'Outbound order is prepare → envelope → encode → frame → write; inbound is frame → decode → envelope → restore. Authentication admits prepared metadata before native backing restore. A concrete IO owner supplies real cancellation, transfer and observation facts.'
               },
               {
                 type: 'paragraph',
-                text: 'runtime-header.ts'
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import type { IRpcRuntimeCallHeader } from '@migaia/rpc-contract/runtime/metadata'\nexport const header: IRpcRuntimeCallHeader = {\n  id: 'price-42',\n  route: {\n    applicationVersion: '1.0.0',\n    senderId: 'checkout',\n    targetId: 'catalog',\n    receiverId: 'catalog',\n    sentAt: Date.now()\n  },\n  task: {\n    mode: 'request',\n    callerId: 'checkout',\n    callerGeneration: { kind: 'session', value: 0, providerId: 'checkout' },\n    targetGeneration: { kind: 'session', value: 0, providerId: 'catalog' },\n    method: 'catalog.price'\n  },\n  options: {}\n}"
-              },
-              {
-                type: 'paragraph',
-                text: 'runtime-call.ts'
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { createRuntimeCallEnvelope } from '@migaia/rpc-contract/runtime/metadata'\nimport { normalizeRuntimeEnvelopeDecoded, readRuntimeCarrier } from '@migaia/rpc-contract/runtime'\nimport { wrapRuntimeCarrier } from '@migaia/rpc-contract/runtime'\nimport { defineJsonCodec } from '@migaia/serialize/codecs/json'\nimport { asCodecValue } from '@migaia/serialize/codec'\nimport { header } from './runtime-header.ts'\nconst request = createRuntimeCallEnvelope(header, { sku: 'pen', quantity: 2 })\nconst codec = defineJsonCodec({ version: 1 })\nconst carrier = readRuntimeCarrier(wrapRuntimeCarrier(codec.encode(asCodecValue(request))))!\nconst decoded = codec.decode(carrier.frame as string)\nconst received = normalizeRuntimeEnvelopeDecoded(decoded)\nconsole.log(JSON.stringify({ kind: received.kind, method: received.task.method }))"
-              },
-              {
-                type: 'code',
-                language: 'json',
-                code: '{"kind":"runtime-call","method":"catalog.price"}'
-              },
-              {
-                type: 'table',
-                headers: ['成员 / 配置', '用途与默认处理'],
-                rows: [
-                  [
-                    '[createRuntimeCallEnvelope](/zh/docs/rpc-contract/api/runtime/metadata/createRuntimeCallEnvelope)(header, payload?, portable?)',
-                    '按已知的 header 构造 runtime-call；省略 payload 不添加该字段。portable 省略时使用内建 runtime 值处理，可保留二进制值，不自行完成能力协商。'
-                  ],
-                  [
-                    'header.id / route / task / options',
-                    'id 区分本次调用；route 提供 applicationVersion/senderId/targetId/receiverId/sentAt 及可有的 forwardRoute；task 关联本次方法及调用双方代次，options 放受保护的调用控制。'
-                  ],
-                  [
-                    'IRpcRuntimeTask / IRpcRuntimeGeneration',
-                    'task 含 mode、callerId、callerGeneration、targetGeneration，request/notify/stream 带 method，group/outcome 不带。generation 含 kind、非负安全整数 value 与 providerId；kind 区分 restart/session，不把它当统一尝试次数。'
-                  ],
-                  [
-                    'IRpcRuntimeOptions',
-                    '仅包含下面四项；省略不请求对应控制，不包含本地 signal 或 false 时限。'
-                  ],
-                  [
-                    'orderKey?: string',
-                    '非空且最多 128 字符，为上层按键安排执行提供数据，不由格式工具排队。'
-                  ],
-                  [
-                    "cancel?: 'before-start'",
-                    '只有这一种线上取消方式；由服务端动作开始前的检查决定，不撤销已经执行的动作。'
-                  ],
-                  [
-                    'timeoutMs?: number',
-                    '使用 0..2147483647 的整数毫秒，不接受小数；它是传递的时长，格式工具不自行启动计时器。'
-                  ],
-                  [
-                    'idempotencyKey?: string',
-                    '1–128 个字符，仅用 [A-Za-z0-9._:~-]；notify/stream 携带该键时还需 cancel:before-start，不作为任意通知或流的重试保证。'
-                  ],
-                  [
-                    '[normalizeRuntimeEnvelope](/zh/docs/rpc-contract/api/runtime/normalizeRuntimeEnvelope)(value, portable?)',
-                    '对未知来源做严格校验，只接收自身数据属性，不调用 getter；返回规范化副本，portable 默认使用本包 runtime 值规则。'
-                  ],
-                  [
-                    '[normalizeRuntimeEnvelopeDecoded](/zh/docs/rpc-contract/api/runtime/normalizeRuntimeEnvelopeDecoded)(value, portable?)',
-                    '只接本库 codec 刚解码且未经过其它业务修改的对象；省去描述符检查仍会校验值域。不能把调用这个函数当成来源证明。'
-                  ],
-                  [
-                    '[normalizeRuntimeEnvelope](/zh/docs/rpc-contract/api/runtime/lazy/normalizeRuntimeEnvelope) / [normalizeRuntimeEnvelopeDecoded](/zh/docs/rpc-contract/api/runtime/lazy/normalizeRuntimeEnvelopeDecoded)',
-                    'lazy 同名函数返回值或 Promise，仅实际流分支可能按需加载解析器；统一 await 可处理两者。Decoded 的来源限制保持不变。'
-                  ],
-                  [
-                    '[normalizeRuntimeGeneration](/zh/docs/rpc-contract/api/runtime/normalizeRuntimeGeneration)(value) / [normalizeRuntimeSteps](/zh/docs/rpc-contract/api/runtime/normalizeRuntimeSteps)(value, portable?)',
-                    '前者校验代次；后者返回稠密、冻结的 group 步骤副本，每步 method 与可有的 payload。省略 portable 沿用 runtime 值规则；不执行任何步骤。'
-                  ],
-                  [
-                    '[wrapRuntimeCarrier](/zh/docs/rpc-contract/api/runtime/wrapRuntimeCarrier)(frame) / [readRuntimeCarrier](/zh/docs/rpc-contract/api/runtime/readRuntimeCarrier)(value)',
-                    '只添加或读取解析器选择包装；read 返回 { frame } 或 undefined。frame 仍是未解释的保护输出，不能从外壳取得认证或调用权限。'
-                  ]
-                ]
+                text: 'The old runtime/remote/ACK profiles and endpoint facade are removed. Native members remain native-owned and Pool private physical Sessions do not become public direct peers.'
               }
             ]
           },
           {
-            id: 'runtime-union',
-            heading: '区分调用、控制与结果记录',
+            id: 'example',
+            heading: 'Use the actual public entry',
             blocks: [
-              {
-                type: 'table',
-                headers: ['成员 / 配置', '用途与默认处理'],
-                rows: [
-                  [
-                    'RpcRuntimeProfile / RpcRuntimeKind / RpcRuntimeMode / RpcRuntimeField',
-                    'profile 为 migaia.rpc.runtime-api/1。kind 分 call/group/control/outcome；mode 分 request/notify/stream/group/outcome，字段常量维持同一份线上名称。'
-                  ],
-                  [
-                    'runtime-call / runtime-group',
-                    'call 放 payload，group 放 request 步骤 steps；options 共用原调用控制，group 结果不意味着事务回滚。'
-                  ],
-                  [
-                    'runtime-control',
-                    'operation 为 cancel、stream 或 terminal；分别携带取消原因、流控制内容或 completion。completion 用 ok/result 或 ok/error 区分结果。'
-                  ],
-                  [
-                    'runtime-outcome / RpcRuntimeOutcomeState',
-                    'lookup 使用 idempotencyKey 查询；result 返回 pending/done/unknown 与 store，done 才包含 outcome。unknown 不能推断业务从未执行。'
-                  ],
-                  [
-                    'RpcRuntimeStepState / IRpcRuntimeStepOutcome',
-                    'success 带可有的 result，failure 带 error，not-executed 不带成功数据；格式工具只校验这些记录，不替业务重试或回滚。'
-                  ],
-                  [
-                    'RpcRuntimeStoreKind / RpcRuntimeStoreContinuity',
-                    'kind 为 memory/external/unavailable；可用存储包含 epoch 与 retained/lost-since-restart，缺失存储保留 unavailable，不编造连续性。'
-                  ],
-                  [
-                    'RpcRuntimeOperation / RpcRuntimeCancel / RpcRuntimeFinish / RpcRuntimeStreamPrefix',
-                    '提供控制操作名、before-start、finish-without-items 和流方法前缀；提前结束仍由真实流所有者处理，不因常量存在自动启用。'
-                  ],
-                  [
-                    '[runtimeOperationCapabilities](/zh/docs/rpc-contract/api/runtime/runtimeOperationCapabilities)(mode, options = {}, hasSignal = false)',
-                    '列出该操作全部所需能力，不代替双方交换。基础需 runtime-api@1/generation@1；再按 stream/group/order/cancel/outcome 等控制添加。before-start 不再添加普通 deadline/abort 要求。'
-                  ]
-                ]
-              }
-            ]
-          },
-          {
-            id: 'message-bootstrap',
-            heading: '在真实 MessageChannel 上交换能力数据',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: 'capabilities.ts 在两个真实端口间发送声明并读回 ACK。这里展示数据格式的交集规则，不创建 RPC Peer、不启动工作线程，也不把收到 ACK 当作对端认证。'
-              },
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { MessageChannel } from 'node:worker_threads'\nimport { once } from 'node:events'\nimport { rpcMessageCapabilityControl as control } from '@migaia/rpc-contract/runtime'\nconst { port1, port2 } = new MessageChannel()\nport2.on('message', (value) => {\n  const offer = control.readOffer(value)\n  if (!offer.valid) return\n  const shared = control.intersect(control.staticCapabilities, offer.value)\n  port2.postMessage(control.acknowledgement(shared))\n})\nconst pending = once(port1, 'message')\nport1.postMessage(control.staticCapabilities)\nconst [reply] = await pending\nconst accepted = control.readAcknowledgement(reply)\nconsole.log(JSON.stringify(accepted))\nport1.close()\nport2.close()"
-              },
-              {
-                type: 'code',
-                language: 'json',
-                code: '{"valid":true,"value":["stream@1","batch@1"]}'
-              },
-              {
-                type: 'table',
-                headers: ['成员 / 配置', '用途与默认处理'],
-                rows: [
-                  [
-                    '[rpcMessageCapabilityControl](/zh/docs/rpc-contract/api/runtime/rpcMessageCapabilityControl)',
-                    '提供标准消息宿主的启动格式与解析操作；字段值只是线数据，真实端口及其来源仍由宿主保管。'
-                  ],
-                  [
-                    'readOffer(value) / localOffer(capabilities) / intersect(local, peer)',
-                    '读取有上限且无重复的能力列表；localOffer 在 portable-binary 已存在时补 native-binary，不能替宿主判断是否实际支持。intersect 保留本地顺序取交集。'
-                  ],
-                  [
-                    'acknowledgement(offer) / readAcknowledgement(value)',
-                    '构造或读取 kind/version/capabilities 的三字段 ACK；读取返回 valid/value 或 valid:false/field，不直接完成连接协商。'
-                  ],
-                  [
-                    'readData(value) / readInitial(value)',
-                    'readData 读取 peerId 与可有的 data；readInitial 再校验 runtimeApi 的 version/self/parent/capabilities 与可有的 generation，返回能力及启动 metadata。'
-                  ],
-                  [
-                    'isInitial(value) / isAcknowledgement(value) / isReady(value)',
-                    '只识别对应 kind，不替代完整字段校验；ready 不是能力声明。'
-                  ],
-                  [
-                    'staticCapabilities / data / ready / version / timeoutMs / failureText',
-                    '静态能力为 stream@1/batch@1，其余字段固定标准消息名称、版本 1 与等待 10000ms 的建议值和错误文本；计时及失败报告由宿主执行。'
-                  ],
-                  [
-                    '[rpcByteRuntimeBootstrap](/zh/docs/rpc-contract/api/runtime/rpcByteRuntimeBootstrap)',
-                    '字节宿主的 kind/version/maxBytes/read 描述；maxBytes 为 65536。read 接 Uint8Array 或已解析记录，返回 valid/value 或 valid:false，不保留带凭据的解析错误。'
-                  ],
-                  [
-                    'IRpcByteRuntimeBootstrap',
-                    '包含 self.name/instanceId、parentInstanceId、token 与可有的 generation；token 属于启动凭据，不写入诊断或示例输出。'
-                  ]
-                ]
+                code: "import type { IRpcCarrier, IRpcCarrierCodec } from '@migaia/rpc-contract/interfaces'\nimport { createRpcMessageCarrier } from '@migaia/rpc-host/sdk'\nimport type { IRpcMessageCarrierOptions } from '@migaia/rpc-host/sdk'\n\nexport type ICarrierParts = { carrier: IRpcCarrier; codec: IRpcCarrierCodec }\nexport function acquired(options: IRpcMessageCarrierOptions) {\n  return createRpcMessageCarrier(options)\n}"
               }
             ]
           }
@@ -72997,206 +70090,38 @@ class CheckoutElement extends HTMLElement {
       },
       next: [
         {
-          label: '继续二进制消息',
-          path: 'binary-messages'
+          label: 'Host namespaces and plugins',
+          path: '../rpc-host/host-and-plugins'
         }
       ]
     },
-    en: {
-      title: 'Construct runtime messages and inspect startup data',
-      lede: 'This page handles runtime call wire data. Constructing or validating it opens no connection, allocates no provider admission, and establishes no execution rights.',
+    zh: {
+      title: '只实现一次载体边界',
+      lede: '纯接口描述约定，真实作者工具载体拥有执行编解码及原生生命周期。',
       document: {
         sections: [
           {
-            id: 'call-envelope',
-            heading: 'Transfer a price request through a real JSON codec',
+            id: 'ownership',
+            heading: '契约与所有权',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'runtime-header.ts and runtime-call.ts form the first scene. Addresses and generations are example data; a real adapter obtains them from its established connection. This example encodes then decodes, so the receive point uses Decoded.'
+                text: '出站依次准备、信封、编码、帧及写入，入站依次帧、解码、信封及恢复。认证在原生缓冲区恢复前接纳准备元数据。具体读写所有者提供真实取消、转移及观察事实。'
               },
               {
                 type: 'paragraph',
-                text: 'runtime-header.ts'
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import type { IRpcRuntimeCallHeader } from '@migaia/rpc-contract/runtime/metadata'\nexport const header: IRpcRuntimeCallHeader = {\n  id: 'price-42',\n  route: {\n    applicationVersion: '1.0.0',\n    senderId: 'checkout',\n    targetId: 'catalog',\n    receiverId: 'catalog',\n    sentAt: Date.now()\n  },\n  task: {\n    mode: 'request',\n    callerId: 'checkout',\n    callerGeneration: { kind: 'session', value: 0, providerId: 'checkout' },\n    targetGeneration: { kind: 'session', value: 0, providerId: 'catalog' },\n    method: 'catalog.price'\n  },\n  options: {}\n}"
-              },
-              {
-                type: 'paragraph',
-                text: 'runtime-call.ts'
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { createRuntimeCallEnvelope } from '@migaia/rpc-contract/runtime/metadata'\nimport { normalizeRuntimeEnvelopeDecoded, readRuntimeCarrier } from '@migaia/rpc-contract/runtime'\nimport { wrapRuntimeCarrier } from '@migaia/rpc-contract/runtime'\nimport { defineJsonCodec } from '@migaia/serialize/codecs/json'\nimport { asCodecValue } from '@migaia/serialize/codec'\nimport { header } from './runtime-header.ts'\nconst request = createRuntimeCallEnvelope(header, { sku: 'pen', quantity: 2 })\nconst codec = defineJsonCodec({ version: 1 })\nconst carrier = readRuntimeCarrier(wrapRuntimeCarrier(codec.encode(asCodecValue(request))))!\nconst decoded = codec.decode(carrier.frame as string)\nconst received = normalizeRuntimeEnvelopeDecoded(decoded)\nconsole.log(JSON.stringify({ kind: received.kind, method: received.task.method }))"
-              },
-              {
-                type: 'code',
-                language: 'json',
-                code: '{"kind":"runtime-call","method":"catalog.price"}'
-              },
-              {
-                type: 'table',
-                headers: ['Member / setting', 'Purpose and default behavior'],
-                rows: [
-                  [
-                    '[createRuntimeCallEnvelope](/en/docs/rpc-contract/api/runtime/metadata/createRuntimeCallEnvelope)(header, payload?, portable?)',
-                    'Construct runtime-call from a known header; omitted payload adds no field. Omitted portable uses runtime value admission, which can preserve binary values without negotiating capabilities.'
-                  ],
-                  [
-                    'header.id / route / task / options',
-                    'id separates calls. route supplies applicationVersion/senderId/targetId/receiverId/sentAt and possible forwardRoute. task correlates the method and both generations; options carries protected call controls.'
-                  ],
-                  [
-                    'IRpcRuntimeTask / IRpcRuntimeGeneration',
-                    'task contains mode, callerId, callerGeneration, targetGeneration, and method for request/notify/stream; group/outcome omit method. generation contains kind, nonnegative safe-integer value, and providerId; restart/session are distinct counters.'
-                  ],
-                  [
-                    'IRpcRuntimeOptions',
-                    'Only the four fields below are carried; omission requests no corresponding control. Local signals and false deadlines are excluded.'
-                  ],
-                  [
-                    'orderKey?: string',
-                    'Nonempty and at most 128 characters; supplies keyed ordering data without scheduling work here.'
-                  ],
-                  [
-                    "cancel?: 'before-start'",
-                    'The sole wire cancellation mode; the provider checks it before start, without undoing executed work.'
-                  ],
-                  [
-                    'timeoutMs?: number',
-                    'Integer milliseconds from 0 to 2147483647, excluding fractions; this is transmitted duration data, not a timer started by this package.'
-                  ],
-                  [
-                    'idempotencyKey?: string',
-                    '1–128 characters from [A-Za-z0-9._:~-]. notify/stream carrying a key also need cancel:before-start; the key does not guarantee retry safety for arbitrary notifications or streams.'
-                  ],
-                  [
-                    '[normalizeRuntimeEnvelope](/en/docs/rpc-contract/api/runtime/normalizeRuntimeEnvelope)(value, portable?)',
-                    'Strictly validate unknown input using own data properties without executing getters; return a normalized copy, using runtime value admission when portable is omitted.'
-                  ],
-                  [
-                    '[normalizeRuntimeEnvelopeDecoded](/en/docs/rpc-contract/api/runtime/normalizeRuntimeEnvelopeDecoded)(value, portable?)',
-                    'Only consume fresh output from this package family’s codec before other business mutation; skipping descriptor checks still validates domains. Calling the function does not prove provenance.'
-                  ],
-                  [
-                    '[normalizeRuntimeEnvelope](/en/docs/rpc-contract/api/runtime/lazy/normalizeRuntimeEnvelope) / [normalizeRuntimeEnvelopeDecoded](/en/docs/rpc-contract/api/runtime/lazy/normalizeRuntimeEnvelopeDecoded)',
-                    'Lazy counterparts return a value or Promise; only an actual stream branch may load its parser on demand. await handles both. Decoded provenance restrictions remain unchanged.'
-                  ],
-                  [
-                    '[normalizeRuntimeGeneration](/en/docs/rpc-contract/api/runtime/normalizeRuntimeGeneration)(value) / [normalizeRuntimeSteps](/en/docs/rpc-contract/api/runtime/normalizeRuntimeSteps)(value, portable?)',
-                    'Validate generations or return a dense frozen group-step copy with method and possible payload. Omitted portable uses runtime value admission; these helpers execute no steps.'
-                  ],
-                  [
-                    '[wrapRuntimeCarrier](/en/docs/rpc-contract/api/runtime/wrapRuntimeCarrier)(frame) / [readRuntimeCarrier](/en/docs/rpc-contract/api/runtime/readRuntimeCarrier)(value)',
-                    'Add or read the parser-selector wrapper, returning frame or undefined. frame remains uninterpreted protection output; the outer wrapper grants no authentication or call rights.'
-                  ]
-                ]
+                text: '旧运行、远端及确认形态和端点门面已删除。原生成员仍归原生所有者，池私有物理会话不会成为公开直接对端。'
               }
             ]
           },
           {
-            id: 'runtime-union',
-            heading: 'Separate calls, control, and retained outcomes',
+            id: 'example',
+            heading: '使用实际公开入口',
             blocks: [
-              {
-                type: 'table',
-                headers: ['Member / setting', 'Purpose and default behavior'],
-                rows: [
-                  [
-                    'RpcRuntimeProfile / RpcRuntimeKind / RpcRuntimeMode / RpcRuntimeField',
-                    'The profile is migaia.rpc.runtime-api/1. Kinds are call/group/control/outcome; modes are request/notify/stream/group/outcome. Field constants supply the canonical wire names.'
-                  ],
-                  [
-                    'runtime-call / runtime-group',
-                    'call carries payload and group carries request steps; options retains original call controls, without implying transactional rollback.'
-                  ],
-                  [
-                    'runtime-control',
-                    'operation selects cancel, stream, or terminal with a reason, stream control, or completion. completion uses ok/result or ok/error.'
-                  ],
-                  [
-                    'runtime-outcome / RpcRuntimeOutcomeState',
-                    'lookup queries idempotencyKey; result reports pending/done/unknown and store, with outcome only when done. unknown does not establish that execution never occurred.'
-                  ],
-                  [
-                    'RpcRuntimeStepState / IRpcRuntimeStepOutcome',
-                    'success has possible result, failure has error, and not-executed has no success data. Format tools validate records without retrying or rolling back business work.'
-                  ],
-                  [
-                    'RpcRuntimeStoreKind / RpcRuntimeStoreContinuity',
-                    'Kinds are memory/external/unavailable. Available stores carry epoch and retained/lost-since-restart; unavailable stores retain that absence instead of inventing continuity.'
-                  ],
-                  [
-                    'RpcRuntimeOperation / RpcRuntimeCancel / RpcRuntimeFinish / RpcRuntimeStreamPrefix',
-                    'Provide control operation names, before-start, finish-without-items, and the stream-method prefix; the actual stream owner still handles early completion.'
-                  ],
-                  [
-                    '[runtimeOperationCapabilities](/en/docs/rpc-contract/api/runtime/runtimeOperationCapabilities)(mode, options = {}, hasSignal = false)',
-                    'List every required operation capability without negotiating. runtime-api@1/generation@1 are baseline; stream/group/order/cancel/outcome add requirements. before-start omits ordinary deadline/abort requirements.'
-                  ]
-                ]
-              }
-            ]
-          },
-          {
-            id: 'message-bootstrap',
-            heading: 'Exchange capability data over a real MessageChannel',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: 'capabilities.ts sends an offer and reads an ACK through two real ports. This demonstrates the intersection grammar without creating an RPC Peer, launching a worker, or authenticating the peer from an ACK.'
-              },
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { MessageChannel } from 'node:worker_threads'\nimport { once } from 'node:events'\nimport { rpcMessageCapabilityControl as control } from '@migaia/rpc-contract/runtime'\nconst { port1, port2 } = new MessageChannel()\nport2.on('message', (value) => {\n  const offer = control.readOffer(value)\n  if (!offer.valid) return\n  const shared = control.intersect(control.staticCapabilities, offer.value)\n  port2.postMessage(control.acknowledgement(shared))\n})\nconst pending = once(port1, 'message')\nport1.postMessage(control.staticCapabilities)\nconst [reply] = await pending\nconst accepted = control.readAcknowledgement(reply)\nconsole.log(JSON.stringify(accepted))\nport1.close()\nport2.close()"
-              },
-              {
-                type: 'code',
-                language: 'json',
-                code: '{"valid":true,"value":["stream@1","batch@1"]}'
-              },
-              {
-                type: 'table',
-                headers: ['Member / setting', 'Purpose and default behavior'],
-                rows: [
-                  [
-                    '[rpcMessageCapabilityControl](/en/docs/rpc-contract/api/runtime/rpcMessageCapabilityControl)',
-                    'Provide standard message-host startup grammar and parsers; fields are wire data, while the host retains actual ports and provenance.'
-                  ],
-                  [
-                    'readOffer(value) / localOffer(capabilities) / intersect(local, peer)',
-                    'Read bounded unique offers. localOffer adds native-binary beside portable-binary but does not verify host support. intersect retains local order for shared entries.'
-                  ],
-                  [
-                    'acknowledgement(offer) / readAcknowledgement(value)',
-                    'Build or read a three-field kind/version/capabilities ACK. Reading returns valid/value or valid:false/field, without completing connection agreement.'
-                  ],
-                  [
-                    'readData(value) / readInitial(value)',
-                    'readData reads peerId and possible data; readInitial additionally checks runtimeApi version/self/parent/capabilities and possible generation, returning capabilities and startup metadata.'
-                  ],
-                  [
-                    'isInitial(value) / isAcknowledgement(value) / isReady(value)',
-                    'Recognize the corresponding kind only, without full-field validation; ready is not a capability offer.'
-                  ],
-                  [
-                    'staticCapabilities / data / ready / version / timeoutMs / failureText',
-                    'Static capabilities are stream@1/batch@1. Other fields supply standard names, version 1, the 10000ms wait value, and failure text; the host owns timers and reporting.'
-                  ],
-                  [
-                    '[rpcByteRuntimeBootstrap](/en/docs/rpc-contract/api/runtime/rpcByteRuntimeBootstrap)',
-                    'Describe byte-host kind/version/maxBytes/read with a 65536-byte limit. read accepts Uint8Array or parsed records and returns valid/value or valid:false without retaining credential-bearing parse errors.'
-                  ],
-                  [
-                    'IRpcByteRuntimeBootstrap',
-                    'Contains self.name/instanceId, parentInstanceId, token, and possible generation. token is startup credential data and stays out of diagnostic/example output.'
-                  ]
-                ]
+                code: "import type { IRpcCarrier, IRpcCarrierCodec } from '@migaia/rpc-contract/interfaces'\nimport { createRpcMessageCarrier } from '@migaia/rpc-host/sdk'\nimport type { IRpcMessageCarrierOptions } from '@migaia/rpc-host/sdk'\n\nexport type ICarrierParts = { carrier: IRpcCarrier; codec: IRpcCarrierCodec }\nexport function acquired(options: IRpcMessageCarrierOptions) {\n  return createRpcMessageCarrier(options)\n}"
               }
             ]
           }
@@ -73204,160 +70129,40 @@ class CheckoutElement extends HTMLElement {
       },
       next: [
         {
-          label: 'Continue to binary messages',
-          path: 'binary-messages'
+          label: '宿主命名空间与插件',
+          path: '../rpc-host/host-and-plugins'
         }
       ]
     }
   },
   'rpc-contract:binary-messages': {
-    zh: {
-      title: '保存二进制内容并核对完整性',
-      lede: 'inline 把字节写进消息，native 把完整 ArrayBuffer 作为 sidecar 配套发送。这里只准备与还原数据，真正发送和转移所有权由宿主决定。',
+    en: {
+      title: 'Capture original backing identity before hashing',
+      lede: 'The binary representation versions a codec shape inside migaia.rpc/2; it is not another RPC grammar or transfer grant.',
       document: {
         sections: [
           {
-            id: 'native-sidecars',
-            heading: '用真实 SHA-256 准备附件',
+            id: 'ownership',
+            heading: 'Contract and ownership',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'native-binary.ts 复用运行时消息页完整展示的 runtime-header.ts。digest.ts 是同一场景的支持文件，使用 Node crypto 对整个 ArrayBuffer 计算 SHA-256；本例没有转移或分离原缓冲区。'
+                text: 'The executing SDK captures business slots synchronously once, charges complete backing bytes before async SHA-256, and restores original backing aliases/views only after metadata admission. It preserves original key order rather than sorting business data.'
               },
               {
                 type: 'paragraph',
-                text: 'digest.ts'
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { createHash } from 'node:crypto'\nexport async function digest(backing: ArrayBuffer) {\n  return createHash('sha256').update(new Uint8Array(backing)).digest('hex')\n}"
-              },
-              {
-                type: 'paragraph',
-                text: 'native-binary.ts'
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import {\n  prepareRpcBinary, restoreRpcBinary, RpcBinaryStorage\n} from '@migaia/rpc-contract/binary'\nimport { createRuntimeCallEnvelope } from '@migaia/rpc-contract/runtime/metadata'\nimport { header } from './runtime-header.ts'\nimport { digest } from './digest.ts'\nconst content = Uint8Array.from([112, 101, 110])\nconst request = createRuntimeCallEnvelope(header, { attachment: content })\nconst storage = RpcBinaryStorage.native\nconst prepared = await prepareRpcBinary(request, storage, 4096, digest)\nconst { manifest, sidecars, backingBytes } = prepared\nconst restored = await restoreRpcBinary(manifest, storage, sidecars, 4096, digest)\nconsole.log(JSON.stringify({\n  backingBytes,\n  backings: sidecars.length,\n  payload: restored.kind === 'runtime-call' ? restored.payload : null\n}))"
-              },
-              {
-                type: 'code',
-                language: 'json',
-                code: '{"backingBytes":3,"backings":1,"payload":{"attachment":{"0":112,"1":101,"2":110}}}'
-              },
-              {
-                type: 'table',
-                headers: ['成员 / 配置', '用途与默认处理'],
-                rows: [
-                  [
-                    '[prepareRpcBinary](/zh/docs/rpc-contract/api/binary/prepareRpcBinary)(message, storage, limit?, digest?, codec?): Promise<IRpcPreparedBinary>',
-                    '同步捕获运行时信封中的业务数据，再异步完成准备。storage 选择 inline/native；limit 默认 16777216，按完整 backing 及有关元数据限制，不只看视图可见长度。'
-                  ],
-                  [
-                    'digest?: (backing: ArrayBuffer) => Promise<string>',
-                    'native 要提供真实完整 backing 的 SHA-256，返回 64 位小写十六进制。inline 不要求摘要；省略 digest 不能准备 native 消息。'
-                  ],
-                  [
-                    'codec?: IRpcBinaryDataCodec',
-                    '省略时使用标准数据路径；自定义 encode(value) 测量实际元数据表示。captureJsonData?(value, roots, backingBytes) 可接收一次构造的数据及二进制根记录，encodeInline?(bytes) 自定义内联编码。'
-                  ],
-                  [
-                    'IRpcPreparedBinary / IRpcBinaryManifest / IRpcBinaryBacking',
-                    '返回 manifest、sidecars、backingBytes；manifest 含 profile/storage/envelope/backings，backings 逐项记录 byteLength/sha256。sidecars 保留原 ArrayBuffer，由发送者决定是否转移。'
-                  ],
-                  [
-                    '[restoreRpcBinary](/zh/docs/rpc-contract/api/binary/restoreRpcBinary)(value, storage, sidecarInput = [], limit = 16777216, digest?)',
-                    '严格校验清单和二进制引用，native 重新核对摘要后返回 IRpcRuntimeEnvelope。sidecar 数量、完整 backing 长度或摘要不符会失败，不自行执行收到的业务方法。'
-                  ],
-                  [
-                    '[restoreRpcBinaryDecoded](/zh/docs/rpc-contract/api/binary/restoreRpcBinaryDecoded)(...)',
-                    '参数同严格版本，只用于真实 codec 新解码、未被其它代码改动的对象。读取自身可枚举属性可能执行 getter；来源不确定时用严格版本。'
-                  ],
-                  [
-                    'RpcBinaryProfile / RpcBinaryStorage / RpcNativeBinaryKind',
-                    '分别固定清单格式、inline/native 存储值及原生包装名称。选择 native 本身不代表对端支持转移。'
-                  ]
-                ]
+                text: 'Native sidecars require actual medium capability, length/digest verification and explicit transfer admission. Inline media retain their coded unsupported-transfer behavior. Pure Contract checks only manifest shape and budgets.'
               }
             ]
           },
           {
-            id: 'capture-before-wait',
-            heading: '在等待前捕获准备发送的内容',
+            id: 'example',
+            heading: 'Use the actual public entry',
             blocks: [
-              {
-                type: 'paragraph',
-                text: 'capture.ts 复用同一 runtime-header.ts，先捕获 inline 附件，再复用业务缓冲区。输出保留捕获时的 112、101、110，JSON 把恢复的 Uint8Array 按索引展示。'
-              },
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { captureRpcBinaryData, RpcBinaryStorage } from '@migaia/rpc-contract/binary/capture'\nimport { restoreRpcBinary } from '@migaia/rpc-contract/binary/lazy'\nimport { createRuntimeCallEnvelope } from '@migaia/rpc-contract/runtime/metadata'\nimport { header } from './runtime-header.ts'\nconst bytes = Uint8Array.from([112, 101, 110])\nconst request = createRuntimeCallEnvelope(header, { attachment: bytes })\nconst captured = captureRpcBinaryData(request, RpcBinaryStorage.inline)\nbytes.fill(0)\nconst { manifest } = await captured.prepare()\nconst restored = await restoreRpcBinary(manifest, RpcBinaryStorage.inline)\nconsole.log(JSON.stringify({\n  payload: restored.kind === 'runtime-call' ? restored.payload : null\n}))"
-              },
-              {
-                type: 'code',
-                language: 'json',
-                code: '{"payload":{"attachment":{"0":112,"1":101,"2":110}}}'
-              },
-              {
-                type: 'table',
-                headers: ['成员 / 配置', '用途与默认处理'],
-                rows: [
-                  [
-                    '[captureRpcBinaryData](/zh/docs/rpc-contract/api/binary/captureRpcBinaryData)(message, storage, limit?, digest?, codec?)',
-                    '也从 ./binary/capture 导入。同步捕获对象图和 inline 字节，返回仅含 prepare():Promise 的对象；需要延后编码时用它，不把内部 codec 状态交给调用方。'
-                  ],
-                  [
-                    'captured.prepare(): Promise<IRpcPreparedBinary>',
-                    '完成已捕获内容，不重新遍历业务对象。native 仍引用原 backing 并在准备阶段计算摘要，不能把 inline 的复制行为推广到 native 字节。'
-                  ],
-                  [
-                    '[prepareRpcBinary](/zh/docs/rpc-contract/api/binary/lazy/prepareRpcBinary) / [restoreRpcBinary](/zh/docs/rpc-contract/api/binary/lazy/restoreRpcBinary) / [restoreRpcBinaryDecoded](/zh/docs/rpc-contract/api/binary/lazy/restoreRpcBinaryDecoded)',
-                    '同名函数始终返回 Promise，首次按需加载完整实现；准备仍先同步捕获，首个 native 摘要可在加载前开始。冷加载不改变 codec 来源限制或所有权。'
-                  ]
-                ]
-              }
-            ]
-          },
-          {
-            id: 'inspect-native',
-            heading: '宿主在接收前测量原生包装',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['成员 / 配置', '用途与默认处理'],
-                rows: [
-                  [
-                    '[hasRpcBinaryEnvelope](/zh/docs/rpc-contract/api/binary/inspect/hasRpcBinaryEnvelope)(envelopeOrPayload): boolean',
-                    '识别已规范化的信封或实际持有 payload 是否含二进制值；不代替未知输入校验，也不协商二进制能力。'
-                  ],
-                  [
-                    '[rpcBinaryView](/zh/docs/rpc-contract/api/binary/inspect/rpcBinaryView)(value: Uint8Array)',
-                    '返回 backing/offset/length；只接受非共享 ArrayBuffer 上的 Uint8Array，不接任意 TypedArray 或 SharedArrayBuffer。'
-                  ],
-                  [
-                    '[rpcBinaryBackingLength](/zh/docs/rpc-contract/api/binary/inspect/rpcBinaryBackingLength)(backing): number',
-                    '读取真实 ArrayBuffer 完整长度；小视图仍按整个 backing 占用预算。'
-                  ],
-                  [
-                    '[measureRpcNativeBinaryFrame](/zh/docs/rpc-contract/api/binary/inspect/measureRpcNativeBinaryFrame)(protectedMetadata, sidecarCount, backingBytes): number',
-                    '计算外壳、受保护元数据、sidecar 占位与完整 backing 字节；不把原缓冲区再次转成 JSON 内容。'
-                  ],
-                  [
-                    '[assertRpcNativeBinaryFrameSize](/zh/docs/rpc-contract/api/binary/inspect/assertRpcNativeBinaryFrameSize)(protectedMetadata, sidecarCount, backingBytes, limit)',
-                    '在宿主自己的物理大小边界执行同一测量；超限抛出错误，不能只比较 manifest 的 JSON 长度。'
-                  ],
-                  [
-                    '[readRpcNativeBinary](/zh/docs/rpc-contract/api/binary/inspect/readRpcNativeBinary)(value, limit)',
-                    '非原生外壳返回 undefined；符合 kind 的外壳检查字段、sidecar 唯一性和完整长度，返回 protectedMetadata/sidecars/backingBytes。此时尚未核对摘要或认证。'
-                  ],
-                  [
-                    '[isRpcBinaryIntegrityFailure](/zh/docs/rpc-contract/api/binary/inspect/isRpcBinaryIntegrityFailure)(error): boolean',
-                    '识别本次错误链中的完整 backing 长度或 SHA 不一致；它用于接收错误分类，不允许继续采用失败的数据。'
-                  ]
-                ]
+                code: "import { prepareRpcBinary } from '@migaia/rpc-host/sdk'\nimport type { IRpcEnvelope } from '@migaia/rpc-contract/protocol'\n\nexport function capture(message: IRpcEnvelope) {\n  return prepareRpcBinary(message, { storage: 'inline' })\n}"
               }
             ]
           }
@@ -73365,158 +70170,38 @@ class CheckoutElement extends HTMLElement {
       },
       next: [
         {
-          label: '继续错误链与公开摘要',
-          path: 'wire-errors-and-metadata'
+          label: 'Host namespaces and plugins',
+          path: '../rpc-host/host-and-plugins'
         }
       ]
     },
-    en: {
-      title: 'Preserve binary data and verify integrity',
-      lede: 'inline embeds bytes in the message; native supplies complete ArrayBuffer sidecars. These helpers prepare and restore data, while the host owns sending and ownership transfer.',
+    zh: {
+      title: '散列前捕获原缓冲区身份',
+      lede: '二进制表示只为第二版协议内部的编解码形状分版，不是另一套远程语法或转移许可。',
       document: {
         sections: [
           {
-            id: 'native-sidecars',
-            heading: 'Prepare an attachment with real SHA-256',
+            id: 'ownership',
+            heading: '契约与所有权',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'native-binary.ts reuses runtime-header.ts shown on the runtime bindings page. Its support file digest.ts uses Node crypto to hash the entire ArrayBuffer with SHA-256. This example does not transfer or detach the original backing.'
+                text: '执行作者工具只同步捕获一次业务槽，在异步散列前计费完整缓冲区字节，并仅在元数据准入后恢复原缓冲区别名及视图。它保留原键顺序，不排序业务数据。'
               },
               {
                 type: 'paragraph',
-                text: 'digest.ts'
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { createHash } from 'node:crypto'\nexport async function digest(backing: ArrayBuffer) {\n  return createHash('sha256').update(new Uint8Array(backing)).digest('hex')\n}"
-              },
-              {
-                type: 'paragraph',
-                text: 'native-binary.ts'
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import {\n  prepareRpcBinary, restoreRpcBinary, RpcBinaryStorage\n} from '@migaia/rpc-contract/binary'\nimport { createRuntimeCallEnvelope } from '@migaia/rpc-contract/runtime/metadata'\nimport { header } from './runtime-header.ts'\nimport { digest } from './digest.ts'\nconst content = Uint8Array.from([112, 101, 110])\nconst request = createRuntimeCallEnvelope(header, { attachment: content })\nconst storage = RpcBinaryStorage.native\nconst prepared = await prepareRpcBinary(request, storage, 4096, digest)\nconst { manifest, sidecars, backingBytes } = prepared\nconst restored = await restoreRpcBinary(manifest, storage, sidecars, 4096, digest)\nconsole.log(JSON.stringify({\n  backingBytes,\n  backings: sidecars.length,\n  payload: restored.kind === 'runtime-call' ? restored.payload : null\n}))"
-              },
-              {
-                type: 'code',
-                language: 'json',
-                code: '{"backingBytes":3,"backings":1,"payload":{"attachment":{"0":112,"1":101,"2":110}}}'
-              },
-              {
-                type: 'table',
-                headers: ['Member / setting', 'Purpose and default behavior'],
-                rows: [
-                  [
-                    '[prepareRpcBinary](/en/docs/rpc-contract/api/binary/prepareRpcBinary)(message, storage, limit?, digest?, codec?): Promise<IRpcPreparedBinary>',
-                    'Capture runtime business data synchronously, then finish preparation asynchronously. storage selects inline/native; default limit 16777216 accounts for whole backings and relevant metadata, not merely visible view lengths.'
-                  ],
-                  [
-                    'digest?: (backing: ArrayBuffer) => Promise<string>',
-                    'native requires genuine whole-backing SHA-256 as 64 lowercase hex characters. inline needs no digest; omitting it cannot prepare native messages.'
-                  ],
-                  [
-                    'codec?: IRpcBinaryDataCodec',
-                    'Omission uses the standard data path. Custom encode(value) measures metadata representation; captureJsonData?(value,roots,backingBytes) consumes constructed data and binary-root records, while encodeInline?(bytes) customizes inline encoding.'
-                  ],
-                  [
-                    'IRpcPreparedBinary / IRpcBinaryManifest / IRpcBinaryBacking',
-                    'Return manifest, sidecars, and backingBytes. manifest contains profile/storage/envelope/backings; each backing records byteLength/sha256. sidecars retain original ArrayBuffers, with transfer decided by the sender.'
-                  ],
-                  [
-                    '[restoreRpcBinary](/en/docs/rpc-contract/api/binary/restoreRpcBinary)(value, storage, sidecarInput = [], limit = 16777216, digest?)',
-                    'Strictly validate manifests and binary references, checking native digests before returning IRpcRuntimeEnvelope. Count, whole-backing length, or digest mismatch fails, without executing business methods.'
-                  ],
-                  [
-                    '[restoreRpcBinaryDecoded](/en/docs/rpc-contract/api/binary/restoreRpcBinaryDecoded)(...)',
-                    'Same arguments as strict restore, but only for fresh actual codec output before other mutation. Own enumerable reads may invoke getters; use strict restore for uncertain provenance.'
-                  ],
-                  [
-                    'RpcBinaryProfile / RpcBinaryStorage / RpcNativeBinaryKind',
-                    'Define manifest profile, inline/native storage values, and native wrapper names. Choosing native does not establish peer transfer support.'
-                  ]
-                ]
+                text: '原生附带列表需要实际媒介能力、长度及散列验证和显式转移准入。内联媒介保留原分类不支持转移行为。纯契约只检查清单形状及预算。'
               }
             ]
           },
           {
-            id: 'capture-before-wait',
-            heading: 'Capture content before an asynchronous wait',
+            id: 'example',
+            heading: '使用实际公开入口',
             blocks: [
-              {
-                type: 'paragraph',
-                text: 'capture.ts reuses runtime-header.ts, capturing an inline attachment before reusing the business buffer. Output retains the captured 112,101,110 bytes; JSON displays the restored Uint8Array by index.'
-              },
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { captureRpcBinaryData, RpcBinaryStorage } from '@migaia/rpc-contract/binary/capture'\nimport { restoreRpcBinary } from '@migaia/rpc-contract/binary/lazy'\nimport { createRuntimeCallEnvelope } from '@migaia/rpc-contract/runtime/metadata'\nimport { header } from './runtime-header.ts'\nconst bytes = Uint8Array.from([112, 101, 110])\nconst request = createRuntimeCallEnvelope(header, { attachment: bytes })\nconst captured = captureRpcBinaryData(request, RpcBinaryStorage.inline)\nbytes.fill(0)\nconst { manifest } = await captured.prepare()\nconst restored = await restoreRpcBinary(manifest, RpcBinaryStorage.inline)\nconsole.log(JSON.stringify({\n  payload: restored.kind === 'runtime-call' ? restored.payload : null\n}))"
-              },
-              {
-                type: 'code',
-                language: 'json',
-                code: '{"payload":{"attachment":{"0":112,"1":101,"2":110}}}'
-              },
-              {
-                type: 'table',
-                headers: ['Member / setting', 'Purpose and default behavior'],
-                rows: [
-                  [
-                    '[captureRpcBinaryData](/en/docs/rpc-contract/api/binary/captureRpcBinaryData)(message, storage, limit?, digest?, codec?)',
-                    'Also importable from ./binary/capture. Capture the object graph and inline bytes synchronously, returning only prepare():Promise. Use it to defer encoding without exposing mutable codec state.'
-                  ],
-                  [
-                    'captured.prepare(): Promise<IRpcPreparedBinary>',
-                    'Finish captured content without traversing business objects again. native still refers to original backings and hashes during preparation; inline copying does not imply native byte copies.'
-                  ],
-                  [
-                    '[prepareRpcBinary](/en/docs/rpc-contract/api/binary/lazy/prepareRpcBinary) / [restoreRpcBinary](/en/docs/rpc-contract/api/binary/lazy/restoreRpcBinary) / [restoreRpcBinaryDecoded](/en/docs/rpc-contract/api/binary/lazy/restoreRpcBinaryDecoded)',
-                    'Lazy counterparts always return Promises and load the full implementation on first use. Preparation still captures synchronously and may start the first native digest before loading; provenance and ownership rules remain unchanged.'
-                  ]
-                ]
-              }
-            ]
-          },
-          {
-            id: 'inspect-native',
-            heading: 'Let the host inspect native wrappers before restore',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['Member / setting', 'Purpose and default behavior'],
-                rows: [
-                  [
-                    '[hasRpcBinaryEnvelope](/en/docs/rpc-contract/api/binary/inspect/hasRpcBinaryEnvelope)(envelopeOrPayload): boolean',
-                    'Check normalized envelopes or held payloads for binary values; this does not validate unknown input or negotiate support.'
-                  ],
-                  [
-                    '[rpcBinaryView](/en/docs/rpc-contract/api/binary/inspect/rpcBinaryView)(value: Uint8Array)',
-                    'Return backing/offset/length for Uint8Array backed by a non-shared ArrayBuffer; arbitrary TypedArrays and SharedArrayBuffers are excluded.'
-                  ],
-                  [
-                    '[rpcBinaryBackingLength](/en/docs/rpc-contract/api/binary/inspect/rpcBinaryBackingLength)(backing): number',
-                    'Read the genuine full ArrayBuffer length; a small view still charges its entire backing.'
-                  ],
-                  [
-                    '[measureRpcNativeBinaryFrame](/en/docs/rpc-contract/api/binary/inspect/measureRpcNativeBinaryFrame)(protectedMetadata, sidecarCount, backingBytes): number',
-                    'Measure the wrapper, protected metadata, sidecar placeholders, and whole backing bytes without serializing raw buffers as JSON content.'
-                  ],
-                  [
-                    '[assertRpcNativeBinaryFrameSize](/en/docs/rpc-contract/api/binary/inspect/assertRpcNativeBinaryFrameSize)(protectedMetadata, sidecarCount, backingBytes, limit)',
-                    'Apply the same measurement at the host’s physical-frame limit; excess fails, so checking only manifest JSON length is insufficient.'
-                  ],
-                  [
-                    '[readRpcNativeBinary](/en/docs/rpc-contract/api/binary/inspect/readRpcNativeBinary)(value, limit)',
-                    'Return undefined for other wrappers. For a native kind, check fields, unique sidecars, and full lengths, returning protectedMetadata/sidecars/backingBytes; hashing and authentication have not occurred yet.'
-                  ],
-                  [
-                    '[isRpcBinaryIntegrityFailure](/en/docs/rpc-contract/api/binary/inspect/isRpcBinaryIntegrityFailure)(error): boolean',
-                    'Classify whole-backing length or SHA mismatch in the error chain; this does not permit accepting failed data.'
-                  ]
-                ]
+                code: "import { prepareRpcBinary } from '@migaia/rpc-host/sdk'\nimport type { IRpcEnvelope } from '@migaia/rpc-contract/protocol'\n\nexport function capture(message: IRpcEnvelope) {\n  return prepareRpcBinary(message, { storage: 'inline' })\n}"
               }
             ]
           }
@@ -73524,8 +70209,8 @@ class CheckoutElement extends HTMLElement {
       },
       next: [
         {
-          label: 'Continue to error chains and summaries',
-          path: 'wire-errors-and-metadata'
+          label: '宿主命名空间与插件',
+          path: '../rpc-host/host-and-plugins'
         }
       ]
     }
@@ -74340,7 +71025,7 @@ class CheckoutElement extends HTMLElement {
               },
               {
                 type: 'paragraph',
-                text: '冻结外层快照不等于递归冻结 config。把这些返回值当成观察结果使用，不靠修改它们控制任务。RPC 的具体嵌套字段见 [IRuntimeConnectionDetail](/zh/docs/rpc-host/api/plugin/IRuntimeConnectionDetail)。'
+                text: '冻结外层快照不等于递归冻结 config。把这些返回值当成观察结果使用，不靠修改它们控制任务。RPC 的具体嵌套字段见 [IRpcMemberConnectionDetail](/zh/docs/rpc-host/api/sdk#rpc-host-sdk--IRpcMemberConnectionDetail)。'
               }
             ]
           },
@@ -74740,7 +71425,7 @@ class CheckoutElement extends HTMLElement {
               },
               {
                 type: 'paragraph',
-                text: 'Freezing a snapshot wrapper does not recursively freeze config. Treat returned values as observations and use registry methods to control tasks. See [IRuntimeConnectionDetail](/en/docs/rpc-host/api/plugin/IRuntimeConnectionDetail) for nested RPC fields.'
+                text: 'Freezing a snapshot wrapper does not recursively freeze config. Treat returned values as observations and use registry methods to control tasks. See [IRpcMemberConnectionDetail](/en/docs/rpc-host/api/sdk#rpc-host-sdk--IRpcMemberConnectionDetail) for nested RPC fields.'
               }
             ]
           },

@@ -1,3 +1,7 @@
+/**
+ * Reads and consumes Deno child-discovery markers only with existing environment permission. It
+ * opens the original stdio/bootstrap resource and supplies the native final-exit operation.
+ */
 import type { IAdapterProcessRuntimeIO } from '../runtime-loader.js'
 import { PROCESS_RUNTIME_API_ENV, PROCESS_RUNTIME_API_BOOTSTRAP_TIMEOUT_MS } from '../constants.js'
 import { openProcessStdioChannel } from './deno-command.js'
@@ -30,6 +34,13 @@ class NativeDenoProcessRuntimeIO implements IAdapterProcessRuntimeIO {
       runtime.env.delete(PROCESS_RUNTIME_API_ENV)
     }
     return { marker, runtime: 'deno' }
+  }
+
+  /** Preserve the native child guard's real runtime exit without a Node shim. */
+  readonly exit = (code: 0 | 1): void => {
+    /** Runtime acquisition remains native and is performed only after Deno was selected. */
+    const runtime = Reflect.get(globalThis, 'Deno') as { exit(code: number): never }
+    runtime.exit(code)
   }
 
   /** Open this actual process's stdin/stdout without constructing a Node stream shim. */

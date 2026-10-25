@@ -1,12 +1,6 @@
-/** Admission belongs to the cooperative transport; wire and replacement errors keep their owners. */
-export const ERROR_SOURCE = 'rpc.transport.coroutine'
+/** RPC failure codes are declared by rpc-contract; this package owns no local codes. */
+export const RpcCoroutineLocalErrorCode = {} as const
 
-/** Invalid sources cannot acquire task ports or supervision authority. */
-export const RpcCoroutineErrorCode = {
-  /** Supply exactly one callable task or a genuine connection received by that task generation. */
-  sourceInvalid: 'COROUTINE_SOURCE_INVALID'
-} as const
-
-/** The package's public admission error values. */
-export type IRpcCoroutineErrorCode =
-  (typeof RpcCoroutineErrorCode)[keyof typeof RpcCoroutineErrorCode]
+/** No package-local semantic values exist; RPC code unions come from rpc-contract. */
+export type IRpcCoroutineLocalErrorCode =
+  (typeof RpcCoroutineLocalErrorCode)[keyof typeof RpcCoroutineLocalErrorCode]

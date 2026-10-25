@@ -1,34 +1,122 @@
-import { defineFeaturePlugin } from '@migaia/rpc-host/plugin'
-import type { IIpcSendQueueOptions, IRpcFeaturePlugin } from '@migaia/rpc-host/plugin'
-import { registerProcessFeatureConfiguration } from './metadata.js'
+/**
+ * Serializes original physical writes with the Utils concurrency limiter and one shared
+ * flow-admission owner. Queued cancellation and close do not create a second RPC execution queue.
+ */
+import { createConcurrencyLimiter } from '@migaia/utils/promise'
+import { RpcCoreErrorText, RpcLifecycleError, tagRpcError } from '@migaia/rpc-contract/errors'
+import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
+import {
+  flowControl,
+  type IIpcFlowControlOptions,
+  type IRpcFlowControlFeature,
+  type IpcFlowControl
+} from './flow-control.js'
 import { ProcessFeatureName } from './text.js'
+import type {
+  IProcessFeatureContext,
+  IIpcSendFacts,
+  IIpcSendAdmission,
+  IIpcWrite,
+  IIpcBatchGuard
+} from './metadata.js'
 
-/** Only capacities are configurable; connection and session identity remain native-owner facts. */
-export type ISendQueueFeatureOptions = Pick<
-  IIpcSendQueueOptions,
-  'maxPendingData' | 'maxPendingControl'
->
+/** Explicit shared flow excludes a second capacity policy on this same native connection. */
+export type ISendQueueOptions = IIpcFlowControlOptions & Readonly<{ flow?: IRpcFlowControlFeature }>
+/** One installed queue serializes original writes and borrows exactly one lane-admission owner. */
+export class IpcSendQueue {
+  /** The original utils implementation owns FIFO, pending cancellation and close rejection. */
+  readonly #limiter
+  /** Admission, watermarks and logs belong only to this shared flow instance. */
+  readonly flow: IpcFlowControl
+  /** A locally created default flow follows this installation's lifetime. */
+  readonly #ownedFlow: boolean
+  /** Only logical members still waiting for their actual coalesced physical flush can be removed. */
+  readonly #queuedCancellations = new Set<(reason: unknown) => void>()
+  /** Local close is independent from a borrowed flow's lifetime. */
+  #closed = false
+  /** Original close reason rejects queued work without replacing its identity. */
+  #closeReason: unknown
 
-/** All configured instances share the SDK's one module-level feature definition identity. */
-const defineSendQueue = /* @__PURE__ */ defineFeaturePlugin(
-  (_options: ISendQueueFeatureOptions) => ({ name: ProcessFeatureName.sendQueue })
-)
-
-/** Supply cold capacity options to process normalization without installing another gate. */
-export function sendQueueFeature(options: ISendQueueFeatureOptions = {}): IRpcFeaturePlugin {
-  /** Snapshot each explicit field once so later caller mutation cannot reconfigure a connection. */
-  const maxPendingData = options.maxPendingData
-  /** Omitting one lane must preserve the source's original capacity for that lane. */
-  const maxPendingControl = options.maxPendingControl
-  /** Only actual configured fields override the native source's ordinary IPC options. */
-  const captured = Object.freeze({
-    ...(maxPendingData === undefined ? {} : { maxPendingData }),
-    ...(maxPendingControl === undefined ? {} : { maxPendingControl })
-  })
-  /** This final native object is the same identity the Host passes to deployment preparation. */
-  const feature = defineSendQueue(captured)
-  registerProcessFeatureConfiguration(feature, Object.freeze({ sendQueue: captured }))
-  return feature
+  /** Native installation supplies the exact same feature/value receipt when flow is shared. */
+  constructor(feature: IRpcFlowControlFeature, context: IProcessFeatureContext) {
+    if (context.flow && context.flow.feature !== feature)
+      throw tagRpcError(
+        new TypeError(RpcCoreErrorText.ipcGateDuplicated),
+        RpcCoreErrorCode.invalidConfig
+      )
+    this.#ownedFlow = context.flow === undefined
+    this.flow = context.flow?.value ?? feature.install(context).value
+    this.#limiter = createConcurrencyLimiter({
+      concurrency: 1,
+      report: (error) => this.flow.reportFailure(error)
+    })
+  }
+  /** Count each logical envelope once, then lend actual FIFO execution to its one shared flow. */
+  readonly run = (
+    facts: IIpcSendFacts,
+    write: IIpcWrite,
+    admission?: IIpcSendAdmission
+  ): Promise<void> => {
+    if (this.#closed)
+      return Promise.reject(new RpcLifecycleError(RpcCoreErrorText.endpointDisposed))
+    return this.flow.run(
+      facts,
+      admission?.coalesced ? () => write(this.#guard) : write,
+      admission,
+      admission?.coalesced
+        ? undefined
+        : (invoke) =>
+            this.#limiter.run(invoke, admission?.signal ? { signal: admission.signal } : undefined)
+    )
+  }
+  /** The physical batch producer retains only cancellation of its still-queued original member. */
+  readonly #guard: IIpcBatchGuard = (cancelQueued) => {
+    if (this.#closed) throw this.#closeReason
+    if (!cancelQueued) return undefined
+    this.#queuedCancellations.add(cancelQueued)
+    return () => {
+      this.#queuedCancellations.delete(cancelQueued)
+    }
+  }
+  /** Observers subscribe to the shared flow, never a second queue-owned event source. */
+  readonly onEvent: IpcFlowControl['onEvent'] = (listener) => this.flow.onEvent(listener)
+  /**
+   * Close admission synchronously before cancelling original queued members and releasing owned
+   * flow.
+   */
+  readonly close = (reason?: unknown): void => {
+    if (this.#closed) return
+    this.#closed = true
+    this.#closeReason = reason ?? new RpcLifecycleError(RpcCoreErrorText.endpointDisposed)
+    this.#limiter.close(this.#closeReason)
+    for (const cancel of this.#queuedCancellations) cancel(this.#closeReason)
+    this.#queuedCancellations.clear()
+    if (this.#ownedFlow) this.flow.close(this.#closeReason)
+  }
+  /** Both FIFO and coalesced writes must leave their original shared capacity before drain settles. */
+  readonly whenIdle = (): Promise<void> => this.flow.whenIdle()
 }
 
-export default sendQueueFeature
+/** A complete queue definition executes FIFO policy, rather than supplying a configuration switch. */
+export function sendQueue(options: ISendQueueOptions = {}) {
+  if (
+    options.flow &&
+    (options.maxPendingData !== undefined || options.maxPendingControl !== undefined)
+  )
+    throw tagRpcError(
+      new TypeError(RpcCoreErrorText.ipcGateDuplicated),
+      RpcCoreErrorCode.invalidConfig
+    )
+  /** One exact cold definition is installed once by the concrete native process source. */
+  const flow = options.flow ?? flowControl(options)
+  return Object.freeze({
+    kind: ProcessFeatureName.sendQueue,
+    flow,
+    install: (context: IProcessFeatureContext) => {
+      /** Each native connection owns its own FIFO while sharing its one actual admission instance. */
+      const value = new IpcSendQueue(flow, context)
+      return { value, dispose: value.close }
+    }
+  })
+}
+export default sendQueue

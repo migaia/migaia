@@ -14,7 +14,7 @@ import {
   NativeReplayReceipt,
   nativeReplayReceipt
 } from '../../../rpc-host/dist/core/internal/native-replay.js'
-import { NativeDefaultIdText } from '../../../rpc-host/dist/core/internal/native-default-id-text.js'
+import { NativeDefaultIdText } from '../../../rpc-host/dist/call/id-text.js'
 import { nativeEndpoint } from '../../../rpc-host/test/replay-window/native-runtime.mjs'
 
 /** Only the failed-construction interval skips retirement in the explicit rollback mutant. */

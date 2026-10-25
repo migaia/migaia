@@ -59,6 +59,8 @@ export const TrayInternal = {
   clientPlugin: 'trayClient',
   relayPlugin: 'trayRelay',
   connection: 'tray',
+  /** Each parent admission installs one genuine transport namespace, separate from root keys. */
+  namespacePrefix: 'tray:',
   init: 'trayChild.init',
   invoke: 'trayChild.invoke',
   stream: 'trayChild.stream',

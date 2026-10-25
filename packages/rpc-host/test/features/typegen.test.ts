@@ -3,12 +3,11 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { describe, expect, it } from 'vitest'
-import type { IRuntimePeerDescription } from '@migaia/rpc-contract/runtime'
-import type { IRpcMethodSchema } from '@migaia/rpc-contract/remote'
-import { renderPeerDeclaration } from '../../dist/features/typegen-render.js'
-import { createRpcHost } from '../../dist/host/create-rpc-host.js'
-import { typegenFeature } from '../../dist/features/typegen.js'
-import { memoryServer } from '../host/fixture.js'
+import type { IRpcDirectory, IRpcMethodSchema } from '@migaia/rpc-contract/protocol'
+import { renderPeerDeclaration } from '../../dist/plugins/typegen/render.js'
+import { createRpcHost } from '@migaia/rpc-host'
+import { typegen } from '@migaia/rpc-host/plugins/typegen'
+import { coreMemoryServer } from '../host/core-fixture.js'
 
 /** Accepted-directory fixtures use the same closed contract shape as real connected peers. */
 function directory(
@@ -19,10 +18,15 @@ function directory(
   }> = {},
   stream = false,
   name = 'peer'
-): IRuntimePeerDescription {
+): IRpcDirectory {
   return {
-    schemaVersion: 2,
-    self: { name, instanceId: 'peer-instance' },
+    schemaVersion: 3,
+    self: {
+      name,
+      instanceId: 'peer-instance',
+      generation: { kind: 'session', value: 1, providerId: 'peer-instance' }
+    },
+    nodeId: '0123456789abcdef0123456789abcdef',
     methods: [
       {
         name: 'resize',
@@ -35,7 +39,7 @@ function directory(
 }
 
 /** Compile the emitted declaration and a real importing consumer using the existing compiler. */
-function typecheckGenerated(description: IRuntimePeerDescription, consumer: string): void {
+function typecheckGenerated(description: IRpcDirectory, consumer: string): void {
   /** A retained temporary consumer makes a compiler failure independently inspectable. */
   const root = mkdtempSync(join(tmpdir(), 'rpc-host-typegen-'))
   /** Both files are compiler inputs rather than string-only assertions about declaration syntax. */
@@ -203,7 +207,7 @@ void result; void same;
     const reports: unknown[] = []
     const failure = new Error('output unavailable')
     let rejectWrite = false
-    const feature = typegenFeature({
+    const feature = typegen({
       out: {
         write(fileName, text) {
           writes.push([fileName, text])
@@ -212,10 +216,10 @@ void result; void same;
       }
     })
     expect(writes).toEqual([])
-    const server = memoryServer('server')
+    const server = coreMemoryServer('server')
     const host = await createRpcHost({
       ...server.options,
-      plugins: [server.transport, feature],
+      plugins: [feature, server.transport],
       report: (error) => reports.push(error)
     })
     const first = await server.connect(
@@ -244,7 +248,7 @@ void result; void same;
     try {
       expect(writes).toHaveLength(1)
       expect(writes[0]![1]).toContain('"api.resize"(payload: number): Promise<string>')
-      expect(await host.request('api.resize', 42)).toBe('42')
+      expect(await host.memory.request('api.resize', 42)).toBe('42')
       await first.host.close()
       const second = await server.connect(
         'peer',
@@ -259,7 +263,7 @@ void result; void same;
         const third = await server.connect('other', { provide: { alive: () => 7 } })
         try {
           await expect.poll(() => reports.includes(failure)).toBe(true)
-          expect(await host.send('other', 'alive')).toBe(7)
+          expect(await host.memory.send('other', 'alive')).toBe(7)
         } finally {
           await third.host.close()
         }

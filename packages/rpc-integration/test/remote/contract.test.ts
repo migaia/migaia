@@ -12,7 +12,7 @@ import {
   REMOTE_NAME_PATTERN
 } from '../../../rpc-host/dist/remote/contract.js'
 import { RpcRemoteLayerErrorText } from '../../../rpc-host/dist/remote/error-text.js'
-import { RpcRemoteLayerErrorCode } from '../../../rpc-host/dist/remote/error-code.js'
+import { RpcRemoteLayerErrorCode } from '@migaia/rpc-contract/error-code'
 
 /** Narrow JSON Schema keyword set used by the checked protocol document. */
 type ISchema = Record<string, unknown>

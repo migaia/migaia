@@ -5,7 +5,10 @@ import {
   decodeRpcDevtoolsRecord,
   encodeRpcDevtoolsRecord
 } from '../../src/contract/record-codec.js'
-import { RpcDevtoolsErrorCode, ERROR_SOURCE as RPC_DEVTOOLS_SOURCE } from '../../src/error-code.js'
+import {
+  RpcDevtoolsErrorCode,
+  RPC_DEVTOOLS_ERROR_SOURCE as RPC_DEVTOOLS_SOURCE
+} from '@migaia/rpc-contract/error-code'
 import {
   RpcDevtoolsRecordFormat,
   type IRpcDevtoolsRecord,

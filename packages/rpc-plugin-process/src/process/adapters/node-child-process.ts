@@ -1,12 +1,12 @@
-import { ERROR_SOURCE as RPC_PROCESS_ERROR_SOURCE } from '../error-code.js'
-import { IpcReporterContext } from '@migaia/rpc-host/plugin'
-import { tagNativeProcessError } from '../error.js'
+/** Acquire one native child generation; bootstrap, process streams and exit remain native-owned. */
+import { IpcReporterContext } from '@migaia/rpc-host/sdk'
+import { createProcessError, tagNativeProcessError } from '../error.js'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { encodeRpcStreamFrame } from '@migaia/rpc-contract/framing/stream'
-import { RPC_CORE_ERROR_SOURCE, RpcCoreErrorCode } from '@migaia/rpc-host'
-import { hostRethrowReporter } from '@migaia/utils/promise'
+import { encodeRpcStreamFrame } from '@migaia/rpc-host/sdk'
+import { RPC_ENDPOINT_ERROR_SOURCE, RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
+import { deferred, hostRethrowReporter } from '@migaia/utils/promise'
 import { CapabilityLevel, StandardCapability, type TerminationMode } from '@migaia/supervision'
 import {
   ProcessCapability,
@@ -14,11 +14,11 @@ import {
   type IProcessLauncher
 } from '@migaia/supervision/process'
 import { receiveAdapterBootstrap } from '../bootstrap.js'
-import { RpcProcessErrorCode } from '../error-code.js'
+import { RpcProcessErrorCode } from '@migaia/rpc-contract/error-code'
 
 import { RpcProcessErrorText } from '../error-text.js'
 import type { IProcessByteChannel } from '../types.js'
-import type { IRuntimePeerIdentity } from '@migaia/rpc-host/plugin'
+import type { IRpcMemberIdentity } from '@migaia/rpc-host/sdk'
 import { createAdapterNodeProcessLaunch } from '../node-launch.js'
 import type { IProcessRuntimeBootstrapOptions } from '../runtime-bootstrap.js'
 import { PROCESS_RUNTIME_API_ENV, PROCESS_RUNTIME_API_ENV_VERSION } from '../constants.js'
@@ -31,7 +31,7 @@ export type INodeProcessHandle = IProcessHandle &
     /** Present only when stdin and stdout were both configured as channels. */
     channel?: IProcessByteChannel
     /** Safe launch identity emitted only for the opted-in runtime bootstrap. */
-    runtimeApiIdentity?: IRuntimePeerIdentity
+    runtimeApiIdentity?: IRpcMemberIdentity
   }>
 
 /** Node does not claim tree termination until the POSIX grandchild fixture proves it. */
@@ -122,9 +122,10 @@ class NodeProcessGeneration {
       this.#state.child.stdout.on('data', (chunk: Buffer) =>
         deliverOutput(this.#state.context.output, 'stdout', chunk)
       )
-    this.#state.exited = new Promise<{ code: number | null; signal: string | null }>((resolve) => {
-      this.#state.child.once('close', (code, signal) => resolve({ code, signal }))
-    })
+    /** The original native close event alone supplies this generation's exit receipt. */
+    const exited = deferred<{ code: number | null; signal: string | null }>()
+    this.#state.child.once('close', (code, signal) => exited.resolve({ code, signal }))
+    this.#state.exited = exited.promise
     this.#state.context.signal.addEventListener('abort', this.#onAbort, { once: true })
     void this.#state.exited.then(() =>
       this.#state.context.signal.removeEventListener('abort', this.#onAbort)
@@ -143,30 +144,15 @@ class NodeProcessGeneration {
       this.#state.launch.assertActive()
       /** A framed bootstrap is always the first stdin write. */
       if (this.#state.spec.bootstrap?.via === 'stdin') {
-        if (!this.#state.child.stdin)
-          throw attachErrorIdentity(new Error(RpcProcessErrorText.connectFailed), {
-            source: RPC_PROCESS_ERROR_SOURCE,
-            code: RpcProcessErrorCode.connectFailed
-          })
+        if (!this.#state.child.stdin) throw createProcessError(RpcProcessErrorCode.connectFailed)
         if (this.#state.stdinFailure) throw this.#state.stdinFailure
-        await new Promise<void>((resolve, reject) => {
-          this.#state.rejectBootstrap = reject
-          this.#state.child.stdin!.write(
-            encodeRpcStreamFrame(
-              this.#state.runtimeBootstrap?.payload ?? this.#state.spec.bootstrap!.payload
-            ),
-            (error) => {
-              if (error) reject(error)
-              else resolve()
-            }
-          )
-        })
+        await this.#writeBootstrap()
         this.#state.rejectBootstrap = undefined
       }
       if (this.#state.stdinFailure) throw this.#state.stdinFailure
       if (this.#state.spec.bootstrap?.via === 'fd')
         throw attachErrorIdentity(new TypeError(RpcProcessErrorText.optionsInvalid), {
-          source: RPC_CORE_ERROR_SOURCE,
+          source: RPC_ENDPOINT_ERROR_SOURCE,
           code: RpcCoreErrorCode.invalidConfig
         })
       /** Stdout channel is never also consumed by the output drain. */
@@ -205,16 +191,30 @@ class NodeProcessGeneration {
       terminateChild(this.#state.child, 'force')
       await this.#state.exited
       this.#state.child.stdin?.removeListener('error', this.#onStdinError)
-      throw ((originalCause: unknown) =>
-        attachErrorIdentity(
-          new Error(
-            RpcProcessErrorText.connectFailed,
-            originalCause === undefined ? undefined : { cause: originalCause }
-          ),
-          { source: RPC_PROCESS_ERROR_SOURCE, code: RpcProcessErrorCode.connectFailed }
-        ))(error)
+      throw createProcessError(RpcProcessErrorCode.connectFailed, error)
     }
   }
+  /** Write this generation's original bootstrap once; stdin failure joins the same completion. */
+  #writeBootstrap(): Promise<void> {
+    /** The existing stdin error callback can reject this exact in-progress native write. */
+    const completion = deferred<void>()
+    this.#state.rejectBootstrap = completion.reject
+    try {
+      this.#state.child.stdin!.write(
+        encodeRpcStreamFrame(
+          this.#state.runtimeBootstrap?.payload ?? this.#state.spec.bootstrap!.payload
+        ),
+        (error) => {
+          if (error) completion.reject(error)
+          else completion.resolve()
+        }
+      )
+    } catch (error) {
+      completion.reject(error)
+    }
+    return completion.promise
+  }
+
   /** Preserve this generation's original native callback and its cleanup identity. */
   #onStdinError = (error: Error): void => {
     this.#state.stdinFailure ??= error
@@ -283,7 +283,7 @@ export async function openProcessStdioChannel(
 ): Promise<Readonly<{ channel: IProcessByteChannel; bootstrap?: Uint8Array }>> {
   if (options.bootstrap === 'fd')
     throw attachErrorIdentity(new TypeError(RpcProcessErrorText.optionsInvalid), {
-      source: RPC_CORE_ERROR_SOURCE,
+      source: RPC_ENDPOINT_ERROR_SOURCE,
       code: RpcCoreErrorCode.invalidConfig
     })
   /** Stdout channel is never also consumed by the output drain. */

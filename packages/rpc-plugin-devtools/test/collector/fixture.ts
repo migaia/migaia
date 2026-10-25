@@ -4,7 +4,7 @@ import {
   RpcProbeOutcome,
   RpcProbeStage,
   type IRpcProbeEventView
-} from '@migaia/rpc-host/probe'
+} from '@migaia/rpc-host/plugins/probe'
 
 /** Shared input vocabulary keeps repeated fixture identity in one owner. */
 export const CollectorFixture = {
@@ -46,6 +46,9 @@ export function collectorView(seq = 1): IRpcProbeEventView {
     receiverId: CollectorFixture.receiver,
     peerId: CollectorFixture.peer,
     trace: CollectorFixture.trace,
+    hop: -1,
+    maxHops: -1,
+    route: undefined,
     sizeBytes: 64,
     chunkIndex: -1,
     chunkCount: -1,

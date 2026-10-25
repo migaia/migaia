@@ -7,7 +7,7 @@
  */
 import type { ICode, ILibraryReference, IMemberDoc, IText, ITypeDoc } from './contract.js'
 import { capabilityReference } from './capability.js'
-import { runtimeSharedTypes } from './rpc-runtime-shared.js'
+import { rpcMemberSharedTypes } from './rpc-runtime-shared.js'
 import { trayCases, trayOptionCases, trayOptionExamples } from './tray-cases.js'
 
 /** Builds one bilingual text. */
@@ -1534,7 +1534,7 @@ await tray.spawn('agent', { id: 'alice' })`
         '`ITrayInstance` plus RPC connection details, from `tray.get(id)`.',
         '`ITrayInstance` 加上 RPC 层的连接详情，由 `tray.get(id)` 返回。'
       ),
-      members: { ...runtimeSharedTypes.IRuntimeConnectionDetail!.members, ...instanceMembers }
+      members: { ...rpcMemberSharedTypes.IRpcMemberConnectionDetail!.members, ...instanceMembers }
     },
     ITrayInstanceEventRecord: {
       summary: t(

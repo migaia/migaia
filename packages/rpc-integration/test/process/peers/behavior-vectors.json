@@ -1,20 +1,40 @@
 {
-  "schema": "migaia.rpc.peer-behavior/1",
+  "schema": "migaia.rpc.peer-behavior/2",
   "hello": {
+    "profile": "migaia.rpc/2",
     "kind": "handshake",
     "step": "hello",
-    "protocol": "migaia.rpc",
     "versions": [
       {
-        "major": 1,
-        "minor": 1
+        "major": 2,
+        "minor": 0
       }
     ],
     "codecs": ["json"],
-    "capabilities": ["ping@1", "abort@1", "close@1", "wire-error@1", "runtime-api@1", "batch@1"],
+    "extensions": [],
     "peer": {
       "id": "behavior-caller",
-      "runtime": "python"
+      "runtime": "python",
+      "runtimeVersion": "3.9"
+    },
+    "directory": {
+      "schemaVersion": 3,
+      "self": {
+        "name": "behavior-caller",
+        "instanceId": "behavior-caller",
+        "generation": {
+          "kind": "session",
+          "value": 0,
+          "providerId": "behavior-caller"
+        }
+      },
+      "methods": [
+        {
+          "name": "echo",
+          "supportedModes": ["request", "notify"],
+          "modeSource": "declared"
+        }
+      ]
     }
   },
   "cases": [
@@ -23,56 +43,63 @@
       "steps": [
         {
           "frame": {
+            "profile": "migaia.rpc/2",
             "kind": "future",
-            "id": "future-1",
-            "data": {
-              "route": {
-                "profile": "migaia.rpc.route",
-                "type": "future",
-                "applicationVersion": "1",
-                "senderId": "behavior-caller",
-                "targetId": "provider",
-                "sentAt": 0
-              }
-            }
+            "route": {
+              "applicationVersion": "1",
+              "senderId": "behavior-caller",
+              "targetId": "provider",
+              "sentAt": 0,
+              "receiverId": "provider"
+            },
+            "id": "future-1"
           }
         },
         {
           "frame": {
-            "kind": "request",
+            "profile": "migaia.rpc/2",
+            "kind": "call",
+            "route": {
+              "applicationVersion": "1",
+              "senderId": "behavior-caller",
+              "targetId": "provider",
+              "sentAt": 0,
+              "receiverId": "provider"
+            },
             "id": "echo-1",
-            "method": "echo",
-            "data": {
-              "route": {
-                "profile": "migaia.rpc.route",
-                "type": "request",
-                "applicationVersion": "1",
-                "senderId": "behavior-caller",
-                "targetId": "provider",
-                "sentAt": 0
+            "task": {
+              "mode": "request",
+              "callerId": "behavior-caller",
+              "callerGeneration": {
+                "kind": "session",
+                "value": 0,
+                "providerId": "behavior-caller"
               },
-              "payload": "still-open"
-            }
+              "targetGeneration": {
+                "kind": "session",
+                "value": 0,
+                "providerId": "provider"
+              },
+              "method": "echo"
+            },
+            "options": {},
+            "payload": "still-open"
           }
         },
         {
           "frame": {
-            "kind": "variation",
+            "profile": "migaia.rpc/2",
+            "kind": "control",
+            "route": {
+              "applicationVersion": "1",
+              "senderId": "behavior-caller",
+              "targetId": "provider",
+              "sentAt": 0,
+              "receiverId": "provider",
+              "remainingMs": 0
+            },
             "id": "close-1",
-            "data": {
-              "route": {
-                "profile": "migaia.rpc.route",
-                "type": "variation",
-                "applicationVersion": "1",
-                "senderId": "behavior-caller",
-                "targetId": "provider",
-                "sentAt": 0,
-                "variation": "close"
-              },
-              "payload": {
-                "drainMs": 0
-              }
-            }
+            "operation": "drain"
           }
         }
       ],
@@ -80,80 +107,78 @@
         "exit": 0,
         "frames": [
           {
+            "profile": "migaia.rpc/2",
+            "kind": "handshake",
+            "step": "hello"
+          },
+          {
+            "profile": "migaia.rpc/2",
             "kind": "handshake",
             "step": "accept"
           },
           {
-            "kind": "response",
+            "profile": "migaia.rpc/2",
+            "kind": "result",
             "id": "echo-1",
-            "ok": true,
-            "data": {
-              "payload": "still-open"
-            }
+            "result": "still-open"
           }
         ],
         "stderr": {
-          "PEER_WARN UNKNOWN_KIND": 1
+          "PEER_ERROR PROTOCOL_INVALID": 1
         }
-      }
+      },
+      "retiredAssertions": [
+        "BC2 unknown-kind warning classification replaced by closed-frame rejection; same following echo and connection continuity remain required."
+      ]
     },
     {
       "id": "ping-not-negotiated",
-      "capabilities": ["close@1", "runtime-api@1", "batch@1"],
       "steps": [
         {
           "frame": {
-            "kind": "variation",
-            "id": "ping-1",
-            "data": {
-              "route": {
-                "profile": "migaia.rpc.route",
-                "type": "variation",
-                "applicationVersion": "1",
-                "senderId": "behavior-caller",
-                "targetId": "provider",
-                "sentAt": 0,
-                "variation": "ping"
-              }
-            }
-          }
-        },
-        {
-          "frame": {
-            "kind": "request",
+            "profile": "migaia.rpc/2",
+            "kind": "call",
+            "route": {
+              "applicationVersion": "1",
+              "senderId": "behavior-caller",
+              "targetId": "provider",
+              "sentAt": 0,
+              "receiverId": "provider"
+            },
             "id": "echo-2",
-            "method": "echo",
-            "data": {
-              "route": {
-                "profile": "migaia.rpc.route",
-                "type": "request",
-                "applicationVersion": "1",
-                "senderId": "behavior-caller",
-                "targetId": "provider",
-                "sentAt": 0
+            "task": {
+              "mode": "request",
+              "callerId": "behavior-caller",
+              "callerGeneration": {
+                "kind": "session",
+                "value": 0,
+                "providerId": "behavior-caller"
               },
-              "payload": 2
-            }
+              "targetGeneration": {
+                "kind": "session",
+                "value": 0,
+                "providerId": "provider"
+              },
+              "method": "echo"
+            },
+            "options": {},
+            "payload": 2
           }
         },
         {
           "frame": {
-            "kind": "variation",
+            "profile": "migaia.rpc/2",
+            "kind": "control",
+            "route": {
+              "applicationVersion": "1",
+              "senderId": "behavior-caller",
+              "targetId": "provider",
+              "sentAt": 0,
+              "receiverId": "provider",
+              "remainingMs": 0
+            },
             "id": "close-2",
-            "data": {
-              "route": {
-                "profile": "migaia.rpc.route",
-                "type": "variation",
-                "applicationVersion": "1",
-                "senderId": "behavior-caller",
-                "targetId": "provider",
-                "sentAt": 0,
-                "variation": "close"
-              },
-              "payload": {
-                "drainMs": 0
-              }
-            }
+            "operation": "drain"
           }
         }
       ],
@@ -161,93 +186,104 @@
         "exit": 0,
         "frames": [
           {
+            "profile": "migaia.rpc/2",
+            "kind": "handshake",
+            "step": "hello"
+          },
+          {
+            "profile": "migaia.rpc/2",
             "kind": "handshake",
             "step": "accept"
           },
           {
-            "kind": "response",
+            "profile": "migaia.rpc/2",
+            "kind": "result",
             "id": "echo-2",
-            "ok": true,
-            "data": {
-              "payload": 2
-            }
+            "result": 2
           }
         ]
-      }
+      },
+      "retiredAssertions": [
+        "BC2 removed optional ping capability gate; retain original echo/wait/finish result/count/order, without sending the formerly ignored control."
+      ]
     },
     {
       "id": "abort-not-negotiated",
-      "capabilities": ["close@1", "runtime-api@1", "batch@1"],
       "steps": [
         {
           "frame": {
-            "kind": "request",
+            "profile": "migaia.rpc/2",
+            "kind": "call",
+            "route": {
+              "applicationVersion": "1",
+              "senderId": "behavior-caller",
+              "targetId": "provider",
+              "sentAt": 0,
+              "receiverId": "provider"
+            },
             "id": "wait-1",
-            "method": "peer.wait",
-            "data": {
-              "route": {
-                "profile": "migaia.rpc.route",
-                "type": "request",
-                "applicationVersion": "1",
-                "senderId": "behavior-caller",
-                "targetId": "provider",
-                "sentAt": 0
-              }
-            }
-          }
-        },
-        {
-          "frame": {
-            "kind": "variation",
-            "id": "wait-1",
-            "data": {
-              "route": {
-                "profile": "migaia.rpc.route",
-                "type": "variation",
-                "applicationVersion": "1",
-                "senderId": "behavior-caller",
-                "targetId": "provider",
-                "sentAt": 0,
-                "variation": "abort"
-              }
-            }
-          }
-        },
-        {
-          "frame": {
-            "kind": "request",
-            "id": "finish-1",
-            "method": "peer.finish",
-            "data": {
-              "route": {
-                "profile": "migaia.rpc.route",
-                "type": "request",
-                "applicationVersion": "1",
-                "senderId": "behavior-caller",
-                "targetId": "provider",
-                "sentAt": 0
-              }
-            }
-          }
-        },
-        {
-          "frame": {
-            "kind": "variation",
-            "id": "close-3",
-            "data": {
-              "route": {
-                "profile": "migaia.rpc.route",
-                "type": "variation",
-                "applicationVersion": "1",
-                "senderId": "behavior-caller",
-                "targetId": "provider",
-                "sentAt": 0,
-                "variation": "close"
+            "task": {
+              "mode": "request",
+              "callerId": "behavior-caller",
+              "callerGeneration": {
+                "kind": "session",
+                "value": 0,
+                "providerId": "behavior-caller"
               },
-              "payload": {
-                "drainMs": 0
-              }
-            }
+              "targetGeneration": {
+                "kind": "session",
+                "value": 0,
+                "providerId": "provider"
+              },
+              "method": "peer.wait"
+            },
+            "options": {}
+          }
+        },
+        {
+          "frame": {
+            "profile": "migaia.rpc/2",
+            "kind": "call",
+            "route": {
+              "applicationVersion": "1",
+              "senderId": "behavior-caller",
+              "targetId": "provider",
+              "sentAt": 0,
+              "receiverId": "provider"
+            },
+            "id": "finish-1",
+            "task": {
+              "mode": "request",
+              "callerId": "behavior-caller",
+              "callerGeneration": {
+                "kind": "session",
+                "value": 0,
+                "providerId": "behavior-caller"
+              },
+              "targetGeneration": {
+                "kind": "session",
+                "value": 0,
+                "providerId": "provider"
+              },
+              "method": "peer.finish"
+            },
+            "options": {}
+          }
+        },
+        {
+          "frame": {
+            "profile": "migaia.rpc/2",
+            "kind": "control",
+            "route": {
+              "applicationVersion": "1",
+              "senderId": "behavior-caller",
+              "targetId": "provider",
+              "sentAt": 0,
+              "receiverId": "provider",
+              "remainingMs": 0
+            },
+            "id": "close-3",
+            "operation": "drain"
           }
         }
       ],
@@ -255,62 +291,63 @@
         "exit": 0,
         "frames": [
           {
+            "profile": "migaia.rpc/2",
+            "kind": "handshake",
+            "step": "hello"
+          },
+          {
+            "profile": "migaia.rpc/2",
             "kind": "handshake",
             "step": "accept"
           },
           {
-            "kind": "response",
-            "id": "wait-1",
-            "ok": true
+            "profile": "migaia.rpc/2",
+            "kind": "result",
+            "id": "wait-1"
           },
           {
-            "kind": "response",
-            "id": "finish-1",
-            "ok": true
+            "profile": "migaia.rpc/2",
+            "kind": "result",
+            "id": "finish-1"
           }
         ]
-      }
+      },
+      "retiredAssertions": [
+        "BC2 removed optional abort capability gate; retain original echo/wait/finish result/count/order, without sending the formerly ignored control."
+      ]
     },
     {
       "id": "close-not-negotiated",
-      "capabilities": ["runtime-api@1", "batch@1"],
       "steps": [
         {
           "frame": {
-            "kind": "variation",
-            "id": "close-4",
-            "data": {
-              "route": {
-                "profile": "migaia.rpc.route",
-                "type": "variation",
-                "applicationVersion": "1",
-                "senderId": "behavior-caller",
-                "targetId": "provider",
-                "sentAt": 0,
-                "variation": "close"
-              },
-              "payload": {
-                "drainMs": 0
-              }
-            }
-          }
-        },
-        {
-          "frame": {
-            "kind": "request",
+            "profile": "migaia.rpc/2",
+            "kind": "call",
+            "route": {
+              "applicationVersion": "1",
+              "senderId": "behavior-caller",
+              "targetId": "provider",
+              "sentAt": 0,
+              "receiverId": "provider"
+            },
             "id": "echo-4",
-            "method": "echo",
-            "data": {
-              "route": {
-                "profile": "migaia.rpc.route",
-                "type": "request",
-                "applicationVersion": "1",
-                "senderId": "behavior-caller",
-                "targetId": "provider",
-                "sentAt": 0
+            "task": {
+              "mode": "request",
+              "callerId": "behavior-caller",
+              "callerGeneration": {
+                "kind": "session",
+                "value": 0,
+                "providerId": "behavior-caller"
               },
-              "payload": "open"
-            }
+              "targetGeneration": {
+                "kind": "session",
+                "value": 0,
+                "providerId": "provider"
+              },
+              "method": "echo"
+            },
+            "options": {},
+            "payload": "open"
           }
         }
       ],
@@ -318,119 +355,123 @@
         "exit": 0,
         "frames": [
           {
+            "profile": "migaia.rpc/2",
+            "kind": "handshake",
+            "step": "hello"
+          },
+          {
+            "profile": "migaia.rpc/2",
             "kind": "handshake",
             "step": "accept"
           },
           {
-            "kind": "response",
+            "profile": "migaia.rpc/2",
+            "kind": "result",
             "id": "echo-4",
-            "ok": true,
-            "data": {
-              "payload": "open"
-            }
+            "result": "open"
           }
         ]
-      }
+      },
+      "retiredAssertions": [
+        "BC2 removed optional close capability gate; retain original echo/wait/finish result/count/order, without sending the formerly ignored control."
+      ]
     },
     {
       "id": "invalid-close-continues",
       "steps": [
         {
           "frame": {
-            "kind": "variation",
+            "profile": "migaia.rpc/2",
+            "kind": "control",
+            "route": {
+              "applicationVersion": "1",
+              "senderId": "behavior-caller",
+              "targetId": "provider",
+              "sentAt": 0,
+              "receiverId": "provider",
+              "remainingMs": "1"
+            },
             "id": "bad-close-1",
-            "data": {
-              "route": {
-                "profile": "migaia.rpc.route",
-                "type": "variation",
-                "applicationVersion": "1",
-                "senderId": "behavior-caller",
-                "targetId": "provider",
-                "sentAt": 0,
-                "variation": "close"
-              },
-              "payload": {
-                "drainMs": "1"
-              }
-            }
+            "operation": "drain"
           }
         },
         {
           "frame": {
-            "kind": "variation",
+            "profile": "migaia.rpc/2",
+            "kind": "control",
+            "route": {
+              "applicationVersion": "1",
+              "senderId": "behavior-caller",
+              "targetId": "provider",
+              "sentAt": 0,
+              "receiverId": "provider",
+              "remainingMs": -1
+            },
             "id": "bad-close-2",
-            "data": {
-              "route": {
-                "profile": "migaia.rpc.route",
-                "type": "variation",
-                "applicationVersion": "1",
-                "senderId": "behavior-caller",
-                "targetId": "provider",
-                "sentAt": 0,
-                "variation": "close"
-              },
-              "payload": {
-                "drainMs": -1
-              }
-            }
+            "operation": "drain"
           }
         },
         {
           "frame": {
-            "kind": "variation",
+            "profile": "migaia.rpc/2",
+            "kind": "control",
+            "route": {
+              "applicationVersion": "1",
+              "senderId": "behavior-caller",
+              "targetId": "provider",
+              "sentAt": 0,
+              "receiverId": "provider",
+              "remainingMs": 2147483648
+            },
             "id": "bad-close-3",
-            "data": {
-              "route": {
-                "profile": "migaia.rpc.route",
-                "type": "variation",
-                "applicationVersion": "1",
-                "senderId": "behavior-caller",
-                "targetId": "provider",
-                "sentAt": 0,
-                "variation": "close"
-              },
-              "payload": {
-                "drainMs": 2147483648
-              }
-            }
+            "operation": "drain"
           }
         },
         {
           "frame": {
-            "kind": "request",
+            "profile": "migaia.rpc/2",
+            "kind": "call",
+            "route": {
+              "applicationVersion": "1",
+              "senderId": "behavior-caller",
+              "targetId": "provider",
+              "sentAt": 0,
+              "receiverId": "provider"
+            },
             "id": "echo-5",
-            "method": "echo",
-            "data": {
-              "route": {
-                "profile": "migaia.rpc.route",
-                "type": "request",
-                "applicationVersion": "1",
-                "senderId": "behavior-caller",
-                "targetId": "provider",
-                "sentAt": 0
+            "task": {
+              "mode": "request",
+              "callerId": "behavior-caller",
+              "callerGeneration": {
+                "kind": "session",
+                "value": 0,
+                "providerId": "behavior-caller"
               },
-              "payload": "continued"
-            }
+              "targetGeneration": {
+                "kind": "session",
+                "value": 0,
+                "providerId": "provider"
+              },
+              "method": "echo"
+            },
+            "options": {},
+            "payload": "continued"
           }
         },
         {
           "frame": {
-            "kind": "variation",
+            "profile": "migaia.rpc/2",
+            "kind": "control",
+            "route": {
+              "applicationVersion": "1",
+              "senderId": "behavior-caller",
+              "targetId": "provider",
+              "sentAt": 0,
+              "receiverId": "provider",
+              "remainingMs": 0
+            },
             "id": "close-5",
-            "data": {
-              "route": {
-                "profile": "migaia.rpc.route",
-                "type": "variation",
-                "applicationVersion": "1",
-                "senderId": "behavior-caller",
-                "targetId": "provider",
-                "sentAt": 0,
-                "variation": "close"
-              },
-              "payload": {
-                "drainMs": 0
-              }
-            }
+            "operation": "drain"
           }
         }
       ],
@@ -438,16 +479,20 @@
         "exit": 0,
         "frames": [
           {
+            "profile": "migaia.rpc/2",
+            "kind": "handshake",
+            "step": "hello"
+          },
+          {
+            "profile": "migaia.rpc/2",
             "kind": "handshake",
             "step": "accept"
           },
           {
-            "kind": "response",
+            "profile": "migaia.rpc/2",
+            "kind": "result",
             "id": "echo-5",
-            "ok": true,
-            "data": {
-              "payload": "continued"
-            }
+            "result": "continued"
           }
         ],
         "stderr": {
@@ -460,55 +505,76 @@
       "steps": [
         {
           "frame": {
-            "kind": "request",
+            "profile": "migaia.rpc/2",
+            "kind": "call",
+            "route": {
+              "applicationVersion": "1",
+              "senderId": "behavior-caller",
+              "targetId": "provider",
+              "sentAt": 0,
+              "receiverId": "provider"
+            },
             "id": "wait-drain",
-            "method": "peer.wait",
-            "data": {
-              "route": {
-                "profile": "migaia.rpc.route",
-                "type": "request",
-                "applicationVersion": "1",
-                "senderId": "behavior-caller",
-                "targetId": "provider",
-                "sentAt": 0
-              }
-            }
+            "task": {
+              "mode": "request",
+              "callerId": "behavior-caller",
+              "callerGeneration": {
+                "kind": "session",
+                "value": 0,
+                "providerId": "behavior-caller"
+              },
+              "targetGeneration": {
+                "kind": "session",
+                "value": 0,
+                "providerId": "provider"
+              },
+              "method": "peer.wait"
+            },
+            "options": {}
           }
         },
         {
           "frame": {
-            "kind": "variation",
+            "profile": "migaia.rpc/2",
+            "kind": "control",
+            "route": {
+              "applicationVersion": "1",
+              "senderId": "behavior-caller",
+              "targetId": "provider",
+              "sentAt": 0,
+              "receiverId": "provider",
+              "remainingMs": 1000
+            },
             "id": "close-drain",
-            "data": {
-              "route": {
-                "profile": "migaia.rpc.route",
-                "type": "variation",
-                "applicationVersion": "1",
-                "senderId": "behavior-caller",
-                "targetId": "provider",
-                "sentAt": 0,
-                "variation": "close"
-              },
-              "payload": {
-                "drainMs": 1000
-              }
-            }
+            "operation": "drain"
           }
         },
         {
           "pauseMs": 30,
           "frame": {
-            "kind": "variation",
+            "profile": "migaia.rpc/2",
+            "kind": "cancel",
+            "route": {
+              "applicationVersion": "1",
+              "senderId": "behavior-caller",
+              "targetId": "provider",
+              "sentAt": 0,
+              "receiverId": "provider"
+            },
             "id": "wait-drain",
-            "data": {
-              "route": {
-                "profile": "migaia.rpc.route",
-                "type": "variation",
-                "applicationVersion": "1",
-                "senderId": "behavior-caller",
-                "targetId": "provider",
-                "sentAt": 0,
-                "variation": "abort"
+            "task": {
+              "mode": "request",
+              "method": "peer.wait",
+              "callerId": "behavior-caller",
+              "callerGeneration": {
+                "kind": "session",
+                "value": 0,
+                "providerId": "behavior-caller"
+              },
+              "targetGeneration": {
+                "kind": "session",
+                "value": 0,
+                "providerId": "provider"
               }
             }
           }
@@ -518,6 +584,12 @@
         "exit": 0,
         "frames": [
           {
+            "profile": "migaia.rpc/2",
+            "kind": "handshake",
+            "step": "hello"
+          },
+          {
+            "profile": "migaia.rpc/2",
             "kind": "handshake",
             "step": "accept"
           }
@@ -530,21 +602,47 @@
     {
       "id": "invalid-hello",
       "hello": {
+        "profile": "migaia.rpc/2",
         "kind": "handshake",
         "step": "hello",
-        "protocol": "migaia.rpc",
         "versions": [],
         "codecs": ["json"],
-        "capabilities": [],
+        "extensions": [],
         "peer": {
           "id": "behavior-caller",
-          "runtime": "python"
+          "runtime": "python",
+          "runtimeVersion": "3.9"
+        },
+        "directory": {
+          "schemaVersion": 3,
+          "self": {
+            "name": "behavior-caller",
+            "instanceId": "behavior-caller",
+            "generation": {
+              "kind": "session",
+              "value": 0,
+              "providerId": "behavior-caller"
+            }
+          },
+          "methods": [
+            {
+              "name": "echo",
+              "supportedModes": ["request", "notify"],
+              "modeSource": "declared"
+            }
+          ]
         }
       },
       "steps": [],
       "expect": {
         "exit": 1,
-        "frames": [],
+        "frames": [
+          {
+            "profile": "migaia.rpc/2",
+            "kind": "handshake",
+            "step": "hello"
+          }
+        ],
         "stderr": {
           "PEER_FAIL HANDSHAKE_INVALID": 1
         }
@@ -556,7 +654,13 @@
       "steps": [],
       "expect": {
         "exit": 1,
-        "frames": [],
+        "frames": [
+          {
+            "profile": "migaia.rpc/2",
+            "kind": "handshake",
+            "step": "hello"
+          }
+        ],
         "stderr": {
           "PEER_FAIL HANDSHAKE_INVALID": 1
         }
@@ -565,25 +669,44 @@
     {
       "id": "request-before-hello",
       "hello": {
-        "kind": "request",
+        "profile": "migaia.rpc/2",
+        "kind": "call",
+        "route": {
+          "applicationVersion": "1",
+          "senderId": "behavior-caller",
+          "targetId": "provider",
+          "sentAt": 0,
+          "receiverId": "provider"
+        },
         "id": "early",
-        "method": "echo",
-        "data": {
-          "route": {
-            "profile": "migaia.rpc.route",
-            "type": "request",
-            "applicationVersion": "1",
-            "senderId": "behavior-caller",
-            "targetId": "provider",
-            "sentAt": 0
+        "task": {
+          "mode": "request",
+          "callerId": "behavior-caller",
+          "callerGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "behavior-caller"
           },
-          "payload": "early"
-        }
+          "targetGeneration": {
+            "kind": "session",
+            "value": 0,
+            "providerId": "provider"
+          },
+          "method": "echo"
+        },
+        "options": {},
+        "payload": "early"
       },
       "steps": [],
       "expect": {
         "exit": 1,
-        "frames": [],
+        "frames": [
+          {
+            "profile": "migaia.rpc/2",
+            "kind": "handshake",
+            "step": "hello"
+          }
+        ],
         "stderr": {
           "PEER_FAIL HANDSHAKE_INVALID": 1
         }
@@ -595,7 +718,13 @@
       "steps": [],
       "expect": {
         "exit": 1,
-        "frames": [],
+        "frames": [
+          {
+            "profile": "migaia.rpc/2",
+            "kind": "handshake",
+            "step": "hello"
+          }
+        ],
         "stderr": {
           "PEER_FAIL HANDSHAKE_INVALID": 1
         }
@@ -606,39 +735,48 @@
       "steps": [
         {
           "frame": {
-            "kind": "request",
+            "profile": "migaia.rpc/2",
+            "kind": "call",
+            "route": {
+              "applicationVersion": "1",
+              "senderId": "behavior-caller",
+              "targetId": "provider",
+              "sentAt": 0,
+              "receiverId": "provider"
+            },
             "id": "method-1",
-            "method": "does.not.exist",
-            "data": {
-              "route": {
-                "profile": "migaia.rpc.route",
-                "type": "request",
-                "applicationVersion": "1",
-                "senderId": "behavior-caller",
-                "targetId": "provider",
-                "sentAt": 0
-              }
-            }
+            "task": {
+              "mode": "request",
+              "callerId": "behavior-caller",
+              "callerGeneration": {
+                "kind": "session",
+                "value": 0,
+                "providerId": "behavior-caller"
+              },
+              "targetGeneration": {
+                "kind": "session",
+                "value": 0,
+                "providerId": "provider"
+              },
+              "method": "does.not.exist"
+            },
+            "options": {}
           }
         },
         {
           "frame": {
-            "kind": "variation",
+            "profile": "migaia.rpc/2",
+            "kind": "control",
+            "route": {
+              "applicationVersion": "1",
+              "senderId": "behavior-caller",
+              "targetId": "provider",
+              "sentAt": 0,
+              "receiverId": "provider",
+              "remainingMs": 0
+            },
             "id": "close-method",
-            "data": {
-              "route": {
-                "profile": "migaia.rpc.route",
-                "type": "variation",
-                "applicationVersion": "1",
-                "senderId": "behavior-caller",
-                "targetId": "provider",
-                "sentAt": 0,
-                "variation": "close"
-              },
-              "payload": {
-                "drainMs": 0
-              }
-            }
+            "operation": "drain"
           }
         }
       ],
@@ -646,16 +784,26 @@
         "exit": 0,
         "frames": [
           {
+            "profile": "migaia.rpc/2",
+            "kind": "handshake",
+            "step": "hello"
+          },
+          {
+            "profile": "migaia.rpc/2",
             "kind": "handshake",
             "step": "accept"
           },
           {
-            "kind": "response",
+            "profile": "migaia.rpc/2",
+            "kind": "error",
             "id": "method-1",
-            "ok": false,
-            "code": "PROVIDER_NOT_FOUND",
             "error": {
-              "code": "PROVIDER_NOT_FOUND"
+              "root": 0,
+              "nodes": [
+                {
+                  "code": "PROVIDER_NOT_FOUND"
+                }
+              ]
             }
           }
         ]
@@ -666,57 +814,78 @@
       "steps": [
         {
           "frame": {
-            "kind": "variation",
+            "profile": "migaia.rpc/2",
+            "kind": "cancel",
+            "route": {
+              "applicationVersion": "1",
+              "senderId": "behavior-caller",
+              "targetId": "provider",
+              "sentAt": 0,
+              "receiverId": "provider"
+            },
             "id": "reuse-1",
-            "data": {
-              "route": {
-                "profile": "migaia.rpc.route",
-                "type": "variation",
-                "applicationVersion": "1",
-                "senderId": "behavior-caller",
-                "targetId": "provider",
-                "sentAt": 0,
-                "variation": "abort"
+            "task": {
+              "mode": "request",
+              "method": "echo",
+              "callerId": "behavior-caller",
+              "callerGeneration": {
+                "kind": "session",
+                "value": 0,
+                "providerId": "behavior-caller"
+              },
+              "targetGeneration": {
+                "kind": "session",
+                "value": 0,
+                "providerId": "provider"
               }
             }
           }
         },
         {
           "frame": {
-            "kind": "request",
+            "profile": "migaia.rpc/2",
+            "kind": "call",
+            "route": {
+              "applicationVersion": "1",
+              "senderId": "behavior-caller",
+              "targetId": "provider",
+              "sentAt": 0,
+              "receiverId": "provider"
+            },
             "id": "reuse-1",
-            "method": "echo",
-            "data": {
-              "route": {
-                "profile": "migaia.rpc.route",
-                "type": "request",
-                "applicationVersion": "1",
-                "senderId": "behavior-caller",
-                "targetId": "provider",
-                "sentAt": 0
+            "task": {
+              "mode": "request",
+              "callerId": "behavior-caller",
+              "callerGeneration": {
+                "kind": "session",
+                "value": 0,
+                "providerId": "behavior-caller"
               },
-              "payload": "reused"
-            }
+              "targetGeneration": {
+                "kind": "session",
+                "value": 0,
+                "providerId": "provider"
+              },
+              "method": "echo"
+            },
+            "options": {},
+            "payload": "reused"
           }
         },
         {
           "frame": {
-            "kind": "variation",
+            "profile": "migaia.rpc/2",
+            "kind": "control",
+            "route": {
+              "applicationVersion": "1",
+              "senderId": "behavior-caller",
+              "targetId": "provider",
+              "sentAt": 0,
+              "receiverId": "provider",
+              "remainingMs": 0
+            },
             "id": "close-reuse",
-            "data": {
-              "route": {
-                "profile": "migaia.rpc.route",
-                "type": "variation",
-                "applicationVersion": "1",
-                "senderId": "behavior-caller",
-                "targetId": "provider",
-                "sentAt": 0,
-                "variation": "close"
-              },
-              "payload": {
-                "drainMs": 0
-              }
-            }
+            "operation": "drain"
           }
         }
       ],
@@ -724,16 +893,20 @@
         "exit": 0,
         "frames": [
           {
+            "profile": "migaia.rpc/2",
+            "kind": "handshake",
+            "step": "hello"
+          },
+          {
+            "profile": "migaia.rpc/2",
             "kind": "handshake",
             "step": "accept"
           },
           {
-            "kind": "response",
+            "profile": "migaia.rpc/2",
+            "kind": "result",
             "id": "reuse-1",
-            "ok": true,
-            "data": {
-              "payload": "reused"
-            }
+            "result": "reused"
           }
         ]
       }
@@ -746,6 +919,12 @@
         "exit": 1,
         "frames": [
           {
+            "profile": "migaia.rpc/2",
+            "kind": "handshake",
+            "step": "hello"
+          },
+          {
+            "profile": "migaia.rpc/2",
             "kind": "handshake",
             "step": "accept"
           }
@@ -756,31 +935,32 @@
     {
       "id": "reject-incompatible-protocol",
       "helloFields": {
-        "protocol": "other.rpc"
+        "profile": "other.rpc"
       },
       "steps": [],
       "expect": {
         "exit": 1,
         "frames": [
           {
+            "profile": "migaia.rpc/2",
             "kind": "handshake",
-            "step": "reject",
-            "error": {
-              "code": "HANDSHAKE_INCOMPATIBLE"
-            }
+            "step": "hello"
           }
         ],
         "stderr": {
           "PEER_FAIL HANDSHAKE_INVALID": 1
         }
-      }
+      },
+      "retiredAssertions": [
+        "BC2 old protocol-selection reject frame removed; invalid profile still fails before business with original exit/diagnostic."
+      ]
     },
     {
       "id": "reject-incompatible-version",
       "helloFields": {
         "versions": [
           {
-            "major": 2,
+            "major": 3,
             "minor": 0
           }
         ]
@@ -790,10 +970,21 @@
         "exit": 1,
         "frames": [
           {
+            "profile": "migaia.rpc/2",
+            "kind": "handshake",
+            "step": "hello"
+          },
+          {
+            "profile": "migaia.rpc/2",
             "kind": "handshake",
             "step": "reject",
             "error": {
-              "code": "HANDSHAKE_INCOMPATIBLE"
+              "root": 0,
+              "nodes": [
+                {
+                  "code": "HANDSHAKE_INCOMPATIBLE"
+                }
+              ]
             }
           }
         ],
@@ -807,54 +998,92 @@
       "steps": [
         {
           "frame": {
-            "kind": "request",
+            "profile": "migaia.rpc/2",
+            "kind": "call",
+            "route": {
+              "applicationVersion": "1",
+              "senderId": "behavior-caller",
+              "targetId": "provider",
+              "sentAt": 0,
+              "receiverId": "provider"
+            },
             "id": "abort-pending-1",
-            "method": "peer.wait",
-            "data": {
-              "route": {
-                "profile": "migaia.rpc.route",
-                "type": "request",
-                "applicationVersion": "1",
-                "senderId": "behavior-caller",
-                "targetId": "provider",
-                "sentAt": 0
-              }
-            }
-          }
-        },
-        {
-          "frame": {
-            "kind": "variation",
-            "id": "abort-pending-1",
-            "data": {
-              "route": {
-                "profile": "migaia.rpc.route",
-                "type": "variation",
-                "applicationVersion": "1",
-                "senderId": "behavior-caller",
-                "targetId": "provider",
-                "sentAt": 0,
-                "variation": "abort"
-              }
-            }
-          }
-        },
-        {
-          "frame": {
-            "kind": "request",
-            "id": "echo-after-abort",
-            "method": "echo",
-            "data": {
-              "route": {
-                "profile": "migaia.rpc.route",
-                "type": "request",
-                "applicationVersion": "1",
-                "senderId": "behavior-caller",
-                "targetId": "provider",
-                "sentAt": 0
+            "task": {
+              "mode": "request",
+              "callerId": "behavior-caller",
+              "callerGeneration": {
+                "kind": "session",
+                "value": 0,
+                "providerId": "behavior-caller"
               },
-              "payload": "alive"
+              "targetGeneration": {
+                "kind": "session",
+                "value": 0,
+                "providerId": "provider"
+              },
+              "method": "peer.wait"
+            },
+            "options": {}
+          }
+        },
+        {
+          "frame": {
+            "profile": "migaia.rpc/2",
+            "kind": "cancel",
+            "route": {
+              "applicationVersion": "1",
+              "senderId": "behavior-caller",
+              "targetId": "provider",
+              "sentAt": 0,
+              "receiverId": "provider"
+            },
+            "id": "abort-pending-1",
+            "task": {
+              "mode": "request",
+              "method": "peer.wait",
+              "callerId": "behavior-caller",
+              "callerGeneration": {
+                "kind": "session",
+                "value": 0,
+                "providerId": "behavior-caller"
+              },
+              "targetGeneration": {
+                "kind": "session",
+                "value": 0,
+                "providerId": "provider"
+              }
             }
+          }
+        },
+        {
+          "frame": {
+            "profile": "migaia.rpc/2",
+            "kind": "call",
+            "route": {
+              "applicationVersion": "1",
+              "senderId": "behavior-caller",
+              "targetId": "provider",
+              "sentAt": 0,
+              "receiverId": "provider"
+            },
+            "id": "echo-after-abort",
+            "task": {
+              "mode": "request",
+              "callerId": "behavior-caller",
+              "callerGeneration": {
+                "kind": "session",
+                "value": 0,
+                "providerId": "behavior-caller"
+              },
+              "targetGeneration": {
+                "kind": "session",
+                "value": 0,
+                "providerId": "provider"
+              },
+              "method": "echo"
+            },
+            "options": {},
+            "payload": "alive"
           }
         }
       ],
@@ -862,16 +1091,20 @@
         "exit": 0,
         "frames": [
           {
+            "profile": "migaia.rpc/2",
+            "kind": "handshake",
+            "step": "hello"
+          },
+          {
+            "profile": "migaia.rpc/2",
             "kind": "handshake",
             "step": "accept"
           },
           {
-            "kind": "response",
+            "profile": "migaia.rpc/2",
+            "kind": "result",
             "id": "echo-after-abort",
-            "ok": true,
-            "data": {
-              "payload": "alive"
-            }
+            "result": "alive"
           }
         ]
       }
@@ -887,6 +1120,12 @@
         "exit": 1,
         "frames": [
           {
+            "profile": "migaia.rpc/2",
+            "kind": "handshake",
+            "step": "hello"
+          },
+          {
+            "profile": "migaia.rpc/2",
             "kind": "handshake",
             "step": "accept"
           }
@@ -895,5 +1134,9 @@
         "stderrNot": ["ERROR peer session failed"]
       }
     }
-  ]
+  ],
+  "history": {
+    "previousSchema": "migaia.rpc.peer-behavior/1",
+    "grammarChange": "BC2: bilateral hello, flat errors, full task/source generation, cancel/control replace variation; original IDs remain with business assertions."
+  }
 }

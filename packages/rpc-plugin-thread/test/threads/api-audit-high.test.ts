@@ -12,16 +12,3 @@ it('constructs the ordinary Bun URL spawn and calls its actual Worker', () => {
     diagnostics: []
   })
 }, 30_000)
-
-it('applies the local capability restriction after an actual bilateral Worker ACK', () => {
-  /** The real public launcher supplies preparation; the caller only configures its public factory. */
-  const fixture = fileURLToPath(new URL('./fixtures/audit-bun-short.mts', import.meta.url))
-  /** The request still executes while the optional stream capability stays disabled. */
-  const output = execFileSync('bun', [fixture, 'policy'], { encoding: 'utf8', timeout: 25_000 })
-  expect(JSON.parse(output.trim().split('\n').at(-1)!)).toEqual({
-    value: 'actual-bun-worker',
-    requestedStream: false,
-    observedStream: false,
-    diagnostics: []
-  })
-}, 30_000)

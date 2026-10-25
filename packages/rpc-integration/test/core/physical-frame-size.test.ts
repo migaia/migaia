@@ -14,7 +14,7 @@ import vectors from '../../schema/vectors/runtime-api.json'
 import { proveFastComponents } from '../../../rpc-host/dist/core/internal/fast-path.js'
 import { readOwnedJsonSnapshot } from '../../../rpc-host/dist/core/internal/outbound-owned-codec.js'
 import { RUNTIME_API_CAPABILITIES } from '../../../rpc-host/dist/remote/runtime-api/constants.js'
-import { RpcSerializationError } from '../../../rpc-host/dist/core/errors.js'
+import { RpcSerializationError } from '@migaia/rpc-contract/errors'
 import { RpcOutboundSender } from '../../../rpc-host/dist/core/internal/outbound-sender.js'
 import type { IRpcSelectedComponents } from '../../../rpc-host/dist/core/internal/endpoint-options.js'
 

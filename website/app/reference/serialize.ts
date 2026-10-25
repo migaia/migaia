@@ -1839,6 +1839,27 @@ console.log(base64ToBytes(bytesToBase64(new Uint8Array([1, 2]))))`
       example: `import { base64ToBytes } from '@migaia/serialize/core'
 console.log(base64ToBytes('AQI='))`
     },
+    isCanonicalBase64url: {
+      role: 'operation',
+      purpose: t(
+        'Synchronously checks whether a string is canonical unpadded RFC 4648 Base64url. It accepts only the URL-safe alphabet, valid encoded lengths and zero unused tail bits, without decoding the text or creating an output byte array.',
+        '同步检查字符串是否为不带填充的规范 `RFC 4648 Base64url`。只接受 URL 安全字母表、合法编码长度及末尾未用位为零的拼写，不解码文本，也不创建输出字节数组。'
+      ),
+      params: {
+        text: t(
+          'String whose exact wire spelling should be checked. Padding, whitespace and the ordinary Base64 plus or slash characters are not accepted.',
+          '需要检查精确线格式拼写的字符串；不接受填充、空白，以及普通 Base64 使用的加号或斜杠。'
+        )
+      },
+      returns: t(
+        'True for canonical text, including the empty string; false for an invalid alphabet, a length congruent to one modulo four, or nonzero unused tail bits.',
+        '规范文本（包括空字符串）返回 `true`；字母表非法、长度除以四余一，或末尾未用位非零时返回 `false`。'
+      ),
+      example: `import { isCanonicalBase64url } from '@migaia/serialize/core'
+console.log(isCanonicalBase64url('_w'))
+console.log(isCanonicalBase64url('_x'))
+console.log(isCanonicalBase64url('_w='))`
+    },
     streamBase64Chunks: {
       role: 'operation',
       purpose: t(

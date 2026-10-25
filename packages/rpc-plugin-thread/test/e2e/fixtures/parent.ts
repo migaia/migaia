@@ -3,8 +3,8 @@ import { systemScheduler } from '@migaia/utils/scheduler'
 import { createRpcHost } from '@migaia/rpc-host'
 import { threadPlugin } from '@migaia/rpc-plugin-thread'
 import {
-  createAdapterWebThreadChannelFactory as createWebThreadChannelFactory,
-  createAdapterWebThreadLauncher as createWebThreadLauncher
+  createWebThreadChannelFactory,
+  createWebThreadLauncher
 } from '../../../dist/threads/web-launcher.js'
 
 /** Preserve the full classification of every admission or shutdown diagnostic. */
@@ -58,7 +58,7 @@ globalThis.runOwnedThreadExitBoundary = async (): Promise<IExitBoundaryReceipt> 
           launcher,
           budget,
           scheduler: systemScheduler,
-          channelFactory: createWebThreadChannelFactory({ scheduler: systemScheduler }),
+          channelFactory: createWebThreadChannelFactory({ scheduler: systemScheduler, report }),
           report,
           supervisor: {
             isolation: 'best-effort',
@@ -71,7 +71,7 @@ globalThis.runOwnedThreadExitBoundary = async (): Promise<IExitBoundaryReceipt> 
   })
   try {
     /** Business success must precede disposal; startup-only evidence cannot prove owned execution. */
-    const value = await Object.values(peer.peers)[0]!.twice(21)
+    const value = await peer.thread.send('thread', 'twice', 21)
     /** Keep the pre-existing best-effort admission warning separate from teardown reporting. */
     const admission = diagnostics.slice()
     /** Closing owns one original Promise and one force/reap operation across repeated calls. */

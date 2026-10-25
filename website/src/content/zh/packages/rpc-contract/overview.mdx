@@ -1,12 +1,12 @@
 ---
 title: rpc-contract
-description: RPC 协议工具
+description: RPC 纯协议与接口契约
 ---
 
 # rpc-contract
 
-独立协议实现使用此包的 wire、握手、framing、binary 与错误工具。普通子路径按协议能力组织；内部编解码实现由包自身维护。
+此包维护唯一 `migaia.rpc/2` 线上协议、公开接口、可移植值规则和错误契约。`protocol` 提供 `normalizeRpcFrame` 校验实际输入；`interfaces` 描述 Host、传输、完整 feature 和信息流 plugin 之间的边界。
 
-协议接收方可用 `normalizeRpcEnvelope` 校验实际输入，再用 `classifyRpcContractError` 读取该次校验错误的受控 code/text。分类只识别本实例实际产生的错误，不读取 cause 或错误 getter；无分类时保留原错误处理。
+`errors` 保留原生错误类型与完整错误链的纯投影规则，`error-code` 提供可独立引入的静态错误码。`schema/protocol` 描述线上帧与展平错误图，`schema/wire-error` 描述独立诊断错误树。
 
-RPC 六个公开包采用锁步版本和精确 peer，直接安装需要的包。完整 API 与资源生命周期见本包生成参考、README 和 USEGUIDE。
+执行编解码与二进制处理由 Host 的 `sdk` 持有；原生连接和来源属于各传输 plugin；认证、分片和批处理由对应信息流 plugin 执行。八个 RPC 包可按职责直接依赖本包，具体入口和生命周期见各包参考、README 与 USEGUIDE。

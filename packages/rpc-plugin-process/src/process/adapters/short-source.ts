@@ -1,7 +1,9 @@
+/** Expand native Process source recipes; the Host retains handshake, calls and Session ownership. */
+import { resolveRpcEntry, retainRpcRuntimeFlags } from '@migaia/rpc-host/sdk'
 import { detectElectronProcessType, isUrlObject, type IUrlLike } from '@migaia/utils'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { attachErrorIdentity } from '@migaia/utils/error'
-import { systemScheduler, systemWallClock, type IScheduler } from '@migaia/utils/scheduler'
+import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
 import { createUnitBudget, SUPERVISION_SOURCE, SupervisionErrorCode } from '@migaia/supervision'
 import type {
   IProcessEnv,
@@ -10,30 +12,18 @@ import type {
   IProcessSpec,
   IProcessSupervisorOptions
 } from '@migaia/supervision/process'
+import { resolveAbortReason } from '@migaia/rpc-host/sdk'
 import {
-  resolveAdapterEntry,
-  retainAdapterRuntimeFlags,
-  readAdapterAbortReason,
-  createAdapterSourceConfigurationError,
-  JSONRPC_ALLOWED_CAPABILITIES
-} from '@migaia/rpc-host/plugin'
-import type { IAdapterPeerPreparation } from '@migaia/rpc-host/plugin'
-import type { IRpcHandshakeOffer } from '@migaia/rpc-contract'
-import type { IRemoteContract } from '@migaia/rpc-host/plugin'
-import { createProcessTransport } from '../handshake.js'
-import { createNativeProcessOffer } from '../offer.js'
-import { createProcessJsonRpcChannel } from '../jsonrpc-channel.js'
-import { RpcProcessErrorCode, ERROR_SOURCE } from '../error-code.js'
+  RpcProcessErrorCode,
+  RPC_PROCESS_ERROR_SOURCE as ERROR_SOURCE
+} from '@migaia/rpc-contract/error-code'
 import { RpcProcessErrorText } from '../error-text.js'
-import { ProcessPluginWire } from '../plugin/constants.js'
 import type {
-  IProcessPluginEstablish,
   IProcessServeListenerIngress,
   ISpawnProcessPluginDeployment
 } from '../plugin/types.js'
 import type { IProcessByteChannel, IListenProcessByteChannel } from '../types.js'
 import type { INodeProcessHandle } from './node-child-process.js'
-import type { IRuntimeProcessPeerOptions, IRuntimeProcessFullPeerOptions } from '../runtime-peer.js'
 import { PROCESS_RUNTIME_API_ENV } from '../constants.js'
 import {
   PROCESS_CONNECT_TIMEOUT_MS,
@@ -97,22 +87,8 @@ export type IProcessShortSpawn = Readonly<{
    * capabilities.
    */
   permissions?: IProcessSpec['permissions']
-  /**
-   * 'native' by default; 'jsonrpc' selects the Content-Length profile and requires a contract or
-   * establish.
-   */
-  wire?: ProcessPluginWire
-  /** Optional local remote contract; the default JSON-RPC establish path requires it. */
-  contract?: IRemoteContract
-  /**
-   * Optional credential; omission generates 32 random bytes encoded as base64url for stdin
-   * bootstrap.
-   */
+  /** Private credential is transported only by the original native launch bootstrap. */
   token?: string
-  /** Optional explicit native proposal; otherwise Core's actual local capabilities supply the offer. */
-  offer?: IRpcHandshakeOffer
-  /** Optional channel negotiator; omission selects the native or JSON-RPC implementation from wire. */
-  establish?: IProcessPluginEstablish
   /** Overrides the default one-unit, best-effort process supervisor and its generated specification. */
   supervision?: Partial<IProcessSupervisorOptions<INodeProcessHandle>>
   /**
@@ -138,8 +114,57 @@ export type IProcessShortSourceOptions = Readonly<{
   connectTimeoutMs?: number
 }>
 
+/** Public short/full recipes expose actual native acquisition, without an endpoint factory. */
+export type IProcessSourceOptions = IProcessShortSourceOptions &
+  Readonly<{
+    spawn?: ISpawnProcessPluginDeployment | true | IUrlLike | IProcessShortSpawn
+    connect?: import('../plugin/types.js').IConnectProcessPluginDeployment | string
+    listen?: IProcessServeListenerIngress | string
+    report?(error: unknown): void
+  }>
+/** Expansion retains every native recipe and changes only the selected short source. */
+export type IProcessFullSources = Omit<IProcessSourceOptions, 'spawn' | 'connect' | 'listen'> &
+  Readonly<{
+    spawn?: ISpawnProcessPluginDeployment
+    connect?: import('../plugin/types.js').IConnectProcessPluginDeployment
+    listen?: IProcessServeListenerIngress
+  }>
+
 /** Every default short launch shares one observable degradation notice in this native process. */
 let terminationNoticeReported = false
+
+/** Match only the original expected native termination degradation; retain every other error. */
+function reportTerminationNotice(
+  error: unknown,
+  policy: Readonly<{
+    onNotice?: (error: unknown) => void
+    reportEach: boolean
+    report(error: unknown): void
+  }>
+): void {
+  /** Match only the existing expected best-effort termination notice, keeping all other errors. */
+  const notice = error as {
+    source?: string
+    code?: string
+    detail?: { capability?: string; level?: string; kind?: string }
+  }
+  if (
+    notice?.source === SUPERVISION_SOURCE &&
+    notice.code === SupervisionErrorCode.capabilityUnsupported &&
+    notice.detail?.capability === 'termination' &&
+    notice.detail.level === 'unsupported' &&
+    notice.detail.kind === 'process'
+  ) {
+    if (policy.onNotice) {
+      policy.onNotice(error)
+      return
+    }
+    if (policy.reportEach || !terminationNoticeReported) {
+      terminationNoticeReported = true
+      policy.report(error)
+    }
+  } else policy.report(error)
+}
 
 /** Reject unsupported short configuration with the existing native configuration identity. */
 function invalid(field: string, text: string = RpcProcessErrorText.pluginInvalidOption): never {
@@ -299,6 +324,43 @@ async function endpoint(value: string) {
   }
 }
 
+/** One original retry delay owns its deadline and exact abort subscription. */
+class ProcessRetryWait {
+  /** The existing caller signal and selected monotonic clock remain borrowed. */
+  readonly #ports: Readonly<{ signal: IAbortSignal; scheduler: IScheduler; delayMs: number }>
+  /** At most one scheduled wait belongs to this attempted native redial. */
+  #timer: ReturnType<IScheduler['schedule']> | undefined
+  /** Native cancellation retains the original reason rather than synthesizing a retry error. */
+  #reject: ((reason: unknown) => void) | undefined
+  /** Scheduler completion resolves the same wait after removing its abort observer. */
+  #resolve: (() => void) | undefined
+  /** Capture only one wait's native clock inputs. */
+  constructor(signal: IAbortSignal, scheduler: IScheduler, delayMs: number) {
+    this.#ports = { signal, scheduler, delayMs }
+  }
+  /** Completion and cancellation both remove the exact original listener. */
+  readonly #done = (): void => {
+    this.#ports.signal.removeEventListener('abort', this.#abort)
+    this.#resolve?.()
+  }
+  /** The existing supervisor signal cancels its pending retry task. */
+  readonly #abort = (): void => {
+    this.#timer?.cancel()
+    this.#ports.signal.removeEventListener('abort', this.#abort)
+    this.#reject?.(resolveAbortReason(this.#ports.signal))
+  }
+  /** Install the original single deadline and handle an already-aborted signal identically. */
+  wait(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.#resolve = resolve
+      this.#reject = reject
+      this.#timer = this.#ports.scheduler.schedule(this.#done, this.#ports.delayMs)
+      this.#ports.signal.addEventListener('abort', this.#abort, { once: true })
+      if (this.#ports.signal.aborted) this.#abort()
+    })
+  }
+}
+
 /** Retry only a missing or not-yet-listening local endpoint within one bounded scheduler deadline. */
 async function dialWhenReady(
   dial: (options: { address: string; signal?: AbortSignal }) => Promise<IProcessByteChannel>,
@@ -324,82 +386,13 @@ async function dialWhenReady(
         scheduler.now() - started >= timeoutMs
       )
         throw error
-      await new Promise<void>((resolve, reject) => {
-        /** Cancellation removes the scheduled retry and retains the original abort reason. */
-        const timer = scheduler.schedule(
-          done,
-          Math.min(PROCESS_CONNECT_RETRY_MS, timeoutMs - (scheduler.now() - started))
-        )
-        /** A completed wait detaches only its own listener. */
-        function done() {
-          signal.removeEventListener('abort', abort)
-          resolve()
-        }
-        /** The existing dial path owns connection errors; this wait only propagates cancellation. */
-        function abort() {
-          timer.cancel()
-          signal.removeEventListener('abort', abort)
-          reject(readAdapterAbortReason(signal))
-        }
-        signal.addEventListener('abort', abort, { once: true })
-        if (signal.aborted) abort()
-      })
+      await new ProcessRetryWait(
+        signal,
+        scheduler,
+        Math.min(PROCESS_CONNECT_RETRY_MS, timeoutMs - (scheduler.now() - started))
+      ).wait()
     }
   }
-}
-
-/** Expand short forms into the same full deployments after original Core preparation is captured. */
-/**
- * Open the selected native/JSON-RPC channel using the held preparation, without acquiring another
- * endpoint.
- */
-function establishShortSpawn(
-  raw: Parameters<IProcessPluginEstablish>[0],
-  prepared: Parameters<IProcessPluginEstablish>[1],
-  context: Readonly<{
-    wire: ProcessPluginWire
-    contract: IRemoteContract | undefined
-    report: (error: unknown) => void
-  }>
-): ReturnType<IProcessPluginEstablish> {
-  const { wire, contract, report } = context
-
-  /** Native stderr is presentation metadata around this one held Core connection. */
-  const ipc = {
-    ...prepared.session,
-    stderr: prepared.stderr,
-    log: () => undefined,
-    ...prepared.ipc
-  }
-  return wire === ProcessPluginWire.jsonrpc
-    ? createProcessJsonRpcChannel({
-        byte: raw as IProcessByteChannel,
-        peerId: contract!.plugin,
-        target: { kind: 'plugin', contract: contract! },
-        offer: {
-          ...prepared.offer!,
-          capabilities: prepared.offer!.capabilities.filter((capability) =>
-            JSONRPC_ALLOWED_CAPABILITIES.includes(capability)
-          )
-        },
-        token: prepared.token!,
-        scheduler: prepared.scheduler,
-        wallClock: systemWallClock,
-        signal: prepared.signal,
-        handshakeTimeoutMs: prepared.handshakeTimeoutMs,
-        ipc,
-        report
-      })
-    : createProcessTransport(raw as IProcessByteChannel, {
-        role: 'initiator',
-        offer: prepared.offer!,
-        peerId: prepared.session.processId!,
-        scheduler: prepared.scheduler,
-        signal: prepared.signal,
-        handshakeTimeoutMs: prepared.handshakeTimeoutMs,
-        ipc,
-        report
-      })
 }
 
 /** Apply named-local socket permissions to the original listener and roll it back on chmod failure. */
@@ -431,186 +424,168 @@ async function listenLocalProcessSocket(
   }
 }
 
-export async function normalizeProcessSources(
-  options: IRuntimeProcessPeerOptions,
+/**
+ * Expand one short native launch; entry resolution, credential custody and supervision stay
+ * together.
+ */
+async function normalizeShortProcessSpawn(
+  options: IProcessSourceOptions,
   runtime: string,
-  preparation: Pick<IAdapterPeerPreparation, 'context'>,
+  forwarded: IProcessShortSourceOptions & Partial<IProcessShortSpawn>,
+  report: (error: unknown) => void,
+  reportEachTerminationNotice: boolean
+): Promise<ISpawnProcessPluginDeployment> {
+  /** Lazy deep paths continue to own native launch; connect/listen do not acquire launchers. */
+  const native =
+    runtime === 'deno'
+      ? await import('./deno-command.js')
+      : runtime === 'bun'
+        ? await import('./bun-spawn.js')
+        : await import('./node-child-process.js')
+  /** All three native runtimes expose the same Node-compatible argument projection when needed. */
+  const { default: process } = await import('node:process')
+  /** Object short forms contain only ordinary user-selected launch defaults. */
+  const short: IProcessShortSpawn = {
+    ...forwarded,
+    ...(typeof options.spawn === 'object' && !isUrlObject(options.spawn)
+      ? options.spawn
+      : { entry: options.spawn === true ? undefined : options.spawn })
+  }
+  if (short.wrap !== undefined && typeof short.wrap !== 'function')
+    invalid(PROCESS_SHORT_WRAP_FIELD)
+  /** Native runtime metadata is input to Core's pure entry resolver. */
+  const deno = Reflect.get(globalThis, 'Deno') as
+    | { mainModule: string; execPath(): string }
+    | undefined
+  /** Self launch must have a real main module; no caller-location stack inference occurs. */
+  const { fileURLToPath, pathToFileURL } = await import('node:url')
+  /** Filesystem absoluteness belongs to the native owner; URL parsing must not reinterpret ?/#. */
+  const { isAbsolute } = await import('node:path')
+  /** Native metadata remains data; the shared pure resolver owns usable-entry policy. */
+  const mainEntry =
+    runtime === 'deno'
+      ? deno?.mainModule
+      : process.argv[1]
+        ? pathToFileURL(process.argv[1])
+        : undefined
+  /** The child inherits Node/Bun runtime loaders and flags, without inheriting ambient environment. */
+  const flags =
+    runtime === 'deno'
+      ? ['run', `--allow-env=PATH,${PROCESS_RUNTIME_API_ENV}`]
+      : retainRpcRuntimeFlags(process.execArgv)
+  /** An explicitly supplied command retains the original profile's command validation. */
+  const explicitCommand = short.command !== undefined
+  /** Exact absolute paths work even when eval/REPL provides no main entry for relative resolution. */
+  const selectedEntry = options.spawn === true ? true : (short.entry ?? true)
+  /** A real path becomes an encoded file URL before the neutral resolver sees its bytes. */
+  const nativeEntry =
+    typeof selectedEntry === 'string' && isAbsolute(selectedEntry)
+      ? pathToFileURL(selectedEntry)
+      : selectedEntry
+  /** Command specifications bypass entry resolution and remain shell-free. */
+  const entry = explicitCommand
+    ? undefined
+    : resolveRpcEntry(nativeEntry, {
+        mainEntry,
+        base: short.base,
+        execArgv: runtime === 'deno' ? undefined : process.execArgv,
+        electron: runtime === 'deno' ? false : detectElectronProcessType() !== undefined,
+        singleBinary: runtime !== 'deno' && process.argv[1] === process.execPath
+      })
+  /** Both supported launchers expose the same existing native byte-handle shape. */
+  const launcher =
+    'createDenoProcessLauncher' in native
+      ? native.createDenoProcessLauncher()
+      : 'createBunProcessLauncher' in native
+        ? native.createBunProcessLauncher()
+        : native.createNodeProcessLauncher()
+  /** Wrapping follows launcher selection so a caller override receives the same command hook. */
+  const selectedLauncher = short.supervision?.launcher ?? launcher
+  /** Each full source receives a fresh secret transported only in its existing stdin bootstrap. */
+  const { randomBytes } = await import('node:crypto')
+  /** An omitted credential receives fresh entropy before this native process is launched. */
+  const token = short.token ?? randomBytes(32).toString('base64url')
+  /** A caller scheduler also owns the default budget's timing, preserving one clock per source. */
+  const scheduler = short.supervision?.scheduler ?? systemScheduler
+  /** One explicit notice record preserves original default coalescing and caller behavior. */
+  const notice = { onNotice: short.onNotice, reportEach: reportEachTerminationNotice, report }
+  /** One native source owns one supervised process unit and its original teardown. */
+  return {
+    kind: 'spawn',
+    channelKind: 'byte',
+    token,
+    supervision: {
+      id: PROCESS_SHORT_CHILD_NAME,
+      scheduler,
+      budget:
+        short.supervision?.budget ?? createUnitBudget({ kind: 'process', maxUnits: 1, scheduler }),
+      isolation: 'best-effort',
+      ...short.supervision,
+      launcher: short.wrap ? wrapLauncher(selectedLauncher, short.wrap) : selectedLauncher,
+      report: short.supervision?.report ?? ((error) => reportTerminationNotice(error, notice)),
+      spec: short.supervision?.spec ?? {
+        command: short.command ?? (runtime === 'deno' ? deno!.execPath() : process.execPath),
+        args: explicitCommand
+          ? (short.args ?? [])
+          : [
+              ...flags,
+              fileURLToPath(entry!),
+              ...(short.args ?? (options.spawn === true ? process.argv.slice(2) : []))
+            ],
+        cwd: short.cwd,
+        env: { inherit: short.env?.inherit ?? ['PATH'], set: short.env?.set ?? {} },
+        stdio: short.stdio ?? { stdin: 'channel', stdout: 'channel', stderr: 'drain' },
+        limits: short.limits,
+        permissions: short.permissions,
+        bootstrap: { via: 'stdin', payload: new TextEncoder().encode(token) }
+      }
+    },
+    rawChannel: async (handle) => (handle as INodeProcessHandle).channel!
+  } as ISpawnProcessPluginDeployment
+}
+
+/** Allocate independent safe labels for the original accepted native connection. */
+function createProcessConnectionContext() {
+  /** No label is derived from credentials or from a decoded wire identity. */
+  const id = globalThis.crypto.randomUUID()
+  return { peerId: id, ipc: { connectionId: id, sessionId: id, log: () => undefined } }
+}
+
+/** Resolve exactly one short source, preserving full caller-owned acquisition recipes unchanged. */
+export async function normalizeProcessSources(
+  options: IProcessSourceOptions,
+  runtime: string,
   forwarded: IProcessShortSourceOptions & Partial<IProcessShortSpawn> = {}
-): Promise<IRuntimeProcessFullPeerOptions> {
+): Promise<IProcessFullSources> {
   /** Default reporting remains observable; full sources retain their original report functions. */
   const configuredReport = options.report
   /** Explicit reporters receive every notice; omitted defaults are coalesced per native process. */
   const reportEachTerminationNotice = configuredReport !== undefined
   const report = configuredReport ?? defaultRpcReporter
-  /** Source-only Plugin values are configuration, not private Host provenance. */
-  const settings = { ...options, ...forwarded, report }
+  /** The selected native recipe stays exact; forwarded call deadlines cannot restore its decorator. */
+  const settings = { ...options, ...forwarded, connect: options.connect, report }
   /** Resolved options are passed only through the held preparation, never prepared a second time. */
   const resolved = { ...settings } as {
-    -readonly [K in keyof IRuntimeProcessFullPeerOptions]: IRuntimeProcessFullPeerOptions[K]
+    -readonly [K in keyof IProcessFullSources]: IProcessFullSources[K]
   }
   if (
     [options.spawn, options.connect, options.listen].filter((source) => source !== undefined)
       .length !== 1
   )
-    throw createAdapterSourceConfigurationError()
+    invalid('source')
   if (options.spawn === null || options.connect === null || options.listen === null)
-    throw createAdapterSourceConfigurationError()
+    invalid('source')
   if (
-    typeof options.spawn !== 'function' &&
     options.spawn !== undefined &&
     !(typeof options.spawn === 'object' && !isUrlObject(options.spawn) && 'kind' in options.spawn)
   ) {
-    /** Lazy deep paths continue to own native launch; connect/listen do not acquire launchers. */
-    const native =
-      runtime === 'deno'
-        ? await import('./deno-command.js')
-        : runtime === 'bun'
-          ? await import('./bun-spawn.js')
-          : await import('./node-child-process.js')
-    /** All three native runtimes expose the same Node-compatible argument projection when needed. */
-    const { default: process } = await import('node:process')
-    /** Object short forms contain only ordinary user-selected launch defaults. */
-    const short: IProcessShortSpawn = {
-      ...forwarded,
-      ...(typeof options.spawn === 'object' && !isUrlObject(options.spawn)
-        ? options.spawn
-        : { entry: options.spawn === true ? undefined : options.spawn })
-    }
-    if (short.wrap !== undefined && typeof short.wrap !== 'function')
-      invalid(PROCESS_SHORT_WRAP_FIELD)
-    /** Native runtime metadata is input to Core's pure entry resolver. */
-    const deno = Reflect.get(globalThis, 'Deno') as
-      | { mainModule: string; execPath(): string }
-      | undefined
-    /** Self launch must have a real main module; no caller-location stack inference occurs. */
-    const { fileURLToPath, pathToFileURL } = await import('node:url')
-    /** Filesystem absoluteness belongs to the native owner; URL parsing must not reinterpret ?/#. */
-    const { isAbsolute } = await import('node:path')
-    /** Native metadata remains data; the shared pure resolver owns usable-entry policy. */
-    const mainEntry =
-      runtime === 'deno'
-        ? deno?.mainModule
-        : process.argv[1]
-          ? pathToFileURL(process.argv[1])
-          : undefined
-    /**
-     * The child inherits Node/Bun runtime loaders and flags, without inheriting ambient
-     * environment.
-     */
-    const flags =
-      runtime === 'deno'
-        ? ['run', `--allow-env=PATH,${PROCESS_RUNTIME_API_ENV}`]
-        : retainAdapterRuntimeFlags(process.execArgv)
-    /** An explicitly supplied command retains the original profile's command validation. */
-    const explicitCommand = short.command !== undefined
-    /** Exact absolute paths work even when eval/REPL provides no main entry for relative resolution. */
-    const selectedEntry = options.spawn === true ? true : (short.entry ?? true)
-    /** A real path becomes an encoded file URL before the neutral resolver sees its bytes. */
-    const nativeEntry =
-      typeof selectedEntry === 'string' && isAbsolute(selectedEntry)
-        ? pathToFileURL(selectedEntry)
-        : selectedEntry
-    /** Command specifications bypass entry resolution and remain shell-free. */
-    const entry = explicitCommand
-      ? undefined
-      : resolveAdapterEntry(nativeEntry, {
-          mainEntry,
-          base: short.base,
-          execArgv: runtime === 'deno' ? undefined : process.execArgv,
-          electron: runtime === 'deno' ? false : detectElectronProcessType() !== undefined,
-          singleBinary: runtime !== 'deno' && process.argv[1] === process.execPath
-        })
-    /** Both supported launchers expose the same existing native byte-handle shape. */
-    const launcher =
-      'createDenoProcessLauncher' in native
-        ? native.createDenoProcessLauncher()
-        : 'createBunProcessLauncher' in native
-          ? native.createBunProcessLauncher()
-          : native.createNodeProcessLauncher()
-    /** Wrapping follows launcher selection so a caller override receives the same command hook. */
-    const selectedLauncher = short.supervision?.launcher ?? launcher
-    /** Each full source receives a fresh secret transported only in its existing stdin bootstrap. */
-    const { randomBytes } = await import('node:crypto')
-    /** An omitted credential receives fresh entropy before this native process is launched. */
-    const token = short.token ?? randomBytes(32).toString('base64url')
-    /**
-     * The public source object names protocol policy; actual agreement remains with the handshake
-     * owner.
-     */
-    const wire = short.wire ?? ProcessPluginWire.native
-    /** A foreign peer supplies its real local schema; native TS peers need no declared facade. */
-    const contract = short.contract ?? settings.contract
-    if (wire === ProcessPluginWire.jsonrpc && !short.establish && !contract)
-      invalid('spawn.contract', RpcProcessErrorText.jsonrpcContractRequired)
-    /** A caller scheduler also owns the default budget's timing, preserving one clock per source. */
-    const scheduler = short.supervision?.scheduler ?? systemScheduler
-    /** One native source owns one supervised process unit and its original teardown. */
-    resolved.spawn = {
-      kind: 'spawn',
-      channelKind: 'byte',
-      wire,
-      token,
-      offer: short.offer,
-      supervision: {
-        id: PROCESS_SHORT_CHILD_NAME,
-        scheduler,
-        budget:
-          short.supervision?.budget ??
-          createUnitBudget({ kind: 'process', maxUnits: 1, scheduler }),
-        isolation: 'best-effort',
-        ...short.supervision,
-        launcher: short.wrap ? wrapLauncher(selectedLauncher, short.wrap) : selectedLauncher,
-        report:
-          short.supervision?.report ??
-          ((error) => {
-            /**
-             * Match only the existing expected best-effort termination notice, keeping all other
-             * errors.
-             */
-            const notice = error as {
-              source?: string
-              code?: string
-              detail?: { capability?: string; level?: string; kind?: string }
-            }
-            if (
-              notice?.source === SUPERVISION_SOURCE &&
-              notice.code === SupervisionErrorCode.capabilityUnsupported &&
-              notice.detail?.capability === 'termination' &&
-              notice.detail.level === 'unsupported' &&
-              notice.detail.kind === 'process'
-            ) {
-              if (short.onNotice) {
-                short.onNotice(error)
-                return
-              }
-              if (reportEachTerminationNotice || !terminationNoticeReported) {
-                terminationNoticeReported = true
-                report(error)
-              }
-            } else report(error)
-          }),
-        spec: short.supervision?.spec ?? {
-          command: short.command ?? (runtime === 'deno' ? deno!.execPath() : process.execPath),
-          args: explicitCommand
-            ? (short.args ?? [])
-            : [
-                ...flags,
-                fileURLToPath(entry!),
-                ...(short.args ?? (options.spawn === true ? process.argv.slice(2) : []))
-              ],
-          cwd: short.cwd,
-          env: { inherit: short.env?.inherit ?? ['PATH'], set: short.env?.set ?? {} },
-          stdio: short.stdio ?? { stdin: 'channel', stdout: 'channel', stderr: 'drain' },
-          limits: short.limits,
-          permissions: short.permissions,
-          bootstrap: { via: 'stdin', payload: new TextEncoder().encode(token) }
-        }
-      },
-      rawChannel: async (handle) => (handle as INodeProcessHandle).channel!,
-      establish:
-        short.establish ??
-        ((raw, prepared) => establishShortSpawn(raw, prepared, { wire, contract, report }))
-    } as ISpawnProcessPluginDeployment
+    resolved.spawn = await normalizeShortProcessSpawn(
+      options,
+      runtime,
+      forwarded,
+      report,
+      reportEachTerminationNotice
+    )
   }
   if (typeof options.connect === 'string' || typeof options.listen === 'string') {
     /** Named endpoint permissions are checked before choosing OS authentication. */
@@ -626,12 +601,6 @@ export async function normalizeProcessSources(
         : runtime === 'bun'
           ? await import('./bun-socket.js')
           : await import('./node-socket.js')
-    /** One local proposal uses Core's genuine self and installed capabilities. */
-    const offer = createNativeProcessOffer({
-      peer: { id: preparation.context.self.instanceId, runtime },
-      auth: token,
-      capabilities: preparation.context.capabilities
-    })
     if (typeof options.connect === 'string') {
       /**
        * The wait deadline only applies to named local rendezvous, with immediate explicit-address
@@ -639,43 +608,35 @@ export async function normalizeProcessSources(
        */
       const timeoutMs = settings.connectTimeoutMs ?? PROCESS_CONNECT_TIMEOUT_MS
       if (!Number.isFinite(timeoutMs) || timeoutMs < 0) invalid('connectTimeoutMs')
+      /** The repeated dial borrows these exact cold source facts without owning native IO. */
+      const connecting = { selected, socket, timeoutMs }
       resolved.connect = {
         kind: 'connect',
         address: selected.address,
         token,
-        offer,
         dial: (address, signal) =>
-          selected.local
+          connecting.selected.local
             ? dialWhenReady(
-                socket.dialProcessByteChannel,
+                connecting.socket.dialProcessByteChannel,
                 address,
                 signal,
-                timeoutMs,
+                connecting.timeoutMs,
                 systemScheduler
               )
-            : socket.dialProcessByteChannel({ address, signal: signal as AbortSignal }),
-        establish: (raw, prepared) =>
-          createProcessTransport(raw as IProcessByteChannel, {
-            role: 'initiator',
-            offer: prepared.offer!,
-            peerId: selected.address,
-            scheduler: prepared.scheduler,
-            signal: prepared.signal,
-            handshakeTimeoutMs: prepared.handshakeTimeoutMs,
-            ipc: { ...prepared.session, log: () => undefined, ...prepared.ipc },
-            report
-          })
+            : connecting.socket.dialProcessByteChannel({ address, signal: signal as AbortSignal })
       }
     } else {
+      /** Permission rollback borrows the original listener module, selection and reporter. */
+      const listening = { socket, selected, report }
       /** Socket mode is narrowed inside the already private directory before exposing the listener. */
       const listen: IListenProcessByteChannel = selected.local
-        ? (input) => listenLocalProcessSocket(input, socket, selected, report)
+        ? (input) =>
+            listenLocalProcessSocket(input, listening.socket, listening.selected, listening.report)
         : socket.listenProcessByteChannel
       resolved.listen = {
         kind: 'listener',
         address: selected.address,
         listen,
-        offer,
         scheduler: systemScheduler,
         verify:
           settings.verify ??
@@ -687,14 +648,7 @@ export async function normalizeProcessSources(
               })
             return selected.local ? selected.principal : selected.address
           }),
-        createConnectionContext: () => {
-          /**
-           * Independent sessions have independent diagnostic labels; none are derived from a
-           * secret.
-           */
-          const id = globalThis.crypto.randomUUID()
-          return { peerId: id, ipc: { connectionId: id, sessionId: id, log: () => undefined } }
-        }
+        createConnectionContext: createProcessConnectionContext
       }
     }
   }

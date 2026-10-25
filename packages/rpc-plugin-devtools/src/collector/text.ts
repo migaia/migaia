@@ -1,4 +1,5 @@
-import { RpcProbeStage, RpcProbeStageName } from '@migaia/rpc-host/probe'
+/** Owns stable collector diagnostics, default probe stages and retention or batching limits. */
+import { RpcProbeStage, RpcProbeStageName } from '@migaia/rpc-host/plugins/probe'
 
 /** Collector-owned diagnostics and service vocabulary stay stable across local and remote calls. */
 export const CollectorText = {
@@ -40,10 +41,11 @@ export const CollectorLimit = {
 } as const
 
 /**
- * Default observation keeps message/control and peer lifecycle events; physical stages are explicit
- * opt-in.
+ * Default observation keeps logical messages, peer lifecycle and forwarding facts; physical stages
+ * remain explicit opt-in.
  */
 export const CollectorDefaultStages = [
   RpcProbeStageName[RpcProbeStage.message],
-  RpcProbeStageName[RpcProbeStage.peer]
+  RpcProbeStageName[RpcProbeStage.peer],
+  RpcProbeStageName[RpcProbeStage.forward]
 ] as const

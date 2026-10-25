@@ -6,11 +6,8 @@ import { readEndpointOwner } from '../../dist/core/internal/endpoint-projection.
 import type { ProviderAdmissionRegistry } from '../../dist/core/internal/provider-admission.js'
 import type { RequestReplayLedger } from '../../dist/core/internal/request-replay-ledger.js'
 import { readRuntimePeerConnection } from '../../dist/remote/runtime-api/peer.js'
-import {
-  connected,
-  RUNTIME_API_FIXTURE_BASE_CAPABILITIES,
-  RuntimeApiFixtureText
-} from './fixture.js'
+import { connected, RUNTIME_API_FIXTURE_BASE_CAPABILITIES } from './fixture.js'
+import { RuntimeApiFixtureText } from '../fixtures/runtime-api-text.js'
 
 it.each([0, 1, 2] as const)(
   'failed group member %i retains only the invoked prefix in the original non-L replay owner',

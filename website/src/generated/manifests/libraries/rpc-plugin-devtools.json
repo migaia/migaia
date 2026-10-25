@@ -15,7 +15,11 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "把真实 host 调用观察为有界事件、累计统计、增量 watch、独立录制和记录导入/导出。"
+                "text": "把真实 RPC 观察保存为有界事件、累计统计、watch 和独立录制。"
+              },
+              {
+                "type": "paragraph",
+                "text": "Contract 定义纯协议与接口，Host 拥有会话、provider 和调用结算，transport 获取真实载体。Devtools 是借统一 probe 的 flow plugin，只读消费观察，不创建业务连接。timeout、retry 等 feature 则安装在所属 plugin 上，拥有调用策略。"
               },
               {
                 "type": "paragraph",
@@ -24,23 +28,8 @@
             ]
           },
           {
-            "id": "为什么选它",
-            "heading": "为什么选它",
-            "blocks": [
-              {
-                "type": "list",
-                "items": [
-                  "事件淘汰不减掉已累计的调用统计；clear 不结束独立录制。",
-                  "一个 `devtoolsPlugin` 直接向 host 安装原 collector，不另建业务连接或转发 emitter。",
-                  "可明确选择逻辑或物理阶段；内容捕获、脱敏与远程公开各自显式控制。",
-                  "collector 的 NDJSON 记录导入/导出保留字节和错误链，可在本地读取已有记录。"
-                ]
-              }
-            ]
-          },
-          {
-            "id": "从这里开始",
-            "heading": "从这里开始",
+            "id": "collector-入门",
+            "heading": "Collector 入门",
             "blocks": [
               {
                 "type": "code",
@@ -49,16 +38,16 @@
               },
               {
                 "type": "paragraph",
-                "text": "创建 feature 后保留它的同一个 collector。下面只演示录制控制，不伪造业务事件："
+                "text": "工厂创建一个由应用持有的 collector。下面只演示真实录制控制，不伪造业务事件。"
               },
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'\n\nconst tools = devtoolsPlugin({ maxEvents: 1000 })\nconst collector = tools.collector\nconst recording = collector.record({ maxEvents: 2000 })\ncollector.pause()\nconsole.log(collector.describe().paused)\ncollector.resume()\nconsole.log(collector.describe().paused)\nconst text = collector.exportRecord(recording.stop())\nconsole.log(collector.importRecord(text).header.version)\ncollector.close()"
+                "code": "import { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'\n\nconst tools = devtoolsPlugin({ maxEvents: 1000 })\ntry {\n  const recording = tools.collector.record({ maxEvents: 2000 })\n  tools.collector.pause()\n  console.log(tools.describe().paused)\n  tools.collector.resume()\n  console.log(tools.describe().paused)\n  const text = tools.collector.exportRecord(recording.stop())\n  console.log(tools.collector.importRecord(text).header.version)\n} finally {\n  tools.close()\n}"
               },
               {
                 "type": "paragraph",
-                "text": "输出 `true`、`false`、`1`。采集真实流量时，将 `tools` 与传输一起加入 `createRpcHost({ plugins: [transport, tools] })`。transport 是所选 process、thread、browser 或 coroutine plugin 的实际返回值。"
+                "text": "输出 `true`、`false`、`1`。采集真实业务时将同一个 tools 与所选 transport 放在 `createRpcHost({ plugins: [tools, transport] })`；完整 Coroutine 示例见使用指南。无需另装一个 probe 转发器。"
               }
             ]
           },
@@ -68,75 +57,43 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "同一 tools 对象可安装到两个 host，将两端原观察汇入同一个 collector。每个 host 内仍只能安装一次该 feature 定义。host.close 撤回该 host 的原观察，不关闭 collector；应用在所有观察结束后显式 `collector.close()`。collector.close 也不会关闭业务 host。"
+                "text": "同一 tools 可安装到多个真实 Host，每个安装有自己的观察寿命，事件进入同一个 collector。每个 Host 内只安装一次同一定义。一个 Host 允许不同 namespace 的 transport；业务仍在 `host.<ns>.*`，Devtools 不增加根调用方法。"
               },
               {
                 "type": "paragraph",
-                "text": "`tools.query/watch/stats/describe/close` 都直接委托同一个 collector。pause/resume、clear、record、export/import 和 service 使用 `tools.collector`，不创建第二份状态。"
+                "text": "Host.close 撤回其观察；应用在所有使用结束后调用 tools.close 或 collector.close。关闭 collector 不关闭业务 Host。query/watch/stats/describe/close 便捷方法直接借用同一个 collector；pause/resume、record、clear、export/import 和 service 使用 tools.collector。"
               }
             ]
           },
           {
-            "id": "观察与保留",
-            "heading": "观察与保留",
+            "id": "选择观察与保留",
+            "heading": "选择观察与保留",
             "blocks": [
               {
                 "type": "table",
-                "headers": ["API / 选项", "行为"],
+                "headers": ["API / 选项", "用途"],
                 "rows": [
-                  [
-                    "`stages`",
-                    "默认 message、peer；envelope/encoded/frame/protected/carrier 需显式启用"
-                  ],
-                  [
-                    "`capture` / `redact`",
-                    "显式选择捕获阶段与同步内容投影；仅选 stages 不会自动保存内容"
-                  ],
-                  ["`methods` / `sample`", "过滤方法、确定性采样；sample 在 0 到 1 之间且不含 0"],
-                  ["`maxEvents`", "默认 10000，限制主环事件数"],
-                  ["`maxContentBytes`", "默认 8 MiB，主环内容预算，不是整个进程内存上限"],
-                  ["`query({ afterSeq, limit, ... })`", "按序列游标读取主环，默认 limit=1000"],
-                  [
-                    "`watch(filters?)`",
-                    "首次 next 开始观察，批次含 events 和 dropped；return 只结束该 watch"
-                  ],
-                  ["`stats()`", "累计符合条件的方法计数与延迟桶，不随主环淘汰减少"],
-                  ["`record({ maxEvents? })`", "独立保留窗口，stop 返回可导出的记录"],
-                  ["`pause/resume/clear`", "暂停/恢复阶段或重置主环与累计值，不关闭业务"]
+                  ["`stages`", "默认 message、peer；其他物理/信封阶段显式启用"],
+                  ["`capture` / `redact`", "显式内容捕获与同步内容投影"],
+                  ["`methods` / `sample`", "精确方法过滤、确定性采样，0 < sample ≤ 1"],
+                  ["`maxEvents`", "主环容量，默认 10000"],
+                  ["`maxContentBytes`", "主环内容预算，默认 8 MiB"],
+                  ["`query` / `watch`", "序列游标历史读取 / 首次 next 后观察未来事件"],
+                  ["`stats`", "累计合格 message 统计，不随主环淘汰减少"],
+                  ["`record`", "独立有界窗口，stop 后可导出"]
                 ]
               },
               {
                 "type": "paragraph",
-                "text": "watch 和 recording 有各自有界保留，丢失数不能被当作零丢失保证。内容、detail 和 error 的嵌套对象仍可能保留引用；主环容量不是任意对象图的深复制或全局内存预算。慢观察者可能丢批次，collector.close 会唤醒等待的 watch 并以 CLOSED 拒绝。"
-              }
-            ]
-          },
-          {
-            "id": "保留的入口",
-            "heading": "保留的入口",
-            "blocks": [
-              {
-                "type": "table",
-                "headers": ["入口", "用途"],
-                "rows": [["根入口", "`devtoolsPlugin`、collector/选项类型、错误身份"]]
+                "text": "仅选择 stages 不会自动捕获内容；capture 必须是 stages 子集。原始 carrier 阶段只来自实际载体的真实观察能力，不能用语义帧推造原始数据。慢 watch 和环淘汰的丢失数应一并读取；主环上限不是进程内存上限。"
               },
               {
                 "type": "paragraph",
-                "text": "record v1 的 format 仍是 `migaia-rpc-devtools`；包改名不改变记录格式。使用同一 collector 的 exportRecord/importRecord 处理记录。"
-              }
-            ]
-          },
-          {
-            "id": "远程查询与错误",
-            "heading": "远程查询与错误",
-            "blocks": [
-              {
-                "type": "paragraph",
-                "text": "`collector.service` 可作为现有 host 的嵌套 provide 交给应用发布。授权由应用负责；`capture` 与 `exposeContent: true` 是两个独立选择。服务读取会排除其实际服务 host 的观察记录；应用决定发布到哪个既有 host。远程边界使用原 portable/wire 转换，不承诺任意 JS 图无损传输。"
+                "text": "公开入口只有根包的 devtoolsPlugin、collector/选项类型和错误身份。记录 format 为 migaia-rpc-devtools、version 为 1；使用 collector.exportRecord/importRecord，不持久化或向采集器重新注入导入内容。自定义观察使用 `@migaia/rpc-host/plugins/probe`，原始载体部署使用 `@migaia/rpc-host/sdk`。"
               },
               {
                 "type": "paragraph",
-                "text": "本包 source 为 `rpc.devtools`。INVALID_OPTION、CLOSED、RECORD_ACTIVE/RECORD_NOT_ACTIVE、RECORD_FORMAT_INVALID、REDACT_FAILED、SERVICE_RESULT_INVALID 保持原生类型和原 cause。诊断回调失败走报告，不改变已完成的业务结果。更多完整场景见使用指南。"
+                "text": "collector.service 可由应用在既有 Host 上显式 provide；应用负责授权，capture 与 exposeContent 是独立选择。本包错误 source 为 rpc.devtools，保留原生类型与 cause。更多容量、录制和清理规则见使用指南。"
               }
             ]
           }
@@ -145,137 +102,95 @@
       "guide": {
         "sections": [
           {
-            "id": "rpc-devtools-使用指南",
-            "heading": "RPC Devtools 使用指南",
+            "id": "devtools-使用指南",
+            "heading": "Devtools 使用指南",
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "English · 包概览 · Host 指南"
+                "text": "English · 包概览"
               },
               {
                 "type": "paragraph",
-                "text": "`devtoolsPlugin()` 是可安装的 feature。它的 collector 就是原有有界采集器；query/watch/stats/describe/close 五个便捷方法直接转交同一个 collector。它不创建业务连接，也不转发一份新的 probe 事件流。"
+                "text": "Contract 提供纯事件/接口契约；Host 拥有业务会话和调用；transport 提供真实载体。Devtools 是 flow plugin，通过统一 probe 的 observe 入口借用真实事件；timeout/retry feature 则拥有调用策略。应用持有 collector，不创建第二个观察连接。一个 Host 可有不同 namespace 的 transport；示例仅使用 coroutine。"
               }
             ]
           },
           {
-            "id": "观察真实双端调用",
-            "heading": "观察真实双端调用",
+            "id": "观察真实调用",
+            "heading": "观察真实调用",
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "下面把同一 tools 对象安装到父子两个真实 host。watch 首次 next 先订阅未来事件，再发业务；最后先关闭 host，再显式关闭应用拥有的 collector。"
+                "text": "此示例另需安装 `@migaia/rpc-plugin-coroutines`。将同一 tools 安装到父子两个真实 Host，watch 首次 next 先订阅未来事件，再发业务。安装 flow plugin 时使用 Host.plugins，而非 transport.features。"
               },
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'\n\nconst tools = devtoolsPlugin({ maxEvents: 1000, methods: ['double'] })\nconst parent = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect }), tools],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    }),\n    tools\n  ]\n})\nconst watch = tools.watch({ stages: ['message'] })\ntry {\n  const next = watch.next()\n  console.log(await parent.request('double', 21))\n  const batch = await next\n  console.log(batch.value?.events.length)\n  console.log(tools.stats().methods)\n} finally {\n  await watch.return(undefined)\n  await parent.close()\n  tools.close()\n}"
+                "code": "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'\nimport { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'\n\nasync function untilStopped(signal: AbortSignal): Promise<void> {\n  let complete!: () => void\n  const stopped = new Promise<void>((resolve) => {\n    complete = resolve\n  })\n  signal.addEventListener('abort', complete, { once: true })\n  if (signal.aborted) complete()\n  try {\n    await stopped\n  } finally {\n    signal.removeEventListener('abort', complete)\n  }\n}\n\nconst tools = devtoolsPlugin({ maxEvents: 1000, methods: ['double'] })\nconst task: ICoroutineUserTask = async ({ connect, signal }) => {\n  const child = await createRpcHost({\n    plugins: [tools, coroutinePlugin({ connectToParent: connect })],\n    provide: { double: (value: number) => value * 2 }\n  })\n  try {\n    await untilStopped(signal)\n  } finally {\n    await child.close()\n  }\n}\n\ntype IWorkerApi = { double(value: number): number }\nconst plugins = [tools, coroutinePlugin({ spawn: task })] as const\nconst parent = await createRpcHost<IWorkerApi, typeof plugins>({ plugins })\nconst watch = tools.watch({ stages: ['message'] })\ntry {\n  const next = watch.next()\n  console.log(await parent.coroutine.request('double', 21))\n  console.log((await next).value?.events.length)\n  console.log(tools.stats().methods)\n} finally {\n  await watch.return(undefined)\n  await parent.close()\n  tools.close()\n}"
               },
               {
                 "type": "paragraph",
-                "text": "业务输出 42；观察计数取决于两端合格事件，不应把“一次业务”固定等同于“一条记录”。同一 tools 可装到多个 host；每个 host 内同一定义只能安装一次。关闭其中一个 host 只撤回它的观察，其他 host 和 collector 继续工作。"
+                "text": "业务返回 42；事件数取决于两端实际合格观察，不能把一次业务固定等同于一条事件。默认 message/peer 足够观察这次调用；其他阶段要显式启用，且真实载体必须提供相应事实。"
               }
             ]
           },
           {
-            "id": "阶段-捕获与脱敏",
-            "heading": "阶段、捕获与脱敏",
+            "id": "捕获-脱敏-查询与服务",
+            "heading": "捕获、脱敏、查询与服务",
             "blocks": [
-              {
-                "type": "paragraph",
-                "text": "默认 stages 是 message 与 peer。envelope、encoded、frame、protected、carrier 需显式启用；其可见性还取决于真实载体和所经过的阶段。仅订阅 stages 不会保存内容。capture 必须是 stages 的子集，默认不捕获；redact 在原 emitter 上同步投影内容。"
-              },
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'\n\nexport const tools = devtoolsPlugin({\n  stages: ['message', 'peer', 'carrier'],\n  capture: ['message'],\n  redact: () => ({ redacted: true }),\n  maxEvents: 2000,\n  maxContentBytes: 1024 * 1024,\n  onError: (error) => console.error(error)\n})"
+                "code": "import { devtoolsPlugin, type IRpcDevtools } from '@migaia/rpc-plugin-devtools'\nimport type { IRpcHost } from '@migaia/rpc-host'\n\nexport const tools = devtoolsPlugin({\n  stages: ['message', 'peer', 'carrier'],\n  capture: ['message'],\n  redact: () => ({ redacted: true }),\n  maxEvents: 2000,\n  maxContentBytes: 1024 * 1024,\n  onError: (error) => console.error(error)\n})\n\nexport function readPage(collector: IRpcDevtools, afterSeq: number) {\n  const page = collector.query({ afterSeq, limit: 100, stages: ['message'] })\n  return { events: page.events, cursor: page.nextSeq, loss: page.counters }\n}\n\nexport function exposeDiagnostics(host: IRpcHost) {\n  host.provide({ diagnostics: tools.collector.service })\n}"
               },
               {
                 "type": "paragraph",
-                "text": "该示例明确替换全部捕获内容。应用需要按自己的数据结构编写脱敏策略，不应假定自动递归删除凭据。redact 抛错会报告 REDACT_FAILED 并丢弃该内容，不改变已完成业务结果。"
+                "text": "上例明确替换捕获内容。redact 同步运行，异常报告 REDACT_FAILED 并丢弃该内容，不改业务结果。方法过滤为精确匹配；sample 大于 0 且不超过 1，暂停使用 collector.pause。resume 恢复原阶段选择，不复活已关闭采集器。"
               },
               {
                 "type": "paragraph",
-                "text": "methods 是精确方法过滤；sample 是大于 0 且不超过 1 的确定性采样比率。暂停请使用 collector.pause，而不是 sample: 0。collector.resume 恢复保存的阶段选择，不复活已关闭 collector。"
+                "text": "query.afterSeq 是排他序列游标，使用 page.nextSeq 继续；它包含已扫描但被过滤的行。limit 默认 1000，范围 1–1000。watch 在首次 next 订阅未来事件，不能代替历史 query；每批最多 256 条、最多 64 批待取，batch.dropped 报告丢失。return 只结束自己的 watch，collector.close 让等待的 next 以 CLOSED 拒绝。"
+              },
+              {
+                "type": "paragraph",
+                "text": "主环 maxEvents 默认 10000、maxContentBytes 默认 8388608、maxInterned 默认 65536。watch、record 和 content/detail/error 引用另有归属，不能将主环容量解释为任意对象图的深复制或全局内存预算。query.counters 报告淘汰、内容丢弃、重入丢失、采样与 intern 溢出。"
+              },
+              {
+                "type": "paragraph",
+                "text": "collector.service 是嵌套 provide。授权由应用负责；默认远程读取不公开捕获内容，只有 exposeContent:true 才允许。服务读取排除其实际服务 Host 的观察，避免查询递归；不为观察另外创建业务 Host。"
               }
             ]
           },
           {
-            "id": "查询-watch-与容量",
-            "heading": "查询、watch 与容量",
+            "id": "录制与-ndjson",
+            "heading": "录制与 NDJSON",
             "blocks": [
-              {
-                "type": "paragraph",
-                "text": "query 使用序列游标而非数组位置。把 nextSeq 作为下次 afterSeq，即使过滤掉一些行也不重复扫描。默认 limit=1000，允许范围 1 到 1000。"
-              },
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import type { IRpcDevtools } from '@migaia/rpc-plugin-devtools'\n\nexport function readPage(collector: IRpcDevtools, afterSeq: number) {\n  const page = collector.query({ afterSeq, limit: 100, stages: ['message'] })\n  return { events: page.events, cursor: page.nextSeq, loss: page.counters }\n}"
+                "code": "import { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'\n\nconst tools = devtoolsPlugin({ maxEvents: 100 })\ntry {\n  const recording = tools.collector.record({ maxEvents: 200 })\n  tools.collector.clear()\n  const record = recording.stop()\n  const text = tools.collector.exportRecord(record)\n  console.log(tools.collector.importRecord(text).header.version)\n} finally {\n  tools.close()\n}"
               },
               {
                 "type": "paragraph",
-                "text": "watch 在首次 next 时订阅未来事件，不代替 query 的历史读取。每批最多 256 项、最多排队 64 批；原始待过滤窗口也有界。batch.dropped 包含相应丢失，慢消费者不能声称零丢失。return 只关闭该 watch，并唤醒其等待；collector.close 则让等待的 next 以 CLOSED 拒绝。"
+                "text": "同一时刻只有一个活动录制，stop 消费该句柄。clear 重置主环、统计和计数，保留序列进度及 record/watch 寿命。stats 累计合格 message 事件，主环淘汰不倒减；延迟分位值来自有界直方图插值。"
               },
               {
                 "type": "paragraph",
-                "text": "主环 maxEvents 默认 10000；maxContentBytes 默认 8388608，仅限制主环内容预算；maxInterned 默认 65536。watch、record 和内容/detail/error 的引用另有归属，不应把主环上限当作进程内存硬上限。query.counters 可解释淘汰、内容丢弃、重入丢失与 intern 溢出。"
-              },
-              {
-                "type": "paragraph",
-                "text": "stats 累计合格 message 事件，主环淘汰不减去累计值。延迟百分位来自有界直方图桶的插值，不是保留样本的精确分位数。clear 重置主环、统计和计数，保留序列进度、record 与 watch 寿命。"
+                "text": "记录头保持 `{ format: 'migaia-rpc-devtools', version: 1 }`。export/import 为纯 NDJSON codec，不持久化、不向当前 collector 注入事件。字节与错误图按记录契约转换，不承诺任意 JS 类实例图无损往返。"
               }
             ]
           },
           {
-            "id": "独立录制与-ndjson",
-            "heading": "独立录制与 NDJSON",
+            "id": "清理与边界",
+            "heading": "清理与边界",
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "一次只能有一个活动 recording。record 使用自己的容量，stop 消费该句柄并返回记录。export/import 是纯 codec，不持久化，也不把导入数据注入当前 collector。"
-              },
-              {
-                "type": "code",
-                "language": "ts",
-                "code": "import { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'\n\nconst tools = devtoolsPlugin({ maxEvents: 100 })\ntry {\n  const recording = tools.collector.record({ maxEvents: 200 })\n  tools.collector.clear()\n  const record = recording.stop()\n  const text = tools.collector.exportRecord(record)\n  const decoded = tools.collector.importRecord(text)\n  console.log(decoded.header.version)\n} finally {\n  tools.close()\n}"
+                "text": "先结束自己的 watch 和 recording，再关闭业务 Host，最后关闭应用拥有的 collector。Host 安装只拥有其 emitter 清理，collector.close 不负责关闭业务。同步 emit 的可复用 view 若需保留，消费者必须按公开 probe 契约及时读取或复制字段。"
               },
               {
                 "type": "paragraph",
-                "text": "record v1 的头保持 `{ format: 'migaia-rpc-devtools', version: 1 }`，包改名不改变格式。collector.exportRecord/importRecord 负责记录编解码。字节采用保留的 `$bytes` 语法及规范 base64；原生错误恢复名称、stack 与原因链，不重新生成远端 stack。格式不承诺任意 JS 类实例图往返。"
-              }
-            ]
-          },
-          {
-            "id": "既有-host-上的远程-service",
-            "heading": "既有 host 上的远程 service",
-            "blocks": [
-              {
-                "type": "paragraph",
-                "text": "collector.service 是嵌套 provide，可由应用发布到自己的既有 host。授权和业务连接由应用负责；不要为观察再建立第二个调用端点。"
-              },
-              {
-                "type": "code",
-                "language": "ts",
-                "code": "import type { IRpcHost } from '@migaia/rpc-host'\nimport type { IDevtoolsPlugin } from '@migaia/rpc-plugin-devtools'\n\nexport function exposeDiagnostics(host: IRpcHost, tools: IDevtoolsPlugin) {\n  host.provide({ diagnostics: tools.collector.service })\n}"
-              },
-              {
-                "type": "paragraph",
-                "text": "capture 与 exposeContent: true 是独立选择；默认远程服务隐藏捕获内容。服务读取会排除其实际服务 host 的观察记录，避免查询观察自身业务。服务保留 query/watch/stats/describe、record.start/stop、clear、pause/resume；跨 RPC 输出沿原 portable/wire 转换。"
-              }
-            ]
-          },
-          {
-            "id": "最终清理与错误",
-            "heading": "最终清理与错误",
-            "blocks": [
-              {
-                "type": "paragraph",
-                "text": "先 return 自己的 watch，停止 recording，关闭业务 host，再关闭仍由应用拥有的 collector。collector.close 幂等且不关闭业务 host；host.close 同样不关闭 collector。"
-              },
-              {
-                "type": "paragraph",
-                "text": "本包 source 为 rpc.devtools。INVALID_OPTION、CLOSED、RECORD_ACTIVE、RECORD_NOT_ACTIVE、RECORD_FORMAT_INVALID、REDACT_FAILED、SERVICE_RESULT_INVALID 保留原生错误类型与原 cause。诊断与清理错误需要处理或报告，不能用采集失败替换原业务错误。"
+                "text": "自定义 probe 从 `@migaia/rpc-host/plugins/probe` 导入；SDK 从 `@migaia/rpc-host/sdk` 导入。物理 carrier/protected 阶段依赖实际路径，不用语义消息伪造。诊断失败不得替换原业务结果；错误 source 为 rpc.devtools，包含 INVALID_OPTION、CLOSED、RECORD_ACTIVE/RECORD_NOT_ACTIVE、RECORD_FORMAT_INVALID、REDACT_FAILED、SERVICE_RESULT_INVALID，保留原类型与 cause。"
               }
             ]
           }
@@ -290,7 +205,11 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Observe real host calls through bounded events, cumulative statistics, incremental watches, independent recording, and record import/export."
+                  "text": "Retain real RPC observations as bounded events, cumulative statistics, watches, and independent recordings."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Contract defines pure protocol rules and interfaces. Host owns sessions, providers, and call settlement; transports acquire real carriers. Devtools is a flow plugin consuming readonly observation through the canonical probe implementation, without a business connection. Features such as timeout and retry attach to their owning plugin and execute call policies."
                 },
                 {
                   "type": "paragraph",
@@ -299,23 +218,8 @@
               ]
             },
             {
-              "id": "why-use-it",
-              "heading": "Why use it",
-              "blocks": [
-                {
-                  "type": "list",
-                  "items": [
-                    "Event eviction does not subtract cumulative calls, and clear does not stop independent recording.",
-                    "A `devtoolsPlugin` installs the original collector on the host without another business connection or forwarding emitter.",
-                    "Logical/physical stages, content capture, redaction, and remote content exposure remain explicit choices.",
-                    "Collector NDJSON import/export retains bytes and error chains for local record inspection."
-                  ]
-                }
-              ]
-            },
-            {
-              "id": "start-here",
-              "heading": "Start here",
+              "id": "collector-basics",
+              "heading": "Collector basics",
               "blocks": [
                 {
                   "type": "code",
@@ -324,16 +228,16 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Keep the feature's same collector. This example demonstrates recording controls without fabricating business events:"
+                  "text": "The factory creates a caller-owned collector. This demonstrates actual recording controls without manufacturing business events."
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'\n\nconst tools = devtoolsPlugin({ maxEvents: 1000 })\nconst collector = tools.collector\nconst recording = collector.record({ maxEvents: 2000 })\ncollector.pause()\nconsole.log(collector.describe().paused)\ncollector.resume()\nconsole.log(collector.describe().paused)\nconst text = collector.exportRecord(recording.stop())\nconsole.log(collector.importRecord(text).header.version)\ncollector.close()"
+                  "code": "import { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'\n\nconst tools = devtoolsPlugin({ maxEvents: 1000 })\ntry {\n  const recording = tools.collector.record({ maxEvents: 2000 })\n  tools.collector.pause()\n  console.log(tools.describe().paused)\n  tools.collector.resume()\n  console.log(tools.describe().paused)\n  const text = tools.collector.exportRecord(recording.stop())\n  console.log(tools.collector.importRecord(text).header.version)\n} finally {\n  tools.close()\n}"
                 },
                 {
                   "type": "paragraph",
-                  "text": "It prints `true`, `false`, and `1`. To observe real traffic, install tools beside the transport with `createRpcHost({ plugins: [transport, tools] })`. transport is the actual result of your chosen process, thread, browser, or coroutine plugin factory."
+                  "text": "It prints `true`, `false`, and `1`. Observe real work by installing the same tools with a selected transport in `createRpcHost({ plugins: [tools, transport] })`; see the guide for a complete Coroutine example. No additional probe forwarding plugin is needed."
                 }
               ]
             },
@@ -343,11 +247,11 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "The same tools object can be installed on two hosts, merging both sides' original observations into one collector. A host can install this feature definition only once. host.close withdraws that host's observation without closing the collector; the application explicitly calls collector.close after observation ends. Closing the collector does not close business hosts."
+                  "text": "One tools object may be installed on several real Hosts. Each installation has its own observation lifetime and feeds the same collector. Install that definition once per Host. A Host allows transports with distinct namespaces; calls remain under `host.<ns>.*`, without root call methods added by Devtools."
                 },
                 {
                   "type": "paragraph",
-                  "text": "`tools.query/watch/stats/describe/close` delegate directly to that collector. Use `tools.collector` for pause/resume, clear, record, export/import, and service; they do not create another state owner."
+                  "text": "Host.close removes its observation. The application calls tools.close or collector.close after all uses end. Collector closure does not close business Hosts. Convenience query/watch/stats/describe/close methods borrow the same collector. Use tools.collector for pause/resume, record, clear, export/import, and service."
                 }
               ]
             },
@@ -357,81 +261,41 @@
               "blocks": [
                 {
                   "type": "table",
-                  "headers": ["API / option", "Behavior"],
+                  "headers": ["API / option", "Purpose"],
                   "rows": [
                     [
                       "`stages`",
-                      "Defaults to message and peer; explicitly enable envelope/encoded/frame/protected/carrier"
+                      "Default message/peer; explicitly enable other physical/envelope stages"
                     ],
                     [
                       "`capture` / `redact`",
-                      "Explicit captured stages and synchronous content projection; selecting stages alone does not retain content"
+                      "Explicit content capture and synchronous content projection"
                     ],
                     [
                       "`methods` / `sample`",
-                      "Method filtering and deterministic sampling; 0 < sample <= 1"
+                      "Exact method selection and deterministic sampling, 0 < sample ≤ 1"
                     ],
-                    ["`maxEvents`", "Default 10000, bounding main-ring event count"],
+                    ["`maxEvents`", "Main ring capacity, default 10000"],
+                    ["`maxContentBytes`", "Main content budget, default 8 MiB"],
+                    ["`query` / `watch`", "Sequence-based history / future events from first next"],
                     [
-                      "`maxContentBytes`",
-                      "Default 8 MiB main-ring content budget, not a process-wide memory bound"
+                      "`stats`",
+                      "Cumulative eligible message statistics, unaffected by ring eviction"
                     ],
-                    [
-                      "`query({ afterSeq, limit, ... })`",
-                      "Reads the ring by sequence cursor; default limit=1000"
-                    ],
-                    [
-                      "`watch(filters?)`",
-                      "First next subscribes; batches contain events and dropped; return ends only that watch"
-                    ],
-                    [
-                      "`stats()`",
-                      "Cumulative eligible method counts and latency buckets survive ring eviction"
-                    ],
-                    [
-                      "`record({ maxEvents? })`",
-                      "Independent retention window; stop produces an exportable record"
-                    ],
-                    [
-                      "`pause/resume/clear`",
-                      "Pause/restore stages or reset the ring and cumulative values without closing business work"
-                    ]
+                    ["`record`", "Independent bounded window, exportable after stop"]
                   ]
                 },
                 {
                   "type": "paragraph",
-                  "text": "Watch and recording retain separate bounded windows; loss counters are not zero-loss guarantees. Nested content, detail, and error can remain references. Ring capacity is neither a deep copy of arbitrary object graphs nor a global memory budget. Slow watchers can lose batches; collector.close wakes waiting watches with CLOSED."
-                }
-              ]
-            },
-            {
-              "id": "retained-entries",
-              "heading": "Retained entries",
-              "blocks": [
-                {
-                  "type": "table",
-                  "headers": ["Entry", "Purpose"],
-                  "rows": [
-                    ["Root", "`devtoolsPlugin`, collector/options types, and error identity"]
-                  ]
+                  "text": "Stages alone do not capture content; capture must be a subset of stages. Raw carrier events require actual carrier observation capability rather than semantic frames relabelled as native data. Read watch/eviction loss alongside events. A main-ring bound is not a process-memory ceiling."
                 },
                 {
                   "type": "paragraph",
-                  "text": "Record v1 retains format `migaia-rpc-devtools`; module renaming does not change the recording grammar. Use the same collector's exportRecord/importRecord operations."
-                }
-              ]
-            },
-            {
-              "id": "remote-access-and-errors",
-              "heading": "Remote access and errors",
-              "blocks": [
-                {
-                  "type": "paragraph",
-                  "text": "The application can publish `collector.service` through an existing host's nested provide. The application owns authorization. `capture` and `exposeContent: true` are independent choices. Service reads exclude observations from their actual serving host; the application chooses the existing host that publishes them. The remote boundary uses existing portable/wire conversion, not arbitrary lossless JavaScript graph transport."
+                  "text": "The module root exports devtoolsPlugin, collector/options types, and error identity. Record format is migaia-rpc-devtools version 1. Use collector.exportRecord/importRecord; neither persists data nor reinjects imported events. Custom observation uses `@migaia/rpc-host/plugins/probe`; raw carrier deployment uses `@migaia/rpc-host/sdk`."
                 },
                 {
                   "type": "paragraph",
-                  "text": "The source is `rpc.devtools`. INVALID_OPTION, CLOSED, RECORD_ACTIVE/RECORD_NOT_ACTIVE, RECORD_FORMAT_INVALID, REDACT_FAILED, and SERVICE_RESULT_INVALID preserve native types and original causes. Diagnostic callback failures are reported without changing completed business results. See the usage guide."
+                  "text": "Applications may explicitly provide collector.service on an existing Host, with their own authorization. Capture and exposeContent are independent settings. Errors use source rpc.devtools while preserving native types and cause. See the usage guide."
                 }
               ]
             }
@@ -440,137 +304,95 @@
         "guide": {
           "sections": [
             {
-              "id": "rpc-devtools-guide",
-              "heading": "RPC Devtools guide",
+              "id": "devtools-usage-guide",
+              "heading": "Devtools usage guide",
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "中文 · Overview · Host guide"
+                  "text": "中文 · Overview"
                 },
                 {
                   "type": "paragraph",
-                  "text": "devtoolsPlugin() installs a feature backed by the original bounded collector. Its query/watch/stats/describe/close conveniences delegate to that same collector. It creates no business connection or separate forwarded probe stream."
+                  "text": "Contract provides pure event/interface contracts. Host owns business sessions and calls; transports provide real carriers. Devtools is a flow plugin borrowing real events at the canonical probe observe hook; timeout/retry features execute call policies. The application owns the collector without a second observation connection. A Host may have distinct transport namespaces; this example uses only coroutine."
                 }
               ]
             },
             {
-              "id": "observe-real-calls-on-both-sides",
-              "heading": "Observe real calls on both sides",
+              "id": "observe-real-calls",
+              "heading": "Observe real calls",
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Install the same tools object on two real hosts. First next subscribes the watch before the call. Finally, close hosts before explicitly closing the application-owned collector."
+                  "text": "This example additionally needs `@migaia/rpc-plugin-coroutines`. Install the same tools on two real parent/child Hosts. The watch's first next subscribes to future events before business begins. Flow plugins go in Host.plugins rather than transport.features."
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'\n\nconst tools = devtoolsPlugin({ maxEvents: 1000, methods: ['double'] })\nconst parent = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect }), tools],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    }),\n    tools\n  ]\n})\nconst watch = tools.watch({ stages: ['message'] })\ntry {\n  const next = watch.next()\n  console.log(await parent.request('double', 21))\n  const batch = await next\n  console.log(batch.value?.events.length)\n  console.log(tools.stats().methods)\n} finally {\n  await watch.return(undefined)\n  await parent.close()\n  tools.close()\n}"
+                  "code": "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'\nimport { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'\n\nasync function untilStopped(signal: AbortSignal): Promise<void> {\n  let complete!: () => void\n  const stopped = new Promise<void>((resolve) => {\n    complete = resolve\n  })\n  signal.addEventListener('abort', complete, { once: true })\n  if (signal.aborted) complete()\n  try {\n    await stopped\n  } finally {\n    signal.removeEventListener('abort', complete)\n  }\n}\n\nconst tools = devtoolsPlugin({ maxEvents: 1000, methods: ['double'] })\nconst task: ICoroutineUserTask = async ({ connect, signal }) => {\n  const child = await createRpcHost({\n    plugins: [tools, coroutinePlugin({ connectToParent: connect })],\n    provide: { double: (value: number) => value * 2 }\n  })\n  try {\n    await untilStopped(signal)\n  } finally {\n    await child.close()\n  }\n}\n\ntype IWorkerApi = { double(value: number): number }\nconst plugins = [tools, coroutinePlugin({ spawn: task })] as const\nconst parent = await createRpcHost<IWorkerApi, typeof plugins>({ plugins })\nconst watch = tools.watch({ stages: ['message'] })\ntry {\n  const next = watch.next()\n  console.log(await parent.coroutine.request('double', 21))\n  console.log((await next).value?.events.length)\n  console.log(tools.stats().methods)\n} finally {\n  await watch.return(undefined)\n  await parent.close()\n  tools.close()\n}"
                 },
                 {
                   "type": "paragraph",
-                  "text": "The business result is 42. Event counts depend on qualifying observations from both sides; one call does not imply one record. The same tools object can install in multiple hosts, once per host. Closing one host removes only its observation; the other host and collector continue working."
+                  "text": "The business call returns 42. Event counts depend on actual eligible observations at both ends, rather than one event per business call. Default message/peer observes this call. Other stages require explicit selection and true facts from the actual carrier."
                 }
               ]
             },
             {
-              "id": "stages-capture-and-redaction",
-              "heading": "Stages, capture, and redaction",
+              "id": "capture-redaction-queries-and-service",
+              "heading": "Capture, redaction, queries, and service",
               "blocks": [
-                {
-                  "type": "paragraph",
-                  "text": "Default stages are message and peer. Explicitly enable envelope, encoded, frame, protected, or carrier when needed. Visibility also depends on the actual carrier and stages traversed. Subscribing to stages alone does not retain content. capture defaults to none and must be a subset of stages. redact projects content synchronously at the original emitter."
-                },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'\n\nexport const tools = devtoolsPlugin({\n  stages: ['message', 'peer', 'carrier'],\n  capture: ['message'],\n  redact: () => ({ redacted: true }),\n  maxEvents: 2000,\n  maxContentBytes: 1024 * 1024,\n  onError: (error) => console.error(error)\n})"
+                  "code": "import { devtoolsPlugin, type IRpcDevtools } from '@migaia/rpc-plugin-devtools'\nimport type { IRpcHost } from '@migaia/rpc-host'\n\nexport const tools = devtoolsPlugin({\n  stages: ['message', 'peer', 'carrier'],\n  capture: ['message'],\n  redact: () => ({ redacted: true }),\n  maxEvents: 2000,\n  maxContentBytes: 1024 * 1024,\n  onError: (error) => console.error(error)\n})\n\nexport function readPage(collector: IRpcDevtools, afterSeq: number) {\n  const page = collector.query({ afterSeq, limit: 100, stages: ['message'] })\n  return { events: page.events, cursor: page.nextSeq, loss: page.counters }\n}\n\nexport function exposeDiagnostics(host: IRpcHost) {\n  host.provide({ diagnostics: tools.collector.service })\n}"
                 },
                 {
                   "type": "paragraph",
-                  "text": "This example replaces all captured content explicitly. Write redaction for your data structure; do not assume credentials are recursively removed automatically. A throwing redactor reports REDACT_FAILED and drops that content without changing completed business results."
+                  "text": "This explicitly replaces captured content. Redact runs synchronously; failures report REDACT_FAILED and discard that content without changing the business result. Methods match exactly. Sample is greater than zero and at most one; use collector.pause to pause. Resume restores previous stages without reviving a closed collector."
                 },
                 {
                   "type": "paragraph",
-                  "text": "methods selects exact methods. sample is a deterministic ratio greater than 0 and at most 1. Pause with collector.pause, not sample: 0. collector.resume restores the saved stages without reviving a closed collector."
+                  "text": "query.afterSeq is an exclusive sequence cursor. Continue from page.nextSeq, which includes scanned rows excluded by filters. Limit defaults to 1000 and ranges from 1–1000. Watch subscribes from first next rather than reading history. Each batch holds at most 256 events, with 64 queued batches; batch.dropped reports loss. Return ends only its watch; collector.close rejects pending next with CLOSED."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Main-ring defaults are maxEvents10000, maxContentBytes8388608, maxInterned65536. Watch, record, and content/detail/error references have separate ownership. Ring capacity does not imply arbitrary graph deep-copying or a process-wide memory bound. query.counters reports eviction, content loss, reentrant loss, sampling, and intern overflow."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "collector.service is a nested provide object. Applications own authorization; remote reads hide captured content unless exposeContent:true. Service reads exclude observations of their actual serving Host to avoid query recursion. Observation does not require another business Host."
                 }
               ]
             },
             {
-              "id": "query-watch-and-bounds",
-              "heading": "Query, watch, and bounds",
+              "id": "recording-and-ndjson",
+              "heading": "Recording and NDJSON",
               "blocks": [
-                {
-                  "type": "paragraph",
-                  "text": "query uses a sequence cursor rather than an array position. Pass nextSeq as the next afterSeq even when some scanned rows were filtered out. Default limit is 1000; accepted values are 1 through 1000."
-                },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import type { IRpcDevtools } from '@migaia/rpc-plugin-devtools'\n\nexport function readPage(collector: IRpcDevtools, afterSeq: number) {\n  const page = collector.query({ afterSeq, limit: 100, stages: ['message'] })\n  return { events: page.events, cursor: page.nextSeq, loss: page.counters }\n}"
+                  "code": "import { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'\n\nconst tools = devtoolsPlugin({ maxEvents: 100 })\ntry {\n  const recording = tools.collector.record({ maxEvents: 200 })\n  tools.collector.clear()\n  const record = recording.stop()\n  const text = tools.collector.exportRecord(record)\n  console.log(tools.collector.importRecord(text).header.version)\n} finally {\n  tools.close()\n}"
                 },
                 {
                   "type": "paragraph",
-                  "text": "watch subscribes to future events on first next; query reads retained history. Batches contain at most 256 events, with at most 64 queued batches and a bounded raw pre-filter window. batch.dropped accounts for loss, so slow consumers cannot claim lossless delivery. return ends only that watch and wakes its pending read. collector.close rejects a pending next with CLOSED."
+                  "text": "Only one recording is active at a time, and stop consumes its handle. Clear resets the main ring, statistics, and counters while retaining sequence progress and record/watch lifetime. Stats accumulates eligible message events without subtracting ring eviction; latency quantiles interpolate bounded histogram buckets."
                 },
                 {
                   "type": "paragraph",
-                  "text": "The main ring defaults to maxEvents=10000 and maxContentBytes=8388608. The latter is a main-ring content budget. maxInterned defaults to 65536. Watch/record windows and content/detail/error references have separate ownership; the main-ring limit is not a hard process-memory bound. query.counters explains eviction, content loss, reentrant drops, and intern overflow."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "stats accumulates qualifying message events independently of ring eviction. Latency percentiles interpolate bounded histogram buckets rather than exact retained samples. clear resets the main ring, statistics, and counters while preserving sequence progress and record/watch lifetimes."
+                  "text": "The record header remains `{ format: 'migaia-rpc-devtools', version: 1 }`. Export/import is pure NDJSON encoding, without persistence or reinjecting events. Bytes and error graphs follow the record contract; arbitrary JavaScript class graphs are not promised lossless roundtrip."
                 }
               ]
             },
             {
-              "id": "independent-recording-and-ndjson",
-              "heading": "Independent recording and NDJSON",
+              "id": "cleanup-and-boundaries",
+              "heading": "Cleanup and boundaries",
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Only one recording can be active. It has its own capacity; stop consumes its handle and returns a record. Export/import are pure codecs: they neither persist data nor ingest decoded events into this collector."
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "import { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'\n\nconst tools = devtoolsPlugin({ maxEvents: 100 })\ntry {\n  const recording = tools.collector.record({ maxEvents: 200 })\n  tools.collector.clear()\n  const record = recording.stop()\n  const text = tools.collector.exportRecord(record)\n  const decoded = tools.collector.importRecord(text)\n  console.log(decoded.header.version)\n} finally {\n  tools.close()\n}"
+                  "text": "End your watches and recording, close business Hosts, then close the caller-owned collector. A Host installation owns only its emitter cleanup; collector.close does not close business Hosts. Consumers retaining a reusable synchronous emit view must read or copy fields according to the public probe contract."
                 },
                 {
                   "type": "paragraph",
-                  "text": "The v1 header remains { format: 'migaia-rpc-devtools', version: 1 }; module renaming does not change it. collector.exportRecord/importRecord own record encoding and decoding. Bytes use reserved $bytes syntax with canonical base64. Native errors restore names, stacks, and cause chains without generating replacement remote stacks. The format does not promise arbitrary JavaScript class-graph round trips."
-                }
-              ]
-            },
-            {
-              "id": "remote-service-on-an-existing-host",
-              "heading": "Remote service on an existing host",
-              "blocks": [
-                {
-                  "type": "paragraph",
-                  "text": "collector.service is a nested provide object published on an application-owned existing host. Applications own authorization and the business connection. Observation needs no second call endpoint."
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "import type { IRpcHost } from '@migaia/rpc-host'\nimport type { IDevtoolsPlugin } from '@migaia/rpc-plugin-devtools'\n\nexport function exposeDiagnostics(host: IRpcHost, tools: IDevtoolsPlugin) {\n  host.provide({ diagnostics: tools.collector.service })\n}"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "capture and exposeContent: true are independent choices. Remote content is hidden by default. Service reads exclude observations from their actual serving host to avoid observing their own queries. The service retains query/watch/stats/describe, record.start/stop, clear, pause, and resume; RPC output uses the original portable/wire conversion."
-                }
-              ]
-            },
-            {
-              "id": "final-cleanup-and-errors",
-              "heading": "Final cleanup and errors",
-              "blocks": [
-                {
-                  "type": "paragraph",
-                  "text": "Return owned watches, stop recording, close business hosts, then close the remaining application-owned collector. collector.close is idempotent and leaves business hosts open; host.close likewise leaves the collector open."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "The source is rpc.devtools. INVALID_OPTION, CLOSED, RECORD_ACTIVE, RECORD_NOT_ACTIVE, RECORD_FORMAT_INVALID, REDACT_FAILED, and SERVICE_RESULT_INVALID preserve native error types and original causes. Handle or report diagnostic and cleanup failures without replacing the original business failure."
+                  "text": "Import custom probes from `@migaia/rpc-host/plugins/probe` and deployment SDK from `@migaia/rpc-host/sdk`. Physical carrier/protected stages depend on actual paths, without semantic messages presented as raw data. Diagnostics must not replace business results. Errors use source rpc.devtools, including INVALID_OPTION, CLOSED, RECORD_ACTIVE/RECORD_NOT_ACTIVE, RECORD_FORMAT_INVALID, REDACT_FAILED, SERVICE_RESULT_INVALID, with original native type and cause."
                 }
               ]
             }
@@ -598,40 +420,54 @@
       "symbols": [
         {
           "name": "devtoolsPlugin",
-          "kind": "const",
-          "signature": "export declare const devtoolsPlugin: (options?: IRpcDevtoolsOptions) => IDevtoolsPlugin;",
-          "declarationLine": 8,
+          "kind": "function",
+          "signature": "export declare function devtoolsPlugin(options?: IRpcDevtoolsOptions): IDevtoolsPlugin;",
+          "declarationLine": 9,
           "source": "packages/rpc-plugin-devtools/dist/plugin.d.ts",
-          "purpose": "Install the original bounded collector directly into real host observation. Same feature object may observe multiple hosts; closing one host withdraws only its observation and never closes the collector.",
-          "core": "IDevtoolsPlugin with one collector plus direct query/watch/stats/describe/close projections; retain the exact installed object.\nmethods: Exact method path filter supplied by the application; methodless control events remain observable.\nNo method filter; all method-bearing events are eligible.\nsample: Deterministic sampling fraction in the interval greater than zero through one, using sender/message identity rather than random per-stage decisions.\n`1`, retaining all eligible identities before retention limits.\ncapture: Explicit stages whose content may be read. Select names from RpcProbeStageName in @migaia/rpc-host/probe and keep capture within initially subscribed stages.\nNo content capture; observation remains metadata-only.\nredact: Synchronous callback receiving numeric RpcProbeStage and captured content. Return the retained replacement; never retain the reusable event view. Collector executes it during ingestion, log executes it at the canonical emitter.\nredact.stage: Numeric stage from RpcProbeStage supplied by the observing emitter.\nredact.content: Captured caller-owned content reference from an explicitly enabled stage.\nReplacement content, including undefined to discard it. Synchronous throws discard content and are reported; asynchronous redaction is not awaited.\nNo redactor; explicitly captured content retains its original reference.\nSet it when explicitly captured content contains data that should not be retained or logged. Return a replacement, or `undefined` to discard content. Omitting it retains the captured reference unchanged; a thrown error is reported and that content is dropped.\nonError: Synchronous observer receiving an original diagnostic error. Return nothing; observer failures are reported through the host failure channel without changing the RPC operation.\nonError.error: Original collector observation failure supplied by its owning component.\nNo result is used and no asynchronous work is awaited by this callback boundary.\nUses the Core hostRethrowReporter failure channel.\nSet this callback when a diagnostic failure should reach the application monitor. It receives collector observation failures without replacing a business result. Omission keeps the documented host reporter for the owning component.\nstages: Initial stage names from Core RpcProbeStageName; physical stages require explicit selection and selection alone never enables capture.\n`[\"message\", \"peer\"]`; physical stages are not subscribed.\nLogical request, response and control observations.\nConnection lifecycle observations.\nEnvelope observations; explicit opt-in.\nEncoded content observations; explicit opt-in.\nFrame observations; explicit opt-in.\nProtected content observations; explicit opt-in.\nPhysical carrier observations; explicit opt-in.\nUse `message` for logical calls and `peer` for connection lifecycle. Add `envelope`, `encoded`, `frame`, `protected` or `carrier` to inspect those physical processing steps. Omission selects message and peer; choosing a stage never enables content capture by itself.\nmaxEvents: Main-ring positive safe integer capacity, at most the JavaScript array length limit; newest events evict oldest events.\n10000 retained events in the main ring.\nmaxContentBytes: Nonnegative safe integer budget for content retained by the main query ring; independent recording/watch references and opaque-object sizing are outside this byte total. It is not a process-wide memory ceiling; excess content drops while metadata stays.\n8388608 bytes, or eight mebibytes.\nmaxInterned: Positive safe integer reader name-table bound, at most floor(sqrt(MAX_SAFE_INTEGER)) minus one; overflow uses an explicit marker.\n65536 names; ingestion itself retains raw string references.\nexposeContent: Allows captured content across the portable service boundary; local query and stopped recordings already use their retained captured content.\nfalse; service responses omit captured content.\nInstall the original bounded collector directly into real host observation. Same feature object may observe multiple hosts; closing one host withdraws only its observation and never closes the collector.",
-          "advanced": "Subscriptions use actual endpoint/carrier probes. Collector close does not close business hosts, and host close does not close the collector.\nInspect calls, loss and cumulative statistics without modifying providers.",
-          "parameters": ["This const declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this const.",
+          "purpose": "Install one genuine observe flow plugin backed by the caller-owned collector. Direct query/watch/stats/describe/close methods refer to that same collector.",
+          "core": "IDevtoolsPlugin with one collector plus direct query/watch/stats/describe/close projections; retain the exact installed object.\nmethods: Exact method path filter supplied by the application; methodless control events remain observable.\nNo method filter; all method-bearing events are eligible.\nsample: Deterministic sampling fraction in the interval greater than zero through one, using sender/message identity rather than random per-stage decisions.\n`1`, retaining all eligible identities before retention limits.\ncapture: Explicit stages whose content may be read. Select names from RpcProbeStageName in @migaia/rpc-host/plugins/probe and keep capture within initially subscribed stages.\nNo content capture; observation remains metadata-only.\nredact: Synchronous callback receiving numeric RpcProbeStage and captured content. Return the retained replacement; never retain the reusable event view. Collector executes it during ingestion, log executes it at the canonical emitter.\nredact.stage: Numeric stage from RpcProbeStage supplied by the observing emitter.\nredact.content: Captured caller-owned content reference from an explicitly enabled stage.\nReplacement content, including undefined to discard it. Synchronous throws discard content and are reported; asynchronous redaction is not awaited.\nNo redactor; explicitly captured content retains its original reference.\nSet it when explicitly captured content contains data that should not be retained or logged. Return a replacement, or `undefined` to discard content. Omitting it retains the captured reference unchanged; a thrown error is reported and that content is dropped.\nonError: Synchronous observer receiving an original diagnostic error. Return nothing; observer failures are reported through the host failure channel without changing the RPC operation.\nonError.error: Original collector observation failure supplied by its owning component.\nNo result is used and no asynchronous work is awaited by this callback boundary.\nUses the Core hostRethrowReporter failure channel.\nSet this callback when a diagnostic failure should reach the application monitor. It receives collector observation failures without replacing a business result. Omission keeps the documented host reporter for the owning component.\nstages: Initial stage names from Core RpcProbeStageName; physical stages require explicit selection and selection alone never enables capture.\n`[\"message\", \"peer\"]`; physical stages are not subscribed.\nLogical request, response and control observations.\nConnection lifecycle observations.\nEnvelope observations; explicit opt-in.\nEncoded content observations; explicit opt-in.\nFrame observations; explicit opt-in.\nProtected content observations; explicit opt-in.\nPhysical carrier observations; explicit opt-in.\nUse `message` for logical calls and `peer` for connection lifecycle. Add `envelope`, `encoded`, `frame`, `protected` or `carrier` to inspect those physical processing steps. Omission selects message and peer; choosing a stage never enables content capture by itself.\nmaxEvents: Main-ring positive safe integer capacity, at most the JavaScript array length limit; newest events evict oldest events.\n10000 retained events in the main ring.\nmaxContentBytes: Nonnegative safe integer budget for content retained by the main query ring; independent recording/watch references and opaque-object sizing are outside this byte total. It is not a process-wide memory ceiling; excess content drops while metadata stays.\n8388608 bytes, or eight mebibytes.\nmaxInterned: Positive safe integer reader name-table bound, at most floor(sqrt(MAX_SAFE_INTEGER)) minus one; overflow uses an explicit marker.\n65536 names; ingestion itself retains raw string references.\nexposeContent: Allows captured content across the portable service boundary; local query and stopped recordings already use their retained captured content.\nfalse; service responses omit captured content.\nInstall the original bounded collector directly into real host observation. Same feature object may observe multiple hosts; closing one host withdraws only its observation and never closes the collector.",
+          "advanced": "The observe hook lends events to the caller-owned collector. Uninstall releases this Host observation; the caller closes its collector.\nInspect calls, loss and cumulative statistics without modifying providers.",
+          "parameters": ["options: IRpcDevtoolsOptions (optional)"],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "IRpcDevtoolsOptions",
+              "optional": true
+            }
+          ],
+          "returns": "IDevtoolsPlugin",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\nimport { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'\n\nconst tools = devtoolsPlugin({ maxEvents: 1000, methods: ['double'] })\nconst parent = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect }), tools],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    }),\n    tools\n  ]\n})\nconst watch = tools.watch({ stages: ['message'] })\ntry {\n  const next = watch.next()\n  console.log(await parent.request('double', 21))\n  const batch = await next\n  console.log(batch.value?.events.length)\n  console.log(tools.stats().methods)\n} finally {\n  await watch.return(undefined)\n  await parent.close()\n  tools.close()\n}",
-            "import { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'\n\nexport const tools = devtoolsPlugin({\n  stages: ['message', 'peer', 'carrier'],\n  capture: ['message'],\n  redact: () => ({ redacted: true }),\n  maxEvents: 2000,\n  maxContentBytes: 1024 * 1024,\n  onError: (error) => console.error(error)\n})",
-            "import { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'\n\nconst tools = devtoolsPlugin({ maxEvents: 100 })\ntry {\n  const recording = tools.collector.record({ maxEvents: 200 })\n  tools.collector.clear()\n  const record = recording.stop()\n  const text = tools.collector.exportRecord(record)\n  const decoded = tools.collector.importRecord(text)\n  console.log(decoded.header.version)\n} finally {\n  tools.close()\n}",
-            "import { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'\n\nconst tools = devtoolsPlugin({ maxEvents: 1000 })\nconst collector = tools.collector\nconst recording = collector.record({ maxEvents: 2000 })\ncollector.pause()\nconsole.log(collector.describe().paused)\ncollector.resume()\nconsole.log(collector.describe().paused)\nconst text = collector.exportRecord(recording.stop())\nconsole.log(collector.importRecord(text).header.version)\ncollector.close()"
+            "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'\nimport { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'\n\nasync function untilStopped(signal: AbortSignal): Promise<void> {\n  let complete!: () => void\n  const stopped = new Promise<void>((resolve) => {\n    complete = resolve\n  })\n  signal.addEventListener('abort', complete, { once: true })\n  if (signal.aborted) complete()\n  try {\n    await stopped\n  } finally {\n    signal.removeEventListener('abort', complete)\n  }\n}\n\nconst tools = devtoolsPlugin({ maxEvents: 1000, methods: ['double'] })\nconst task: ICoroutineUserTask = async ({ connect, signal }) => {\n  const child = await createRpcHost({\n    plugins: [tools, coroutinePlugin({ connectToParent: connect })],\n    provide: { double: (value: number) => value * 2 }\n  })\n  try {\n    await untilStopped(signal)\n  } finally {\n    await child.close()\n  }\n}\n\ntype IWorkerApi = { double(value: number): number }\nconst plugins = [tools, coroutinePlugin({ spawn: task })] as const\nconst parent = await createRpcHost<IWorkerApi, typeof plugins>({ plugins })\nconst watch = tools.watch({ stages: ['message'] })\ntry {\n  const next = watch.next()\n  console.log(await parent.coroutine.request('double', 21))\n  console.log((await next).value?.events.length)\n  console.log(tools.stats().methods)\n} finally {\n  await watch.return(undefined)\n  await parent.close()\n  tools.close()\n}",
+            "import { devtoolsPlugin, type IRpcDevtools } from '@migaia/rpc-plugin-devtools'\nimport type { IRpcHost } from '@migaia/rpc-host'\n\nexport const tools = devtoolsPlugin({\n  stages: ['message', 'peer', 'carrier'],\n  capture: ['message'],\n  redact: () => ({ redacted: true }),\n  maxEvents: 2000,\n  maxContentBytes: 1024 * 1024,\n  onError: (error) => console.error(error)\n})\n\nexport function readPage(collector: IRpcDevtools, afterSeq: number) {\n  const page = collector.query({ afterSeq, limit: 100, stages: ['message'] })\n  return { events: page.events, cursor: page.nextSeq, loss: page.counters }\n}\n\nexport function exposeDiagnostics(host: IRpcHost) {\n  host.provide({ diagnostics: tools.collector.service })\n}",
+            "import { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'\n\nconst tools = devtoolsPlugin({ maxEvents: 100 })\ntry {\n  const recording = tools.collector.record({ maxEvents: 200 })\n  tools.collector.clear()\n  const record = recording.stop()\n  const text = tools.collector.exportRecord(record)\n  console.log(tools.collector.importRecord(text).header.version)\n} finally {\n  tools.close()\n}",
+            "import { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'\n\nconst tools = devtoolsPlugin({ maxEvents: 1000 })\ntry {\n  const recording = tools.collector.record({ maxEvents: 2000 })\n  tools.collector.pause()\n  console.log(tools.describe().paused)\n  tools.collector.resume()\n  console.log(tools.describe().paused)\n  const text = tools.collector.exportRecord(recording.stop())\n  console.log(tools.collector.importRecord(text).header.version)\n} finally {\n  tools.close()\n}"
           ],
           "members": [],
           "composes": [],
           "aliasOf": "devtoolsPlugin",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const devtoolsPlugin: (options?: IRpcDevtoolsOptions) => IDevtoolsPlugin;"
+            "export declare function devtoolsPlugin(options?: IRpcDevtoolsOptions): IDevtoolsPlugin;"
           ],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "IRpcDevtoolsOptions",
+                "optional": true
+              }
+            ]
+          ],
+          "overloadReturns": ["IDevtoolsPlugin"],
           "whenToUse": "",
           "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Install the original bounded collector directly into real host observation. Same feature object may observe multiple hosts; closing one host withdraws only its observation and never closes the collector."
+              "content": "Install one genuine observe flow plugin backed by the caller-owned collector. Direct query/watch/stats/describe/close methods refer to that same collector."
             },
             {
               "id": "getting-started",
@@ -641,22 +477,22 @@
             {
               "id": "when-to-use",
               "title": "适用场景",
-              "content": "Use devtoolsPlugin when its const contract and declared inputs match the result you need. Choose a different public symbol when devtoolsPlugin does not match the required inputs or return contract."
+              "content": "Use devtoolsPlugin when its function contract and declared inputs match the result you need. Choose a different public symbol when devtoolsPlugin does not match the required inputs or return contract."
             },
             {
               "id": "quick-implementation",
               "title": "快速实现",
-              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
             },
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "IDevtoolsPlugin with one collector plus direct query/watch/stats/describe/close projections; retain the exact installed object.\nmethods: Exact method path filter supplied by the application; methodless control events remain observable.\nNo method filter; all method-bearing events are eligible.\nsample: Deterministic sampling fraction in the interval greater than zero through one, using sender/message identity rather than random per-stage decisions.\n`1`, retaining all eligible identities before retention limits.\ncapture: Explicit stages whose content may be read. Select names from RpcProbeStageName in @migaia/rpc-host/probe and keep capture within initially subscribed stages.\nNo content capture; observation remains metadata-only.\nredact: Synchronous callback receiving numeric RpcProbeStage and captured content. Return the retained replacement; never retain the reusable event view. Collector executes it during ingestion, log executes it at the canonical emitter.\nredact.stage: Numeric stage from RpcProbeStage supplied by the observing emitter.\nredact.content: Captured caller-owned content reference from an explicitly enabled stage.\nReplacement content, including undefined to discard it. Synchronous throws discard content and are reported; asynchronous redaction is not awaited.\nNo redactor; explicitly captured content retains its original reference.\nSet it when explicitly captured content contains data that should not be retained or logged. Return a replacement, or `undefined` to discard content. Omitting it retains the captured reference unchanged; a thrown error is reported and that content is dropped.\nonError: Synchronous observer receiving an original diagnostic error. Return nothing; observer failures are reported through the host failure channel without changing the RPC operation.\nonError.error: Original collector observation failure supplied by its owning component.\nNo result is used and no asynchronous work is awaited by this callback boundary.\nUses the Core hostRethrowReporter failure channel.\nSet this callback when a diagnostic failure should reach the application monitor. It receives collector observation failures without replacing a business result. Omission keeps the documented host reporter for the owning component.\nstages: Initial stage names from Core RpcProbeStageName; physical stages require explicit selection and selection alone never enables capture.\n`[\"message\", \"peer\"]`; physical stages are not subscribed.\nLogical request, response and control observations.\nConnection lifecycle observations.\nEnvelope observations; explicit opt-in.\nEncoded content observations; explicit opt-in.\nFrame observations; explicit opt-in.\nProtected content observations; explicit opt-in.\nPhysical carrier observations; explicit opt-in.\nUse `message` for logical calls and `peer` for connection lifecycle. Add `envelope`, `encoded`, `frame`, `protected` or `carrier` to inspect those physical processing steps. Omission selects message and peer; choosing a stage never enables content capture by itself.\nmaxEvents: Main-ring positive safe integer capacity, at most the JavaScript array length limit; newest events evict oldest events.\n10000 retained events in the main ring.\nmaxContentBytes: Nonnegative safe integer budget for content retained by the main query ring; independent recording/watch references and opaque-object sizing are outside this byte total. It is not a process-wide memory ceiling; excess content drops while metadata stays.\n8388608 bytes, or eight mebibytes.\nmaxInterned: Positive safe integer reader name-table bound, at most floor(sqrt(MAX_SAFE_INTEGER)) minus one; overflow uses an explicit marker.\n65536 names; ingestion itself retains raw string references.\nexposeContent: Allows captured content across the portable service boundary; local query and stopped recordings already use their retained captured content.\nfalse; service responses omit captured content.\nInstall the original bounded collector directly into real host observation. Same feature object may observe multiple hosts; closing one host withdraws only its observation and never closes the collector."
+              "content": "IDevtoolsPlugin with one collector plus direct query/watch/stats/describe/close projections; retain the exact installed object.\nmethods: Exact method path filter supplied by the application; methodless control events remain observable.\nNo method filter; all method-bearing events are eligible.\nsample: Deterministic sampling fraction in the interval greater than zero through one, using sender/message identity rather than random per-stage decisions.\n`1`, retaining all eligible identities before retention limits.\ncapture: Explicit stages whose content may be read. Select names from RpcProbeStageName in @migaia/rpc-host/plugins/probe and keep capture within initially subscribed stages.\nNo content capture; observation remains metadata-only.\nredact: Synchronous callback receiving numeric RpcProbeStage and captured content. Return the retained replacement; never retain the reusable event view. Collector executes it during ingestion, log executes it at the canonical emitter.\nredact.stage: Numeric stage from RpcProbeStage supplied by the observing emitter.\nredact.content: Captured caller-owned content reference from an explicitly enabled stage.\nReplacement content, including undefined to discard it. Synchronous throws discard content and are reported; asynchronous redaction is not awaited.\nNo redactor; explicitly captured content retains its original reference.\nSet it when explicitly captured content contains data that should not be retained or logged. Return a replacement, or `undefined` to discard content. Omitting it retains the captured reference unchanged; a thrown error is reported and that content is dropped.\nonError: Synchronous observer receiving an original diagnostic error. Return nothing; observer failures are reported through the host failure channel without changing the RPC operation.\nonError.error: Original collector observation failure supplied by its owning component.\nNo result is used and no asynchronous work is awaited by this callback boundary.\nUses the Core hostRethrowReporter failure channel.\nSet this callback when a diagnostic failure should reach the application monitor. It receives collector observation failures without replacing a business result. Omission keeps the documented host reporter for the owning component.\nstages: Initial stage names from Core RpcProbeStageName; physical stages require explicit selection and selection alone never enables capture.\n`[\"message\", \"peer\"]`; physical stages are not subscribed.\nLogical request, response and control observations.\nConnection lifecycle observations.\nEnvelope observations; explicit opt-in.\nEncoded content observations; explicit opt-in.\nFrame observations; explicit opt-in.\nProtected content observations; explicit opt-in.\nPhysical carrier observations; explicit opt-in.\nUse `message` for logical calls and `peer` for connection lifecycle. Add `envelope`, `encoded`, `frame`, `protected` or `carrier` to inspect those physical processing steps. Omission selects message and peer; choosing a stage never enables content capture by itself.\nmaxEvents: Main-ring positive safe integer capacity, at most the JavaScript array length limit; newest events evict oldest events.\n10000 retained events in the main ring.\nmaxContentBytes: Nonnegative safe integer budget for content retained by the main query ring; independent recording/watch references and opaque-object sizing are outside this byte total. It is not a process-wide memory ceiling; excess content drops while metadata stays.\n8388608 bytes, or eight mebibytes.\nmaxInterned: Positive safe integer reader name-table bound, at most floor(sqrt(MAX_SAFE_INTEGER)) minus one; overflow uses an explicit marker.\n65536 names; ingestion itself retains raw string references.\nexposeContent: Allows captured content across the portable service boundary; local query and stopped recordings already use their retained captured content.\nfalse; service responses omit captured content.\nInstall the original bounded collector directly into real host observation. Same feature object may observe multiple hosts; closing one host withdraws only its observation and never closes the collector."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "Subscriptions use actual endpoint/carrier probes. Collector close does not close business hosts, and host close does not close the collector.\nInspect calls, loss and cumulative statistics without modifying providers."
+              "content": "The observe hook lends events to the caller-owned collector. Uninstall releases this Host observation; the caller closes its collector.\nInspect calls, loss and cumulative statistics without modifying providers."
             }
           ],
           "declaredConfiguration": [
@@ -721,65 +557,65 @@
               "description": "Optional diagnostic sink; omission or a throwing sink uses Core's host failure route."
             }
           ],
-          "identity": "packages/rpc-plugin-devtools/dist/plugin.d.ts:devtoolsPlugin:export declare const devtoolsPlugin: (options?: IRpcDevtoolsOptions) => IDevtoolsPlugin;",
+          "identity": "packages/rpc-plugin-devtools/dist/plugin.d.ts:devtoolsPlugin:export declare function devtoolsPlugin(options?: IRpcDevtoolsOptions): IDevtoolsPlugin;",
           "guidance": [],
-          "usageScore": 60,
+          "usageScore": 54,
           "configuration": [
             {
               "name": "stages",
               "type": "readonly IRpcProbeStageName[]",
               "optional": true,
-              "description": "Defaults to message and peer; pass physical stages here or use setStages() to enable them.",
+              "description": "`stages` — 默认 message、peer；其他物理/信封阶段显式启用",
               "descriptionEn": "Defaults to message and peer; pass physical stages here or use setStages() to enable them.",
-              "descriptionZh": ""
+              "descriptionZh": "`stages` — 默认 message、peer；其他物理/信封阶段显式启用"
             },
             {
               "name": "capture",
               "type": "readonly IRpcProbeStageName[]",
               "optional": true,
-              "description": "Explicit captured stages, default none; capture must be a subset of subscribed stages.",
+              "description": "`capture` / `redact` — 显式内容捕获与同步内容投影",
               "descriptionEn": "Explicit captured stages, default none; capture must be a subset of subscribed stages.",
-              "descriptionZh": ""
+              "descriptionZh": "`capture` / `redact` — 显式内容捕获与同步内容投影"
             },
             {
               "name": "redact",
               "type": "(stage: RpcProbeStage, content: unknown) => unknown",
               "optional": true,
-              "description": "Optional synchronous projection; throws report REDACT_FAILED and discard this content.",
+              "description": "`capture` / `redact` — 显式内容捕获与同步内容投影",
               "descriptionEn": "Optional synchronous projection; throws report REDACT_FAILED and discard this content.",
-              "descriptionZh": ""
+              "descriptionZh": "`capture` / `redact` — 显式内容捕获与同步内容投影"
             },
             {
               "name": "methods",
               "type": "readonly string[]",
               "optional": true,
-              "description": "methods 是精确方法过滤；sample 是大于 0 且不超过 1 的确定性采样比率。暂停请使用 collector.pause，而不是 sample: 0。collector.resume 恢复保存的阶段选择，不复活已关闭 collector。",
+              "description": "`methods` / `sample` — 精确方法过滤、确定性采样，0 < sample ≤ 1",
               "descriptionEn": "Optional exact method selection compiled by Core; omission observes all eligible methods.",
-              "descriptionZh": "methods 是精确方法过滤；sample 是大于 0 且不超过 1 的确定性采样比率。暂停请使用 collector.pause，而不是 sample: 0。collector.resume 恢复保存的阶段选择，不复活已关闭 collector。"
+              "descriptionZh": "`methods` / `sample` — 精确方法过滤、确定性采样，0 < sample ≤ 1"
             },
             {
               "name": "sample",
               "type": "number",
               "optional": true,
-              "description": "Deterministic sampling ratio, default 1; greater than 0 and at most 1.",
+              "description": "`methods` / `sample` — 精确方法过滤、确定性采样，0 < sample ≤ 1",
               "descriptionEn": "Deterministic sampling ratio, default 1; greater than 0 and at most 1.",
-              "descriptionZh": ""
+              "descriptionZh": "`methods` / `sample` — 精确方法过滤、确定性采样，0 < sample ≤ 1"
             },
             {
               "name": "maxEvents",
               "type": "number",
               "optional": true,
-              "description": "Main-ring capacity, default 10000; positive safe integer within JavaScript array limits.",
+              "description": "`maxEvents` — 主环容量，默认 10000",
               "descriptionEn": "Main-ring capacity, default 10000; positive safe integer within JavaScript array limits.",
-              "descriptionZh": ""
+              "descriptionZh": "`maxEvents` — 主环容量，默认 10000"
             },
             {
               "name": "maxContentBytes",
               "type": "number",
               "optional": true,
-              "description": "Main-ring budget, default 8388608 bytes, allowing 0; record/watch references are independent.",
+              "description": "`maxContentBytes` — 主环内容预算，默认 8 MiB",
               "descriptionEn": "Main-ring budget, default 8388608 bytes, allowing 0; record/watch references are independent.",
-              "descriptionZh": ""
+              "descriptionZh": "`maxContentBytes` — 主环内容预算，默认 8 MiB"
             },
             {
               "name": "maxInterned",
@@ -811,10 +647,10 @@
         {
           "name": "IDevtoolsPlugin",
           "kind": "type",
-          "signature": "export type IDevtoolsPlugin = IRpcFeaturePlugin & Readonly<{ collector: IRpcDevtools; }> & Pick<IRpcDevtools, 'query' | 'watch' | 'stats' | 'describe' | 'close'>;",
-          "declarationLine": 4,
+          "signature": "export type IDevtoolsPlugin = IRpcFlowPlugin & Readonly<{ collector: IRpcDevtools; }> & Pick<IRpcDevtools, 'query' | 'watch' | 'stats' | 'describe' | 'close'>;",
+          "declarationLine": 5,
           "source": "packages/rpc-plugin-devtools/dist/plugin.d.ts",
-          "purpose": "Registered feature surface forwarding to one exact collector; pause/resume and service remain on collector.",
+          "purpose": "Complete flow plugin retaining its collector and the same query, watch, stats, describe and close methods. Collector close does not close observing Hosts.",
           "core": "collector: Exact original collector; the application owns its final close.\nquery: Synchronously scans retained events with compiled filters. This is a snapshot rather than a subscription; limits are one through one thousand.\nquery.input: Optional query options; default cursor zero, limit one thousand and no field filters. Take subsequent afterSeq from the prior page nextSeq.\nA page with events, nextSeq and loss counters. Invalid inputs use INVALID_OPTION and closed collectors use CLOSED.\nwatch: Subscribes from first generator advancement to future filtered events. Batches contain at most 256 events and each watcher retains at most 64 queued batches; overflow is counted rather than blocking RPC.\nwatch.input: Optional query filters excluding afterSeq and limit; defaults to no filters. Use query separately for retained history.\nAn async generator of event batches; return wakes a pending local next and releases the watcher without needing Collector.close. Collector close instead wakes pending reads with CLOSED; remote stream cancellation ends its service watcher normally.\nstats: Snapshots endpoint/method settlement aggregates independently from query-ring eviction; clear resets them.\nA statistics snapshot with cumulative counts and histogram-derived quantiles; a closed collector throws CLOSED.\ndescribe: Reports the current monotonic clock sample, pause state, known endpoint descriptors, limits and loss counters.\nA collector description snapshot; descriptors preserve their element references. Closed collectors throw CLOSED.\nclose: Idempotently removes subscriptions, releases retained storage and wakes pending watchers. It owns no serving Peer and does not close application endpoints.\nCollector storage and subscriptions are released synchronously; later operational calls reject with CLOSED.",
           "advanced": "Share a collector across two actual hosts while preserving separate host cleanup.",
           "parameters": ["This type declaration has no parameters."],
@@ -822,9 +658,7 @@
           "returns": "No explicit return annotation is declared for this type.",
           "errors": [],
           "lifecycleConcurrency": "",
-          "examples": [
-            "import type { IRpcHost } from '@migaia/rpc-host'\nimport type { IDevtoolsPlugin } from '@migaia/rpc-plugin-devtools'\n\nexport function exposeDiagnostics(host: IRpcHost, tools: IDevtoolsPlugin) {\n  host.provide({ diagnostics: tools.collector.service })\n}"
-          ],
+          "examples": [],
           "members": [
             {
               "name": "collector",
@@ -893,11 +727,11 @@
               "returns": "void"
             }
           ],
-          "composes": ["IRpcFeaturePlugin"],
+          "composes": ["IRpcFlowPlugin"],
           "aliasOf": "IDevtoolsPlugin",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IDevtoolsPlugin = IRpcFeaturePlugin & Readonly<{ collector: IRpcDevtools; }> & Pick<IRpcDevtools, 'query' | 'watch' | 'stats' | 'describe' | 'close'>;"
+            "export type IDevtoolsPlugin = IRpcFlowPlugin & Readonly<{ collector: IRpcDevtools; }> & Pick<IRpcDevtools, 'query' | 'watch' | 'stats' | 'describe' | 'close'>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -907,7 +741,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Registered feature surface forwarding to one exact collector; pause/resume and service remain on collector."
+              "content": "Complete flow plugin retaining its collector and the same query, watch, stats, describe and close methods. Collector close does not close observing Hosts."
             },
             {
               "id": "getting-started",
@@ -936,20 +770,20 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-plugin-devtools/dist/plugin.d.ts:IDevtoolsPlugin:export type IDevtoolsPlugin = IRpcFeaturePlugin & Readonly<{ collector: IRpcDevtools; }> & Pick<IRpcDevtools, 'query' | 'watch' | 'stats' | 'describe' | 'close'>;",
+          "identity": "packages/rpc-plugin-devtools/dist/plugin.d.ts:IDevtoolsPlugin:export type IDevtoolsPlugin = IRpcFlowPlugin & Readonly<{ collector: IRpcDevtools; }> & Pick<IRpcDevtools, 'query' | 'watch' | 'stats' | 'describe' | 'close'>;",
           "guidance": [],
-          "usageScore": 14,
+          "usageScore": 0,
           "configuration": [],
           "fragment": "rpc-plugin-devtools-index--IDevtoolsPlugin"
         },
         {
           "name": "IRpcDevtools",
           "kind": "type",
-          "signature": "export type IRpcDevtools = IRpcProbe & Readonly<{ /** * Consume a reusable Core view now; metadata is copied, nested error/content/detail retain * references. */ emit(view: IRpcProbeEventView): void; /** Read retained history after a sequence cursor; locally captured content is available. */ query(input?: IRpcDevtoolsQuery): IRpcDevtoolsPage; /** * A local iterator return wakes its pending next and releases only that watch, not the * Collector. First next subscribes to future events; query reads history. Batches contain at * most 256 events with 64 queued batches and a loss count. Collector close rejects pending next * with CLOSED rather than leaving it suspended. */ watch(input?: Omit<IRpcDevtoolsQuery, 'afterSeq' | 'limit'>): AsyncGenerator<IRpcDevtoolsWatchBatch>; /** Snapshot cumulative eligible message statistics; ring eviction does not reset them. */ stats(): IRpcDevtoolsStats; /** * Read the current monotonic clock, descriptors, limits and counter snapshot; rejects after * close. */ describe(): IRpcDevtoolsDescribe; /** * Start the sole independent recording; maxEvents defaults to the main capacity, and stop * consumes this handle. */ record(options?: Readonly<{ maxEvents?: number; }>): Readonly<{ stop(): IRpcDevtoolsRecord; }>; /** Pure NDJSON encoding, without persistence or an open-collector requirement. */ exportRecord(record: IRpcDevtoolsRecord): string; /** Pure decoding, without ingesting events into this collector; usable after close. */ importRecord(text: string): IRpcDevtoolsRecord; /** Temporarily remove current stages and save their selection; repeated pause is harmless. */ pause(): void; /** Restore the saved selection, without reviving a closed collector. */ resume(): void; /** * Reset the main ring, statistics and counters, retaining sequence progress and record/watch * ownership. */ clear(): void; /** Synchronously retire storage and wake watches; idempotent, without closing any serving Peer. */ close(): void; /** Nested provide object; wire content is hidden unless exposeContent is true. */ readonly service: IRuntimePeerProvide; }>;",
-          "declarationLine": 29,
+          "signature": "export type IRpcDevtools = IRpcProbe & Readonly<{ /** * Consume a reusable Core view now; metadata is copied, nested error/content/detail retain * references. */ emit(view: IRpcProbeEventView): void; /** Read retained history after a sequence cursor; locally captured content is available. */ query(input?: IRpcDevtoolsQuery): IRpcDevtoolsPage; /** * A local iterator return wakes its pending next and releases only that watch, not the * Collector. First next subscribes to future events; query reads history. Batches contain at * most 256 events with 64 queued batches and a loss count. Collector close rejects pending next * with CLOSED rather than leaving it suspended. */ watch(input?: Omit<IRpcDevtoolsQuery, 'afterSeq' | 'limit'>): AsyncGenerator<IRpcDevtoolsWatchBatch>; /** Snapshot cumulative eligible message statistics; ring eviction does not reset them. */ stats(): IRpcDevtoolsStats; /** * Read the current monotonic clock, descriptors, limits and counter snapshot; rejects after * close. */ describe(): IRpcDevtoolsDescribe; /** * Start the sole independent recording; maxEvents defaults to the main capacity, and stop * consumes this handle. */ record(options?: Readonly<{ maxEvents?: number; }>): Readonly<{ stop(): IRpcDevtoolsRecord; }>; /** Pure NDJSON encoding, without persistence or an open-collector requirement. */ exportRecord(record: IRpcDevtoolsRecord): string; /** Pure decoding, without ingesting events into this collector; usable after close. */ importRecord(text: string): IRpcDevtoolsRecord; /** Temporarily remove current stages and save their selection; repeated pause is harmless. */ pause(): void; /** Restore the saved selection, without reviving a closed collector. */ resume(): void; /** * Reset the main ring, statistics and counters, retaining sequence progress and record/watch * ownership. */ clear(): void; /** Synchronously retire storage and wake watches; idempotent, without closing any serving Peer. */ close(): void; /** Nested provide object; wire content is hidden unless exposeContent is true. */ readonly service: IRpcProvide; }>;",
+          "declarationLine": 30,
           "source": "packages/rpc-plugin-devtools/dist/collector-types.d.ts",
           "purpose": "Collector exposed by devtoolsPlugin().collector, composed with external IRpcProbe. The Core owns stage masks and setStages; this collector owns retention, queries, recording, service projection and explicit close.",
-          "core": "emit: Consumes a Core-owned reusable IRpcProbeEventView synchronously into retained columns; never keeps the view itself. Installed emitters call it through the Host probe option or the devtools plugin.\nemit.view: IRpcProbeEventView issued by an installed Core emitter, valid only during its synchronous emit call; external type semantics remain in @migaia/rpc-host/probe.\nMetadata is retained or accounted as filtered, paused, closed or reentrant loss. Observation failures are reported instead of reaching the business caller.\nquery: Synchronously scans retained events with compiled filters. This is a snapshot rather than a subscription; limits are one through one thousand.\nquery.input: Optional query options; default cursor zero, limit one thousand and no field filters. Take subsequent afterSeq from the prior page nextSeq.\nA page with events, nextSeq and loss counters. Invalid inputs use INVALID_OPTION and closed collectors use CLOSED.\nwatch: Subscribes from first generator advancement to future filtered events. Batches contain at most 256 events and each watcher retains at most 64 queued batches; overflow is counted rather than blocking RPC.\nwatch.input: Optional query filters excluding afterSeq and limit; defaults to no filters. Use query separately for retained history.\nAn async generator of event batches; return wakes a pending local next and releases the watcher without needing Collector.close. Collector close instead wakes pending reads with CLOSED; remote stream cancellation ends its service watcher normally.\nstats: Snapshots endpoint/method settlement aggregates independently from query-ring eviction; clear resets them.\nA statistics snapshot with cumulative counts and histogram-derived quantiles; a closed collector throws CLOSED.\ndescribe: Reports the current monotonic clock sample, pause state, known endpoint descriptors, limits and loss counters.\nA collector description snapshot; descriptors preserve their element references. Closed collectors throw CLOSED.\nrecord: Starts one independent bounded recording ring. Pair its handle stop() with exportRecord to obtain an offline record; only one recording may be active.\nrecord.options: Optional maxEvents positive safe integer capacity, defaulting to the collector maxEvents. This bound is separate from main query retention.\nA handle with stop() returning its captured record, taking no arguments and stopping only its own active ring. Duplicate start throws RECORD_ACTIVE; a stale or repeated stop throws RECORD_NOT_ACTIVE; closure throws CLOSED.\nexportRecord: Encodes a stopped record through the standalone canonical record codec; this method does not change retained collector state.\nexportRecord.record: A captured record returned by a recording handle stop or importRecord.\nVersion-one NDJSON string; unsupported record input throws RECORD_FORMAT_INVALID with cause.\nimportRecord: Decodes offline text into an independent record; it does not append events to this collector or change its ring.\nimportRecord.text: Version-one text returned by exportRecord.\nA record with revived native errors and bytes, or RECORD_FORMAT_INVALID with cause.\npause: Snapshots current effective stage subscriptions and replaces them with an empty selection. Repeated pause is harmless; retained data remains queryable.\nCollection is paused without pausing business RPC; closed collectors throw CLOSED.\nresume: Restores the effective stage selection saved by the first pause. It does not revive a closed collector.\nCollection resumes with prior subscriptions; repeated resume is harmless and closed collectors throw CLOSED.\nclear: Clears main query retention, aggregate statistics and loss counters. Independent recording and watch windows keep their ownership.\nMain retention and statistics are empty; the collector stays open. Closed collectors throw CLOSED.\nclose: Idempotently removes subscriptions, releases retained storage and wakes pending watchers. It owns no serving Peer and does not close application endpoints.\nCollector storage and subscriptions are released synchronously; later operational calls reject with CLOSED.\nservice: IRuntimePeerProvide object installed by the caller on a separate serving Peer, commonly under a devtools namespace. Service endpoints are excluded using actual localEndpointId; the caller owns transport and Peer lifetime.",
+          "core": "emit: Consumes a reusable IRpcProbeEventView synchronously into retained columns; never retains the view. The installed observe flow forwards actual Host observation here.\nemit.view: IRpcProbeEventView issued by an installed Core emitter, valid only during its synchronous emit call; external type semantics remain in @migaia/rpc-host/plugins/probe.\nMetadata is retained or accounted as filtered, paused, closed or reentrant loss. Observation failures are reported instead of reaching the business caller.\nquery: Synchronously scans retained events with compiled filters. This is a snapshot rather than a subscription; limits are one through one thousand.\nquery.input: Optional query options; default cursor zero, limit one thousand and no field filters. Take subsequent afterSeq from the prior page nextSeq.\nA page with events, nextSeq and loss counters. Invalid inputs use INVALID_OPTION and closed collectors use CLOSED.\nwatch: Subscribes from first generator advancement to future filtered events. Batches contain at most 256 events and each watcher retains at most 64 queued batches; overflow is counted rather than blocking RPC.\nwatch.input: Optional query filters excluding afterSeq and limit; defaults to no filters. Use query separately for retained history.\nAn async generator of event batches; return wakes a pending local next and releases the watcher without needing Collector.close. Collector close instead wakes pending reads with CLOSED; remote stream cancellation ends its service watcher normally.\nstats: Snapshots endpoint/method settlement aggregates independently from query-ring eviction; clear resets them.\nA statistics snapshot with cumulative counts and histogram-derived quantiles; a closed collector throws CLOSED.\ndescribe: Reports the current monotonic clock sample, pause state, known endpoint descriptors, limits and loss counters.\nA collector description snapshot; descriptors preserve their element references. Closed collectors throw CLOSED.\nrecord: Starts one independent bounded recording ring. Pair its handle stop() with exportRecord to obtain an offline record; only one recording may be active.\nrecord.options: Optional maxEvents positive safe integer capacity, defaulting to the collector maxEvents. This bound is separate from main query retention.\nA handle with stop() returning its captured record, taking no arguments and stopping only its own active ring. Duplicate start throws RECORD_ACTIVE; a stale or repeated stop throws RECORD_NOT_ACTIVE; closure throws CLOSED.\nexportRecord: Encodes a stopped record through the standalone canonical record codec; this method does not change retained collector state.\nexportRecord.record: A captured record returned by a recording handle stop or importRecord.\nVersion-one NDJSON string; unsupported record input throws RECORD_FORMAT_INVALID with cause.\nimportRecord: Decodes offline text into an independent record; it does not append events to this collector or change its ring.\nimportRecord.text: Version-one text returned by exportRecord.\nA record with revived native errors and bytes, or RECORD_FORMAT_INVALID with cause.\npause: Snapshots current effective stage subscriptions and replaces them with an empty selection. Repeated pause is harmless; retained data remains queryable.\nCollection is paused without pausing business RPC; closed collectors throw CLOSED.\nresume: Restores the effective stage selection saved by the first pause. It does not revive a closed collector.\nCollection resumes with prior subscriptions; repeated resume is harmless and closed collectors throw CLOSED.\nclear: Clears main query retention, aggregate statistics and loss counters. Independent recording and watch windows keep their ownership.\nMain retention and statistics are empty; the collector stays open. Closed collectors throw CLOSED.\nclose: Idempotently removes subscriptions, releases retained storage and wakes pending watchers. It owns no serving Peer and does not close application endpoints.\nCollector storage and subscriptions are released synchronously; later operational calls reject with CLOSED.\nservice: Nested IRpcProvide object installed explicitly on a separate authorized Host; the application owns that serving connection and its cleanup.",
           "advanced": "Observe endpoint traffic locally and serve a separate diagnostics connection without owning business transports.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -957,7 +791,7 @@
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import type { IRpcDevtools } from '@migaia/rpc-plugin-devtools'\n\nexport function readPage(collector: IRpcDevtools, afterSeq: number) {\n  const page = collector.query({ afterSeq, limit: 100, stages: ['message'] })\n  return { events: page.events, cursor: page.nextSeq, loss: page.counters }\n}"
+            "import { devtoolsPlugin, type IRpcDevtools } from '@migaia/rpc-plugin-devtools'\nimport type { IRpcHost } from '@migaia/rpc-host'\n\nexport const tools = devtoolsPlugin({\n  stages: ['message', 'peer', 'carrier'],\n  capture: ['message'],\n  redact: () => ({ redacted: true }),\n  maxEvents: 2000,\n  maxContentBytes: 1024 * 1024,\n  onError: (error) => console.error(error)\n})\n\nexport function readPage(collector: IRpcDevtools, afterSeq: number) {\n  const page = collector.query({ afterSeq, limit: 100, stages: ['message'] })\n  return { events: page.events, cursor: page.nextSeq, loss: page.counters }\n}\n\nexport function exposeDiagnostics(host: IRpcHost) {\n  host.provide({ diagnostics: tools.collector.service })\n}"
           ],
           "members": [
             {
@@ -1108,17 +942,17 @@
               "name": "service",
               "kind": "property",
               "optional": false,
-              "signature": "readonly service: IRuntimePeerProvide;",
+              "signature": "readonly service: IRpcProvide;",
               "description": "Nested provide object; wire content is hidden unless exposeContent is true.",
               "parameterDetails": [],
-              "returns": "IRuntimePeerProvide"
+              "returns": "IRpcProvide"
             }
           ],
           "composes": ["IRpcProbe"],
           "aliasOf": "IRpcDevtools",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IRpcDevtools = IRpcProbe & Readonly<{ /** * Consume a reusable Core view now; metadata is copied, nested error/content/detail retain * references. */ emit(view: IRpcProbeEventView): void; /** Read retained history after a sequence cursor; locally captured content is available. */ query(input?: IRpcDevtoolsQuery): IRpcDevtoolsPage; /** * A local iterator return wakes its pending next and releases only that watch, not the * Collector. First next subscribes to future events; query reads history. Batches contain at * most 256 events with 64 queued batches and a loss count. Collector close rejects pending next * with CLOSED rather than leaving it suspended. */ watch(input?: Omit<IRpcDevtoolsQuery, 'afterSeq' | 'limit'>): AsyncGenerator<IRpcDevtoolsWatchBatch>; /** Snapshot cumulative eligible message statistics; ring eviction does not reset them. */ stats(): IRpcDevtoolsStats; /** * Read the current monotonic clock, descriptors, limits and counter snapshot; rejects after * close. */ describe(): IRpcDevtoolsDescribe; /** * Start the sole independent recording; maxEvents defaults to the main capacity, and stop * consumes this handle. */ record(options?: Readonly<{ maxEvents?: number; }>): Readonly<{ stop(): IRpcDevtoolsRecord; }>; /** Pure NDJSON encoding, without persistence or an open-collector requirement. */ exportRecord(record: IRpcDevtoolsRecord): string; /** Pure decoding, without ingesting events into this collector; usable after close. */ importRecord(text: string): IRpcDevtoolsRecord; /** Temporarily remove current stages and save their selection; repeated pause is harmless. */ pause(): void; /** Restore the saved selection, without reviving a closed collector. */ resume(): void; /** * Reset the main ring, statistics and counters, retaining sequence progress and record/watch * ownership. */ clear(): void; /** Synchronously retire storage and wake watches; idempotent, without closing any serving Peer. */ close(): void; /** Nested provide object; wire content is hidden unless exposeContent is true. */ readonly service: IRuntimePeerProvide; }>;"
+            "export type IRpcDevtools = IRpcProbe & Readonly<{ /** * Consume a reusable Core view now; metadata is copied, nested error/content/detail retain * references. */ emit(view: IRpcProbeEventView): void; /** Read retained history after a sequence cursor; locally captured content is available. */ query(input?: IRpcDevtoolsQuery): IRpcDevtoolsPage; /** * A local iterator return wakes its pending next and releases only that watch, not the * Collector. First next subscribes to future events; query reads history. Batches contain at * most 256 events with 64 queued batches and a loss count. Collector close rejects pending next * with CLOSED rather than leaving it suspended. */ watch(input?: Omit<IRpcDevtoolsQuery, 'afterSeq' | 'limit'>): AsyncGenerator<IRpcDevtoolsWatchBatch>; /** Snapshot cumulative eligible message statistics; ring eviction does not reset them. */ stats(): IRpcDevtoolsStats; /** * Read the current monotonic clock, descriptors, limits and counter snapshot; rejects after * close. */ describe(): IRpcDevtoolsDescribe; /** * Start the sole independent recording; maxEvents defaults to the main capacity, and stop * consumes this handle. */ record(options?: Readonly<{ maxEvents?: number; }>): Readonly<{ stop(): IRpcDevtoolsRecord; }>; /** Pure NDJSON encoding, without persistence or an open-collector requirement. */ exportRecord(record: IRpcDevtoolsRecord): string; /** Pure decoding, without ingesting events into this collector; usable after close. */ importRecord(text: string): IRpcDevtoolsRecord; /** Temporarily remove current stages and save their selection; repeated pause is harmless. */ pause(): void; /** Restore the saved selection, without reviving a closed collector. */ resume(): void; /** * Reset the main ring, statistics and counters, retaining sequence progress and record/watch * ownership. */ clear(): void; /** Synchronously retire storage and wake watches; idempotent, without closing any serving Peer. */ close(): void; /** Nested provide object; wire content is hidden unless exposeContent is true. */ readonly service: IRpcProvide; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -1148,7 +982,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "emit: Consumes a Core-owned reusable IRpcProbeEventView synchronously into retained columns; never keeps the view itself. Installed emitters call it through the Host probe option or the devtools plugin.\nemit.view: IRpcProbeEventView issued by an installed Core emitter, valid only during its synchronous emit call; external type semantics remain in @migaia/rpc-host/probe.\nMetadata is retained or accounted as filtered, paused, closed or reentrant loss. Observation failures are reported instead of reaching the business caller.\nquery: Synchronously scans retained events with compiled filters. This is a snapshot rather than a subscription; limits are one through one thousand.\nquery.input: Optional query options; default cursor zero, limit one thousand and no field filters. Take subsequent afterSeq from the prior page nextSeq.\nA page with events, nextSeq and loss counters. Invalid inputs use INVALID_OPTION and closed collectors use CLOSED.\nwatch: Subscribes from first generator advancement to future filtered events. Batches contain at most 256 events and each watcher retains at most 64 queued batches; overflow is counted rather than blocking RPC.\nwatch.input: Optional query filters excluding afterSeq and limit; defaults to no filters. Use query separately for retained history.\nAn async generator of event batches; return wakes a pending local next and releases the watcher without needing Collector.close. Collector close instead wakes pending reads with CLOSED; remote stream cancellation ends its service watcher normally.\nstats: Snapshots endpoint/method settlement aggregates independently from query-ring eviction; clear resets them.\nA statistics snapshot with cumulative counts and histogram-derived quantiles; a closed collector throws CLOSED.\ndescribe: Reports the current monotonic clock sample, pause state, known endpoint descriptors, limits and loss counters.\nA collector description snapshot; descriptors preserve their element references. Closed collectors throw CLOSED.\nrecord: Starts one independent bounded recording ring. Pair its handle stop() with exportRecord to obtain an offline record; only one recording may be active.\nrecord.options: Optional maxEvents positive safe integer capacity, defaulting to the collector maxEvents. This bound is separate from main query retention.\nA handle with stop() returning its captured record, taking no arguments and stopping only its own active ring. Duplicate start throws RECORD_ACTIVE; a stale or repeated stop throws RECORD_NOT_ACTIVE; closure throws CLOSED.\nexportRecord: Encodes a stopped record through the standalone canonical record codec; this method does not change retained collector state.\nexportRecord.record: A captured record returned by a recording handle stop or importRecord.\nVersion-one NDJSON string; unsupported record input throws RECORD_FORMAT_INVALID with cause.\nimportRecord: Decodes offline text into an independent record; it does not append events to this collector or change its ring.\nimportRecord.text: Version-one text returned by exportRecord.\nA record with revived native errors and bytes, or RECORD_FORMAT_INVALID with cause.\npause: Snapshots current effective stage subscriptions and replaces them with an empty selection. Repeated pause is harmless; retained data remains queryable.\nCollection is paused without pausing business RPC; closed collectors throw CLOSED.\nresume: Restores the effective stage selection saved by the first pause. It does not revive a closed collector.\nCollection resumes with prior subscriptions; repeated resume is harmless and closed collectors throw CLOSED.\nclear: Clears main query retention, aggregate statistics and loss counters. Independent recording and watch windows keep their ownership.\nMain retention and statistics are empty; the collector stays open. Closed collectors throw CLOSED.\nclose: Idempotently removes subscriptions, releases retained storage and wakes pending watchers. It owns no serving Peer and does not close application endpoints.\nCollector storage and subscriptions are released synchronously; later operational calls reject with CLOSED.\nservice: IRuntimePeerProvide object installed by the caller on a separate serving Peer, commonly under a devtools namespace. Service endpoints are excluded using actual localEndpointId; the caller owns transport and Peer lifetime."
+              "content": "emit: Consumes a reusable IRpcProbeEventView synchronously into retained columns; never retains the view. The installed observe flow forwards actual Host observation here.\nemit.view: IRpcProbeEventView issued by an installed Core emitter, valid only during its synchronous emit call; external type semantics remain in @migaia/rpc-host/plugins/probe.\nMetadata is retained or accounted as filtered, paused, closed or reentrant loss. Observation failures are reported instead of reaching the business caller.\nquery: Synchronously scans retained events with compiled filters. This is a snapshot rather than a subscription; limits are one through one thousand.\nquery.input: Optional query options; default cursor zero, limit one thousand and no field filters. Take subsequent afterSeq from the prior page nextSeq.\nA page with events, nextSeq and loss counters. Invalid inputs use INVALID_OPTION and closed collectors use CLOSED.\nwatch: Subscribes from first generator advancement to future filtered events. Batches contain at most 256 events and each watcher retains at most 64 queued batches; overflow is counted rather than blocking RPC.\nwatch.input: Optional query filters excluding afterSeq and limit; defaults to no filters. Use query separately for retained history.\nAn async generator of event batches; return wakes a pending local next and releases the watcher without needing Collector.close. Collector close instead wakes pending reads with CLOSED; remote stream cancellation ends its service watcher normally.\nstats: Snapshots endpoint/method settlement aggregates independently from query-ring eviction; clear resets them.\nA statistics snapshot with cumulative counts and histogram-derived quantiles; a closed collector throws CLOSED.\ndescribe: Reports the current monotonic clock sample, pause state, known endpoint descriptors, limits and loss counters.\nA collector description snapshot; descriptors preserve their element references. Closed collectors throw CLOSED.\nrecord: Starts one independent bounded recording ring. Pair its handle stop() with exportRecord to obtain an offline record; only one recording may be active.\nrecord.options: Optional maxEvents positive safe integer capacity, defaulting to the collector maxEvents. This bound is separate from main query retention.\nA handle with stop() returning its captured record, taking no arguments and stopping only its own active ring. Duplicate start throws RECORD_ACTIVE; a stale or repeated stop throws RECORD_NOT_ACTIVE; closure throws CLOSED.\nexportRecord: Encodes a stopped record through the standalone canonical record codec; this method does not change retained collector state.\nexportRecord.record: A captured record returned by a recording handle stop or importRecord.\nVersion-one NDJSON string; unsupported record input throws RECORD_FORMAT_INVALID with cause.\nimportRecord: Decodes offline text into an independent record; it does not append events to this collector or change its ring.\nimportRecord.text: Version-one text returned by exportRecord.\nA record with revived native errors and bytes, or RECORD_FORMAT_INVALID with cause.\npause: Snapshots current effective stage subscriptions and replaces them with an empty selection. Repeated pause is harmless; retained data remains queryable.\nCollection is paused without pausing business RPC; closed collectors throw CLOSED.\nresume: Restores the effective stage selection saved by the first pause. It does not revive a closed collector.\nCollection resumes with prior subscriptions; repeated resume is harmless and closed collectors throw CLOSED.\nclear: Clears main query retention, aggregate statistics and loss counters. Independent recording and watch windows keep their ownership.\nMain retention and statistics are empty; the collector stays open. Closed collectors throw CLOSED.\nclose: Idempotently removes subscriptions, releases retained storage and wakes pending watchers. It owns no serving Peer and does not close application endpoints.\nCollector storage and subscriptions are released synchronously; later operational calls reject with CLOSED.\nservice: Nested IRpcProvide object installed explicitly on a separate authorized Host; the application owns that serving connection and its cleanup."
             },
             {
               "id": "advanced-usage",
@@ -1157,7 +991,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-plugin-devtools/dist/collector-types.d.ts:IRpcDevtools:export type IRpcDevtools = IRpcProbe & Readonly<{ /** * Consume a reusable Core view now; metadata is copied, nested error/content/detail retain * references. */ emit(view: IRpcProbeEventView): void; /** Read retained history after a sequence cursor; locally captured content is available. */ query(input?: IRpcDevtoolsQuery): IRpcDevtoolsPage; /** * A local iterator return wakes its pending next and releases only that watch, not the * Collector. First next subscribes to future events; query reads history. Batches contain at * most 256 events with 64 queued batches and a loss count. Collector close rejects pending next * with CLOSED rather than leaving it suspended. */ watch(input?: Omit<IRpcDevtoolsQuery, 'afterSeq' | 'limit'>): AsyncGenerator<IRpcDevtoolsWatchBatch>; /** Snapshot cumulative eligible message statistics; ring eviction does not reset them. */ stats(): IRpcDevtoolsStats; /** * Read the current monotonic clock, descriptors, limits and counter snapshot; rejects after * close. */ describe(): IRpcDevtoolsDescribe; /** * Start the sole independent recording; maxEvents defaults to the main capacity, and stop * consumes this handle. */ record(options?: Readonly<{ maxEvents?: number; }>): Readonly<{ stop(): IRpcDevtoolsRecord; }>; /** Pure NDJSON encoding, without persistence or an open-collector requirement. */ exportRecord(record: IRpcDevtoolsRecord): string; /** Pure decoding, without ingesting events into this collector; usable after close. */ importRecord(text: string): IRpcDevtoolsRecord; /** Temporarily remove current stages and save their selection; repeated pause is harmless. */ pause(): void; /** Restore the saved selection, without reviving a closed collector. */ resume(): void; /** * Reset the main ring, statistics and counters, retaining sequence progress and record/watch * ownership. */ clear(): void; /** Synchronously retire storage and wake watches; idempotent, without closing any serving Peer. */ close(): void; /** Nested provide object; wire content is hidden unless exposeContent is true. */ readonly service: IRuntimePeerProvide; }>;",
+          "identity": "packages/rpc-plugin-devtools/dist/collector-types.d.ts:IRpcDevtools:export type IRpcDevtools = IRpcProbe & Readonly<{ /** * Consume a reusable Core view now; metadata is copied, nested error/content/detail retain * references. */ emit(view: IRpcProbeEventView): void; /** Read retained history after a sequence cursor; locally captured content is available. */ query(input?: IRpcDevtoolsQuery): IRpcDevtoolsPage; /** * A local iterator return wakes its pending next and releases only that watch, not the * Collector. First next subscribes to future events; query reads history. Batches contain at * most 256 events with 64 queued batches and a loss count. Collector close rejects pending next * with CLOSED rather than leaving it suspended. */ watch(input?: Omit<IRpcDevtoolsQuery, 'afterSeq' | 'limit'>): AsyncGenerator<IRpcDevtoolsWatchBatch>; /** Snapshot cumulative eligible message statistics; ring eviction does not reset them. */ stats(): IRpcDevtoolsStats; /** * Read the current monotonic clock, descriptors, limits and counter snapshot; rejects after * close. */ describe(): IRpcDevtoolsDescribe; /** * Start the sole independent recording; maxEvents defaults to the main capacity, and stop * consumes this handle. */ record(options?: Readonly<{ maxEvents?: number; }>): Readonly<{ stop(): IRpcDevtoolsRecord; }>; /** Pure NDJSON encoding, without persistence or an open-collector requirement. */ exportRecord(record: IRpcDevtoolsRecord): string; /** Pure decoding, without ingesting events into this collector; usable after close. */ importRecord(text: string): IRpcDevtoolsRecord; /** Temporarily remove current stages and save their selection; repeated pause is harmless. */ pause(): void; /** Restore the saved selection, without reviving a closed collector. */ resume(): void; /** * Reset the main ring, statistics and counters, retaining sequence progress and record/watch * ownership. */ clear(): void; /** Synchronously retire storage and wake watches; idempotent, without closing any serving Peer. */ close(): void; /** Nested provide object; wire content is hidden unless exposeContent is true. */ readonly service: IRpcProvide; }>;",
           "guidance": [],
           "usageScore": 14,
           "configuration": [],
@@ -1167,8 +1001,8 @@
           "name": "IRpcDevtoolsErrorCode",
           "kind": "type",
           "signature": "export type IRpcDevtoolsErrorCode = (typeof RpcDevtoolsErrorCode)[keyof typeof RpcDevtoolsErrorCode];",
-          "declarationLine": 21,
-          "source": "packages/rpc-plugin-devtools/dist/error-code.d.ts",
+          "declarationLine": 506,
+          "source": "packages/rpc-contract/dist/error-code.d.ts",
           "purpose": "Value union of the devtools semantic code table; classify with RPC_DEVTOOLS_SOURCE and preserve original cause chains.",
           "core": "Value union of the devtools semantic code table; classify with RPC_DEVTOOLS_SOURCE and preserve original cause chains.",
           "advanced": "",
@@ -1222,7 +1056,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-plugin-devtools/dist/error-code.d.ts:IRpcDevtoolsErrorCode:export type IRpcDevtoolsErrorCode = (typeof RpcDevtoolsErrorCode)[keyof typeof RpcDevtoolsErrorCode];",
+          "identity": "@migaia/rpc-plugin-devtools:packages/rpc-contract/dist/error-code.d.ts:IRpcDevtoolsErrorCode:export type IRpcDevtoolsErrorCode = (typeof RpcDevtoolsErrorCode)[keyof typeof RpcDevtoolsErrorCode];",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -1232,10 +1066,10 @@
           "name": "IRpcDevtoolsOptions",
           "kind": "type",
           "signature": "export type IRpcDevtoolsOptions = Readonly<{ /** Defaults to message and peer; pass physical stages here or use setStages() to enable them. */ stages?: readonly IRpcProbeStageName[]; /** Explicit captured stages, default none; capture must be a subset of subscribed stages. */ capture?: readonly IRpcProbeStageName[]; /** Optional synchronous projection; throws report REDACT_FAILED and discard this content. */ redact?(stage: RpcProbeStage, content: unknown): unknown; /** Optional exact method selection compiled by Core; omission observes all eligible methods. */ methods?: readonly string[]; /** Deterministic sampling ratio, default 1; greater than 0 and at most 1. */ sample?: number; /** Main-ring capacity, default 10000; positive safe integer within JavaScript array limits. */ maxEvents?: number; /** Main-ring budget, default 8388608 bytes, allowing 0; record/watch references are independent. */ maxContentBytes?: number; /** Reader name capacity, default 65536; positive bounded safe integer, with overflow counted. */ maxInterned?: number; /** Defaults to false; only true permits captured content across the remote service boundary. */ exposeContent?: boolean; /** Optional diagnostic sink; omission or a throwing sink uses Core's host failure route. */ onError?(error: unknown): void; }>;",
-          "declarationLine": 6,
+          "declarationLine": 7,
           "source": "packages/rpc-plugin-devtools/dist/collector-types.d.ts",
           "purpose": "Construction policies for a bounded collector; capacities are captured once, while effective subscriptions can later change through the Core probe setStages API.",
-          "core": "methods: Exact method path filter supplied by the application; methodless control events remain observable.\nNo method filter; all method-bearing events are eligible.\nsample: Deterministic sampling fraction in the interval greater than zero through one, using sender/message identity rather than random per-stage decisions.\n`1`, retaining all eligible identities before retention limits.\ncapture: Explicit stages whose content may be read. Select names from RpcProbeStageName in @migaia/rpc-host/probe and keep capture within initially subscribed stages.\nNo content capture; observation remains metadata-only.\nredact: Synchronous callback receiving numeric RpcProbeStage and captured content. Return the retained replacement; never retain the reusable event view. Collector executes it during ingestion, log executes it at the canonical emitter.\nredact.stage: Numeric stage from RpcProbeStage supplied by the observing emitter.\nredact.content: Captured caller-owned content reference from an explicitly enabled stage.\nReplacement content, including undefined to discard it. Synchronous throws discard content and are reported; asynchronous redaction is not awaited.\nNo redactor; explicitly captured content retains its original reference.\nSet it when explicitly captured content contains data that should not be retained or logged. Return a replacement, or `undefined` to discard content. Omitting it retains the captured reference unchanged; a thrown error is reported and that content is dropped.\nonError: Synchronous observer receiving an original diagnostic error. Return nothing; observer failures are reported through the host failure channel without changing the RPC operation.\nonError.error: Original collector observation failure supplied by its owning component.\nNo result is used and no asynchronous work is awaited by this callback boundary.\nUses the Core hostRethrowReporter failure channel.\nSet this callback when a diagnostic failure should reach the application monitor. It receives collector observation failures without replacing a business result. Omission keeps the documented host reporter for the owning component.\nstages: Initial stage names from Core RpcProbeStageName; physical stages require explicit selection and selection alone never enables capture.\n`[\"message\", \"peer\"]`; physical stages are not subscribed.\nLogical request, response and control observations.\nConnection lifecycle observations.\nEnvelope observations; explicit opt-in.\nEncoded content observations; explicit opt-in.\nFrame observations; explicit opt-in.\nProtected content observations; explicit opt-in.\nPhysical carrier observations; explicit opt-in.\nUse `message` for logical calls and `peer` for connection lifecycle. Add `envelope`, `encoded`, `frame`, `protected` or `carrier` to inspect those physical processing steps. Omission selects message and peer; choosing a stage never enables content capture by itself.\nmaxEvents: Main-ring positive safe integer capacity, at most the JavaScript array length limit; newest events evict oldest events.\n10000 retained events in the main ring.\nmaxContentBytes: Nonnegative safe integer budget for content retained by the main query ring; independent recording/watch references and opaque-object sizing are outside this byte total. It is not a process-wide memory ceiling; excess content drops while metadata stays.\n8388608 bytes, or eight mebibytes.\nmaxInterned: Positive safe integer reader name-table bound, at most floor(sqrt(MAX_SAFE_INTEGER)) minus one; overflow uses an explicit marker.\n65536 names; ingestion itself retains raw string references.\nexposeContent: Allows captured content across the portable service boundary; local query and stopped recordings already use their retained captured content.\nfalse; service responses omit captured content.",
+          "core": "methods: Exact method path filter supplied by the application; methodless control events remain observable.\nNo method filter; all method-bearing events are eligible.\nsample: Deterministic sampling fraction in the interval greater than zero through one, using sender/message identity rather than random per-stage decisions.\n`1`, retaining all eligible identities before retention limits.\ncapture: Explicit stages whose content may be read. Select names from RpcProbeStageName in @migaia/rpc-host/plugins/probe and keep capture within initially subscribed stages.\nNo content capture; observation remains metadata-only.\nredact: Synchronous callback receiving numeric RpcProbeStage and captured content. Return the retained replacement; never retain the reusable event view. Collector executes it during ingestion, log executes it at the canonical emitter.\nredact.stage: Numeric stage from RpcProbeStage supplied by the observing emitter.\nredact.content: Captured caller-owned content reference from an explicitly enabled stage.\nReplacement content, including undefined to discard it. Synchronous throws discard content and are reported; asynchronous redaction is not awaited.\nNo redactor; explicitly captured content retains its original reference.\nSet it when explicitly captured content contains data that should not be retained or logged. Return a replacement, or `undefined` to discard content. Omitting it retains the captured reference unchanged; a thrown error is reported and that content is dropped.\nonError: Synchronous observer receiving an original diagnostic error. Return nothing; observer failures are reported through the host failure channel without changing the RPC operation.\nonError.error: Original collector observation failure supplied by its owning component.\nNo result is used and no asynchronous work is awaited by this callback boundary.\nUses the Core hostRethrowReporter failure channel.\nSet this callback when a diagnostic failure should reach the application monitor. It receives collector observation failures without replacing a business result. Omission keeps the documented host reporter for the owning component.\nstages: Initial stage names from Core RpcProbeStageName; physical stages require explicit selection and selection alone never enables capture.\n`[\"message\", \"peer\"]`; physical stages are not subscribed.\nLogical request, response and control observations.\nConnection lifecycle observations.\nEnvelope observations; explicit opt-in.\nEncoded content observations; explicit opt-in.\nFrame observations; explicit opt-in.\nProtected content observations; explicit opt-in.\nPhysical carrier observations; explicit opt-in.\nUse `message` for logical calls and `peer` for connection lifecycle. Add `envelope`, `encoded`, `frame`, `protected` or `carrier` to inspect those physical processing steps. Omission selects message and peer; choosing a stage never enables content capture by itself.\nmaxEvents: Main-ring positive safe integer capacity, at most the JavaScript array length limit; newest events evict oldest events.\n10000 retained events in the main ring.\nmaxContentBytes: Nonnegative safe integer budget for content retained by the main query ring; independent recording/watch references and opaque-object sizing are outside this byte total. It is not a process-wide memory ceiling; excess content drops while metadata stays.\n8388608 bytes, or eight mebibytes.\nmaxInterned: Positive safe integer reader name-table bound, at most floor(sqrt(MAX_SAFE_INTEGER)) minus one; overflow uses an explicit marker.\n65536 names; ingestion itself retains raw string references.\nexposeContent: Allows captured content across the portable service boundary; local query and stopped recordings already use their retained captured content.\nfalse; service responses omit captured content.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -1386,7 +1220,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "methods: Exact method path filter supplied by the application; methodless control events remain observable.\nNo method filter; all method-bearing events are eligible.\nsample: Deterministic sampling fraction in the interval greater than zero through one, using sender/message identity rather than random per-stage decisions.\n`1`, retaining all eligible identities before retention limits.\ncapture: Explicit stages whose content may be read. Select names from RpcProbeStageName in @migaia/rpc-host/probe and keep capture within initially subscribed stages.\nNo content capture; observation remains metadata-only.\nredact: Synchronous callback receiving numeric RpcProbeStage and captured content. Return the retained replacement; never retain the reusable event view. Collector executes it during ingestion, log executes it at the canonical emitter.\nredact.stage: Numeric stage from RpcProbeStage supplied by the observing emitter.\nredact.content: Captured caller-owned content reference from an explicitly enabled stage.\nReplacement content, including undefined to discard it. Synchronous throws discard content and are reported; asynchronous redaction is not awaited.\nNo redactor; explicitly captured content retains its original reference.\nSet it when explicitly captured content contains data that should not be retained or logged. Return a replacement, or `undefined` to discard content. Omitting it retains the captured reference unchanged; a thrown error is reported and that content is dropped.\nonError: Synchronous observer receiving an original diagnostic error. Return nothing; observer failures are reported through the host failure channel without changing the RPC operation.\nonError.error: Original collector observation failure supplied by its owning component.\nNo result is used and no asynchronous work is awaited by this callback boundary.\nUses the Core hostRethrowReporter failure channel.\nSet this callback when a diagnostic failure should reach the application monitor. It receives collector observation failures without replacing a business result. Omission keeps the documented host reporter for the owning component.\nstages: Initial stage names from Core RpcProbeStageName; physical stages require explicit selection and selection alone never enables capture.\n`[\"message\", \"peer\"]`; physical stages are not subscribed.\nLogical request, response and control observations.\nConnection lifecycle observations.\nEnvelope observations; explicit opt-in.\nEncoded content observations; explicit opt-in.\nFrame observations; explicit opt-in.\nProtected content observations; explicit opt-in.\nPhysical carrier observations; explicit opt-in.\nUse `message` for logical calls and `peer` for connection lifecycle. Add `envelope`, `encoded`, `frame`, `protected` or `carrier` to inspect those physical processing steps. Omission selects message and peer; choosing a stage never enables content capture by itself.\nmaxEvents: Main-ring positive safe integer capacity, at most the JavaScript array length limit; newest events evict oldest events.\n10000 retained events in the main ring.\nmaxContentBytes: Nonnegative safe integer budget for content retained by the main query ring; independent recording/watch references and opaque-object sizing are outside this byte total. It is not a process-wide memory ceiling; excess content drops while metadata stays.\n8388608 bytes, or eight mebibytes.\nmaxInterned: Positive safe integer reader name-table bound, at most floor(sqrt(MAX_SAFE_INTEGER)) minus one; overflow uses an explicit marker.\n65536 names; ingestion itself retains raw string references.\nexposeContent: Allows captured content across the portable service boundary; local query and stopped recordings already use their retained captured content.\nfalse; service responses omit captured content."
+              "content": "methods: Exact method path filter supplied by the application; methodless control events remain observable.\nNo method filter; all method-bearing events are eligible.\nsample: Deterministic sampling fraction in the interval greater than zero through one, using sender/message identity rather than random per-stage decisions.\n`1`, retaining all eligible identities before retention limits.\ncapture: Explicit stages whose content may be read. Select names from RpcProbeStageName in @migaia/rpc-host/plugins/probe and keep capture within initially subscribed stages.\nNo content capture; observation remains metadata-only.\nredact: Synchronous callback receiving numeric RpcProbeStage and captured content. Return the retained replacement; never retain the reusable event view. Collector executes it during ingestion, log executes it at the canonical emitter.\nredact.stage: Numeric stage from RpcProbeStage supplied by the observing emitter.\nredact.content: Captured caller-owned content reference from an explicitly enabled stage.\nReplacement content, including undefined to discard it. Synchronous throws discard content and are reported; asynchronous redaction is not awaited.\nNo redactor; explicitly captured content retains its original reference.\nSet it when explicitly captured content contains data that should not be retained or logged. Return a replacement, or `undefined` to discard content. Omitting it retains the captured reference unchanged; a thrown error is reported and that content is dropped.\nonError: Synchronous observer receiving an original diagnostic error. Return nothing; observer failures are reported through the host failure channel without changing the RPC operation.\nonError.error: Original collector observation failure supplied by its owning component.\nNo result is used and no asynchronous work is awaited by this callback boundary.\nUses the Core hostRethrowReporter failure channel.\nSet this callback when a diagnostic failure should reach the application monitor. It receives collector observation failures without replacing a business result. Omission keeps the documented host reporter for the owning component.\nstages: Initial stage names from Core RpcProbeStageName; physical stages require explicit selection and selection alone never enables capture.\n`[\"message\", \"peer\"]`; physical stages are not subscribed.\nLogical request, response and control observations.\nConnection lifecycle observations.\nEnvelope observations; explicit opt-in.\nEncoded content observations; explicit opt-in.\nFrame observations; explicit opt-in.\nProtected content observations; explicit opt-in.\nPhysical carrier observations; explicit opt-in.\nUse `message` for logical calls and `peer` for connection lifecycle. Add `envelope`, `encoded`, `frame`, `protected` or `carrier` to inspect those physical processing steps. Omission selects message and peer; choosing a stage never enables content capture by itself.\nmaxEvents: Main-ring positive safe integer capacity, at most the JavaScript array length limit; newest events evict oldest events.\n10000 retained events in the main ring.\nmaxContentBytes: Nonnegative safe integer budget for content retained by the main query ring; independent recording/watch references and opaque-object sizing are outside this byte total. It is not a process-wide memory ceiling; excess content drops while metadata stays.\n8388608 bytes, or eight mebibytes.\nmaxInterned: Positive safe integer reader name-table bound, at most floor(sqrt(MAX_SAFE_INTEGER)) minus one; overflow uses an explicit marker.\n65536 names; ingestion itself retains raw string references.\nexposeContent: Allows captured content across the portable service boundary; local query and stopped recordings already use their retained captured content.\nfalse; service responses omit captured content."
             },
             {
               "id": "advanced-usage",
@@ -1405,10 +1239,10 @@
           "name": "RPC_DEVTOOLS_SOURCE",
           "kind": "const",
           "signature": "export declare const RPC_DEVTOOLS_SOURCE = \"rpc.devtools\";",
-          "declarationLine": 2,
-          "source": "packages/rpc-plugin-devtools/dist/error-code.d.ts",
-          "purpose": "Identifies failures created by RPC Devtools. When handling a caught error, compare its source with RPC_DEVTOOLS_SOURCE, then compare code with RpcDevtoolsErrorCode to select a response. Configuration failures remain TypeError instances; failures involving a diagnostic session use Error. You do not need to parse the message to classify them.",
-          "core": "Identifies failures created by RPC Devtools. When handling a caught error, compare its source with RPC_DEVTOOLS_SOURCE, then compare code with RpcDevtoolsErrorCode to select a response. Configuration failures remain TypeError instances; failures involving a diagnostic session use Error. You do not need to parse the message to classify them.",
+          "declarationLine": 483,
+          "source": "packages/rpc-contract/dist/error-code.d.ts",
+          "purpose": "Stable rpc.devtools source declared by @migaia/rpc-contract/error-code and re-exported here. Other RPC/native families retain their own source and code.",
+          "core": "Stable rpc.devtools source declared by @migaia/rpc-contract/error-code and re-exported here. Other RPC/native families retain their own source and code.",
           "advanced": "",
           "parameters": ["This const declaration has no parameters."],
           "parameterDetails": [],
@@ -1418,7 +1252,7 @@
           "examples": [],
           "members": [],
           "composes": [],
-          "aliasOf": "ERROR_SOURCE",
+          "aliasOf": "RPC_DEVTOOLS_ERROR_SOURCE",
           "exportPath": ".",
           "overloadSignatures": ["export declare const RPC_DEVTOOLS_SOURCE = \"rpc.devtools\";"],
           "overloadParameterDetails": [[]],
@@ -1429,7 +1263,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Identifies failures created by RPC Devtools. When handling a caught error, compare its source with RPC_DEVTOOLS_SOURCE, then compare code with RpcDevtoolsErrorCode to select a response. Configuration failures remain TypeError instances; failures involving a diagnostic session use Error. You do not need to parse the message to classify them."
+              "content": "Stable rpc.devtools source declared by @migaia/rpc-contract/error-code and re-exported here. Other RPC/native families retain their own source and code."
             },
             {
               "id": "getting-started",
@@ -1449,7 +1283,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Identifies failures created by RPC Devtools. When handling a caught error, compare its source with RPC_DEVTOOLS_SOURCE, then compare code with RpcDevtoolsErrorCode to select a response. Configuration failures remain TypeError instances; failures involving a diagnostic session use Error. You do not need to parse the message to classify them."
+              "content": "Stable rpc.devtools source declared by @migaia/rpc-contract/error-code and re-exported here. Other RPC/native families retain their own source and code."
             },
             {
               "id": "advanced-usage",
@@ -1458,7 +1292,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-plugin-devtools/dist/error-code.d.ts:RPC_DEVTOOLS_SOURCE:export declare const RPC_DEVTOOLS_SOURCE = \"rpc.devtools\";",
+          "identity": "@migaia/rpc-plugin-devtools:packages/rpc-contract/dist/error-code.d.ts:RPC_DEVTOOLS_SOURCE:export declare const RPC_DEVTOOLS_SOURCE = \"rpc.devtools\";",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -1468,8 +1302,8 @@
           "name": "RpcDevtoolsErrorCode",
           "kind": "const",
           "signature": "export declare const RpcDevtoolsErrorCode: { /** Captured service data cannot be encoded; inspect cause or disable content exposure. */ readonly serviceResultInvalid: 'SERVICE_RESULT_INVALID'; /** Collector options violate their supported domain; fix the option before construction. */ readonly invalidOption: 'INVALID_OPTION'; /** Collector is closed; create a new instance rather than reviving retained resources. */ readonly closed: 'CLOSED'; /** A recording already owns the collector; stop it before starting another. */ readonly recordActive: 'RECORD_ACTIVE'; /** No recording remains active; start one before stopping it. */ readonly recordNotActive: 'RECORD_NOT_ACTIVE'; /** Record header or NDJSON is invalid; inspect cause and supply a version-1 record. */ readonly recordFormatInvalid: 'RECORD_FORMAT_INVALID'; /** Redaction failed; report the original cause and discard content (collector). */ readonly redactFailed: 'REDACT_FAILED'; };",
-          "declarationLine": 4,
-          "source": "packages/rpc-plugin-devtools/dist/error-code.d.ts",
+          "declarationLine": 489,
+          "source": "packages/rpc-contract/dist/error-code.d.ts",
           "purpose": "Stable semantic error vocabulary for options, collector lifecycle, recording and portable service conversion. Original causes remain reachable through native error chains.",
           "core": "serviceResultInvalid: Service result cannot become portable wire data; inspect the original conversion cause.\ninvalidOption: Collector options violate a supported domain; correct the supplied option.\nclosed: An operation uses a closed collector; create a live instance rather than reviving it.\nrecordActive: A recording is already active on the collector; stop it before starting another.\nrecordNotActive: Stop has no matching active recording, including repeated stop or a stale handle.\nrecordFormatInvalid: Record header, event, bytes or error graph fails the frozen version-one format boundary.\nredactFailed: Collector redaction throws; content is discarded and the original cause is reported.",
           "advanced": "",
@@ -1587,7 +1421,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-plugin-devtools/dist/error-code.d.ts:RpcDevtoolsErrorCode:export declare const RpcDevtoolsErrorCode: { /** Captured service data cannot be encoded; inspect cause or disable content exposure. */ readonly serviceResultInvalid: 'SERVICE_RESULT_INVALID'; /** Collector options violate their supported domain; fix the option before construction. */ readonly invalidOption: 'INVALID_OPTION'; /** Collector is closed; create a new instance rather than reviving retained resources. */ readonly closed: 'CLOSED'; /** A recording already owns the collector; stop it before starting another. */ readonly recordActive: 'RECORD_ACTIVE'; /** No recording remains active; start one before stopping it. */ readonly recordNotActive: 'RECORD_NOT_ACTIVE'; /** Record header or NDJSON is invalid; inspect cause and supply a version-1 record. */ readonly recordFormatInvalid: 'RECORD_FORMAT_INVALID'; /** Redaction failed; report the original cause and discard content (collector). */ readonly redactFailed: 'REDACT_FAILED'; };",
+          "identity": "@migaia/rpc-plugin-devtools:packages/rpc-contract/dist/error-code.d.ts:RpcDevtoolsErrorCode:export declare const RpcDevtoolsErrorCode: { /** Captured service data cannot be encoded; inspect cause or disable content exposure. */ readonly serviceResultInvalid: 'SERVICE_RESULT_INVALID'; /** Collector options violate their supported domain; fix the option before construction. */ readonly invalidOption: 'INVALID_OPTION'; /** Collector is closed; create a new instance rather than reviving retained resources. */ readonly closed: 'CLOSED'; /** A recording already owns the collector; stop it before starting another. */ readonly recordActive: 'RECORD_ACTIVE'; /** No recording remains active; start one before stopping it. */ readonly recordNotActive: 'RECORD_NOT_ACTIVE'; /** Record header or NDJSON is invalid; inspect cause and supply a version-1 record. */ readonly recordFormatInvalid: 'RECORD_FORMAT_INVALID'; /** Redaction failed; report the original cause and discard content (collector). */ readonly redactFailed: 'REDACT_FAILED'; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],

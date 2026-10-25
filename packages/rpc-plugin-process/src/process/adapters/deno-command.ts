@@ -1,5 +1,7 @@
-import { ERROR_SOURCE as RPC_PROCESS_ERROR_SOURCE } from '../error-code.js'
-import { IpcReporterContext } from '@migaia/rpc-host/plugin'
+/** Acquire native Deno child streams and exit facts; Session and supervision own higher policy. */
+import { RPC_PROCESS_ERROR_SOURCE } from '@migaia/rpc-contract/error-code'
+import { createProcessError } from '../error.js'
+import { IpcReporterContext } from '@migaia/rpc-host/sdk'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { CapabilityLevel, StandardCapability, type TerminationMode } from '@migaia/supervision'
@@ -9,14 +11,14 @@ import {
   type IProcessHandle,
   type IProcessLauncher
 } from '@migaia/supervision/process'
-import { encodeRpcStreamFrame } from '@migaia/rpc-contract/framing/stream'
-import { RPC_CORE_ERROR_SOURCE, RpcCoreErrorCode } from '@migaia/rpc-host'
+import { encodeRpcStreamFrame } from '@migaia/rpc-host/sdk'
+import { RPC_ENDPOINT_ERROR_SOURCE, RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { receiveAdapterBootstrap } from '../bootstrap.js'
-import { RpcProcessErrorCode } from '../error-code.js'
+import { RpcProcessErrorCode } from '@migaia/rpc-contract/error-code'
 
 import { RpcProcessErrorText } from '../error-text.js'
 import type { IProcessByteChannel } from '../types.js'
-import type { IRuntimePeerIdentity } from '@migaia/rpc-host/plugin'
+import type { IRpcMemberIdentity } from '@migaia/rpc-host/sdk'
 import { createAdapterProcessLaunch } from '../launch.js'
 import { createAdapterWebByteIO } from '../web-byte-stream.js'
 import type { IProcessRuntimeBootstrapOptions } from '../runtime-bootstrap.js'
@@ -67,7 +69,7 @@ function denoRuntime(): IDenoRuntime {
   const runtime: unknown = Reflect.get(globalThis, 'Deno')
   if (!runtime || typeof runtime !== 'object' || !('Command' in runtime))
     throw attachErrorIdentity(new TypeError(RpcProcessErrorText.optionsInvalid), {
-      source: RPC_CORE_ERROR_SOURCE,
+      source: RPC_ENDPOINT_ERROR_SOURCE,
       code: RpcCoreErrorCode.invalidConfig
     })
   return runtime as IDenoRuntime
@@ -100,7 +102,7 @@ export type IDenoProcessHandle = IProcessHandle &
     /** Present only when both standard-input and standard-output directions are channels. */
     channel?: IProcessByteChannel
     /** Safe runtime identity present only when the original launch prepared runtime bootstrap. */
-    runtimeApiIdentity?: IRuntimePeerIdentity
+    runtimeApiIdentity?: IRpcMemberIdentity
   }>
 
 /**
@@ -262,7 +264,7 @@ export function createDenoProcessLauncher(
       /** Deno has no supported dedicated bootstrap fd in this adapter. */
       if (spec.bootstrap?.via === 'fd')
         throw attachErrorIdentity(new TypeError(RpcProcessErrorText.optionsInvalid), {
-          source: RPC_CORE_ERROR_SOURCE,
+          source: RPC_ENDPOINT_ERROR_SOURCE,
           code: RpcCoreErrorCode.invalidConfig
         })
       let child: IDenoChild
@@ -277,14 +279,7 @@ export function createDenoProcessLauncher(
           stderr: spec.stdio.stderr === 'ignore' ? 'null' : 'piped'
         }).spawn()
       } catch (error) {
-        throw ((originalCause: unknown) =>
-          attachErrorIdentity(
-            new Error(
-              RpcProcessErrorText.connectFailed,
-              originalCause === undefined ? undefined : { cause: originalCause }
-            ),
-            { source: RPC_PROCESS_ERROR_SOURCE, code: RpcProcessErrorCode.connectFailed }
-          ))(error)
+        throw createProcessError(RpcProcessErrorCode.connectFailed, error)
       }
       /** One generation owns all post-spawn callbacks and the exact original native exit receipt. */
       return new DenoProcessGeneration(child, spec, context, launch, runtimeBootstrap).open()
@@ -309,7 +304,7 @@ export function openProcessStdioChannel(
 ): Promise<Readonly<{ channel: IProcessByteChannel; bootstrap?: Uint8Array }>> {
   if (options.bootstrap === 'fd')
     throw attachErrorIdentity(new TypeError(RpcProcessErrorText.optionsInvalid), {
-      source: RPC_CORE_ERROR_SOURCE,
+      source: RPC_ENDPOINT_ERROR_SOURCE,
       code: RpcCoreErrorCode.invalidConfig
     })
   const runtime = denoRuntime()

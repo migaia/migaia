@@ -1,7 +1,13 @@
-import type { IAdapterEventEmitterMessagePort } from '@migaia/rpc-host/plugin'
+/** Native EventEmitter operations preserve transfer and exact listener identities. */
+export type IThreadNodePort = Readonly<{
+  postMessage(message: unknown, transfer?: readonly unknown[]): void
+  on(event: string, listener: (...args: any[]) => void): unknown
+  off(event: string, listener: (...args: any[]) => void): unknown
+  listenerCount(event: 'message'): number
+}>
 
 /** A held parent port supplies its real physical close and reader-count operations. */
-export type IThreadParentPort = IAdapterEventEmitterMessagePort &
+export type IThreadParentPort = IThreadNodePort &
   Readonly<{
     /** Observe this actual parent port's close event once. */
     once(event: 'close', listener: () => void): unknown

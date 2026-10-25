@@ -18,4 +18,5 @@ export function reportFailure(error: unknown, onError?: (error: unknown) => void
 export function enqueueBatch(callback: () => void): void {
   ;(globalThis as unknown as IReportHost).queueMicrotask(callback)
 }
-import { hostRethrowReporter, IpcReporterContext } from '@migaia/rpc-host/probe'
+import { hostRethrowReporter } from '@migaia/utils/promise'
+import { IpcReporterContext } from '@migaia/rpc-host/sdk'

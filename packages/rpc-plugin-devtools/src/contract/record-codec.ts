@@ -1,9 +1,10 @@
+/** Converts offline records and byte tags to NDJSON, delegating error graphs to Contract. */
 import {
   deserializeRpcError,
   normalizeRpcSerializedError,
   serializeRpcError
 } from '@migaia/rpc-contract/errors'
-import { RpcDevtoolsErrorCode } from '../error-code.js'
+import { RpcDevtoolsErrorCode } from '@migaia/rpc-contract/error-code'
 import { RpcDevtoolsErrorText } from '../error-text.js'
 import { identifyDevtoolsError } from '../errors.js'
 import {
@@ -17,16 +18,19 @@ import {
 
 /** Convert captured bytes to the record's Base64 text without changing their backing. */
 function encodeBytes(bytes: Uint8Array): string {
-  /** The result belongs to this one offline conversion; collection never executes this loop. */
-  let text = ''
+  /** Each fixed quartet is retained once until the final offline representation is joined. */
+  const quartets: string[] = []
   for (let i = 0; i < bytes.length; i += 3) {
     /** At most three input bytes form one canonical Base64 quartet. */
     const word = (bytes[i] << 16) | ((bytes[i + 1] ?? 0) << 8) | (bytes[i + 2] ?? 0)
-    text += Base64Alphabet[(word >>> 18) & 63] + Base64Alphabet[(word >>> 12) & 63]
-    text += i + 1 < bytes.length ? Base64Alphabet[(word >>> 6) & 63] : '='
-    text += i + 2 < bytes.length ? Base64Alphabet[word & 63] : '='
+    quartets.push(
+      Base64Alphabet[(word >>> 18) & 63] +
+        Base64Alphabet[(word >>> 12) & 63] +
+        (i + 1 < bytes.length ? Base64Alphabet[(word >>> 6) & 63] : '=') +
+        (i + 2 < bytes.length ? Base64Alphabet[word & 63] : '=')
+    )
   }
-  return text
+  return quartets.join('')
 }
 
 /** Decode only record v1's canonical padded spelling; malformed tags retain a native cause. */

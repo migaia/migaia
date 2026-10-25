@@ -496,44 +496,54 @@ const domainInventory = Object.freeze([
     source: 'tray'
   },
   {
-    file: 'packages/rpc-contract/src/contract/error-code.ts',
-    source: 'rpc.contract'
+    file: 'packages/rpc-contract/src/error-code.ts',
+    source: 'rpc.contract',
+    table: 'RpcContractErrorCode'
   },
   {
-    file: 'packages/rpc-contract/src/contract/framing/jsonrpc/error-code.ts',
-    source: 'rpc.contract.jsonrpc'
+    file: 'packages/rpc-contract/src/error-code.ts',
+    source: 'rpc.contract.jsonrpc',
+    table: 'JsonRpcBridgeErrorCode'
   },
   {
-    file: 'packages/rpc-host/src/core/error-code.ts',
-    source: 'rpc.endpoint'
+    file: 'packages/rpc-contract/src/error-code.ts',
+    source: 'rpc.endpoint',
+    table: 'RpcCoreErrorCode'
   },
   {
-    file: 'packages/rpc-host/src/remote/error-code.ts',
-    source: 'rpc.remote'
+    file: 'packages/rpc-contract/src/error-code.ts',
+    source: 'rpc.remote',
+    table: 'RpcRemoteLayerErrorCode'
   },
   {
-    file: 'packages/rpc-plugin-process/src/error-code.ts',
-    source: 'rpc.transport.process'
+    file: 'packages/rpc-contract/src/error-code.ts',
+    source: 'rpc.transport.process',
+    table: 'RpcProcessErrorCode'
   },
   {
-    file: 'packages/rpc-plugin-thread/src/error-code.ts',
-    source: 'rpc.transport.thread'
+    file: 'packages/rpc-contract/src/error-code.ts',
+    source: 'rpc.transport.thread',
+    table: 'RpcThreadErrorCode'
   },
   {
-    file: 'packages/rpc-plugin-browser/src/error-code.ts',
-    source: 'rpc.transport.browser'
+    file: 'packages/rpc-contract/src/error-code.ts',
+    source: 'rpc.transport.browser',
+    table: 'RpcBrowserErrorCode'
   },
   {
-    file: 'packages/rpc-plugin-coroutines/src/error-code.ts',
-    source: 'rpc.transport.coroutine'
+    file: 'packages/rpc-contract/src/error-code.ts',
+    source: 'rpc.transport.coroutine',
+    table: 'RpcCoroutineErrorCode'
   },
   {
-    file: 'packages/rpc-plugin-pool/src/error-code.ts',
-    source: 'rpc.pool'
+    file: 'packages/rpc-contract/src/error-code.ts',
+    source: 'rpc.pool',
+    table: 'RpcPoolErrorCode'
   },
   {
-    file: 'packages/rpc-plugin-devtools/src/error-code.ts',
-    source: 'rpc.devtools'
+    file: 'packages/rpc-contract/src/error-code.ts',
+    source: 'rpc.devtools',
+    table: 'RpcDevtoolsErrorCode'
   },
   {
     file: 'packages/store-light/src/error-code.ts',
@@ -621,12 +631,35 @@ test('source domains agreed runtime domain inventory', () => {
 })
 
 /** Per-owner cases cannot be hidden by the first failing collection-level assertion. */
-for (const { file, source } of domainInventory)
-  test(`source domains agreed owner ${file} declares its fixed domain`, () => {
+for (const { file, source, table } of domainInventory)
+  test(`source domains agreed owner ${file} ${table ?? 'default'} declares its fixed domain`, () => {
     /** A swapped pair of valid domains is still a migration error. */
     const declaration = readFileSync(join(repositoryRoot, file), 'utf8')
     assert.ok(
-      declaration.includes(`export const ERROR_SOURCE = '${source}'`),
+      table
+        ? declaration.includes(`@error-source ${source}\n`) &&
+            declaration.includes(`export const ${table} = {`)
+        : declaration.includes(`export const ERROR_SOURCE = '${source}'`),
       `SOURCE_DOMAIN_OWNER: ${file}`
     )
+  })
+
+/** RPC adapters consume the contract's families instead of declaring a second code owner. */
+for (const packageName of [
+  'rpc-host',
+  'rpc-plugin-process',
+  'rpc-plugin-thread',
+  'rpc-plugin-browser',
+  'rpc-plugin-coroutines',
+  'rpc-plugin-pool',
+  'rpc-plugin-devtools'
+])
+  test(`source domains ${packageName} retains only an empty local code table`, () => {
+    /** The repository root-file contract remains present without owning any semantic pair. */
+    const declaration = readFileSync(
+      join(repositoryRoot, 'packages', packageName, 'src/error-code.ts'),
+      'utf8'
+    )
+    assert.match(declaration, /export const [A-Za-z]+LocalErrorCode = \{\} as const/u)
+    assert.doesNotMatch(declaration, /[A-Za-z]\w*\s*:\s*'[A-Z][A-Z0-9_]*'/u)
   })

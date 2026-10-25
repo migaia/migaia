@@ -39,7 +39,7 @@ import { runtimeSources, runtimeTestHost } from '../../../rpc-host/test/runtime-
 import { RpcNativeBinaryKind, RpcBinaryProfile, RpcBinaryStorage } from '@migaia/rpc-contract/wire'
 import { readAuthenticationEnvelope } from '../../../rpc-host/dist/core/middleware/authentication-envelope.js'
 import * as authenticationReplay from '../../../rpc-host/dist/core/internal/authentication-replay.js'
-import { RpcCoreErrorCode } from '../../../rpc-host/dist/core/errors.js'
+import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { createRuntimeApiEndpoint } from '../../../rpc-host/dist/core/runtime-api-endpoint.js'
 import { codec } from '../../../rpc-host/dist/core/middleware/codec.js'
 import { framer } from '../../../rpc-host/dist/core/middleware/framer.js'

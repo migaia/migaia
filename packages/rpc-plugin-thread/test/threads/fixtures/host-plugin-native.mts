@@ -5,7 +5,7 @@ import { systemScheduler } from '@migaia/utils/scheduler'
 import {
   createWebThreadLauncher,
   createWebThreadChannelFactory
-} from '../../../dist/threads/adapters/web.js'
+} from '../../../dist/threads/web-launcher.js'
 
 if (await isThreadChild()) {
   await createRpcHost({
@@ -29,16 +29,20 @@ if (await isThreadChild()) {
         spawn: {
           entry: new URL(import.meta.url),
           launcher,
-          channelFactory: createWebThreadChannelFactory({ scheduler: systemScheduler }),
+          channelFactory: createWebThreadChannelFactory({
+            scheduler: systemScheduler,
+            report: (error) => reports.push(error)
+          }),
           supervisor: { stop: { reapTimeoutMs: 2000 } }
         }
       })
     ],
     report: (error) => reports.push(error)
   })
-  const value = await host.request('echo', 'native-worker')
+  const value = await host.thread.request('echo', 'native-worker')
   const values: unknown[] = []
-  for await (const item of host.stream('sequence') as AsyncIterable<unknown>) values.push(item)
+  for await (const item of host.thread.stream('sequence') as AsyncIterable<unknown>)
+    values.push(item)
   await host.close()
   await host.close()
   console.log(

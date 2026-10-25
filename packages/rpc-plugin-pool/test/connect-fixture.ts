@@ -1,111 +1,139 @@
-import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
+/** Repeat real process-connect acquisitions over original Node byte streams and SDK codecs. */
+import { PassThrough } from 'node:stream'
+import { createRpcHost, type IRpcHostOptions } from '@migaia/rpc-host'
 import {
-  createAdapterDeployment,
   defineTransportPlugin,
-  type IAdapterDeploymentContext
-} from '@migaia/rpc-host/plugin'
-import { memoryServer } from '../../rpc-host/test/host/fixture.js'
+  createRpcByteCarrier,
+  type IRpcNativePoolMember
+} from '@migaia/rpc-host/sdk'
+import { processPlugin } from '@migaia/rpc-plugin-process'
+import { createAdapterChildStdio } from '../../rpc-plugin-process/dist/process/node-io.js'
+import { pool } from '../dist/index.js'
+import { observingPool } from './pool-fixture.js'
 
-/** Per-acquisition inputs observe real Host operations without replacing their results. */
+/** Original acquisition and cleanup gates remain outside real native constructors. */
 type IRepeatableConnectOptions = Readonly<{
   beforeOpen?(index: number): void | Promise<void>
-  closeErrors?: readonly (unknown | undefined)[]
-  provide?(index: number): Parameters<typeof createRpcHost>[0]['provide']
+  closeErrors?: readonly unknown[]
+  provide?(index: number): IRpcHostOptions['provide']
 }>
-/** The fixture wraps only the actual native source channel returned by the canonical server. */
-type IRepeatableChannel = Awaited<ReturnType<ReturnType<typeof memoryServer>['open']>>
 
-/** Own the fixture's one close observation around an actual channel and remote Host. */
-class RepeatableFixtureChannel {
-  /** The channel retains its own physical cleanup semantics. */
-  #channel: IRepeatableChannel
-  /** The actual remote Host closes after its physical source. */
-  #remote: IRpcHost<unknown>
-  /** Acquisition order identifies which original native source is closing. */
-  #index: number
-  /** Shared observation records actual close ordering without owning production lifecycle. */
-  #closeOrder: number[]
-  /** This case may reject only after its real owned resources close. */
-  #options: IRepeatableConnectOptions
-  /** Repeated close returns the same complete cleanup receipt. */
-  #closing: Promise<void> | undefined
-  /** The source keeps every original operation except this case-owned close observation. */
-  readonly value: IRepeatableChannel
-  /** Retain the exact channel and Host already acquired by the fixture. */
-  constructor(
-    channel: IRepeatableChannel,
-    remote: IRpcHost<unknown>,
-    index: number,
-    closeOrder: number[],
-    options: IRepeatableConnectOptions
-  ) {
-    this.#channel = channel
-    this.#remote = remote
-    this.#index = index
-    this.#closeOrder = closeOrder
-    this.#options = options
-    this.value = { ...channel, close: this.#close }
-  }
-  /** Share the exact original teardown completion across reentrant and repeated close. */
-  #close = (): Promise<void> => (this.#closing ??= this.#release())
-  /** Observe close before releasing the original channel and genuine remote Host in order. */
-  async #release(): Promise<void> {
-    this.#closeOrder.push(this.#index)
-    await this.#channel.close()
-    await this.#remote.close()
-    if (this.#options.closeErrors?.[this.#index] !== undefined)
-      throw this.#options.closeErrors[this.#index]
-  }
-}
-
-/** Own one repeatable source fixture's acquisitions and remote Host observations. */
+/** The fixture owns genuine native byte endpoints and actual opposite public Hosts. */
 class RepeatableConnectFixture {
-  /** Caller-selected acquisition behavior remains local to this fixture instance. */
-  #options: IRepeatableConnectOptions
-  /** Count actual source openings rather than mocked member-facade calls. */
+  /** Only case data and cold provider factories are retained. */
+  readonly #options: IRepeatableConnectOptions
+  /** Actual attempted native resource openings are observed before their optional gates. */
   #opens = 0
-  /** Real remote Hosts remain accessible to the fixture's existing business assertions. */
-  #remotes: IRpcHost<unknown>[] = []
-  /** Close-order evidence is separate from logical pool membership. */
-  #closeOrder: number[] = []
-  /** Preserve the original fixture surface and its actual transport authoring recipe. */
-  readonly value
-  /** Create the cold recipe before any acquisition can observe this fixture. */
+  /** Successful native dial order identifies the independently accepted opposite Host. */
+  #dials = 0
+  /** Opposite public hosts are observations, never substitutes for native resource state. */
+  readonly remotes: Readonly<{ self: Readonly<{ instanceId: string }>; close(): Promise<void> }>[] =
+    []
+  /** Exact native identity selects the corresponding opposite Host without a per-close scan. */
+  readonly #remoteIds = new Map<
+    string,
+    Readonly<{ self: Readonly<{ instanceId: string }>; close(): Promise<void> }>
+  >()
+  /** Public diagnostic receipts remain available instead of swallowing native failures. */
+  readonly reports: unknown[] = []
+  /** Real source cleanup order is recorded at the existing native member boundary. */
+  readonly closeOrder: number[] = []
+  /** Only actual native member resources are exposed to isolation assertions. */
+  readonly members: IRpcNativePoolMember[] = []
+  /** Store options without creating a stream, supervisor, codec or Host. */
   constructor(options: IRepeatableConnectOptions) {
     this.#options = options
-    this.value = {
-      transport: defineTransportPlugin({
-        name: 'repeatable-connect',
-        mode: 'connect',
-        deployment: createAdapterDeployment({ open: this.#open })
-      }),
-      remotes: this.#remotes,
-      closeOrder: this.#closeOrder,
-      opens: () => this.#opens
-    }
   }
-  /** Open independent genuine remote Hosts and canonical raw channels for every acquisition. */
-  #open = async (context: IAdapterDeploymentContext) => {
-    /** This source number belongs to one original native acquisition. */
-    const index = this.#opens++
-    await this.#options.beforeOpen?.(index)
-    /** A fresh server identity isolates this acquisition's accepted endpoint. */
-    const server = memoryServer(`member-${index}`, `member-${crypto.randomUUID()}`)
-    const remote = await createRpcHost({
-      ...server.options,
+  /** Every installed feature reuses the actual process-connect native constructor. */
+  transport(feature = pool({ size: 1 })) {
+    return processPlugin({
+      connect: {
+        target: {
+          kind: 'connect',
+          address: 'native-byte-fixture',
+          token: 'fixture-credential',
+          dial: this.#dial
+        }
+      },
+      features: [
+        observingPool(feature, this.members, {
+          beforeOpen: this.#options.beforeOpen,
+          closeErrors: this.#options.closeErrors,
+          closeOrder: this.closeOrder,
+          afterClose: this.#afterClose,
+          opened: () => {
+            this.#opens++
+          }
+        })
+      ],
+      report: this.#report
+    })
+  }
+  /** Native and provider diagnostics remain available without a second transport error policy. */
+  readonly #report = (error: unknown): void => {
+    this.reports.push(error)
+  }
+
+  /** Counter ownership remains the real native feature acquisition port. */
+  opens(): number {
+    return this.#opens
+  }
+  /** Native Node streams carry actual framed bytes; the same canonical codec handles both ends. */
+  readonly #dial = async () => {
+    const index = this.#dials++
+    const toRemote = new PassThrough()
+    const fromRemote = new PassThrough()
+    const local = createAdapterChildStdio({ stdout: fromRemote, stdin: toRemote })
+    const remote = createAdapterChildStdio({ stdout: toRemote, stdin: fromRemote })
+    const opening = createRpcHost({
+      self: { name: `member-${index}`, instanceId: `member-${crypto.randomUUID()}` },
+      report: this.#report,
       provide: this.#options.provide?.(index) ?? {
         identity: () => index,
         echo: (value: unknown) => value
-      }
+      },
+      plugins: [
+        defineTransportPlugin({
+          name: `native-remote-${index}`,
+          namespace: 'process',
+          open: async (context) => {
+            const session = context.attach(
+              createRpcByteCarrier({
+                io: remote,
+                report: this.#report,
+                id: `remote-${crypto.randomUUID()}`
+              })
+            )
+            await session.ready
+            return { dispose: session.close }
+          }
+        })
+      ]
     })
-    this.#remotes.push(remote)
-    const channel = await server.open(context)
-    return new RepeatableFixtureChannel(channel, remote, index, this.#closeOrder, this.#options)
-      .value
+    void opening.then(
+      (host) => {
+        this.remotes.push(host)
+        this.#remoteIds.set(host.self.instanceId, host)
+      },
+      (error) => this.reports.push(error)
+    )
+    return local
+  }
+  /** Release only the opposite Host belonging to this exact native connection. */
+  readonly #afterClose = async (instanceId: string | undefined): Promise<void> => {
+    if (!instanceId) return
+    const host = this.#remoteIds.get(instanceId)
+    this.#remoteIds.delete(instanceId)
+    await host?.close()
+  }
+
+  /** Close opposite original Hosts after their corresponding native resources have drained. */
+  async close(): Promise<void> {
+    await Promise.all(this.remotes.map((host) => host.close()))
   }
 }
 
-/** Create an independent observation owner for actual repeatable canonical source acquisitions. */
+/** Existing repeatable-connect assertions share actual native recipes, without an adapter grammar. */
 export function repeatableConnect(options: IRepeatableConnectOptions = {}) {
-  return new RepeatableConnectFixture(options).value
+  return new RepeatableConnectFixture(options)
 }

@@ -1,5 +1,7 @@
 /** Stable Browser Peer admission and cleanup text belongs to the public Peer owner. */
 export const BrowserPeerErrorText = {
+  /** Original native message-source startup timeout text remains public across protocol revisions. */
+  handshakeNotAcknowledged: 'Thread data bootstrap was not acknowledged',
   /** An explicit origin keeps the Window Peer from inheriting a different realm's default. */
   windowOriginRequired: 'Browser Peer window connection requires an explicit origin',
   /** Core's one-to-one Peer contract excludes partial reliability and unordered RTC delivery. */

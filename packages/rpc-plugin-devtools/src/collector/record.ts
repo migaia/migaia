@@ -1,3 +1,4 @@
+/** Materializes an owned recording ring at stop and releases its retained event references. */
 import {
   RpcDevtoolsRecordFormat,
   type IRpcDevtoolsRecord,

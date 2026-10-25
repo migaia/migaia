@@ -1,55 +1,47 @@
-import { describe, expect, it } from 'vitest'
-import { RpcRouteProfile } from '@migaia/rpc-contract'
-import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
-import { createComposedEndpoint } from '../../dist/core/composed.js'
-import { connect } from '../../dist/core/middleware/connect.js'
-import { streamRoots } from './fixture.js'
+/** Wrong-credit input reaches the original stream consumer through actual public Hosts. */
+import { describe, expect, it, vi } from 'vitest'
+import { RpcWireKind, type IRpcSemanticFrame } from '@migaia/rpc-contract/protocol'
+import { connectedCoreHosts } from '../host/core-fixture.js'
 
 /** Wrong-credit item must fail only its pending caller pull. */
 describe('streaming credit order', () => {
   it('rejects an item with a sequence different from the pending pull', async () => {
-    const [clientTransport, peer] = createMemoryTransportPair()
-    const client = await createComposedEndpoint(
+    /** Both native subscriptions and the provider stream are genuine owners. */
+    const fixture = await connectedCoreHosts(
+      {},
       {
-        id: 'client',
-        transport: clientTransport,
-        targetIds: ['server'],
-        middlewares: [connect({ transport: clientTransport })]
-      },
-      streamRoots()
-    )
-    const peerSend = (id: string, event: string, seq: number, value?: string): void => {
-      void peer.send({
-        kind: 'stream',
-        id,
-        data: {
-          route: {
-            profile: RpcRouteProfile,
-            type: 'stream',
-            applicationVersion: '1.0',
-            senderId: 'server',
-            targetId: 'client',
-            sentAt: 0
-          },
-          payload: { event, seq, ...(value === undefined ? {} : { value }) }
+        count: function* () {
+          yield 'wrong'
         }
-      })
-    }
-    const unsubscribe = peer.subscribe(({ data }) => {
-      const frame = data as { kind?: string; id?: string; data?: { payload?: { event?: string } } }
-      if (frame.kind === 'request' && frame.id) peerSend(frame.id, 'open', 0)
-      if (frame.kind === 'stream' && frame.id && frame.data?.payload?.event === 'pull')
-        peerSend(frame.id, 'item', 2, 'wrong')
+      },
+      () => undefined
+    )
+    /** Keep the original receiverless native writer; no parallel transport or stream owner exists. */
+    const write = fixture.pair[1].write
+    /** Change only the original invalid sequence at the same physical item handoff. */
+    const fault = vi.spyOn(fixture.pair[1], 'write').mockImplementation((frame, options) => {
+      if (frame.kind === 'message') {
+        /** The fixture's existing identity codec exposes its actual semantic frame. */
+        const message = frame.data as IRpcSemanticFrame
+        if (message.kind === RpcWireKind.stream && message.stream.event === 'item')
+          return write(
+            { ...frame, data: { ...message, stream: { ...message.stream, seq: 2 } } },
+            options
+          )
+      }
+      return write(frame, options)
     })
     try {
-      await expect(client.stream.open('server', 'count', null).next()).rejects.toMatchObject({
+      /** The actual single accepted provider selects the ordinary public iterator. */
+      const stream = fixture.a.memory.stream('count', null) as AsyncIterableIterator<unknown>
+      await expect(stream.next()).rejects.toMatchObject({
         code: 'INVALID_STREAM',
         violation: 'seq',
         pointer: '/seq'
       })
     } finally {
-      unsubscribe()
-      await client.dispose()
+      fault.mockRestore()
+      await fixture.close()
     }
   })
 })

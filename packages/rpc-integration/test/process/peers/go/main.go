@@ -1,4 +1,4 @@
-// Native RPC peer for process-channel and conformance fixtures. It has no third-party dependencies.
+// Independent native RPC peer. Standard-library IO and one ordered JSON owner carry migaia.rpc/2.
 package main
 
 import (
@@ -9,11 +9,11 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"math"
 	"net"
 	"os"
 	"regexp"
-	"slices"
-	"sort"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -21,43 +21,67 @@ import (
 
 const maxFrameBytes = 16 * 1024 * 1024
 const maxHandshakeBytes = 65536
+const protocol = "migaia.rpc/2"
 
+var errProtocol = errors.New("PROTOCOL_INVALID")
+var errHandshakeInvalid = errors.New("HANDSHAKE_INVALID")
+var errHandshakeIncompatible = errors.New("HANDSHAKE_INCOMPATIBLE")
 var codecPattern = regexp.MustCompile(`^[a-z][a-z0-9.-]{0,31}$`)
-var capabilityPattern = regexp.MustCompile(`^[a-z][a-z0-9.-]*@[1-9][0-9]*$`)
+var extensionPattern = regexp.MustCompile(`^[a-z][a-z0-9.-]*@[1-9][0-9]*$`)
 var runtimePattern = regexp.MustCompile(`^[a-z][a-z0-9-]{0,31}$`)
-var errInvalidClose = errors.New("invalid close payload")
-var errHandshakeInvalid = errors.New("invalid handshake")
-var errHandshakeIncompatible = errors.New("incompatible handshake")
 
+// Lookup maps never determine serialized key order.
 type record = map[string]any
 
-type version struct {
-	Major int `json:"major"`
-	Minor int `json:"minor"`
+// orderedRecord stores each own field once and lends the same lookup to metadata admission.
+type orderedRecord struct {
+	// names retain the order supplied by the actual parser or constructor, without lexicographic sorting.
+	names []string
+	// values support O(1) field admission and business lookup on that same object.
+	values record
 }
 
-type offer struct {
-	Versions     []version `json:"versions"`
-	Codecs       []string  `json:"codecs"`
-	Capabilities []string  `json:"capabilities"`
-	Peer         record    `json:"peer"`
+// object constructs an actual wire object from explicitly ordered name/value pairs.
+func object(pairs ...any) *orderedRecord {
+	value := &orderedRecord{values: record{}}
+	for index := 0; index < len(pairs); index += 2 {
+		value.set(pairs[index].(string), pairs[index+1])
+	}
+	return value
 }
 
-type agreement struct {
-	Major        int
-	Minor        int
-	Codec        string
-	Capabilities []string
+// set replaces a duplicate JSON own field without changing its first insertion position.
+func (value *orderedRecord) set(name string, member any) {
+	if _, exists := value.values[name]; !exists {
+		value.names = append(value.names, name)
+	}
+	value.values[name] = member
 }
+
+// field borrows an existing lookup; validators do not project or clone the business graph.
+func field(value any) record {
+	switch item := value.(type) {
+	case *orderedRecord:
+		if item != nil {
+			return item.values
+		}
+	case record:
+		return item
+	}
+	return nil
+}
+func entries(value any) []any                     { result, _ := value.([]any); return result }
+func stringField(value record, key string) string { result, _ := value[key].(string); return result }
+func integerField(value record, key string) int   { result, _ := asInt(value[key]); return result }
 
 // readFrame checks the unsigned payload length before allocation. EOF between frames ends a session.
-func readFrame(reader io.Reader) ([]byte, error) {
+func readFrame(reader io.Reader, maximum int) ([]byte, error) {
 	var header [4]byte
 	if _, err := io.ReadFull(reader, header[:]); err != nil {
 		return nil, err
 	}
 	length := binary.BigEndian.Uint32(header[:])
-	if length == 0 || length > maxFrameBytes {
+	if length == 0 || length > uint32(maximum) {
 		return nil, errors.New("invalid frame length")
 	}
 	payload := make([]byte, int(length))
@@ -93,561 +117,459 @@ func writeAll(writer io.Writer, payload []byte) error {
 	return nil
 }
 
-// receive decodes one framed JSON record; error strings never contain untrusted input.
-func receive(reader io.Reader, handshake bool) (record, error) {
-	payload, err := readFrame(reader)
+// readBaselineBody retains the original bounded Content-Length accounting fixture, without RPC admission.
+func readBaselineBody(reader io.Reader) ([]byte, error) {
+	header := []byte{}
+	one := make([]byte, 1)
+	for !strings.HasSuffix(string(header), "\r\n\r\n") {
+		_, err := io.ReadFull(reader, one)
+		if err == io.EOF && len(header) == 0 {
+			return nil, io.EOF
+		}
+		if err != nil {
+			return nil, err
+		}
+		if len(header) >= 1024 {
+			return nil, errProtocol
+		}
+		header = append(header, one[0])
+	}
+	length, count := 0, 0
+	for _, line := range strings.Split(string(header), "\r\n") {
+		key, raw, ok := strings.Cut(line, ":")
+		if ok && strings.EqualFold(key, "content-length") {
+			count++
+			value, err := strconv.Atoi(strings.TrimSpace(raw))
+			if err != nil {
+				return nil, err
+			}
+			length = value
+		}
+	}
+	if count != 1 || length < 1 || length > maxFrameBytes {
+		return nil, errProtocol
+	}
+	body := make([]byte, length)
+	_, err := io.ReadFull(reader, body)
+	return body, err
+}
+
+// runJSONBaseline parses and writes each payload once through the same ordered JSON owner as native RPC.
+func runJSONBaseline(reader io.Reader, writer io.Writer) error {
+	for {
+		body, err := readBaselineBody(reader)
+		if err == io.EOF {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		value, err := readJSON(body)
+		if err != nil {
+			return err
+		}
+		if field(value)["xrtReverse"] == true {
+			value, err = baselineReverse(reader, writer, field(value))
+			if err != nil {
+				return err
+			}
+		}
+		if err = writeBaselineJSON(writer, value); err != nil {
+			return err
+		}
+	}
+}
+
+// writeBaselineJSON lends the sole ordered encoder to both ordinary echo and the original bare reverse loop.
+func writeBaselineJSON(writer io.Writer, value any) error {
+	body, err := appendJSON(nil, value)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	if handshake && len(payload) > maxHandshakeBytes {
-		return nil, errors.New("invalid handshake length")
+	if _, err = fmt.Fprintf(writer, "Content-Length: %d\r\n\r\n", len(body)); err != nil {
+		return err
 	}
-	if !utf8.Valid(payload) {
-		return nil, errors.New("invalid UTF-8 payload")
+	return writeAll(writer, body)
+}
+
+// baselineReverse keeps the existing bounded accounting algorithm without dispatching any RPC profile or method.
+func baselineReverse(reader io.Reader, writer io.Writer, control record) (any, error) {
+	count := integerField(control, "count")
+	payload, ok := control["payload"].(string)
+	if !ok || count < 1 || count > 10000 {
+		return nil, errProtocol
+	}
+	latencies := make([]any, 0, count)
+	start := time.Now()
+	for index := 0; index < count; index++ {
+		round := time.Now()
+		if err := writeBaselineJSON(writer, payload); err != nil {
+			return nil, err
+		}
+		body, err := readBaselineBody(reader)
+		if err != nil {
+			return nil, err
+		}
+		reply, err := readJSON(body)
+		if err != nil || reply != payload {
+			return nil, errProtocol
+		}
+		latencies = append(latencies, time.Since(round).Nanoseconds())
+	}
+	return object("xrtReceipt", true, "calls", count, "elapsedNs", time.Since(start).Nanoseconds(), "latenciesNs", latencies, "clientInFlightPeak", 1, "burstSize", 1), nil
+}
+
+// readJSON uses the existing native decoder once; token order is retained instead of sorted by maps.
+func readJSON(payload []byte) (any, error) {
+	if !utf8.Valid(payload) || !validUnicodeEscapes(payload) {
+		return nil, errProtocol
 	}
 	decoder := json.NewDecoder(bytes.NewReader(payload))
 	decoder.UseNumber()
-	var value record
-	if err := decoder.Decode(&value); err != nil || value == nil {
-		return nil, errors.New("invalid JSON record")
+	value, err := decodeValue(decoder, 0)
+	if err != nil {
+		return nil, errProtocol
 	}
-	var extra any
-	if decoder.Decode(&extra) != io.EOF {
-		return nil, errors.New("trailing JSON value")
+	if _, err := decoder.Token(); err != io.EOF {
+		return nil, errProtocol
 	}
 	return value, nil
 }
 
-// send serializes a JSON record and applies the strict byte framing.
-func send(writer io.Writer, value record) error {
-	payload, err := json.Marshal(value)
+// decodeValue builds one ordered JSON graph directly from the standard decoder's tokens.
+func decodeValue(decoder *json.Decoder, depth int) (any, error) {
+	if depth > 128 {
+		return nil, errProtocol
+	}
+	token, err := decoder.Token()
 	if err != nil {
-		return errors.New("invalid outbound record")
+		return nil, errProtocol
+	}
+	switch item := token.(type) {
+	case json.Delim:
+		if item == '{' {
+			result := object()
+			for decoder.More() {
+				name, err := decoder.Token()
+				if err != nil {
+					return nil, errProtocol
+				}
+				key, ok := name.(string)
+				if !ok {
+					return nil, errProtocol
+				}
+				value, err := decodeValue(decoder, depth+1)
+				if err != nil {
+					return nil, err
+				}
+				result.set(key, value)
+			}
+			end, err := decoder.Token()
+			if err != nil || end != json.Delim('}') {
+				return nil, errProtocol
+			}
+			return result, nil
+		}
+		if item == '[' {
+			result := []any{}
+			for decoder.More() {
+				value, err := decodeValue(decoder, depth+1)
+				if err != nil {
+					return nil, err
+				}
+				result = append(result, value)
+			}
+			end, err := decoder.Token()
+			if err != nil || end != json.Delim(']') {
+				return nil, errProtocol
+			}
+			return result, nil
+		}
+		return nil, errProtocol
+	case json.Number:
+		number, err := strconv.ParseFloat(string(item), 64)
+		if err != nil || math.IsInf(number, 0) || math.IsNaN(number) {
+			return nil, errProtocol
+		}
+		return number, nil
+	default:
+		return token, nil
+	}
+}
+
+// appendString follows JSON.stringify's portable scalar escaping, without HTML or separator escaping.
+func appendString(output []byte, value string) ([]byte, error) {
+	if !utf8.ValidString(value) {
+		return nil, errProtocol
+	}
+	output = append(output, '"')
+	for _, char := range value {
+		switch char {
+		case '"', '\\':
+			output = append(output, '\\', byte(char))
+		case '\b':
+			output = append(output, `\b`...)
+		case '\f':
+			output = append(output, `\f`...)
+		case '\n':
+			output = append(output, `\n`...)
+		case '\r':
+			output = append(output, `\r`...)
+		case '\t':
+			output = append(output, `\t`...)
+		default:
+			if char < 0x20 {
+				const hex = "0123456789abcdef"
+				output = append(output, '\\', 'u', '0', '0', hex[byte(char)>>4], hex[byte(char)&15])
+			} else {
+				output = utf8.AppendRune(output, char)
+			}
+		}
+	}
+	return append(output, '"'), nil
+}
+
+// appendNumber preserves finite IEEE-754 values and JSON.stringify's decimal/exponent thresholds.
+func appendNumber(output []byte, value float64) ([]byte, error) {
+	if math.IsNaN(value) || math.IsInf(value, 0) {
+		return nil, errProtocol
+	}
+	if value == 0 {
+		return append(output, '0'), nil
+	}
+	format := byte('f')
+	absolute := math.Abs(value)
+	if absolute < 1e-6 || absolute >= 1e21 {
+		format = 'e'
+	}
+	text := strconv.FormatFloat(value, format, -1, 64)
+	text = strings.ReplaceAll(strings.ReplaceAll(text, "e+0", "e+"), "e-0", "e-")
+	return append(output, text...), nil
+}
+
+// appendJSON is the sole writer; no fallback map encoder silently sorts keys or copies the graph.
+func appendJSON(output []byte, value any) ([]byte, error) {
+	switch item := value.(type) {
+	case nil:
+		return append(output, "null"...), nil
+	case bool:
+		return strconv.AppendBool(output, item), nil
+	case string:
+		return appendString(output, item)
+	case float64:
+		return appendNumber(output, item)
+	case int:
+		return appendNumber(output, float64(item))
+	case int64:
+		return appendNumber(output, float64(item))
+	case *orderedRecord:
+		if item == nil {
+			return append(output, "null"...), nil
+		}
+		output = append(output, '{')
+		for index, name := range item.names {
+			if index > 0 {
+				output = append(output, ',')
+			}
+			var err error
+			output, err = appendString(output, name)
+			if err != nil {
+				return nil, err
+			}
+			output = append(output, ':')
+			output, err = appendJSON(output, item.values[name])
+			if err != nil {
+				return nil, err
+			}
+		}
+		return append(output, '}'), nil
+	case []any:
+		output = append(output, '[')
+		for index, member := range item {
+			if index > 0 {
+				output = append(output, ',')
+			}
+			var err error
+			output, err = appendJSON(output, member)
+			if err != nil {
+				return nil, err
+			}
+		}
+		return append(output, ']'), nil
+	}
+	return nil, errProtocol
+}
+
+// receive keeps the original native length and handshake ceilings before one semantic JSON parse.
+func receive(reader io.Reader, handshake bool) (*orderedRecord, error) {
+	maximum := maxFrameBytes
+	if handshake {
+		maximum = maxHandshakeBytes
+	}
+	payload, err := readFrame(reader, maximum)
+	if err != nil {
+		return nil, err
+	}
+	if handshake && len(payload) > maxHandshakeBytes {
+		return nil, errHandshakeInvalid
+	}
+	value, err := readJSON(payload)
+	result, ok := value.(*orderedRecord)
+	if err != nil || !ok {
+		return nil, errProtocol
+	}
+	return result, nil
+}
+
+// send writes the actual ordered object through the original length-frame owner.
+func send(writer io.Writer, value *orderedRecord) error {
+	payload, err := appendJSON(nil, value)
+	if err != nil {
+		return err
 	}
 	return writeFrame(writer, payload)
 }
 
-// asInt admits only nonnegative JSON integers in the protocol's safe integer domain.
+// asInt retains the existing nonnegative safe-integer metadata domain after native JSON number parsing.
 func asInt(value any) (int, bool) {
-	if integer, ok := value.(int); ok {
-		return integer, integer >= 0 && integer <= 9007199254740991
+	switch item := value.(type) {
+	case int:
+		return item, item >= 0 && item <= 9007199254740991
+	case float64:
+		return int(item), item >= 0 && item <= 9007199254740991 && math.Trunc(item) == item
 	}
-	number, ok := value.(json.Number)
-	if !ok || strings.ContainsAny(string(number), ".eE") {
-		return 0, false
-	}
-	parsed, err := number.Int64()
-	return int(parsed), err == nil && parsed >= 0 && parsed <= 9007199254740991
+	return 0, false
 }
 
-// asStrings checks ordered, unique, bounded protocol label lists.
-func asStrings(value any, max int, pattern *regexp.Regexp) ([]string, bool) {
-	items, ok := value.([]any)
-	if !ok || len(items) > max {
-		return nil, false
-	}
-	result := make([]string, 0, len(items))
-	for _, item := range items {
-		label, ok := item.(string)
-		if !ok || !pattern.MatchString(label) || slices.Contains(result, label) {
-			return nil, false
-		}
-		result = append(result, label)
-	}
-	return result, true
-}
-
-// parseHello validates one language-neutral hello without returning or logging its auth field.
-func parseHello(value record) (offer, error) {
-	if value["kind"] != "handshake" || value["step"] != "hello" {
-		return offer{}, errors.New("invalid hello")
-	}
-	if _, ok := value["protocol"].(string); !ok {
-		return offer{}, errors.New("invalid hello protocol")
-	}
-	versionsRaw, ok := value["versions"].([]any)
-	if !ok || len(versionsRaw) < 1 || len(versionsRaw) > 8 {
-		return offer{}, errors.New("invalid hello versions")
-	}
-	parsed := offer{Versions: make([]version, 0, len(versionsRaw))}
-	for _, item := range versionsRaw {
-		entry, ok := item.(record)
-		if !ok {
-			return offer{}, errors.New("invalid hello version")
-		}
-		major, goodMajor := asInt(entry["major"])
-		minor, goodMinor := asInt(entry["minor"])
-		if !goodMajor || major == 0 || !goodMinor {
-			return offer{}, errors.New("invalid hello version")
-		}
-		for _, prior := range parsed.Versions {
-			if prior.Major == major {
-				return offer{}, errors.New("duplicate hello major")
-			}
-		}
-		parsed.Versions = append(parsed.Versions, version{major, minor})
-	}
-	parsed.Codecs, ok = asStrings(value["codecs"], 16, codecPattern)
-	if !ok || !slices.Contains(parsed.Codecs, "json") {
-		return offer{}, errors.New("invalid hello codecs")
-	}
-	parsed.Capabilities, ok = asStrings(value["capabilities"], 64, capabilityPattern)
-	if !ok {
-		return offer{}, errors.New("invalid hello capabilities")
-	}
-	parsed.Peer, ok = value["peer"].(record)
-	if !ok {
-		return offer{}, errors.New("invalid hello peer")
-	}
-	id, goodID := parsed.Peer["id"].(string)
-	runtime, goodRuntime := parsed.Peer["runtime"].(string)
-	if !goodID || len(id) < 1 || len(id) > 128 || !goodRuntime || !runtimePattern.MatchString(runtime) {
-		return offer{}, errors.New("invalid hello peer")
-	}
-	return parsed, nil
-}
-
-// localOffer is the basic native JSON profile; it has no installed stream provider.
-func localOffer() offer {
-	return offer{
-		Versions:     []version{{Major: 1, Minor: 1}},
-		Codecs:       []string{"json"},
-		Capabilities: []string{"abort@1", "ping@1", "close@1", "wire-error@1", runtimeCapability, batchCapability},
-		Peer:         record{"id": "go-peer", "runtime": "go"},
-	}
-}
-
-// helloRecord encodes the local offer without optional credentials.
-func helloRecord(local offer) record {
-	return record{"kind": "handshake", "step": "hello", "protocol": "migaia.rpc", "versions": local.Versions, "codecs": local.Codecs, "capabilities": local.Capabilities, "peer": local.Peer}
-}
-
-// negotiate selects highest shared major, lower minor, initiator-preferred codec, and ordered capability intersection.
-func negotiate(initiator, responder offer) (agreement, bool) {
-	chosen := agreement{}
-	for _, remote := range initiator.Versions {
-		for _, local := range responder.Versions {
-			if remote.Major == local.Major && remote.Major > chosen.Major {
-				chosen.Major = remote.Major
-				chosen.Minor = min(remote.Minor, local.Minor)
-			}
-		}
-	}
-	if chosen.Major == 0 {
-		return agreement{}, false
-	}
-	for _, codec := range initiator.Codecs {
-		if slices.Contains(responder.Codecs, codec) {
-			chosen.Codec = codec
-			break
-		}
-	}
-	if chosen.Codec == "" {
-		return agreement{}, false
-	}
-	for _, capability := range initiator.Capabilities {
-		if slices.Contains(responder.Capabilities, capability) {
-			chosen.Capabilities = append(chosen.Capabilities, capability)
-		}
-	}
-	if chosen.Capabilities == nil {
-		chosen.Capabilities = []string{}
-	}
-	return chosen, true
-}
-
-// acceptRecord publishes only negotiated nonsecret fields.
-func acceptRecord(chosen agreement, local offer) record {
-	return record{"kind": "handshake", "step": "accept", "protocol": "migaia.rpc", "major": chosen.Major, "minor": chosen.Minor, "codec": chosen.Codec, "capabilities": chosen.Capabilities, "peer": local.Peer}
-}
-
-// wireError uses the required source/code/name/message/stack wire fields with fixed safe text.
-func wireError(code, message string) record {
-	return record{"source": "rpc.endpoint", "code": code, "name": "Error", "message": message, "stack": "Error: " + message}
-}
-
-// rejectRecord never includes a received hello or a credential.
-func rejectRecord(code, message string) record {
-	failure := wireError(code, message)
-	failure["source"] = "rpc.transport.process"
-	return record{"kind": "handshake", "step": "reject", "protocol": "migaia.rpc", "error": failure}
-}
-
-// parseAccept verifies that responder choices are a subset of the initiator offer.
-func parseAccept(value record, local offer) error {
-	if value["kind"] != "handshake" || value["step"] != "accept" || value["protocol"] != "migaia.rpc" {
-		return errors.New("invalid handshake accept")
-	}
-	major, majorOK := asInt(value["major"])
-	minor, minorOK := asInt(value["minor"])
-	codec, codecOK := value["codec"].(string)
-	if !majorOK || major == 0 || !minorOK || !codecOK || !slices.Contains(local.Codecs, codec) {
-		return errors.New("invalid handshake accept")
-	}
-	versionOK := false
-	for _, offered := range local.Versions {
-		versionOK = versionOK || offered.Major == major && minor <= offered.Minor
-	}
-	capabilities, capOK := asStrings(value["capabilities"], 64, capabilityPattern)
-	if !versionOK || !capOK {
-		return errors.New("invalid handshake accept")
-	}
-	for _, capability := range capabilities {
-		if !slices.Contains(local.Capabilities, capability) {
-			return errors.New("invalid handshake accept")
-		}
-	}
-	return nil
-}
-
-// route creates protocol-owned routing metadata for one reply or control message.
-func route(kind, senderID, targetID string) record {
-	return record{"profile": "migaia.rpc.route", "type": kind, "applicationVersion": "1", "senderId": senderID, "targetId": targetID, "sentAt": 0}
-}
-
-// replyRoute reverses validated sender/target identities and includes the response method.
-func replyRoute(inbound record, method string) record {
-	senderID, _ := inbound["targetId"].(string)
-	targetID, _ := inbound["senderId"].(string)
-	result := route("response", senderID, targetID)
-	result["method"] = method
-	if _, ok := inbound["receiverId"]; ok {
-		result["receiverId"] = targetID
+// route constructs direct metadata; trace is supplied only by the current operation.
+func route(sender, target string, trace any) *orderedRecord {
+	result := object("applicationVersion", "1", "senderId", sender, "targetId", target, "receiverId", target, "sentAt", time.Now().UnixMilli())
+	if trace != nil {
+		result.set("trace", trace)
 	}
 	return result
 }
 
-// routeOf checks the shared route prefix before an inbound envelope is dispatched.
-func routeOf(message record, expected string) (record, error) {
-	data, ok := message["data"].(record)
-	if !ok {
-		return nil, errors.New("invalid envelope data")
-	}
-	routing, ok := data["route"].(record)
-	if !ok || routing["profile"] != "migaia.rpc.route" || routing["type"] != expected {
-		return nil, errors.New("invalid envelope route")
-	}
-	for _, field := range []string{"applicationVersion", "senderId", "targetId"} {
-		value, ok := routing[field].(string)
-		if !ok || value == "" || len(value) > 128 {
-			return nil, errors.New("invalid envelope route")
-		}
-	}
-	if _, ok := asInt(routing["sentAt"]); !ok {
-		return nil, errors.New("invalid envelope route")
-	}
-	return routing, nil
+// localIdentity is explicit for borrowed/standalone peers; owned launch uses its real bootstrap identity.
+func localIdentity() *orderedRecord {
+	return object("name", "go-peer", "instanceId", "go-peer", "generation", object("kind", "session", "value", 0, "providerId", "go-peer"))
 }
 
-// successResponse preserves the request's route identities while returning a fixed method result.
-func successResponse(id, method string, routing record, payload any, hasPayload bool) record {
-	data := record{"route": replyRoute(routing, method)}
-	if hasPayload {
-		data["payload"] = payload
-	}
-	return record{"kind": "response", "id": id, "ok": true, "data": data}
+// localOffer publishes the actual installed provider directory rather than reserved discovery methods.
+func localOffer(identity *orderedRecord, business bool) *orderedRecord {
+	return object("profile", protocol, "kind", "handshake", "step", "hello", "versions", []any{object("major", 2, "minor", 0)}, "codecs", []any{"json"}, "extensions", []any{}, "peer", object("id", field(identity)["instanceId"], "runtime", "go"), "directory", runtimeDescription(identity, business))
 }
 
-// response returns zero or more frames for one-way, wait, finish, echo, and error requests.
-func response(message record, pending map[string]record) ([]record, error) {
-	routing, err := routeOf(message, "request")
-	if err != nil {
+// acceptance reuses this side's original identity, directory and configured credential.
+func acceptance(local *orderedRecord) *orderedRecord {
+	value := object("profile", protocol, "kind", "handshake", "step", "accept", "major", 2, "minor", 0, "codec", "json", "extensions", []any{}, "peer", field(local)["peer"], "directory", field(local)["directory"])
+	if auth, present := field(local)["auth"]; present {
+		value.set("auth", auth)
+	}
+	return value
+}
+
+// handshake exchanges true bilateral hello and keeps the original strict configured token check.
+func handshake(reader io.Reader, writer io.Writer, local *orderedRecord, token, parent string) (*orderedRecord, error) {
+	if err := send(writer, local); err != nil {
 		return nil, err
 	}
-	id, idOK := message["id"].(string)
-	method, methodOK := message["method"].(string)
-	if !idOK || !methodOK || id == "" || method == "" {
-		return nil, errors.New("invalid request")
-	}
-	if routing["dispatchOnly"] == true {
-		if method == "peer.wait" {
-			fmt.Fprintln(os.Stderr, "PEER_ERROR CAPABILITY_UNSUPPORTED")
-		}
-		return nil, nil
-	}
-	if method == runtimeDescribeMethod {
-		return []record{successResponse(id, method, routing, runtimeDescription(false, false, false), true)}, nil
-	}
-	if method == "peer.wait" {
-		pending[id] = routing
-		return nil, nil
-	}
-	data := message["data"].(record)
-	if method == "peer.finish" {
-		ids := make([]string, 0, len(pending))
-		for waitingID := range pending {
-			ids = append(ids, waitingID)
-		}
-		// Test-oracle exception: n is the current pending-request ID count; preserve the independent peer.finish reply sequence.
-		sort.Strings(ids)
-		replies := make([]record, 0, len(ids)+1)
-		for _, waitingID := range ids {
-			replies = append(replies, successResponse(waitingID, "peer.wait", pending[waitingID], nil, false))
-			delete(pending, waitingID)
-		}
-		payload, present := data["payload"]
-		return append(replies, successResponse(id, method, routing, payload, present)), nil
-	}
-	if method == "echo" || method == "peer.echo" {
-		payload, present := data["payload"]
-		return []record{successResponse(id, method, routing, payload, present)}, nil
-	}
-	code, messageText := "PROVIDER_NOT_FOUND", runtimeMethodUnavailable
-	if strings.HasPrefix(method, runtimeStreamPrefix) {
-		code, messageText = "CAPABILITY_UNSUPPORTED", runtimeCapabilityUnavailable
-	}
-	failure := runtimeFailure(code, messageText)
-	if method == "peer.error" {
-		code, messageText = "PEER_ERROR", "peer requested error"
-		failure = wireError(code, messageText)
-	}
-	return []record{{"kind": "response", "id": id, "ok": false, "code": code, "message": messageText, "error": failure, "data": record{"route": replyRoute(routing, method)}}}, nil
-}
-
-// control ignores unnegotiated controls and returns a close duration only for negotiated close.
-func control(message record, pending map[string]record, capabilities []string) (record, *int, error) {
-	routing, err := routeOf(message, "variation")
-	if err != nil {
-		return nil, nil, err
-	}
-	id, ok := message["id"].(string)
-	if !ok || id == "" {
-		return nil, nil, errors.New("invalid variation")
-	}
-	variation, ok := routing["variation"].(string)
-	if !ok {
-		return nil, nil, errors.New("invalid variation")
-	}
-	if required := map[string]string{"abort": "abort@1", "ping": "ping@1", "close": "close@1"}[variation]; required != "" && !slices.Contains(capabilities, required) {
-		return nil, nil, nil
-	}
-	senderID, _ := routing["targetId"].(string)
-	targetID, _ := routing["senderId"].(string)
-	switch variation {
-	case "abort":
-		delete(pending, id)
-		return nil, nil, nil
-	case "ping":
-		pongRoute := route("variation", senderID, targetID)
-		pongRoute["variation"] = "pong"
-		return record{"kind": "variation", "id": id, "data": record{"route": pongRoute}}, nil, nil
-	case "pong":
-		return nil, nil, nil
-	case "close":
-		payload, ok := message["data"].(record)["payload"].(record)
-		if !ok {
-			return nil, nil, errInvalidClose
-		}
-		drain, ok := asInt(payload["drainMs"])
-		if !ok || drain > 2147483647 {
-			return nil, nil, errInvalidClose
-		}
-		return nil, &drain, nil
-	default:
-		return nil, nil, nil
-	}
-}
-
-// responder consumes the first hello, then dispatches only validated framed RPC records.
-func responder(reader io.Reader, writer io.Writer) error {
-	first, err := receive(reader, true)
-	if err != nil {
-		return errHandshakeInvalid
-	}
-	remote, err := parseHello(first)
-	if err != nil {
-		return errHandshakeInvalid
-	}
-	if first["protocol"] != "migaia.rpc" {
-		_ = send(writer, rejectRecord("HANDSHAKE_INCOMPATIBLE", "incompatible protocol"))
-		return errHandshakeIncompatible
-	}
-	chosen, ok := negotiate(remote, localOffer())
-	if !ok || !baselineAgreement(chosen) {
-		_ = send(writer, rejectRecord("HANDSHAKE_INCOMPATIBLE", "incompatible version or codec"))
-		return errHandshakeIncompatible
-	}
-	if err := send(writer, acceptRecord(chosen, localOffer())); err != nil {
-		return err
-	}
-	// A dedicated reader lets a drain deadline close an idle stdio session.
-	type inboundFrame struct {
-		message record
-		err     error
-	}
-	inbound := make(chan inboundFrame, 1)
-	go func() {
-		for {
-			message, readErr := receive(reader, false)
-			inbound <- inboundFrame{message: message, err: readErr}
-			if readErr != nil {
-				return
-			}
-		}
-	}()
-	pending := make(map[string]record)
-	var drainTimer *time.Timer
-	var drainDeadline <-chan time.Time
-	defer func() {
-		if drainTimer != nil {
-			drainTimer.Stop()
-		}
-	}()
+	var remoteHello, selected *orderedRecord
 	for {
-		var received inboundFrame
-		select {
-		case received = <-inbound:
-		case <-drainDeadline:
-			return nil
+		remote, err := receive(reader, true)
+		if err != nil || !validHandshake(remote) {
+			return nil, errHandshakeInvalid
 		}
-		if errors.Is(received.err, io.EOF) {
-			return nil
+		value := field(remote)
+		if value["step"] == "reject" {
+			return nil, errHandshakeInvalid
 		}
-		if received.err != nil {
-			return received.err
+		remoteID, localID := stringField(field(value["peer"]), "id"), stringField(field(field(local)["peer"]), "id")
+		if remoteID == localID || parent != "" && remoteID != parent {
+			return nil, errHandshakeInvalid
 		}
-		members, batched, frameErr := baselineMembers(received.message)
-		if frameErr != nil {
-			return frameErr
+		if token != "" && value["auth"] != token {
+			_ = send(writer, object("profile", protocol, "kind", "handshake", "step", "reject", "error", wireError("AUTH_REJECTED", "authentication rejected", "rpc.transport.process")))
+			return nil, errHandshakeInvalid
 		}
-		for _, message := range members {
-			if memberErr := validateBaselineMember(message); memberErr != nil {
-				if batched || errors.Is(memberErr, errUnsupportedRuntimeProfile) {
-					fmt.Fprintln(os.Stderr, "PEER_ERROR PROTOCOL_INVALID")
-					continue
-				}
-				return memberErr
+		if value["step"] == "pending" {
+			if remoteHello == nil || !runtimeSchemaEqual(field(remoteHello)["peer"], value["peer"]) {
+				return nil, errHandshakeInvalid
 			}
-			switch message["kind"] {
-			case "discovery":
-				if field(field(message["data"])["route"])["type"] == "discovery-query" {
-					if sendErr := send(writer, baselineDiscovery(message)); sendErr != nil {
-						return sendErr
-					}
-				}
-			case "request":
-				if drainTimer != nil {
-					continue
-				}
-				replies, dispatchErr := response(message, pending)
-				if dispatchErr != nil {
-					if batched {
-						fmt.Fprintln(os.Stderr, "PEER_ERROR PROTOCOL_INVALID")
-						continue
-					}
-					return dispatchErr
-				}
-				for _, reply := range replies {
-					if sendErr := send(writer, reply); sendErr != nil {
-						return sendErr
-					}
-				}
-			case "variation":
-				reply, closeMs, controlErr := control(message, pending, chosen.Capabilities)
-				if errors.Is(controlErr, errInvalidClose) {
-					_, _ = fmt.Fprintln(os.Stderr, "PEER_ERROR PROTOCOL_INVALID")
-					continue
-				}
-				if controlErr != nil {
-					if batched {
-						fmt.Fprintln(os.Stderr, "PEER_ERROR PROTOCOL_INVALID")
-						continue
-					}
-					return controlErr
-				}
-				if reply != nil {
-					if sendErr := send(writer, reply); sendErr != nil {
-						return sendErr
-					}
-				}
-				data, _ := message["data"].(record)
-				routing, _ := data["route"].(record)
-				if drainTimer != nil && routing["variation"] == "abort" && slices.Contains(chosen.Capabilities, "abort@1") {
-					_, _ = fmt.Fprintln(os.Stderr, "PEER_EVENT ABORT_DURING_DRAIN")
-					if len(pending) == 0 {
-						return nil
-					}
-				}
-				if closeMs != nil && drainTimer == nil {
-					if *closeMs == 0 || len(pending) == 0 {
-						return nil
-					}
-					drainTimer = time.NewTimer(time.Duration(*closeMs) * time.Millisecond)
-					drainDeadline = drainTimer.C
-				}
-			default:
-				_, _ = fmt.Fprintln(os.Stderr, "PEER_WARN UNKNOWN_KIND")
-			}
+			continue
 		}
+		if value["step"] == "hello" {
+			if localID < remoteID {
+				remoteHello = remote
+				continue
+			}
+			if !supportsVersion(value) {
+				return nil, errHandshakeIncompatible
+			}
+			if len(entries(value["requiredExtensions"])) > 0 {
+				return nil, errHandshakeIncompatible
+			}
+			accept := acceptance(local)
+			if err := send(writer, accept); err != nil {
+				return nil, err
+			}
+			remoteHello, selected = remote, accept
+			continue
+		}
+		if selected != nil {
+			for _, key := range []string{"major", "minor", "codec", "extensions"} {
+				if !runtimeSchemaEqual(value[key], field(selected)[key]) {
+					return nil, errHandshakeInvalid
+				}
+			}
+			if !runtimeSchemaEqual(field(remoteHello)["peer"], value["peer"]) || !runtimeSchemaEqual(field(remoteHello)["directory"], value["directory"]) {
+				return nil, errHandshakeInvalid
+			}
+			return remoteHello, nil
+		}
+		if localID > remoteID || integerField(value, "major") != 2 || integerField(value, "minor") != 0 || value["codec"] != "json" || len(entries(value["extensions"])) > 0 {
+			return nil, errHandshakeInvalid
+		}
+		if remoteHello != nil && (!runtimeSchemaEqual(field(remoteHello)["peer"], value["peer"]) || !runtimeSchemaEqual(field(remoteHello)["directory"], value["directory"])) {
+			return nil, errHandshakeInvalid
+		}
+		confirmation := acceptance(local)
+		if err := send(writer, confirmation); err != nil {
+			return nil, err
+		}
+		return remote, nil
 	}
 }
 
-// initiator requires the runtime baseline, validates v2 identity, sends batch echo, then closes the session.
+// initiator proves canonical directory-bound echo without old batch or reserved describe traffic.
 func initiator(reader io.Reader, writer io.Writer) error {
-	local := localOffer()
-	if err := send(writer, helloRecord(local)); err != nil {
-		return err
-	}
-	accept, err := receive(reader, true)
+	identity := localIdentity()
+	local := localOffer(identity, false)
+	remote, err := handshake(reader, writer, local, "", "")
 	if err != nil {
 		return err
 	}
-	if err := parseAccept(accept, local); err != nil {
-		return err
-	}
-	capabilities, _ := asStrings(accept["capabilities"], 64, capabilityPattern)
-	if integerField(accept, "major") != 1 || integerField(accept, "minor") != 1 || !slices.Contains(capabilities, runtimeCapability) || !slices.Contains(capabilities, batchCapability) {
-		return errHandshakeIncompatible
-	}
-	remoteID := stringField(field(accept["peer"]), "id")
-	if remoteID == "" {
-		return errHandshakeInvalid
-	}
-	describeRoute := route("request", "go-peer", remoteID)
-	describeRoute["receiverId"] = remoteID
-	if err := send(writer, record{"kind": "request", "id": "go-describe-1", "method": runtimeDescribeMethod, "data": record{"route": describeRoute, "payload": nil}}); err != nil {
-		return err
-	}
-	described, err := receive(reader, false)
-	if err != nil {
-		return err
-	}
-	description := field(field(described["data"])["payload"])
-	if described["kind"] != "response" || described["id"] != "go-describe-1" || described["ok"] != true || !validRuntimeDescription(description, remoteID) {
-		return errors.New("invalid runtime description")
-	}
-	payload := record{"probe": "go"}
-	echoRoute := route("request", "go-peer", remoteID)
-	echoRoute["receiverId"] = remoteID
-	request := record{"kind": "request", "id": "go-echo-1", "method": "echo", "data": record{"route": echoRoute, "payload": payload}}
-	if err := send(writer, record{"kind": "batch", "envelopes": []any{request}}); err != nil {
+	peer := field(field(remote)["directory"])["self"]
+	task := object("mode", "request", "callerId", field(identity)["instanceId"], "callerGeneration", field(identity)["generation"], "targetGeneration", field(peer)["generation"], "method", "echo")
+	payload := object("probe", "go")
+	request := object("profile", protocol, "kind", "call", "id", "go-echo-1", "route", route("go-peer", stringField(field(peer), "instanceId"), nil), "task", task, "options", object(), "payload", payload)
+	if err = send(writer, request); err != nil {
 		return err
 	}
 	reply, err := receive(reader, false)
-	if err != nil {
-		return err
+	if err != nil || !validFrame(reply) || field(reply)["kind"] != "result" || field(reply)["id"] != "go-echo-1" || !runtimeSchemaEqual(field(reply)["task"], task) || !runtimeSchemaEqual(field(reply)["result"], payload) {
+		return errProtocol
 	}
-	if reply["kind"] != "response" || reply["id"] != "go-echo-1" || reply["ok"] != true {
-		return errors.New("invalid echo response")
-	}
-	data, ok := reply["data"].(record)
-	if !ok {
-		return errors.New("invalid echo data")
-	}
-	returned, ok := data["payload"].(record)
-	if !ok || returned["probe"] != "go" {
-		return errors.New("echo mismatch")
-	}
-	closing := route("variation", "go-peer", remoteID)
-	closing["variation"] = "close"
-	if err := send(writer, record{"kind": "variation", "id": "go-close-1", "data": record{"route": closing, "payload": record{"drainMs": 0}}}); err != nil {
-		return err
-	}
-	_, _ = fmt.Fprintln(os.Stderr, "RESULT ok")
+	fmt.Fprintln(os.Stderr, "RESULT ok")
 	return nil
 }
 
-// serveUnix accepts one connection and removes only its own socket path on exit.
+// responder shares the same actual provider/session owner as the business CLI.
+func responder(reader io.Reader, writer io.Writer) error {
+	return serveBusiness(reader, writer, localIdentity(), "", "", false)
+}
+
+// serveUnix retains the existing single socket acquisition and exact native cleanup owner.
 func serveUnix(path, role string) error {
 	if role == "initiator" {
 		connection, err := net.Dial("unix", path)
@@ -673,38 +595,37 @@ func serveUnix(path, role string) error {
 	return responder(connection, connection)
 }
 
-// main selects a selftest, stdio session, or a single Unix socket session.
+// main keeps the existing CLI/transport owner while removing semantic-v1/JSON-RPC/remote-Host selectors.
 func main() {
-	business := flag.Bool("business", false, "serve published business profile")
-	descendant := flag.Bool("descendant", false, "own a real child until stdin EOF")
-	bridge := flag.Bool("jsonrpc", false, "serve Content-Length bridge profile")
-	bare := flag.Bool("bare-jsonrpc", false, "echo physical Content-Length frames")
-	host := flag.Bool("host", false, "serve portable Host controls")
-	bootstrap := flag.String("bootstrap", "none", "native stdin bootstrap")
+	business := flag.Bool("business", false, "serve published providers")
+	jsonrpc := flag.Bool("jsonrpc", false, "historical pure JSON baseline label only")
+	bareJSON := flag.Bool("bare-jsonrpc", false, "parse and write JSON only; no RPC profile")
+	descendant := flag.Bool("descendant", false, "own child until EOF")
+	bootstrap := flag.String("bootstrap", "none", "native launch bootstrap")
 	authFD := flag.Int("auth-fd", -1, "inherited auth descriptor")
-	nonIdempotentRequest := flag.Bool("non-idempotent-request", false, "declare actual business request non-idempotent")
+	nonIdempotent := flag.Bool("non-idempotent-request", false, "declare business request non-idempotent")
 	role := flag.String("role", "responder", "responder or initiator")
-	stdio := flag.Bool("stdio", false, "use framed stdin/stdout")
-	listenUnix := flag.String("listen-unix", "", "listen on a Unix socket")
-	connectUnix := flag.String("connect-unix", "", "connect to a Unix socket")
-	selftest := flag.Bool("selftest", false, "run vector selftest")
-	vectors := flag.String("vectors", "", "path to schema/vectors")
+	stdio := flag.Bool("stdio", false, "framed stdin/stdout")
+	listenUnix := flag.String("listen-unix", "", "listen on Unix socket")
+	connectUnix := flag.String("connect-unix", "", "connect Unix socket")
+	selftest := flag.Bool("selftest", false, "run existing vector owner")
+	vectors := flag.String("vectors", "", "schema/vectors path")
 	flag.Parse()
-	businessRequestIdempotent = !*nonIdempotentRequest
+	if *jsonrpc != *bareJSON || *bareJSON && (!*business || !*stdio) {
+		fmt.Fprintln(os.Stderr, "ERROR retired semantic profile")
+		os.Exit(2)
+	}
+	businessRequestIdempotent = !*nonIdempotent
 	if *selftest {
 		os.Exit(runSelftest(*vectors))
 	}
-	if *role != "responder" && *role != "initiator" {
-		_, _ = fmt.Fprintln(os.Stderr, "ERROR invalid role")
-		os.Exit(2)
-	}
-	if *listenUnix != "" && *connectUnix != "" || *stdio && (*listenUnix != "" || *connectUnix != "") {
-		_, _ = fmt.Fprintln(os.Stderr, "ERROR conflicting transport")
+	if *role != "responder" && *role != "initiator" || *listenUnix != "" && *connectUnix != "" || *stdio && (*listenUnix != "" || *connectUnix != "") {
+		fmt.Fprintln(os.Stderr, "ERROR invalid transport selection")
 		os.Exit(2)
 	}
 	var err error
 	if *business {
-		err = runBusiness(*stdio, *listenUnix, *host, *bootstrap, *authFD, *bridge, *bare, *descendant, *role == "initiator")
+		err = runBusiness(*stdio, *listenUnix, *bootstrap, *authFD, *descendant, *bareJSON)
 	} else if *listenUnix != "" {
 		err = serveUnix(*listenUnix, *role)
 	} else if *connectUnix != "" {
@@ -718,14 +639,7 @@ func main() {
 		}
 	}
 	if err != nil {
-		switch {
-		case errors.Is(err, errHandshakeInvalid):
-			_, _ = fmt.Fprintln(os.Stderr, "PEER_FAIL HANDSHAKE_INVALID")
-		case errors.Is(err, errHandshakeIncompatible):
-			_, _ = fmt.Fprintln(os.Stderr, "PEER_FAIL HANDSHAKE_INVALID")
-		default:
-			_, _ = fmt.Fprintln(os.Stderr, "PEER_FAIL SESSION_ERROR")
-		}
+		fmt.Fprintln(os.Stderr, "PEER_FAIL SESSION_ERROR")
 		os.Exit(1)
 	}
 }

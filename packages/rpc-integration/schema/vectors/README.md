@@ -5,9 +5,8 @@ portable-value vector, or `node generate.mjs --check` in a gate. Vectors must be
 with a descriptor version change or an explicit type-only/non-wire proof.
 
 `error-chain.json` version 2 is the language-neutral `wire-error` fixture. `valid` values normalize
-unchanged; `invalid` values report the listed first violation and JSON Pointer. `unknownFields`
-checks both reject and ignore modes, including the normalized `ignoreExpected` snapshot and
-ordered unknown-field callbacks. `truncation` maps logical thrown values to canonical payloads;
+unchanged; `invalid` values report the listed first violation and JSON Pointer. `unknownFields` now checks BC9 acceptance; the legacy `ignoreExpected` snapshot retains the
+known error fields. Unknown metadata is ignored without a callback. `truncation` maps logical thrown values to canonical payloads;
 `{ "absent": true }` represents JavaScript `undefined` and may be skipped by languages without an
 absent value. `{ "logicalError": { ... } }` describes an Error-like graph without relying on a JS
 prototype; `{ "ref": "root" }` in `cause` makes a cycle. `jsonrpc` maps foreign JSON-RPC errors.
@@ -35,7 +34,7 @@ receiver rejects them. Child admission counts only the child's five fields befor
 descendants. `cause` precedes `errors`, and cleanup errors append to `errors` in source order.
 
 `envelope.json` records current envelope kinds, invalid values with the first `violation` and `pointer`,
-unknown-field callback order, validation order, and per-connection warning keys. An invalid case
+unknown metadata acceptance and the original known-field validation order. An invalid case
 marked `evolvable` may become valid in a later negotiated minor version. `control.json` records
 the four initial variation subtypes, their payloads, and expected actions; its unknown subtype is
 also evolvable. `handshake.json` records offer pairs, negotiated values, invalid first messages,
@@ -56,3 +55,29 @@ violations, JSON pointers, wire-error graphs, warning order, framing bytes and s
 assertions remain. V1 remote-contract and Host-control vectors remain local advanced facade
 configuration until those APIs are removed; foreign network selftests do not interpret them as
 describe responses.
+
+## Core profile family
+
+`core-profile.json` is the sole live `migaia.rpc/2` semantic family. Its `valid` and `invalid`
+sections retain the existing protocol, correlation, portable-value and schema cases. Under R17/BC9,
+unknown metadata is accepted; the former frame/option unknown-field rejection cases now belong to
+`valid`. `unknownIgnored` pairs a baseline with a frame containing exactly two unknown fields on
+one protocol record. Each language admits the original object and compares all remaining known
+content after removing only those two test fields. The extra fields are never business payloads,
+so their acceptance does not relax portable bytes markers or JSON Schema keywords.
+
+The current conformance runner requires every core-profile ID from Go, Python, Rust and the public
+TypeScript `normalizeRpcFrame` entry. Foreign peers continue their complete existing selftests,
+including independent native business, schema, portable value, error-budget and framing assertions;
+any non-retired failure still fails. Older vector files and the six v1 TypeScript runner files stay
+as historical migration inputs. Moving the current runner does not claim their business assertions
+were received or passed.
+
+`packages/rpc-contract/schema/protocol.schema.json` documents the JSON grammar. Pure validators
+remain authoritative for node-index bounds, text/depth budgets, handshake identity, group fail-stop
+ordering, method uniqueness and runtime state. Only the metadata admission rules changed in BC9.
+
+R19/BC10 adds route-boundary vectors: `forwardRoute` and retained error-node provenance both
+accept the origin plus sixteen forwarding hosts (seventeen nodes), and reject eighteen nodes.
+Native peers use the same protocol maximum; this does not implement a foreign Host forwarding
+policy or change other portable, error-text, graph-node or schema budgets.

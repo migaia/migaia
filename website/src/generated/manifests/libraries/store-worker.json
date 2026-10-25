@@ -3156,7 +3156,7 @@
           "name": "IWorkerDiagnosticType",
           "kind": "type",
           "signature": "export type IWorkerDiagnosticType = (typeof WorkerDiagnosticType)[keyof typeof WorkerDiagnosticType];",
-          "declarationLine": 32,
+          "declarationLine": 30,
           "source": "packages/store-worker/dist/worker-constants.d.ts",
           "purpose": "The single literal worker, used as default codec diagnostic and plugin format label.",
           "core": "The single literal worker, used as default codec diagnostic and plugin format label.",
@@ -3220,11 +3220,11 @@
         {
           "name": "IWorkerPort",
           "kind": "type",
-          "signature": "export type IWorkerPort = IWebWorkerLikePort;",
+          "signature": "export type IWorkerPort = IWorkerMessagePort;",
           "declarationLine": 8,
           "source": "packages/store-worker/dist/worker.d.ts",
-          "purpose": "Alias of the rpc-plugin-browser/adapters/web-worker IWebWorkerLikePort; dedicated Worker, MessagePort and compatible listener-based hosts implement this external protocol.",
-          "core": "postMessage: Synchronous host callback sending a raw RPC envelope; do not reinterpret it as an application payload. Transfer is the optional native list and return value is unused; host errors propagate into transport handling.\npostMessage.message: Raw envelope received from the transport.\npostMessage.transfer: Optional native transfer list received from send options; omit for ordinary cloning.\nVoid after the host accepted the send; it does not mean peer computation completed.\naddEventListener: Host installs a listener for message, error or messageerror; RPC owns subscriptions and dispatch. Do not steal a mutable onmessage slot for the main-side adapter.\naddEventListener.type: Event name supplied by the RPC adapter: message, error or messageerror.\naddEventListener.listener: Synchronous callback receiving an event-like object with data, origin, source and type as applicable; return void, and transport isolates listener failures.\nVoid after listener registration.\nremoveEventListener: Host removes the exact type/listener pair installed by the transport during endpoint cleanup.\nremoveEventListener.type: Previously registered event name from the transport.\nremoveEventListener.listener: Exact callback identity received during registration.\nVoid after listener removal; native cleanup failures reject endpoint disposal.",
+          "purpose": "Alias of the native port accepted by rpc-plugin-browser dedicatedWorkerPlugin options.worker, through IWorkerMessagePort. It borrows synchronous postMessage, listener registration and removal, and optional start; the application retains the physical Worker or MessagePort lifetime.",
+          "core": "postMessage: Synchronous host callback sending a raw RPC envelope; do not reinterpret it as an application payload. Transfer is the optional native list and return value is unused; host errors propagate into transport handling.\npostMessage.value: Original frame value supplied by the canonical worker transport; forward it unchanged to native postMessage rather than wrapping it as another application request.\npostMessage.transfer: Optional native transfer list received from send options; omit for ordinary cloning.\nVoid after the host accepted the send; it does not mean peer computation completed.\nstart: Optional synchronous native MessagePort start operation borrowed from the supplied port. The canonical worker transport invokes it before installing its message listener; Worker-like ports without this method need no substitute.\nVoid after native startup; this operation does not acquire ownership of the port or terminate it during cleanup.\nOmitted for ports that do not require explicit message delivery startup.\naddEventListener: Host installs a listener for message, error or messageerror; RPC owns subscriptions and dispatch. Do not steal a mutable onmessage slot for the main-side adapter.\naddEventListener.type: Event name supplied by the RPC adapter: message, error or messageerror.\naddEventListener.listener: Synchronous callback receiving an event-like object with data, origin, source and type as applicable; return void, and transport isolates listener failures.\nVoid after listener registration.\nremoveEventListener: Host removes the exact type/listener pair installed by the transport during endpoint cleanup.\nremoveEventListener.type: Previously registered event name from the transport.\nremoveEventListener.listener: Exact callback identity received during registration.\nVoid after listener removal; native cleanup failures reject endpoint disposal.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -3232,10 +3232,80 @@
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [],
-          "members": [],
-          "composes": ["IWebWorkerLikePort"],
+          "members": [
+            {
+              "name": "postMessage",
+              "kind": "method",
+              "optional": false,
+              "signature": "postMessage(value: unknown, transfer?: readonly Transferable[]): void;",
+              "description": "Native Transferable overloads stay assignable; RPC forwards its original ArrayBuffer list.",
+              "parameterDetails": [
+                {
+                  "name": "value",
+                  "type": "unknown",
+                  "optional": false
+                },
+                {
+                  "name": "transfer",
+                  "type": "readonly Transferable[]",
+                  "optional": true
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "start",
+              "kind": "method",
+              "optional": true,
+              "signature": "start?(): void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "void"
+            },
+            {
+              "name": "addEventListener",
+              "kind": "method",
+              "optional": false,
+              "signature": "addEventListener(type: string, listener: (event: any) => void): void;",
+              "description": "Native EventTarget overloads deliver distinct message and error event types.",
+              "parameterDetails": [
+                {
+                  "name": "type",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "listener",
+                  "type": "(event: any) => void",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "removeEventListener",
+              "kind": "method",
+              "optional": false,
+              "signature": "removeEventListener(type: string, listener: (event: any) => void): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "type",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "listener",
+                  "type": "(event: any) => void",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            }
+          ],
+          "composes": [],
           "exportPath": ".",
-          "overloadSignatures": ["export type IWorkerPort = IWebWorkerLikePort;"],
+          "overloadSignatures": ["export type IWorkerPort = IWorkerMessagePort;"],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
           "whenToUse": "",
@@ -3244,7 +3314,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Alias of the rpc-plugin-browser/adapters/web-worker IWebWorkerLikePort; dedicated Worker, MessagePort and compatible listener-based hosts implement this external protocol."
+              "content": "Alias of the native port accepted by rpc-plugin-browser dedicatedWorkerPlugin options.worker, through IWorkerMessagePort. It borrows synchronous postMessage, listener registration and removal, and optional start; the application retains the physical Worker or MessagePort lifetime."
             },
             {
               "id": "getting-started",
@@ -3264,7 +3334,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "postMessage: Synchronous host callback sending a raw RPC envelope; do not reinterpret it as an application payload. Transfer is the optional native list and return value is unused; host errors propagate into transport handling.\npostMessage.message: Raw envelope received from the transport.\npostMessage.transfer: Optional native transfer list received from send options; omit for ordinary cloning.\nVoid after the host accepted the send; it does not mean peer computation completed.\naddEventListener: Host installs a listener for message, error or messageerror; RPC owns subscriptions and dispatch. Do not steal a mutable onmessage slot for the main-side adapter.\naddEventListener.type: Event name supplied by the RPC adapter: message, error or messageerror.\naddEventListener.listener: Synchronous callback receiving an event-like object with data, origin, source and type as applicable; return void, and transport isolates listener failures.\nVoid after listener registration.\nremoveEventListener: Host removes the exact type/listener pair installed by the transport during endpoint cleanup.\nremoveEventListener.type: Previously registered event name from the transport.\nremoveEventListener.listener: Exact callback identity received during registration.\nVoid after listener removal; native cleanup failures reject endpoint disposal."
+              "content": "postMessage: Synchronous host callback sending a raw RPC envelope; do not reinterpret it as an application payload. Transfer is the optional native list and return value is unused; host errors propagate into transport handling.\npostMessage.value: Original frame value supplied by the canonical worker transport; forward it unchanged to native postMessage rather than wrapping it as another application request.\npostMessage.transfer: Optional native transfer list received from send options; omit for ordinary cloning.\nVoid after the host accepted the send; it does not mean peer computation completed.\nstart: Optional synchronous native MessagePort start operation borrowed from the supplied port. The canonical worker transport invokes it before installing its message listener; Worker-like ports without this method need no substitute.\nVoid after native startup; this operation does not acquire ownership of the port or terminate it during cleanup.\nOmitted for ports that do not require explicit message delivery startup.\naddEventListener: Host installs a listener for message, error or messageerror; RPC owns subscriptions and dispatch. Do not steal a mutable onmessage slot for the main-side adapter.\naddEventListener.type: Event name supplied by the RPC adapter: message, error or messageerror.\naddEventListener.listener: Synchronous callback receiving an event-like object with data, origin, source and type as applicable; return void, and transport isolates listener failures.\nVoid after listener registration.\nremoveEventListener: Host removes the exact type/listener pair installed by the transport during endpoint cleanup.\nremoveEventListener.type: Previously registered event name from the transport.\nremoveEventListener.listener: Exact callback identity received during registration.\nVoid after listener removal; native cleanup failures reject endpoint disposal."
             },
             {
               "id": "advanced-usage",
@@ -3273,7 +3343,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-worker/dist/worker.d.ts:IWorkerPort:export type IWorkerPort = IWebWorkerLikePort;",
+          "identity": "packages/store-worker/dist/worker.d.ts:IWorkerPort:export type IWorkerPort = IWorkerMessagePort;",
           "guidance": [],
           "usageScore": 6,
           "configuration": [],
@@ -4227,11 +4297,11 @@
         {
           "name": "IWorkerLike",
           "kind": "type",
-          "signature": "export type IWorkerLike = IWebWorkerLikePort & { /** Called once on parser disposal only when terminateOnDispose is true; otherwise not invoked. */ terminate?(): void; };",
+          "signature": "export type IWorkerLike = IWorkerMessagePort & { /** Called once on parser disposal only when terminateOnDispose is true; otherwise not invoked. */ terminate?(): void; };",
           "declarationLine": 10,
           "source": "packages/store-worker/dist/serialize/worker.d.ts",
-          "purpose": "IWebWorkerLikePort plus optional terminate; parser disposal borrows it by default and terminates only when explicitly requested.",
-          "core": "postMessage: Synchronous host callback sending a raw RPC envelope; do not reinterpret it as an application payload. Transfer is the optional native list and return value is unused; host errors propagate into transport handling.\npostMessage.message: Raw envelope received from the transport.\npostMessage.transfer: Optional native transfer list received from send options; omit for ordinary cloning.\nVoid after the host accepted the send; it does not mean peer computation completed.\naddEventListener: Host installs a listener for message, error or messageerror; RPC owns subscriptions and dispatch. Do not steal a mutable onmessage slot for the main-side adapter.\naddEventListener.type: Event name supplied by the RPC adapter: message, error or messageerror.\naddEventListener.listener: Synchronous callback receiving an event-like object with data, origin, source and type as applicable; return void, and transport isolates listener failures.\nVoid after listener registration.\nremoveEventListener: Host removes the exact type/listener pair installed by the transport during endpoint cleanup.\nremoveEventListener.type: Previously registered event name from the transport.\nremoveEventListener.listener: Exact callback identity received during registration.\nVoid after listener removal; native cleanup failures reject endpoint disposal.\nterminate: Optional synchronous no-argument host cleanup callback; called after endpoint cleanup only when terminateOnDispose is true, even if endpoint cleanup failed.\nVoid; a failure rejects disposal alone or joins CLEANUP_FAILED AggregateError.",
+          "purpose": "The same borrowed native worker port accepted through IWorkerMessagePort, with an additional optional terminate callback. Parser disposal releases its endpoint but leaves the Worker alive by default; terminateOnDispose explicitly opts into native termination.",
+          "core": "postMessage: Synchronous host callback sending a raw RPC envelope; do not reinterpret it as an application payload. Transfer is the optional native list and return value is unused; host errors propagate into transport handling.\npostMessage.value: Original frame value supplied by the canonical worker transport; forward it unchanged to native postMessage rather than wrapping it as another application request.\npostMessage.transfer: Optional native transfer list received from send options; omit for ordinary cloning.\nVoid after the host accepted the send; it does not mean peer computation completed.\nstart: Optional synchronous native MessagePort start operation borrowed from the supplied port. The canonical worker transport invokes it before installing its message listener; Worker-like ports without this method need no substitute.\nVoid after native startup; this operation does not acquire ownership of the port or terminate it during cleanup.\nOmitted for ports that do not require explicit message delivery startup.\naddEventListener: Host installs a listener for message, error or messageerror; RPC owns subscriptions and dispatch. Do not steal a mutable onmessage slot for the main-side adapter.\naddEventListener.type: Event name supplied by the RPC adapter: message, error or messageerror.\naddEventListener.listener: Synchronous callback receiving an event-like object with data, origin, source and type as applicable; return void, and transport isolates listener failures.\nVoid after listener registration.\nremoveEventListener: Host removes the exact type/listener pair installed by the transport during endpoint cleanup.\nremoveEventListener.type: Previously registered event name from the transport.\nremoveEventListener.listener: Exact callback identity received during registration.\nVoid after listener removal; native cleanup failures reject endpoint disposal.\nterminate: Optional synchronous no-argument host cleanup callback; called after endpoint cleanup only when terminateOnDispose is true, even if endpoint cleanup failed.\nVoid; a failure rejects disposal alone or joins CLEANUP_FAILED AggregateError.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -4248,12 +4318,81 @@
               "description": "Called once on parser disposal only when terminateOnDispose is true; otherwise not invoked.",
               "parameterDetails": [],
               "returns": "void"
+            },
+            {
+              "name": "postMessage",
+              "kind": "method",
+              "optional": false,
+              "signature": "postMessage(value: unknown, transfer?: readonly Transferable[]): void;",
+              "description": "Native Transferable overloads stay assignable; RPC forwards its original ArrayBuffer list.",
+              "parameterDetails": [
+                {
+                  "name": "value",
+                  "type": "unknown",
+                  "optional": false
+                },
+                {
+                  "name": "transfer",
+                  "type": "readonly Transferable[]",
+                  "optional": true
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "start",
+              "kind": "method",
+              "optional": true,
+              "signature": "start?(): void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "void"
+            },
+            {
+              "name": "addEventListener",
+              "kind": "method",
+              "optional": false,
+              "signature": "addEventListener(type: string, listener: (event: any) => void): void;",
+              "description": "Native EventTarget overloads deliver distinct message and error event types.",
+              "parameterDetails": [
+                {
+                  "name": "type",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "listener",
+                  "type": "(event: any) => void",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "removeEventListener",
+              "kind": "method",
+              "optional": false,
+              "signature": "removeEventListener(type: string, listener: (event: any) => void): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "type",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "listener",
+                  "type": "(event: any) => void",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
             }
           ],
-          "composes": ["IWebWorkerLikePort"],
+          "composes": [],
           "exportPath": "./serialize/worker",
           "overloadSignatures": [
-            "export type IWorkerLike = IWebWorkerLikePort & { /** Called once on parser disposal only when terminateOnDispose is true; otherwise not invoked. */ terminate?(): void; };"
+            "export type IWorkerLike = IWorkerMessagePort & { /** Called once on parser disposal only when terminateOnDispose is true; otherwise not invoked. */ terminate?(): void; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4263,7 +4402,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "IWebWorkerLikePort plus optional terminate; parser disposal borrows it by default and terminates only when explicitly requested."
+              "content": "The same borrowed native worker port accepted through IWorkerMessagePort, with an additional optional terminate callback. Parser disposal releases its endpoint but leaves the Worker alive by default; terminateOnDispose explicitly opts into native termination."
             },
             {
               "id": "getting-started",
@@ -4283,7 +4422,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "postMessage: Synchronous host callback sending a raw RPC envelope; do not reinterpret it as an application payload. Transfer is the optional native list and return value is unused; host errors propagate into transport handling.\npostMessage.message: Raw envelope received from the transport.\npostMessage.transfer: Optional native transfer list received from send options; omit for ordinary cloning.\nVoid after the host accepted the send; it does not mean peer computation completed.\naddEventListener: Host installs a listener for message, error or messageerror; RPC owns subscriptions and dispatch. Do not steal a mutable onmessage slot for the main-side adapter.\naddEventListener.type: Event name supplied by the RPC adapter: message, error or messageerror.\naddEventListener.listener: Synchronous callback receiving an event-like object with data, origin, source and type as applicable; return void, and transport isolates listener failures.\nVoid after listener registration.\nremoveEventListener: Host removes the exact type/listener pair installed by the transport during endpoint cleanup.\nremoveEventListener.type: Previously registered event name from the transport.\nremoveEventListener.listener: Exact callback identity received during registration.\nVoid after listener removal; native cleanup failures reject endpoint disposal.\nterminate: Optional synchronous no-argument host cleanup callback; called after endpoint cleanup only when terminateOnDispose is true, even if endpoint cleanup failed.\nVoid; a failure rejects disposal alone or joins CLEANUP_FAILED AggregateError."
+              "content": "postMessage: Synchronous host callback sending a raw RPC envelope; do not reinterpret it as an application payload. Transfer is the optional native list and return value is unused; host errors propagate into transport handling.\npostMessage.value: Original frame value supplied by the canonical worker transport; forward it unchanged to native postMessage rather than wrapping it as another application request.\npostMessage.transfer: Optional native transfer list received from send options; omit for ordinary cloning.\nVoid after the host accepted the send; it does not mean peer computation completed.\nstart: Optional synchronous native MessagePort start operation borrowed from the supplied port. The canonical worker transport invokes it before installing its message listener; Worker-like ports without this method need no substitute.\nVoid after native startup; this operation does not acquire ownership of the port or terminate it during cleanup.\nOmitted for ports that do not require explicit message delivery startup.\naddEventListener: Host installs a listener for message, error or messageerror; RPC owns subscriptions and dispatch. Do not steal a mutable onmessage slot for the main-side adapter.\naddEventListener.type: Event name supplied by the RPC adapter: message, error or messageerror.\naddEventListener.listener: Synchronous callback receiving an event-like object with data, origin, source and type as applicable; return void, and transport isolates listener failures.\nVoid after listener registration.\nremoveEventListener: Host removes the exact type/listener pair installed by the transport during endpoint cleanup.\nremoveEventListener.type: Previously registered event name from the transport.\nremoveEventListener.listener: Exact callback identity received during registration.\nVoid after listener removal; native cleanup failures reject endpoint disposal.\nterminate: Optional synchronous no-argument host cleanup callback; called after endpoint cleanup only when terminateOnDispose is true, even if endpoint cleanup failed.\nVoid; a failure rejects disposal alone or joins CLEANUP_FAILED AggregateError."
             },
             {
               "id": "advanced-usage",
@@ -4292,7 +4431,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-worker/dist/serialize/worker.d.ts:IWorkerLike:export type IWorkerLike = IWebWorkerLikePort & { /** Called once on parser disposal only when terminateOnDispose is true; otherwise not invoked. */ terminate?(): void; };",
+          "identity": "packages/store-worker/dist/serialize/worker.d.ts:IWorkerLike:export type IWorkerLike = IWorkerMessagePort & { /** Called once on parser disposal only when terminateOnDispose is true; otherwise not invoked. */ terminate?(): void; };",
           "guidance": [],
           "usageScore": 18,
           "configuration": [],

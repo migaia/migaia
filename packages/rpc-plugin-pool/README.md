@@ -1,28 +1,25 @@
 # `@migaia/rpc-plugin-pool`
 
-把一个 host 的真实进程、线程或协作任务成员交给原有有限调度、FIFO、扩缩容与排空 owner。
+把同一种 transport 的多个真实成员呈现为一个逻辑对端 `pool`。
+
+`rpc-contract` 定义纯协议与接口，`rpc-host` 拥有会话、provider、调用结算与取消；transport plugin 获取并监管原生资源。auth、chunk、batch、probe 等 flow plugin 处理消息流。`pool` 是安装在 transport 上的 feature，负责成员选择、有限 FIFO、扩缩容和排空；timeout、retry 也是完整 feature。
 
 [English](./README.en.md) · [使用指南](./USEGUIDE.md)
 
-## 为什么选它
+## 开始使用
 
-- 一个逻辑对端 **pool**，每次业务操作只选择一个成员执行，不广播给所有成员。
-- 成员忙时进入有限 FIFO；队列取消只移除该项，溢出在进入业务前拒绝。
-- 缩容先退休空闲成员，流在结束前保留自己的槽。
-- 关闭先停止接纳，再排空已接受操作，最后沿原连接归属关闭成员。
-
-## 从这里开始
-
-下面使用 Node 24 的实际 Worker；保存为独立 ESM TypeScript 入口，或用工具链先编译为 ESM。
+下面使用 Node 24 的真实 Worker。保存为独立 ESM TypeScript 入口，或先编译为 ESM。仅父端安装 pool，子端连接实际父端。
 
 ```bash
 pnpm add @migaia/rpc-host @migaia/rpc-contract @migaia/rpc-plugin-thread @migaia/rpc-plugin-pool
 ```
 
-```ts doc-test=run
+```ts doc-test=check
 import { createRpcHost } from '@migaia/rpc-host'
 import { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'
-import { poolPlugin } from '@migaia/rpc-plugin-pool'
+import { pool } from '@migaia/rpc-plugin-pool'
+
+type IWorkerApi = { double(value: number): number }
 
 if (await isThreadChild()) {
   await createRpcHost({
@@ -30,48 +27,42 @@ if (await isThreadChild()) {
     provide: { double: (value: number) => value * 2 }
   })
 } else {
-  const pool = poolPlugin({ size: 3, maxQueue: 32 })
-  const host = await createRpcHost<{ double(value: number): number }>({
-    plugins: [threadPlugin({ spawn: true }), pool]
-  })
+  const plugins = [
+    threadPlugin({ spawn: true, features: [pool({ size: 3, maxQueue: 32 })] })
+  ] as const
+  const host = await createRpcHost<IWorkerApi, typeof plugins>({ plugins })
   try {
-    console.log(await host.request('double', 21))
-    console.log(await host.send('pool', 'double', 21))
-    await pool.controls(host).resize(2)
-    console.log(pool.controls(host).stats().targetSize)
+    console.log(await host.thread.send('pool', 'double', 21))
+    await host.thread.pool.resize(2)
+    console.log(host.thread.pool.stats().targetSize)
   } finally {
     await host.close()
   }
 }
 ```
 
-依次输出 `42`、`42`、`2`。两次调用各执行一次，均返回标量。三个成员拥有独立原生寿命，但本 host 仍只构造一个调用端点。
+输出 `42` 和 `2`。每次调用只选一个成员，返回该次操作的结果，不广播到三个成员。
 
-## 目标与成员
+## 安装与逻辑目标
 
-pool 是 feature，必须与一个可重复打开独立成员的传输组合：`processPlugin({ spawn / connect })`、`threadPlugin({ spawn })` 或 `coroutinePlugin({ spawn })`。listen 或 connectToParent 来源在打开任何成员前以 `POOL_TRANSPORT_UNSUPPORTED` 拒绝。
+`pool({ size })` 放在 `threadPlugin`、`processPlugin` 或 `coroutinePlugin` 的 `features` 中。来源必须能重复获取独立成员：thread/coroutine spawn，或 process spawn/connect。listen、connectToParent 在获取成员前拒绝为 `POOL_TRANSPORT_UNSUPPORTED`。
 
-对外直连集合只有 `pool`，隐藏成员不进入 `host.peers` 或直接目标列表。`request / notify / stream / group / outcome` 以及 `send('pool', ...)` 都只经过一次原调度选择。group 的整组由同一成员执行，outcome 也只选择一个成员，不替应用做全池结果搜索。不要按隐藏成员原生 ID 定向调用。
+调用与控制都在 transport 的命名空间：`host.thread.send('pool', ...)`、`host.thread.pool`、`host.thread.members`。隐藏成员不进入该 namespace 的业务目标目录；`members` 仅提供真实原生资源的诊断和管理。一个 Host 可以容纳命名空间不同的 transport；pool 本身只聚合同一种载体。
 
-## 控制与统计
+`request/notify/stream/group` 每次只进行一次成员选择。group 的整组使用同一成员。`outcome` 查询需要安装 idempotency plugin；查询只选择一个成员，不进行全池结果搜索。
 
-保留工厂返回的准确实例，然后用 `pool.controls(actualHost)` 读取该安装的原 controls。同一定义可安装到不同 host，controls 按实际 host 隔离。
+## 选项与控制
 
-| API / 选项              | 行为                                                   |
-| ----------------------- | ------------------------------------------------------ |
-| `size`                  | 必填正整数；安装等待目标数量的独立成员就绪             |
-| `maxQueue`              | 默认 256，非负整数；0 表示不排队                       |
-| `idleTimeoutMs`         | 省略则不空闲回收；正有限毫秒值，回收后需要时补成员     |
-| `scheduler`             | 只拥有原 idle 定时；不替换原生重启或调用期限时钟       |
-| `controls.stats()`      | 冻结快照：targetSize/memberCount/inFlight/queued/state |
-| `controls.resize(size)` | 串行接受容量变更，忙成员安全退休后结算                 |
-| `controls.close()`      | 停止池接纳并排空；重复调用共享原 Promise               |
-| `host.describe()`       | canonical host 描述附带 pool 统计                      |
+| API / 选项                      | 行为                                                     |
+| ------------------------------- | -------------------------------------------------------- |
+| `size`                          | 必填正整数；初次安装等待目标成员就绪                     |
+| `maxQueue`                      | 默认 256，非负整数；0 表示没有等待槽                     |
+| `idleTimeoutMs`                 | 省略则不回收；正有限毫秒，最大 2147483647                |
+| `scheduler`                     | 只负责 pool 空闲计时                                     |
+| `host.thread.pool.stats()`      | 冻结的 targetSize/memberCount/inFlight/queued/state 快照 |
+| `host.thread.pool.resize(size)` | 按顺序调整目标容量，忙成员完成后安全退休                 |
+| `host.thread.pool.close()`      | 停止新接纳，等待已接纳操作，再关闭成员                   |
 
-`inFlight` 统计客户端占槽，不代表远端 provider 或 CPU 并发。流是惰性的，第一次 next 才申请槽；结束、return、throw 或取消后释放。主 host.close 会先排空逻辑池，再释放成员；只关闭 controls 不代替应用最终关闭 host。
+`inFlight` 是客户端占槽数，不代表 provider 或 CPU 并发。流第一次 `next()` 才占槽，消费完毕或结束迭代后释放。缩容优先退休空闲成员。
 
-## 错误与生命周期
-
-池拥有的 source 为 `rpc.pool`，包括 INVALID_OPTIONS、POOL_TRANSPORT_UNSUPPORTED、POOL_CLOSED、QUEUE_FULL、CALL_ABORTED 与 CLOSE_FAILED。原业务/传输失败保持原 source/code/cause，池不自动重放业务。
-
-部分构造失败会尝试关闭所有已打开成员并保留原 primary；清理失败继续可从其错误图或报告中定位。close 尝试所有成员，聚合清理错误时保留原 errors/cause，池保持终态。更多排队、取消、缩容和失败示例见[使用指南](./USEGUIDE.md)。
+业务与传输失败保留各自错误身份，pool 不自行重放业务。池错误 source 为 `rpc.pool`；按 code/cause 处理，参见[使用指南](./USEGUIDE.md)。自定义 transport 使用 `@migaia/rpc-host/sdk`，观察使用 `@migaia/rpc-host/plugins/probe`。

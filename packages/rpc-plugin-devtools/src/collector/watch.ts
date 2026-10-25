@@ -1,8 +1,9 @@
+/** Owns bounded watch batches and releases stream cancellation when the watcher closes. */
 import type { IRpcContext } from '@migaia/rpc-host'
-import { type IRpcProbeEventView } from '@migaia/rpc-host/probe'
+import { type IRpcProbeEventView } from '@migaia/rpc-host/plugins/probe'
 import type { IRpcDevtoolsQuery, IRpcDevtoolsWatchBatch } from '../contract/service.js'
 import type { IRpcDevtoolsWireEvent } from '../contract/wire.js'
-import { RpcDevtoolsErrorCode } from '../error-code.js'
+import { RpcDevtoolsErrorCode } from '@migaia/rpc-contract/error-code'
 import { identifyDevtoolsError } from '../errors.js'
 import { EventRing } from './ring.js'
 import { NameTable } from './intern.js'
@@ -41,6 +42,8 @@ export class CollectorWatcher {
   #assertOpen: (() => void) | undefined
   /** A mounted service borrows its existing stream scope to wake this owner on remote cancellation. */
   #signal: IRpcContext['signal'] | undefined
+  /** The exact registered callback is released on close even while iteration is paused at yield. */
+  #abortListener: (() => void) | undefined
 
   /** Allocate bounded storage and compile filters once, before any watcher joins ingestion. */
   constructor(
@@ -128,11 +131,20 @@ export class CollectorWatcher {
   close(): void {
     if (this.#closed) return
     this.#closed = true
+    this.#releaseAbort()
     this.clear()
     /** The waiting iterator observes closed before deciding whether another batch is available. */
     const wake = this.#wake
     this.#wake = undefined
     if (wake !== undefined) wake()
+  }
+
+  /** Take the original subscription before removal so generator finalization remains idempotent. */
+  #releaseAbort(): void {
+    /** Only this watcher can remove the callback registered on its borrowed service signal. */
+    const listener = this.#abortListener
+    this.#abortListener = undefined
+    if (listener) this.#signal?.removeEventListener('abort', listener)
   }
 
   /** Release this watcher's ownership before the collector resets its shared intern identities. */
@@ -150,6 +162,8 @@ export class CollectorWatcher {
     const iterator = this.#iterate()
     /** Its inherited built-in return requires the exact branded generator as receiver. */
     const returnIterator = iterator.return
+    /** The return override borrows one exact native receiver and its original method. */
+    const returning = { iterator, returnIterator }
     Object.defineProperty(iterator, 'return', {
       configurable: true,
       writable: true,
@@ -158,7 +172,9 @@ export class CollectorWatcher {
           this.#returning = true
           this.close()
         }
-        return Reflect.apply(returnIterator, iterator, [value]) as ReturnType<typeof returnIterator>
+        return Reflect.apply(returning.returnIterator, returning.iterator, [value]) as ReturnType<
+          typeof returnIterator
+        >
       }
     })
     return iterator
@@ -170,8 +186,8 @@ export class CollectorWatcher {
     this.#filter.after = this.#readSequence()
     this.#active.push(this)
     /** Stream cancellation wakes the existing pending read; it creates no second lifetime owner. */
-    const onAbort = (): void => this.close()
-    this.#signal?.addEventListener('abort', onAbort, { once: true })
+    this.#abortListener = (): void => this.close()
+    this.#signal?.addEventListener('abort', this.#abortListener, { once: true })
     if (this.#signal?.aborted) this.close()
     try {
       while (true) {
@@ -210,7 +226,7 @@ export class CollectorWatcher {
         yield { events, dropped }
       }
     } finally {
-      this.#signal?.removeEventListener('abort', onAbort)
+      this.#releaseAbort()
       /** Unregistration runs at the iterator boundary, outside synchronous event ingestion. */
       const index = this.#active.indexOf(this)
       if (index >= 0) this.#active.splice(index, 1)

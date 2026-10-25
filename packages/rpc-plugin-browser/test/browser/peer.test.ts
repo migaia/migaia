@@ -1,8 +1,15 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import { setTimeout as delay } from 'node:timers/promises'
-import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'
-import { createRpcHost } from '@migaia/rpc-host'
-import type { IRpcFanoutResult } from '../../../rpc-host/dist/core/typing.js'
+import { normalizeRpcHandshake, RpcWireHandshakeStep } from '@migaia/rpc-contract/protocol'
+import { createRpcHost, type IRpcHost, type IRpcFanoutResult } from '@migaia/rpc-host'
+import {
+  defineFlowPlugin,
+  HostObservationKind,
+  type IRpcTransportPlugin,
+  type IRpcFlowPlugin
+} from '@migaia/rpc-host/sdk'
+import { idempotency } from '@migaia/rpc-host/plugins/idempotency'
+import { timeout } from '@migaia/rpc-host/features/timeout'
 import {
   windowPlugin,
   sharedWorkerPlugin,
@@ -10,6 +17,16 @@ import {
   RPC_BROWSER_ERROR_SOURCE
 } from '@migaia/rpc-plugin-browser'
 import { messageTarget, windowPair, portPair, rtcChannel } from './message-fixture.js'
+
+/** Concrete native factory identity preserves one explicit namespace independently of root lifetime. */
+type IBrowserTransportPlugins = readonly [IRpcTransportPlugin<'browser'>]
+/** Actual store extension types join the selected transport rather than a root request facade. */
+type IBrowserReplayPlugins = readonly [
+  ReturnType<typeof idempotency>,
+  IRpcTransportPlugin<'browser'>
+]
+/** A cold native observation hook precedes the listener transport. */
+type IBrowserObservedPlugins = readonly [IRpcFlowPlugin, IRpcTransportPlugin<'browser'>]
 
 /** Remote application declarations keep scalar and generator calls separate. */
 type IFixtureApi = {
@@ -57,7 +74,7 @@ function providers() {
   return new BrowserProviderFixture().value
 }
 
-describe('browser Runtime Peer', () => {
+describe('browser public namespace runtime', () => {
   it.each(['window', 'shared-worker'] as const)(
     'provides typed request, notify, stream, directory, group and outcome over %s',
     async (carrier) => {
@@ -65,27 +82,37 @@ describe('browser Runtime Peer', () => {
       const pair = carrier === 'window' ? windowPair() : portPair()
       /** Both factories participate in the original message handshake concurrently. */
       const peers = await Promise.all([
-        createRpcHost<IFixtureApi>({
+        createRpcHost<IFixtureApi, IBrowserReplayPlugins>({
           plugins: [
+            idempotency(),
             carrier === 'window'
               ? windowPlugin({
+                  namespace: 'browser',
                   window: pair.right.target,
                   origin: 'https://right.test',
                   receiver: pair.left.target
                 })
-              : sharedWorkerPlugin({ sharedWorker: { port: pair.left.target } })
+              : sharedWorkerPlugin({
+                  namespace: 'browser',
+                  sharedWorker: { port: pair.left.target }
+                })
           ],
           report: () => undefined
         }),
         createRpcHost({
           plugins: [
+            idempotency(),
             carrier === 'window'
               ? windowPlugin({
+                  namespace: 'browser',
                   window: pair.left.target,
                   origin: 'https://left.test',
                   receiver: pair.right.target
                 })
-              : sharedWorkerPlugin({ sharedWorker: { port: pair.right.target } })
+              : sharedWorkerPlugin({
+                  namespace: 'browser',
+                  sharedWorker: { port: pair.right.target }
+                })
           ],
           provide: providers(),
           report: () => undefined
@@ -93,35 +120,37 @@ describe('browser Runtime Peer', () => {
       ])
       try {
         /** Generic remote typing must preserve the application's concrete scalar return. */
-        const result = peers[0].request('echo', 'browser-peer')
+        const result = peers[0].browser.request('echo', 'browser-peer')
         expectTypeOf(result).toEqualTypeOf<Promise<string | IRpcFanoutResult<string>>>()
         expect(await result).toBe('browser-peer')
-        await peers[0].notify('record', 'first')
-        expect(await peers[0].request('recorded')).toEqual(['first'])
+        await peers[0].browser.notify('record', 'first')
+        expect(await peers[0].browser.request('recorded')).toEqual(['first'])
         /** Generator typing and actual yielded values must both survive the browser carrier. */
-        const streamed = peers[0].stream('values', 3)
+        const streamed = peers[0].browser.stream('values', 3)
         const stream = streamed as AsyncIterableIterator<number>
         expectTypeOf(stream).toEqualTypeOf<AsyncIterableIterator<number>>()
         expect(await stream.next()).toEqual({ done: false, value: 3 })
         expect(await stream.next()).toEqual({ done: false, value: 4 })
         expect((await stream.next()).done).toBe(true)
-        expect((await peers[0].describe()).connections).toHaveLength(1)
+        expect(Object.keys(peers[0].browser.peers)).toHaveLength(1)
         expect(
-          await peers[0].group([{ method: 'echo', payload: 'group' }], {
+          await peers[0].browser.group([{ method: 'echo', payload: 'group' }], {
             idempotencyKey: `browser-${carrier}`
           })
         ).toMatchObject([{ state: 'success', result: 'group' }])
-        expect(await peers[0].outcome(`browser-${carrier}`)).toMatchObject({ state: 'done' })
+        expect(await peers[0].browser.outcome(`browser-${carrier}`)).toMatchObject({
+          state: 'done'
+        })
         /** This uncalled callback proves typo, payload and scalar/generator misuse rejection. */
         const checkTypes = () => {
           // @ts-expect-error Unknown methods are absent from the remote API.
-          peers[0].request('missing')
+          peers[0].browser.request('missing')
           // @ts-expect-error The method payload remains string, not a caller-selected generic.
-          peers[0].request('echo', 3)
+          peers[0].browser.request('echo', 3)
           // @ts-expect-error Generators use stream rather than scalar request.
-          peers[0].request('values', 3)
+          peers[0].browser.request('values', 3)
           // @ts-expect-error Scalar methods cannot be claimed as streams.
-          peers[0].stream('echo', 'value')
+          peers[0].browser.stream('echo', 'value')
         }
         void checkTypes
         /** Close and asyncDispose retain Core's exact cleanup function and settlement Promise. */
@@ -149,9 +178,10 @@ describe('browser Runtime Peer', () => {
     let calls = 0
     /** Both accepted factories retain original Core runtime method admission. */
     const peers = await Promise.all([
-      createRpcHost<{ count(): number }>({
+      createRpcHost<{ count(): number }, IBrowserTransportPlugins>({
         plugins: [
           windowPlugin({
+            namespace: 'browser',
             window: pair.right.target,
             origin: 'https://right.test',
             receiver: pair.left.target
@@ -162,6 +192,7 @@ describe('browser Runtime Peer', () => {
       createRpcHost({
         plugins: [
           windowPlugin({
+            namespace: 'browser',
             window: pair.left.target,
             origin: 'https://left.test',
             receiver: pair.right.target
@@ -176,7 +207,9 @@ describe('browser Runtime Peer', () => {
       /** The completed handshake's frame count is the baseline before this request is sent. */
       const previous = pair.right.sent.length
       /** The untouched real outbound request is replayed only with hostile native metadata first. */
-      const pending = peers[0].request('count', undefined, { timeoutMs: 500 })
+      const pending = peers[0].browser.request('count', undefined, {
+        timeout: timeout({ ms: 500 })
+      })
       await expect.poll(() => pair.right.sent.length).toBeGreaterThan(previous)
       /** The last actual outbound frame retains its complete request payload. */
       const frame = pair.right.sent.at(-1)
@@ -195,11 +228,12 @@ describe('browser Runtime Peer', () => {
   it('requires explicit Window origin and preserves the existing wildcard escape', async () => {
     /** Invalid configuration must fail before allocating any inbound listener. */
     const fixture = messageTarget()
-    expect(() => windowPlugin({ window: fixture.target } as never)).toThrow(
+    expect(() => windowPlugin({ namespace: 'browser', window: fixture.target } as never)).toThrow(
       expect.objectContaining({ source: RPC_BROWSER_ERROR_SOURCE, code: 'WINDOW_ORIGIN_REQUIRED' })
     )
     expect(() =>
       windowPlugin({
+        namespace: 'browser',
         window: fixture.target,
         origin: '*',
         receiver: fixture.target
@@ -226,7 +260,7 @@ describe('browser Runtime Peer', () => {
     })
     pair.left.setSend((message, origin) => {
       if (origin !== 'https://left.test') return
-      if (rpcMessageCapabilityControl.isInitial(message)) {
+      if (leftInitial === undefined) {
         leftInitial = message
         if (rightInitial !== undefined) release()
         return
@@ -237,7 +271,7 @@ describe('browser Runtime Peer', () => {
     })
     pair.right.setSend((message, origin) => {
       if (origin !== 'https://right.test') return
-      if (rpcMessageCapabilityControl.isInitial(message)) {
+      if (rightInitial === undefined) {
         rightInitial = message
         if (leftInitial !== undefined) release()
         return
@@ -250,9 +284,10 @@ describe('browser Runtime Peer', () => {
     const reports: unknown[] = []
     /** Both factories supply independent local offers through their original Core capture owners. */
     const opening = [
-      createRpcHost<{ echo(value: string): string }>({
+      createRpcHost<{ echo(value: string): string }, IBrowserTransportPlugins>({
         plugins: [
           windowPlugin({
+            namespace: 'browser',
             window: pair.right.target,
             origin: 'https://right.test',
             receiver: pair.left.target
@@ -263,6 +298,7 @@ describe('browser Runtime Peer', () => {
       createRpcHost({
         plugins: [
           windowPlugin({
+            namespace: 'browser',
             window: pair.left.target,
             origin: 'https://left.test',
             receiver: pair.right.target
@@ -286,8 +322,12 @@ describe('browser Runtime Peer', () => {
       }
     )
     await captured
-    expect(rpcMessageCapabilityControl.isInitial(leftInitial)).toBe(true)
-    expect(rpcMessageCapabilityControl.isInitial(rightInitial)).toBe(true)
+    expect(normalizeRpcHandshake(JSON.parse((leftInitial as { data: string }).data)).step).toBe(
+      RpcWireHandshakeStep.hello
+    )
+    expect(normalizeRpcHandshake(JSON.parse((rightInitial as { data: string }).data)).step).toBe(
+      RpcWireHandshakeStep.hello
+    )
     pair.left.emit('message', leftInitial, pair.right.target, 'https://wrong.test')
     await delay(0)
     expect(leftSettled).toBe(false)
@@ -299,7 +339,9 @@ describe('browser Runtime Peer', () => {
     /** Only genuine source/origin metadata may complete either original identity exchange. */
     const peers = await opened
     try {
-      expect(await peers[0].request('echo', 'after-real-initial')).toBe('after-real-initial')
+      expect(await peers[0].browser.request('echo', 'after-real-initial')).toBe(
+        'after-real-initial'
+      )
     } finally {
       await Promise.all(peers.map((peer) => peer.close()))
     }
@@ -332,6 +374,7 @@ describe('browser Runtime Peer', () => {
     const pending = createRpcHost({
       plugins: [
         windowPlugin({
+          namespace: 'browser',
           window: fixture.target,
           origin: 'https://silent.test',
           receiver: fixture.target
@@ -355,25 +398,38 @@ describe('browser Runtime Peer', () => {
     /** Ready observations count actual accepted sessions without exposing internal membership. */
     const ready: string[] = []
     /** Failed clients remain independently available for final cleanup. */
-    const clients: Awaited<ReturnType<typeof createRpcHost<{ echo(value: string): string }>>>[] = []
+    const clients: IRpcHost<{ echo(value: string): string }, IBrowserTransportPlugins>[] = []
     /** A listener's direct API selects a session only when there is exactly one. */
-    const server = await createRpcHost<{ identify(): string }>({
-      plugins: [sharedWorkerPlugin({ listen: scope.target })],
+    const server = await createRpcHost<{ identify(): string }, IBrowserObservedPlugins>({
+      plugins: [
+        defineFlowPlugin({
+          name: 'browser-shared-native-ready',
+          setup: () => ({
+            hooks: {
+              observe: (event) => {
+                if (event.kind === HostObservationKind.peerReady) ready.push(String(event.peerId))
+              }
+            }
+          })
+        }),
+        sharedWorkerPlugin({ namespace: 'browser', listen: scope.target })
+      ],
       provide: { echo: (value: string) => value },
       report: () => undefined
     })
-    server.on('ready', (event) => ready.push(String(event.instanceId)))
     try {
-      expect(await server.request('identify')).toEqual({ fulfilled: {}, rejected: {} })
+      expect(await server.browser.request('identify')).toEqual({ fulfilled: {}, rejected: {} })
       await expect(
         createRpcHost({
-          plugins: [sharedWorkerPlugin({ listen: scope.target })],
+          plugins: [sharedWorkerPlugin({ namespace: 'browser', listen: scope.target })],
           report: () => undefined
         })
       ).rejects.toMatchObject({ source: RPC_BROWSER_ERROR_SOURCE, code: 'LISTENER_ALREADY_BOUND' })
       /** The page and connect event participate concurrently in the actual message handshake. */
-      const first = createRpcHost<{ echo(value: string): string }>({
-        plugins: [sharedWorkerPlugin({ sharedWorker: { port: pairs[0].left.target } })],
+      const first = createRpcHost<{ echo(value: string): string }, IBrowserTransportPlugins>({
+        plugins: [
+          sharedWorkerPlugin({ namespace: 'browser', sharedWorker: { port: pairs[0].left.target } })
+        ],
         self: { name: 'page-a', instanceId: 'page-a' },
         provide: { identify: () => 'page-a' },
         report: () => undefined
@@ -381,10 +437,12 @@ describe('browser Runtime Peer', () => {
       scope.connect(pairs[0].right.target)
       clients.push(await first)
       await expect.poll(() => ready.length).toBe(1)
-      expect(await server.request('identify')).toBe('page-a')
+      expect(await server.browser.request('identify')).toBe('page-a')
       /** A second accepted port must neither replace nor reuse the first page's session. */
-      const second = createRpcHost<{ echo(value: string): string }>({
-        plugins: [sharedWorkerPlugin({ sharedWorker: { port: pairs[1].left.target } })],
+      const second = createRpcHost<{ echo(value: string): string }, IBrowserTransportPlugins>({
+        plugins: [
+          sharedWorkerPlugin({ namespace: 'browser', sharedWorker: { port: pairs[1].left.target } })
+        ],
         self: { name: 'page-b', instanceId: 'page-b' },
         provide: { identify: () => 'page-b' },
         report: () => undefined
@@ -393,10 +451,10 @@ describe('browser Runtime Peer', () => {
       clients.push(await second)
       await expect.poll(() => ready.length).toBe(2)
       expect(new Set(ready).size).toBe(2)
-      expect((await server.describe()).connections).toHaveLength(2)
-      expect(await server.request('identify')).toEqual({
+      expect(Object.keys(server.browser.peers)).toHaveLength(2)
+      expect(await server.browser.request('identify')).toEqual({
         fulfilled: Object.fromEntries(
-          Object.keys(server.peers).map((name, index) => [
+          Object.keys(server.browser.peers).map((name, index) => [
             JSON.stringify(['target', name]),
             index === 0 ? 'page-a' : 'page-b'
           ])
@@ -404,10 +462,12 @@ describe('browser Runtime Peer', () => {
         rejected: {}
       })
       expect(
-        await Promise.all(clients.map((peer, index) => peer.request('echo', `page-${index}`)))
+        await Promise.all(
+          clients.map((peer, index) => peer.browser.request('echo', `page-${index}`))
+        )
       ).toEqual(['page-0', 'page-1'])
       await clients[0]!.close()
-      expect(await clients[1]!.request('echo', 'survivor')).toBe('survivor')
+      expect(await clients[1]!.browser.request('echo', 'survivor')).toBe('survivor')
       /** Closing listener subscription and accepted Peers does not close any page-owned port. */
       const closing = server.close()
       expect(server.close()).toBe(closing)
@@ -432,6 +492,7 @@ describe('browser Runtime Peer', () => {
     const fixture = messageTarget()
     expect(() =>
       rtcDataChannelPlugin({
+        namespace: 'browser',
         rtcDataChannel: { ...fixture.target, ...configuration, readyState: 'open', send() {} }
       })
     ).toThrow(
@@ -448,26 +509,33 @@ describe('browser Runtime Peer', () => {
     const reports: unknown[] = []
     /** Both borrowed channels negotiate through the same Core ACK and directory owners. */
     const peers = await Promise.all([
-      createRpcHost<IFixtureApi>({
-        plugins: [rtcDataChannelPlugin({ rtcDataChannel: rtcChannel(pair.left) })],
-        defaultTimeoutMs: 200,
+      createRpcHost<IFixtureApi, IBrowserTransportPlugins>({
+        plugins: [
+          rtcDataChannelPlugin({
+            namespace: 'browser',
+            rtcDataChannel: rtcChannel(pair.left),
+            features: [timeout({ ms: 200 })]
+          })
+        ],
         report: (error) => reports.push(error)
       }),
       createRpcHost({
-        plugins: [rtcDataChannelPlugin({ rtcDataChannel: rtcChannel(pair.right) })],
+        plugins: [
+          rtcDataChannelPlugin({ namespace: 'browser', rtcDataChannel: rtcChannel(pair.right) })
+        ],
         provide: providers(),
         report: (error) => reports.push(error)
       })
     ])
     try {
-      expect(await peers[0].request('echo', 'rtc-peer')).toBe('rtc-peer')
+      expect(await peers[0].browser.request('echo', 'rtc-peer')).toBe('rtc-peer')
       /** Yielded values prove the reliable accepted channel supports the complete stream path. */
-      const stream = peers[0].stream('values', 7) as AsyncIterableIterator<number>
+      const stream = peers[0].browser.stream('values', 7) as AsyncIterableIterator<number>
       expect(await stream.next()).toEqual({ done: false, value: 7 })
       expect(await stream.next()).toEqual({ done: false, value: 8 })
       expect((await stream.next()).done).toBe(true)
       /** Observe the pending operation before malformed input terminates or times it out. */
-      const pending = peers[0].request('hold').catch((error: unknown) => error)
+      const pending = peers[0].browser.request('hold').catch((error: unknown) => error)
       pair.left.emit('message', '{malformed-json')
       reports.push(await pending)
       /**

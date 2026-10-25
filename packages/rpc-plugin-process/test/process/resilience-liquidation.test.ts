@@ -125,7 +125,7 @@ describe('process resilience committed liquidation', () => {
       name: 'P',
       host
     })
-    /** Both owner and dependant call guards must retain this same terminal cause. */
+    /** Both owner and dependant native diagnostics retain this same terminal cause. */
     const terminal = new Error('terminal')
     source.enter(terminal)
     await settle()
@@ -142,9 +142,7 @@ describe('process resilience committed liquidation', () => {
       /** Each public rejection must retain the exact original terminal reason. */
       let failure: unknown
       try {
-        resilience
-          .callGuard(name)
-          .beforeDispatch({ method: 'read', mode: 'request', generation: 1 })
+        resilience.assertAvailable(name)
       } catch (error) {
         failure = error
       }
@@ -352,6 +350,63 @@ describe('process resilience committed liquidation', () => {
     expect(resilience.inspect('p1')).toMatchObject({ liquidated: true })
     expect(resilience.inspect('p100')).toMatchObject({ liquidated: true })
     await resilience.close()
+  })
+
+  it('closes every registration once when an original unsubscribe fails', async () => {
+    /** Cleanup failure must retain its exact native identity through the public close aggregate. */
+    const primary = new Error('original unsubscribe failure')
+    /** The first borrowed native subscription fails only when its actual remover is invoked. */
+    const removeFirst = vi.fn(() => {
+      throw primary
+    })
+    /** A sibling registration still releases its original subscription once. */
+    const removeSecond = vi.fn()
+    /** Registration cleanup must not dispose the borrowed execution owners. */
+    const dispose = vi.fn(async () => undefined)
+    /** Both native-shaped source records reuse the existing registration fixture. */
+    const original = terminalSource(() => undefined).binding
+    /** No terminal event is raised; this case exercises explicit cleanup only. */
+    const resilience = createProcessResilience({
+      scheduler: createManualScheduler(),
+      report: () => undefined
+    })
+    resilience.attachRegistration(
+      'first',
+      {
+        ...original,
+        supervisor: { ...original.supervisor, onTerminal: () => removeFirst, dispose }
+      },
+      { kind: 'standalone-host', release: async () => undefined }
+    )
+    /** Both subscriptions exist before any close callback can fail or reenter the governor. */
+    const second = resilience.attachRegistration(
+      'second',
+      {
+        ...original,
+        supervisor: { ...original.supervisor, onTerminal: () => removeSecond, dispose }
+      },
+      { kind: 'standalone-host', release: async () => undefined }
+    )
+    /** Concurrent callers observe the same original cleanup Promise, including its rejection. */
+    const closing = resilience.close()
+    expect(resilience.close()).toBe(closing)
+    /** Observe the native aggregate without replacing the original Promise under test. */
+    const failure = await closing.then(
+      () => expect.fail('original unsubscribe failure must reject close'),
+      (error: unknown) => error
+    )
+    expect(failure).toBeInstanceOf(AggregateError)
+    expect(failure).toMatchObject({
+      source: 'rpc.transport.process',
+      code: 'PROCESS_CHANNEL_CLOSED'
+    })
+    expect((failure as AggregateError).errors).toEqual([primary])
+    expect((failure as AggregateError).errors[0]).toBe(primary)
+    expect(removeFirst).toHaveBeenCalledTimes(1)
+    expect(removeSecond).toHaveBeenCalledTimes(1)
+    expect(second.inspect()).toBeUndefined()
+    expect(dispose).not.toHaveBeenCalled()
+    expect(resilience.close()).toBe(closing)
   })
 
   it('a liquidated handle cannot remove a replacement registration', async () => {

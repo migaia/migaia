@@ -1,4 +1,4 @@
-import type { IAbortSignal } from '@migaia/utils/promise'
+/** Native installation commit, rollback and cancellation retain the original business oracles. */
 import {
   defineFeature,
   definePlugin,
@@ -8,29 +8,16 @@ import {
 } from '@migaia/plugin-host'
 import { deferred } from '@migaia/utils/promise'
 import { describe, expect, it, vi } from 'vitest'
-import { createRpcAbortError, RpcCoreErrorCode } from '../../dist/core/errors.js'
-import {
-  attachProviderPreflight,
-  readProviderPreflight
-} from '../../dist/core/internal/provider.js'
-import * as catalog from '../../dist/remote/runtime-api/catalog.js'
-import { RuntimePluginKey } from '../../dist/remote/runtime-api/constants.js'
-import * as runtimePlugin from '../../dist/remote/runtime-api/plugin.js'
-import { defineTransportPlugin } from '../../dist/plugin/define.js'
-import {
-  createAdapterDeployment,
-  type IAdapterDeploymentContext
-} from '../../dist/runtime-adapter/deployment.js'
-import { createRpcHost } from '../../dist/index.js'
-import type { IRuntimePeer } from '../../dist/remote/runtime-api/peer.js'
-import { holdMemoryChannel } from '../host/fixture.js'
-import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
+import { createRpcAbortError } from '../../dist/host/error-owner.js'
+import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
+import * as catalog from '../../dist/dispatch/catalog.js'
+import * as exposure from '../../dist/dispatch/exposure.js'
+import type { IProviderCommitGate } from '../../dist/dispatch/types.js'
+import { timeout } from '@migaia/rpc-host/features/timeout'
+import { coreMemoryServer } from '../host/core-fixture.js'
 
-/** The private side table is optional only for the required unmodified-main red run. */
-type IObservedCommitGate = Readonly<{
-  isOpen(): boolean
-  wait(signal: IAbortSignal): Promise<void>
-}>
+/** The existing connection owns the exact public Host rather than a per-session Peer facade. */
+type IConnectedHost = Awaited<ReturnType<ReturnType<typeof coreMemoryServer>['connect']>>['host']
 
 /** Preserve complete local and wire error classification in the acceptance evidence. */
 function classify(error: unknown): unknown {
@@ -54,59 +41,59 @@ function observe<T>(operation: Promise<T>) {
   )
 }
 
-/** Own one genuine uncommitted Host batch and the physical caller that exercises its gate. */
+/** Own one genuine uncommitted native batch and its existing physical caller fixture. */
 class ServeCommitBarrier {
-  /** Feature and runtime registrations share one native batch commit decision. */
-  #host = new PluginHost<Record<string, never>>({
+  /** Feature and SDK transport registrations share the original native commit decision. */
+  readonly #host = new PluginHost<Record<string, never>>({
+    identity: { name: 'provider' },
     execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
   })
-  /** Physical resource ownership starts before either side negotiates its actual capability offer. */
-  #transports = createMemoryTransportPair()
-  /** Provider receive capture uses the existing native-style acceptance fixture. */
-  #providerSource = holdMemoryChannel(this.#transports[1])
-  /** Caller receive capture independently owns its side of the same raw channel. */
-  #callerSource = holdMemoryChannel(this.#transports[0])
-  /** The acceptance case controls only the existing native installation's commit boundary. */
-  #release = deferred<void>()
-  /** Readiness observes completed transport preparation before business calls begin. */
-  #prepared = deferred<void>()
-  /** Both borrowed fixture resources must start capture before either real ACK can arrive. */
-  #sourceReady = deferred<void>()
-  /** This fixture has exactly two physical ends, fixed by createMemoryTransportPair's tuple. */
-  #sourceArrivals = 0
-  /** Waiters observe the count of real provider preflight visits. */
-  #admissionWaiters: { count: number; resolve(): void }[] = []
-  /** The actual compiler's method names record original admission order. */
-  #arrivals: string[] = []
-  /** One-way failures retain their original reporting channel. */
-  #reports: unknown[] = []
-  /** Each actual gate wait keeps its original provider signal and rejection. */
-  #gateWaits: { method: string; signal: IAbortSignal; error?: unknown }[] = []
-  /** A caller-independent gate wait proves rollback's lifecycle cause. */
+  /** The canonical memory listener lends actual SDK attach and bilateral Session negotiation. */
+  readonly #server = coreMemoryServer('provider', 'provider-1', 'memory', [], ['business'])
+  /** Only the native installation's existing continuation is held by this acceptance fixture. */
+  readonly #release = deferred<void>()
+  /** This receipt means the actual SDK transport install has returned its original resources. */
+  readonly #prepared = deferred<void>()
+  /** Waiters borrow the true number of original native gate waits, never synthetic arrivals. */
+  readonly #admissionWaiters: { count: number; resolve(): void }[] = []
+  /** Actual visits to the one native gate retain admission count without replacing its identity. */
+  readonly #arrivals: string[] = []
+  /** Caller report and the ordinary native owner's actual default reporter retain original errors. */
+  readonly #reports: unknown[] = []
+  /** A caller-independent wait on the original native gate proves the real rollback cause. */
   #rollbackGate: Promise<{ value: void } | { error: unknown }> | undefined
-  /** Original method invocation counts distinguish admission from execution. */
-  #calls = { request: 0, notify: 0, stream: 0 }
-  /** Notification execution is independent of physical one-way send completion. */
-  #notified = deferred<void>()
-  /** The later failing registration preserves the original installation cause identity. */
-  #installFailure = new Error('serve-after-commit install failure')
-  /** One test mode chooses commit or native rollback after preparation. */
-  #rollback: boolean
-  /** The caller retains one actual public Host with a single direct target. */
-  #caller!: IRuntimePeer
-  /** Cleanup joins the exact original native batch Promise. */
-  #installing!: Promise<unknown>
-  /** Transparent compiler observation is restored by the same physical fixture owner. */
+  /** Business entry counts remain independent from admission and one-way physical completion. */
+  readonly #calls = { request: 0, notify: 0, stream: 0 }
+  /** Genuine notification business completion is independent from caller write settlement. */
+  readonly #notified = deferred<void>()
+  /** The later native registration preserves this exact installation primary on rollback. */
+  readonly #installFailure = new Error('serve-after-commit install failure')
+  /** One test scenario selects commit or native rollback after actual preparation. */
+  readonly #rollback: boolean
+  /** One introduced lookup regression uses an actual accepted downstream business peer. */
+  readonly #forwarded: boolean
+  /** The caller is the real Host returned by the canonical memory fixture. */
+  #caller: IConnectedHost | undefined
+  /** The real business peer is independently closed through its original public Host. */
+  #downstream: IConnectedHost | undefined
+  /** Cleanup always joins the exact original native use batch. */
+  #installing: Promise<unknown> | undefined
+  /** Canonical compiler observation is restored by this same test owner. */
   #observation: { mockRestore(): void } | undefined
-  /** The original compiler remains the only producer of provider method objects. */
-  #expose = runtimePlugin.exposedProvide
+  /** The ordinary RPC owner's existing public default sink is observed without replacing policy. */
+  #reportObservation: { mockRestore(): void } | undefined
+  /** All selected entries borrow one observed original gate after their callable is compiled. */
+  #forwardGateObservation: { mockRestore(): void } | undefined
+  /** The unchanged canonical exposure compiler remains the only method producer. */
+  readonly #expose = exposure.exposedProvide
 
-  /** Capture the scenario decision without opening or publishing a connection. */
-  constructor(rollback: boolean) {
+  /** Capture only the scenario decision before any native registration is opened. */
+  constructor(rollback: boolean, forwarded: boolean) {
     this.#rollback = rollback
+    this.#forwarded = forwarded
   }
 
-  /** Build the cold application Feature; every callback reads this scenario's explicit owner. */
+  /** Build the actual application Feature without direct provider registration or early commit. */
   #business() {
     return definePlugin({
       name: 'business',
@@ -127,7 +114,7 @@ class ServeCommitBarrier {
     })
   }
 
-  /** Keep construction, yields and terminal value in the original business iterator. */
+  /** Construction, yields and terminal value remain the original business generator. */
   *#stream() {
     this.#calls.stream += 1
     yield 1
@@ -136,83 +123,73 @@ class ServeCommitBarrier {
     return 4
   }
 
-  /** Observe actual exposure admission without replacing method identities or availability checks. */
-  #observeProvide = (...args: Parameters<typeof runtimePlugin.exposedProvide>) => {
-    /** Invoke the original compiler without introducing a receiver. */
-    const expose = this.#expose
-    /** This remains the canonical compiler's exact method tree. */
-    const provide = expose(...args)
-    for (const entry of catalog.compileRuntimeMethods(provide)) {
-      if (entry.kind === 'forward') continue
-      /** The real availability guard stays ahead of the original preflight behavior. */
-      const preflight = readProviderPreflight(entry.method)
-      attachProviderPreflight(entry.method, (route) => {
-        this.#arrivals.push(entry.name)
-        for (const waiter of this.#admissionWaiters)
-          if (this.#arrivals.length >= waiter.count) waiter.resolve()
-        preflight?.(route)
-      })
-      /** Reflective access retains compatibility with the required original-main red oracle. */
-      const readGate = Reflect.get(catalog, 'readCommitGate') as
-        | ((method: Function) => IObservedCommitGate | undefined)
-        | undefined
-      /** Only existing canonical gate metadata is observed. */
-      const gate = readGate?.(entry.method)
-      if (gate) this.#observeGate(entry.name, entry.method, gate)
+  /** Observe the actual captured gate without replacing method identity or native availability. */
+  readonly #observeProvide = (...args: Parameters<typeof exposure.exposedProvide>) => {
+    /** Only the original exposure compiler produces this exact method graph. */
+    const provide = this.#expose(...args)
+    for (const entry of catalog.compileProviderMethods(provide).values()) {
+      if (entry.kind === 'forward') {
+        this.#observeGate(args[2])
+        continue
+      }
+      /** This is the installer's genuine metadata, not a fixture-created commit gate. */
+      const gate = catalog.readProviderCommitGate(entry.method)
+      if (gate) this.#observeGate(gate)
     }
     return provide
   }
 
-  /** Preserve the exact install gate while recording its signal and refusal. */
-  #observeGate(name: string, method: Function, gate: IObservedCommitGate): void {
+  /** Preserve the exact gate while observing genuine pre-commit invocation waits. */
+  #observeGate(gate: IProviderCommitGate): void {
     if (this.#rollback && this.#rollbackGate === undefined)
       this.#rollbackGate = observe(gate.wait(new AbortController().signal))
-    /** The existing metadata attachment replaces only the transparent observation object. */
-    const attachGate = Reflect.get(catalog, 'attachCommitGate') as (
-      method: Function,
-      gate: IObservedCommitGate
-    ) => Function
-    attachGate(method, {
-      isOpen: () => gate.isOpen(),
-      wait: (signal) => {
-        /** The original context signal and eventual rejection stay together. */
-        const observation: { method: string; signal: IAbortSignal; error?: unknown } = {
-          method: name,
-          signal
-        }
-        this.#gateWaits.push(observation)
-        return gate.wait(signal).catch((error: unknown) => {
-          observation.error = error
-          throw error
-        })
-      }
+    if (this.#forwardGateObservation) return
+    /** The existing native gate retains its original wait callback and Promise implementation. */
+    const observation = { owner: this, wait: gate.wait }
+    this.#forwardGateObservation = vi.spyOn(gate, 'wait').mockImplementation((signal) => {
+      observation.owner.#recordArrival('native-install')
+      return observation.wait(signal)
     })
   }
 
-  /** Create the actual native transport and pause only after its endpoint preparation completes. */
-  #runtime() {
-    /** The existing shared-slot owner recognizes this real physical family. */
-    const family = Object.freeze({})
-    /** The canonical deployment owns opening and closing the captured raw source. */
-    const transport = defineTransportPlugin({
-      name: 'connection',
-      mode: 'connect',
-      expose: ['business'],
-      deployment: createAdapterDeployment({
-        runtimeKey: RuntimePluginKey.thread,
-        runtimeFamily: family,
-        runtimeOptions: {
-          self: { name: 'provider', instanceId: 'provider-1' },
-          report: (error) => this.#reports.push(error)
+  /** Native gate visits share one observation count without another execution or admission path. */
+  #recordArrival(name: string): void {
+    this.#arrivals.push(name)
+    for (const waiter of this.#admissionWaiters)
+      if (this.#arrivals.length >= waiter.count) waiter.resolve()
+  }
+
+  /** Connect one genuine business peer before preparing a separate native forwarding candidate. */
+  async #openBusinessPeer(): Promise<void> {
+    /** This committed namespace owns the real accepted downstream Session and its native index. */
+    const back = coreMemoryServer('provider', 'provider-back', 'back')
+    await this.#host.use(back.transport)
+    /** Only the actual downstream callback increments execution for the forwarding regression. */
+    const connected = await back.connect(
+      'business',
+      {
+        provide: {
+          request: (payload: unknown) => {
+            this.#calls.request += 1
+            return payload
+          }
         },
-        open: (context) => this.#openSource(this.#providerSource, 'caller-1', context)
-      })
-    })
+        report: (error) => this.#reports.push(error)
+      },
+      'business-1'
+    )
+    this.#downstream = connected.host
+  }
+
+  /** Hold only the original SDK install result before the actual native batch may commit. */
+  #runtime() {
+    /** Canonical memory admission supplies all real carrier and handshake behavior. */
+    const transport = this.#server.transport
     return definePlugin({
       ...transport,
       install: async (core) => {
-        /** The genuine install result remains withheld until the same batch can commit. */
-        const installed = await transport.install(core)
+        /** Original native resources are already acquired before this continuation is withheld. */
+        const installed = await transport.install!(core)
         this.#prepared.resolve()
         await this.#release.promise
         return installed
@@ -220,24 +197,16 @@ class ServeCommitBarrier {
     })
   }
 
-  /** Join the two actual raw openings so ordinary Host setup cannot lose the first native ACK. */
-  async #openSource(
-    open: ReturnType<typeof holdMemoryChannel>,
-    peerId: string,
-    context: IAdapterDeploymentContext
-  ) {
-    this.#sourceArrivals += 1
-    if (this.#sourceArrivals === 2) this.#sourceReady.resolve()
-    await this.#sourceReady.promise
-    return open(peerId, context)
-  }
-
-  /** Open both genuine Host owners and return observations only after native preparation. */
+  /** Open the real listener batch before connecting its actual public caller. */
   async open() {
     this.#observation = vi
-      .spyOn(runtimePlugin, 'exposedProvide')
+      .spyOn(exposure, 'exposedProvide')
       .mockImplementation(this.#observeProvide)
-    /** The later native member fails only after the runtime owns its actual cleanup receipts. */
+    this.#reportObservation = vi.spyOn(console, 'error').mockImplementation((error: unknown) => {
+      this.#reports.push(error)
+    })
+    if (this.#forwarded) await this.#openBusinessPeer()
+    /** A later genuine native registration selects rollback only after transport preparation. */
     const tail = definePlugin({
       name: 'tail',
       install: () => {
@@ -245,28 +214,25 @@ class ServeCommitBarrier {
         return {}
       }
     })
-    this.#installing = this.#host.use(this.#business(), this.#runtime(), tail)
+    this.#installing = this.#host.use(
+      ...(this.#forwarded ? [] : [this.#business()]),
+      this.#runtime(),
+      tail
+    )
     void this.#installing.catch(() => undefined)
-    this.#caller = (await createRpcHost({
-      self: { name: 'caller', instanceId: 'caller-1' },
-      plugins: [
-        defineTransportPlugin({
-          name: 'caller-connection',
-          mode: 'connect',
-          deployment: createAdapterDeployment({
-            open: (context) => this.#openSource(this.#callerSource, 'provider-1', context)
-          })
-        })
-      ],
-      report: (error) => this.#reports.push(error)
-    })) as unknown as IRuntimePeer
     await this.#prepared.promise
+    /** The existing fixture owns both original MemoryCarrier endpoints and their ready receipts. */
+    const connected = await this.#server.connect(
+      'caller',
+      { report: (error) => this.#reports.push(error) },
+      'caller-1'
+    )
+    this.#caller = connected.host
     return {
       caller: this.#caller,
       calls: this.#calls,
       arrivals: this.#arrivals,
       reports: this.#reports,
-      gateWaits: this.#gateWaits,
       installFailure: this.#installFailure,
       rollbackGate: this.#rollbackGate,
       notified: this.#notified.promise,
@@ -277,26 +243,31 @@ class ServeCommitBarrier {
     }
   }
 
-  /** Count actual preflight visits without a fixture timer or a parallel dispatch path. */
+  /** Join true admission visits without a fixture timer or a parallel dispatch path. */
   #waitForArrivals(count: number): Promise<void> {
     if (this.#arrivals.length >= count) return Promise.resolve()
     return new Promise((resolve) => this.#admissionWaiters.push({ count, resolve }))
   }
 
-  /** Release the original batch before draining both actual Host and physical resource owners. */
+  /** Release the original batch before draining the actual caller, native owner and observations. */
   async #close(): Promise<void> {
     this.#release.resolve()
-    await this.#installing.catch(() => undefined)
-    await this.#caller.close()
-    await this.#host.dispose()
-    this.#transports[0].close()
-    this.#observation?.mockRestore()
+    try {
+      await this.#installing?.catch(() => undefined)
+      await this.#caller?.close()
+      await this.#downstream?.close()
+      await this.#host.dispose()
+    } finally {
+      this.#observation?.mockRestore()
+      this.#reportObservation?.mockRestore()
+      this.#forwardGateObservation?.mockRestore()
+    }
   }
 }
 
-/** Open one bounded acceptance scenario through its explicit fixture owner. */
-function installBarrier(rollback = false) {
-  return new ServeCommitBarrier(rollback).open()
+/** Open one bounded original acceptance scenario through its explicit fixture owner. */
+function installBarrier(rollback = false, forwarded = false) {
+  return new ServeCommitBarrier(rollback, forwarded).open()
 }
 
 describe('runtime exposed methods serve after commit', () => {
@@ -304,11 +275,13 @@ describe('runtime exposed methods serve after commit', () => {
     /** A real paused Host install makes arrival timing deterministic for all three call kinds. */
     const fixture = await installBarrier()
     /** Request and stream outcomes are handled before the original guard can reject either one. */
-    const request = observe(fixture.caller.request('business.request', 'committed'))
+    const request = observe(fixture.caller.memory.request('business.request', 'committed'))
     /** Notify's caller completion proves only physical send completion. */
-    const notify = fixture.caller.notify('business.notify')
+    const notify = fixture.caller.memory.notify('business.notify')
     /** A first pull sends the actual stream-open call before commit. */
-    const iterator = fixture.caller.stream('business.stream')
+    const iterator = fixture.caller.memory.stream(
+      'business.stream'
+    ) as AsyncIterableIterator<unknown>
     /** Capture the whole iterable to reject a Promise-returning stream registration. */
     const stream = observe(
       (async () => {
@@ -356,11 +329,13 @@ describe('runtime exposed methods serve after commit', () => {
     /** A later install failure rolls back the same genuine prepared runtime registration. */
     const fixture = await installBarrier(true)
     /** Caller outcomes are recorded immediately because rollback may close their transport first. */
-    const request = observe(fixture.caller.request('business.request', 'rolled-back'))
+    const request = observe(fixture.caller.memory.request('business.request', 'rolled-back'))
     /** Notify remains one-way even though its target later reports a gate refusal. */
-    const notify = fixture.caller.notify('business.notify')
+    const notify = fixture.caller.memory.notify('business.notify')
     /** First pull admits the real stream before the batch's rollback decision. */
-    const iterator = fixture.caller.stream('business.stream')
+    const iterator = fixture.caller.memory.stream(
+      'business.stream'
+    ) as AsyncIterableIterator<unknown>
     /** A stream refusal belongs to its consumer rather than an invented notify response. */
     const stream = observe(iterator.next())
     try {
@@ -432,12 +407,19 @@ describe('runtime exposed methods serve after commit', () => {
       const controller = new AbortController()
       /** Existing stream cancellation preserves the caller's exact reason rather than replacing it. */
       const cancellation = createRpcAbortError()
-      /** Deadline expiry uses the existing positive timeout option, with no fixture timer. */
-      const options = interruption === 'abort' ? { signal: controller.signal } : { timeoutMs: 20 }
+      /** Deadline expiry uses the complete timeout feature, with no fixture timer. */
+      const options =
+        interruption === 'abort' ? { signal: controller.signal } : { timeout: timeout({ ms: 20 }) }
       /** Handle caller failure immediately while waiting for actual provider admission. */
-      const request = observe(fixture.caller.request('business.request', interruption, options))
+      const request = observe(
+        fixture.caller.memory.request('business.request', interruption, options)
+      )
       /** First pull admits the stream's own signal-aware gate branch. */
-      const iterator = fixture.caller.stream('business.stream', interruption, options)
+      const iterator = fixture.caller.memory.stream(
+        'business.stream',
+        interruption,
+        options
+      ) as AsyncIterableIterator<unknown>
       /** Stream and scalar outcomes are independent cancellations, even under one caller signal. */
       const stream = observe(iterator.next())
       try {
@@ -457,10 +439,13 @@ describe('runtime exposed methods serve after commit', () => {
         await fixture.installing
         /** Interrupted methods stay uninvoked when the shared install gate eventually opens. */
         expect(fixture.calls).toEqual({ request: 0, notify: 0, stream: 0 })
-        expect(await fixture.caller.request('business.request', 'fresh')).toBe('fresh')
+        expect(await fixture.caller.memory.request('business.request', 'fresh')).toBe('fresh')
         /** A fresh generator proves stream registration remains usable after held interruption. */
         const fresh: unknown[] = []
-        for await (const value of fixture.caller.stream('business.stream')) fresh.push(value)
+        for await (const value of fixture.caller.memory.stream(
+          'business.stream'
+        ) as AsyncIterableIterator<unknown>)
+          fresh.push(value)
         expect(fresh).toEqual([1, 2, 3])
         expect(fixture.calls).toEqual({ request: 1, notify: 0, stream: 1 })
       } finally {
@@ -469,4 +454,22 @@ describe('runtime exposed methods serve after commit', () => {
       }
     }
   )
+
+  it('holds an actual forwarded native candidate until its installing batch commits', async () => {
+    /** RPC-C6-SERVE-FORWARD-CANDIDATE-001 uses the same native install barrier and genuine IO. */
+    const fixture = await installBarrier(false, true)
+    /** The pending candidate must retain its actual native gate even after callable compilation. */
+    const request = observe(fixture.caller.memory.request('business.request', 'forward-committed'))
+    try {
+      await fixture.waitForArrivals(1)
+      expect(fixture.calls).toEqual({ request: 0, notify: 0, stream: 0 })
+      fixture.release()
+      await fixture.installing
+      expect(await request).toEqual({ value: 'forward-committed' })
+      expect(fixture.calls).toEqual({ request: 1, notify: 0, stream: 0 })
+    } finally {
+      await fixture.close()
+      await request
+    }
+  })
 })

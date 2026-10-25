@@ -1,5 +1,5 @@
 import { attachErrorIdentity, attachSecondaryErrors, isNativeErrorValue } from '@migaia/utils/error'
-import { WorkerMessagePort } from '../worker-message-event.js'
+import { WorkerMessagePort, type IWorkerMessagePort } from '../worker-message-event.js'
 import {
   SerializeCodecError,
   SerializeChunkKind,
@@ -11,8 +11,7 @@ import {
   type ISerializePlugin
 } from '@migaia/serialize'
 import { isUint8Array } from '@migaia/utils/bytes'
-import type { IWebWorkerLikePort } from '@migaia/rpc-host/plugin'
-import { RpcLifecycleError } from '@migaia/rpc-host'
+import { RpcLifecycleError } from '@migaia/rpc-contract/errors'
 import { createWorkerContractEndpoint, type IWorkerContractEndpoint } from '../worker-contract.js'
 import { toManagedRpcHandler, type IManagedRpcHandler } from '../managed-rpc-handler.js'
 import {
@@ -40,7 +39,7 @@ import { CursorQueue } from '../cursor-queue.js'
 export type IWorkerFailureEvent = 'error' | 'messageerror'
 
 /** Borrowed Worker-like port with optional synchronous termination for explicitly owned cleanup. */
-export type IWorkerLike = IWebWorkerLikePort & {
+export type IWorkerLike = IWorkerMessagePort & {
   /** Called once on parser disposal only when terminateOnDispose is true; otherwise not invoked. */
   terminate?(): void
 }

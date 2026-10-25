@@ -1,5 +1,5 @@
 import { threadPlugin } from '@migaia/rpc-plugin-thread'
-import type { IRpcTransportPlugin } from '@migaia/rpc-host/plugin'
+import type { IRpcTransportPlugin } from '@migaia/rpc-host/sdk'
 import type { INodeThreadHandle } from '../../dist/threads/node-launcher.js'
 import type {
   IWebThreadHandle,

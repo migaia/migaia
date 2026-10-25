@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { defineProbe, RpcProbeStage } from '@migaia/rpc-host/probe'
+import { defineProbe, RpcProbeStage } from '@migaia/rpc-host/plugins/probe'
 import * as CoroutineSupervision from '@migaia/supervision/coroutine'
 import * as ThreadSupervision from '@migaia/supervision/threads'
 import * as ProcessSupervision from '@migaia/supervision/process'

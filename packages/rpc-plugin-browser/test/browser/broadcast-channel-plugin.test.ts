@@ -1,10 +1,17 @@
 import { randomUUID } from 'node:crypto'
 import { describe, expect, it, vi } from 'vitest'
 import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
-import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'
+import {
+  defineFlowPlugin,
+  HostObservationKind,
+  type IRpcTransportPlugin
+} from '@migaia/rpc-host/sdk'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { broadcastChannelPlugin } from '../../dist/index.js'
 import { BroadcastChannelControl } from '../../dist/browser/broadcast-channel-text.js'
+
+/** Actual factory namespace types remain independent from the public root lifetime surface. */
+type IRoomHost = IRpcHost<Record<never, never>, readonly [IRpcTransportPlugin<'broadcastChannel'>]>
 
 /** Independent provider state proves every participant owns its own calls and failures. */
 type IParticipant = {
@@ -12,14 +19,17 @@ type IParticipant = {
   notes: unknown[]
   reports: unknown[]
   failure: Error
+  /** Actual cold observations retain accepted and retired peer instances. */
+  joined: unknown[]
+  departed: unknown[]
 }
 /** The actual native channels remain caller-owned after every logical host closes. */
 type IRoom = {
   name: string
   channels: BroadcastChannel[]
-  hosts: IRpcHost[]
+  hosts: IRoomHost[]
   states: IParticipant[]
-  add(value: number): Promise<IRpcHost>
+  add(value: number): Promise<IRoomHost>
   close(): Promise<void>
 }
 
@@ -28,7 +38,7 @@ type IRoom = {
 function broadcastRoomFixtureState() {
   const name = randomUUID()
   const channels: BroadcastChannel[] = []
-  const hosts: IRpcHost[] = []
+  const hosts: IRoomHost[] = []
   const states: IParticipant[] = []
   return { name, channels, hosts, states }
 }
@@ -48,7 +58,8 @@ class BroadcastRoomFixture {
       await this.#add(2)
       await this.#add(3)
       await vi.waitFor(() => {
-        for (const host of this.#state.hosts) expect(Object.keys(host.peers)).toHaveLength(2)
+        for (const host of this.#state.hosts)
+          expect(Object.keys(host.broadcastChannel.peers)).toHaveLength(2)
       })
       return {
         name: this.#state.name,
@@ -72,13 +83,15 @@ class BroadcastRoomFixture {
     }
   }
   /** Preserve the original listener operation against this listener's explicit state. */
-  #add = async (value: number): Promise<IRpcHost> => {
+  #add = async (value: number): Promise<IRoomHost> => {
     /** The third provider's original Error is deliberately observed on its original report channel. */
     const state: IParticipant = {
       value,
       notes: [],
       reports: [],
-      failure: new Error('third participant provider failure')
+      failure: new Error('third participant provider failure'),
+      joined: [],
+      departed: []
     }
     this.#state.states.push(state)
     /** Separate same-named channel objects are genuine independent native participants. */
@@ -86,7 +99,21 @@ class BroadcastRoomFixture {
     this.#state.channels.push(channel)
     /** Default host identities must be unique without manually assigning aliases. */
     const host = await createRpcHost({
-      plugins: [broadcastChannelPlugin({ channel, connect: { timeoutMs: 1000 } })],
+      plugins: [
+        defineFlowPlugin<Record<never, never>>({
+          name: 'broadcast-native-observer',
+          setup: () => ({
+            hooks: {
+              observe: (event) => {
+                if (event.kind === HostObservationKind.peerReady) state.joined.push(event.peerId)
+                else if (event.kind === HostObservationKind.peerLeave)
+                  state.departed.push(event.peerId)
+              }
+            }
+          })
+        }),
+        broadcastChannelPlugin({ channel, connect: { timeoutMs: 1000 } })
+      ],
       report: (error) => state.reports.push(error),
       provide: {
         who: () => value,
@@ -120,34 +147,34 @@ async function openRoom(): Promise<IRoom> {
 }
 
 /** Fanout keys are the existing host target keys, using each actual accepted participant name. */
-function target(host: IRpcHost): string {
+function target(host: IRoomHost): string {
   return JSON.stringify(['target', host.self.name])
 }
 
 describe('BroadcastChannel transport plugin', () => {
   it('broadcasts request notify and stream with independent participant values and failures', async () => {
     const room = await openRoom()
-    const [a, b, c] = room.hosts as [IRpcHost, IRpcHost, IRpcHost]
+    const [a, b, c] = room.hosts as [IRoomHost, IRoomHost, IRoomHost]
     try {
       expect(new Set(room.hosts.map((host) => host.self.name)).size).toBe(3)
-      expect(await a.request('who')).toEqual({
+      expect(await a.broadcastChannel.request('who')).toEqual({
         fulfilled: { [target(b)]: 2, [target(c)]: 3 },
         rejected: {}
       })
-      const result = await a.request('maybe')
+      const result = await a.broadcastChannel.request('maybe')
       expect(result).toMatchObject({
         fulfilled: { [target(b)]: 2 },
-        rejected: { [target(c)]: { code: 'UNKNOWN' } }
+        rejected: { [target(c)]: { code: 'INTERNAL' } }
       })
       expect(Object.keys((result as { rejected: object }).rejected)).toEqual([target(c)])
-      await a.notify('failNote', 'broadcast notification')
+      await a.broadcastChannel.notify('failNote', 'broadcast notification')
       await vi.waitFor(() => {
         expect(room.states[0]!.notes).toEqual([])
         expect(room.states[1]!.notes).toEqual(['broadcast notification'])
         expect(room.states[2]!.notes).toEqual(['broadcast notification'])
         expect(room.states[2]!.reports).toContain(room.states[2]!.failure)
       })
-      const streams = a.stream('sequence') as {
+      const streams = a.broadcastChannel.stream('sequence') as {
         fulfilled: Record<string, AsyncIterableIterator<unknown>>
         rejected: Record<string, unknown>
       }
@@ -155,7 +182,7 @@ describe('BroadcastChannel transport plugin', () => {
       expect(await streams.fulfilled[target(b)]!.next()).toEqual({ value: 2, done: false })
       expect(await streams.fulfilled[target(c)]!.next()).toEqual({ value: 3, done: false })
       expect(await streams.fulfilled[target(b)]!.next()).toEqual({ value: 20, done: false })
-      await expect(streams.fulfilled[target(c)]!.next()).rejects.toMatchObject({ code: 'UNKNOWN' })
+      await expect(streams.fulfilled[target(c)]!.next()).rejects.toMatchObject({ code: 'INTERNAL' })
       expect(await streams.fulfilled[target(b)]!.next()).toMatchObject({ done: true })
     } finally {
       await room.close()
@@ -164,17 +191,17 @@ describe('BroadcastChannel transport plugin', () => {
 
   it('sends and dispatches only to the selected live direct endpoint id', async () => {
     const room = await openRoom()
-    const [a, b, c] = room.hosts as [IRpcHost, IRpcHost, IRpcHost]
+    const [a, b, c] = room.hosts as [IRoomHost, IRoomHost, IRoomHost]
     try {
-      expect(await a.send(b.self.instanceId, 'who')).toBe(2)
-      await a.send(b.self.instanceId, 'note', 'only second')
-      a.dispatch(c.self.instanceId, 'note', 'only third')
+      expect(await a.broadcastChannel.send(b.self.instanceId, 'who')).toBe(2)
+      await a.broadcastChannel.send(b.self.instanceId, 'note', 'only second')
+      a.broadcastChannel.dispatch(c.self.instanceId, 'note', 'only third')
       await vi.waitFor(() => {
         expect(room.states[0]!.notes).toEqual([])
         expect(room.states[1]!.notes).toEqual(['only second'])
         expect(room.states[2]!.notes).toEqual(['only third'])
       })
-      await expect(a.send('absent-participant', 'who')).rejects.toMatchObject({
+      await expect(a.broadcastChannel.send('absent-participant', 'who')).rejects.toMatchObject({
         code: 'TARGET_UNKNOWN'
       })
     } finally {
@@ -185,22 +212,21 @@ describe('BroadcastChannel transport plugin', () => {
   it('publishes a fourth accepted join and explicit leave then excludes its retired session', async () => {
     const room = await openRoom()
     const first = room.hosts[0]!
-    const joined: unknown[] = []
-    const departed: unknown[] = []
-    first.on('ready', (event) => joined.push(event.instanceId))
-    first.on('exit', (event) => departed.push(event.instanceId))
+    const joined = room.states[0]!.joined
+    const departed = room.states[0]!.departed
     try {
       const fourth = await room.add(4)
       await vi.waitFor(() => {
         expect(joined).toContain(fourth.self.instanceId)
-        for (const host of room.hosts) expect(Object.keys(host.peers)).toHaveLength(3)
+        for (const host of room.hosts)
+          expect(Object.keys(host.broadcastChannel.peers)).toHaveLength(3)
       })
       await fourth.close()
       await vi.waitFor(() => {
         expect(departed).toContain(fourth.self.instanceId)
-        expect(Object.keys(first.peers)).toHaveLength(2)
+        expect(Object.keys(first.broadcastChannel.peers)).toHaveLength(2)
       })
-      const result = await first.request('who')
+      const result = await first.broadcastChannel.request('who')
       expect(result).toEqual({
         fulfilled: { [target(room.hosts[1]!)]: 2, [target(room.hosts[2]!)]: 3 },
         rejected: {}
@@ -221,9 +247,9 @@ describe('BroadcastChannel transport plugin', () => {
     const room = await openRoom()
     try {
       const buffer = new ArrayBuffer(8)
-      expect(() => room.hosts[0]!.request('echo', buffer, { transfer: [buffer] })).toThrowError(
-        expect.objectContaining({ code: 'CAPABILITY_UNSUPPORTED' })
-      )
+      expect(() =>
+        room.hosts[0]!.broadcastChannel.request('echo', buffer, { transfer: [buffer] })
+      ).toThrowError(expect.objectContaining({ code: 'CAPABILITY_UNSUPPORTED' }))
       expect(buffer.byteLength).toBe(8)
     } finally {
       await room.close()
@@ -249,7 +275,7 @@ describe('BroadcastChannel transport plugin', () => {
           expect.objectContaining({
             name: 'TypeError',
             code: 'INVALID_CONFIG',
-            message: rpcMessageCapabilityControl.failureText
+            message: 'Thread data bootstrap was not acknowledged'
           })
         )
       )
@@ -258,7 +284,7 @@ describe('BroadcastChannel transport plugin', () => {
         ([, delay]) => typeof delay === 'number' && delay > 0 && delay <= 20
       )
       expect(startupTimers).toHaveLength(1)
-      expect(Object.keys(host.peers)).toEqual([])
+      expect(Object.keys(host.broadcastChannel.peers)).toEqual([])
     } finally {
       await host.close()
       channel.close()

@@ -2,7 +2,7 @@ import { assert, describe, expect, it, vi } from 'vitest'
 import { normalizeRpcEnvelope, RpcRouteProfile, type IRpcPortableValue } from '@migaia/rpc-contract'
 import type { IPluginRuntimeSharedSlot } from '@migaia/plugin-host'
 import type { IRpcContext, IRpcProviderResult } from '../../dist/core/typing.js'
-import { RpcCoreErrorCode } from '../../dist/core/errors.js'
+import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import {
   ProviderExecutor,
   type IProviderRequestInput

@@ -85,22 +85,13 @@
       "version": "0.0.11",
       "exports": [
         ".",
-        "./binary/inspect",
-        "./binary/lazy",
+        "./error-code",
         "./errors",
-        "./framing",
-        "./framing/jsonrpc",
-        "./framing/stream",
-        "./framing/v1",
+        "./interfaces",
         "./portable",
-        "./remote",
-        "./runtime",
-        "./runtime/lazy",
-        "./runtime/metadata",
-        "./schema/wire-error",
-        "./stream",
-        "./v1",
-        "./wire"
+        "./protocol",
+        "./schema/protocol",
+        "./schema/wire-error"
       ],
       "readmeLocales": ["zh", "en"]
     },
@@ -111,13 +102,19 @@
       "exports": [
         ".",
         "./features",
-        "./features/auth",
-        "./features/chunk",
         "./features/retry",
         "./features/timeout",
-        "./features/typegen",
-        "./plugin",
-        "./probe"
+        "./plugins",
+        "./plugins/auth",
+        "./plugins/batch",
+        "./plugins/chunk",
+        "./plugins/idempotency",
+        "./plugins/limits",
+        "./plugins/link-policy",
+        "./plugins/probe",
+        "./plugins/schema",
+        "./plugins/typegen",
+        "./sdk"
       ],
       "readmeLocales": ["zh", "en"]
     },

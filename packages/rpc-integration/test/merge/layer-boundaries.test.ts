@@ -139,6 +139,21 @@ function sourceFiles(directory: string): string[] {
 }
 
 describe('layer dependency direction', () => {
+  it('[CORE-A1-DEPENDENCIES] keeps exactly the six permitted Host runtime dependencies', () => {
+    /** Read the actual package boundary; a dev or peer entry cannot replace a runtime dependency. */
+    const manifest = JSON.parse(readFileSync(join(sourceRoot, '../package.json'), 'utf8')) as {
+      dependencies: Record<string, string>
+    }
+    expect(Object.keys(manifest.dependencies).sort()).toEqual([
+      '@migaia/lifecycle',
+      '@migaia/plugin-host',
+      '@migaia/rpc-contract',
+      '@migaia/serialize',
+      '@migaia/supervision',
+      '@migaia/utils'
+    ])
+  })
+
   it('keeps remote retry independent of process and coroutine launchers', () => {
     const source = readFileSync(
       join(import.meta.dirname, '../../../rpc-host/src/remote/retry.ts'),

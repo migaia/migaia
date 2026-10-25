@@ -1,15 +1,19 @@
-import type { IRpcTransportPlugin } from '@migaia/rpc-host/plugin'
-import { defineTransportPlugin, RpcTransportMode } from '@migaia/rpc-host/plugin'
+/** Validates a borrowed reliable RTC channel and builds its cold transport definition. */
+import { defineTransportPlugin } from '@migaia/rpc-host/sdk'
+import type { IRpcTransportPlugin } from '@migaia/rpc-host/sdk'
 import { BrowserPeerErrorText } from '../error-text.js'
-import { RpcBrowserErrorCode } from '../error-code.js'
+import { RpcBrowserErrorCode } from '@migaia/rpc-contract/error-code'
 import { createBrowserPeerError } from './peer-error.js'
-import { BrowserPluginName } from './peer-text.js'
-import { getBrowserMessageAdapter } from './peer-adapter.js'
+import { BrowserPluginName, BrowserNamespace } from './peer-text.js'
+import { attachBrowserCarrier } from './native-message.js'
+import { createRtcDataChannelCarrier } from './adapters/rtc-data-channel.js'
 import type { IRtcDataChannelPluginOptions } from './peer-types.js'
 
-/** Capture only an ordered reliable channel; native signaling and channel ownership stay borrowed. */
-export function rtcDataChannelPlugin(options: IRtcDataChannelPluginOptions): IRpcTransportPlugin {
-  /** The actual channel exposes its negotiated native reliability settings. */
+/** Capture an already ordered/reliable native channel; no signaling or implicit native close. */
+export function rtcDataChannelPlugin<const N extends string = 'rtcDataChannel'>(
+  options: IRtcDataChannelPluginOptions & Readonly<{ namespace?: N }>
+): IRpcTransportPlugin<NoInfer<N>> {
+  /** Native reliability settings are admitted before any listener acquisition. */
   const channel = options?.rtcDataChannel
   if (
     !channel ||
@@ -23,9 +27,10 @@ export function rtcDataChannelPlugin(options: IRtcDataChannelPluginOptions): IRp
     )
   return defineTransportPlugin({
     name: options.name ?? BrowserPluginName.rtc,
+    namespace: (options.namespace ?? BrowserNamespace.rtc) as N,
     expose: options.expose,
-    connect: options.connect,
-    mode: RpcTransportMode.connect,
-    deployment: getBrowserMessageAdapter().deployment({ connect: { rtcDataChannel: channel } })
+    features: options.features,
+    handshakeTimeoutMs: options.connect?.timeoutMs,
+    open: (context) => attachBrowserCarrier(createRtcDataChannelCarrier(channel, context), context)
   })
 }

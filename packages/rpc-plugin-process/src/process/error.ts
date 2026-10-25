@@ -1,5 +1,13 @@
+/**
+ * Constructs registered Process failures from their centralized code/text contract while preserving
+ * native types and causes. Cleanup aggregation retains the original ordered error instances.
+ */
 import { attachErrorIdentity } from '@migaia/utils/error'
-import { ERROR_SOURCE, RpcProcessErrorCode, type IRpcProcessErrorCode } from './error-code.js'
+import {
+  RPC_PROCESS_ERROR_SOURCE as ERROR_SOURCE,
+  RpcProcessErrorCode,
+  type IRpcProcessErrorCode
+} from '@migaia/rpc-contract/error-code'
 import { RpcProcessErrorText } from './error-text.js'
 
 /** One stable text is assigned to each process code at its single construction site. */
@@ -79,4 +87,12 @@ export function createProcessRangeError(field: string): RangeError {
       detail: { field }
     }
   )
+}
+
+/** Preserve ordered primary/cleanup failures under the existing Process close identity. */
+export function createProcessCleanupError(errors: readonly unknown[]): AggregateError {
+  return attachErrorIdentity(new AggregateError(errors, RpcProcessErrorText.channelClosed), {
+    source: ERROR_SOURCE,
+    code: RpcProcessErrorCode.channelClosed
+  })
 }

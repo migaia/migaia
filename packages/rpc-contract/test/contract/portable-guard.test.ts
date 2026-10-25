@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { normalizePortable } from '../../dist/contract/index.js'
+import { normalizePortable } from '@migaia/rpc-contract/portable'
 
 it('retains the bare native-input guard receiver and root error identity', () => {
   for (const value of [new Uint8Array(), new ArrayBuffer(0)]) {

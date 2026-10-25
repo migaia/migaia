@@ -1,33 +1,19 @@
-//! Dependency-free process peer for RPC protocol conformance.
+//! Dependency-free native peer: one ordered JSON owner and the sole migaia.rpc/2 semantic protocol.
 mod business;
 mod json;
 mod selftest;
-
 use json::{number, object, string, Value};
-use std::env;
-use std::io::{self, Read, Write};
-use std::os::fd::FromRawFd;
-use std::os::unix::net::{UnixListener, UnixStream};
-use std::path::PathBuf;
-
+use std::{
+    env,
+    io::{self, Read, Write},
+    os::{
+        fd::FromRawFd,
+        unix::net::{UnixListener, UnixStream},
+    },
+    path::PathBuf,
+};
 const MAX_FRAME: usize = 16_777_216;
 const MAX_HANDSHAKE: usize = 65_536;
-/// Every real session uses the runtime-baseline directory and native physical batch baseline.
-const CAPABILITIES: [&str; 6] = [
-    "abort@1",
-    "ping@1",
-    "close@1",
-    "wire-error@1",
-    "runtime-api@1",
-    "batch@1",
-];
-/// The only application directory method belongs to the schemaVersion 2 baseline.
-const RUNTIME_DESCRIBE: &str = "migaia.remote.runtime.describe";
-/// Logical stream methods use the actual production registered route prefix.
-const RUNTIME_STREAM_PREFIX: &str = "migaia.remote.runtime.stream.";
-/// Whitelist refusal keeps the production core source/code/text contract.
-const METHOD_UNAVAILABLE: &str = "Runtime method is not provided by this peer";
-
 /// Optional method metadata uses the same closed schema vocabulary as the TS directory owner.
 const SCHEMA_FIELDS: [&str; 3] = ["input", "output", "yield"];
 const SCHEMA_KEYS: [&str; 9] = [
@@ -263,7 +249,8 @@ fn valid_runtime_schema(value: &Value) -> bool {
         }
         true
     }
-    if !runtime_schema_data(value, 0) {
+    // Directory.methods[index].schema contributes three original portable container levels.
+    if !runtime_schema_data(value, 3) {
         return false;
     }
     let mut nodes = std::collections::HashSet::new();
@@ -274,74 +261,110 @@ fn valid_runtime_schema(value: &Value) -> bool {
         && references.iter().all(|pointer| nodes.contains(*pointer))
 }
 
-/// Require the new baseline at the real session boundary without altering pure negotiation vectors.
-fn baseline_agreed(agreement: &Value) -> bool {
-    agreement.get("major").and_then(Value::as_u64) == Some(1)
-        && agreement.get("minor").and_then(Value::as_u64) == Some(1)
-        && negotiated(agreement, "runtime-api@1")
-        && negotiated(agreement, "batch@1")
+/// The only semantic profile is independent from the native launch record's version.
+const PROFILE: &str = "migaia.rpc/2";
+/// The route carries its origin plus at most sixteen forwarding hosts; error provenance carries the same forwarded route.
+const MAX_FORWARD_ROUTE_NODES: usize = 17;
+const METHOD_UNAVAILABLE: &str = "Runtime method is not provided by this peer";
+
+/// Borrow an already parsed own field; absent business data has the original null default.
+fn value<'a>(input: &'a Value, key: &str) -> &'a Value {
+    input.get(key).unwrap_or(&Value::Null)
+}
+fn text<'a>(input: &'a Value, key: &str) -> &'a str {
+    value(input, key).as_str().unwrap_or("")
+}
+fn items(input: &Value) -> &[Value] {
+    input.as_array().unwrap_or(&[])
+}
+fn set(input: &mut Value, key: &str, member: Value) {
+    if let Value::Object(fields) = input {
+        if let Some((_, value)) = fields.iter_mut().find(|(name, _)| name == key) {
+            *value = member;
+        } else {
+            fields.push((key.to_owned(), member));
+        }
+    }
+}
+fn invalid(code: &'static str) -> io::Error {
+    io::Error::new(io::ErrorKind::InvalidData, code)
 }
 
-/// Describe only explicitly installed routes and safe identity, never source or bootstrap secrets.
-fn runtime_description(methods: &[(&str, &[&str])]) -> Value {
+/// Read only required known fields; unknown protocol metadata is ignored under R17.
+fn has_fields(input: &Value, required: &[&str]) -> bool {
+    matches!(input, Value::Object(_)) && required.iter().all(|key| input.has(key))
+}
+fn identifier(input: &Value) -> bool {
+    matches!(input,Value::String(text) if (1..=128).contains(&text.encode_utf16().count()))
+}
+fn safe_integer(input: &Value) -> Option<u64> {
+    match input {
+        Value::Number(text) => text
+            .parse::<f64>()
+            .ok()
+            .filter(|n| {
+                n.is_finite() && *n >= 0.0 && *n <= 9_007_199_254_740_991.0 && n.fract() == 0.0
+            })
+            .map(|n| n as u64),
+        _ => None,
+    }
+}
+fn finite_number(input: &Value, maximum: f64) -> bool {
+    matches!(input,Value::Number(text) if text.parse::<f64>().is_ok_and(|n|n.is_finite() && n >= 0.0 && n <= maximum))
+}
+fn segment(input: &str) -> bool {
+    !input.is_empty()
+        && input.len() <= 40
+        && input.as_bytes()[0].is_ascii_alphabetic()
+        && input
+            .bytes()
+            .all(|ch| ch.is_ascii_alphanumeric() || ch == b'_' || ch == b'-')
+}
+fn method_name(input: &Value) -> bool {
+    identifier(input)
+        && input
+            .as_str()
+            .is_some_and(|name| name.split('.').all(segment))
+}
+fn hex_node(input: &Value) -> bool {
+    matches!(input,Value::String(id) if id.len() == 32 && id.bytes().all(|ch|ch.is_ascii_digit() || (b'a'..=b'f').contains(&ch)))
+}
+fn valid_generation(input: &Value) -> bool {
+    has_fields(input, &["kind", "value", "providerId"])
+        && matches!(text(input, "kind"), "session" | "restart")
+        && safe_integer(value(input, "value")).is_some()
+        && identifier(value(input, "providerId"))
+}
+fn identity() -> Value {
     object(&[
-        ("schemaVersion", number(2)),
+        ("name", string("rust-peer")),
+        ("instanceId", string("rust-peer")),
         (
-            "self",
+            "generation",
             object(&[
-                ("name", string("rust-peer")),
-                ("instanceId", string("rust-peer")),
+                ("kind", string("session")),
+                ("value", number(0)),
+                ("providerId", string("rust-peer")),
             ]),
-        ),
-        (
-            "methods",
-            Value::Array(
-                methods
-                    .iter()
-                    .map(|(name, modes)| {
-                        object(&[
-                            ("name", string(name)),
-                            (
-                                "supportedModes",
-                                Value::Array(modes.iter().map(|mode| string(mode)).collect()),
-                            ),
-                            ("modeSource", string("declared")),
-                        ])
-                    })
-                    .collect(),
-            ),
         ),
     ])
 }
 
-/// Admit a closed v2 directory using the actual negotiated peer identity and logical method grammar.
-fn valid_runtime_description(value: &Value, remote_id: &str) -> bool {
-    let Value::Object(fields) = value else {
-        return false;
-    };
-    if fields.len() != 3 || value.get("schemaVersion").and_then(Value::as_u64) != Some(2) {
-        return false;
-    }
-    let Some(Value::Object(identity)) = value.get("self") else {
-        return false;
-    };
-    if identity.len() != 2
-        || !["name", "instanceId"].iter().all(|key| {
-            value
-                .get("self")
-                .and_then(|value| value.get(key))
-                .and_then(Value::as_str)
-                .is_some_and(|text| !text.is_empty() && text.chars().count() <= 128)
-        })
-        || value
-            .get("self")
-            .and_then(|value| value.get("instanceId"))
-            .and_then(Value::as_str)
-            != Some(remote_id)
+/// Original schema checks remain the sole directory extension owner; schema3 binds the actual generation.
+fn valid_runtime_description(input: &Value, remote_id: &str) -> bool {
+    let own = value(input, "self");
+    if !has_fields(input, &["schemaVersion", "self", "methods"])
+        || safe_integer(value(input, "schemaVersion")) != Some(3)
+        || !has_fields(own, &["name", "instanceId", "generation"])
+        || !identifier(value(own, "name"))
+        || text(own, "instanceId") != remote_id
+        || !identifier(value(own, "instanceId"))
+        || !valid_generation(value(own, "generation"))
+        || input.get("nodeId").is_some_and(|node| !hex_node(node))
     {
         return false;
     }
-    let Some(methods) = value.get("methods").and_then(Value::as_array) else {
+    let Some(methods) = value(input, "methods").as_array() else {
         return false;
     };
     if methods.len() > 4096 {
@@ -349,39 +372,25 @@ fn valid_runtime_description(value: &Value, remote_id: &str) -> bool {
     }
     let mut seen = std::collections::HashSet::new();
     for method in methods {
-        let Value::Object(fields) = method else {
-            return false;
-        };
-        if fields.iter().any(|(key, _)| {
-            !["name", "supportedModes", "modeSource", "idempotent"].contains(&key.as_str())
-                && !SCHEMA_FIELDS.contains(&key.as_str())
-        }) {
-            return false;
-        }
-        if SCHEMA_FIELDS.iter().any(|key| {
-            method
-                .get(key)
-                .is_some_and(|schema| !valid_runtime_schema(schema))
-        }) {
-            return false;
-        }
-        let Some(name) = method.get("name").and_then(Value::as_str) else {
-            return false;
-        };
-        if name.len() > 128
-            || !seen.insert(name)
-            || !name.split('.').all(|part| {
-                !part.is_empty()
-                    && part.len() <= 40
-                    && part.as_bytes()[0].is_ascii_alphabetic()
-                    && part
-                        .bytes()
-                        .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-')
+        if !has_fields(method, &["name", "supportedModes", "modeSource"])
+            || !method_name(value(method, "name"))
+            || !seen.insert(text(method, "name"))
+            || !matches!(text(method, "modeSource"), "declared" | "generated-routes")
+            || method
+                .get("idempotent")
+                .is_some_and(|value| !matches!(value, Value::Bool(_)))
+            || method
+                .get("forwardedVia")
+                .is_some_and(|value| value.as_str().is_none_or(|value| !segment(value)))
+            || SCHEMA_FIELDS.iter().any(|key| {
+                method
+                    .get(key)
+                    .is_some_and(|schema| !valid_runtime_schema(schema))
             })
         {
             return false;
         }
-        let Some(modes) = method.get("supportedModes").and_then(Value::as_array) else {
+        let Some(modes) = value(method, "supportedModes").as_array() else {
             return false;
         };
         if modes.is_empty()
@@ -393,79 +402,559 @@ fn valid_runtime_description(value: &Value, remote_id: &str) -> bool {
         {
             return false;
         }
-        if !matches!(
-            method.get("modeSource").and_then(Value::as_str),
-            Some("declared" | "generated-routes")
-        ) || method
-            .get("idempotent")
-            .is_some_and(|value| !matches!(value, Value::Bool(_)))
-        {
-            return false;
-        }
-    }
-    // Method schemas consume the complete directory's existing portable nesting budget.
-    runtime_schema_data(value, 0)
-}
-
-/// Decode the native physical batch without changing individual member admission or correlation.
-fn physical_envelopes(message: Value) -> io::Result<Vec<Value>> {
-    if message.get("kind").and_then(Value::as_str) != Some("batch") {
-        return Ok(vec![message]);
-    }
-    if !matches!(&message, Value::Object(fields) if fields.len() == 2) {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidData,
-            "INVALID_ENVELOPE",
-        ));
-    }
-    match message.get("envelopes").and_then(Value::as_array) {
-        Some(members) if !members.is_empty() => Ok(members.to_vec()),
-        _ => Err(io::Error::new(
-            io::ErrorKind::InvalidData,
-            "INVALID_ENVELOPE",
-        )),
-    }
-}
-
-/// Admit only current native envelopes; unsupported profile/options never enter business dispatch.
-fn native_envelope_valid(message: &Value) -> bool {
-    let Some(kind) = message.get("kind").and_then(Value::as_str) else {
-        return false;
-    };
-    if !matches!(
-        kind,
-        "request" | "response" | "variation" | "discovery" | "stream"
-    ) || message
-        .get("id")
-        .and_then(Value::as_str)
-        .is_none_or(str::is_empty)
-        || message.has("options")
-        || message.has("task")
-        || message.has("profile")
-    {
-        return false;
-    }
-    let route = message.get("data").and_then(|data| data.get("route"));
-    if route
-        .and_then(|route| route.get("profile"))
-        .and_then(Value::as_str)
-        != Some("migaia.rpc.route")
-    {
-        return false;
-    }
-    if kind == "request" {
-        return message
-            .get("method")
-            .and_then(Value::as_str)
-            .is_some_and(|method| !method.is_empty())
-            && route
-                .and_then(|route| route.get("type"))
-                .and_then(Value::as_str)
-                == Some("request");
     }
     true
 }
 
+/// Canonical bytes strings use the URL alphabet with unused low bits zero, without a second codec.
+fn canonical_base64(input: &str) -> bool {
+    let mut last = 0;
+    for byte in input.bytes() {
+        last = match byte {
+            b'A'..=b'Z' => byte - b'A',
+            b'a'..=b'z' => byte - b'a' + 26,
+            b'0'..=b'9' => byte - b'0' + 52,
+            b'-' => 62,
+            b'_' => 63,
+            _ => return false,
+        };
+    }
+    match input.len() % 4 {
+        0 => true,
+        2 => last & 15 == 0,
+        3 => last & 3 == 0,
+        _ => false,
+    }
+}
+
+/// Text-only data quota is distinct from portable stream's JSON punctuation accounting.
+fn error_data_text(input: &Value, depth: usize) -> Option<usize> {
+    if depth > 64 {
+        return None;
+    }
+    let count = match input {
+        Value::Null | Value::Bool(_) => 0,
+        Value::Number(text) if text.parse::<f64>().is_ok_and(f64::is_finite) => 0,
+        Value::String(text) => text.len(),
+        Value::Array(values) => {
+            let mut sum = 0;
+            for value in values {
+                sum += error_data_text(value, depth + 1)?;
+            }
+            sum
+        }
+        Value::Object(fields) if input.has("$rpc") => {
+            let encoded = text(input, "base64url");
+            if fields.len() != 2
+                || text(input, "$rpc") != "bytes"
+                || !matches!(value(input, "base64url"), Value::String(_))
+                || !canonical_base64(encoded)
+            {
+                return None;
+            }
+            encoded.len()
+        }
+        Value::Object(fields) => {
+            let mut sum = 0;
+            for (key, value) in fields {
+                sum += key.len() + error_data_text(value, depth + 1)?;
+            }
+            sum
+        }
+        _ => return None,
+    };
+    (count <= 65_536).then_some(count)
+}
+
+/// Validate flat graph edges by integer index; cycles and repeated references retain their topology.
+fn valid_flat_error(input: &Value) -> bool {
+    let Some(nodes) = value(input, "nodes").as_array() else {
+        return false;
+    };
+    let Some(root) = safe_integer(value(input, "root")) else {
+        return false;
+    };
+    if !has_fields(input, &["root", "nodes"])
+        || nodes.is_empty()
+        || nodes.len() > 1024
+        || root as usize >= nodes.len()
+    {
+        return false;
+    }
+    let mut bytes = 0;
+    for node in nodes {
+        if !has_fields(node, &["source", "code", "name", "message", "stack"]) {
+            return false;
+        }
+        for key in ["source", "code", "name", "message", "stack"] {
+            let Value::String(part) = value(node, key) else {
+                return false;
+            };
+            if key != "message" && part.is_empty() || part.len() > 65_536 {
+                return false;
+            }
+            bytes += part.len();
+        }
+        if node.get("cause").is_some_and(|edge| {
+            safe_integer(edge).is_none_or(|index| index as usize >= nodes.len())
+        }) {
+            return false;
+        }
+        if let Some(edges) = node.get("errors") {
+            let Some(edges) = edges.as_array() else {
+                return false;
+            };
+            if edges.is_empty()
+                || edges.iter().any(|edge| {
+                    safe_integer(edge).is_none_or(|index| index as usize >= nodes.len())
+                })
+            {
+                return false;
+            }
+        }
+        if let Some(data) = node.get("data") {
+            if error_data_text(data, 17).is_none() {
+                return false;
+            }
+            bytes += data.text().len();
+        }
+        if let Some(route) = node.get("route") {
+            let Some(route) = route.as_array() else {
+                return false;
+            };
+            if route.is_empty()
+                || route.len() > MAX_FORWARD_ROUTE_NODES
+                || !route.iter().all(hex_node)
+            {
+                return false;
+            }
+            bytes += route.len() * 32;
+        }
+        if bytes > 1_048_576
+            || node
+                .get("truncated")
+                .is_some_and(|flag| flag != &Value::Bool(true))
+        {
+            return false;
+        }
+    }
+    true
+}
+
+/// The original conservative portable counter validates in the same walk that charges semantic bytes.
+fn portable_bytes(input: &Value, depth: usize) -> Option<usize> {
+    if depth > 64 {
+        return None;
+    }
+    let count = match input {
+        Value::Null => 4,
+        Value::Bool(true) => 4,
+        Value::Bool(false) => 5,
+        Value::Number(text) if text.parse::<f64>().is_ok_and(f64::is_finite) => 24,
+        Value::String(text) => {
+            2 + text
+                .chars()
+                .map(|ch| match ch {
+                    '"' | '\\' => 2,
+                    ch if ch <= '\u{1f}' => 6,
+                    ch => ch.len_utf8(),
+                })
+                .sum::<usize>()
+        }
+        Value::Array(values) => {
+            let mut count = 2 + values.len().saturating_sub(1);
+            for value in values {
+                count += portable_bytes(value, depth + 1)?;
+            }
+            count
+        }
+        Value::Object(fields) if input.has("$rpc") => {
+            if fields.len() != 2
+                || text(input, "$rpc") != "bytes"
+                || !matches!(value(input, "base64url"), Value::String(_))
+                || !canonical_base64(text(input, "base64url"))
+            {
+                return None;
+            }
+            input.text().len()
+        }
+        Value::Object(fields) => {
+            let mut count = 2 + fields.len().saturating_sub(1);
+            for (key, value) in fields {
+                count += portable_bytes(&string(key), depth + 1)?
+                    + 1
+                    + portable_bytes(value, depth + 1)?;
+            }
+            count
+        }
+        _ => return None,
+    };
+    Some(count)
+}
+fn valid_stream(input: &Value) -> bool {
+    let Some(seq) = safe_integer(value(input, "seq")) else {
+        return false;
+    };
+    let (field, required) = match text(input, "event") {
+        "open" if seq == 0 => ("", false),
+        "pull" => ("", false),
+        "item" => ("value", true),
+        "end" => ("value", false),
+        "fail" => ("error", true),
+        "cancelled" => ("error", false),
+        "finish-without-items" => ("reason", false),
+        _ => return false,
+    };
+    if !has_fields(input, &["event", "seq"]) || required && !input.has(field) {
+        return false;
+    }
+    match input.get(field) {
+        None => true,
+        Some(value) if field == "value" => {
+            portable_bytes(value, 0).is_some_and(|count| count <= 16_384)
+        }
+        Some(value) => valid_flat_error(value),
+    }
+}
+
+fn valid_route(input: &Value) -> bool {
+    has_fields(input,&["applicationVersion","senderId","receiverId","targetId"]) &&
+    ["applicationVersion","senderId","receiverId","targetId"].iter().all(|key|identifier(value(input,key))) &&
+    input.get("sentAt").is_none_or(|value|finite_number(value,f64::MAX)) &&
+    input.get("remainingMs").is_none_or(|value|finite_number(value,2_147_483_647.0)) &&
+    input.get("trace").is_none_or(|value|matches!(value,Value::String(text) if (1..=256).contains(&text.len()) && text.bytes().all(|ch|(32..=126).contains(&ch)))) &&
+    input.get("forwardRoute").is_none_or(|route|route.as_array().is_some_and(|route|route.len() <= MAX_FORWARD_ROUTE_NODES && route.iter().all(identifier)))
+}
+fn valid_task(input: &Value) -> bool {
+    if !has_fields(
+        input,
+        &["mode", "callerId", "callerGeneration", "targetGeneration"],
+    ) || !identifier(value(input, "callerId"))
+        || !valid_generation(value(input, "callerGeneration"))
+        || !valid_generation(value(input, "targetGeneration"))
+    {
+        return false;
+    }
+    match text(input, "mode") {
+        "request" | "notify" | "stream" => method_name(value(input, "method")),
+        "group" | "outcome" => true,
+        _ => false,
+    }
+}
+fn valid_options(input: &Value, mode: &str) -> bool {
+    has_fields(input, &[])
+        && ["orderKey", "idempotencyKey"]
+            .iter()
+            .all(|key| input.get(key).is_none_or(identifier))
+        && input
+            .get("cancel")
+            .is_none_or(|value| value.as_str() == Some("before-start"))
+        && (mode != "notify"
+            || !input.has("idempotencyKey")
+            || text(input, "cancel") == "before-start")
+}
+fn valid_outcomes(input: &Value) -> bool {
+    let Some(outcomes) = input.as_array() else {
+        return false;
+    };
+    if outcomes.is_empty() {
+        return false;
+    }
+    let mut failed = false;
+    for outcome in outcomes {
+        match text(outcome, "state") {
+            "success" => {
+                if failed
+                    || !has_fields(outcome, &["state"])
+                    || outcome
+                        .get("result")
+                        .is_some_and(|result| portable_bytes(result, 0).is_none())
+                {
+                    return false;
+                }
+            }
+            "failure" => {
+                if failed
+                    || !has_fields(outcome, &["state", "error"])
+                    || !valid_flat_error(value(outcome, "error"))
+                {
+                    return false;
+                }
+                failed = true;
+            }
+            "not-executed" => {
+                if !failed || !has_fields(outcome, &["state"]) {
+                    return false;
+                }
+            }
+            _ => return false,
+        }
+    }
+    true
+}
+
+fn valid_completion(input: &Value, mode: &str) -> bool {
+    if value(input, "ok") == &Value::Bool(false) {
+        return has_fields(input, &["ok", "error"]) && valid_flat_error(value(input, "error"));
+    }
+    if value(input, "ok") != &Value::Bool(true) || !has_fields(input, &["ok"]) {
+        return false;
+    }
+    if mode == "group" {
+        valid_outcomes(value(input, "result"))
+    } else {
+        input
+            .get("result")
+            .is_none_or(|result| portable_bytes(result, 0).is_some())
+    }
+}
+
+fn valid_outcome_store(input: &Value) -> bool {
+    text(input, "kind") == "unavailable"
+        && has_fields(input, &["kind", "continuity"])
+        && text(input, "continuity") == "unavailable"
+        || has_fields(input, &["kind", "epoch", "continuity"])
+            && matches!(text(input, "kind"), "memory" | "external")
+            && identifier(value(input, "epoch"))
+            && matches!(text(input, "continuity"), "retained" | "lost-since-restart")
+}
+
+fn codec_name(input: &str) -> bool {
+    !input.is_empty()
+        && input.len() <= 32
+        && input.as_bytes()[0].is_ascii_lowercase()
+        && input
+            .bytes()
+            .all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || matches!(ch, b'.' | b'-'))
+}
+fn extension_name(input: &str) -> bool {
+    let Some((name, version)) = input.split_once('@') else {
+        return false;
+    };
+    !name.is_empty()
+        && name.as_bytes()[0].is_ascii_lowercase()
+        && name
+            .bytes()
+            .all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || matches!(ch, b'.' | b'-'))
+        && !version.is_empty()
+        && version.as_bytes()[0] != b'0'
+        && version.bytes().all(|ch| ch.is_ascii_digit())
+}
+fn names(input: &Value, maximum: usize, valid: fn(&str) -> bool) -> bool {
+    let Some(values) = input.as_array() else {
+        return false;
+    };
+    if values.len() > maximum {
+        return false;
+    }
+    let mut seen = std::collections::HashSet::new();
+    values.iter().all(|value| {
+        value
+            .as_str()
+            .is_some_and(|name| valid(name) && seen.insert(name))
+    })
+}
+
+/// Pure handshake checks known fields; semantic/auth selection occurs only in handshake().
+fn valid_handshake(input: &Value) -> bool {
+    if text(input, "profile") != PROFILE || text(input, "kind") != "handshake" {
+        return false;
+    }
+    if text(input, "step") == "reject" {
+        return has_fields(input, &["profile", "kind", "step", "error"])
+            && valid_flat_error(value(input, "error"));
+    }
+    let own = value(input, "peer");
+    if !has_fields(own, &["id", "runtime"])
+        || !identifier(value(own, "id"))
+        || !codec_name(text(own, "runtime"))
+        || text(own, "runtime").contains('.')
+        || own
+            .get("runtimeVersion")
+            .is_some_and(|value| !matches!(value, Value::String(_)))
+        || own.get("implementation").is_some_and(|value| {
+            !has_fields(value, &["name", "version"])
+                || ["name", "version"]
+                    .iter()
+                    .any(|key| !matches!(self::value(value, key), Value::String(_)))
+        })
+        || (text(input, "step") != "pending"
+            && (!valid_runtime_description(value(input, "directory"), text(own, "id"))
+                || !names(value(input, "extensions"), 64, extension_name)))
+        || input
+            .get("auth")
+            .is_some_and(|auth| portable_bytes(auth, 0).is_none())
+    {
+        return false;
+    }
+    match text(input, "step") {
+        "pending" => {
+            has_fields(input, &["profile", "kind", "step", "peer", "remainingMs"])
+                && finite_number(value(input, "remainingMs"), 2_147_483_647.0)
+        }
+        "hello" => {
+            if !has_fields(
+                input,
+                &[
+                    "profile",
+                    "kind",
+                    "step",
+                    "versions",
+                    "codecs",
+                    "extensions",
+                    "peer",
+                    "directory",
+                ],
+            ) {
+                return false;
+            }
+            let Some(versions) = value(input, "versions").as_array() else {
+                return false;
+            };
+            let mut seen = std::collections::HashSet::new();
+            !versions.is_empty()
+                && versions.len() <= 8
+                && versions.iter().all(|version| {
+                    has_fields(version, &["major", "minor"])
+                        && safe_integer(value(version, "major"))
+                            .is_some_and(|major| major > 0 && seen.insert(major))
+                        && safe_integer(value(version, "minor")).is_some()
+                })
+                && names(value(input, "codecs"), 16, codec_name)
+                && items(value(input, "codecs")).contains(&string("json"))
+                && input.get("requiredExtensions").is_none_or(|required| {
+                    names(required, 64, extension_name)
+                        && items(required)
+                            .iter()
+                            .all(|item| items(value(input, "extensions")).contains(item))
+                })
+        }
+        "accept" => {
+            has_fields(
+                input,
+                &[
+                    "profile",
+                    "kind",
+                    "step",
+                    "major",
+                    "minor",
+                    "codec",
+                    "extensions",
+                    "peer",
+                    "directory",
+                ],
+            ) && safe_integer(value(input, "major")).is_some_and(|major| major > 0)
+                && safe_integer(value(input, "minor")).is_some()
+                && codec_name(text(input, "codec"))
+        }
+        _ => false,
+    }
+}
+/// All live input and selftest vectors use this same single semantic admission function.
+fn valid_frame(input: &Value) -> bool {
+    if text(input, "kind") == "handshake" {
+        return valid_handshake(input);
+    }
+    if text(input, "profile") != PROFILE {
+        return false;
+    }
+    let (required, optional): (&[&str], &[&str]) = match text(input, "kind") {
+        "call" => (&["task", "options"], &["payload", "extensions"]),
+        "group" => (&["task", "options", "steps"], &["extensions"]),
+        "result" => (&["task"], &["result", "extensions"]),
+        "error" => (&["task", "error"], &["extensions"]),
+        "cancel" => (&["task"], &["reason", "extensions"]),
+        "stream" => (&["task", "stream"], &["extensions"]),
+        "control" => (&["operation"], &["reason"]),
+        "directory" => (&["directory"], &[]),
+        "outcome" => (
+            &["task", "operation"],
+            &["idempotencyKey", "state", "store", "outcome", "extensions"],
+        ),
+        _ => return false,
+    };
+    let mut fields = vec!["profile", "kind", "id", "route"];
+    fields.extend_from_slice(required);
+    if !has_fields(input, &fields)
+        || !identifier(value(input, "id"))
+        || !valid_route(value(input, "route"))
+        || required.contains(&"task") && !valid_task(value(input, "task"))
+        || optional.contains(&"extensions")
+            && input.get("extensions").is_some_and(|extension| {
+                !matches!(extension, Value::Object(_)) || portable_bytes(extension, 0).is_none()
+            })
+        || ["error", "reason"].iter().any(|key| {
+            (required.contains(key) || optional.contains(key))
+                && input.get(key).is_some_and(|error| !valid_flat_error(error))
+        })
+    {
+        return false;
+    }
+    let mode = text(value(input, "task"), "mode");
+    match text(input, "kind") {
+        "call" => {
+            matches!(mode, "request" | "notify" | "stream")
+                && valid_options(value(input, "options"), mode)
+                && input
+                    .get("payload")
+                    .is_none_or(|payload| portable_bytes(payload, 0).is_some())
+        }
+        "group" => {
+            mode == "group"
+                && valid_options(value(input, "options"), mode)
+                && value(input, "steps").as_array().is_some_and(|steps| {
+                    !steps.is_empty()
+                        && steps.iter().all(|step| {
+                            has_fields(step, &["method"])
+                                && method_name(value(step, "method"))
+                                && step
+                                    .get("payload")
+                                    .is_none_or(|payload| portable_bytes(payload, 0).is_some())
+                        })
+                })
+        }
+        "result" if mode == "group" => valid_outcomes(value(input, "result")),
+        "result" => input
+            .get("result")
+            .is_none_or(|result| portable_bytes(result, 0).is_some()),
+        "stream" => mode == "stream" && valid_stream(value(input, "stream")),
+        "control" => matches!(text(input, "operation"), "ping" | "pong" | "drain"),
+        "directory" => valid_runtime_description(
+            value(input, "directory"),
+            text(value(value(input, "directory"), "self"), "instanceId"),
+        ),
+        "outcome" => {
+            if mode != "outcome" {
+                return false;
+            }
+            match text(input, "operation") {
+                "lookup" => identifier(value(input, "idempotencyKey")),
+                "result" => {
+                    valid_outcome_store(value(input, "store"))
+                        && match text(input, "state") {
+                            "pending" | "unknown" => true,
+                            "done" => {
+                                let outcome = value(input, "outcome");
+                                has_fields(outcome, &["mode", "targetGeneration", "completion"])
+                                    && matches!(
+                                        text(outcome, "mode"),
+                                        "request" | "notify" | "stream" | "group"
+                                    )
+                                    && valid_generation(value(outcome, "targetGeneration"))
+                                    && valid_completion(
+                                        value(outcome, "completion"),
+                                        text(outcome, "mode"),
+                                    )
+                            }
+                            _ => false,
+                        }
+                }
+                _ => false,
+            }
+        }
+        _ => true,
+    }
+}
 /// Apply the current connection-phase limit before allocating or reading its payload.
 fn read_frame(input: &mut impl Read, max_bytes: usize) -> io::Result<Option<Vec<u8>>> {
     let mut header = [0u8; 4];
@@ -517,604 +1006,415 @@ fn read_json(input: &mut impl Read) -> io::Result<Option<Value>> {
     Ok(Some(value))
 }
 
-/// This fixed error never includes untrusted input, including handshake auth.
-fn wire_error(source: &str, code: &str, message: &str) -> Value {
+/// Stable diagnostic factory retains native type/name/source/code and remote stack text in the flat graph.
+fn error_node(source: &str, code: &str, name: &str, message: &str) -> Value {
     object(&[
         ("source", string(source)),
         ("code", string(code)),
-        ("name", string("Error")),
+        ("name", string(name)),
         ("message", string(message)),
-        ("stack", string(&format!("Error: {message}"))),
+        ("stack", string(&format!("{name}: {message}"))),
     ])
 }
-
-fn required_str<'a>(value: &'a Value, key: &str) -> Result<&'a str, &'static str> {
-    value
-        .get(key)
-        .and_then(Value::as_str)
-        .ok_or("invalid handshake")
+fn wire_error(source: &str, code: &str, message: &str) -> Value {
+    object(&[
+        ("root", number(0)),
+        (
+            "nodes",
+            Value::Array(vec![error_node(source, code, "Error", message)]),
+        ),
+    ])
 }
-
-/// Validate hello and choose the highest shared major, minimum minor, first initiator codec, and ordered capability intersection.
-fn negotiate(hello: &Value) -> Result<Value, &'static str> {
-    if required_str(hello, "kind")? != "handshake" || required_str(hello, "step")? != "hello" {
-        return Err("invalid handshake");
-    }
-    if required_str(hello, "protocol")? != "migaia.rpc" {
-        return Err("incompatible handshake");
-    }
-    let versions = hello
-        .get("versions")
-        .and_then(Value::as_array)
-        .ok_or("invalid handshake")?;
-    if versions.is_empty() || versions.len() > 8 {
-        return Err("invalid handshake");
-    }
-    let mut selected = None;
-    let mut seen = Vec::new();
-    for version in versions {
-        let major = version
-            .get("major")
-            .and_then(Value::as_u64)
-            .ok_or("invalid handshake")?;
-        let minor = version
-            .get("minor")
-            .and_then(Value::as_u64)
-            .ok_or("invalid handshake")?;
-        if major == 0
-            || major > 9_007_199_254_740_991
-            || minor > 9_007_199_254_740_991
-            || !seen.insert_if_absent(major)
-        {
-            return Err("invalid handshake");
-        }
-        if major == 1 {
-            selected = Some((major, minor.min(1)));
-        }
-    }
-    let codecs = hello
-        .get("codecs")
-        .and_then(Value::as_array)
-        .ok_or("invalid handshake")?;
-    if codecs.is_empty()
-        || codecs.len() > 16
-        || !codecs.iter().any(|codec| codec.as_str() == Some("json"))
-    {
-        return Err("invalid handshake");
-    }
-    if codecs.iter().any(|codec| codec.as_str().is_none()) {
-        return Err("invalid handshake");
-    }
-    let offered = hello
-        .get("capabilities")
-        .and_then(Value::as_array)
-        .ok_or("invalid handshake")?;
-    if offered.len() > 64 || offered.iter().any(|cap| cap.as_str().is_none()) {
-        return Err("invalid handshake");
-    }
-    let (major, minor) = selected.ok_or("incompatible handshake")?;
-    let capabilities = offered
-        .iter()
-        .filter_map(|cap| cap.as_str())
-        .filter(|cap| CAPABILITIES.contains(cap))
-        .map(string)
-        .collect();
-    Ok(object(&[
-        ("major", number(major)),
-        ("minor", number(minor)),
-        ("codec", string("json")),
-        ("capabilities", Value::Array(capabilities)),
-    ]))
-}
-
-trait InsertIfAbsent<T> {
-    fn insert_if_absent(&mut self, value: T) -> bool;
-}
-impl<T: PartialEq> InsertIfAbsent<T> for Vec<T> {
-    fn insert_if_absent(&mut self, value: T) -> bool {
-        if self.contains(&value) {
-            false
-        } else {
-            self.push(value);
-            true
-        }
-    }
-}
-
-fn peer() -> Value {
-    object(&[("id", string("rust-peer")), ("runtime", string("rust"))])
-}
-fn hello(auth: Option<&str>) -> Value {
-    let mut message = object(&[
+fn hello(own: &Value, business: bool, auth: Option<&str>) -> Value {
+    let mut hello = object(&[
+        ("profile", string(PROFILE)),
         ("kind", string("handshake")),
         ("step", string("hello")),
-        ("protocol", string("migaia.rpc")),
         (
             "versions",
-            Value::Array(vec![object(&[("major", number(1)), ("minor", number(1))])]),
+            Value::Array(vec![object(&[("major", number(2)), ("minor", number(0))])]),
         ),
         ("codecs", Value::Array(vec![string("json")])),
+        ("extensions", Value::Array(vec![])),
         (
-            "capabilities",
-            Value::Array(CAPABILITIES.iter().map(|cap| string(cap)).collect()),
+            "peer",
+            object(&[
+                ("id", value(own, "instanceId").clone()),
+                ("runtime", string("rust")),
+            ]),
         ),
-        ("peer", peer()),
+        ("directory", business::description(own, business)),
     ]);
-    if let (Some(auth), Value::Object(fields)) = (auth, &mut message) {
-        fields.push(("auth".to_owned(), string(auth)));
+    if let Some(auth) = auth {
+        set(&mut hello, "auth", string(auth));
     }
-    message
+    hello
 }
-fn accept(agreement: &Value) -> Value {
+fn accept(local: &Value) -> Value {
     object(&[
+        ("profile", string(PROFILE)),
         ("kind", string("handshake")),
         ("step", string("accept")),
-        ("protocol", string("migaia.rpc")),
-        (
-            "major",
-            agreement.get("major").cloned().unwrap_or(Value::Null),
-        ),
-        (
-            "minor",
-            agreement.get("minor").cloned().unwrap_or(Value::Null),
-        ),
+        ("major", number(2)),
+        ("minor", number(0)),
         ("codec", string("json")),
-        (
-            "capabilities",
-            agreement
-                .get("capabilities")
-                .cloned()
-                .unwrap_or(Value::Array(vec![])),
-        ),
-        ("peer", peer()),
-    ])
-}
-fn reject() -> Value {
-    object(&[
-        ("kind", string("handshake")),
-        ("step", string("reject")),
-        ("protocol", string("migaia.rpc")),
-        (
-            "error",
-            wire_error(
-                "rpc.contract",
-                "HANDSHAKE_INCOMPATIBLE",
-                "Handshake rejected",
-            ),
-        ),
+        ("extensions", Value::Array(vec![])),
+        ("peer", value(local, "peer").clone()),
+        ("directory", value(local, "directory").clone()),
     ])
 }
 
-fn route(request: &Value, route_type: &str, method: Option<&str>) -> Value {
-    let incoming = request.get("data").and_then(|data| data.get("route"));
-    let sender = incoming
-        .and_then(|route| route.get("targetId"))
-        .and_then(Value::as_str)
-        .unwrap_or("rust-peer");
-    let target = incoming
-        .and_then(|route| route.get("senderId"))
-        .and_then(Value::as_str)
-        .unwrap_or("caller");
-    let version = incoming
-        .and_then(|route| route.get("applicationVersion"))
-        .and_then(Value::as_str)
-        .unwrap_or("1");
-    let mut fields = vec![
-        ("profile".to_owned(), string("migaia.rpc.route")),
-        ("type".to_owned(), string(route_type)),
-        ("applicationVersion".to_owned(), string(version)),
-        ("senderId".to_owned(), string(sender)),
-        ("targetId".to_owned(), string(target)),
-        ("sentAt".to_owned(), number(0)),
-    ];
-    if let Some(method) = method {
-        fields.push(("method".to_owned(), string(method)));
-    }
-    Value::Object(fields)
-}
-
-fn response(request: &Value, payload: Value, failure: Option<(&str, &str, &str)>) -> Value {
-    let id = request
-        .get("id")
-        .cloned()
-        .unwrap_or_else(|| string("invalid-id"));
-    let method = request
-        .get("method")
-        .and_then(Value::as_str)
-        .unwrap_or("echo");
-    let data = object(&[
-        ("route", route(request, "response", Some(method))),
-        ("payload", payload),
-    ]);
-    if let Some((source, code, message)) = failure {
-        object(&[
-            ("kind", string("response")),
-            ("id", id),
-            ("ok", Value::Bool(false)),
-            ("code", string(code)),
-            ("message", string(message)),
-            ("data", data),
-            ("error", wire_error(source, code, message)),
-        ])
-    } else {
-        object(&[
-            ("kind", string("response")),
-            ("id", id),
-            ("ok", Value::Bool(true)),
-            ("data", data),
-        ])
-    }
-}
-
-fn variation(request: &Value, subtype: &str) -> Value {
-    let mut output_route = route(request, "variation", None);
-    if let Value::Object(fields) = &mut output_route {
-        fields.push(("variation".to_owned(), string(subtype)));
-    }
-    object(&[
-        ("kind", string("variation")),
-        (
-            "id",
-            request
-                .get("id")
-                .cloned()
-                .unwrap_or_else(|| string("invalid-id")),
-        ),
-        ("data", object(&[("route", output_route)])),
-    ])
-}
-
-fn subtype(value: &Value) -> Option<&str> {
-    value.get("data")?.get("route")?.get("variation")?.as_str()
-}
-
-fn negotiated(agreement: &Value, capability: &str) -> bool {
-    agreement
-        .get("capabilities")
-        .and_then(Value::as_array)
-        .unwrap_or(&[])
-        .iter()
-        .any(|value| value.as_str() == Some(capability))
-}
-
-fn valid_close(value: &Value) -> bool {
-    value
-        .get("data")
-        .and_then(|data| data.get("payload"))
-        .and_then(|payload| payload.get("drainMs"))
-        .and_then(Value::as_u64)
-        .is_some_and(|duration| duration < 2_147_483_648)
-}
-
-/// Own one connection. Never print or serialize untrusted handshake fields.
-fn serve(
+/// Both sides send hello; the lexicographically larger actual peer id owns acceptance and exact auth checks.
+fn handshake(
     input: &mut impl Read,
     output: &mut impl Write,
-    required_auth: Option<&str>,
-) -> io::Result<()> {
-    let handshake_invalid = || io::Error::new(io::ErrorKind::InvalidData, "HANDSHAKE_INVALID");
-    let frame = read_frame(input, MAX_HANDSHAKE)
-        .map_err(|_| handshake_invalid())?
-        .ok_or_else(|| handshake_invalid())?;
-    let first = json::parse(&frame).map_err(|_| handshake_invalid())?;
-    let agreement = match negotiate(&first) {
-        Ok(value)
-            if required_auth
-                .is_none_or(|auth| first.get("auth").and_then(Value::as_str) == Some(auth))
-                && baseline_agreed(&value) =>
-        {
-            value
+    local: &Value,
+    auth: Option<&str>,
+    parent: Option<&str>,
+) -> io::Result<Value> {
+    write_frame(output, local)?;
+    let mut remote_hello: Option<Value> = None;
+    let mut selected: Option<Value> = None;
+    loop {
+        let frame =
+            read_frame(input, MAX_HANDSHAKE)?.ok_or_else(|| invalid("HANDSHAKE_INVALID"))?;
+        let remote = json::parse(&frame).map_err(|_| invalid("HANDSHAKE_INVALID"))?;
+        if !valid_handshake(&remote) {
+            return Err(invalid("HANDSHAKE_INVALID"));
         }
-        Ok(_) => {
-            write_frame(output, &reject())?;
-            return Err(handshake_invalid());
+        let local_id = text(value(local, "peer"), "id");
+        let remote_id = text(value(&remote, "peer"), "id");
+        if local_id == remote_id || parent.is_some_and(|expected| expected != remote_id) {
+            return Err(invalid("HANDSHAKE_INVALID"));
         }
-        Err("incompatible handshake") => {
-            write_frame(output, &reject())?;
-            return Err(handshake_invalid());
-        }
-        _ => return Err(handshake_invalid()),
-    };
-    write_frame(output, &accept(&agreement))?;
-    let mut waiting: Option<Value> = None;
-    let mut one_way_receipts = 0u64;
-    let mut draining = false;
-    'session: while let Some(physical) = read_json(input)? {
-        for message in physical_envelopes(physical)? {
-            // Unknown wire kinds are diagnostic-only and cannot retire later baseline calls.
-            if message
-                .get("kind")
-                .and_then(Value::as_str)
-                .is_some_and(|kind| {
-                    !matches!(
-                        kind,
-                        "request" | "response" | "variation" | "discovery" | "stream"
-                    )
-                })
-            {
-                eprintln!("PEER_WARN UNKNOWN_KIND");
-                continue;
-            }
-            if !native_envelope_valid(&message) {
-                eprintln!("PEER_ERROR PROTOCOL_INVALID");
-                continue;
-            }
-            match message.get("kind").and_then(Value::as_str) {
-                Some("request") => {
-                    if draining
-                        && message.get("method").and_then(Value::as_str) != Some("peer.finish")
-                    {
-                        continue;
-                    }
-                    let route = message.get("data").and_then(|data| data.get("route"));
-                    if route
-                        .and_then(|route| route.get("profile"))
-                        .and_then(Value::as_str)
-                        != Some("migaia.rpc.route")
-                        || route
-                            .and_then(|route| route.get("type"))
-                            .and_then(Value::as_str)
-                            != Some("request")
-                    {
-                        continue;
-                    }
-                    let one_way = route.and_then(|route| route.get("dispatchOnly"))
-                        == Some(&Value::Bool(true));
-                    if one_way {
-                        one_way_receipts += 1;
-                    }
-                    match message.get("method").and_then(Value::as_str) {
-                        Some(RUNTIME_DESCRIBE) => {
-                            if !one_way {
-                                let directory = runtime_description(&[
-                                    ("echo", &["request", "notify"]),
-                                    ("peer.echo", &["request", "notify"]),
-                                    ("peer.wait", &["request", "notify"]),
-                                    ("peer.finish", &["request", "notify"]),
-                                    ("peer.error", &["request", "notify"]),
-                                    ("peer.receipts", &["request", "notify"]),
-                                ]);
-                                write_frame(output, &response(&message, directory, None))?;
-                            }
-                        }
-                        Some("peer.wait") => {
-                            if !one_way {
-                                waiting = Some(message);
-                            }
-                        }
-                        Some("peer.finish") => {
-                            if let Some(pending) = waiting.take() {
-                                write_frame(output, &response(&pending, Value::Null, None))?;
-                            }
-                            if !one_way {
-                                write_frame(output, &response(&message, Value::Null, None))?;
-                            }
-                            if draining {
-                                break 'session;
-                            }
-                        }
-                        Some("peer.error") => {
-                            if !one_way {
-                                write_frame(
-                                    output,
-                                    &response(
-                                        &message,
-                                        Value::Null,
-                                        Some((
-                                            "rpc.endpoint",
-                                            "INTERNAL",
-                                            "Peer requested failure",
-                                        )),
-                                    ),
-                                )?;
-                            }
-                        }
-                        Some("peer.receipts") => {
-                            if !one_way {
-                                write_frame(
-                                    output,
-                                    &response(&message, number(one_way_receipts), None),
-                                )?;
-                            }
-                        }
-                        Some("echo") | Some("peer.echo") => {
-                            if !one_way {
-                                write_frame(
-                                    output,
-                                    &response(
-                                        &message,
-                                        message
-                                            .get("data")
-                                            .and_then(|data| data.get("payload"))
-                                            .cloned()
-                                            .unwrap_or(Value::Null),
-                                        None,
-                                    ),
-                                )?;
-                            }
-                        }
-                        _ => {
-                            if !one_way {
-                                write_frame(
-                                    output,
-                                    &response(
-                                        &message,
-                                        Value::Null,
-                                        Some((
-                                            "rpc.endpoint",
-                                            "PROVIDER_NOT_FOUND",
-                                            METHOD_UNAVAILABLE,
-                                        )),
-                                    ),
-                                )?;
-                            }
-                        }
-                    }
+        match text(&remote, "step") {
+            "pending" => {
+                let original = remote_hello
+                    .as_ref()
+                    .ok_or_else(|| invalid("HANDSHAKE_INVALID"))?;
+                if value(original, "peer") != value(&remote, "peer") {
+                    return Err(invalid("HANDSHAKE_INVALID"));
                 }
-                Some("variation") => match subtype(&message) {
-                    Some("ping") if negotiated(&agreement, "ping@1") => {
-                        write_frame(output, &variation(&message, "pong"))?
-                    }
-                    Some("abort") if negotiated(&agreement, "abort@1") => {
-                        if draining {
-                            eprintln!("PEER_EVENT ABORT_DURING_DRAIN");
-                        }
-                        if let Some(pending) = waiting.take() {
-                            if pending.get("id") == message.get("id") {
-                                if draining {
-                                    break 'session;
-                                }
-                            } else {
-                                waiting = Some(pending);
-                            }
-                        }
-                    }
-                    Some("close") if negotiated(&agreement, "close@1") => {
-                        if !valid_close(&message) {
-                            eprintln!("PEER_ERROR PROTOCOL_INVALID");
-                            continue;
-                        }
-                        if waiting.is_some() {
-                            draining = true;
-                        } else {
-                            break 'session;
-                        }
-                    }
-                    _ => {}
-                },
-                Some("response") | Some("discovery") | Some("stream") => {}
-                _ => eprintln!("PEER_WARN UNKNOWN_KIND"),
+                if auth.is_some_and(|expected| text(&remote, "auth") != expected) {
+                    return Err(invalid("AUTH_REJECTED"));
+                }
+                continue;
             }
+            "hello" => {
+                if auth.is_some_and(|expected| text(&remote, "auth") != expected) {
+                    return Err(invalid("AUTH_REJECTED"));
+                }
+                if !items(value(&remote, "versions"))
+                    .iter()
+                    .any(|version| safe_integer(value(version, "major")) == Some(2))
+                    || !items(value(&remote, "requiredExtensions")).is_empty()
+                {
+                    return Err(invalid("HANDSHAKE_INCOMPATIBLE"));
+                }
+                if local_id > remote_id {
+                    let mut accepted = accept(local);
+                    if let Some(auth) = local.get("auth") {
+                        set(&mut accepted, "auth", auth.clone());
+                    }
+                    write_frame(output, &accepted)?;
+                    selected = Some(accepted);
+                    remote_hello = Some(remote);
+                    continue;
+                }
+                remote_hello = Some(remote);
+            }
+            "accept" => {
+                if auth.is_some_and(|expected| text(&remote, "auth") != expected) {
+                    return Err(invalid("AUTH_REJECTED"));
+                }
+                if let Some(accepted) = selected.as_ref() {
+                    let original = remote_hello
+                        .as_ref()
+                        .ok_or_else(|| invalid("HANDSHAKE_INVALID"))?;
+                    if ["major", "minor", "codec", "extensions"]
+                        .iter()
+                        .any(|key| !runtime_schema_equal(value(&remote, key), value(accepted, key)))
+                        || value(original, "peer") != value(&remote, "peer")
+                        || !runtime_schema_equal(
+                            value(original, "directory"),
+                            value(&remote, "directory"),
+                        )
+                    {
+                        return Err(invalid("HANDSHAKE_INVALID"));
+                    }
+                    return Ok(original.clone());
+                }
+                if local_id > remote_id
+                    || safe_integer(value(&remote, "major")) != Some(2)
+                    || safe_integer(value(&remote, "minor")) != Some(0)
+                    || text(&remote, "codec") != "json"
+                    || !items(value(&remote, "extensions")).is_empty()
+                {
+                    return Err(invalid("HANDSHAKE_INVALID"));
+                }
+                if let Some(hello) = remote_hello.as_ref() {
+                    if value(hello, "peer") != value(&remote, "peer")
+                        || !runtime_schema_equal(
+                            value(hello, "directory"),
+                            value(&remote, "directory"),
+                        )
+                    {
+                        return Err(invalid("HANDSHAKE_INVALID"));
+                    }
+                } else if auth.is_some() {
+                    return Err(invalid("AUTH_REJECTED"));
+                }
+                let mut confirmation = accept(local);
+                for key in ["major", "minor", "codec", "extensions"] {
+                    set(&mut confirmation, key, value(&remote, key).clone());
+                }
+                if let Some(auth) = local.get("auth") {
+                    set(&mut confirmation, "auth", auth.clone());
+                }
+                write_frame(output, &confirmation)?;
+                return Ok(remote);
+            }
+            _ => return Err(invalid("HANDSHAKE_INCOMPATIBLE")),
         }
     }
-    Ok(())
 }
 
-fn request(remote_id: &str) -> Value {
-    object(&[
-        ("kind", string("request")),
-        ("id", string("rust-echo-1")),
-        ("method", string("echo")),
+/// Actual response routing reverses the admitted direct sender while retaining trace and transparent forward facts.
+fn reply_route(original: &Value) -> Value {
+    let incoming = value(original, "route");
+    let mut route = object(&[
         (
-            "data",
+            "applicationVersion",
+            value(incoming, "applicationVersion").clone(),
+        ),
+        ("senderId", value(incoming, "receiverId").clone()),
+        ("receiverId", value(incoming, "senderId").clone()),
+        ("targetId", value(incoming, "senderId").clone()),
+        ("sentAt", number(0)),
+    ]);
+    for key in ["trace", "forwardRoute"] {
+        if let Some(value) = incoming.get(key) {
+            set(&mut route, key, value.clone());
+        }
+    }
+    route
+}
+fn request(remote: &Value, own: &Value) -> Value {
+    object(&[
+        ("profile", string(PROFILE)),
+        ("kind", string("call")),
+        ("id", string("rust-echo-1")),
+        (
+            "route",
             object(&[
-                (
-                    "route",
-                    object(&[
-                        ("profile", string("migaia.rpc.route")),
-                        ("type", string("request")),
-                        ("applicationVersion", string("1")),
-                        ("senderId", string("rust-peer")),
-                        ("targetId", string(remote_id)),
-                        ("sentAt", number(0)),
-                    ]),
-                ),
-                ("payload", string("rust-echo")),
+                ("applicationVersion", string("1")),
+                ("senderId", value(own, "instanceId").clone()),
+                ("receiverId", value(remote, "instanceId").clone()),
+                ("targetId", value(remote, "instanceId").clone()),
+                ("sentAt", number(0)),
             ]),
         ),
+        (
+            "task",
+            object(&[
+                ("mode", string("request")),
+                ("callerId", value(own, "instanceId").clone()),
+                ("callerGeneration", value(own, "generation").clone()),
+                ("targetGeneration", value(remote, "generation").clone()),
+                ("method", string("echo")),
+            ]),
+        ),
+        ("options", object(&[])),
+        ("payload", string("rust-echo")),
     ])
 }
-
-/// Cross-language initiator proves the new directory and native batch before closing.
 fn initiate(input: &mut impl Read, output: &mut impl Write, auth: Option<&str>) -> io::Result<()> {
-    write_frame(output, &hello(auth))?;
-    let accepted = read_json(input)?
-        .ok_or_else(|| io::Error::new(io::ErrorKind::UnexpectedEof, "missing accept"))?;
-    if accepted.get("kind").and_then(Value::as_str) != Some("handshake")
-        || accepted.get("step").and_then(Value::as_str) != Some("accept")
-        || accepted.get("protocol").and_then(Value::as_str) != Some("migaia.rpc")
-        || accepted.get("codec").and_then(Value::as_str) != Some("json")
-        || accepted.get("major").and_then(Value::as_u64) != Some(1)
-        || accepted.get("minor").and_then(Value::as_u64) != Some(1)
-        || accepted
-            .get("capabilities")
-            .and_then(Value::as_array)
-            .is_none_or(|caps| {
-                caps.iter().any(|cap| {
-                    !CAPABILITIES
-                        .iter()
-                        .any(|offered| cap.as_str() == Some(offered))
-                })
-            })
+    let own = identity();
+    let accepted = handshake(input, output, &hello(&own, false, auth), auth, None)?;
+    let request = request(value(value(&accepted, "directory"), "self"), &own);
+    write_frame(output, &request)?;
+    let incoming = read_json(input)?.ok_or_else(|| invalid("PROTOCOL_INVALID"))?;
+    if !valid_frame(&incoming)
+        || text(&incoming, "kind") != "result"
+        || value(&incoming, "id") != value(&request, "id")
+        || value(&incoming, "task") != value(&request, "task")
+        || value(&incoming, "result") != value(&request, "payload")
+        || text(value(&incoming, "route"), "senderId") != text(value(&accepted, "peer"), "id")
+        || text(value(&incoming, "route"), "receiverId") != text(&own, "instanceId")
+        || text(value(&incoming, "route"), "targetId") != text(&own, "instanceId")
     {
-        return Err(io::Error::new(io::ErrorKind::InvalidData, "invalid accept"));
+        return Err(invalid("PROTOCOL_INVALID"));
     }
-    if !baseline_agreed(&accepted) {
-        return Err(io::Error::new(io::ErrorKind::InvalidData, "invalid accept"));
-    }
-    let remote_id = accepted
-        .get("peer")
-        .and_then(|peer| peer.get("id"))
-        .and_then(Value::as_str)
-        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "invalid accept"))?;
-    let mut describe = request(remote_id);
-    if let Value::Object(fields) = &mut describe {
-        fields.iter_mut().find(|(name, _)| name == "id").unwrap().1 = string("rust-describe-1");
-        fields
-            .iter_mut()
-            .find(|(name, _)| name == "method")
-            .unwrap()
-            .1 = string(RUNTIME_DESCRIBE);
-    }
-    write_frame(output, &describe)?;
-    let description = read_json(input)?
-        .ok_or_else(|| io::Error::new(io::ErrorKind::UnexpectedEof, "missing description"))?;
-    let directory = description.get("data").and_then(|data| data.get("payload"));
-    if description.get("kind").and_then(Value::as_str) != Some("response")
-        || description.get("id") != describe.get("id")
-        || description.get("ok") != Some(&Value::Bool(true))
-        || directory.is_none_or(|value| !valid_runtime_description(value, remote_id))
-    {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidData,
-            "invalid description",
-        ));
-    }
-    let outgoing = request(remote_id);
-    write_frame(
-        output,
-        &object(&[
-            ("kind", string("batch")),
-            ("envelopes", Value::Array(vec![outgoing.clone()])),
-        ]),
-    )?;
-    let incoming = read_json(input)?
-        .ok_or_else(|| io::Error::new(io::ErrorKind::UnexpectedEof, "missing response"))?;
-    if incoming.get("kind").and_then(Value::as_str) != Some("response")
-        || incoming.get("id") != outgoing.get("id")
-        || incoming.get("ok") != Some(&Value::Bool(true))
-        || incoming.get("data").and_then(|data| data.get("payload"))
-            != outgoing.get("data").and_then(|data| data.get("payload"))
-    {
-        return Err(io::Error::new(io::ErrorKind::InvalidData, "echo mismatch"));
-    }
-    let close = object(&[
-        ("kind", string("variation")),
-        ("id", string("rust-close-1")),
-        (
-            "data",
-            object(&[
-                (
-                    "route",
-                    object(&[
-                        ("profile", string("migaia.rpc.route")),
-                        ("type", string("variation")),
-                        ("applicationVersion", string("1")),
-                        ("senderId", string("rust-peer")),
-                        ("targetId", string(remote_id)),
-                        ("sentAt", number(0)),
-                        ("variation", string("close")),
-                    ]),
-                ),
-                ("payload", object(&[("drainMs", number(0))])),
-            ]),
-        ),
-    ]);
-    write_frame(output, &close)?;
     eprintln!("RESULT ok");
     Ok(())
 }
 
+/// The historical accounting carrier parses one bounded Content-Length body with no semantic dispatch.
+fn baseline_body(input: &mut impl Read) -> io::Result<Option<Vec<u8>>> {
+    let mut header = Vec::new();
+    while !header.ends_with(b"\r\n\r\n") {
+        let mut byte = [0];
+        if input.read(&mut byte)? == 0 {
+            return if header.is_empty() {
+                Ok(None)
+            } else {
+                Err(invalid("INVALID_FRAME_LENGTH"))
+            };
+        }
+        if header.len() >= 1024 {
+            return Err(invalid("INVALID_FRAME_LENGTH"));
+        }
+        header.push(byte[0]);
+    }
+    let header = std::str::from_utf8(&header).map_err(|_| invalid("INVALID_FRAME_LENGTH"))?;
+    let lengths: Vec<_> = header
+        .split("\r\n")
+        .filter_map(|line| line.split_once(':'))
+        .filter(|(key, _)| key.eq_ignore_ascii_case("content-length"))
+        .collect();
+    if lengths.len() != 1 {
+        return Err(invalid("INVALID_FRAME_LENGTH"));
+    }
+    let length = lengths[0]
+        .1
+        .trim()
+        .parse::<usize>()
+        .map_err(|_| invalid("INVALID_FRAME_LENGTH"))?;
+    if !(1..=MAX_FRAME).contains(&length) {
+        return Err(invalid("INVALID_FRAME_LENGTH"));
+    }
+    let mut body = vec![0; length];
+    input.read_exact(&mut body)?;
+    Ok(Some(body))
+}
+fn baseline_write(output: &mut impl Write, body: &[u8]) -> io::Result<()> {
+    write!(output, "Content-Length: {}\r\n\r\n", body.len())?;
+    output.write_all(body)?;
+    output.flush()
+}
+fn baseline_read(input: &mut impl Read) -> io::Result<Value> {
+    let raw = baseline_body(input)?.ok_or_else(|| invalid("INVALID_JSON"))?;
+    json::parse(&raw).map_err(|_| invalid("INVALID_JSON"))
+}
+fn json_baseline(input: &mut impl Read, output: &mut impl Write) -> io::Result<()> {
+    while let Some(body) = baseline_body(input)? {
+        let value = json::parse(&body).map_err(|_| invalid("INVALID_JSON"))?;
+        let result = if value.get("xrtReverse") == Some(&Value::Bool(true)) {
+            baseline_reverse(input, output, &value)?
+        } else {
+            value
+        };
+        baseline_write(output, result.text().as_bytes())?;
+    }
+    Ok(())
+}
+
+/// Preserve the original bare JSON reverse accounting loop, without a protocol or method dispatcher.
+fn baseline_reverse(
+    input: &mut impl Read,
+    output: &mut impl Write,
+    control: &Value,
+) -> io::Result<Value> {
+    let count = value(control, "count").as_u64().unwrap_or(0);
+    let payload = value(control, "payload");
+    if !(1..=10000).contains(&count) || payload.as_str().is_none() {
+        return Err(invalid("INVALID_ENVELOPE"));
+    }
+    let mut latencies = Vec::with_capacity(count as usize);
+    let start = std::time::Instant::now();
+    for _ in 0..count {
+        let round = std::time::Instant::now();
+        baseline_write(output, payload.text().as_bytes())?;
+        if baseline_read(input)? != *payload {
+            return Err(invalid("INVALID_ENVELOPE"));
+        }
+        latencies.push(number(round.elapsed().as_nanos() as u64));
+    }
+    Ok(object(&[
+        ("xrtReceipt", Value::Bool(true)),
+        ("calls", number(count)),
+        ("elapsedNs", number(start.elapsed().as_nanos() as u64)),
+        ("latenciesNs", Value::Array(latencies)),
+        ("clientInFlightPeak", number(1)),
+        ("burstSize", number(1)),
+    ]))
+}
+
+/// Native-v1 launch custody supplies exact self/generation/parent/token; it never admits a semantic-v1 frame.
+fn bootstrap(input: &mut impl Read) -> io::Result<(Value, String, String)> {
+    let raw = read_frame(input, MAX_HANDSHAKE)?.ok_or_else(|| invalid("BOOTSTRAP_INVALID"))?;
+    let bootstrap = json::parse(&raw).map_err(|_| invalid("BOOTSTRAP_INVALID"))?;
+    let own = value(&bootstrap, "self");
+    if !has_fields(
+        &bootstrap,
+        &["kind", "version", "self", "parentInstanceId", "token"],
+    ) || text(&bootstrap, "kind") != "rpc-runtime-api-bootstrap"
+        || safe_integer(value(&bootstrap, "version")) != Some(1)
+        || !has_fields(own, &["name", "instanceId"])
+        || !identifier(value(own, "name"))
+        || !identifier(value(own, "instanceId"))
+        || !identifier(value(&bootstrap, "parentInstanceId"))
+        || text(&bootstrap, "token").is_empty()
+    {
+        return Err(invalid("BOOTSTRAP_INVALID"));
+    }
+    let generation = bootstrap.get("generation").cloned().unwrap_or_else(|| {
+        object(&[
+            ("kind", string("session")),
+            ("value", number(0)),
+            ("providerId", value(own, "instanceId").clone()),
+        ])
+    });
+    if !valid_generation(&generation) {
+        return Err(invalid("BOOTSTRAP_INVALID"));
+    }
+    Ok((
+        object(&[
+            ("name", value(own, "name").clone()),
+            ("instanceId", value(own, "instanceId").clone()),
+            ("generation", generation),
+        ]),
+        text(&bootstrap, "token").to_owned(),
+        text(&bootstrap, "parentInstanceId").to_owned(),
+    ))
+}
+
+/// Consume the dedicated inherited auth descriptor exactly once without exposing credential text.
+fn read_auth(auth_fd: Option<i32>) -> io::Result<Option<String>> {
+    let auth = if let Some(fd) = auth_fd {
+        if fd < 3 {
+            return Err(invalid("INVALID_AUTH_DESCRIPTOR"));
+        }
+        // Exact original inherited resource ownership; the token never enters argv, environment or diagnostics.
+        let input = unsafe { std::fs::File::from_raw_fd(fd) };
+        let mut token = String::new();
+        input.take(4097).read_to_string(&mut token)?;
+        let token = token.trim_end_matches(['\n', '\r']).to_owned();
+        if token.is_empty() || token.len() > 4096 {
+            return Err(invalid("INVALID_AUTH_TOKEN"));
+        }
+        Some(token)
+    } else {
+        None
+    };
+    Ok(auth)
+}
+/// One borrowed native socket owns its cloned reader and writer until the same session returns.
+fn serve_socket(
+    stream: UnixStream,
+    role: &str,
+    auth: Option<&str>,
+    business: bool,
+) -> io::Result<()> {
+    let mut input = stream.try_clone()?;
+    let mut output = stream;
+    if role == "initiator" {
+        initiate(&mut input, &mut output, auth)
+    } else {
+        self::business::serve(&mut input, &mut output, &identity(), None, auth, business)
+    }
+}
+/// CLI keeps the original native acquisition, fd custody and finally cleanup; removed profiles have no aliases.
 fn run() -> io::Result<()> {
     let mut role = "responder";
     let mut listener_path: Option<PathBuf> = None;
@@ -1124,31 +1424,26 @@ fn run() -> io::Result<()> {
     let mut selftest = false;
     let mut business_profile = false;
     let mut descendant = false;
-    let mut bridge_profile = false;
+    let mut baseline_label = false;
     let mut bare_profile = false;
-    let mut host_profile = false;
     let mut bootstrap_stdin = false;
     let mut arguments = env::args().skip(1);
     while let Some(argument) = arguments.next() {
         match argument.as_str() {
             "--role" => {
-                let value = arguments
+                let next = arguments
                     .next()
-                    .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "missing role"))?;
-                if value != "initiator" && value != "responder" {
-                    return Err(io::Error::new(io::ErrorKind::InvalidInput, "invalid role"));
-                }
-                role = if value == "initiator" {
-                    "initiator"
-                } else {
-                    "responder"
+                    .ok_or_else(|| invalid("INVALID_ARGUMENT"))?;
+                role = match next.as_str() {
+                    "responder" => "responder",
+                    "initiator" => "initiator",
+                    _ => return Err(invalid("INVALID_ARGUMENT")),
                 };
             }
             "--business" => business_profile = true,
             "--descendant" => descendant = true,
-            "--jsonrpc" => bridge_profile = true,
+            "--jsonrpc" => baseline_label = true,
             "--bare-jsonrpc" => bare_profile = true,
-            "--host" => host_profile = true,
             "--bootstrap" => bootstrap_stdin = arguments.next().as_deref() == Some("stdin"),
             "--non-idempotent-request" => {
                 business::REQUEST_IDEMPOTENT.store(false, std::sync::atomic::Ordering::Relaxed)
@@ -1162,79 +1457,32 @@ fn run() -> io::Result<()> {
                 auth_fd = Some(
                     arguments
                         .next()
-                        .ok_or_else(|| {
-                            io::Error::new(io::ErrorKind::InvalidInput, "missing auth descriptor")
-                        })?
+                        .ok_or_else(|| invalid("INVALID_ARGUMENT"))?
                         .parse()
-                        .map_err(|_| {
-                            io::Error::new(io::ErrorKind::InvalidInput, "invalid auth descriptor")
-                        })?,
+                        .map_err(|_| invalid("INVALID_ARGUMENT"))?,
                 )
             }
-            _ => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "unknown argument",
-                ));
-            }
+            _ => return Err(invalid("INVALID_ARGUMENT")),
         }
+    }
+    if baseline_label != bare_profile
+        || bare_profile && (!business_profile || listener_path.is_some() || connect_path.is_some())
+    {
+        return Err(invalid("RETIRED_PROFILE"));
     }
     if selftest {
-        return selftest::run(
-            &vectors.ok_or_else(|| {
-                io::Error::new(io::ErrorKind::InvalidInput, "missing vectors path")
-            })?,
-        );
+        return selftest::run(&vectors.ok_or_else(|| invalid("MISSING_VECTORS"))?);
     }
-    let mut auth = if let Some(fd) = auth_fd {
-        if fd < 3 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "reserved auth descriptor",
-            ));
-        }
-        // Caller transfers ownership of a dedicated inherited descriptor; no token enters argv or environment.
-        let input = unsafe { std::fs::File::from_raw_fd(fd) };
-        let mut token = String::new();
-        input.take(4097).read_to_string(&mut token)?;
-        let token = token.trim_end_matches(['\n', '\r']).to_owned();
-        if token.is_empty() || token.len() > 4096 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "invalid auth token",
-            ));
-        }
-        Some(token)
-    } else {
-        None
-    };
+    let mut auth = read_auth(auth_fd)?;
     if listener_path.is_some() && connect_path.is_some() {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            "ambiguous connection",
-        ));
+        return Err(invalid("AMBIGUOUS_CONNECTION"));
     }
     if let Some(path) = listener_path {
         let listener = UnixListener::bind(&path)?;
         eprintln!("READY pid={}", std::process::id());
         loop {
             let (stream, _) = listener.accept()?;
-            let mut input = stream.try_clone()?;
-            let mut output = stream;
-            let result = if business_profile {
-                business::serve(
-                    &mut input,
-                    &mut output,
-                    host_profile,
-                    auth.as_deref(),
-                    bridge_profile,
-                    bare_profile,
-                )
-            } else if role == "initiator" {
-                initiate(&mut input, &mut output, auth.as_deref())
-            } else {
-                serve(&mut input, &mut output, auth.as_deref())
-            };
+            let result = serve_socket(stream, role, auth.as_deref(), business_profile);
             if role == "initiator" {
                 let _ = std::fs::remove_file(&path);
                 return result;
@@ -1247,34 +1495,23 @@ fn run() -> io::Result<()> {
     if let Some(path) = connect_path {
         let stream = UnixStream::connect(path)?;
         eprintln!("READY pid={}", std::process::id());
-        let mut input = stream.try_clone()?;
-        let mut output = stream;
-        return if business_profile {
-            business::serve(
-                &mut input,
-                &mut output,
-                host_profile,
-                auth.as_deref(),
-                bridge_profile,
-                bare_profile,
-            )
-        } else if role == "initiator" {
-            initiate(&mut input, &mut output, auth.as_deref())
-        } else {
-            serve(&mut input, &mut output, auth.as_deref())
-        };
+        return serve_socket(stream, role, auth.as_deref(), business_profile);
     }
     eprintln!("READY pid={}", std::process::id());
     let mut input = io::stdin().lock();
     let mut output = io::stdout().lock();
-    if business_profile && bootstrap_stdin {
-        auth = Some(business::bootstrap(&mut input)?);
+    if bare_profile {
+        return json_baseline(&mut input, &mut output);
     }
-    if business_profile && bridge_profile && role == "initiator" {
-        return business::initiate_bridge(&mut input, &mut output, auth.as_deref());
+    let mut own = identity();
+    let mut parent = None;
+    if business_profile && bootstrap_stdin {
+        let (next, token, owner) = bootstrap(&mut input)?;
+        own = next;
+        auth = Some(token);
+        parent = Some(owner);
     }
     if business_profile {
-        // This real child is owned through EOF and reaped before the peer returns.
         let mut child = if descendant {
             Some(
                 std::process::Command::new("/bin/sleep")
@@ -1287,10 +1524,10 @@ fn run() -> io::Result<()> {
         let result = business::serve(
             &mut input,
             &mut output,
-            host_profile,
+            &own,
+            parent.as_deref(),
             auth.as_deref(),
-            bridge_profile,
-            bare_profile,
+            true,
         );
         if let Some(child) = &mut child {
             let _ = child.kill();
@@ -1300,10 +1537,16 @@ fn run() -> io::Result<()> {
     } else if role == "initiator" {
         initiate(&mut input, &mut output, auth.as_deref())
     } else {
-        serve(&mut input, &mut output, auth.as_deref())
+        business::serve(
+            &mut input,
+            &mut output,
+            &own,
+            parent.as_deref(),
+            auth.as_deref(),
+            false,
+        )
     }
 }
-
 fn main() {
     if let Err(error) = run() {
         let label = if error.kind() == io::ErrorKind::InvalidData
@@ -1323,7 +1566,6 @@ fn main() {
         std::process::exit(1);
     }
 }
-
 #[cfg(test)]
 mod review_tests {
     use super::*;

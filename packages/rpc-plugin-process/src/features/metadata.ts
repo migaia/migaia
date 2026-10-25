@@ -1,25 +1,29 @@
-import type { IIpcLogRecord, IIpcSendQueueOptions } from '@migaia/rpc-host/plugin'
+/**
+ * Defines the native connection facts, cancellation admission and batch-write guards borrowed by
+ * Process features. Facts come from actual Process installation and codec boundaries.
+ */
+import type { IRpcFeatureContext } from '@migaia/rpc-contract/interfaces'
+import type { IpcFlowControl, IRpcFlowControlFeature } from './flow-control.js'
 
-/** Cold options belong to the exact registered feature object, never a copied public descriptor. */
-export type IProcessFeatureConfiguration = Readonly<{
-  sendQueue?: Pick<IIpcSendQueueOptions, 'maxPendingData' | 'maxPendingControl'>
-  log?: Readonly<{ report(record: IIpcLogRecord): void | Promise<void> }>
+/**
+ * Concrete process installation supplies only original connection facts and an optional shared
+ * flow.
+ */
+export type IProcessFeatureContext = IRpcFeatureContext &
+  Readonly<{
+    connectionId: string
+    sessionId?: string
+    flow?: Readonly<{ feature: IRpcFlowControlFeature; value: IpcFlowControl }>
+  }>
+/** Physical admission facts originate in the admitted process codec, never opaque wire inspection. */
+export type IIpcSendFacts = Readonly<{ sendClass: 'data' | 'control'; trace?: string }>
+/** Original operation cancellation is borrowed until actual native preparation starts. */
+export type IIpcSendAdmission = Readonly<{
+  signal?: import('@migaia/utils/promise').IAbortSignal
+  assertCanSend?(): void
+  coalesced?: boolean
 }>
-
-/** Process normalization alone reads these options before its original physical connection opens. */
-const configurations = new WeakMap<object, IProcessFeatureConfiguration>()
-
-/** Retain immutable cold configuration without creating a queue, gate, log subscription or cleanup. */
-export function registerProcessFeatureConfiguration(
-  feature: object,
-  configuration: IProcessFeatureConfiguration
-): void {
-  configurations.set(feature, configuration)
-}
-
-/** Exact feature possession selects configuration; public fields or copied objects grant none. */
-export function readProcessFeatureConfiguration(
-  feature: unknown
-): IProcessFeatureConfiguration | undefined {
-  return typeof feature === 'object' && feature !== null ? configurations.get(feature) : undefined
-}
+/** A batch producer removes only its own still-queued logical member on physical queue shutdown. */
+export type IIpcBatchGuard = (cancelQueued?: (reason: unknown) => void) => (() => void) | undefined
+/** Whole logical writes settle only at their original physical flush, including explicit batching. */
+export type IIpcWrite = (guard?: IIpcBatchGuard) => void | Promise<void>

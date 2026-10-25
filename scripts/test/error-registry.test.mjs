@@ -148,7 +148,7 @@ test('maps merged RPC codes and preserves capability graph ownership', () => {
    * owner tests.
    */
   const laterAdded = {
-    contract: ['CALLBACK_FAILED'],
+    contract: ['CALLBACK_FAILED', 'EXTENSION_NEGOTIATION_FAILED'],
     core: [
       'CALLBACK_FAILED',
       'CAPABILITY_UNSUPPORTED',
@@ -521,4 +521,32 @@ test('source domains cross-package readers reference owner constants instead of 
     return contents.includes(`'${domain}'`) || contents.includes(`"${domain}"`)
   })
   assert.deepEqual(duplicated, [], 'SOURCE_DOMAIN_INLINE_READER_DOMAINS')
+})
+
+test('attributes centralized code tables to their own semantic sources', () => {
+  /** One canonical owner can declare multiple unchanged semantic domains. */
+  const root = createFixture(
+    `
+/** Contract domain. @error-source fixture.contract */
+export const ContractErrorCode = {
+  /** Invalid contract input. */
+  invalid: 'INVALID'
+} as const
+/** Endpoint domain. @error-source fixture.endpoint */
+export const EndpointErrorCode = {
+  /** Invalid endpoint input. */
+  invalid: 'INVALID'
+} as const
+`,
+    'example',
+    true
+  )
+  try {
+    assert.deepEqual(collectErrorRegistry(root), [
+      { source: 'fixture.contract', code: 'INVALID', scenario: 'Invalid contract input.' },
+      { source: 'fixture.endpoint', code: 'INVALID', scenario: 'Invalid endpoint input.' }
+    ])
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
 })

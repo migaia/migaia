@@ -6,9 +6,10 @@ import {
   RpcRouteProfile,
   type IRpcEnvelope
 } from '@migaia/rpc-contract'
-import { RpcContractErrorCode } from '@migaia/rpc-contract'
+import { RpcContractErrorCode } from '@migaia/rpc-contract/error-code'
 import { messageFramerV1 } from '@migaia/rpc-contract/framing'
-import { RpcCoreErrorCode, RpcTransportError } from '../../../dist/core/errors.js'
+import { RpcTransportError } from '@migaia/rpc-contract/errors'
+import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { RpcOutboundSender } from '../../../dist/core/internal/outbound-sender.js'
 import type { IRpcSelectedComponents } from '../../../dist/core/internal/endpoint-options.js'
 import { createIpcSendQueueFeature } from '../../../dist/core/plugins/send-queue.js'

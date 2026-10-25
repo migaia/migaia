@@ -1,4 +1,6 @@
 import { createRpcHost } from '@migaia/rpc-host'
+import { auth } from '@migaia/rpc-host/plugins/auth'
+import { timeout } from '@migaia/rpc-host/features/timeout'
 import { threadPlugin } from '@migaia/rpc-plugin-thread'
 import { fileURLToPath } from 'node:url'
 import { createUnitBudget } from '@migaia/supervision'
@@ -7,7 +9,7 @@ import { describe, expect, it } from 'vitest'
 import {
   createNodeThreadLauncher,
   createNodeThreadChannelFactory
-} from '../../src/threads/adapters/node.js'
+} from '../../src/threads/node-launcher.js'
 import { createFixtureAuthentication } from './fixtures/dx-authentication.mjs'
 
 /** The actual Worker provide descriptor publishes these ordinary request result shapes. */
@@ -40,15 +42,22 @@ describe('ordinary signed native-binary thread profile', () => {
     /** Only credentials configure signing; actual channel and middleware owners mint trust facts. */
     const options = { authentication: createFixtureAuthentication() }
     /** The public thread factory owns its real Worker and the existing default endpoint. */
-    const peer = await createRpcHost<IBytesApi>({
-      ...options,
+    const peer = await createRpcHost<
+      { thread: IBytesApi },
+      readonly [ReturnType<typeof auth>, ReturnType<typeof threadPlugin<'thread'>>]
+    >({
       report: (error) => reported.push(error),
-      plugins: [threadPlugin({ spawn: source(true, (error) => reported.push(error)) })]
+      plugins: [
+        auth(options.authentication),
+        threadPlugin({ spawn: source(true, (error) => reported.push(error)) })
+      ]
     })
     try {
       /** Native transfer must detach caller storage once the signed frame reaches the held port. */
       const buffer = new Uint8Array([7, 8, 9]).buffer
-      expect(await peer.request('bytes.inspect', buffer, { transfer: [buffer] })).toEqual({
+      expect(
+        await peer.thread.send('thread', 'bytes.inspect', buffer, { transfer: [buffer] })
+      ).toEqual({
         length: 3,
         first: 7
       })
@@ -61,21 +70,26 @@ describe('ordinary signed native-binary thread profile', () => {
 
   it('keeps unsigned transfer disabled and preserves caller storage', async () => {
     /** Unsigned endpoints retain the default copying profile despite native messaging support. */
-    const peer = await createRpcHost<IBytesApi>({
+    const peer = await createRpcHost<
+      { thread: IBytesApi },
+      readonly [ReturnType<typeof threadPlugin<'thread'>>]
+    >({
       report: () => undefined,
       plugins: [threadPlugin({ spawn: source(false, () => undefined) })]
     })
     try {
       /** Rejection before submission must leave the caller buffer usable. */
       const buffer = new Uint8Array([7, 8, 9]).buffer
-      expect(() => peer.request('bytes.inspect', buffer, { transfer: [buffer] })).toThrowError(
+      await expect(
+        peer.thread.send('thread', 'bytes.inspect', buffer, { transfer: [buffer] })
+      ).rejects.toMatchObject(
         expect.objectContaining({
           source: 'rpc.endpoint',
           code: 'CAPABILITY_UNSUPPORTED'
         })
       )
       expect(buffer.byteLength).toBe(3)
-      expect(await peer.request('bytes.calls')).toBe(0)
+      expect(await peer.thread.send('thread', 'bytes.calls')).toBe(0)
     } finally {
       await peer.close()
     }
@@ -101,21 +115,29 @@ describe('ordinary signed native-binary thread profile', () => {
       }
     }
     /** Canonical default factories must retain the same signature barrier as custom endpoints. */
-    const peer = await createRpcHost<IBytesApi>({
-      ...options,
+    const peer = await createRpcHost<
+      { thread: IBytesApi },
+      readonly [ReturnType<typeof auth>, ReturnType<typeof threadPlugin<'thread'>>]
+    >({
       report: () => undefined,
-      plugins: [threadPlugin({ spawn: source(true, () => undefined) })]
+      plugins: [
+        auth(options.authentication),
+        threadPlugin({ spawn: source(true, () => undefined) })
+      ]
     })
     try {
       /** The submitted native frame detaches storage even though the peer refuses its signature. */
       const buffer = new Uint8Array([7, 8, 9]).buffer
       forge = true
       await expect(
-        peer.request('bytes.inspect', buffer, { transfer: [buffer], timeoutMs: 100 })
+        peer.thread.send('thread', 'bytes.inspect', buffer, {
+          transfer: [buffer],
+          timeout: timeout({ ms: 100 })
+        })
       ).rejects.toMatchObject({ source: 'rpc.endpoint', code: 'DEADLINE_EXCEEDED' })
       expect(buffer.byteLength).toBe(0)
       forge = false
-      expect(await peer.request('bytes.calls')).toBe(0)
+      expect(await peer.thread.send('thread', 'bytes.calls')).toBe(0)
     } finally {
       await peer.close()
     }

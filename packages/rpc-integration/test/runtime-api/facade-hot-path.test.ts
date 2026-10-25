@@ -9,7 +9,7 @@ import { readRuntimePeerEndpoint } from '../../../rpc-host/dist/remote/runtime-a
 import { readEndpointOwner } from '../../../rpc-host/dist/core/internal/endpoint-projection.js'
 import { EndpointOwnerKey } from '../../../rpc-host/dist/core/endpoint-kernel.js'
 import type { ProviderRegistry } from '../../../rpc-host/dist/core/internal/provider.js'
-import { RpcSerializationError } from '../../../rpc-host/dist/core/errors.js'
+import { RpcSerializationError } from '@migaia/rpc-contract/errors'
 import { observePortableNormalization } from '../../../rpc-contract/test/fixtures/portable-observer.js'
 import vectors from '../../schema/vectors/runtime-api.json'
 import {

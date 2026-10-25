@@ -1,3 +1,4 @@
+/** Contract owns wire error policy; the shared Utils walker owns bounded graph traversal. */
 import {
   serializeErrorChain,
   deserializeErrorChain,
@@ -6,21 +7,16 @@ import {
   sanitizeErrorText,
   type IErrorChainStrategy
 } from '@migaia/utils/error'
-import {
-  createContractError,
-  localErrorWireSummary,
-  localErrorWireRoute,
-  registerLocalErrorWireRoute
-} from './contract-error.js'
-import { RpcContractErrorCode } from './error-code.js'
-import { normalizePortable } from './normalize.js'
+import { createContractError } from './contract-error.js'
+import { RpcContractErrorCode } from '../error-code.js'
+import { RpcWireLimit } from '../wire/limits.js'
+import { normalizePortable } from '../portable/normalize.js'
 import type {
   IRpcSerializedError,
   IRpcSerializeErrorOptions,
   IRpcWireErrorOptions,
   IRpcErrorWireMetadata,
-  IRpcErrorWireSummary,
-  IRpcErrorWireRouteStore
+  IRpcErrorWireSummary
 } from './types.js'
 import {
   RpcErrorReachLimit,
@@ -30,21 +26,13 @@ import {
   RpcWireErrorViolation
 } from './wire-error-constants.js'
 
-/**
- * Classify only a package-minted error for diagnostic presentation. Its held summary grants no
- * channel authority, and neither copied errors nor wire properties can supply the policy.
- */
-export function classifyRpcContractError(error: unknown): IRpcErrorWireSummary | undefined {
-  return localErrorWireSummary(error)
-}
-
 /** Read exact-reference presentation before ordinary error getters, preserving reentrant order. */
 function readWireSummary(
   input: unknown,
   metadata?: IRpcErrorWireMetadata
 ): IRpcErrorWireSummary | undefined {
   if ((typeof input === 'object' && input !== null) || typeof input === 'function')
-    return metadata?.summaries?.get(input as Error) ?? localErrorWireSummary(input)
+    return metadata?.summaries?.get(input as Error)
   return undefined
 }
 
@@ -53,17 +41,23 @@ function readWireRoute(
   input: object,
   metadata?: IRpcErrorWireMetadata
 ): readonly string[] | undefined {
-  return metadata?.routes?.get(input as Error) ?? localErrorWireRoute(input)
+  return metadata?.routes?.get(input as Error)
+}
+
+/** Error routes retain the same origin/forward-node allowance as actual forwarded calls. */
+function invalidErrorRouteNode(id: unknown): boolean {
+  return typeof id !== 'string' || !/^[0-9a-f]{32}$/u.test(id)
 }
 
 /** Attach the RPC violation identity and pointer without replacing the native TypeError or cause. */
 export function createInvalidWireError(
   cause: unknown,
   pointer: string,
-  violation: RpcWireErrorViolation
+  violation: RpcWireErrorViolation,
+  metadata?: IRpcErrorWireMetadata
 ): Error {
   /** Contract-owned failure retains the original input through its cause. */
-  const error = createContractError(RpcContractErrorCode.invalidWireError, cause)
+  const error = createContractError(RpcContractErrorCode.invalidWireError, cause, metadata)
   Object.defineProperty(error, 'pointer', { value: pointer })
   Object.defineProperty(error, 'violation', { value: violation })
   return error
@@ -75,7 +69,7 @@ export function createInvalidWireError(
  */
 function rpcErrorStrategy(
   metadata?: IRpcErrorWireMetadata,
-  routes?: IRpcErrorWireRouteStore
+  causeProjector?: (cause: unknown) => unknown
 ): IErrorChainStrategy {
   return {
     fields: RpcWireErrorField,
@@ -89,7 +83,12 @@ function rpcErrorStrategy(
         ? { text: record.base64url, key: 'base64url' }
         : undefined,
     createViolation: (cause, pointer, violation) =>
-      createInvalidWireError(cause, pointer, violation),
+      createInvalidWireError(
+        causeProjector ? causeProjector(cause) : cause,
+        pointer,
+        violation,
+        metadata
+      ),
     extensions: [
       {
         field: 'route',
@@ -101,18 +100,22 @@ function rpcErrorStrategy(
           if (
             !Array.isArray(route) ||
             route.length < 1 ||
-            route.length > 4 ||
-            route.some((id) => typeof id !== 'string' || !/^[0-9a-f]{32}$/u.test(id))
+            route.length > RpcWireLimit.maxForwardRouteNodes ||
+            route.some(invalidErrorRouteNode)
           )
-            throw createInvalidWireError(raw, pointer, RpcWireErrorViolation.type)
+            throw createInvalidWireError(
+              causeProjector ? causeProjector(raw) : raw,
+              pointer,
+              RpcWireErrorViolation.type,
+              metadata
+            )
           return { value: route, bytes: route.length * 32 }
         },
         /** Registration retains route diagnostics only; it never mints a local control identity. */
         restore: (error, value) => {
           /** The generic validator has admitted this extension through its route grammar. */
           const route = value as readonly string[]
-          registerLocalErrorWireRoute(error, route)
-          routes?.set(error, route)
+          metadata?.routes?.set(error, route)
         }
       }
     ]
@@ -140,9 +143,10 @@ export function serializeRpcError(
  */
 export function* reachRpcError(
   value: unknown,
-  options: IRpcSerializeErrorOptions
+  options: IRpcSerializeErrorOptions,
+  metadata?: IRpcErrorWireMetadata
 ): Generator<unknown> {
-  yield* reachErrorChain(value, rpcErrorStrategy(), options)
+  yield* reachErrorChain(value, rpcErrorStrategy(metadata), options)
 }
 
 /** Retain the RPC UTF-8 text limit while delegating scalar replacement and prefix selection. */
@@ -167,9 +171,15 @@ export function sanitizeText(
  */
 export function normalizeRpcSerializedError(
   value: unknown,
-  options: IRpcWireErrorOptions = {}
+  options: IRpcWireErrorOptions = {},
+  metadata?: IRpcErrorWireMetadata,
+  causeProjector?: (cause: unknown) => unknown
 ): IRpcSerializedError {
-  return normalizeSerializedErrorChain(value, rpcErrorStrategy(), options) as IRpcSerializedError
+  return normalizeSerializedErrorChain(
+    value,
+    rpcErrorStrategy(metadata, causeProjector),
+    options
+  ) as IRpcSerializedError
 }
 
 /**
@@ -181,7 +191,7 @@ export function normalizeRpcSerializedError(
 export function deserializeRpcError(
   value: unknown,
   options?: IRpcWireErrorOptions,
-  routes?: IRpcErrorWireRouteStore
+  metadata?: IRpcErrorWireMetadata
 ): Error {
-  return deserializeErrorChain(value, rpcErrorStrategy(undefined, routes), options)
+  return deserializeErrorChain(value, rpcErrorStrategy(metadata), options)
 }

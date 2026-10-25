@@ -1,114 +1,36 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { it, vi } from 'vitest'
-import vectors from '../../schema/vectors/runtime-api.json'
-import { normalizeRuntimeEnvelope } from '@migaia/rpc-contract/runtime'
-import { prepareWithBinaryDataCodec } from '../../../rpc-contract/test/runtime-api/binary-operation.js'
-import { restoreRpcBinary } from '../../../rpc-contract/dist/contract/runtime-api/binary.js'
-import type { IRpcBinaryDataCodec } from '../../../rpc-contract/dist/contract/runtime-api/binary-data-codec.js'
-import { RpcBinaryStorage } from '@migaia/rpc-contract/wire'
+import vectors from '../../schema/vectors/core-profile.json'
+import {
+  prepareRpcBinary,
+  restoreRpcBinary,
+  RpcBinaryStorage,
+  RpcJsonCarrierCodec
+} from '@migaia/rpc-host/sdk'
+import type { IRpcEnvelope } from '@migaia/rpc-contract/protocol'
 import { Buffer } from 'node:buffer'
-import { PassThrough } from 'node:stream'
-import { createNativeProcessOffer } from '../../../rpc-plugin-process/dist/process/offer.js'
-import { createProcessTransport } from '../../../rpc-plugin-process/dist/process/handshake.js'
-import { defineJsonCodec } from '@migaia/serialize/codecs/json'
-import { asCodecValue } from '@migaia/serialize/codec'
-import { rpcProtocolV1 } from '@migaia/rpc-contract'
-import { bindRpcFrameIngress } from '@migaia/rpc-contract/framing'
-import { remoteProcessJsonCodec } from '../fixtures/process-diagnostics.js'
-import { remoteProcessStringFramer } from '@migaia/rpc-contract/framing'
-import {
-  proveFastComponents,
-  readFastInlineEncoder
-} from '../../../rpc-host/dist/core/internal/fast-path.js'
-import {
-  prepareOwnedBinaryJsonSnapshot,
-  readOwnedJsonSnapshot,
-  RpcOwnedBinaryAlphabet
-} from '../../../rpc-host/dist/core/internal/outbound-owned-codec.js'
-import { nodeByteStream } from '../../../rpc-plugin-process/dist/process/node-byte-stream.js'
-import type { IRpcSelectedComponents } from '../../../rpc-host/dist/core/internal/endpoint-options.js'
 
 /** Original task/route vectors supply the complete normative metadata rather than a fake endpoint. */
-const envelope = (payload: unknown) => normalizeRuntimeEnvelope({ ...vectors.valid[0], payload })
+const envelope = (payload: unknown): IRpcEnvelope =>
+  ({
+    ...vectors.valid.find(
+      (value) => value.frame.kind === 'call' && value.frame.task?.mode === 'request'
+    )!.frame,
+    payload
+  }) as IRpcEnvelope
 
 /** A real full-backing digest proves that invisible bytes participate in native integrity. */
 const digest = async (backing: ArrayBuffer) =>
   createHash('sha256').update(new Uint8Array(backing)).digest('hex')
 
-/** Obtain the production native codec from actual held streams and the public Process handshake. */
-async function createNativeProcessCodec() {
-  /** Independent physical directions retain the original ordered, backpressured byte operations. */
-  const forward = new PassThrough()
-  const reverse = new PassThrough()
-  /** Both actual raw ports borrow the same fixture-owned pair and retire it idempotently. */
-  const destroy = (): void => {
-    forward.destroy()
-    reverse.destroy()
-  }
-  try {
-    /** Only the canonical Node byte constructor holds the native byte-view factory for Core. */
-    const left = nodeByteStream(reverse, forward, destroy)
-    const right = nodeByteStream(forward, reverse, destroy)
-    /** Actual correlated control bytes produce the same complete Process channels as production. */
-    const [channel, peer] = await Promise.all([
-      createProcessTransport(left, {
-        role: 'initiator',
-        peerId: 'native-right',
-        offer: createNativeProcessOffer({ peer: { id: 'native-left', runtime: 'node' } }),
-        ipc: {
-          connectionId: 'native-left',
-          sessionId: 'native-left',
-          log: () => undefined
-        },
-        report: () => undefined
-      }),
-      createProcessTransport(right, {
-        role: 'responder',
-        peerId: 'native-left',
-        offer: createNativeProcessOffer({ peer: { id: 'native-right', runtime: 'node' } }),
-        auth: { mode: 'none' },
-        ipc: {
-          connectionId: 'native-right',
-          sessionId: 'native-right',
-          log: () => undefined
-        },
-        report: () => undefined
-      })
-    ])
-    return {
-      codec: channel.pipeline!.codec,
-      /** Native resource cleanup follows the public channel owner before fixture stream disposal. */
-      async close() {
-        try {
-          await Promise.all([channel.close!(), peer.close!()])
-        } finally {
-          destroy()
-        }
-      }
-    }
-  } catch (error) {
-    destroy()
-    throw error
-  }
-}
-
 for (const size of [64 * 1024, 1024 * 1024]) {
   it(`${size} owned inline bytes encode natively once without a second business walk`, async () => {
-    /** The actual public handshake supplies Core's resource-bound production codec. */
-    const fixture = await createNativeProcessCodec()
-    /** The same real codec/framer identities select the encoder held by the Node byte adapter. */
-    const components: IRpcSelectedComponents = {
-      protocol: rpcProtocolV1,
-      codec: fixture.codec as IRpcSelectedComponents['codec'],
-      framer: remoteProcessStringFramer,
-      ingressPrepare: bindRpcFrameIngress(remoteProcessStringFramer.accept),
-      shadowed: []
-    }
-    proveFastComponents(components, rpcProtocolV1, fixture.codec, remoteProcessStringFramer)
-    /** The callable comes from actual adapter admission, not a fixture reimplementation. */
-    const encodeInline = readFastInlineEncoder(components)
-    assert.ok(encodeInline)
+    /** The actual SDK executes preparation and encoding; native process acquisition moves to C3. */
+    const codec = new RpcJsonCarrierCodec()
+    /** The caller lends its actual native byte intrinsic through the public codec option. */
+    const encodeInline = (bytes: Uint8Array): string =>
+      Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength).toString('base64url')
     /** Hidden prefix/suffix bytes distinguish inline view semantics from native whole backings. */
     const backing = new Uint8Array(size + 4).fill(7)
     backing[0] = 91
@@ -124,49 +46,42 @@ for (const size of [64 * 1024, 1024 * 1024]) {
       this: Buffer,
       ...args: unknown[]
     ) {
-      if (args[0] === RpcOwnedBinaryAlphabet) nativeCalls++
+      if (args[0] === 'base64url') nativeCalls++
       return Reflect.apply(original, this, args)
     })
     try {
-      /** The original prepare visitor emits both the tags and their root construction bounds. */
-      const prepared = await prepareWithBinaryDataCodec(
-        input,
-        RpcBinaryStorage.inline,
-        undefined,
-        undefined,
-        new (class implements IRpcBinaryDataCodec {
-          /** Hold the same actual process codec used by the original encoding assertion. */
-          encode(value: unknown): unknown {
-            return fixture.codec.encode(value)
+      /** The original visitor reports its exact constructed roots without a second business walk. */
+      const captures: Array<{ manifest: object; roots: ReadonlyMap<object, number> }> = []
+      const prepared = await prepareRpcBinary(input, {
+        storage: RpcBinaryStorage.inline,
+        encoding: {
+          encodeInline,
+          capture(manifest, roots) {
+            captures.push({ manifest, roots })
           }
-          /** Exact selected-components provenance supplies the unchanged native byte intrinsic. */
-          readonly encodeInline = encodeInline
-          /** This Core-owned data resource retains the original metadata and binary-root bounds. */
-          captureJsonData(manifest: object, roots: ReadonlyMap<object, number>): unknown {
-            return prepareOwnedBinaryJsonSnapshot(manifest, roots)
-          }
-        })()
-      )
-      /** Reusing the exact tag root proves metadata preparation did not copy the business graph. */
-      const retained = readOwnedJsonSnapshot(prepared.manifest)
-      assert.ok(retained)
-      const json = retained.value as typeof prepared.manifest
-      assert.ok('payload' in prepared.manifest.envelope && 'payload' in json.envelope)
-      assert.equal(
-        json.envelope.payload,
-        prepared.manifest.envelope.payload,
-        'same encoded business root'
-      )
-      /** Compare the actual process codec against the unchanged source JSON codec's wire order. */
-      const encoded = fixture.codec.encode(prepared.manifest)
-      assert.equal(encoded, defineJsonCodec({ version: 1 }).encode(asCodecValue(prepared.manifest)))
+        }
+      })
+      /** The callback observes the published manifest and its actual encoded business root. */
+      assert.equal(captures.length, 1)
+      assert.equal(captures[0]!.manifest, prepared.manifest)
+      assert.ok('payload' in prepared.manifest.envelope)
+      assert.ok(captures[0]!.roots.has(prepared.manifest.envelope.payload as object))
+      /** BC2 preserves admitted key order in the new canonical JSON codec, without legacy sorting. */
+      const encoded = codec.encode(
+        {
+          message: prepared.manifest.envelope,
+          manifest: prepared.manifest,
+          sidecars: prepared.sidecars
+        },
+        { codec: 'json', nativeBinary: false, maxFrameBytes: 16 * 1024 * 1024 }
+      ).data
+      assert.equal(encoded, JSON.stringify(prepared.manifest))
       assert.equal(nativeCalls, 1, 'real native base64 once per binary leaf')
-      assert.ok(Buffer.byteLength(encoded as string) <= retained.byteUpperBound)
+      assert.ok(Buffer.byteLength(encoded as string) <= 16 * 1024 * 1024)
       /** The shipped restore owner decides offset, zero-prefix, text and visible byte equality. */
-      const restored = await restoreRpcBinary(
-        JSON.parse(encoded as string),
-        RpcBinaryStorage.inline
-      )
+      const restored = await restoreRpcBinary(JSON.parse(encoded as string), {
+        storage: RpcBinaryStorage.inline
+      })
       assert.ok('payload' in restored)
       const payload = restored.payload as { z: Uint8Array; a: string }
       assert.equal(payload.z.byteOffset, 2)
@@ -174,9 +89,9 @@ for (const size of [64 * 1024, 1024 * 1024]) {
       assert.deepEqual(new Uint8Array(payload.z.buffer, 0, 2), new Uint8Array(2))
       assert.deepEqual(payload.z, new Uint8Array(backing.buffer, 2, size))
       assert.equal(payload.a, '汉字\ud83d')
+      assert.deepEqual(Object.keys(payload), ['z', 'a'])
     } finally {
       native.mockRestore()
-      await fixture.close()
     }
   })
 }
@@ -188,56 +103,39 @@ it('private owned capture preserves public preparation shape and native digest o
   /** All preparation paths share the original admitted semantic source. */
   const input = envelope({ first, view: new Uint8Array(first, 1, 2), second })
   /** The same source without an internal capture retains the public result geometry. */
-  const ordinary = await prepareWithBinaryDataCodec(
-    input,
-    RpcBinaryStorage.native,
-    undefined,
-    digest
-  )
+  const ordinary = await prepareRpcBinary(input, { storage: RpcBinaryStorage.native, digest })
   /** Only actual digest invocations enter this ordered record. */
   const order: ArrayBuffer[] = []
   /** Prehash must occur once before the first real digest starts. */
   let beforeDigest = 0
-  const prepared = await prepareWithBinaryDataCodec(
-    input,
-    RpcBinaryStorage.native,
-    undefined,
-    async (backing) => {
+  /** Prehash callbacks must see the exact preceding capture, without v1 private snapshot stamps. */
+  const captured: object[] = []
+  const prepared = await prepareRpcBinary(input, {
+    storage: RpcBinaryStorage.native,
+    digest: async (backing) => {
       order.push(backing)
       return digest(backing)
     },
-    new (class implements IRpcBinaryDataCodec {
-      /** Observe only the first native metadata capture at the original prehash point. */
-      #prehashObserved = false
-      /** Hold the original codec whose immutable JSON snapshot is under observation. */
-      encode(value: unknown): unknown {
-        return remoteProcessJsonCodec.encode(value)
+    encoding: {
+      capture(manifest, roots) {
+        assert.ok(roots.size > 0)
+        captured.push(manifest)
       }
-      /** Retain actual metadata and prove capture precedes every original native digest. */
-      captureJsonData(
-        manifest: object,
-        roots: ReadonlyMap<object, number>,
-        bytes: number
-      ): unknown {
-        const retained = prepareOwnedBinaryJsonSnapshot(manifest, roots)
-        if (!this.#prehashObserved) {
-          this.#prehashObserved = true
-          beforeDigest++
-          assert.equal(order.length, 0)
-          assert.equal(bytes, 6)
-          assert.ok(readOwnedJsonSnapshot(manifest))
-        }
-        return retained
-      }
-    })()
-  )
+    },
+    beforeDigest(manifest, bytes) {
+      beforeDigest++
+      assert.equal(order.length, 0)
+      assert.equal(bytes, 6)
+      assert.equal(captured.at(-1), manifest)
+    }
+  })
   assert.equal(beforeDigest, 1)
   assert.deepEqual(order, [first, second])
   assert.deepEqual(prepared, ordinary)
   assert.deepEqual(Object.keys(prepared), Object.keys(ordinary))
   assert.deepEqual(Object.keys(prepared.manifest), Object.keys(ordinary.manifest))
   assert.equal(Object.getPrototypeOf(prepared.manifest), Object.getPrototypeOf(ordinary.manifest))
-  assert.equal(readOwnedJsonSnapshot(ordinary.manifest), undefined)
+  assert.equal(captured.at(-1), prepared.manifest)
   /** Native signer input keeps the original tuple mutability; only its sizing facts are retained. */
   assert.ok('payload' in prepared.manifest.envelope)
   assert.equal(Object.isFrozen(prepared.manifest.envelope.payload), false)

@@ -1,351 +1,251 @@
-import { BrowserCarrierObservation, BrowserRpcCarrier } from '../probe-detail.js'
-import type { IRpcTransport } from '@migaia/rpc-host/plugin'
+/** Adapts one borrowed ordered RTC channel to native text message IO for the shared SDK carrier. */
+import { BrowserPeerEvent, BrowserNativeState } from '../peer-text.js'
 import {
-  RpcPlatform,
-  RpcTransportOwnership,
-  collectListenerCleanupFailures,
-  collectListenerFailure,
-  createListenerFailure,
-  createListenerFailureState,
-  createMessageListenerHub,
-  drainListenerFailures,
-  observeListener,
-  registerListeners,
-  releaseListenerRegistration,
-  reportListenerFailure,
-  safeRead
-} from '@migaia/rpc-host/plugin'
-import { RPC_CORE_ERROR_SOURCE, RpcCoreErrorCode } from '@migaia/rpc-host'
-import { createBrowserTransportError } from '../error.js'
+  createRpcMessageCarrier,
+  RpcJsonCarrierCodec,
+  defaultRpcId,
+  RpcCarrierObservation
+} from '@migaia/rpc-host/sdk'
+import type { IRpcMessageIO, IRpcTransportSetupContext } from '@migaia/rpc-host/sdk'
+import {
+  RpcCarrierPlatform,
+  RpcCarrierTopology,
+  RpcCarrierEncoding,
+  RpcProbeDirection,
+  type IRpcCarrierFrame,
+  type IRpcCarrierWriteOptions
+} from '@migaia/rpc-contract/interfaces'
+import { RpcCarrierFrameKind } from '@migaia/rpc-contract/protocol'
+import { safeRead } from '@migaia/rpc-contract/errors'
+import {
+  RpcCoreErrorCode,
+  RpcBrowserErrorCode,
+  RPC_ENDPOINT_ERROR_SOURCE
+} from '@migaia/rpc-contract/error-code'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import { BrowserRpcErrorText } from '../error-text.js'
+import { createBrowserTransportError, rejectBrowserTransfer } from '../error.js'
+import { createBrowserPeerError } from '../peer-error.js'
+import { BrowserPeerErrorText } from '../../error-text.js'
+import { emitBrowserObservation, type IBrowserObservationMetadata } from '../native-observation.js'
 
-/** Minimal RTCDataChannel surface accepted by the adapter. */
+/** Native RTC transmits one JSON text message; signaling and the channel lifetime remain borrowed. */
 export type IRTCDataChannel = {
-  /** Native string send; the adapter stringifies non-string outgoing messages before delegation. */
   send(data: string): void
-  /** Construct with open, or closed for an already-terminal adapter; connecting/closing rejects. */
   readonly readyState: string
-  /** Register message delivery and closing/close/error terminal notification. */
   addEventListener(
     type: 'message' | 'closing' | 'close' | 'error',
     listener: (event: unknown) => void
   ): void
-  /** Remove the same native callback; adapter cleanup never calls the channel's close method. */
   removeEventListener(
     type: 'message' | 'closing' | 'close' | 'error',
     listener: (event: unknown) => void
   ): void
 }
+/** The original terminal events share one native listener and deterministic registration order. */
+const terminalEvents = [
+  BrowserPeerEvent.closing,
+  BrowserPeerEvent.close,
+  BrowserPeerEvent.error
+] as const
 
-/**
- * Adapt an existing RTCDataChannel as a borrowed exclusive string Endpoint transport. Strings are
- * sent unchanged and other values use JSON.stringify; received data remains undecoded. The Peer
- * bridge adds JSON decoding and reliability checks, while this lower-level adapter does not check
- * ordered/maxRetransmits/maxPacketLifeTime. Complete signaling and wait for open before normal
- * use.
- *
- * Missing lifecycle operations or connecting/closing states throw TypeError/INVALID_CONFIG. An
- * already-closed channel yields a terminal adapter. Closing/close/error events mark it closed,
- * retire listeners and report TRANSPORT, retaining the event's original error by identity or cause.
- * Late onTransportError subscribers see the stored primary; later send/subscribe throw. Listener
- * and probe failures use onListenerError. Subscription cleanup releases native hooks, not the
- * channel or its RTCPeerConnection; the caller owns both physical lifetimes.
- */
-/** Allocate one ordered reliable RTC carrier before installing behavior callbacks. */
-function rtcDataChannelTransportState(channel: IRTCDataChannel) {
-  if (
-    !channel ||
-    typeof channel !== 'object' ||
-    typeof channel.send !== 'function' ||
-    typeof channel.readyState !== 'string' ||
-    typeof channel.addEventListener !== 'function' ||
-    typeof channel.removeEventListener !== 'function'
-  )
-    throw attachErrorIdentity(
-      new TypeError(
-        BrowserRpcErrorText.rtcDataChannelMustExposeReadyStateAndTerminalEventListeners
-      ),
-      { source: RPC_CORE_ERROR_SOURCE, code: RpcCoreErrorCode.invalidConfig }
+/** Only native event acquisition and text framing live here; SDK owns codec and all pending work. */
+class RtcMessageIO implements IRpcMessageIO {
+  /** Cold RTC text facts and raw observations belong to this one acquired native channel. */
+  readonly observation: RpcCarrierObservation
+  /** Native RTC has no source selector; its original detail records only actual send/receive facts. */
+  readonly #metadata: IBrowserObservationMetadata = { rejectedSource: 0 }
+  /** The exact native channel remains borrowed until the caller closes it. */
+  readonly #channel: IRTCDataChannel
+  /** Native data/reflection failures use the receiving installation's existing reporter. */
+  readonly #report: (error: unknown) => void
+  /** SDK's original terminal callback is installed after native message acquisition. */
+  #closed: ((reason?: unknown) => void) | undefined
+  /** SDK's original physical-failure callback receives hostile data getter failures. */
+  #error: ((error: unknown) => void) | undefined
+  /** Native already-closed and repeated terminal events preserve the first original reason. */
+  #ended = false
+  /** Stored only to replay a native terminal event that precedes SDK callback installation. */
+  #reason: unknown
+
+  /** Reject incomplete or connecting native channels before registering any callback. */
+  constructor(channel: IRTCDataChannel, report: (error: unknown) => void) {
+    if (
+      !channel ||
+      typeof channel.send !== 'function' ||
+      typeof channel.readyState !== 'string' ||
+      typeof channel.addEventListener !== 'function' ||
+      typeof channel.removeEventListener !== 'function'
     )
-  if (channel.readyState !== 'open' && channel.readyState !== 'closed')
-    throw attachErrorIdentity(
-      new TypeError(BrowserRpcErrorText.rtcDataChannelMustBeOpenBeforeTransportConstruction),
-      { source: RPC_CORE_ERROR_SOURCE, code: RpcCoreErrorCode.invalidConfig }
+      throw attachErrorIdentity(
+        new TypeError(
+          BrowserRpcErrorText.rtcDataChannelMustExposeReadyStateAndTerminalEventListeners
+        ),
+        { source: RPC_ENDPOINT_ERROR_SOURCE, code: RpcCoreErrorCode.invalidConfig }
+      )
+    if (
+      channel.readyState !== BrowserNativeState.open &&
+      channel.readyState !== BrowserNativeState.closed
     )
-  /** Logical message subscribers share one native listener and retain registration order. */
-  const listeners = createMessageListenerHub<{ data: unknown }>()
-  /** Registered diagnostic callbacks receive listener failures without losing the primary error. */
-  const listenerErrors = new Set<(error: unknown) => void>()
-  /** Native carrier failures fan out to the currently registered transport subscribers. */
-  const transportErrors = new Set<(error: unknown) => void>()
-  /**
-   * Reporter and listener cleanup failures remain reachable until the existing failure drain
-   * observes them.
-   */
-  const secondaryFailures = createListenerFailureState()
-  /** Observation failures use listener reporting so Endpoint never rejects pending business calls. */
-  const observation = new BrowserCarrierObservation(BrowserRpcCarrier.rtcDataChannel, (error) =>
-    reportListenerFailure(error, listenerErrors, secondaryFailures)
-  )
-  /** Terminal admission state prevents this owner from accepting work after its resource is closed. */
-  let closed = channel.readyState === 'closed'
-  if (closed) observation.close()
-  /** A terminal carrier failure is published once even when closing and close both arrive. */
-  let terminalReported = closed
-  /** The first terminal carrier reason remains stable for late error subscribers. */
-  let terminalError: unknown = closed
-    ? attachErrorIdentity(new Error(BrowserRpcErrorText.rtcClosed), {
-        source: RPC_CORE_ERROR_SOURCE,
-        code: RpcCoreErrorCode.transport
-      })
-    : undefined
-  /** Native closing and close listeners are shared until the last logical registration leaves. */
-  let terminalListenersInstalled = false
-
-  return {
-    listeners,
-    listenerErrors,
-    transportErrors,
-    secondaryFailures,
-    observation,
-    closed,
-    terminalReported,
-    terminalError,
-    terminalListenersInstalled,
-    channel
-  }
-}
-
-/** Own one ordered reliable RTC carrier; callbacks access only this explicit instance. */
-class RtcDataChannelTransport {
-  /** All mutable storage and original construction inputs belong to this operation. */
-  #state: ReturnType<typeof rtcDataChannelTransportState>
-  /** Preserve the original stable resource surface and callback identities. */
-  readonly value: IRpcTransport
-  /** Initialize owned storage before publishing the resource's callbacks. */
-  constructor(channel: IRTCDataChannel) {
-    this.#state = rtcDataChannelTransportState(channel)
-
-    this.value = {
-      platform: RpcPlatform.rtcDataChannel,
-      topology: 'exclusive',
-      ownership: RpcTransportOwnership.borrowed,
-      closed: false,
-      encodedType: 'string',
-      send: (message) => {
-        if (this.#state.closed)
-          throw createBrowserTransportError(BrowserRpcErrorText.rtcDataChannelIsClosed)
-        /** The existing physical wire boundary serializes only non-string messages. */
-        const data = typeof message === 'string' ? message : JSON.stringify(message)
-        /** Observation sees the same physical string passed to the native channel. */
-        const probe = this.#state.observation.probe
-        if (probe !== undefined) this.#state.observation.emit(probe, 0, data)
-        this.#state.channel.send(data)
+      throw attachErrorIdentity(
+        new TypeError(BrowserRpcErrorText.rtcDataChannelMustBeOpenBeforeTransportConstruction),
+        { source: RPC_ENDPOINT_ERROR_SOURCE, code: RpcCoreErrorCode.invalidConfig }
+      )
+    this.#channel = channel
+    this.#report = report
+    this.observation = new RpcCarrierObservation(
+      {
+        platform: RpcCarrierPlatform.rtcDataChannel,
+        topology: RpcCarrierTopology.exclusive,
+        encodedType: RpcCarrierEncoding.string
       },
-      /** Replace the single endpoint probe; disposal is generation-safe and idempotent. */
-      observe: (probe) => {
-        return this.#state.observation.observe(probe)
-      },
-      subscribe: (listener) => {
-        if (this.#state.closed)
-          throw createBrowserTransportError(BrowserRpcErrorText.rtcDataChannelIsClosed)
-        this.#state.listeners.add(listener, () => {
-          this.#installTerminalListeners()
-          try {
-            this.#state.channel.addEventListener('message', this.#onMessage)
-          } catch (error) {
-            const cleanupErrors = collectListenerCleanupFailures([
-              () => this.#state.channel.removeEventListener('closing', this.#onTerminal),
-              () => this.#state.channel.removeEventListener('close', this.#onTerminal),
-              () => this.#state.channel.removeEventListener('error', this.#onTerminal)
-            ])
-            if (cleanupErrors.length === 0) this.#state.terminalListenersInstalled = false
-            drainListenerFailures([error, ...cleanupErrors], {
-              code: RpcCoreErrorCode.transport,
-              message: BrowserRpcErrorText.rtcSubscriptionCleanupFailed,
-              secondaryFailures: this.#state.secondaryFailures
-            })
-          }
-        })
-        return () => {
-          if (!this.#state.listeners.has(listener)) return
-          const isFinal = this.#state.listeners.size === 1
-          releaseListenerRegistration(
-            isFinal
-              ? [
-                  ...(this.#state.transportErrors.size === 0
-                    ? [
-                        () => this.#state.channel.removeEventListener('closing', this.#onTerminal),
-                        () => this.#state.channel.removeEventListener('close', this.#onTerminal),
-                        () => this.#state.channel.removeEventListener('error', this.#onTerminal)
-                      ]
-                    : []),
-                  () => this.#state.channel.removeEventListener('message', this.#onMessage)
-                ]
-              : [],
-            () => {
-              this.#state.listeners.remove(listener, () => undefined)
-              if (isFinal && this.#state.transportErrors.size === 0)
-                this.#state.terminalListenersInstalled = false
-            },
-            { code: RpcCoreErrorCode.transport, secondaryFailures: this.#state.secondaryFailures }
-          )
-        }
-      },
-      onListenerError: (listener) => {
-        this.#state.listenerErrors.add(listener)
-        return () => {
-          const deleted = this.#state.listenerErrors.delete(listener)
-          drainListenerFailures([], {
-            code: RpcCoreErrorCode.transport,
-            secondaryFailures: this.#state.secondaryFailures
-          })
-          return deleted
-        }
-      },
-      onTransportError: (listener) => {
-        if (!this.#state.terminalReported) this.#installTerminalListeners()
-        this.#state.transportErrors.add(listener)
-        if (this.#state.terminalReported) {
-          observeListener(
-            () => listener(this.#state.terminalError),
-            (error) => collectListenerFailure(this.#state.secondaryFailures, error),
-            this.#state.secondaryFailures
-          )
-        }
-        return () => {
-          if (!this.#state.transportErrors.has(listener)) return
-          const isFinal = this.#state.transportErrors.size === 1 && this.#state.listeners.size === 0
-          releaseListenerRegistration(
-            isFinal
-              ? [
-                  () => this.#state.channel.removeEventListener('closing', this.#onTerminal),
-                  () => this.#state.channel.removeEventListener('close', this.#onTerminal),
-                  () => this.#state.channel.removeEventListener('error', this.#onTerminal)
-                ]
-              : [],
-            () => {
-              this.#state.transportErrors.delete(listener)
-              if (isFinal) this.#state.terminalListenersInstalled = false
-            },
-            { code: RpcCoreErrorCode.transport, secondaryFailures: this.#state.secondaryFailures }
-          )
-        }
-      }
+      report
+    )
+    if (channel.readyState === BrowserNativeState.closed) {
+      this.#ended = true
+      this.#reason = createBrowserTransportError(BrowserRpcErrorText.rtcClosed)
     }
-    Object.defineProperties(this.value, {
-      closed: {
-        get: () => {
-          return this.#state.closed
-        }
-      }
-    })
   }
-
-  #installTerminalListeners = (): void => {
-    if (this.#state.terminalListenersInstalled) return
-    registerListeners(
-      [
-        {
-          add: () => this.#state.channel.addEventListener('closing', this.#onTerminal),
-          remove: () => this.#state.channel.removeEventListener('closing', this.#onTerminal)
-        },
-        {
-          add: () => this.#state.channel.addEventListener('close', this.#onTerminal),
-          remove: () => this.#state.channel.removeEventListener('close', this.#onTerminal)
-        },
-        {
-          add: () => this.#state.channel.addEventListener('error', this.#onTerminal),
-          remove: () => this.#state.channel.removeEventListener('error', this.#onTerminal)
-        }
-      ],
-      { code: RpcCoreErrorCode.transport, secondaryFailures: this.#state.secondaryFailures }
-    )
-    this.#state.terminalListenersInstalled = true
+  /** Canonical codec already supplies JSON text; native RTC never encodes or parses business data. */
+  send(
+    value: unknown,
+    _transfer?: readonly ArrayBuffer[],
+    options?: IRpcCarrierWriteOptions
+  ): void {
+    if (this.#ended) throw this.#reason
+    /** This shell is the actual admitted media frame produced by SDK, not untrusted business data. */
+    const frame = value as IRpcCarrierFrame & { data: string }
+    options?.onWriteStart?.()
+    emitBrowserObservation(this.observation, this.#metadata, RpcProbeDirection.outbound, frame.data)
+    this.#channel.send(frame.data)
   }
-
-  #onMessage = (event: unknown): void => {
-    let readFailed = false
-    /** The existing physical wire boundary serializes only non-string messages. */
-    const data = safeRead<unknown>(event, 'data', ({ error }) => {
-      readFailed = true
-      reportListenerFailure(
-        createBrowserTransportError(BrowserRpcErrorText.rtcMessageReadFailed, error),
-        this.#state.transportErrors,
-        this.#state.secondaryFailures
-      )
-      return undefined
-    })
-    if (readFailed) return
-    /** Capture physical channel data before any business decoding. */
-    const probe = this.#state.observation.probe
-    if (probe !== undefined) this.#state.observation.emit(probe, 1, data)
-    this.#state.listeners.dispatch({ data }, (listener, message) => {
-      observeListener(
-        () => listener(message),
-        (error) =>
-          reportListenerFailure(error, this.#state.listenerErrors, this.#state.secondaryFailures),
-        this.#state.secondaryFailures
-      )
-    })
-  }
-
-  #onTerminal = (event: unknown): void => {
-    if (this.#state.terminalReported) return
-    this.#state.terminalReported = true
-    this.#state.closed = true
-    this.#state.observation.close()
-    this.#state.listeners.clear(() => undefined)
-    const cleanupErrors = collectListenerCleanupFailures([
-      () => this.#state.channel.removeEventListener('closing', this.#onTerminal),
-      () => this.#state.channel.removeEventListener('close', this.#onTerminal),
-      () => this.#state.channel.removeEventListener('error', this.#onTerminal),
-      () => this.#state.channel.removeEventListener('message', this.#onMessage)
-    ])
-    if (cleanupErrors.length === 0) this.#state.terminalListenersInstalled = false
-    /** Keep an attachable external Error by identity; otherwise preserve it through cause. */
-    let error: Error
-    /** Preflight or tagging failures remain behind the terminal primary. */
-    const secondary: unknown[] = []
-    if (event instanceof Error) {
+  /** Acquire native terminal listeners before message delivery; rollback preserves original errors. */
+  onMessage(listener: (value: unknown) => void): () => void {
+    /** Exact acquired native callbacks are the entire rollback receipt. */
+    const admitted: Array<() => void> = []
+    /** Getter failure is a physical failure; no fabricated data reaches Session. */
+    const receive = (event: unknown): void => {
       try {
-        error =
-          Object.isExtensible(event) && !('source' in event) && !('code' in event)
-            ? attachErrorIdentity(event, {
-                source: RPC_CORE_ERROR_SOURCE,
-                code: RpcCoreErrorCode.transport
-              })
-            : attachErrorIdentity(new Error(BrowserRpcErrorText.rtcClosed, { cause: event }), {
-                source: RPC_CORE_ERROR_SOURCE,
-                code: RpcCoreErrorCode.transport
-              })
-      } catch (failure) {
-        secondary.push(failure)
-        error = attachErrorIdentity(new Error(BrowserRpcErrorText.rtcClosed, { cause: event }), {
-          source: RPC_CORE_ERROR_SOURCE,
-          code: RpcCoreErrorCode.transport
-        })
+        /** Read the actual native data getter once for both observation and codec delivery. */
+        const data = Reflect.get(event as object, 'data')
+        emitBrowserObservation(this.observation, this.#metadata, RpcProbeDirection.inbound, data)
+        listener({ kind: RpcCarrierFrameKind.message, data })
+      } catch (cause) {
+        this.#failure(createBrowserTransportError(BrowserRpcErrorText.rtcMessageReadFailed, cause))
       }
-    } else {
-      /** RTC-style event objects retain their error slot, or the event itself if none is present. */
-      const cause =
-        safeRead<unknown>(event, 'error', ({ error }) => {
-          secondary.push(error)
-          return undefined
-        }) ?? event
-      error = createBrowserTransportError(BrowserRpcErrorText.rtcClosed, cause)
     }
-    this.#state.terminalError = error
-    const failure = createListenerFailure([error, ...secondary, ...cleanupErrors], {
-      code: RpcCoreErrorCode.transport,
-      message: BrowserRpcErrorText.rtcSubscriptionCleanupFailed
-    })
-    reportListenerFailure(failure, this.#state.transportErrors, this.#state.secondaryFailures)
+    try {
+      for (const type of terminalEvents) {
+        this.#channel.addEventListener(type, this.#terminal)
+        admitted.push(() => this.#channel.removeEventListener(type, this.#terminal))
+      }
+      this.#channel.addEventListener(BrowserPeerEvent.message, receive)
+      admitted.push(() => this.#channel.removeEventListener(BrowserPeerEvent.message, receive))
+    } catch (primary) {
+      for (const remove of admitted.reverse())
+        try {
+          remove()
+        } catch (cleanup) {
+          this.#report(cleanup)
+        }
+      throw primary
+    }
+    return () => {
+      /** Original terminal-before-message cleanup attempts every native listener once. */
+      const failures: unknown[] = []
+      for (const remove of admitted)
+        try {
+          remove()
+        } catch (error) {
+          failures.push(error)
+        }
+      if (failures.length === 0) return
+      /** Native terminal cleanup keeps its primary first; ordinary unsubscribe keeps its identity. */
+      const errors =
+        this.#ended && this.#reason !== undefined ? [this.#reason, ...failures] : failures
+      if (errors.length === 1) throw errors[0]
+      throw attachErrorIdentity(
+        new AggregateError(errors, BrowserRpcErrorText.rtcSubscriptionCleanupFailed, {
+          cause: errors[0]
+        }),
+        { source: RPC_ENDPOINT_ERROR_SOURCE, code: RpcCoreErrorCode.transport }
+      )
+    }
+  }
+  /** An original native close observed during acquisition is replayed unchanged to SDK. */
+  onClose(listener: (reason?: unknown) => void): () => void {
+    this.#closed = listener
+    if (this.#ended) listener(this.#reason)
+    return () => {
+      if (this.#closed === listener) this.#closed = undefined
+    }
+  }
+  /** Error observation is independent of native ownership. */
+  onError(listener: (error: unknown) => void): () => void {
+    this.#error = listener
+    return () => {
+      if (this.#error === listener) this.#error = undefined
+    }
+  }
+  /** Logical close never invokes the caller-owned RTC channel or RTCPeerConnection close. */
+  close(): void {}
+  /** Native terminal Error identity and event.error cause preserve the previous browser policy. */
+  readonly #terminal = (event: unknown): void => {
+    if (this.#ended) return
+    this.#ended = true
+    /** Reflection failures stay reported behind the primary native terminal reason. */
+    const cause =
+      event instanceof Error
+        ? event
+        : (safeRead(event, 'error', ({ error }) => {
+            this.#report(error)
+            return undefined
+          }) ?? event)
+    try {
+      this.#reason =
+        cause instanceof Error &&
+        Object.isExtensible(cause) &&
+        !('source' in cause) &&
+        !('code' in cause)
+          ? attachErrorIdentity(cause, {
+              source: RPC_ENDPOINT_ERROR_SOURCE,
+              code: RpcCoreErrorCode.transport
+            })
+          : createBrowserTransportError(BrowserRpcErrorText.rtcClosed, cause)
+    } catch (failure) {
+      this.#report(failure)
+      this.#reason = createBrowserTransportError(BrowserRpcErrorText.rtcClosed, cause)
+    }
+    this.#closed?.(this.#reason)
+  }
+  /** Reflection failures before SDK error admission retain the installation diagnostic destination. */
+  #failure(error: unknown): void {
+    if (this.#error) this.#error(error)
+    else this.#report(error)
   }
 }
 
-/** Construct the single owner for one ordered reliable RTC carrier. */
-export function createRtcDataChannelTransport(channel: IRTCDataChannel): IRpcTransport {
-  return new RtcDataChannelTransport(channel).value
+/** Preserve native RTC terminal/source semantics while sharing SDK's one JSON and lifetime owner. */
+export function createRtcDataChannelCarrier(
+  channel: IRTCDataChannel,
+  context: Pick<IRpcTransportSetupContext, 'report'>
+) {
+  /** The native IO and carrier lend the same observer, without another codec or receiver. */
+  const io = new RtcMessageIO(channel, context.report)
+  return createRpcMessageCarrier({
+    id: defaultRpcId(),
+    nativeBinary: false,
+    assertTransfer: rejectBrowserTransfer,
+    codec: new RpcJsonCarrierCodec({
+      projectDecodeFailure: (cause) =>
+        createBrowserPeerError(
+          RpcBrowserErrorCode.messageDecodeFailed,
+          BrowserPeerErrorText.messageDecodeFailed,
+          cause
+        )
+    }),
+    io,
+    observation: io.observation,
+    report: context.report
+  })
 }

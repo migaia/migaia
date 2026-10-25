@@ -1,6 +1,6 @@
 import { runInNewContext } from 'node:vm'
 import { describe, expect, it } from 'vitest'
-import { normalizeRpcSerializedError, serializeRpcError } from '../../dist/contract/index.js'
+import { normalizeRpcSerializedError, serializeRpcError } from '@migaia/rpc-contract/errors'
 
 describe('contract guarded property policy', () => {
   it('reports one failed stack read and marks the wire node truncated', () => {

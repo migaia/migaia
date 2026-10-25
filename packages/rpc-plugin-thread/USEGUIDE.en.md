@@ -1,99 +1,110 @@
-# Thread plugin usage guide
+# Thread usage guide
 
 [README](./README.en.md) · [中文](./USEGUIDE.md)
 
-This package supplies transport for actual Node, Bun, and Deno threads. Browser Workers, SharedWorkers, and page ports use the [browser guide](../rpc-plugin-browser/USEGUIDE.en.md), not server guards guessing browser sources.
+Contract defines pure protocol rules and interfaces. Host owns sessions, directories, providers, and call lifetime. The Thread transport acquires and supervises real Workers. Flow plugins provide auth, chunk, batch, and probe at fixed message hooks; features provide their owning plugin's timeout, retry, or pool. A Host may install several transports in distinct namespaces; this guide needs only Thread.
 
-## Start with a real Worker
+## Explicit parent and child entries
 
-Save as a standalone ESM entry. Node 24 runs TypeScript directly; other toolchains compile first. The parent explicitly spawns and the child joins through actual bootstrap:
-
-```ts doc-test=check
-import { createRpcHost } from '@migaia/rpc-host'
-import { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'
-
-if (await isThreadChild()) {
-  await createRpcHost({
-    plugins: [threadPlugin({ connectToParent: true })],
-    provide: { double: (value: number) => value * 2 }
-  })
-} else {
-  const host = await createRpcHost<{ double(value: number): number }>({
-    plugins: [threadPlugin({ spawn: true, connect: { timeoutMs: 1500 } })]
-  })
-  try {
-    console.log(await host.request('double', 21))
-  } finally {
-    await host.close()
-  }
-}
-```
-
-The parent prints 42. An explicit entry can use spawn:new URL('./worker.js',import.meta.url). Providers can yield generators, and either side can call back on the same session. self is application handshake identity, not a claim derived from native ports or environment strings. Omission retains independent launcher/bootstrap identity.
-
-## Streams, early return, and cancellation
+The parent uses a real `worker.js` and installs complete policies in transport `features`. When declaring remote methods, retain `typeof plugins` as well, so namespaces and member controls retain their types.
 
 ```ts doc-test=check
-import type { IRpcHost } from '@migaia/rpc-host'
+import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
+import { threadPlugin } from '@migaia/rpc-plugin-thread'
+import { timeout, retry } from '@migaia/rpc-host/features'
 
 type IWorkerApi = {
-  worker: { values(end: number): AsyncIterable<number>; wait(value: number): number }
+  values(end: number): AsyncIterable<number>
+  wait(value: number): number
+  bytes(value: Uint8Array<ArrayBuffer>): number
 }
-export async function consume(host: IRpcHost<IWorkerApi>) {
-  const stream = host.peers.worker.values(3)
+
+const plugins = [
+  threadPlugin({
+    name: 'worker',
+    spawn: new URL('./worker.js', import.meta.url),
+    features: [timeout({ ms: 1500 }), retry({ attempts: 2 })]
+  })
+] as const
+
+type IThreadHost = IRpcHost<IWorkerApi, typeof plugins>
+
+export function open() {
+  return createRpcHost<IWorkerApi, typeof plugins>({ plugins })
+}
+
+export async function firstValue(host: IThreadHost) {
+  const stream = host.thread.peers.worker.values(3)
   try {
     return await stream.next()
   } finally {
     await stream.return?.()
   }
 }
-export async function cancel(host: IRpcHost<IWorkerApi>) {
-  const controller = new AbortController()
-  const pending = host.send('worker', 'wait', 1, { signal: controller.signal, timeoutMs: 1500 })
-  controller.abort()
-  return await pending
+
+export function work(host: IThreadHost, signal: AbortSignal) {
+  return host.thread.send('worker', 'wait', 21, {
+    signal,
+    timeout: timeout({ ms: 500 }),
+    retry: false
+  })
+}
+
+export function sendBytes(host: IThreadHost, bytes: Uint8Array<ArrayBuffer>) {
+  return host.thread.send('worker', 'bytes', bytes, { transfer: [bytes.buffer] })
+}
+
+export async function inspectAndRestart(host: IThreadHost) {
+  const before = await host.thread.members.get('worker')
+  await host.thread.members.restart('worker')
+  return before
 }
 ```
 
-The helper declares the current direct worker. next/return/throw belong to the original iterator; early return ends that business stream rather than the Worker. A call signal is distinct from task/Worker lifetime. Providers must observe context.signal; cancellation cannot preempt a synchronous loop.
-
-notify waits only for physical sending; request waits for business results. Untargeted calls with multiple direct peers follow host broadcasting. Use send(nameOrId,method,payload) for a scalar. Held peers.worker methods stay bound to their original generation and reject after restart; read the current directory for new capabilities.
-
-## Crash recovery and reconciliation
+The child entry for `worker.js` follows. Compile it to ESM, or select the actual `.ts` entry in a runtime supporting native TypeScript. Relative strings resolve from the actual main entry; shorthand `{ entry, base }` selects an explicit base.
 
 ```ts doc-test=check
-import { retryFeature, timeoutFeature } from '@migaia/rpc-host/features'
+import { createRpcHost } from '@migaia/rpc-host'
+import { threadPlugin } from '@migaia/rpc-plugin-thread'
 
-export const recoveryFeatures = [retryFeature(), timeoutFeature({ ms: 1500 })]
+await createRpcHost({
+  plugins: [threadPlugin({ connectToParent: true })],
+  provide: {
+    values: async function* (end: number) {
+      for (let value = 0; value < end; value += 1) yield value
+    },
+    wait: (value: number) => value,
+    bytes: (value: Uint8Array) => value.byteLength
+  }
+})
 ```
 
-Install these in host.plugins. The original supervisor decides whether and when to restart. retryFeature uses existing generations, declarations, idempotency, and deadlines to decide whether a request can retry; it adds no restarter. Unconfirmed work can produce REMOTE_RESULT_UNKNOWN. Without that policy, original transport failures keep their identity. Connection recovery never justifies blindly replaying non-idempotent work.
+Choose exactly one of `spawn` and `connectToParent`. Shorthand accepts `entry/name/data/limits` and caller-selected native launcher, budget, and scheduler. Full `IThreadSpawn` retains the chosen supervision recipe. `name` is the registration name; `namespace` determines `host.<ns>`. Real bootstrap supplies child identity and generation; explicit `self` must agree with that source.
 
-connect.timeoutMs is one identity/capability preparation budget; call timeoutMs bounds that business wait. Startup timeout, stop, budget, heap, and permission enforcement remain native-source/supervisor responsibilities. A closed host does not revive; create a new owner for new work.
+## Calls and policies
 
-## Clone and ownership transfer
+Untargeted `host.thread.request` uses current direct targets. `send(nameOrId, method, payload, options)` selects one target. `notify` selects with `{ targetId }` and waits only for actual physical write, without provider completion or ACK. With several ordinary direct targets, untargeted calls retain independent per-target results.
 
-```ts doc-test=check
-import type { IRpcHost } from '@migaia/rpc-host'
+`timeout` and `retry` accept complete feature instances or `false`. Precedence is per-call, installed transport policy, then link-policy plugin. The example chooses a 500 ms call timeout and disables retry for that call. No selected policy means no automatic policy. Native startup, health, stop, and business deadlines keep their respective owners; business timeout does not configure those clocks.
 
-type IWorkerApi = { worker: { bytes(value: Uint8Array): number } }
-export async function sendOwnedBytes(host: IRpcHost<IWorkerApi>, bytes: Uint8Array<ArrayBuffer>) {
-  return await host.send('worker', 'bytes', bytes, { transfer: [bytes.buffer] })
-}
-```
+Thread `spec.limits.callWallTimeMs` surrounds the whole originating call, including retry/backoff. The native registration retains its initially admitted spec's cap across restart and replacement. A shorter business timeout may end the call earlier; `timeout: false` cannot disable the native cap. Without a native cap, `timeout: false` adds no deadline.
 
-This helper succeeds only with an actual native carrier, bilateral capabilities, and supported authentication. Unauthenticated RPC transfer rejects at original admission; a native postMessage method is not authorization. Omit transfer for normal copying. On failure inspect whether the original buffer remains owned locally rather than assuming detach or business completion.
+`signal` cooperatively cancels business work through provider context.signal. It neither preempts synchronous loops nor terminates a Worker. Native supervisor policy owns restart; retry decides replay only under supported generation and business-declaration conditions. Unconfirmed work may already have run, so connection recovery is not authorization to replay it.
 
-## Native errors and usage observation
+## Streams, transfer, and observation
 
-rpc.transport.thread identifies native boundaries; rpc.endpoint/rpc.remote retain call and managed failures. The standard cross-Worker error representation keeps source/code/name/message/stack/cause and aggregate members, not arbitrary custom class prototypes. Branch on identity rather than text.
+The example obtains a generation-bound stream through current `host.thread.peers.worker`. Finish it or call `return()` on early exit. An old held capability cannot silently become a new-generation capability; read the current directory again after replacement.
 
-Usage sampling addresses the selected actual Worker isolate. Heap/CPU fields exist only when native APIs support them. Threads share a process PID; parent RSS is not thread memory. A pending sample across replacement remains bound to the original generation instead of selecting its successor.
+Pass the original ArrayBuffer to `transfer`, without substituting another backing. Successful native handoff may move ownership; omit transfer for ordinary copying. Authentication is installed as a separate auth flow plugin. Use combinations supported by the actual carrier; a native `postMessage` method does not establish additional authentication or capability guarantees.
 
-## Host integration and closure
+Custom carriers use `@migaia/rpc-host/sdk`; readonly carrier/flow observation uses `@migaia/rpc-host/plugins/probe`. Resource queries report actual native samples. Threads share a process PID, so process RSS is not reported as one thread's memory.
 
-Ordinary PluginHost installation retains the thread outlet's stop/restart/replace, ready/exit, and generation owners. name is installation identity, distinct from remote self.name. Use the host's existing controls rather than rebuilding supervision or using a complete legacy call object as source.
+A native `messageerror` reports that diagnostic once without closing a valid connection. Failed diagnostic conversion first reports its original cause. Readonly probe callback failures retain `TRANSPORT` and the original cause without blocking native delivery. An intentional restart/replacement without a native error does not fabricate a TRANSPORT cause; REMOTE_CLOSED retains its generation detail.
 
-host.close follows original drain before releasing the owned Worker. Termination is requested at most once; exited settles only after native exit. Late old-generation results do not reopen a closed connection. Cancelling a call, returning a stream, closing a host, and killing a Worker have different owners.
+An untargeted namespace call made during restart selects the currently accepted set, using ordinary fanout results for an empty set. A previously held function remains bound to its original generation and rejects with `TARGET_UNKNOWN` after departure instead of moving to the successor Worker.
 
-The package exposes only its root: threadPlugin/isThreadChild, options, and errors. Short options cover ordinary applications; custom raw deployments use the host `/plugin` SDK. Browsers use browser plugins.
+## Member management and closure
+
+`host.thread.members` provides `list/get/stop/kill/restart/replace/on/watch`. Queries accept current instance identity or registered name. Stop/restart/replace require a genuinely managed source; borrowed sources do not acquire a supervisor. Event and query identity comes from the original registration and actual accepted session.
+
+Call completion, stream completion, namespace.close, Host.close, and native kill are distinct operations. Finish application-held streams and work before closing the Host; native resources are released through their actual ownership. Errors may use `rpc.transport.thread`, `rpc.endpoint`, or `rpc.remote`. Inspect code/cause and the retained error graph instead of matching message text.

@@ -411,15 +411,15 @@ importers:
 
   packages/rpc-host:
     dependencies:
-      '@migaia/event-subscriber':
-        specifier: workspace:^
-        version: link:../event-subscriber
       '@migaia/lifecycle':
         specifier: workspace:^
         version: link:../lifecycle
       '@migaia/plugin-host':
         specifier: workspace:^
         version: link:../plugin-host
+      '@migaia/rpc-contract':
+        specifier: workspace:*
+        version: link:../rpc-contract
       '@migaia/serialize':
         specifier: workspace:^
         version: link:../serialize
@@ -436,9 +436,6 @@ importers:
       '@migaia/middleware-pipeline':
         specifier: workspace:^
         version: link:../middleware-pipeline
-      '@migaia/rpc-contract':
-        specifier: workspace:*
-        version: link:../rpc-contract
       '@types/node':
         specifier: 24.13.2
         version: 24.13.2
@@ -650,6 +647,9 @@ importers:
       '@migaia/plugin-host':
         specifier: workspace:^
         version: link:../plugin-host
+      '@migaia/rpc-contract':
+        specifier: workspace:*
+        version: link:../rpc-contract
       '@migaia/rpc-host':
         specifier: workspace:*
         version: link:../rpc-host

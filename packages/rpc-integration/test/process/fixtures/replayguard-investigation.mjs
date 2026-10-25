@@ -19,7 +19,7 @@ import { createStringFramer } from '@migaia/rpc-contract/framing'
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
 import { RpcOutboundAttachment } from '../../../../rpc-host/dist/core/internal/outbound-attachment.js'
 import { RpcProviderAttachment } from '../../../../rpc-host/dist/core/internal/provider-attachment.js'
-import { RpcCoreErrorText } from '../../../../rpc-host/dist/core/error-text.js'
+import { RpcCoreErrorText } from '@migaia/rpc-contract/errors'
 import { createProcessTransport } from '../../../../rpc-plugin-process/dist/process/handshake.js'
 import { createNativeProcessOffer } from '../../../../rpc-plugin-process/dist/process/offer.js'
 import {

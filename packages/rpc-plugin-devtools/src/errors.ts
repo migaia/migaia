@@ -1,4 +1,11 @@
-import { ERROR_SOURCE, type IRpcDevtoolsErrorCode } from './error-code.js'
+/**
+ * Attaches centralized Devtools identities to existing native errors without replacing their
+ * stacks.
+ */
+import {
+  RPC_DEVTOOLS_ERROR_SOURCE as ERROR_SOURCE,
+  type IRpcDevtoolsErrorCode
+} from '@migaia/rpc-contract/error-code'
 
 /** Attach devtools identity to the native error without replacing its type, stack or cause. */
 export function identifyDevtoolsError<T extends Error>(error: T, code: IRpcDevtoolsErrorCode): T {

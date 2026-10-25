@@ -7,7 +7,7 @@ import type {
   IPluginFeatureOutput
 } from '@migaia/plugin-host'
 import type { IAbortSignal, IUrlLike } from '@migaia/utils'
-import type { IRuntimeConnectionDetail } from '@migaia/rpc-host/plugin'
+import type { IRpcMemberConnectionDetail } from '@migaia/rpc-host/sdk'
 import type { TrayInstanceEvent, TrayInstanceState, TrayRuntime } from './constants.js'
 import type { ITrayRoutingPolicy } from './routing-policy.js'
 
@@ -112,7 +112,7 @@ export type ITrayInstance = ITrayInstanceInfo &
     inFlight: number
   }>
 /** Discovery merges rpc detail while retaining Tray's numeric unit generation. */
-export type ITrayInstanceDetail = ITrayInstance & Omit<IRuntimeConnectionDetail, 'generation'>
+export type ITrayInstanceDetail = ITrayInstance & Omit<IRpcMemberConnectionDetail, 'generation'>
 /** Frozen lifecycle record carries safe exit classification rather than crash object identity. */
 export type ITrayInstanceEventRecord = ITrayInstance &
   Readonly<{

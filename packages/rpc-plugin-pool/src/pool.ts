@@ -1,9 +1,14 @@
+/**
+ * Owns bounded FIFO member acquisition, cold-start rollback, resizing and idle retirement. Slots
+ * hold native resources; provider execution and concurrency stay with Host.
+ */
 import { resolveSchedulerOption } from '@migaia/lifecycle/scheduler'
-import { systemScheduler, type IScheduledTask } from '@migaia/utils/scheduler'
-import { defaultRpcReporter, type IRpcHostMember } from '@migaia/rpc-host/plugin'
+import { systemScheduler, type IScheduledTask, type IScheduler } from '@migaia/utils/scheduler'
+import { deferred, type IAbortSignal } from '@migaia/utils/promise'
 import { attachSecondaryErrors } from '@migaia/utils/error'
-import type { IRpcPoolControls, IPoolPluginOptions } from './types.js'
-import { RpcPoolErrorCode } from './error-code.js'
+import { defaultRpcReporter } from '@migaia/rpc-host'
+import { RpcPoolErrorCode } from '@migaia/rpc-contract/error-code'
+import type { IRpcPoolControls, IRpcPoolStats, IPoolPluginOptions } from './types.js'
 import { queuedPoolAbort, tagPoolError } from './error.js'
 import {
   RPC_POOL_DEFAULT_MAX_QUEUE,
@@ -12,41 +17,28 @@ import {
   RpcPoolText
 } from './text.js'
 
-/** Only original public Peer calls and cleanup cross the scheduling boundary. */
-type IPoolPeer = Pick<
-  IRpcHostMember,
-  'request' | 'notify' | 'stream' | 'group' | 'outcome' | 'close'
->
-/** Original call options stay intact; the queue reads only their cancellation signal. */
-type IPoolCallOptions = Pick<NonNullable<Parameters<IPoolPeer['request']>[2]>, 'signal'>
-/** The internal dynamic dispatcher is projected back to each factory's unchanged public types. */
-type IPool = Omit<IPoolPeer, 'close'> & IRpcPoolControls
-/** One member owns one client slot, a native acquisition, and exactly one public close. */
-type IPoolMember = {
-  peer?: IPoolPeer
-  ready: Promise<IPoolPeer>
-  resolveReady(peer: IPoolPeer): void
-  rejectReady(error: unknown): void
+/** Pool owns acquired native resources; business execution remains with the actual Host owners. */
+export type IPoolResource = Readonly<{ close(): Promise<void> }>
+/** One original member slot retains its own acquisition, idle timer and shared cleanup receipts. */
+export type IPoolSlot<T extends IPoolResource> = {
+  resource?: T
+  ready: ReturnType<typeof deferred<T>>
+  closed: ReturnType<typeof deferred<void>>
   busy: boolean
   inFlight: boolean
   retiring: boolean
   idleTimer?: IScheduledTask
   closing?: Promise<void>
-  closed: Promise<void>
-  resolveClosed(): void
-  rejectClosed(error: unknown): void
 }
-/** Waiting entries keep their own cancellation receipt and receive exactly one member slot. */
-type IPoolWaiter = {
-  resolve(member: IPoolMember): void
+/** A queued operation owns only its admission result and exact original abort registration. */
+type IPoolWaiter<T extends IPoolResource> = {
+  resolve(member: IPoolSlot<T>): void
   reject(error: unknown): void
-  unsubscribe(): void
+  signal?: IAbortSignal
+  abort(): void
 }
 
-/** Only this local identity settles a consumer stopped before its original iterator exists. */
-const STREAM_FINISHED = Symbol()
-
-/** Reject malformed and invalid numeric configuration before native creation starts. */
+/** Reject malformed numeric configuration before acquiring any member. */
 export function validatePoolOptions(options: IPoolPluginOptions): void {
   if (!options || typeof options !== 'object' || Array.isArray(options))
     throw tagPoolError(new TypeError(RpcPoolText.optionsObject), RpcPoolErrorCode.invalidOptions)
@@ -68,8 +60,7 @@ export function validatePoolOptions(options: IPoolPluginOptions): void {
   )
     throw tagPoolError(new RangeError(RpcPoolText.idleTimeoutMs), RpcPoolErrorCode.invalidOptions)
 }
-
-/** Construction and resize share the same positive integer boundary. */
+/** Construction and resize share the original positive-integer admission boundary. */
 function validatePoolSize(size: number): void {
   if (typeof size !== 'number')
     throw tagPoolError(new TypeError(RpcPoolText.size), RpcPoolErrorCode.invalidOptions)
@@ -77,646 +68,410 @@ function validatePoolSize(size: number): void {
     throw tagPoolError(new RangeError(RpcPoolText.size), RpcPoolErrorCode.invalidOptions)
 }
 
-/** Compose client scheduling over existing public factories without native state or recovery logic. */
-/** Allocate the pool scheduler's member, FIFO and lifecycle ownership before opening peers. */
-function poolState(options: IPoolPluginOptions, createPeer: () => Promise<IPoolPeer>) {
-  /** Admit one timer capability before any original Peer factory can acquire resources. */
-  const scheduler = resolveSchedulerOption(options, systemScheduler)
-  /** Target capacity survives idle retirement; only explicit resize changes it. */
-  let targetSize = options.size
-  /** Queue capacity excludes tasks already assigned to a member. */
-  const maxQueue = options.maxQueue ?? RPC_POOL_DEFAULT_MAX_QUEUE
-  /** Pool state governs new client admission independently of every native Peer state. */
-  const state: RpcPoolState = RpcPoolState.open
-  /** Native acquisitions and retiring resources stay owned here until their cleanup completes. */
-  const members = new Set<IPoolMember>()
-  /** All accepted operations without a member remain in this bounded FIFO. */
-  const queue = new Set<IPoolWaiter>()
-  /** Accepted tasks include waiting, assigned acquisition, and actual public dispatch. */
-  let accepted = 0
-  /** A cursor rotates equally idle members without another priority or native scheduler. */
-  let cursor = 0
-  /** Creation batches remain owned across partial failure and close races. */
-  const creationJobs = new Set<Promise<void>>()
-  /** All native close failures remain available to the final aggregate, including retired members. */
-  const closeErrors: unknown[] = []
-  /** Accepted resizes converge in call order; rejection never poisons the next operation. */
-  const resizeTail: Promise<void> = Promise.resolve()
-  /** The original close Promise is published before any asynchronous drain work. */
-  const closePromise = undefined as Promise<void> | undefined
-  /** Drain waits only for this pool's accepted operations and in-progress acquisitions. */
-  const drainedResolve = undefined as (() => void) | undefined
+/** The sole native-resource scheduler retains the original FIFO, rotation, resize and drain owner. */
+export class PoolScheduler<T extends IPoolResource> implements IRpcPoolControls {
+  /** Cold options preserve the original scheduler getter and idle-policy read semantics. */
+  readonly #options: IPoolPluginOptions
+  /** Repeatable acquisition belongs to the installed concrete transport, never a public Peer. */
+  readonly #createResource: () => Promise<T>
+  /** Native and idle failures use the owning installation's genuine report port. */
+  readonly #report: (error: unknown) => void
+  /** Idle timers borrow the scheduler admitted once before any member can open. */
+  readonly #scheduler: IScheduler
+  /** The requested capacity survives native idle retirement until an explicit resize. */
+  #targetSize: number
+  /** FIFO capacity excludes already reserved cold or ready member slots. */
+  readonly #maxQueue: number
+  /** Pool admission changes independently from each member's native supervision phase. */
+  #state: RpcPoolState = RpcPoolState.open
+  /** Resources remain held through retirement until their exact cleanup Promise settles. */
+  readonly #members = new Set<IPoolSlot<T>>()
+  /** Insertion order is the original bounded FIFO; cancellation removes its exact entry only. */
+  readonly #queue = new Set<IPoolWaiter<T>>()
+  /** Accepted work includes queued operations and reserved native acquisitions. */
+  #accepted = 0
+  /** One cursor rotates equally available members without another scheduler. */
+  #cursor = 0
+  /** Transactional acquisition batches survive partial failure and concurrent close. */
+  readonly #creationJobs = new Set<Promise<void>>()
+  /** Original member failures remain in the final CLOSE_FAILED AggregateError. */
+  readonly #closeErrors: unknown[] = []
+  /** Resize results stay visible while the sequencing tail recovers after rejection. */
+  #resizeTail: Promise<void> = Promise.resolve()
+  /** Every close caller joins the original cleanup Promise. */
+  readonly #closing = deferred<void>()
+  /** Closing waits only for accepted work and genuine acquisition jobs owned here. */
+  #drained: (() => void) | undefined
 
-  return {
-    scheduler,
-    targetSize,
-    maxQueue,
-    state: state as RpcPoolState,
-    members,
-    queue,
-    accepted,
-    cursor,
-    creationJobs,
-    closeErrors,
-    resizeTail,
-    closePromise: closePromise as Promise<void> | undefined,
-    drainedResolve: drainedResolve as (() => void) | undefined,
-    options,
-    createPeer
-  }
-}
-
-/** Admission callbacks publish only this scheduler's exact member and waiting receipt. */
-type IAcquirePoolMember = (
-  options?: IPoolCallOptions,
-  onAssigned?: (member: IPoolMember) => void,
-  onWaiting?: (cancel: () => void) => void
-) => Promise<IPoolMember>
-
-/** Prepare one lazy stream's cancellation receipt without admitting any pool operation. */
-function poolStreamState() {
-  /** Calling stream without next neither acquires a slot nor calls the Peer. */
-  const acquisition = undefined as Promise<IPoolMember> | undefined
-  /** The exact acquired slot is released once across iterator races. */
-  const member = undefined as IPoolMember | undefined
-  /** The original native iterator receives every actual consumer operation. */
-  const iterator = undefined as ReturnType<IPoolPeer['stream']> | undefined
-  /** Completion prevents later iterator calls from acquiring another member. */
-  let finished = false
-  /** Only next operations are serialized; termination must reach a pending original consumer. */
-  const tail: Promise<unknown> = Promise.resolve()
-  /** The existing FIFO receipt can withdraw a stream before its first native dispatch. */
-  const cancelWaiting = undefined as (() => void) | undefined
-  /** Cold acquisition waits can finish without leaving their already-reserved pool slot. */
-  let stopResolve!: () => void
-  /** This local consumer completion never cancels or replaces the public native factory. */
-  const stopped = new Promise<void>((resolve) => {
-    stopResolve = resolve
-  })
-
-  return {
-    acquisition: acquisition as Promise<IPoolMember> | undefined,
-    member: member as IPoolMember | undefined,
-    iterator: iterator as ReturnType<IPoolPeer['stream']> | undefined,
-    finished,
-    tail,
-    cancelWaiting: cancelWaiting as (() => void) | undefined,
-    stopResolve,
-    stopped
-  }
-}
-
-/** One lazy consumer owns its acquired member until the original iterator terminates. */
-class PoolStream {
-  /** Iterator, admission and termination state belong only to this consumer. */
-  #state = poolStreamState()
-  /** Original call arguments cross the peer boundary unchanged. */
-  #args: Parameters<IPoolPeer['stream']>
-  /** Admission is delegated to the one pool scheduler. */
-  #acquire: IAcquirePoolMember
-  /** Completion releases the exact reserved member through its scheduler. */
-  #release: (member: IPoolMember) => void
-  /** Store scheduler callbacks without opening or consuming a peer stream. */
+  /** Capture only cold ownership; open performs the actual transactional initial acquisition. */
   constructor(
-    args: Parameters<IPoolPeer['stream']>,
-    acquire: IAcquirePoolMember,
-    release: (member: IPoolMember) => void
+    options: IPoolPluginOptions,
+    createResource: () => Promise<T>,
+    report: (error: unknown) => void = defaultRpcReporter
   ) {
-    this.#args = args
-    this.#acquire = acquire
-    this.#release = release
-  }
-  /** Release after the public iterator's original terminal completion point. */
-  #finish = (): void => {
-    if (this.#state.finished) return
-    this.#state.finished = true
-    ;(0, this.#state.stopResolve)()
-    ;(0, this.#state.cancelWaiting)?.()
-    if (this.#state.member) {
-      this.#release(this.#state.member)
-      this.#state.member = undefined
-    }
+    this.#options = options
+    this.#scheduler = resolveSchedulerOption(options, systemScheduler)
+    this.#targetSize = options.size
+    this.#maxQueue = options.maxQueue ?? RPC_POOL_DEFAULT_MAX_QUEUE
+    this.#createResource = createResource
+    this.#report = report
+    void this.#closing.promise.catch(() => undefined)
   }
 
-  /** Open only after first-next synchronous admission, retaining original call arguments. */
-  #start = async (): Promise<ReturnType<IPoolPeer['stream']>> => {
-    if (this.#state.iterator) return this.#state.iterator
-    /** Keep the assigned member locally even if return releases the consumer while it loads. */
-    const assigned = await this.#state.acquisition!
-    /** A failed idle refill still releases its reserved slot and accepted operation. */
-    const peer = await Promise.race([
-      assigned.ready,
-      this.#state.stopped.then(() => {
-        throw STREAM_FINISHED
+  /** Initial construction publishes no usable feature until every original slot is ready. */
+  async open(): Promise<void> {
+    await Promise.all(this.#createBatch(this.#targetSize).map((member) => member.ready.promise))
+  }
+  /** Native projection observes existing admission state without enumerating scheduler slots. */
+  get state(): RpcPoolState {
+    return this.#state
+  }
+
+  /** Logical publication borrows the scheduler's same original final-close Promise. */
+  get closed(): Promise<void> {
+    return this.#closing.promise
+  }
+
+  /** Return the original frozen instantaneous snapshot, without acquiring or sampling a member. */
+  readonly stats = (): IRpcPoolStats =>
+    Object.freeze({
+      targetSize: this.#targetSize,
+      memberCount: [...this.#members].filter((member) => member.resource !== undefined).length,
+      inFlight: [...this.#members].filter((member) => member.inFlight).length,
+      queued: this.#queue.size,
+      state: this.#state
+    })
+  /** Reserve before settling callers; the caller borrows the original native resource readiness. */
+  acquire(signal?: IAbortSignal): Promise<IPoolSlot<T>> {
+    if (this.#state !== RpcPoolState.open) return Promise.reject(this.#closedError())
+    this.#refill()
+    this.#pump()
+    /** A cold reserved acquisition is not a waiting FIFO entry. */
+    const member = this.#queue.size === 0 ? this.#available().next().value : undefined
+    if (member) {
+      this.#reserve(member)
+      this.#accepted++
+      return Promise.resolve(member)
+    }
+    if (this.#queue.size >= this.#maxQueue)
+      return Promise.reject(
+        tagPoolError(new Error(RpcPoolText.queueFull), RpcPoolErrorCode.queueFull)
+      )
+    if (signal?.aborted) return Promise.reject(queuedPoolAbort(signal.reason))
+    return new Promise<IPoolSlot<T>>((resolve, reject) =>
+      this.#enqueue({
+        resolve,
+        reject,
+        signal
       })
-    ])
-    if (this.#state.finished) throw STREAM_FINISHED
-    assigned.inFlight = true
-    this.#state.iterator = peer.stream(...this.#args)
-    return this.#state.iterator
-  }
-
-  /** Serialize one consumer operation while preserving its original rejection value. */
-  #step = (operation: () => Promise<IteratorResult<unknown>>): Promise<IteratorResult<unknown>> => {
-    /** Rejected operations remain observable to their caller while later cleanup can run. */
-    const result = this.#state.tail.then(operation)
-    this.#state.tail = result.catch(() => undefined)
-    return result
-  };
-  [Symbol.asyncIterator]() {
-    return this
-  }
-
-  next(): ReturnType<ReturnType<IPoolPeer['stream']>['next']> {
-    if (this.#state.finished) return Promise.resolve({ done: true, value: undefined })
-    this.#state.acquisition ??= this.#acquire(
-      this.#args[2],
-      (assigned) => {
-        this.#state.member = assigned
-      },
-      (cancel) => {
-        this.#state.cancelWaiting = cancel
-      }
     )
-    // Observe admission immediately even when a prior iterator operation has not settled.
-    void this.#state.acquisition.catch(() => undefined)
-    return this.#step(async () => {
-      if (this.#state.finished) return { done: true, value: undefined }
-      try {
-        /** The original iterator decides values and completion. */
-        const result = await (await this.#start()).next()
-        if (result.done) this.#finish()
-        return result
-      } catch (error) {
-        this.#finish()
-        if (error === STREAM_FINISHED) return { done: true, value: undefined }
-        throw error
-      }
-    }) as ReturnType<ReturnType<IPoolPeer['stream']>['next']>
   }
-
-  return(value?: unknown): ReturnType<NonNullable<ReturnType<IPoolPeer['stream']>['return']>> {
-    if (!this.#state.iterator || this.#state.finished) {
-      this.#finish()
-      return Promise.resolve({ done: true, value })
+  /** Borrow the actual originating operation's Promise; interpret no request or stream protocol. */
+  async run<V>(invoke: (resource: T) => Promise<V>, signal?: IAbortSignal): Promise<V> {
+    /** Reservation precedes native readiness exactly as in the original single dispatch algorithm. */
+    const member = await this.acquire(signal)
+    try {
+      /** Only this genuine acquisition result can enter the caller's canonical execution owner. */
+      const resource = await member.ready.promise
+      member.inFlight = true
+      return await invoke(resource)
+    } finally {
+      this.release(member)
     }
-    /** Termination reaches this exact original consumer even while its next() is pending. */
-    const current = this.#state.iterator
-    return (async () => {
-      try {
-        /** Return is forwarded to the original consumer before releasing its slot. */
-        return current.return ? await current.return(value) : { done: true, value }
-      } finally {
-        this.#finish()
-      }
-    })() as ReturnType<NonNullable<ReturnType<IPoolPeer['stream']>['return']>>
   }
-
-  throw(error?: unknown): ReturnType<NonNullable<ReturnType<IPoolPeer['stream']>['throw']>> {
-    if (!this.#state.iterator || this.#state.finished) {
-      this.#finish()
+  /** Actual Host completion releases the selected slot; pool never interprets business replies. */
+  release(member: IPoolSlot<T>): void {
+    member.busy = false
+    member.inFlight = false
+    this.#accepted--
+    if (member.retiring) void this.#closeMember(member).catch(this.#report)
+    this.#pump()
+    this.#notifyDrain()
+  }
+  /** Serialize accepted capacity changes while keeping each original failure visible. */
+  readonly resize = (size: number): Promise<void> => {
+    if (this.#state !== RpcPoolState.open) return Promise.reject(this.#closedError())
+    try {
+      validatePoolSize(size)
+    } catch (error) {
       return Promise.reject(error)
     }
-    /** Throw uses the same original consumer, rather than waiting behind its blocked next. */
-    const current = this.#state.iterator
-    return (async () => {
+    /** This result is distinct from the recovered sequencing tail. */
+    const resizing = this.#resizeTail.then(() => this.#resize(size))
+    this.#resizeTail = resizing.catch(() => undefined)
+    return resizing
+  }
+  /** Fence admission immediately, drain accepted work, then close every original resource. */
+  readonly close = (): Promise<void> => {
+    if (this.#state !== RpcPoolState.open) return this.#closing.promise
+    this.#state = RpcPoolState.closing
+    for (const member of this.#members) this.#clearIdle(member)
+    void this.#close().then(this.#closing.resolve, this.#closing.reject)
+    return this.#closing.promise
+  }
+  /** Keep the original registered closed error and text at each public scheduler admission. */
+  #closedError(): Error {
+    return tagPoolError(new Error(RpcPoolText.closed), RpcPoolErrorCode.poolClosed)
+  }
+  /** Shrink preserves idle-first/insertion order; expansion rolls target back after batch failure. */
+  async #resize(size: number): Promise<void> {
+    if (this.#state !== RpcPoolState.open) throw this.#closedError()
+    /** Failed expansion restores only the original target while this scheduler remains open. */
+    const previous = this.#targetSize
+    this.#targetSize = size
+    /** Partition held resources without changing either partition's insertion order. */
+    const idle: IPoolSlot<T>[] = []
+    /** Occupied retirees keep their actual native resource until the original operation ends. */
+    const occupied: IPoolSlot<T>[] = []
+    for (const member of this.#members)
+      if (!member.retiring) (member.busy ? occupied : idle).push(member)
+    /** The same idle-first snapshot decides the original shrinking order. */
+    const active = [...idle, ...occupied]
+    if (active.length > size)
+      await Promise.all(active.slice(0, active.length - size).map(this.#retire))
+    else {
       try {
-        /** Throw is forwarded once, without converting the caller's original reason. */
-        if (current.throw) return await current.throw(error)
+        await Promise.all(this.#refill().map((member) => member.ready.promise))
+      } catch (error) {
+        if (this.#state === RpcPoolState.open) this.#targetSize = previous
         throw error
-      } finally {
-        this.#finish()
       }
-    })() as ReturnType<NonNullable<ReturnType<IPoolPeer['stream']>['throw']>>
+    }
+    this.#pump()
   }
-}
-
-/** Own member rotation, FIFO admission and pool cleanup behind the public scheduling surface. */
-class ClientPool {
-  /** All member and lifecycle mutation belongs to this scheduler instance. */
-  #state: ReturnType<typeof poolState>
-  /** Public operations retain stable identities across resize and close. */
-  readonly value: IPool
-  /** Compose public dispatch callbacks after scheduler storage is initialized. */
-  constructor(options: IPoolPluginOptions, createPeer: () => Promise<IPoolPeer>) {
-    this.#state = poolState(options, createPeer)
-    this.value = Object.freeze({
-      request: (...args: Parameters<IPoolPeer['request']>) =>
-        this.#dispatch(args[2], (peer) => peer.request(...args)),
-      notify: (...args: Parameters<IPoolPeer['notify']>) =>
-        this.#dispatch(args[2], (peer) => peer.notify(...args)),
-      stream: this.#stream,
-      group: (...args: Parameters<IPoolPeer['group']>) =>
-        this.#dispatch(args[1], (peer) => peer.group(...args)),
-      outcome: (...args: Parameters<IPoolPeer['outcome']>) =>
-        this.#dispatch(undefined, (peer) => peer.outcome(...args)),
-      stats: () =>
-        Object.freeze({
-          targetSize: this.#state.targetSize,
-          memberCount: [...this.#state.members].filter((member) => member.peer !== undefined)
-            .length,
-          inFlight: [...this.#state.members].filter((member) => member.inFlight).length,
-          queued: this.#state.queue.size,
-          state: this.#state.state
+  /** Native cleanup preserves the shared close Promise and original retained error ordering. */
+  async #close(): Promise<void> {
+    await this.#resizeTail
+    if (this.#accepted > 0 || this.#creationJobs.size > 0)
+      await new Promise<void>((resolve) => {
+        this.#drained = resolve
+        this.#notifyDrain()
+      })
+    await Promise.allSettled([...this.#members].map(this.#retire))
+    this.#state = RpcPoolState.closed
+    if (this.#closeErrors.length)
+      throw tagPoolError(
+        new AggregateError(this.#closeErrors, RpcPoolText.closeFailed, {
+          cause: this.#closeErrors[0]
         }),
-      resize: (size: number) => {
-        if (this.#state.state !== RpcPoolState.open)
-          return Promise.reject(
-            tagPoolError(new Error(RpcPoolText.closed), RpcPoolErrorCode.poolClosed)
-          )
-        try {
-          validatePoolSize(size)
-        } catch (error) {
-          return Promise.reject(error)
-        }
-        /**
-         * This operation's original result remains visible even though the sequencing tail
-         * recovers.
-         */
-        const resizing = this.#state.resizeTail.then(async () => {
-          if (this.#state.state !== RpcPoolState.open)
-            throw tagPoolError(new Error(RpcPoolText.closed), RpcPoolErrorCode.poolClosed)
-          /** Restore the old target if an expanding creation batch fails transactionally. */
-          const previous = this.#state.targetSize
-          this.#state.targetSize = size
-          /**
-           * Prefer idle slots when shrinking and defer occupied retirement until its operation
-           * ends.
-           */
-          const idle: IPoolMember[] = []
-          /** Busy members retain insertion order after the idle partition. */
-          const occupied: IPoolMember[] = []
-          for (const member of this.#state.members) {
-            if (member.retiring) continue
-            ;(member.busy ? occupied : idle).push(member)
-          }
-          /**
-           * Prefer idle slots when shrinking and defer occupied retirement until its operation
-           * ends.
-           */
-          const active = [...idle, ...occupied]
-          if (active.length > size)
-            await Promise.all(active.slice(0, active.length - size).map(this.#retire))
-          else {
-            try {
-              await Promise.all(this.#refill().map((member) => member.ready))
-            } catch (error) {
-              if (this.#state.state === RpcPoolState.open) this.#state.targetSize = previous
-              throw error
-            }
-          }
-          this.#pump()
-        })
-        this.#state.resizeTail = resizing.catch(() => undefined)
-        return resizing
-      },
-      close: () => {
-        if (this.#state.closePromise) return this.#state.closePromise
-        this.#state.state = RpcPoolState.closing
-        for (const member of this.#state.members) this.#clearIdle(member)
-        this.#state.closePromise = (async () => {
-          await this.#state.resizeTail
-          if (this.#state.accepted > 0 || this.#state.creationJobs.size > 0)
-            await new Promise<void>((resolve) => {
-              this.#state.drainedResolve = resolve
-              this.#notifyDrain()
-            })
-          await Promise.allSettled([...this.#state.members].map(this.#retire))
-          this.#state.state = RpcPoolState.closed
-          if (this.#state.closeErrors.length > 0)
-            throw tagPoolError(
-              new AggregateError(this.#state.closeErrors, RpcPoolText.closeFailed, {
-                cause: this.#state.closeErrors[0]
-              }),
-              RpcPoolErrorCode.closeFailed
-            )
-        })()
-        return this.#state.closePromise
-      }
-    })
+        RpcPoolErrorCode.closeFailed
+      )
   }
-  /** Initial construction exposes no operations until transactional capacity is ready. */
-  async open(): Promise<void> {
-    await Promise.all(this.#createBatch(this.#state.targetSize).map((member) => member.ready))
+  /** Drain observes the original accepted-work and acquisition counts only. */
+  #notifyDrain(): void {
+    if (this.#accepted === 0 && this.#creationJobs.size === 0) this.#drained?.()
   }
-  /** Resolve a closing pool's drain after all accepted continuations have settled. */
-  #notifyDrain = (): void => {
-    if (this.#state.accepted === 0 && this.#state.creationJobs.size === 0)
-      (0, this.#state.drainedResolve)?.()
-  }
-
-  /** Clear a member's owned idle timer before assignment, retirement or pool close. */
-  #clearIdle = (member: IPoolMember): void => {
+  /** Reservation, retirement and close cancel the exact original native idle task. */
+  #clearIdle(member: IPoolSlot<T>): void {
     member.idleTimer?.cancel()
     member.idleTimer = undefined
   }
-
-  /** Close through the original Peer once, retaining original failures for the final aggregate. */
-  #closeMember = (member: IPoolMember): Promise<void> => {
+  /** A member is closed once; acquisition failure already owns its original partial rollback. */
+  #closeMember(member: IPoolSlot<T>): Promise<void> {
     if (member.closing) return member.closing
     this.#clearIdle(member)
-    member.closing = member.ready
+    member.closing = member.ready.promise
       .then(
-        (peer) => peer.close(),
-        // Failed acquisition already rejects its callers and owns its partial rollback.
+        (resource) => resource.close(),
         () => undefined
       )
       .then(
         () => {
-          this.#state.members.delete(member)
-          member.resolveClosed()
+          this.#members.delete(member)
+          member.closed.resolve()
           this.#notifyDrain()
         },
         (error: unknown) => {
-          this.#state.closeErrors.push(error)
-          this.#state.members.delete(member)
-          member.rejectClosed(error)
+          this.#closeErrors.push(error)
+          this.#members.delete(member)
+          member.closed.reject(error)
           this.#notifyDrain()
           throw error
         }
       )
     return member.closing
   }
-
-  /** Mark retirement immediately; an occupied slot keeps its actual Peer until completion. */
-  #retire = (member: IPoolMember): Promise<void> => {
+  /** Busy retirement fences new reservations but does not interrupt original native work. */
+  readonly #retire = (member: IPoolSlot<T>): Promise<void> => {
     member.retiring = true
     this.#clearIdle(member)
-    if (!member.busy) void this.#closeMember(member).catch(defaultRpcReporter)
-    return member.closed
+    if (!member.busy) void this.#closeMember(member).catch(this.#report)
+    return member.closed.promise
   }
-
-  /** Arm only real idle resources with no pending pool demand. */
-  #armIdle = (member: IPoolMember): void => {
+  /** Another member's activity never resets an already armed idle deadline. */
+  #armIdle(member: IPoolSlot<T>): void {
     if (
-      this.#state.options.idleTimeoutMs === undefined ||
-      this.#state.state !== RpcPoolState.open ||
+      this.#options.idleTimeoutMs === undefined ||
+      this.#state !== RpcPoolState.open ||
       member.retiring ||
       member.busy ||
-      !member.peer ||
-      this.#state.queue.size > 0
+      !member.resource ||
+      this.#queue.size > 0
     ) {
       this.#clearIdle(member)
       return
     }
-    // Another member's activity must not reset this member's actual idle duration.
     if (member.idleTimer !== undefined) return
-    member.idleTimer = this.#state.scheduler.schedule(() => {
-      member.idleTimer = undefined
-      if (this.#state.state === RpcPoolState.open && !member.busy && this.#state.queue.size === 0)
-        // The owned close operation already reports its failure while retaining it for close().
-        void this.#retire(member).catch(() => undefined)
-    }, this.#state.options.idleTimeoutMs)
+    member.idleTimer = this.#scheduler.schedule(
+      () => this.#expireIdle(member),
+      this.#options.idleTimeoutMs
+    )
     member.idleTimer.unref?.()
-  };
-
-  /** Scan one rotating snapshot once; each yielded slot advances before reentrant callbacks. */
-  *#available(): Generator<IPoolMember> {
-    /** Held insertion order defines the existing round-robin cursor semantics. */
-    const ordered = [...this.#state.members]
-    /** This batch retains its starting position while each yield advances the next batch. */
-    const start = this.#state.cursor
+  }
+  /** A real idle expiry retires only an unreserved member; original close reporting owns failure. */
+  #expireIdle(member: IPoolSlot<T>): void {
+    member.idleTimer = undefined
+    if (this.#state === RpcPoolState.open && !member.busy && this.#queue.size === 0)
+      void this.#retire(member).catch(() => undefined)
+  }
+  /** Scan one rotating snapshot once, advancing before a reentrant reservation can occur. */
+  *#available(): Generator<IPoolSlot<T>> {
+    /** Original insertion order defines round-robin tie selection. */
+    const ordered = [...this.#members]
+    /** Each yielded slot advances the next batch without moving this batch's starting point. */
+    const start = this.#cursor
     for (let offset = 0; offset < ordered.length; offset++) {
-      /** Only this exact member owns its dispatch slot. */
+      /** This exact resource alone owns the selected native slot. */
       const index = (start + offset) % ordered.length
       const member = ordered[index]!
       if (!member.retiring && !member.busy) {
-        this.#state.cursor = (index + 1) % ordered.length
+        this.#cursor = (index + 1) % ordered.length
         yield member
       }
     }
   }
-
-  /** A single admission needs at most one scan of the current member set. */
-  #select = (): IPoolMember | undefined => this.#available().next().value
-
-  /** Reserve before settling callers so reentrant operations observe the occupied slot. */
-  #reserve = (member: IPoolMember): void => {
+  /** Publish occupancy before returning a slot or resolving a queued caller. */
+  #reserve(member: IPoolSlot<T>): void {
     this.#clearIdle(member)
     member.busy = true
-    member.inFlight = member.peer !== undefined
+    member.inFlight = member.resource !== undefined
   }
-
-  /** FIFO dispatch never bypasses waiting operations or invokes native recovery itself. */
-  #pump = (): void => {
-    /** One iterator scans the rotating snapshot; do not advance when no waiter needs a slot. */
+  /** FIFO work is reserved first, without an extra readiness/recovery owner. */
+  #pump(): void {
+    /** A single rotating iterator serves this original FIFO pump. */
     const available = this.#available()
-    while (this.#state.queue.size > 0) {
-      /** Advancing the cursor belongs only to a slot actually considered for waiting work. */
+    while (this.#queue.size > 0) {
+      /** Do not advance the cursor when no queued operation needs another slot. */
       const member = available.next().value
       if (member === undefined) break
-      /** Queued cancellation stops owning this task at the original dispatch boundary. */
-      const waiter = this.#state.queue.values().next().value!
-      this.#state.queue.delete(waiter)
-      waiter.unsubscribe()
+      /** Exact insertion order prevents reentrant admission from bypassing an accepted waiter. */
+      const waiter = this.#queue.values().next().value!
+      this.#queue.delete(waiter)
+      waiter.signal?.removeEventListener('abort', waiter.abort)
       this.#reserve(member)
       waiter.resolve(member)
     }
-    for (const member of this.#state.members) this.#armIdle(member)
+    for (const member of this.#members) this.#armIdle(member)
   }
-
-  /** Release one accepted client operation after its original Peer completion point. */
-  #release = (member: IPoolMember): void => {
-    member.busy = false
-    member.inFlight = false
-    this.#state.accepted--
-    if (member.retiring) void this.#closeMember(member).catch(defaultRpcReporter)
+  /** Register one exact abort receipt only while its operation remains in this FIFO. */
+  #enqueue(input: Pick<IPoolWaiter<T>, 'resolve' | 'reject' | 'signal'>): void {
+    /** The exact FIFO entry owns its native cancellation callback before registration begins. */
+    const waiter: IPoolWaiter<T> = {
+      ...input,
+      abort: () => this.#cancel(waiter, queuedPoolAbort(waiter.signal?.reason))
+    }
+    this.#queue.add(waiter)
+    this.#accepted++
+    waiter.signal?.addEventListener('abort', waiter.abort, { once: true })
+    if (waiter.signal?.aborted) waiter.abort()
+  }
+  /** Cancellation never removes another operation or starts native acquisition itself. */
+  #cancel(waiter: IPoolWaiter<T>, reason: unknown): void {
+    if (!this.#queue.delete(waiter)) return
+    waiter.signal?.removeEventListener('abort', waiter.abort)
+    this.#accepted--
+    waiter.reject(reason)
     this.#pump()
     this.#notifyDrain()
   }
-
-  /** Acquire a batch transactionally; partial success closes without replacing the first failure. */
-  #createBatch = (count: number): IPoolMember[] => {
-    /** Deferred member slots let idle refill accept work without consuming FIFO capacity. */
-    const batch = Array.from({ length: count }, (): IPoolMember => {
-      /** The actual factory result is published only when the whole creation batch succeeds. */
-      let resolveReady!: IPoolMember['resolveReady']
-      /** The batch's original primary rejects every unpublished slot. */
-      let rejectReady!: IPoolMember['rejectReady']
-      /** Retirement waits on the same per-member cleanup receipt. */
-      let resolveClosed!: IPoolMember['resolveClosed']
-      /** Native close failure remains visible to resize and close callers. */
-      let rejectClosed!: IPoolMember['rejectClosed']
-      /** All startup rejections have a caller or rollback owner before publication. */
-      const ready = new Promise<IPoolPeer>((resolve, reject) => {
-        resolveReady = resolve
-        rejectReady = reject
-      })
-      /** Cleanup is observed even if idle retirement has no explicit resize caller. */
-      const closed = new Promise<void>((resolve, reject) => {
-        resolveClosed = resolve
-        rejectClosed = reject
-      })
-      void ready.catch(() => undefined)
-      void closed.catch(() => undefined)
-      return {
-        ready,
-        resolveReady,
-        rejectReady,
-        closed,
-        resolveClosed,
-        rejectClosed,
-        busy: false,
-        inFlight: false,
-        retiring: false
-      }
-    })
-    for (const member of batch) this.#state.members.add(member)
-    /** Factory throws and rejections remain their original values, without source/code inspection. */
-    const job = Promise.allSettled(batch.map(() => Promise.resolve().then(this.#state.createPeer)))
-      .then(async (results) => {
-        /** Input order defines the original primary when several acquisitions fail together. */
-        const failed = results.find((result) => result.status === 'rejected')
-        if (failed?.status === 'rejected') {
-          /** Original rollback failures stay reachable without replacing an extensible primary. */
-          const cleanupErrors: unknown[] = []
-          await Promise.all(
-            results.map(async (result) => {
-              if (result.status === 'fulfilled') {
-                try {
-                  await result.value.close()
-                } catch (cleanup) {
-                  cleanupErrors.push(cleanup)
-                  defaultRpcReporter(cleanup)
-                }
-              }
-            })
-          )
-          /** Reuse the canonical error graph attachment without adding another rollback owner. */
-          const primary = attachSecondaryErrors(failed.reason, cleanupErrors)
-          for (const member of batch) {
-            this.#state.members.delete(member)
-            member.rejectReady(primary)
-            member.resolveClosed()
-          }
-          // Without any surviving slot, this refill's FIFO cannot dispatch or recover by itself.
-          if (![...this.#state.members].some((member) => !member.retiring)) {
-            for (const waiter of this.#state.queue) {
-              this.#state.queue.delete(waiter)
-              waiter.unsubscribe()
-              this.#state.accepted--
-              waiter.reject(primary)
-            }
-          }
-          this.#pump()
-          this.#notifyDrain()
-          return
-        }
-        for (let index = 0; index < batch.length; index++) {
-          /** A fulfilled batch retains each exact original public Peer object. */
-          const member = batch[index]!
-          /** No rejected result remains after the transactional branch above. */
-          const result = results[index]!
-          if (result.status !== 'fulfilled') continue
-          member.peer = result.value
-          member.inFlight = member.busy
-          member.resolveReady(result.value)
-          if (this.#state.state !== RpcPoolState.open && !member.busy) member.retiring = true
-          if (member.retiring && !member.busy)
-            void this.#closeMember(member).catch(defaultRpcReporter)
-        }
-        this.#pump()
-      })
+  /** Deferred native slots preserve original transactional publication and shared close receipts. */
+  #slot(): IPoolSlot<T> {
+    /** Rejections are observed immediately even before a particular operation reserves the slot. */
+    const ready = deferred<T>()
+    /** Idle retirement may have no separate resize caller to observe cleanup. */
+    const closed = deferred<void>()
+    void ready.promise.catch(() => undefined)
+    void closed.promise.catch(() => undefined)
+    return { ready, closed, busy: false, inFlight: false, retiring: false }
+  }
+  /** Start the same original allSettled transaction without publishing partial successes. */
+  #createBatch(count: number): IPoolSlot<T>[] {
+    /** A batch retains input order independently from native completion order. */
+    const batch = Array.from({ length: count }, () => this.#slot())
+    for (const member of batch) this.#members.add(member)
+    /** Factory throws remain exact values, just like asynchronous acquisition failures. */
+    const creating = Promise.allSettled(
+      batch.map(() => Promise.resolve().then(this.#createResource))
+    )
+    /** One explicit operation keeps cleanup callbacks within the owning scheduler. */
+    const operation = { batch, job: undefined as Promise<void> | undefined }
+    const job = creating
+      .then((results) => this.#settleBatch(operation.batch, results))
       .finally(() => {
-        this.#state.creationJobs.delete(job)
+        this.#creationJobs.delete(operation.job!)
         this.#notifyDrain()
       })
-    this.#state.creationJobs.add(job)
+    operation.job = job
+    this.#creationJobs.add(job)
     return batch
   }
-
-  /** Refill only missing capacity on demand; never replace a failed native generation. */
-  #refill = (): IPoolMember[] => {
-    /** Retiring resources no longer count against the requested client slot capacity. */
-    const count = [...this.#state.members].filter((member) => !member.retiring).length
-    return count < this.#state.targetSize ? this.#createBatch(this.#state.targetSize - count) : []
-  }
-
-  /** Admission commits synchronously; only FIFO waiting owns a pool cancellation listener. */
-  #acquire = (
-    callOptions?: IPoolCallOptions,
-    onAssigned?: (member: IPoolMember) => void,
-    onWaiting?: (cancel: () => void) => void
-  ): Promise<IPoolMember> => {
-    if (this.#state.state !== RpcPoolState.open)
-      return Promise.reject(
-        tagPoolError(new Error(RpcPoolText.closed), RpcPoolErrorCode.poolClosed)
+  /** Preserve input-order primary selection and rollback all fulfilled native acquisitions. */
+  async #settleBatch(batch: IPoolSlot<T>[], results: PromiseSettledResult<T>[]): Promise<void> {
+    /** The first failed input retains primary ownership even when later inputs fail sooner. */
+    const failed = results.find((result) => result.status === 'rejected')
+    if (failed?.status === 'rejected') {
+      /** Rollback failures remain reachable through the same canonical error graph attachment. */
+      const cleanupErrors: unknown[] = []
+      await Promise.all(
+        results.map(async (result) => {
+          if (result.status !== 'fulfilled') return
+          try {
+            await result.value.close()
+          } catch (cleanup) {
+            cleanupErrors.push(cleanup)
+            this.#report(cleanup)
+          }
+        })
       )
-    this.#refill()
-    /** FIFO work is dispatched before a reentrant new call can select a freed slot. */
+      /**
+       * Extensible primaries retain identity; nonextensible values retain original aggregate
+       * policy.
+       */
+      const primary = attachSecondaryErrors(failed.reason, cleanupErrors)
+      for (const member of batch) {
+        this.#members.delete(member)
+        member.ready.reject(primary)
+        member.closed.resolve()
+      }
+      if (![...this.#members].some((member) => !member.retiring)) {
+        for (const waiter of this.#queue) {
+          this.#queue.delete(waiter)
+          waiter.signal?.removeEventListener('abort', waiter.abort)
+          this.#accepted--
+          waiter.reject(primary)
+        }
+      }
+      this.#pump()
+      this.#notifyDrain()
+      return
+    }
+    for (let index = 0; index < batch.length; index++) {
+      /** Only a completely fulfilled batch publishes its exact original native resources. */
+      const member = batch[index]!
+      const result = results[index]!
+      if (result.status !== 'fulfilled') continue
+      member.resource = result.value
+      member.inFlight = member.busy
+      member.ready.resolve(result.value)
+      if (this.#state !== RpcPoolState.open && !member.busy) member.retiring = true
+      if (member.retiring && !member.busy) void this.#closeMember(member).catch(this.#report)
+    }
     this.#pump()
-    /** A fresh free slot needs no queue admission, even while idle refill acquires its Peer. */
-    const member = this.#state.queue.size === 0 ? this.#select() : undefined
-    if (member) {
-      this.#reserve(member)
-      this.#state.accepted++
-      onAssigned?.(member)
-      return Promise.resolve(member)
-    }
-    if (this.#state.queue.size >= this.#state.maxQueue)
-      return Promise.reject(
-        tagPoolError(new Error(RpcPoolText.queueFull), RpcPoolErrorCode.queueFull)
-      )
-    /** The caller's actual signal is read only for pool waiting, then passed on untouched. */
-    const signal = callOptions?.signal
-    if (signal?.aborted) return Promise.reject(queuedPoolAbort(signal.reason))
-    return new Promise<IPoolMember>((resolve, reject) => {
-      /** One exact entry prevents cancellation from removing another accepted operation. */
-      const waiter: IPoolWaiter = {
-        resolve: (member) => {
-          onAssigned?.(member)
-          resolve(member)
-        },
-        reject,
-        unsubscribe: () => signal?.removeEventListener('abort', abort)
-      }
-      /** One queue receipt owns signal cancellation and a not-yet-started stream's termination. */
-      const remove = (reason: unknown): void => {
-        /** Cancellation changes only an entry that still belongs to this FIFO. */
-        if (!this.#state.queue.delete(waiter)) return
-        waiter.unsubscribe()
-        this.#state.accepted--
-        reject(reason)
-        this.#pump()
-        this.#notifyDrain()
-      }
-      /** Signal cancellation preserves the original reason on the registered pool AbortError. */
-      const abort = (): void => remove(queuedPoolAbort(signal?.reason))
-      this.#state.queue.add(waiter)
-      this.#state.accepted++
-      onWaiting?.(() => remove(STREAM_FINISHED))
-      signal?.addEventListener('abort', abort, { once: true })
-      if (signal?.aborted) abort()
-    })
   }
-
-  /** Preserve original payload/options objects and original errors across one public invocation. */
-  #dispatch = async <T>(
-    callOptions: IPoolCallOptions | undefined,
-    invoke: (peer: IPoolPeer) => Promise<T>
-  ): Promise<T> => {
-    /** First admission reserves a slot before native acquisition or business invocation awaits. */
-    const member = await this.#acquire(callOptions)
-    try {
-      /** Initial construction is the only readiness wait owned by the pool. */
-      const peer = await member.ready
-      member.inFlight = true
-      return await invoke(peer)
-    } finally {
-      this.#release(member)
-    }
+  /** Refill only missing capacity on demand; native restart policy remains with its actual source. */
+  #refill(): IPoolSlot<T>[] {
+    /** Retiring resources no longer consume requested target capacity. */
+    const count = [...this.#members].filter((member) => !member.retiring).length
+    return count < this.#targetSize ? this.#createBatch(this.#targetSize - count) : []
   }
-  /** Construct one lazy stream owner without acquiring a scheduler member. */
-  #stream = (...args: Parameters<IPoolPeer['stream']>): ReturnType<IPoolPeer['stream']> =>
-    new PoolStream(args, this.#acquire, this.#release)
-}
-
-/** Compose client scheduling over original public peers, awaiting transactional initial capacity. */
-export async function createPool(
-  options: IPoolPluginOptions,
-  createPeer: () => Promise<IPoolPeer>
-): Promise<IPool> {
-  const pool = new ClientPool(options, createPeer)
-  await pool.open()
-  return pool.value
 }

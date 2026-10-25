@@ -4284,6 +4284,16 @@
           "ownerFragment": "serialize-codec--IPortableWalkerStrategy"
         },
         {
+          "identity": "packages/serialize/dist/base64.d.ts:isCanonicalBase64url:export declare function isCanonicalBase64url(text: string): boolean;",
+          "name": "isCanonicalBase64url",
+          "signature": "export declare function isCanonicalBase64url(text: string): boolean;",
+          "source": "packages/serialize/dist/base64.d.ts",
+          "exportPath": ".",
+          "ownerExportPath": "./core",
+          "ownerModule": "core",
+          "ownerFragment": "serialize-core--isCanonicalBase64url"
+        },
+        {
           "identity": "packages/serialize/dist/types.d.ts:isChunkShape:export declare const isChunkShape: (value: unknown) => value is readonly [string, unknown];",
           "name": "isChunkShape",
           "signature": "export declare const isChunkShape: (value: unknown) => value is readonly [string, unknown];",
@@ -8319,6 +8329,85 @@
           "usageScore": 6,
           "configuration": [],
           "fragment": "serialize-core--IFrameBudgetOptions"
+        },
+        {
+          "name": "isCanonicalBase64url",
+          "kind": "function",
+          "signature": "export declare function isCanonicalBase64url(text: string): boolean;",
+          "declarationLine": 26,
+          "source": "packages/serialize/dist/base64.d.ts",
+          "purpose": "Synchronously checks whether a string is canonical unpadded RFC 4648 Base64url. It accepts only the URL-safe alphabet, valid encoded lengths and zero unused tail bits, without decoding the text or creating an output byte array.",
+          "core": "text: String whose exact wire spelling should be checked. Padding, whitespace and the ordinary Base64 plus or slash characters are not accepted.\nTrue for canonical text, including the empty string; false for an invalid alphabet, a length congruent to one modulo four, or nonzero unused tail bits.",
+          "advanced": "",
+          "parameters": ["text: string"],
+          "parameterDetails": [
+            {
+              "name": "text",
+              "type": "string",
+              "optional": false
+            }
+          ],
+          "returns": "boolean",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "aliasOf": "isCanonicalBase64url",
+          "exportPath": "./core",
+          "overloadSignatures": [
+            "export declare function isCanonicalBase64url(text: string): boolean;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "text",
+                "type": "string",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["boolean"],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Synchronously checks whether a string is canonical unpadded RFC 4648 Base64url. It accepts only the URL-safe alphabet, valid encoded lengths and zero unused tail bits, without decoding the text or creating an output byte array."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import isCanonicalBase64url from @migaia/serialize/core, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use isCanonicalBase64url when its function contract and declared inputs match the result you need. Choose a different public symbol when isCanonicalBase64url does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "text: String whose exact wire spelling should be checked. Padding, whitespace and the ordinary Base64 plus or slash characters are not accepted.\nTrue for canonical text, including the empty string; false for an invalid alphabet, a length congruent to one modulo four, or nonzero unused tail bits."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/serialize/dist/base64.d.ts:isCanonicalBase64url:export declare function isCanonicalBase64url(text: string): boolean;",
+          "guidance": [],
+          "usageScore": 6,
+          "configuration": [],
+          "fragment": "serialize-core--isCanonicalBase64url"
         },
         {
           "name": "isChunkShape",

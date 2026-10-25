@@ -1,61 +1,21 @@
 import { execFileSync } from 'node:child_process'
-import { readFileSync, readdirSync, writeFileSync } from 'node:fs'
+import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { evidence, peers } from './fixtures/conformance-business.js'
-import { randomUUID } from 'node:crypto'
-import { createProcessTransport } from '../../../rpc-plugin-process/dist/process/handshake.js'
-import { createNativeProcessOffer } from '../../../rpc-plugin-process/dist/process/offer.js'
-import { createNodeProcessLauncher } from '../../../rpc-plugin-process/dist/process/adapters/node-child-process.js'
-import { endpointFor } from './peers/ts/runtime.js'
-
-/** Independent scope is frozen here, so editing the baseline artifact cannot shrink it. */
-const vectorFiles = [
-  'handshake.json',
-  'control.json',
-  'envelope.json',
-  'stream.json',
-  'error-chain.json',
-  'stream-framing.json',
-  'remote-host-control.json',
-  'runtime-description.json',
-  'batch.json'
-] as const
-/** Every applicable case ID must appear in a real independent selftest receipt. */
-const requiredIds = [
-  ...new Set(
-    vectorFiles.flatMap((file) => {
-      const vector = JSON.parse(
-        readFileSync(new URL(`../../schema/vectors/${file}`, import.meta.url), 'utf8')
-      )
-      /** Retires only v1 catalogs and describeHost; use/unUse/inspect stay live wire methods. */
-      const sections =
-        file === 'remote-host-control.json'
-          ? [
-              vector.controls.filter(
-                (value: { definition: string }) => value.definition !== 'describeHost'
-              )
-            ]
-          : Object.values(vector)
-      return sections.flatMap((section) =>
-        Array.isArray(section)
-          ? section
-              .filter(
-                (value) =>
-                  value &&
-                  typeof value === 'object' &&
-                  (typeof value.id === 'string' || file === 'runtime-description.json')
-              )
-              .map((value, index) =>
-                typeof value.id === 'string'
-                  ? (value.id as string)
-                  : `${file}/${section === vector.valid ? 'valid' : 'invalid'}/${index}`
-              )
-          : []
-      )
-    })
-  )
-]
+import { normalizeRpcFrame } from '@migaia/rpc-contract/protocol'
+/** R17 current semantic vectors are independent of the retired v1 TS endpoint runner. */
+const vectors = JSON.parse(
+  readFileSync(new URL('../../schema/vectors/core-profile.json', import.meta.url), 'utf8')
+) as {
+  valid: Array<{ id: string; frame: unknown }>
+  invalid: Array<{ id: string; frame: unknown }>
+  unknownIgnored: Array<{ id: string; baseline: unknown; frame: unknown; pointer: string }>
+}
+/** Every current case must appear in each real independent peer's complete selftest receipt. */
+const requiredIds = [...vectors.valid, ...vectors.invalid, ...vectors.unknownIgnored].map(
+  ({ id }) => id
+)
 
 beforeAll(async () => {
   const { admitConformanceToolchains } = await import(
@@ -70,88 +30,41 @@ beforeAll(async () => {
 })
 
 describe('published vectors evaluated by independent language owners', () => {
-  for (const peer of peers.slice(0, 4))
-    it(`${peer.language} missing negotiated stream capability rejects before its first physical write`, async () => {
-      /** The public proposal deliberately omits stream while preserving native mandatory controls. */
-      const token = randomUUID()
-      const handle = await createNodeProcessLauncher().launch(
-        {
-          command: peer.command,
-          args: [...peer.args, '--stdio', '--bootstrap', 'stdin'],
-          env: { inherit: ['PATH'], set: {} },
-          stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' },
-          bootstrap: { via: 'stdin', payload: new TextEncoder().encode(token) }
-        },
-        { signal: new AbortController().signal, output: () => undefined }
-      )
-      const byte = handle.channel!
-      const write = byte.write
-      let writes = 0
-      Object.assign(byte, {
-        write: async (chunk: Uint8Array) => {
-          writes++
-          await write(chunk)
-        }
-      })
-      const channel = await createProcessTransport(byte, {
-        role: 'initiator',
-        peerId: peer.id,
-        offer: {
-          ...createNativeProcessOffer({
-            peer: { id: 'caller', runtime: 'node' },
-            stream: false,
-            capabilities: ['abort@1', 'wire-error@1', 'runtime-api@1']
-          }),
-          auth: token
-        },
-        report: () => undefined,
-        ipc: { connectionId: 'missing-stream', sessionId: 'missing-stream', log: () => undefined }
-      })
-      const runtime = await endpointFor(channel, 'caller')
-      try {
-        expect(channel.agreement.capabilities).not.toContain('stream@1')
-        const before = writes
-        await expect(
-          runtime.stream!.open(peer.id, 'p.f.generator', ['no-stream']).next()
-        ).rejects.toMatchObject({ source: 'rpc.endpoint', code: 'CAPABILITY_CONFLICT' })
-        expect(writes).toBe(before)
-      } finally {
-        await runtime.endpoint.dispose()
-        await channel.close()
-        handle.terminate('force')
-        await handle.exited
-      }
-    }, 15000)
   for (const peer of peers.slice(0, 3))
     it(`${peer.language} executes each applicable case oracle and retains its raw receipt`, () => {
-      /** Selftests own acceptance, first pointer, error graph, warning order and wire-byte oracles. */
+      /** Complete native selftests retain known-field errors, error graphs and wire-byte oracles. */
       const args = peer.language === 'python' ? peer.args.slice(0, 2) : peer.args.slice(0, 1)
-      const output = execFileSync(
-        peer.command,
-        [
-          ...args,
-          '--selftest',
-          '--vectors',
-          new URL('../../schema/vectors', import.meta.url).pathname
-        ],
-        {
-          encoding: 'utf8',
-          env: { ...process.env, PYTHONDONTWRITEBYTECODE: '1' },
-          timeout: 30000
-        }
-      )
+      /** Failed children keep their actual raw output before the original exception leaves the test. */
+      let output: string
+      try {
+        output = execFileSync(
+          peer.command,
+          [
+            ...args,
+            '--selftest',
+            '--vectors',
+            new URL('../../schema/vectors', import.meta.url).pathname
+          ],
+          {
+            encoding: 'utf8',
+            env: { ...process.env, PYTHONDONTWRITEBYTECODE: '1' },
+            timeout: 30000
+          }
+        )
+      } catch (error) {
+        /**
+         * Node's configured UTF-8 child boundary carries the captured streams on its original
+         * error.
+         */
+        const captured = error as { stdout?: string; stderr?: string }
+        writeFileSync(join(evidence, `vectors-${peer.language}.log`), captured.stdout ?? '')
+        writeFileSync(join(evidence, `vectors-${peer.language}.stderr.log`), captured.stderr ?? '')
+        throw error
+      }
       writeFileSync(join(evidence, `vectors-${peer.language}.log`), output)
       expect(output).not.toMatch(/^FAIL /m)
       expect(output).toMatch(/failed=0/)
       const rows = output.split('\n')
-      const warningGroups = vectorFiles.filter(
-        (file) =>
-          JSON.parse(readFileSync(new URL(`../../schema/vectors/${file}`, import.meta.url), 'utf8'))
-            .warnings
-      )
-      expect(
-        rows.filter((line) => line.startsWith('PASS ') && line.endsWith('/warnings/sequence'))
-      ).toHaveLength(warningGroups.length)
       for (const id of requiredIds)
         expect(
           rows.some(
@@ -168,21 +81,21 @@ describe('published vectors evaluated by independent language owners', () => {
       for (const row of rows.filter((line) => line.startsWith('SKIP ')))
         expect(row).toContain('absent')
     }, 30000)
-  it('TS reference executes the existing public vector owners', () => {
-    /**
-     * Public TS tests consume canonical package factories rather than another protocol
-     * implementation.
-     */
-    const output = execFileSync(
-      'sh',
-      [new URL('./peers/ts/selftest.sh', import.meta.url).pathname],
-      { encoding: 'utf8', timeout: 30000 }
-    )
-    writeFileSync(join(evidence, 'vectors-typescript.log'), output)
-    const owners = readdirSync(new URL('./peers/ts', import.meta.url)).filter((file) =>
-      file.endsWith('-vectors.test.ts')
-    )
-    expect(output).toMatch(new RegExp(`Test Files\\s+${owners.length} passed`))
-    expect(output).not.toMatch(/Tests\s+\d+ failed/)
-  }, 30000)
+  it('TS reference executes every current semantic vector through the public Contract', () => {
+    for (const { id, frame } of vectors.valid) expect(normalizeRpcFrame(frame), id).toBe(frame)
+    for (const { id, frame } of vectors.invalid)
+      expect(() => normalizeRpcFrame(frame), id).toThrow()
+    for (const { id, frame, baseline, pointer } of vectors.unknownIgnored) {
+      expect(normalizeRpcFrame(baseline), id).toBe(baseline)
+      const normalized = normalizeRpcFrame(frame)
+      expect(normalized, id).toBe(frame)
+      let target: unknown = normalized
+      for (const key of pointer.split('/').slice(1)) target = Reflect.get(target as object, key)
+      expect(Object.hasOwn(target as object, 'futureA'), id).toBe(true)
+      expect(Object.hasOwn(target as object, 'futureB'), id).toBe(true)
+      Reflect.deleteProperty(target as object, 'futureA')
+      Reflect.deleteProperty(target as object, 'futureB')
+      expect(normalized, id).toEqual(baseline)
+    }
+  })
 })

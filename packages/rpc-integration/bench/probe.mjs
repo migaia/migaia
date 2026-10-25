@@ -891,19 +891,13 @@ async function admitProbeInventory(options, rootMode, cells) {
   mkdirSync(options.output, { recursive: true })
   /** Canonical declared codes bound the native fixture's observable package classification. */
   const codeTables = {
-    'rpc.endpoint': ['packages/rpc-host/src/core/error-code.ts', 'RpcCoreErrorCode'],
-    'rpc.contract': ['packages/rpc-contract/src/contract/error-code.ts', 'RpcContractErrorCode'],
-    'rpc.transport.process': [
-      'packages/rpc-plugin-process/src/error-code.ts',
-      'RpcProcessErrorCode'
-    ],
-    'rpc.transport.thread': ['packages/rpc-plugin-thread/src/error-code.ts', 'RpcThreadErrorCode']
+    'rpc.endpoint': ['packages/rpc-contract/src/error-code.ts', 'RpcCoreErrorCode'],
+    'rpc.contract': ['packages/rpc-contract/src/error-code.ts', 'RpcContractErrorCode'],
+    'rpc.transport.process': ['packages/rpc-contract/src/error-code.ts', 'RpcProcessErrorCode'],
+    'rpc.transport.thread': ['packages/rpc-contract/src/error-code.ts', 'RpcThreadErrorCode']
   }
   if (rootMode)
-    codeTables['rpc.devtools'] = [
-      'packages/rpc-plugin-devtools/src/error-code.ts',
-      'RpcDevtoolsErrorCode'
-    ]
+    codeTables['rpc.devtools'] = ['packages/rpc-contract/src/error-code.ts', 'RpcDevtoolsErrorCode']
   /** Inventory parsing reads source tables only; it never adds a production diagnostic path. */
   const observableCodes = Object.fromEntries(
     Object.entries(codeTables).map(([source, [path, name]]) => {

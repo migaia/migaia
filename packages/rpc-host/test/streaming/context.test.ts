@@ -1,62 +1,48 @@
-import { describe, expect, it, vi } from 'vitest'
-import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
-import { createComposedEndpoint } from '../../dist/core/composed.js'
-import { ProviderExecutor } from '../../dist/core/internal/provider-executor.js'
-import { connect } from '../../dist/core/middleware/connect.js'
-import type { IRpcContext } from '../../dist/core/typing.js'
-import { streamRoots } from './fixture.js'
+import { describe, expect, it } from 'vitest'
+import type { IRpcContext } from '@migaia/rpc-host'
+import { connectedCoreHosts } from '../host/core-fixture.js'
 
 describe('streaming provider context', () => {
-  it('passes the core-created stream context by identity and isolates ordinary requests', async () => {
-    const [clientTransport, serverTransport] = createMemoryTransportPair()
-    const contextCreation = vi.spyOn(ProviderExecutor.prototype, 'createContext')
-    const server = await createComposedEndpoint(
+  it('passes the original stream context through iterator execution and isolates ordinary requests', async () => {
+    /** Context references are observed only through actual public business callbacks. */
+    const contexts: { ordinary?: IRpcContext; stream?: IRpcContext } = {}
+    /** Provider methods receive the canonical context directly, without a legacy stream wrapper. */
+    const fixture = await connectedCoreHosts(
       {
-        id: 'server',
-        transport: serverTransport,
-        middlewares: [connect({ transport: serverTransport })]
+        ordinary: (_params, context) => {
+          contexts.ordinary = context
+          return context.success('ok')
+        },
+        stream: function* (params, context) {
+          contexts.stream = context
+          /** The original native signal survives generator suspension and cleanup unchanged. */
+          const signal = context.signal
+          expect(context.data).toEqual(params)
+          expect(typeof context.dispatchTo).toBe('function')
+          try {
+            yield 'item'
+          } finally {
+            expect(context.signal).toBe(signal)
+            expect(contexts.stream).toBe(context)
+            expect(contexts.ordinary).not.toBe(context)
+          }
+        }
       },
-      streamRoots()
+      {},
+      () => undefined
     )
-    const client = await createComposedEndpoint(
-      {
-        id: 'client',
-        transport: clientTransport,
-        middlewares: [connect({ transport: clientTransport })]
-      },
-      streamRoots()
-    )
-    let ordinaryContext: IRpcContext | undefined
-    let streamContext: IRpcContext | undefined
-    server.provide('ordinary', (context) => {
-      ordinaryContext = context
-      return context.success('ok')
-    })
-    server.stream.provide('stream', (params, { signal, context }) => {
-      streamContext = context
-      expect(context.signal).toBe(signal)
-      expect(context.data).toEqual(params)
-      expect(typeof context.dispatchTo).toBe('function')
-      return (function* () {
-        yield 'item'
-      })()
-    })
     try {
-      expect(await client.send('server', 'ordinary', { kind: 'ordinary' })).toBe('ok')
-      const iterator = client.stream.open('server', 'stream', { kind: 'stream' })
+      expect(await fixture.b.memory.send('a', 'ordinary', { kind: 'ordinary' })).toBe('ok')
+      /** One actual peer receives this original payload and context for the full stream lifetime. */
+      const iterator = fixture.b.memory.stream('stream', {
+        kind: 'stream'
+      }) as AsyncIterableIterator<unknown>
       expect(await iterator.next()).toEqual({ done: false, value: 'item' })
-      expect(streamContext).toBeDefined()
-      expect(streamContext).not.toBe(ordinaryContext)
-      const coreContext = contextCreation.mock.results
-        .map((result) => result.value as IRpcContext)
-        .find((context) => (context.data as { kind?: string })?.kind === 'stream')
-      expect(streamContext).toBe(coreContext)
-      expect(ordinaryContext).not.toBe(coreContext)
+      expect(contexts.stream).toBeDefined()
+      expect(contexts.stream).not.toBe(contexts.ordinary)
       await iterator.return?.()
     } finally {
-      await client.dispose()
-      await server.dispose()
-      contextCreation.mockRestore()
+      await fixture.close()
     }
   })
 })

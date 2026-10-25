@@ -98,7 +98,9 @@ export type IConfigPathRule = {
  * Options of `combineConfig`: global `strategies`, per-prefix `pathRules`, and a synchronous
  * `onConflict` for values that cannot be merged automatically. Array conflicts observe the current
  * accumulated contents; a retained accumulator reference receives later array merges in this call.
- * Resolver-selected graphs are captured when accepted so their nested arrays are private builders.
+ * Callbacks read accumulated arrays and return decisions; directly mutating those arrays is
+ * unsupported. Resolver-selected graphs are captured when accepted so their nested arrays are
+ * private builders.
  */
 export type IConfigCombineOptions = IOwnConfigOptions & {
   readonly strategies?: Partial<IConfigMergeStrategies>

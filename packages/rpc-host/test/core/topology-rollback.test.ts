@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { createComposedEndpoint } from '../../dist/core/composed.js'
 
 import { defineRpcFeature } from '../../dist/core/internal/define-rpc-feature.js'
-import { RpcCoreErrorCode } from '../../dist/core/errors.js'
+import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
 import type { IRpcCoreConfig } from '../../dist/core/composed.js'
 import type { IRpcPluginInstallScope } from '../../dist/core/typing.js'

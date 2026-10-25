@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
+import { timeout } from '@migaia/rpc-host/features/timeout'
 import { serviceWorkerPlugin } from '@migaia/rpc-plugin-browser'
 import { serviceWorkerRealm } from './fixtures/service-worker.js'
 
@@ -68,12 +69,12 @@ describe('ServiceWorker raw session plugin', () => {
       expect(calls).toEqual([])
       second.releaseToWorker()
       b = await next
-      expect(await server.send('page-a', 'who')).toBe('a')
-      expect(await server.send('page-b', 'who')).toBe('b')
+      expect(await server.serviceWorker.send('page-a', 'who')).toBe('a')
+      expect(await server.serviceWorker.send('page-b', 'who')).toBe('b')
       /** A Client-b native source cannot dispatch a frame belonging to Client-a's admitted peer. */
       first.holdToWorker()
       let completed = false
-      const pending = a.request('record', 'client-a-value').then((value) => {
+      const pending = a.serviceWorker.request('record', 'client-a-value').then((value) => {
         completed = true
         return value
       })
@@ -87,7 +88,7 @@ describe('ServiceWorker raw session plugin', () => {
       /** A wrong ServiceWorker cannot complete the page's pending business response either. */
       first.holdToPage()
       completed = false
-      const response = a.request('record', 'correct-reply').then((value) => {
+      const response = a.serviceWorker.request('record', 'correct-reply').then((value) => {
         completed = true
         return value
       })
@@ -101,7 +102,7 @@ describe('ServiceWorker raw session plugin', () => {
       /** A reply injected through Client-b cannot settle the server's actual Client-a request. */
       first.holdToWorker()
       completed = false
-      const serverPending = server.send('page-a', 'who').then((value) => {
+      const serverPending = server.serviceWorker.send('page-a', 'who').then((value) => {
         completed = true
         return value
       })
@@ -165,9 +166,11 @@ describe('ServiceWorker raw session plugin', () => {
       plugins: [serviceWorkerPlugin({ serviceWorker: page.serviceWorker, receiver: page.receiver })]
     })
     try {
-      expect(await host.request('echo', 'before')).toBe('before')
+      expect(await host.serviceWorker.request('echo', 'before')).toBe('before')
       realm.silence()
-      await expect(host.request('echo', 'silent', { timeoutMs: 30 })).rejects.toMatchObject({
+      await expect(
+        host.serviceWorker.request('echo', 'silent', { timeout: timeout({ ms: 30 }) })
+      ).rejects.toMatchObject({
         source: 'rpc.endpoint',
         code: 'DEADLINE_EXCEEDED'
       })
@@ -204,9 +207,9 @@ describe('ServiceWorker raw session plugin', () => {
       plugins: [serviceWorkerPlugin({ serviceWorker: registration.active })]
     })
     try {
-      expect(await oldHost.request('generation')).toBe('old')
+      expect(await oldHost.serviceWorker.request('generation')).toBe('old')
       oldRealm.silence()
-      expect(await freshHost.request('generation')).toBe('new')
+      expect(await freshHost.serviceWorker.request('generation')).toBe('new')
       expect(freshHost.self.instanceId).not.toBe(oldHost.self.instanceId)
       expect(freshServer.self.instanceId).not.toBe(oldServer.self.instanceId)
     } finally {

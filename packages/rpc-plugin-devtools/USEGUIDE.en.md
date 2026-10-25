@@ -1,46 +1,53 @@
-# RPC Devtools guide
+# Devtools usage guide
 
-[中文](./USEGUIDE.md) · [Overview](./README.en.md) · [Host guide](../rpc-host/USEGUIDE.en.md)
+[中文](./USEGUIDE.md) · [Overview](./README.en.md)
 
-devtoolsPlugin() installs a feature backed by the original bounded collector. Its query/watch/stats/describe/close conveniences delegate to that same collector. It creates no business connection or separate forwarded probe stream.
+Contract provides pure event/interface contracts. Host owns business sessions and calls; transports provide real carriers. Devtools is a flow plugin borrowing real events at the canonical probe observe hook; timeout/retry features execute call policies. The application owns the collector without a second observation connection. A Host may have distinct transport namespaces; this example uses only coroutine.
 
-## Observe real calls on both sides
+## Observe real calls
 
-Install the same tools object on two real hosts. First next subscribes the watch before the call. Finally, close hosts before explicitly closing the application-owned collector.
+This example additionally needs `@migaia/rpc-plugin-coroutines`. Install the same tools on two real parent/child Hosts. The watch's first next subscribes to future events before business begins. Flow plugins go in Host.plugins rather than transport.features.
 
 ```ts doc-test=check
 import { createRpcHost } from '@migaia/rpc-host'
-import { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'
+import { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'
 import { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'
 
+async function untilStopped(signal: AbortSignal): Promise<void> {
+  let complete!: () => void
+  const stopped = new Promise<void>((resolve) => {
+    complete = resolve
+  })
+  signal.addEventListener('abort', complete, { once: true })
+  if (signal.aborted) complete()
+  try {
+    await stopped
+  } finally {
+    signal.removeEventListener('abort', complete)
+  }
+}
+
 const tools = devtoolsPlugin({ maxEvents: 1000, methods: ['double'] })
-const parent = await createRpcHost<{ double(value: number): number }>({
-  plugins: [
-    coroutinePlugin({
-      spawn: async ({ connect, signal }) => {
-        const child = await createRpcHost({
-          plugins: [coroutinePlugin({ connectToParent: connect }), tools],
-          provide: { double: (value: number) => value * 2 }
-        })
-        try {
-          if (!signal.aborted)
-            await new Promise<void>((resolve) => {
-              signal.addEventListener('abort', () => resolve(), { once: true })
-            })
-        } finally {
-          await child.close()
-        }
-      }
-    }),
-    tools
-  ]
-})
+const task: ICoroutineUserTask = async ({ connect, signal }) => {
+  const child = await createRpcHost({
+    plugins: [tools, coroutinePlugin({ connectToParent: connect })],
+    provide: { double: (value: number) => value * 2 }
+  })
+  try {
+    await untilStopped(signal)
+  } finally {
+    await child.close()
+  }
+}
+
+type IWorkerApi = { double(value: number): number }
+const plugins = [tools, coroutinePlugin({ spawn: task })] as const
+const parent = await createRpcHost<IWorkerApi, typeof plugins>({ plugins })
 const watch = tools.watch({ stages: ['message'] })
 try {
   const next = watch.next()
-  console.log(await parent.request('double', 21))
-  const batch = await next
-  console.log(batch.value?.events.length)
+  console.log(await parent.coroutine.request('double', 21))
+  console.log((await next).value?.events.length)
   console.log(tools.stats().methods)
 } finally {
   await watch.return(undefined)
@@ -49,14 +56,13 @@ try {
 }
 ```
 
-The business result is 42. Event counts depend on qualifying observations from both sides; one call does not imply one record. The same tools object can install in multiple hosts, once per host. Closing one host removes only its observation; the other host and collector continue working.
+The business call returns 42. Event counts depend on actual eligible observations at both ends, rather than one event per business call. Default message/peer/forward observes this call. Other stages require explicit selection and true facts from the actual carrier.
 
-## Stages, capture, and redaction
-
-Default stages are message and peer. Explicitly enable envelope, encoded, frame, protected, or carrier when needed. Visibility also depends on the actual carrier and stages traversed. Subscribing to stages alone does not retain content. capture defaults to none and must be a subset of stages. redact projects content synchronously at the original emitter.
+## Capture, redaction, queries, and service
 
 ```ts doc-test=check
-import { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'
+import { devtoolsPlugin, type IRpcDevtools } from '@migaia/rpc-plugin-devtools'
+import type { IRpcHost } from '@migaia/rpc-host'
 
 export const tools = devtoolsPlugin({
   stages: ['message', 'peer', 'carrier'],
@@ -66,34 +72,26 @@ export const tools = devtoolsPlugin({
   maxContentBytes: 1024 * 1024,
   onError: (error) => console.error(error)
 })
-```
-
-This example replaces all captured content explicitly. Write redaction for your data structure; do not assume credentials are recursively removed automatically. A throwing redactor reports REDACT_FAILED and drops that content without changing completed business results.
-
-methods selects exact methods. sample is a deterministic ratio greater than 0 and at most 1. Pause with collector.pause, not sample: 0. collector.resume restores the saved stages without reviving a closed collector.
-
-## Query, watch, and bounds
-
-query uses a sequence cursor rather than an array position. Pass nextSeq as the next afterSeq even when some scanned rows were filtered out. Default limit is 1000; accepted values are 1 through 1000.
-
-```ts doc-test=check
-import type { IRpcDevtools } from '@migaia/rpc-plugin-devtools'
 
 export function readPage(collector: IRpcDevtools, afterSeq: number) {
   const page = collector.query({ afterSeq, limit: 100, stages: ['message'] })
   return { events: page.events, cursor: page.nextSeq, loss: page.counters }
 }
+
+export function exposeDiagnostics(host: IRpcHost) {
+  host.provide({ diagnostics: tools.collector.service })
+}
 ```
 
-watch subscribes to future events on first next; query reads retained history. Batches contain at most 256 events, with at most 64 queued batches and a bounded raw pre-filter window. batch.dropped accounts for loss, so slow consumers cannot claim lossless delivery. return ends only that watch and wakes its pending read. collector.close rejects a pending next with CLOSED.
+This explicitly replaces captured content. Redact runs synchronously; failures report REDACT_FAILED and discard that content without changing the business result. Methods match exactly. Sample is greater than zero and at most one; use collector.pause to pause. Resume restores previous stages without reviving a closed collector.
 
-The main ring defaults to maxEvents=10000 and maxContentBytes=8388608. The latter is a main-ring content budget. maxInterned defaults to 65536. Watch/record windows and content/detail/error references have separate ownership; the main-ring limit is not a hard process-memory bound. query.counters explains eviction, content loss, reentrant drops, and intern overflow.
+query.afterSeq is an exclusive sequence cursor. Continue from page.nextSeq, which includes scanned rows excluded by filters. Limit defaults to 1000 and ranges from 1–1000. Watch subscribes from first next rather than reading history. Each batch holds at most 256 events, with 64 queued batches; batch.dropped reports loss. Return ends only its watch; collector.close rejects pending next with CLOSED.
 
-stats accumulates qualifying message events independently of ring eviction. Latency percentiles interpolate bounded histogram buckets rather than exact retained samples. clear resets the main ring, statistics, and counters while preserving sequence progress and record/watch lifetimes.
+Main-ring defaults are maxEvents10000, maxContentBytes8388608, maxInterned65536. Watch, record, and content/detail/error references have separate ownership. Ring capacity does not imply arbitrary graph deep-copying or a process-wide memory bound. query.counters reports eviction, content loss, reentrant loss, sampling, and intern overflow.
 
-## Independent recording and NDJSON
+collector.service is a nested provide object. Applications own authorization; remote reads hide captured content unless exposeContent:true. Service reads exclude observations of their actual serving Host to avoid query recursion. Observation does not require another business Host.
 
-Only one recording can be active. It has its own capacity; stop consumes its handle and returns a record. Export/import are pure codecs: they neither persist data nor ingest decoded events into this collector.
+## Recording and NDJSON
 
 ```ts doc-test=check
 import { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'
@@ -104,32 +102,20 @@ try {
   tools.collector.clear()
   const record = recording.stop()
   const text = tools.collector.exportRecord(record)
-  const decoded = tools.collector.importRecord(text)
-  console.log(decoded.header.version)
+  console.log(tools.collector.importRecord(text).header.version)
 } finally {
   tools.close()
 }
 ```
 
-The v1 header remains { format: 'migaia-rpc-devtools', version: 1 }; package renaming does not change it. collector.exportRecord/importRecord own record encoding and decoding. Bytes use reserved $bytes syntax with canonical base64. Native errors restore names, stacks, and cause chains without generating replacement remote stacks. The format does not promise arbitrary JavaScript class-graph round trips.
+Only one recording is active at a time, and stop consumes its handle. Clear resets the main ring, statistics, and counters while retaining sequence progress and record/watch lifetime. Stats accumulates eligible message events without subtracting ring eviction; latency quantiles interpolate bounded histogram buckets.
 
-## Remote service on an existing host
+The record header remains `{ format: 'migaia-rpc-devtools', version: 1 }`. Export/import is pure NDJSON encoding, without persistence or reinjecting events. Bytes and error graphs follow the record contract; arbitrary JavaScript class graphs are not promised lossless roundtrip.
 
-collector.service is a nested provide object published on an application-owned existing host. Applications own authorization and the business connection. Observation needs no second call endpoint.
+## Cleanup and boundaries
 
-```ts doc-test=check
-import type { IRpcHost } from '@migaia/rpc-host'
-import type { IDevtoolsPlugin } from '@migaia/rpc-plugin-devtools'
+End your watches and recording, close business Hosts, then close the caller-owned collector. A Host installation owns only its emitter cleanup; collector.close does not close business Hosts. Consumers retaining a reusable synchronous emit view must read or copy fields according to the public probe contract.
 
-export function exposeDiagnostics(host: IRpcHost, tools: IDevtoolsPlugin) {
-  host.provide({ diagnostics: tools.collector.service })
-}
-```
+Import custom probes from `@migaia/rpc-host/plugins/probe` and deployment SDK from `@migaia/rpc-host/sdk`. Physical carrier/protected stages depend on actual paths, without semantic messages presented as raw data. Diagnostics must not replace business results. Errors use source rpc.devtools, including INVALID_OPTION, CLOSED, RECORD_ACTIVE/RECORD_NOT_ACTIVE, RECORD_FORMAT_INVALID, REDACT_FAILED, SERVICE_RESULT_INVALID, with original native type and cause.
 
-capture and exposeContent: true are independent choices. Remote content is hidden by default. Service reads exclude observations from their actual serving host to avoid observing their own queries. The service retains query/watch/stats/describe, record.start/stop, clear, pause, and resume; RPC output uses the original portable/wire conversion.
-
-## Final cleanup and errors
-
-Return owned watches, stop recording, close business hosts, then close the remaining application-owned collector. collector.close is idempotent and leaves business hosts open; host.close likewise leaves the collector open.
-
-The source is rpc.devtools. INVALID_OPTION, CLOSED, RECORD_ACTIVE, RECORD_NOT_ACTIVE, RECORD_FORMAT_INVALID, REDACT_FAILED, and SERVICE_RESULT_INVALID preserve native error types and original causes. Handle or report diagnostic and cleanup failures without replacing the original business failure.
+Forwarding rows are included by default. Query or record the ordered rows and correlate `messageId`, `route`, and the caller’s optional `trace` to inspect each host’s `hop`, `maxHops`, and refusal reason. The existing ring copies borrowed routes when retaining rows; live probe callbacks still borrow them.

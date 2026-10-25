@@ -1,9 +1,11 @@
-import { ERROR_SOURCE as RPC_PROCESS_ERROR_SOURCE } from '../error-code.js'
-import { RpcProcessErrorText } from '../error-text.js'
-import { attachErrorIdentity } from '@migaia/utils/error'
+/**
+ * Tracks one native registration's terminal diagnostics and scheduled notifications before
+ * liquidation. Supervisor state remains authoritative for actual restart and execution
+ * availability.
+ */
+import { createProcessError } from '../error.js'
 import type { IScheduledTask, IScheduler } from '@migaia/utils/scheduler'
-import type { IRemoteCallGuard } from '@migaia/rpc-host/plugin'
-import { RpcProcessErrorCode } from '../error-code.js'
+import { RpcProcessErrorCode } from '@migaia/rpc-contract/error-code'
 
 import type {
   IProcessRegistration,
@@ -14,8 +16,21 @@ import type {
 /** One registration owns its terminal diagnostics, while supervision owns restart policy. */
 export type IProcessTerminalRegistration = Readonly<{
   registration: IProcessRegistration
-  guard: IRemoteCallGuard
+  assertAvailable(): void
   snapshot(): IProcessResilienceSnapshot | undefined
+}>
+
+/** Construction and public factory borrow the same actual native terminal-diagnostic ports. */
+type IProcessTerminalOptions = Readonly<{
+  name: string
+  binding: IProcessRegistrationBinding
+  scheduler: IScheduler
+  reportAtMs: readonly number[]
+  unhandledLimit: number
+  report(error: unknown): void
+  notify(snapshot: IProcessResilienceSnapshot): Promise<boolean>
+  liquidate(): Promise<void>
+  onClose(): void
 }>
 
 /** One offset rule is shared by primary registrations and suspended dependants. */
@@ -35,19 +50,7 @@ export function scheduleProcessDiagnostic(
 
 /** Create one terminal report clock without adding a second supervisor state machine. */
 /** Allocate one registration terminal diagnostic clock before installing behavior callbacks. */
-function processTerminalRegistrationState(
-  options: Readonly<{
-    name: string
-    binding: IProcessRegistrationBinding
-    scheduler: IScheduler
-    reportAtMs: readonly number[]
-    unhandledLimit: number
-    report(error: unknown): void
-    notify(snapshot: IProcessResilienceSnapshot): Promise<boolean>
-    liquidate(): Promise<void>
-    onClose(): void
-  }>
-) {
+function processTerminalRegistrationState(options: IProcessTerminalOptions) {
   /** This owner stores only diagnostics not present in the supervisor snapshot. */
   let unhandled = 0
   /**
@@ -88,111 +91,74 @@ class ProcessTerminalRegistration {
   #state: ReturnType<typeof processTerminalRegistrationState>
   /** Preserve the original stable resource surface and callback identities. */
   readonly value: IProcessTerminalRegistration
-  /** Initialize owned storage before publishing the resource's callbacks. */
-  constructor(
-    options: Readonly<{
-      name: string
-      binding: IProcessRegistrationBinding
-      scheduler: IScheduler
-      reportAtMs: readonly number[]
-      unhandledLimit: number
-      report(error: unknown): void
-      notify(snapshot: IProcessResilienceSnapshot): Promise<boolean>
-      liquidate(): Promise<void>
-      onClose(): void
-    }>
-  ) {
+  /** Publish genuine registration methods after acquiring the original terminal subscription. */
+  constructor(options: IProcessTerminalOptions) {
     this.#state = processTerminalRegistrationState(options)
-    this.#state.unsubscribe = this.#state.options.binding.supervisor.onTerminal((event) => {
-      this.#state.timer?.cancel()
-      this.#state.entry = event.entry
-      this.#state.reason = event.error
-      const beganAt = this.#state.options.scheduler.now()
-      void this.#deliver(this.#state.entry, 0, beganAt)
-    })
-    const guard: IRemoteCallGuard = Object.freeze({
-      beforeDispatch: (): void => {
-        if (this.#state.closed) return
-        if (this.#state.liquidated)
-          throw ((
-            originalCause: unknown,
-            originalDetail: Readonly<Record<string, unknown>> | undefined
-          ) =>
-            attachErrorIdentity(
-              new Error(
-                RpcProcessErrorText.liquidated,
-                originalCause === undefined ? undefined : { cause: originalCause }
-              ),
-              {
-                source: RPC_PROCESS_ERROR_SOURCE,
-                code: RpcProcessErrorCode.liquidated,
-                ...(originalDetail ? { detail: originalDetail } : {})
-              }
-            ))(this.#state.reason, {
-            registrationId: this.#state.options.name
-          })
-        if (this.#state.options.binding.supervisor.inspect().state === 'terminal')
-          throw ((
-            originalCause: unknown,
-            originalDetail: Readonly<Record<string, unknown>> | undefined
-          ) =>
-            attachErrorIdentity(
-              new Error(
-                RpcProcessErrorText.terminalCall,
-                originalCause === undefined ? undefined : { cause: originalCause }
-              ),
-              {
-                source: RPC_PROCESS_ERROR_SOURCE,
-                code: RpcProcessErrorCode.terminalCall,
-                ...(originalDetail ? { detail: originalDetail } : {})
-              }
-            ))(this.#state.reason, {
-            registrationId: this.#state.options.name
-          })
-      }
-    })
+    this.#state.unsubscribe = this.#state.options.binding.supervisor.onTerminal(this.#terminal)
+    /** Native availability remains local; the unresolved origin-routing policy is unchanged. */
     const registration: IProcessRegistration = Object.freeze({
-      restart: async () => {
-        if (this.#state.liquidated)
-          throw ((originalCause: unknown) =>
-            attachErrorIdentity(
-              new Error(
-                RpcProcessErrorText.liquidated,
-                originalCause === undefined ? undefined : { cause: originalCause }
-              ),
-              { source: RPC_PROCESS_ERROR_SOURCE, code: RpcProcessErrorCode.liquidated }
-            ))(this.#state.reason)
-        if (this.#state.liquidation) await this.#state.liquidation.catch(() => undefined)
-        if (this.#state.liquidated)
-          throw ((originalCause: unknown) =>
-            attachErrorIdentity(
-              new Error(
-                RpcProcessErrorText.liquidated,
-                originalCause === undefined ? undefined : { cause: originalCause }
-              ),
-              { source: RPC_PROCESS_ERROR_SOURCE, code: RpcProcessErrorCode.liquidated }
-            ))(this.#state.reason)
-        if (!this.#state.closed) {
-          this.#state.timer?.cancel()
-          this.#state.unhandled = 0
-        }
-        return this.#state.options.binding.supervisor.restart()
-      },
+      restart: this.#restart,
       inspect: this.#snapshot,
-      close: (): Promise<void> => {
-        return (this.#state.closePromise ??= (async () => {
-          this.#state.closed = true
-          this.#state.timer?.cancel()
-          ;(0, this.#state.unsubscribe)()
-          this.#state.unhandled = 0
-          await this.#state.liquidation?.catch(() => undefined)
-          this.#state.options.onClose()
-        })())
-      }
+      close: this.#close
     })
-    this.value = Object.freeze({ registration, guard, snapshot: this.#snapshot })
+    this.value = Object.freeze({
+      registration,
+      assertAvailable: this.#assertAvailable,
+      snapshot: this.#snapshot
+    })
   }
 
+  /** Capture the same terminal entry and begin its original zero-offset diagnostic delivery. */
+  readonly #terminal = (event: Readonly<{ entry: number; error: unknown }>): void => {
+    this.#state.timer?.cancel()
+    this.#state.entry = event.entry
+    this.#state.reason = event.error
+    /** The original scheduler alone supplies this entry's monotonic diagnostic origin. */
+    const beganAt = this.#state.options.scheduler.now()
+    void this.#deliver(this.#state.entry, 0, beganAt)
+  }
+
+  /** Retain the original terminal/liquidated distinction without changing originating policy. */
+  readonly #assertAvailable = (): void => {
+    if (this.#state.closed) return
+    if (this.#state.liquidated)
+      throw createProcessError(RpcProcessErrorCode.liquidated, this.#state.reason, {
+        registrationId: this.#state.options.name
+      })
+    if (this.#state.options.binding.supervisor.inspect().state === 'terminal')
+      throw createProcessError(RpcProcessErrorCode.terminalCall, this.#state.reason, {
+        registrationId: this.#state.options.name
+      })
+  }
+
+  /** Restart remains delegated to the original supervisor after any current liquidation settles. */
+  readonly #restart: IProcessRegistration['restart'] = async () => {
+    if (this.#state.liquidated)
+      throw createProcessError(RpcProcessErrorCode.liquidated, this.#state.reason)
+    if (this.#state.liquidation) await this.#state.liquidation.catch(() => undefined)
+    if (this.#state.liquidated)
+      throw createProcessError(RpcProcessErrorCode.liquidated, this.#state.reason)
+    if (!this.#state.closed) {
+      this.#state.timer?.cancel()
+      this.#state.unhandled = 0
+    }
+    return this.#state.options.binding.supervisor.restart()
+  }
+
+  /** Return the same cached Promise while preserving the original synchronous close prefix. */
+  readonly #close = (): Promise<void> => (this.#state.closePromise ??= this.#release())
+
+  /** Cancel and unsubscribe before waiting for original liquidation, then remove this registration. */
+  async #release(): Promise<void> {
+    this.#state.closed = true
+    this.#state.timer?.cancel()
+    ;(0, this.#state.unsubscribe)()
+    this.#state.unhandled = 0
+    await this.#state.liquidation?.catch(() => undefined)
+    this.#state.options.onClose()
+  }
+
+  /** Observe the original supervisor without changing its restart or terminal state. */
   #snapshot = (): IProcessResilienceSnapshot | undefined => {
     if (this.#state.closed) return undefined
     const supervisor = this.#state.options.binding.supervisor.inspect()
@@ -208,20 +174,24 @@ class ProcessTerminalRegistration {
     })
   }
 
+  /** Schedule the next original report offset only for this still-current terminal entry. */
   #scheduleNext = (currentEntry: number, index: number, beganAt: number): void => {
     if (this.#state.closed || this.#state.liquidated || this.#state.entry !== currentEntry) return
+    /** One explicit scheduled operation retains only this entry's original clock facts. */
+    const delivery = { currentEntry, index, beganAt }
     this.#state.timer = scheduleProcessDiagnostic(
       this.#state.options.scheduler,
       this.#state.options.reportAtMs,
       beganAt,
       index,
       () => {
-        void this.#deliver(currentEntry, index, beganAt)
+        void this.#deliver(delivery.currentEntry, delivery.index, delivery.beganAt)
       }
     )
   }
 
   /** Supervision already reported index zero; this owner reports only later ticks. */
+  /** Notify observers, then retain the original unhandled threshold and liquidation ordering. */
   #deliver = async (currentEntry: number, index: number, beganAt: number): Promise<void> => {
     this.#state.timer = undefined
     if (this.#state.closed || this.#state.liquidated || this.#state.entry !== currentEntry) return
@@ -260,17 +230,7 @@ class ProcessTerminalRegistration {
 
 /** Construct the single owner for one registration terminal diagnostic clock. */
 export function createProcessTerminalRegistration(
-  options: Readonly<{
-    name: string
-    binding: IProcessRegistrationBinding
-    scheduler: IScheduler
-    reportAtMs: readonly number[]
-    unhandledLimit: number
-    report(error: unknown): void
-    notify(snapshot: IProcessResilienceSnapshot): Promise<boolean>
-    liquidate(): Promise<void>
-    onClose(): void
-  }>
+  options: IProcessTerminalOptions
 ): IProcessTerminalRegistration {
   return new ProcessTerminalRegistration(options).value
 }

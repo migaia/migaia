@@ -1,3 +1,4 @@
+import { TrayInternal } from '../../src/hosts/constants.js'
 import { describe, expect, it } from 'vitest'
 import {
   assembled,
@@ -51,10 +52,12 @@ describe('Tray instance admission and discovery', () => {
       await expect(tray.spawn('node-co', { id: 'coroutine-0' })).rejects.toMatchObject({
         code: 'TRAY_INSTANCE_DUPLICATE'
       })
-      for (const record of tray.list()) await tray.remove(record.id)
+      /** Original accepted admissions identify their actual native namespace publications. */
+      const admitted = tray.list()
+      for (const record of admitted) await tray.remove(record.id)
       expect(tray.list()).toEqual([])
-      for (const runtime of ['coroutine', 'thread', 'process'])
-        expect(await (host[runtime]?.list() ?? [])).toEqual([])
+      for (const record of admitted)
+        expect(host[`${TrayInternal.namespacePrefix}${record.id}`]).toBeUndefined()
       expect(await liveThreads()).toEqual(before)
       for (const pid of pids)
         await until(
@@ -96,7 +99,7 @@ describe('Tray instance admission and discovery', () => {
           cause: expect.anything()
         })
         expect(tray.list()).toEqual([])
-        expect(await (host.coroutine?.list() ?? [])).toEqual([])
+        expect(host[`${TrayInternal.namespacePrefix}invalid`]).toBeUndefined()
       }
     } finally {
       await tray.dispose()
@@ -137,7 +140,8 @@ describe('Tray instance admission and discovery', () => {
         Boolean
       )
       expect(tray.list()).toEqual([])
-      expect(await (host.coroutine?.list() ?? [])).toEqual([])
+      expect(host[`${TrayInternal.namespacePrefix}factory`]).toBeUndefined()
+      expect(host[`${TrayInternal.namespacePrefix}rollback`]).toBeUndefined()
     } finally {
       await tray.dispose()
     }

@@ -7,7 +7,7 @@ import { systemScheduler } from '@migaia/utils'
 import { connect } from '../../dist/core/middleware/connect.js'
 
 import { defineMiddleware } from '../../dist/core/middleware.js'
-import { RpcLifecycleError } from '../../dist/core/errors.js'
+import { RpcLifecycleError } from '@migaia/rpc-contract/errors'
 import { uuid } from '../fixtures/core-role/uuid.js'
 import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
 import { createRuntimePeer } from '../../dist/remote/runtime-api/peer.js'

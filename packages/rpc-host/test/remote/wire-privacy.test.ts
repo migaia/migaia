@@ -6,11 +6,12 @@ import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
 import { createComposedEndpoint } from '../../dist/core/composed.js'
 import { connect } from '../../dist/core/middleware/connect.js'
 import { hooks } from '../../dist/core/middleware/hooks.js'
-import { serializeRpcError } from '../../dist/core/internal/error-wire-metadata.js'
-import { normalizeRpcEnvelope, RpcContractErrorCode } from '@migaia/rpc-contract'
+import { serializeRpcError } from '../../dist/host/error-wire-metadata.js'
+import { normalizeRpcEnvelope } from '@migaia/rpc-contract'
+import { RpcContractErrorCode } from '@migaia/rpc-contract/error-code'
 import { normalizeRemoteHostCatalog } from '../../dist/remote/contract.js'
 import { streamRoots } from '../streaming/fixture.js'
-import { RpcRemoteLayerErrorCode } from '../../dist/remote/error-code.js'
+import { RpcRemoteLayerErrorCode } from '@migaia/rpc-contract/error-code'
 
 /** An actual protocol read violation retains the supplied local getter failure without a factory. */
 function contractReadFailure(original: Error): Error {

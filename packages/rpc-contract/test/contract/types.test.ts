@@ -1,64 +1,49 @@
 import { describe, expect, it } from 'vitest'
-import { createDescriptor, rpcProtocolV1 } from '../../dist/contract/index.js'
-import type { IRpcEnvelope } from '../../dist/contract/index.js'
-import * as rpcV1 from '@migaia/rpc-contract/v1'
-import type { IRpcEnvelope as IRpcV1Envelope } from '../../dist/contract/v1/index.js'
+import {
+  RpcWireProfile,
+  RpcWireVersion,
+  normalizeRpcFrame,
+  type IRpcSemanticFrame
+} from '@migaia/rpc-contract/protocol'
+import { header } from '../fixtures/core-profile.js'
 
 describe('rpc-contract declarations', () => {
-  it('preserves descriptor literals and exhaustive envelope narrowing', () => {
-    const descriptor = createDescriptor('test.protocol', 7)
-    const id: 'test.protocol' = descriptor.id
-    const version: 7 = descriptor.version
-    expect(() => {
-      // @ts-expect-error descriptor identity is immutable after construction.
-      descriptor.id = 'changed'
-    }).toThrow(TypeError)
-    expect([id, version]).toEqual(['test.protocol', 7])
-    expect(rpcProtocolV1).toBe(rpcV1.rpcProtocol)
-    const v1Id: 'migaia.rpc' = rpcV1.rpcProtocol.id
-    // @ts-expect-error V1 descriptor identity is not a different literal.
-    const v2Id: 'migaia.rpc.v2' = rpcV1.rpcProtocol.id
-    const v1Version: 1 = rpcV1.rpcProtocol.version
-    // @ts-expect-error V1 descriptor version is not assignable to version 2.
-    const v2Version: 2 = rpcV1.rpcProtocol.version
-    void v2Id
-    void v2Version
-    expect(v1Id).toBe('migaia.rpc')
-    expect(v1Version).toBe(1)
-
-    const envelope = rpcProtocolV1.normalize({
-      kind: 'response',
-      ok: true,
-      id: '1',
-      data: {
-        route: {
-          profile: 'migaia.rpc.route',
-          type: 'response',
-          applicationVersion: '1.0',
-          senderId: 'sender',
-          targetId: 'target',
-          method: 'm',
-          sentAt: 0
-        }
-      }
-    })
+  it('preserves sole-profile literals and exhaustive semantic frame narrowing', () => {
+    const id: 'migaia.rpc/2' = RpcWireProfile
+    const major: 2 = RpcWireVersion.major
+    // @ts-expect-error The old profile literal is no longer the sole protocol identity.
+    const legacyId: 'migaia.rpc' = RpcWireProfile
+    // @ts-expect-error The protocol major is not assignable to its retired generation.
+    const legacyVersion: 1 = RpcWireVersion.major
+    void legacyId
+    void legacyVersion
+    expect([id, major]).toEqual(['migaia.rpc/2', 2])
+    const envelope = normalizeRpcFrame({ ...header(), kind: 'result', result: 1 })
     const exhaustive = (value: never): never => value
-    const narrowed = (value: IRpcEnvelope): string => {
-      if (value.kind === 'response') return value.ok ? value.id : value.code
-      if (value.kind === 'request') return value.method
-      if (value.kind === 'discovery') return value.version
-      if (value.kind === 'variation') return value.id
-      if (value.kind === 'stream') return value.id
-      return exhaustive(value)
+    const narrowed = (value: IRpcSemanticFrame): string => {
+      switch (value.kind) {
+        case 'handshake':
+          return value.step
+        case 'call':
+          return value.task.method!
+        case 'group':
+        case 'result':
+        case 'error':
+        case 'cancel':
+        case 'stream':
+        case 'outcome':
+        case 'control':
+        case 'directory':
+          return value.id
+        default:
+          return exhaustive(value)
+      }
     }
-    expect(narrowed(envelope)).toBe('1')
-    const v1Envelope: IRpcV1Envelope = envelope
-    expect(narrowed(v1Envelope)).toBe('1')
-
-    if (envelope.kind === 'response' && envelope.ok) {
-      // @ts-expect-error response-success cannot expose failure-only code.
-      const code: string = envelope.code
-      expect(code).toBeUndefined()
+    expect(narrowed(envelope)).toBe('call-1')
+    if (envelope.kind === 'result') {
+      // @ts-expect-error A successful result cannot expose the failed terminal's error graph.
+      const error: string = envelope.error
+      expect(error).toBeUndefined()
     }
   })
 })

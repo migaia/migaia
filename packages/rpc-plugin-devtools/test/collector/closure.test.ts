@@ -5,7 +5,7 @@ import {
   RpcProbeOutcome,
   RpcProbeKind,
   RpcProbeStage
-} from '@migaia/rpc-host/probe'
+} from '@migaia/rpc-host/plugins/probe'
 import { devtoolsPlugin } from '../../src/index.js'
 import type { IRpcDevtoolsWatchBatch, IRpcDevtoolsServiceApi } from '../../src/contract/service.js'
 import { NameTable, CarrierTable } from '../../src/collector/intern.js'
@@ -125,11 +125,13 @@ it('reports an open terminal bound and clamps every quantile to the observed max
   }
 })
 
-it('defaults to message and peer and admits physical stages only after selection', () => {
-  /** Default mask retains mandatory logical messages and peer lifecycle without physical overhead. */
+it('defaults to message, peer and forward and admits physical stages only after selection', () => {
+  /** Default mask retains logical messages, peer lifecycle and forwards without physical overhead. */
   const devtools = devtoolsPlugin().collector
   try {
-    expect(readProbeStages(devtools)).toBe((1 << RpcProbeStage.message) | (1 << RpcProbeStage.peer))
+    expect(readProbeStages(devtools)).toBe(
+      (1 << RpcProbeStage.message) | (1 << RpcProbeStage.peer) | (1 << RpcProbeStage.forward)
+    )
     /** Direct views obey the same dynamically selected mask as installed emitters. */
     const view = collectorView()
     view.stage = RpcProbeStage.carrier

@@ -1,6 +1,7 @@
-import type { IRpcHost } from '@migaia/rpc-host'
+import { createRpcHost } from '@migaia/rpc-host'
+import { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'
 import {
-  poolPlugin,
+  pool,
   type IPoolPluginOptions,
   type IRpcPoolControls,
   type IRpcPoolStats,
@@ -9,9 +10,12 @@ import {
 import type * as Pool from '../dist/index.js'
 
 /** Scheduling controls belong to the feature installation on this exact host. */
-declare const host: IRpcHost<unknown>
+declare const task: Parameters<typeof coroutinePlugin>[0]['spawn']
 const options: IPoolPluginOptions = { size: 3, maxQueue: 6 }
-const controls: IRpcPoolControls = poolPlugin(options).controls(host)
+const host = await createRpcHost({
+  plugins: [coroutinePlugin({ spawn: task!, features: [pool(options)] })]
+})
+const controls: IRpcPoolControls = host.coroutine.pool
 const stats: IRpcPoolStats = controls.stats()
 const code: IRpcPoolErrorCode = 'POOL_CLOSED'
 void [stats, code]

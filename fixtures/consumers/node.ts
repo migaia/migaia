@@ -1,10 +1,11 @@
+/** Check real package declarations for a DOM-free Node consumer, including native RPC message IO. */
 // @migaia/storage-web 主入口是 web-only（localStorageHost/sessionStorageHost/document.cookie/
 // IndexedDB 全是浏览器 API），Node 主线程没有这些全局对象——见
 // 但 `memoryStorageHost` 是纯内存后端
 // （Map 实现、SSR/Node/testing 降级目标），经 DOM-free 子路径 `@migaia/storage-web/memory`
 // 单独引入，不把 IDB/WebStorage 的 DOM 类型带进来。
 import { MessageChannel } from 'node:worker_threads'
-import { defineMessageAdapter } from '@migaia/rpc-host/plugin'
+import type { IRpcMessageIO } from '@migaia/rpc-host/sdk'
 import { Logger, type ILogEntry, type ISink } from '@migaia/logger'
 import { createCapabilityHost } from '@migaia/capability'
 import { jsonPlugin } from '@migaia/serialize'
@@ -60,11 +61,32 @@ new Logger({
   ] as const
 })
 
+/** The native channel remains the consumer's resource rather than a second RPC endpoint. */
 const channel = new MessageChannel()
-/** A Node plugin author captures the actual port without constructing another endpoint. */
-const deployment = defineMessageAdapter<unknown>({ open: () => channel.port1 }).deployment({
-  connect: {}
-})
-void deployment
+/** Node adapter authors implement native IO; the SDK alone owns carrier/codec/session behavior. */
+const messageIO: IRpcMessageIO = {
+  /** Native handoff preserves the actual transfer list and the SDK's write-start callback. */
+  send: (value, transfer, options) => {
+    options?.onWriteStart?.()
+    channel.port1.postMessage(value, transfer)
+  },
+  /** The carrier owns this native listener's lifetime through its exact removal receipt. */
+  onMessage: (listener) => {
+    channel.port1.on('message', listener)
+    return () => {
+      channel.port1.off('message', listener)
+    }
+  },
+  /** Native close notification retires the same carrier without a second connection owner. */
+  onClose: (listener) => {
+    channel.port1.on('close', listener)
+    return () => {
+      channel.port1.off('close', listener)
+    }
+  },
+  /** Native cleanup belongs to the original channel endpoint. */
+  close: () => channel.port1.close()
+}
+void messageIO
 channel.port1.close()
 channel.port2.close()

@@ -1,3 +1,7 @@
+/**
+ * Defines client-slot statistics, pool lifecycle controls and caller-selected scheduling options.
+ * These snapshots describe pool admission rather than provider concurrency.
+ */
 import type { IScheduler } from '@migaia/utils/scheduler'
 import type { RpcPoolState } from './text.js'
 

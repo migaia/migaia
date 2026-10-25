@@ -10,8 +10,9 @@ import { defineJsonCodec } from '@migaia/serialize/codecs/json'
 
 import { defineFeature, type IRpcFeature } from '../../dist/core/feature.js'
 import { defineMiddleware } from '../../dist/core/middleware.js'
-import { RpcError, RpcCoreErrorCode } from '../../dist/core/errors.js'
-import { RpcCoreErrorText } from '../../dist/core/error-text.js'
+import { RpcError } from '@migaia/rpc-contract/errors'
+import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
+import { RpcCoreErrorText } from '@migaia/rpc-contract/errors'
 
 /**
  * Native definitions come from actual Host assembly; each composition still owns independent

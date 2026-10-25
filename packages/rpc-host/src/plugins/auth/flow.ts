@@ -1,0 +1,425 @@
+/**
+ * Owns one installed authentication flow's signed-counter windows and request-ID replay retention.
+ * Fixed handshake/envelope hooks verify admitted data; dispatch borrows real business completion.
+ * Native cancellation releases these records without owning Sessions, providers or outcome keys.
+ */
+import type { IAbortSignal } from '@migaia/utils/promise'
+import type {
+  IRpcFlowContext,
+  IRpcEnvelopeContext,
+  IRpcPreparedMessage,
+  IRpcDispatchContext,
+  IRpcDispatchOutcome
+} from '@migaia/rpc-contract/interfaces'
+import {
+  RpcProbeStage,
+  RpcProbeAuthentication,
+  RpcProbeDirection,
+  RpcProbeObservationKind,
+  RpcDispatchDrop
+} from '@migaia/rpc-contract/interfaces'
+import type { IRpcHandshake, IRpcPortableValue } from '@migaia/rpc-contract/protocol'
+import { RpcWireHandshakeStep, RpcWireKind } from '@migaia/rpc-contract/protocol'
+import {
+  RpcAuthenticationError,
+  RpcConfigurationError,
+  RpcCoreErrorText,
+  RpcProviderRejectionReason
+} from '@migaia/rpc-contract/errors'
+import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
+import {
+  createRpcAuthenticationError,
+  createRpcConfigurationError,
+  createRpcError,
+  isLocalRpcError
+} from '../../host/error-owner.js'
+import { registerLocalErrorWireSummary } from '../../host/error-wire-metadata.js'
+import { splitRpcPreparedMetadata, joinRpcPreparedMetadata } from '../../sdk/carrier/prepared.js'
+import type { IRpcFlowInstallation, IRpcFlowSetupContext } from '../../sdk/types.js'
+import { AuthenticationRepresentation } from './representation.js'
+import { RpcAuthenticationEnvelope as Format } from './constants.js'
+import { RpcAuthenticationText as Text } from './text.js'
+import {
+  admitAuthenticationCounter,
+  createAuthenticationNonce,
+  readAuthenticationEnvelope,
+  wrapAuthenticationEnvelope
+} from './envelope.js'
+import { registerAuthenticationCounterSetter } from './counter.js'
+import type { IAuthenticationCounterWindow, IRpcAuthenticationOptions } from './types.js'
+import { RequestReplayLedger, type IRequestReplaySource } from './request-replay.js'
+import { readAuthenticationHandshake, wrapAuthenticationHandshake } from './handshake.js'
+
+/** One original physical source owns its pinned nonce/window and exact retirement receipt. */
+type IAuthenticationSource = IRequestReplaySource & {
+  id: string
+  signal: IAbortSignal
+  window?: IAuthenticationCounterWindow
+  /** A rebuilt logical source must prove this receiver's new challenge before becoming ready. */
+  challenge?: string
+  /** The peer's signed challenge is pinned until this exact physical source retires. */
+  remoteChallenge?: string
+  abort(): void
+}
+
+/** All transforms, outgoing sequence and inbound replay windows belong to this installed plugin. */
+export class RpcAuthenticationFlow {
+  /** Immutable callbacks were captured once by the canonical configuration reader. */
+  readonly #config: IRpcAuthenticationOptions
+  /** The existing replay wrapper preserves explicit string/byte transform categories. */
+  readonly #representation: AuthenticationRepresentation
+  /** One secure nonce belongs to this installation, independent from shared configuration identity. */
+  #nonce: string | undefined
+  /** Synchronous uint64 allocation is never rolled back after an asynchronous transform fails. */
+  #counter = 0n
+  /** Actual physical ids index one existing nonce/64-bit window, without discovery/challenge tables. */
+  readonly #sources = new Map<string, IAuthenticationSource>()
+  /** Correlation replay retention is separate from signed-envelope nonce/counter admission. */
+  readonly #requests: RequestReplayLedger
+  /** Native setup cancellation owns all listener and replay-window cleanup for this installation. */
+  readonly #signal: IAbortSignal
+  /** Actual protection facts use the one readonly observer path without exposing replay state. */
+  readonly #observe: IRpcFlowSetupContext['observe']
+  /** Final cleanup prevents a late verifier from repinning a retired source window. */
+  #closed = false
+  /** Fixed hooks are the sole installed authentication behavior; host core imports no auth policy. */
+  readonly value: IRpcFlowInstallation
+
+  /** Capture transforms and the one bounded request ledger without a Peer or native clock. */
+  constructor(
+    config: IRpcAuthenticationOptions,
+    signal: IAbortSignal,
+    observe?: IRpcFlowSetupContext['observe']
+  ) {
+    this.#config = config
+    this.#signal = signal
+    this.#observe = observe
+    this.#requests = new RequestReplayLedger(config.maxReplayEntriesPerPeer)
+    this.#representation = new AuthenticationRepresentation(config.encodedType)
+    this.value = {
+      observationFacts: {
+        authentication: config.encrypt
+          ? RpcProbeAuthentication.encryptSign
+          : config.sign
+            ? RpcProbeAuthentication.sign
+            : RpcProbeAuthentication.none
+      },
+      hooks: {
+        handshake: this.#handshake,
+        envelope: { outbound: this.#outbound, inbound: this.#inbound },
+        dispatch: { inbound: this.#dispatch }
+      },
+      dispose: this.close
+    }
+    registerAuthenticationCounterSetter(this.value, (counter) => {
+      this.#counter = counter
+    })
+    signal.addEventListener('abort', this.close, { once: true })
+    if (signal.aborted) this.close()
+  }
+
+  /** Keep an admitted request ID until actual business/stream completion and bounded retention. */
+  readonly #dispatch = (
+    context: IRpcDispatchContext,
+    next: () => Promise<IRpcDispatchOutcome>
+  ): Promise<IRpcDispatchOutcome> => {
+    this.#assert(context)
+    /** Only the existing accepted physical source owns this correlation and its retirement. */
+    const source = this.#source(context)
+    /** Quota identity comes from actual business admission, after handshake publishes the peer. */
+    const peerKey = context.session?.peerId ?? context.carrierId
+    /** The admitted caller stays distinct from the immediate physical source and public task ID. */
+    const key = JSON.stringify([
+      context.carrierId,
+      context.envelope.route.senderId,
+      context.envelope.id
+    ])
+    /** Lazy expiry uses the same monotonic clock for admission and actual completion. */
+    const now = performance.now()
+    if (this.#requests.has(key, now)) return Promise.resolve(RpcDispatchDrop)
+    /** Original entry identity prevents late completion from touching a reused correlation. */
+    const entry = this.#requests.admit(source, peerKey, key, now, context.exclusive === true)
+    if (!entry) {
+      void this.#notify(context, peerKey, key)
+      /**
+       * Local capacity diagnostics retain their detail; this exact refusal has the original wire
+       * summary.
+       */
+      const error = createRpcError(
+        RpcCoreErrorCode.overloaded,
+        RpcCoreErrorText.requestReplayLedgerIsFull
+      )
+      registerLocalErrorWireSummary(
+        error,
+        RpcCoreErrorCode.overloaded,
+        RpcCoreErrorText.providerFailed,
+        { preserveSerializedError: true }
+      )
+      throw error
+    }
+    void context.completion
+      .then(() => this.#requests.settle(key, entry, performance.now()))
+      .catch(context.report)
+    return next()
+  }
+
+  /** Replay refusal preserves the original local observer contract without changing its reply. */
+  async #notify(context: IRpcDispatchContext, peerKey: string, key: string): Promise<void> {
+    /** A lexical callback keeps the configured observer's original undefined receiver. */
+    const observer = this.#config.onRejected
+    if (!observer) return
+    try {
+      await observer(
+        Object.freeze({
+          verifiedPeerKey: peerKey,
+          controllerKey: key,
+          method: context.envelope.task.method ?? context.envelope.kind,
+          reason:
+            context.envelope.kind === RpcWireKind.group
+              ? RpcProviderRejectionReason.groupReplayFull
+              : RpcProviderRejectionReason.replayLedgerFull
+        })
+      )
+    } catch (cause) {
+      context.report(
+        createRpcError(
+          RpcCoreErrorCode.internal,
+          RpcCoreErrorText.providerAdmissionObserverFailed,
+          cause
+        )
+      )
+    }
+  }
+
+  /**
+   * Native credentials are checked only by the real handshake verifier; no principal grants
+   * dispatch.
+   */
+  readonly #handshake = async (
+    frame: IRpcHandshake,
+    context: IRpcFlowContext
+  ): Promise<IRpcHandshake> => {
+    this.#assert(context)
+    if (frame.step === RpcWireHandshakeStep.reject) return frame
+    try {
+      if (context.direction === 'outbound') {
+        /** One captured resolver borrows the native owner's exact connection-local token. */
+        const configured = this.#config.credentials
+        /** Static credentials retain their original value; resolver completion cannot outlive close. */
+        const credentials =
+          typeof configured === 'function' ? await configured(context) : configured
+        this.#assert(context)
+        if (!this.#config.sign)
+          return credentials === undefined ? frame : { ...frame, auth: credentials }
+        /** The same source record owns both replay admission and handshake freshness. */
+        const source = this.#source(context)
+        source.challenge ??= createAuthenticationNonce()
+        return {
+          ...frame,
+          auth: wrapAuthenticationHandshake(credentials, source.challenge, source.remoteChallenge)
+        }
+      }
+      /** Credentials-only native authentication retains its original literal auth representation. */
+      const credentials = this.#config.verify
+        ? this.#handshakeCredentials(frame.auth, frame.step, context)
+        : frame.auth
+      /** Only an explicit verifier result can grant a principal; wire identity never supplies it. */
+      const verified = await this.#config.verifyCredentials?.(credentials, frame.peer, context)
+      this.#assert(context)
+      if (verified !== null && typeof verified === 'object' && !Array.isArray(verified)) {
+        /** Formerly ignored primitive returns retain their original non-authoritative meaning. */
+        const principalId = (verified as { principalId?: unknown }).principalId
+        if (typeof principalId === 'string' && principalId.length > 0 && context.handshakeResult)
+          context.handshakeResult.authentication = { principalId }
+      }
+      return frame
+    } catch {
+      /**
+       * Original native credential failures are deliberately withheld from report/cause
+       * diagnostics.
+       */
+      throw createRpcAuthenticationError(Text.inboundFrameAuthenticationFailed)
+    }
+  }
+
+  /** A signed accept must echo this exact receiver's challenge, not a prior source's valid packet. */
+  #handshakeCredentials(
+    auth: IRpcPortableValue | undefined,
+    step: IRpcHandshake['step'],
+    context: IRpcFlowContext
+  ): IRpcPortableValue | undefined {
+    /** The source already owns its nonce window and cancellation remover. */
+    const source = this.#source(context)
+    source.challenge ??= createAuthenticationNonce()
+    /** Verification of the outer signed envelope precedes this hook and its private auth fields. */
+    const binding = readAuthenticationHandshake(auth)
+    if (
+      (source.remoteChallenge !== undefined && source.remoteChallenge !== binding.challenge) ||
+      (binding.replyChallenge !== undefined && binding.replyChallenge !== source.challenge) ||
+      (step === RpcWireHandshakeStep.accept && binding.replyChallenge !== source.challenge)
+    )
+      throw createRpcAuthenticationError(Text.authenticationReplayBindingInvalid)
+    source.remoteChallenge = binding.challenge
+    return binding.credentials
+  }
+
+  /**
+   * Allocate replay binding before encryption, then sign the entire original metadata/manifest
+   * once.
+   */
+  readonly #outbound = async (
+    value: IRpcPreparedMessage,
+    context: IRpcEnvelopeContext
+  ): Promise<IRpcPreparedMessage> => {
+    this.#assert(context)
+    if (!this.#config.sign) return value
+    try {
+      if (this.#counter === Format.maximumCounter)
+        throw createRpcConfigurationError(Text.authenticationCounterExhausted)
+      this.#nonce ??= createAuthenticationNonce()
+      /** The complete native backing digest/length manifest stays inside both transforms. */
+      const bound = this.#representation.bound(
+        wrapAuthenticationEnvelope(joinRpcPreparedMetadata(value), this.#nonce, ++this.#counter)
+      )
+      /** Preserve original encrypt-before-sign order without lending the mutable owner as receiver. */
+      const encrypted = this.#config.encrypt
+        ? await (0, this.#config.encrypt)(bound, context)
+        : bound
+      /** The exact configured callback is held across suspension independently from caller mutation. */
+      const sign = this.#config.sign
+      const protectedValue = await sign(encrypted, context)
+      this.#assert(context)
+      /** The actual protected representation is observed before any physical transfer may detach it. */
+      const prepared = {
+        message: this.#representation.pack(protectedValue),
+        sidecars: value.sidecars
+      }
+      this.#protected(context, prepared.message)
+      return prepared
+    } catch (error) {
+      if (
+        isLocalRpcError(error, RpcAuthenticationError) ||
+        isLocalRpcError(error, RpcConfigurationError)
+      )
+        throw error
+      throw createRpcAuthenticationError(Text.outboundFrameAuthenticationFailed, error)
+    }
+  }
+
+  /** Verify/decrypt and complete the sole SDK restore before committing the original replay bitmap. */
+  readonly #inbound = async (
+    value: IRpcPreparedMessage,
+    context: IRpcEnvelopeContext
+  ): Promise<IRpcPreparedMessage> => {
+    this.#assert(context)
+    if (!this.#config.verify) return value
+    this.#protected(context, value.message)
+    /** Capture actual physical ownership before any asynchronous user verifier can suspend. */
+    const source = this.#source(context)
+    /** Only the actual cached restore's native failure keeps its original classification. */
+    let validationFailure: unknown
+    /** A supported thrown undefined must remain distinct from no integrity failure. */
+    let validationFailed = false
+    try {
+      /** Signature verification precedes decryption exactly as in the original middleware. */
+      const verified = await (0, this.#config.verify)(
+        this.#representation.unpack(value.message),
+        context
+      )
+      /** Decrypted replay fields remain untrusted until their existing binding grammar passes. */
+      const decrypted = this.#config.decrypt
+        ? await (0, this.#config.decrypt)(verified, context)
+        : verified
+      this.#assert(context)
+      if (this.#sources.get(source.id) !== source || source.signal.aborted)
+        throw createRpcAuthenticationError(Text.authenticationReplayBindingInvalid)
+      /** One original nonce and one counter bind the complete prepared native metadata. */
+      const envelope = readAuthenticationEnvelope(this.#representation.plaintext(decrypted))
+      /**
+       * This same root identity will be returned to Session, which reuses its cached restore
+       * Promise.
+       */
+      const inner = splitRpcPreparedMetadata(
+        this.#representation.metadata(envelope.payload),
+        value.sidecars
+      )
+      try {
+        if ((await context.restore(inner)) === undefined) return inner
+      } catch (error) {
+        validationFailed = true
+        validationFailure = error
+        throw error
+      }
+      this.#assert(context)
+      if (this.#sources.get(source.id) !== source || source.signal.aborted)
+        throw createRpcAuthenticationError(Text.authenticationReplayBindingInvalid)
+      source.window ??= { nonce: envelope.nonce, high: 0n, bits: new BigUint64Array(1) }
+      if (source.window.nonce !== envelope.nonce)
+        throw createRpcAuthenticationError(Text.authenticationReplayBindingInvalid)
+      admitAuthenticationCounter(source.window, BigInt(envelope.counter))
+      return inner
+    } catch (error) {
+      if (validationFailed && error === validationFailure) throw error
+      if (isLocalRpcError(error, RpcAuthenticationError)) throw error
+      throw createRpcAuthenticationError(Text.inboundFrameAuthenticationFailed, error)
+    }
+  }
+
+  /** Accepted physical lifecycle owns one replay state and remover, never caller-visible metadata. */
+  #source(context: IRpcFlowContext): IAuthenticationSource {
+    /** Source identity is supplied by Session before looking at signed or business fields. */
+    let source = this.#sources.get(context.carrierId)
+    if (source) return source
+    source = {
+      id: context.carrierId,
+      replayKeys: new Set(),
+      signal: context.connectionSignal ?? context.signal,
+      abort: () => undefined
+    }
+    /** The record carries its compact id so this callback captures only its explicit owner/record. */
+    const record = source
+    record.abort = () => {
+      this.#retire(record)
+    }
+    this.#sources.set(record.id, record)
+    record.signal.addEventListener('abort', record.abort, { once: true })
+    if (record.signal.aborted) record.abort()
+    return record
+  }
+
+  /** Check the real operation/connection lifetime after every asynchronous authentication phase. */
+  #assert(context: IRpcFlowContext): void {
+    if (this.#closed || context.signal.aborted || context.connectionSignal?.aborted)
+      throw createRpcAuthenticationError(Text.authenticationReplayBindingInvalid)
+  }
+  /** Observe actual sign/verify inputs without inferring protection from an opaque object's shape. */
+  #protected(context: IRpcFlowContext, content: unknown): void {
+    this.#observe?.({
+      kind: RpcProbeObservationKind.event,
+      namespace: context.namespace,
+      carrierId: context.carrierId,
+      peerId: context.session?.peerId,
+      data: {
+        stage: RpcProbeStage.protected,
+        direction:
+          context.direction === 'outbound' ? RpcProbeDirection.outbound : RpcProbeDirection.inbound,
+        peerId: context.session?.peerId,
+        content
+      }
+    })
+  }
+  /** Retire only this source and drop its pinned nonce/bitmap before late verification can return. */
+  #retire(source: IAuthenticationSource): void {
+    if (this.#sources.get(source.id) !== source) return
+    this.#sources.delete(source.id)
+    this.#requests.retire(source)
+    source.signal.removeEventListener('abort', source.abort)
+  }
+  /** Native rollback/final close revokes every original source receipt without a second state table. */
+  readonly close = (): void => {
+    if (this.#closed) return
+    this.#closed = true
+    this.#signal.removeEventListener('abort', this.close)
+    for (const source of this.#sources.values()) this.#retire(source)
+  }
+}

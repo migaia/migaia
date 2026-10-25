@@ -1,6 +1,9 @@
+/**
+ * Prepares one supervised Process launch, retaining its original signal and optional private
+ * bootstrap allocation. Successful native streams are lent to the shared SDK byte lifecycle.
+ */
 import type { IProcessLauncher, IProcessSpec } from '@migaia/supervision/process'
-import { holdAdapterLaunch } from '@migaia/rpc-host/plugin'
-import { readAdapterAbortReason as resolveAbortReason } from '@migaia/rpc-host/plugin'
+import { readRpcLaunchFacts, resolveAbortReason } from '@migaia/rpc-host/sdk'
 import {
   prepareProcessRuntimeBootstrap,
   invalidProcessRuntimeBootstrap
@@ -31,12 +34,12 @@ export class AdapterProcessLaunch {
   ) {
     this.#context = context
     /** Only the original held supervisor request can expose Core's private launch context. */
-    const runtime = holdAdapterLaunch(context).proposal
+    const runtime = readRpcLaunchFacts(context)
     /** Keep the original short-circuit reads of the caller's explicit bootstrap option. */
     const runtimeApiBootstrap = runtime
       ? {
-          name: runtime.childName ?? options.runtimeApiBootstrap?.name ?? runtime.self.name,
-          parentInstanceId: runtime.self.instanceId,
+          name: runtime.childName ?? options.runtimeApiBootstrap?.name ?? runtime.parent.name,
+          parentInstanceId: runtime.parent.instanceId,
           ...(runtime.generation ? { generation: runtime.generation } : {})
         }
       : options.runtimeApiBootstrap

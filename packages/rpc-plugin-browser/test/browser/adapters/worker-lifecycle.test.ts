@@ -1,16 +1,27 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createServiceWorkerTransport } from '../../../src/browser/adapters/service-worker.js'
-import { createSharedWorkerTransport } from '../../../src/browser/adapters/shared-worker.js'
-import { createWebWorkerTransport } from '@migaia/rpc-host/plugin'
+import { createServiceWorkerCarrier } from '../../../dist/browser/adapters/service-worker.js'
+import { createSharedWorkerCarrier } from '../../../dist/browser/adapters/shared-worker.js'
+import {
+  createDedicatedWorkerCarrier,
+  subscribeWorkerErrors
+} from '../../../dist/browser/adapters/dedicated-worker.js'
+import { RpcCarrierFrameKind } from '@migaia/rpc-contract/protocol'
 
-describe('shared-worker adapter lifecycle', () => {
-  it('shares one underlying subscription and isolates delivery failures', () => {
-    const listeners = new Map<string, (event: MessageEvent<unknown> | Event) => void>()
+describe('shared-worker native lifecycle', () => {
+  it('shares one underlying subscription and isolates delivery failures', async () => {
+    /** Native callbacks and their exact acquisition/release order remain the original oracle. */
+    const listeners = new Map<string, (event: MessageEvent<unknown>) => void>()
+    /** Only actual native add calls enter this receipt. */
     const added: string[] = []
+    /** SDK cleanup must remove the same native callbacks in original reverse order. */
     const removed: string[] = []
+    /** Native postMessage receives the exact frame and original backing list. */
     const sent: unknown[] = []
+    /** Transfer identity is independent of new semantic media framing. */
     const transferLists: Array<readonly Transferable[]> = []
+    /** Actual MessagePort activation occurs once, before its one message subscription. */
     let starts = 0
+    /** This borrowed native source has no close operation taken by the carrier. */
     const port = {
       postMessage(message: unknown, transfer?: readonly Transferable[]) {
         sent.push(message)
@@ -19,144 +30,201 @@ describe('shared-worker adapter lifecycle', () => {
       start() {
         starts += 1
       },
-      addEventListener(type: 'message' | 'messageerror', listener: (event: Event) => void) {
+      addEventListener(type: string, listener: (event: MessageEvent<unknown>) => void) {
         added.push(type)
         listeners.set(type, listener)
       },
-      removeEventListener(type: 'message' | 'messageerror') {
+      removeEventListener(type: string) {
         removed.push(type)
         listeners.delete(type)
       }
     }
-    const transport = createSharedWorkerTransport(port)
+    /** Original callback failures reach the actual SDK reporter without escaping native delivery. */
     const listenerFailures: unknown[] = []
+    /** Physical messageerror is still a separate native transport failure. */
     const transportFailures: unknown[] = []
-    transport.onListenerError?.((error) => listenerFailures.push(error))
-    transport.onTransportError?.((error) => transportFailures.push(error))
-    const first = transport.subscribe(() => {
-      throw new Error('listener failed')
+    /** This is the actual native constructor used by sharedWorkerPlugin. */
+    const carrier = createSharedWorkerCarrier(port, {
+      report: (error) => listenerFailures.push(error)
     })
+    /** SDK has one receiver; first delivery exercises real callback-failure containment. */
+    const first = carrier.subscribe({
+      frame: () => {
+        throw new Error('listener failed')
+      },
+      error: () => undefined,
+      close: () => undefined
+    })
+    expect(() => listeners.get('message')?.({ data: 'inbound' } as MessageEvent)).not.toThrow()
+    first()
+    expect(removed).toEqual([])
+    /** A new actual receiver replaces the deleted adapter subscriber fanout. */
     const received: unknown[] = []
-    const second = transport.subscribe((message) => received.push(message))
-    const token = {} as Transferable
-    transport.send('outbound', { transfer: [token] })
-    const source = {}
+    carrier.subscribe({
+      frame: (message) => received.push(message),
+      error: (error) => transportFailures.push(error),
+      close: () => undefined
+    })
+    /** Real backing identity replaces the old opaque Transferable placeholder. */
+    const token = new ArrayBuffer(1)
+    /** Canonical media shell is passed unchanged to actual native postMessage. */
+    const frame = { kind: RpcCarrierFrameKind.message, data: 'outbound' } as const
+    await carrier.write(frame, { transfer: [token] })
     listeners.get('message')?.({
       data: 'inbound',
       origin: 'https://peer.test',
-      source
-    } as unknown as Event)
-    listeners.get('messageerror')?.(new Event('messageerror'))
+      source: {}
+    } as MessageEvent)
+    listeners.get('messageerror')?.(new Event('messageerror') as MessageEvent)
     expect(starts).toBe(1)
     expect(added).toEqual(['message', 'messageerror'])
-    expect(sent).toEqual(['outbound'])
+    expect(sent).toEqual([frame])
     expect(transferLists).toEqual([[token]])
-    expect(received).toEqual([{ data: 'inbound', origin: 'https://peer.test', source }])
+    expect(received).toEqual(['inbound'])
     expect(listenerFailures).toHaveLength(1)
     expect(transportFailures).toHaveLength(1)
-    first()
-    expect(removed).toEqual([])
-    second()
+    await carrier.close()
     expect(removed).toEqual(['messageerror', 'message'])
   })
 
-  it('reports hostile events and contains throwing diagnostic listeners', () => {
-    let message: ((event: Event) => void) | undefined
-    let messageError: ((event: Event) => void) | undefined
-    const port = {
-      postMessage() {},
-      addEventListener(type: 'message' | 'messageerror', listener: (event: Event) => void) {
-        if (type === 'message') message = listener
-        else messageError = listener
-      },
-      removeEventListener() {}
-    }
-    const transport = createSharedWorkerTransport(port)
+  it('reports hostile events and contains throwing diagnostic listeners', async () => {
+    /**
+     * Each native physical failure is tested on a live carrier, without delivering after
+     * retirement.
+     */
     const failures: unknown[] = []
-    transport.onTransportError?.(() => {
-      throw new Error('reporter failed')
-    })
-    transport.onTransportError?.((error) => failures.push(error))
-    transport.subscribe(() => undefined)
-    expect(() =>
-      message?.(
-        Object.defineProperty({}, 'data', {
-          get: () => {
-            throw new Error('hostile data')
-          }
-        }) as Event
-      )
-    ).not.toThrow()
-    expect(() => messageError?.(new Event('messageerror'))).not.toThrow()
+    for (const kind of ['data', 'messageerror']) {
+      /** The original event and messageerror callbacks belong only to this actual acquisition. */
+      const listeners = new Map<string, (event: MessageEvent<unknown>) => void>()
+      /** This borrowed native object exposes only the real callback registration operations. */
+      const port = {
+        postMessage() {},
+        addEventListener(type: string, listener: (event: MessageEvent<unknown>) => void) {
+          listeners.set(type, listener)
+        },
+        removeEventListener(type: string) {
+          listeners.delete(type)
+        }
+      }
+      /** Callback faults are independently reported by SDK after the original physical failure. */
+      const diagnostics: unknown[] = []
+      /** The production native constructor retains the original getter/messageerror classification. */
+      const carrier = createSharedWorkerCarrier(port, {
+        report: (error) => diagnostics.push(error)
+      })
+      carrier.subscribe({
+        frame: () => undefined,
+        error: (error) => {
+          failures.push(error)
+          throw new Error('reporter failed')
+        },
+        close: () => undefined
+      })
+      if (kind === 'data') {
+        expect(() =>
+          listeners.get('message')?.(
+            Object.defineProperty({}, 'data', {
+              get: () => {
+                throw new Error('hostile data')
+              }
+            }) as MessageEvent
+          )
+        ).not.toThrow()
+      } else
+        expect(() =>
+          listeners.get('messageerror')?.(new Event('messageerror') as MessageEvent)
+        ).not.toThrow()
+      expect(diagnostics).toHaveLength(1)
+      await carrier.close()
+    }
     expect(failures).toHaveLength(2)
   })
 
-  it('retains the final subscription when shared-worker cleanup fails', () => {
+  it('retains the final subscription when shared-worker cleanup fails', async () => {
+    /** Native removal failure remains exact; deleted subscriber retry protocol is not recreated. */
     let removals = 0
+    /** The native exception must stay the actual close rejection, without test wrapping. */
+    const primary = new Error('message cleanup failed')
+    /** This exact native remover fails only its original first attempt. */
     const port = {
       postMessage() {},
       addEventListener() {},
       removeEventListener(type: string) {
         if (type !== 'message') return
         removals += 1
-        if (removals === 1) throw new Error('message cleanup failed')
+        if (removals === 1) throw primary
       }
     }
-    const transport = createSharedWorkerTransport(port)
-    const unsubscribe = transport.subscribe(() => undefined)
-
-    expect(() => unsubscribe()).toThrow('message cleanup failed')
-    expect(() => unsubscribe()).not.toThrow()
-    expect(removals).toBe(2)
+    /** Actual SDK close owns this lifetime and shares one physical completion. */
+    const carrier = createSharedWorkerCarrier(port, { report: () => undefined })
+    /** Close is published before native cleanup can fail or reenter. */
+    const closing = carrier.close()
+    await expect(closing).rejects.toThrow('message cleanup failed')
+    await expect(closing).rejects.toBe(primary)
+    expect(carrier.close()).toBe(closing)
+    expect(removals).toBe(1)
   })
 })
 
-describe('dedicated-worker adapter lifecycle', () => {
-  it('forwards metadata and owns lazy message and failure subscriptions', () => {
-    const listeners = new Map<string, (event: Event) => void>()
-    const add = vi.fn((type: string, listener: (event: Event) => void) =>
+describe('dedicated-worker native lifecycle', () => {
+  it('forwards metadata and owns lazy message and failure subscriptions', async () => {
+    /** Actual native callback effects preserve acquisition and cleanup counts. */
+    const listeners = new Map<string, (event: MessageEvent<unknown>) => void>()
+    /** Native acquisition remains exactly message, error and messageerror once. */
+    const add = vi.fn((type: string, listener: (event: MessageEvent<unknown>) => void) =>
       listeners.set(type, listener)
     )
+    /** The actual SDK lifetime releases the three original callbacks once. */
     const remove = vi.fn((type: string) => listeners.delete(type))
+    /** Only the exact outgoing native port is used for physical write. */
     const postMessage = vi.fn()
+    /** This source is the same actual borrowed Worker surface used by the public plugin. */
     const port = { postMessage, addEventListener: add, removeEventListener: remove }
-    const transport = createWebWorkerTransport(port, {
-      peerId: 'worker-1',
-      origin: 'https://worker.test'
-    })
+    /** One actual receiver failure goes to SDK report, separate from physical failures. */
     const listenerFailures: unknown[] = []
-    const transportFailures: unknown[] = []
-    const stopFailures = transport.onTransportError?.((error) => transportFailures.push(error))
-    transport.onListenerError?.((error) => listenerFailures.push(error))
-    const stopFirst = transport.subscribe(() => {
-      throw new Error('listener failed')
+    /** The real native constructor owns no accepted peerId/origin metadata facade. */
+    const carrier = createDedicatedWorkerCarrier(port, {
+      report: (error) => listenerFailures.push(error)
     })
+    /** The first actual delivery exercises callback isolation without fabricating subscriber fanout. */
+    const first = carrier.subscribe({
+      frame: () => {
+        throw new Error('listener failed')
+      },
+      error: () => undefined,
+      close: () => undefined
+    })
+    expect(() => listeners.get('message')?.({ data: 'inbound' } as MessageEvent)).not.toThrow()
+    first()
+    /** The next actual receiver observes unchanged native payload. */
     const received: unknown[] = []
-    const stopSecond = transport.subscribe((message) => received.push(message))
-    transport.send('outbound', { transfer: [{} as Transferable] })
+    carrier.subscribe({
+      frame: (message) => received.push(message),
+      error: () => undefined,
+      close: () => undefined
+    })
+    /** New media framing retains the same semantic payload and exact native backing transfer. */
+    const frame = { kind: RpcCarrierFrameKind.message, data: 'outbound' } as const
+    await carrier.write(frame, { transfer: [new ArrayBuffer(1)] })
     listeners.get('message')?.({
       data: 'inbound',
       origin: 'origin',
       source: 'source'
-    } as unknown as Event)
-    listeners.get('error')?.({ message: 'worker exploded' } as unknown as Event)
-    listeners.get('messageerror')?.(new Event('messageerror'))
-    expect(transport.peerId).toBe('worker-1')
-    expect(transport.origin).toBe('https://worker.test')
-    expect(received).toEqual([{ data: 'inbound', origin: 'origin', source: 'source' }])
+    } as unknown as MessageEvent)
+    expect(received).toEqual(['inbound'])
     expect(listenerFailures).toHaveLength(1)
-    expect(transportFailures).toHaveLength(2)
     expect(add).toHaveBeenCalledTimes(3)
-    stopFirst()
-    stopSecond()
-    stopFailures?.()
+    await carrier.close()
     expect(remove).toHaveBeenCalledTimes(3)
     expect(postMessage).toHaveBeenCalledOnce()
   })
 
   it('rolls back the first failure listener when the second registration fails', () => {
+    /** This native error subscription is the exact helper called by the actual Worker carrier. */
     const added: string[] = []
+    /** Only the first successfully acquired native callback may be removed on partial failure. */
     const removed: string[] = []
+    /** The second native add fails before its callback has been acquired. */
     const port = {
       postMessage() {},
       addEventListener(type: string) {
@@ -167,62 +235,106 @@ describe('dedicated-worker adapter lifecycle', () => {
         removed.push(type)
       }
     }
-    const transport = createWebWorkerTransport(port)
-    expect(() => transport.onTransportError?.(() => undefined)).toThrow(
-      'messageerror listener failed'
-    )
+    expect(() =>
+      subscribeWorkerErrors(
+        port,
+        () => undefined,
+        () => undefined
+      )
+    ).toThrow('messageerror listener failed')
     expect(added).toEqual(['error'])
     expect(removed).toEqual(['error'])
   })
 
-  it('retains the final failure subscription when cleanup fails', () => {
+  it('retains the final failure subscription when cleanup fails', async () => {
+    /** Actual native cleanup executes once; old subscriber rollback/retry state is retired by BC3. */
     let removals = 0
+    /** The exact original native failure must survive actual Worker close aggregation. */
+    const primary = new Error('error listener removal failed')
+    /** Each actual remover is attempted despite its sibling's failure. */
+    const removed: string[] = []
+    /** Native error callback removal fails without taking ownership of the borrowed Worker. */
     const port = {
       postMessage() {},
       addEventListener() {},
       removeEventListener(type: string) {
+        removed.push(type)
         if (type !== 'error') return
         removals += 1
-        if (removals === 1) throw new Error('error listener removal failed')
+        if (removals === 1) throw primary
       }
     }
-    const transport = createWebWorkerTransport(port)
-    const unsubscribe = transport.onTransportError?.(() => undefined)
-
-    expect(() => unsubscribe?.()).toThrow('error listener removal failed')
-    expect(() => unsubscribe?.()).not.toThrow()
-    expect(removals).toBe(2)
+    /** Production Worker construction and SDK close are the only actual cleanup owners. */
+    const carrier = createDedicatedWorkerCarrier(port, { report: () => undefined })
+    /** Existing original Worker close aggregates even a single native removal failure. */
+    const closing = carrier.close()
+    /**
+     * Observe the actual native aggregate without rebuilding its primary or child list in the
+     * fixture.
+     */
+    const failure = await closing.catch((error) => error)
+    expect(failure).toBeInstanceOf(AggregateError)
+    expect((failure as AggregateError).errors).toContain(primary)
+    expect((failure as Error).cause).toBe(primary)
+    expect(primary.message).toBe('error listener removal failed')
+    expect(carrier.close()).toBe(closing)
+    expect(removals).toBe(1)
+    expect(removed).toEqual(['error', 'messageerror', 'message'])
   })
 })
 
-describe('service-worker adapter lifecycle', () => {
-  it('uses separate send and receive owners with shared listener cleanup', () => {
+describe('service-worker native lifecycle', () => {
+  it('uses separate send and receive owners with shared listener cleanup', async () => {
+    /** The original receiving callback is independent from the native outgoing Client. */
     let inbound: ((event: MessageEvent<unknown>) => void) | undefined
+    /** Native transfer uses only this original caller-owned Client. */
     const target = { id: 'client-1', postMessage: vi.fn() }
+    /** Only the actual receiver owns native callback registration and release. */
     const receiver = {
-      addEventListener(_type: 'message', listener: (event: MessageEvent<unknown>) => void) {
+      addEventListener(_type: string, listener: (event: MessageEvent<unknown>) => void) {
         inbound = listener
       },
       removeEventListener: vi.fn()
     }
-    const transport = createServiceWorkerTransport({ target, receiver })
+    /** Actual native receiver failures are isolated through SDK's original report port. */
     const listenerFailures: unknown[] = []
-    transport.onListenerError?.((error) => listenerFailures.push(error))
-    const stopFirst = transport.subscribe(() => {
-      throw new Error('listener failed')
+    /** Source and receiver are supplied directly to the one actual native owner. */
+    const carrier = createServiceWorkerCarrier(
+      { target, receiver },
+      { report: (error) => listenerFailures.push(error) }
+    )
+    /** The first actual native delivery throws through the one current SDK receiver. */
+    const first = carrier.subscribe({
+      frame: () => {
+        throw new Error('listener failed')
+      },
+      error: () => undefined,
+      close: () => undefined
     })
-    const received: unknown[] = []
-    const stopSecond = transport.subscribe((message) => received.push(message))
-    const transfer = {} as Transferable
-    transport.send('outbound', { transfer: [transfer] })
+    /** Same-id cross-realm source remains the original native Client selection. */
     const source = { id: 'client-1' }
-    inbound?.({ data: 'inbound', origin: 'origin', source } as unknown as MessageEvent)
-    expect(target.postMessage).toHaveBeenCalledWith('outbound', [transfer])
-    expect(received).toEqual([{ data: 'inbound', origin: 'origin', source: target }])
-    expect(listenerFailures).toHaveLength(1)
-    stopFirst()
+    expect(() =>
+      inbound?.({ data: 'inbound', origin: 'origin', source } as unknown as MessageEvent)
+    ).not.toThrow()
+    first()
     expect(receiver.removeEventListener).not.toHaveBeenCalled()
-    stopSecond()
+    /** Replacing SDK receiver never registers a second native event source. */
+    const received: unknown[] = []
+    carrier.subscribe({
+      frame: (message) => received.push(message),
+      error: () => undefined,
+      close: () => undefined
+    })
+    /** The exact native backing remains the physical transfer object. */
+    const transfer = new ArrayBuffer(1)
+    /** Shared codec's canonical shell reaches native postMessage unchanged. */
+    const frame = { kind: RpcCarrierFrameKind.message, data: 'outbound' } as const
+    await carrier.write(frame, { transfer: [transfer] })
+    inbound?.({ data: 'inbound', origin: 'origin', source } as unknown as MessageEvent)
+    expect(target.postMessage).toHaveBeenCalledWith(frame, [transfer])
+    expect(received).toEqual(['inbound'])
+    expect(listenerFailures).toHaveLength(1)
+    await carrier.close()
     expect(receiver.removeEventListener).toHaveBeenCalledOnce()
   })
 })

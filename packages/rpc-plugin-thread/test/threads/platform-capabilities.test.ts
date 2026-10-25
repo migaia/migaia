@@ -1,13 +1,14 @@
 import { createUnitBudget } from '@migaia/supervision'
 import { createManualScheduler } from '@migaia/utils/testing'
-import { RpcControl, RpcEnvelopeKind } from '@migaia/rpc-contract'
+import { RpcWireKind, RpcWireControlOperation } from '@migaia/rpc-contract/protocol'
+import { threadFrames } from './frame.js'
 import { describe, expect, it, vi } from 'vitest'
 import { threadPlugin } from '@migaia/rpc-plugin-thread'
 import { createRpcHost } from '@migaia/rpc-host'
-import { runtimeTestHost } from '../../../rpc-host/test/runtime-api/public-host.js'
+import { defineHost } from '@migaia/plugin-host'
 import {
-  createAdapterWebThreadLauncher as createWebThreadLauncher,
-  createAdapterWebThreadChannelFactory as createWebThreadChannelFactory
+  createWebThreadLauncher,
+  createWebThreadChannelFactory
 } from '../../dist/threads/web-launcher.js'
 
 import { nativeFixture } from './fixture.js'
@@ -35,11 +36,11 @@ describe('platform capability admission', () => {
         launcher,
         budget,
         scheduler,
-        channelFactory: createWebThreadChannelFactory({ scheduler }),
+        channelFactory: createWebThreadChannelFactory({ scheduler, report: vi.fn() }),
 
         report: vi.fn()
       }
-      const host = runtimeTestHost({
+      const host = defineHost({
         host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
       })
       expect(launcher.capabilities).toMatchObject({
@@ -113,7 +114,10 @@ describe('platform capability admission', () => {
       capabilities: { ...fixture.launcher.capabilities, 'exit-observation': 'unsupported' as const }
     }
     /** Standalone source Peers use the same supported default health path documented for Web. */
-    const peer = await createRpcHost<{ 'p.read'(value: string): string }>({
+    const peer = await createRpcHost<
+      { 'p.read'(value: string): string },
+      readonly [ReturnType<typeof threadPlugin<'thread'>>]
+    >({
       self: { name: 'health-parent', instanceId: 'health-parent' },
       plugins: [
         threadPlugin({
@@ -127,18 +131,17 @@ describe('platform capability admission', () => {
       report: (error) => fixture.reported.push(error)
     })
     try {
-      expect(await peer.request('p.read', 'before health')).toBe('before health')
+      expect(await peer.thread.request('p.read', 'before health')).toBe('before health')
       scheduler.advance(5000)
       await expect
-        .poll(() =>
-          fixture.frames.some(
-            ({ message }) =>
-              message.kind === RpcEnvelopeKind.variation &&
-              message.data?.route?.variation === RpcControl.ping
+        .poll(async () =>
+          (await threadFrames(fixture.frames)).some(
+            (frame) =>
+              frame.kind === RpcWireKind.control && frame.operation === RpcWireControlOperation.ping
           )
         )
         .toBe(true)
-      expect(await peer.request('p.read', 'after health')).toBe('after health')
+      expect(await peer.thread.request('p.read', 'after health')).toBe('after health')
       expect(fixture.handles).toHaveLength(1)
     } finally {
       await peer.close()

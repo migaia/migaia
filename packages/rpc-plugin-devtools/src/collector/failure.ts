@@ -1,4 +1,8 @@
-import { RpcCoreErrorCode, RPC_CORE_ERROR_SOURCE } from '@migaia/rpc-host'
+/** Classifies RPC and native cancellation or deadline failures for collector statistics. */
+import {
+  RpcCoreErrorCode,
+  RPC_ENDPOINT_ERROR_SOURCE as RPC_CORE_ERROR_SOURCE
+} from '@migaia/rpc-contract/error-code'
 import { CollectorText } from './text.js'
 
 /** Statistics and logging share one classification of the frozen failed observation outcome. */

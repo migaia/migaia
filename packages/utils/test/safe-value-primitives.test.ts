@@ -69,3 +69,20 @@ describe('safe value primitives', () => {
     expect(createSafeRecord()).not.toBe(record)
   })
 })
+
+// RPC-TEST-CCDBF0994A49-C002: original supported atoms received at their canonical owner; old alias/key facets stay NoPASS.
+it('accepts only safe integer values', () => {
+  expect(isSafeIntegerValue(0)).toBe(true)
+  expect(isSafeIntegerValue(Number.MAX_SAFE_INTEGER)).toBe(true)
+  expect(isSafeIntegerValue(Number.NaN)).toBe(false)
+  expect(isSafeIntegerValue(Number.POSITIVE_INFINITY)).toBe(false)
+  expect(isSafeIntegerValue(1.5)).toBe(false)
+})
+
+// RPC-TEST-CCDBF0994A49-C004: original supported atoms received at their canonical owner; old alias/key facets stay NoPASS.
+it('returns a null-prototype dictionary for attacker-controlled keys', () => {
+  const record = createSafeRecord<number>()
+  record['__proto__'] = 1
+  expect(Object.getPrototypeOf(record)).toBeNull()
+  expect(Object.hasOwn(record, '__proto__')).toBe(true)
+})

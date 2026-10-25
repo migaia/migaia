@@ -1,74 +1,61 @@
 # `@migaia/rpc-plugin-devtools`
 
-Observe real host calls through bounded events, cumulative statistics, incremental watches, independent recording, and record import/export.
+Retain real RPC observations as bounded events, cumulative statistics, watches, and independent recordings.
+
+Contract defines pure protocol rules and interfaces. Host owns sessions, providers, and call settlement; transports acquire real carriers. Devtools is a flow plugin consuming readonly observation through the canonical probe implementation, without a business connection. Features such as timeout and retry attach to their owning plugin and execute call policies.
 
 [中文](./README.md) · [Usage guide](./USEGUIDE.en.md)
 
-## Why use it
-
-- Event eviction does not subtract cumulative calls, and clear does not stop independent recording.
-- A `devtoolsPlugin` installs the original collector on the host without another business connection or forwarding emitter.
-- Logical/physical stages, content capture, redaction, and remote content exposure remain explicit choices.
-- Collector NDJSON import/export retains bytes and error chains for local record inspection.
-
-## Start here
+## Collector basics
 
 ```bash
 pnpm add @migaia/rpc-host @migaia/rpc-contract @migaia/rpc-plugin-devtools
 ```
 
-Keep the feature's same collector. This example demonstrates recording controls without fabricating business events:
+The factory creates a caller-owned collector. This demonstrates actual recording controls without manufacturing business events.
 
-```ts doc-test=run
+```ts doc-test=check
 import { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'
 
 const tools = devtoolsPlugin({ maxEvents: 1000 })
-const collector = tools.collector
-const recording = collector.record({ maxEvents: 2000 })
-collector.pause()
-console.log(collector.describe().paused)
-collector.resume()
-console.log(collector.describe().paused)
-const text = collector.exportRecord(recording.stop())
-console.log(collector.importRecord(text).header.version)
-collector.close()
+try {
+  const recording = tools.collector.record({ maxEvents: 2000 })
+  tools.collector.pause()
+  console.log(tools.describe().paused)
+  tools.collector.resume()
+  console.log(tools.describe().paused)
+  const text = tools.collector.exportRecord(recording.stop())
+  console.log(tools.collector.importRecord(text).header.version)
+} finally {
+  tools.close()
+}
 ```
 
-It prints `true`, `false`, and `1`. To observe real traffic, install tools beside the transport with `createRpcHost({ plugins: [transport, tools] })`. transport is the actual result of your chosen [process](../rpc-plugin-process/README.en.md), [thread](../rpc-plugin-thread/README.en.md), [browser](../rpc-plugin-browser/README.en.md), or [coroutine](../rpc-plugin-coroutines/README.en.md) plugin factory.
+It prints `true`, `false`, and `1`. Observe real work by installing the same tools with a selected transport in `createRpcHost({ plugins: [tools, transport] })`; see the guide for a complete Coroutine example. No additional probe forwarding plugin is needed.
 
 ## Installation and ownership
 
-The same tools object can be installed on two hosts, merging both sides' original observations into one collector. A host can install this feature definition only once. host.close withdraws that host's observation without closing the collector; the application explicitly calls collector.close after observation ends. Closing the collector does not close business hosts.
+One tools object may be installed on several real Hosts. Each installation has its own observation lifetime and feeds the same collector. Install that definition once per Host. A Host allows transports with distinct namespaces; calls remain under `host.<ns>.*`, without root call methods added by Devtools.
 
-`tools.query/watch/stats/describe/close` delegate directly to that collector. Use `tools.collector` for pause/resume, clear, record, export/import, and service; they do not create another state owner.
+Host.close removes its observation. The application calls tools.close or collector.close after all uses end. Collector closure does not close business Hosts. Convenience query/watch/stats/describe/close methods borrow the same collector. Use tools.collector for pause/resume, record, clear, export/import, and service.
 
 ## Observation and retention
 
-| API / option                      | Behavior                                                                                                    |
-| --------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `stages`                          | Defaults to message and peer; explicitly enable envelope/encoded/frame/protected/carrier                    |
-| `capture` / `redact`              | Explicit captured stages and synchronous content projection; selecting stages alone does not retain content |
-| `methods` / `sample`              | Method filtering and deterministic sampling; 0 < sample <= 1                                                |
-| `maxEvents`                       | Default 10000, bounding main-ring event count                                                               |
-| `maxContentBytes`                 | Default 8 MiB main-ring content budget, not a process-wide memory bound                                     |
-| `query({ afterSeq, limit, ... })` | Reads the ring by sequence cursor; default limit=1000                                                       |
-| `watch(filters?)`                 | First next subscribes; batches contain events and dropped; return ends only that watch                      |
-| `stats()`                         | Cumulative eligible method counts and latency buckets survive ring eviction                                 |
-| `record({ maxEvents? })`          | Independent retention window; stop produces an exportable record                                            |
-| `pause/resume/clear`              | Pause/restore stages or reset the ring and cumulative values without closing business work                  |
+| API / option         | Purpose                                                                        |
+| -------------------- | ------------------------------------------------------------------------------ |
+| `stages`             | Default message/peer/forward; explicitly enable other physical/envelope stages |
+| `capture` / `redact` | Explicit content capture and synchronous content projection                    |
+| `methods` / `sample` | Exact method selection and deterministic sampling, 0 < sample ≤ 1              |
+| `maxEvents`          | Main ring capacity, default 10000                                              |
+| `maxContentBytes`    | Main content budget, default 8 MiB                                             |
+| `query` / `watch`    | Sequence-based history / future events from first next                         |
+| `stats`              | Cumulative eligible message statistics, unaffected by ring eviction            |
+| `record`             | Independent bounded window, exportable after stop                              |
 
-Watch and recording retain separate bounded windows; loss counters are not zero-loss guarantees. Nested content, detail, and error can remain references. Ring capacity is neither a deep copy of arbitrary object graphs nor a global memory budget. Slow watchers can lose batches; collector.close wakes waiting watches with CLOSED.
+Stages alone do not capture content; capture must be a subset of stages. Raw carrier events require actual carrier observation capability rather than semantic frames relabelled as native data. Read watch/eviction loss alongside events. A main-ring bound is not a process-memory ceiling.
 
-## Retained entries
+The package root exports devtoolsPlugin, collector/options types, and error identity. Record format is migaia-rpc-devtools version 1. Use collector.exportRecord/importRecord; neither persists data nor reinjects imported events. Custom observation uses `@migaia/rpc-host/plugins/probe`; raw carrier deployment uses `@migaia/rpc-host/sdk`.
 
-| Entry | Purpose                                                       |
-| ----- | ------------------------------------------------------------- |
-| Root  | `devtoolsPlugin`, collector/options types, and error identity |
+Applications may explicitly provide collector.service on an existing Host, with their own authorization. Capture and exposeContent are independent settings. Errors use source rpc.devtools while preserving native types and cause. See the [usage guide](./USEGUIDE.en.md).
 
-Record v1 retains format `migaia-rpc-devtools`; package renaming does not change the recording grammar. Use the same collector's exportRecord/importRecord operations.
-
-## Remote access and errors
-
-The application can publish `collector.service` through an existing host's nested provide. The application owns authorization. `capture` and `exposeContent: true` are independent choices. Service reads exclude observations from their actual serving host; the application chooses the existing host that publishes them. The remote boundary uses existing portable/wire conversion, not arbitrary lossless JavaScript graph transport.
-
-The source is `rpc.devtools`. INVALID_OPTION, CLOSED, RECORD_ACTIVE/RECORD_NOT_ACTIVE, RECORD_FORMAT_INVALID, REDACT_FAILED, and SERVICE_RESULT_INVALID preserve native types and original causes. Diagnostic callback failures are reported without changing completed business results. See the [usage guide](./USEGUIDE.en.md).
+Forwarding rows are included by default. Query or record the ordered rows and correlate `messageId`, `route`, and the caller’s optional `trace` to inspect each host’s `hop`, `maxHops`, and refusal reason. The existing ring copies borrowed routes when retaining rows; live probe callbacks still borrow them.

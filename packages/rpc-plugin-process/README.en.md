@@ -1,15 +1,8 @@
 # `@migaia/rpc-plugin-process`
 
-Provide real child processes, local service connections, and multi-session listeners to `createRpcHost`. Native process owners retain launch, authentication, recovery, and release.
+Connect real child processes, local connections and listeners to RPC. Process owns native launch, byte/message I/O, supervision and resource release; Host owns sessions, method directories and calls.
 
 [中文](./README.md) · [Usage guide](./USEGUIDE.en.md)
-
-## Why use it
-
-- One session supports requests in both directions, notifications, streams, and provider directories.
-- `spawn` owns a child, `connect` owns only its session, and `listen` owns its listener and accepted sessions.
-- Existing supervisors retain generations, restart, resource budgets, and exit observation. Reconnection does not make business replay safe.
-- Explicit addresses can reach independent services implementing the same authentication and protocol. JSON-RPC uses reliable bytes and Content-Length framing.
 
 ## Start here
 
@@ -17,72 +10,62 @@ Provide real child processes, local service connections, and multi-session liste
 pnpm add @migaia/rpc-host @migaia/rpc-contract @migaia/rpc-plugin-process
 ```
 
-This example uses a same-user named local service on Node/POSIX. Each host has one transport plugin; the server can still accept multiple independent clients.
+Save this self-spawn example as a standalone ESM entry. Node 24 can execute TypeScript directly; compile for other environments as required. Parent calls use `host.process`; the child checks its role before spawning anything.
 
-```ts doc-test=run
-import { randomUUID } from 'node:crypto'
+```ts doc-test=check
 import { createRpcHost } from '@migaia/rpc-host'
-import { processPlugin } from '@migaia/rpc-plugin-process'
+import { processPlugin, isProcessChild } from '@migaia/rpc-plugin-process'
 
-const name = 'reader-' + randomUUID()
-const server = await createRpcHost({
-  plugins: [processPlugin({ listen: name })],
-  provide: { double: (value: number) => value * 2 }
-})
-try {
-  const client = await createRpcHost<{ double(value: number): number }>({
-    plugins: [processPlugin({ connect: { target: name, timeoutMs: 1500 } })]
+if (await isProcessChild()) {
+  await createRpcHost({
+    plugins: [processPlugin({ connectToParent: true })],
+    provide: { double: (value: number) => value * 2 }
+  })
+} else {
+  const host = await createRpcHost({
+    plugins: [processPlugin({ spawn: true, connect: { timeoutMs: 1500 } })]
   })
   try {
-    console.log(await client.request('double', 21))
+    console.log(await host.process.request('double', 21))
   } finally {
-    await client.close()
+    await host.close()
   }
-} finally {
-  await server.close()
 }
 ```
 
-It prints `42`. Closing a client withdraws its connection; the external service remains owned by its creator.
+The child provides `double`; after a compatible peer completes the handshake, the parent receives `42`. In stdio mode stdout belongs to the protocol; child application logs use stderr. This demonstrates calls, not external-service authentication configuration.
 
-## Choose a source
+## Sources and ownership
 
-`processPlugin(options)` requires exactly one source below. A timeout-only `connect: { timeoutMs }` can also decorate the other modes.
+`processPlugin(options)` selects exactly one source. The default namespace is `process`; `namespace` can change it.
 
-| Source                   | Configuration                                          | Ownership                                                                |
-| ------------------------ | ------------------------------------------------------ | ------------------------------------------------------------------------ |
-| Launch a child           | `spawn: true`, entry path/URL, or launch configuration | The host stops its own child                                             |
-| Existing service         | `connect: { target: nameOrAddress, timeoutMs? }`       | Releases only the session                                                |
-| Independent clients      | `listen: nameOrListener`                               | Owns listener and accepted sessions                                      |
-| Child joining its parent | `connectToParent: true`                                | Reads the actual stdin bootstrap, never an inferred environment identity |
+| Source               | Configuration                                       | Ownership                                           |
+| -------------------- | --------------------------------------------------- | --------------------------------------------------- |
+| Child process        | `spawn: true`, entry path/URL or full native recipe | Owns the launched child                             |
+| Existing service     | `connect: { target: nameOrAddress, timeoutMs? }`    | Owns the local connection, not the external process |
+| Listener             | `listen: nameOrListener`                            | Owns listener and accepted local sessions           |
+| Child joining parent | `connectToParent: true`                             | Uses actual native bootstrap and parent I/O         |
 
-For a self-spawned entry, branch on `await isProcessChild()`: the child uses `processPlugin({ connectToParent: true })`, the parent `processPlugin({ spawn: true })`. Place application `provide`, `self`, call defaults, and authentication on `createRpcHost`; ordinary plugin-host installations can retain those values in local plugin configuration.
+Handshake negotiation and name admission have separate deadlines, each defaulting to 10,000 ms. A timeout-only `connect: { timeoutMs }` also sets name admission for the other sources. A waiting peer follows the remaining budget in `pending`; repeated notices never refresh it. Worst-case waiting approaches the sum of both phases. Short options include `entry`, `command/args`, `cwd`, explicit environment, `wrap`, native limits and `supervision`. Actual limits depend on the runtime; configuration does not grant native isolation.
 
-Short launch options include entry, command/args, cwd, explicit env, wrap, native limits/permissions, and supervision. `wrap` rewrites the original command once per actual launch. An explicit command runs without a shell. Adapters do not grant isolation or termination capabilities missing from their native platform.
+Prefer one transport kind per Host; it may have many sessions. If different transports must share a Host, use distinct namespaces and explicit routing and permissions. They are not a homogeneous member pool.
 
-## Calls and recovery
+## Current API
 
-Untargeted `host.request / notify / stream / group / outcome` use current direct targets. Use `host.send(clientName, method, payload)` for one target, or a notification's `targetId`. With providers on both sides, calls interleave on the same session. One client disconnecting does not retire other clients.
+Runtime root exports are `processPlugin`, `isProcessChild`, `RpcProcessErrorCode` and `RPC_PROCESS_ERROR_SOURCE`, alongside option/native-source types. `name` is local registration identity, `namespace` selects the call surface, and `expose` is an ordinary PluginHost's explicit local Feature allowlist.
 
-`connect.timeoutMs` bounds handshake preparation. Top-level `connectTimeoutMs` bounds named-local rendezvous; they are independent. Initial named-source discovery can wait for the service; initial explicit-address dialing does not use that rendezvous loop. The existing supervisor still owns recovery after an established session disconnects, including an explicit socket service restarting. In stdio mode stdout belongs to the RPC byte channel; send application logs to stderr.
+Use `host.process.request/notify/stream/group` and targeted `host.process.send`. The root retains `self`, `provide` and `close`, without those call methods. Native member queries, controls and events live under `host.process.members`: `list/get/stop/kill/restart/replace/on/watch`. Borrowing a connection does not authorize terminating its external process.
 
-Explicit socket/TCP addresses require matching credentials and protocol. Default credentials for same-user named endpoints depend on local OS isolation. JSON-RPC needs an actual contract or custom establish callback; an arbitrary JSON text service is not automatically compatible. Copying credentials, bootstrap shapes, or private handles does not grant trusted identity.
+`/features` exports complete-instance factories `sendQueue`, `flowControl` and `ipcLog`; pass instances to `processPlugin({ features })`. `sendQueue({ flow })` can borrow that same flow instance without another capacity policy. Business timeout/retry are also selected through transport `features`. Host intervention plugins use `@migaia/rpc-host/plugins/*` and install before transports.
 
-## Features and platform entries
+## Protocol and extension ownership
 
-| Entry       | Purpose                                                                                                      |
-| ----------- | ------------------------------------------------------------------------------------------------------------ |
-| Root        | `processPlugin`, `isProcessChild`, options, and error identity                                               |
-| `/features` | `sendQueueFeature`, `ipcLogFeature`, and original flow-control constants/types configure existing IPC owners |
+The sole profile is `migaia.rpc/2`. `@migaia/rpc-contract/protocol` provides pure protocol data and admission; `/interfaces` provides capability types, and `/errors` plus `/error-code` provide error contracts. Contract performs no I/O, business schema validation or supervision. `/plugins/schema` owns business validation. Custom carrier authors use `@migaia/rpc-host/sdk` and canonical carriers rather than returning another Host or endpoint.
 
-Native process/socket implementations remain package-owned. Applications select the existing short or full deployment recipe; carrier authors use the host `/plugin` deployment SDK.
+## Current boundaries
 
-Install shared deadlines, authentication, chunking, retry, and type generation from [rpc-host/features](../rpc-host/README.en.md#choose-transport-and-features). Process-specific features override their matching IPC fields without creating another logging or sending queue.
+A native token/bootstrap does not establish completed automatic verification, principal identity or authenticated scope across reconnects; these boundaries have unresolved items. Do not infer trusted identity or safe business replay. Host close versus accepted-work drain, untargeted errors during restart downtime and same-name admission diagnostics retain known behavioral differences. IPC capacity rejection retains `OVERLOADED`; actual physical I/O failure retains `TRANSPORT` with its original cause. Admission failure does not mean a write happened.
 
-## Errors and lifetime
+A startup channel may directly report `PROCESS_CHANNEL_CLOSED` at the actual close phase. Native failures such as `EPIPE` remain reachable without requiring two nested wrappers carrying the same code. Business `timeout: false` disables the selected business deadline and adds no Process call cap.
 
-Native process boundary failures use `rpc.transport.process`; host admission/calls can use `rpc.endpoint`, and managed uncertainty can use `rpc.remote`. Inspect source/code and original causes. Sending does not establish completion; reconcile uncertain non-idempotent work before retrying.
-
-A responsive same-name client rejects a candidate with `HOST_PEER_NAME_DUPLICATE`. Closed or failed old sessions retire normally before the candidate is admitted, without adding a background heartbeat.
-
-Definitions also install directly on ordinary `PluginHost`. Its process outlet retains stop, restart, kill, replace, generations, exits, and the original close Promise. Real installation owners perform cleanup; an external service is not an owned child. See the [usage guide](./USEGUIDE.en.md).
+Inspect `source/code/cause` and retain native causes. Full migration acceptance remains pending; these differences are not implementation guarantees. See the [usage guide](./USEGUIDE.en.md).

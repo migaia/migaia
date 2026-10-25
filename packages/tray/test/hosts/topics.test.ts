@@ -173,7 +173,7 @@ describe('Tray business topics', () => {
     expect(received).toEqual([1, 2, 2])
     await Promise.all([offSecond(), offSecond()])
     expect(request).toHaveBeenCalledTimes(2)
-    expect(request.mock.calls.map((call) => call[1])).toEqual([
+    expect(request.mock.calls.map((call) => call[0])).toEqual([
       'trayRelay.subscribe',
       'trayRelay.unsubscribe'
     ])
@@ -342,14 +342,14 @@ describe('Tray business topics', () => {
     /** Existing selector is wrapped only for the requested delivery fault. */
     const outletSpy = vi
       .spyOn(runtime, 'outletOf')
-      .mockImplementation((host: any, definition: any) => {
+      .mockImplementation((host: any, definition: any, id?: any) => {
         /** Genuine outlet owns every native resource and RPC receipt. */
-        const outlet = originalOutlet(host, definition)
+        const outlet = originalOutlet(host, definition, id)
         if (host !== parent) return outlet
         return {
           ...outlet,
           notify: (...args: any[]) =>
-            rejectSend && args[1] === 'trayChild.deliver'
+            rejectSend && args[0] === 'trayChild.deliver'
               ? Promise.reject(sendFailure)
               : outlet.notify(...args)
         }

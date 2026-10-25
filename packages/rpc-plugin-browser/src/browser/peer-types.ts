@@ -1,7 +1,11 @@
+/**
+ * Defines borrowed browser source options and native connect-event shapes used by transport
+ * acquisition.
+ */
 import type { IWindowMessageTarget, IWindowMessageReceiver } from './adapters/window.js'
 import type { ISharedWorkerPort } from './adapters/shared-worker.js'
 import type { IRTCDataChannel } from './adapters/rtc-data-channel.js'
-import type { IWebWorkerLikePort } from '@migaia/rpc-host/plugin'
+import type { IBrowserEventPort } from './native-message.js'
 import type { IBrowserPluginOptions } from './plugin-types.js'
 
 /**
@@ -50,13 +54,13 @@ export type IRuntimeBrowserConnect =
   | IRuntimeBrowserWindowConnect
   | IRuntimeBrowserSharedWorkerConnect
   | IRuntimeBrowserRtcConnect
-  | Readonly<{ worker: IWebWorkerLikePort }>
+  | Readonly<{ worker: IBrowserEventPort }>
 
 /** Window connection configuration is validated before the cold plugin is registered. */
 export type IWindowPluginOptions = IBrowserPluginOptions & IRuntimeBrowserWindowConnect
 
 /** Both a page Worker and its worker-side self supply the same borrowed native operations. */
-export type IWorkerPluginOptions = IBrowserPluginOptions & Readonly<{ worker: IWebWorkerLikePort }>
+export type IWorkerPluginOptions = IBrowserPluginOptions & Readonly<{ worker: IBrowserEventPort }>
 
 /** Exactly one SharedWorker page port or native worker accept scope is selected. */
 export type ISharedWorkerPluginOptions = IBrowserPluginOptions &

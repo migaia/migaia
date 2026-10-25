@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { it, vi } from 'vitest'
 import { RpcCapability } from '@migaia/rpc-contract'
 import { createHmac } from 'node:crypto'
-import { RpcCoreErrorCode } from '../../dist/core/errors.js'
+import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { createRuntimeApiEndpoint } from '../../dist/core/runtime-api-endpoint.js'
 import { authentication } from '../../dist/core/middleware/authentication.js'
 import { codec } from '../../dist/core/middleware/codec.js'
@@ -15,11 +15,8 @@ import { hooks } from '../../dist/core/middleware/hooks.js'
 import { ping } from '../../dist/core/middleware/ping.js'
 import type { IRpcEndpoint } from '../../dist/core/typing.js'
 import { createRuntimePeer } from '../../dist/remote/runtime-api/peer.js'
-import {
-  runtimeSources,
-  RuntimeApiFixtureText,
-  RUNTIME_API_FIXTURE_BASE_CAPABILITIES
-} from './fixture.js'
+import { runtimeSources, RUNTIME_API_FIXTURE_BASE_CAPABILITIES } from './fixture.js'
+import { RuntimeApiFixtureText } from '../fixtures/runtime-api-text.js'
 
 it('a genuine response signing failure retains the completed keyed group', async () => {
   /** Both peers negotiate the actual group, result store and caller deadline owners. */

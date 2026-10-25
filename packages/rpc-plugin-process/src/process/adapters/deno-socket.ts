@@ -1,5 +1,9 @@
+/**
+ * Uses Deno's Node-compatible socket adapter for native TCP/Unix acquisition. Unsupported
+ * named-pipe addresses reject before dialing or binding, preserving the shared socket lifecycle.
+ */
 import { attachErrorIdentity } from '@migaia/utils/error'
-import { RPC_CORE_ERROR_SOURCE, RpcCoreErrorCode } from '@migaia/rpc-host'
+import { RPC_ENDPOINT_ERROR_SOURCE, RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { RpcProcessErrorText } from '../error-text.js'
 import type { IListenProcessByteChannel, IProcessByteChannel } from '../types.js'
 import {
@@ -11,7 +15,7 @@ import {
 function rejectUnsupportedPipe(address: string): void {
   if (address.startsWith('\\\\.\\pipe\\'))
     throw attachErrorIdentity(new TypeError(RpcProcessErrorText.optionsInvalid), {
-      source: RPC_CORE_ERROR_SOURCE,
+      source: RPC_ENDPOINT_ERROR_SOURCE,
       code: RpcCoreErrorCode.invalidConfig
     })
 }

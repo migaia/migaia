@@ -1,12 +1,20 @@
+/**
+ * Connects StoreWorker request handlers to the actual RPC Host and borrowed Worker IO. Preparation,
+ * remote readiness and one close Promise remain distinct; failed preparation borrows the Host's
+ * original native cleanup receipts rather than collecting listener failures a second time.
+ */
 import type { IAbortSignal, INativeAbortSignal } from '@migaia/utils/promise'
 import { deferred } from '@migaia/utils/promise'
-import { normalizePortable, type IRpcPortableValue } from '@migaia/rpc-contract'
+import { attachSecondaryErrors } from '@migaia/utils/error'
+import { normalizeRpcPortable, type IRpcPortableValue } from '@migaia/rpc-contract/portable'
 import { createRpcHost, type IRpcHost, type IRpcContext } from '@migaia/rpc-host'
-import { defineFeaturePlugin } from '@migaia/rpc-host/plugin'
+import { timeout } from '@migaia/rpc-host/features/timeout'
+import { RpcConstructionError, RpcLifecycleError } from '@migaia/rpc-contract/errors'
 import { dedicatedWorkerPlugin } from '@migaia/rpc-plugin-browser'
-import type { IWebWorkerLikePort } from '@migaia/rpc-host/plugin'
+import type { IWorkerMessagePort } from './worker-message-event.js'
+import { StoreWorkerErrorText } from './error-text.js'
 import { isArrayBuffer, isUint8Array } from '@migaia/utils/bytes'
-import { WorkerRpcBridgeFeatureName, WorkerRpcIdentity } from './worker-constants.js'
+import { WorkerRpcIdentity } from './worker-constants.js'
 
 type IWorkerHandler = (
   payload: unknown,
@@ -29,24 +37,26 @@ type IWorkerContractOptions = Readonly<{
   targetId?: string
 }>
 
-/** The original setup hook lends the genuine Host, so raw handshake delivery never waits on itself. */
-const workerBridgeFeature = defineFeaturePlugin((prepared: (host: IRpcHost<unknown>) => void) => ({
-  name: WorkerRpcBridgeFeatureName,
-  setup: ({ host }) => prepared(host)
-}))
+/** The actual dedicated Worker plugin determines this Host's sole transport namespace. */
+type IWorkerRpcHost = IRpcHost<
+  Record<never, never>,
+  readonly [ReturnType<typeof dedicatedWorkerPlugin<'worker'>>]
+>
 
 /** One bridge owns application handlers while the actual Host owns connections and providers. */
 class WorkerContractEndpoint implements IWorkerContractEndpoint {
   /** Borrowed native port; physical lifetime remains with its caller. */
-  #port: IWebWorkerLikePort
+  #port: IWorkerMessagePort
   /** Request configuration remains live exactly as in the original bridge. */
   #options: IWorkerContractOptions
+  /** The original local identity is captured before reading the direct target option. */
+  readonly #id: string
   /** Default direct peer is captured once at construction. */
   #targetId: string
   /** Initial catalog is borrowed by the one actual Host compiler. */
   #providers: IWorkerProviders = Object.create(null)
-  /** Native feature setup lends the Host before transport installation. */
-  #host!: IRpcHost<unknown>
+  /** Only the actual committed Host may publish later provider registrations. */
+  #host: IWorkerRpcHost | undefined
   /** Only synchronous local preparation may extend the initial catalog. */
   #initializing = true
   /** Ordered application callbacks are separate from Host provider registration. */
@@ -58,38 +68,30 @@ class WorkerContractEndpoint implements IWorkerContractEndpoint {
   /** The original preparation result includes any caller-owned disposal projection. */
   #preparedResult: unknown
   /** Remote readiness is awaited by request and notification callers. */
-  #opening: Promise<unknown>
+  #opening: Promise<IWorkerRpcHost>
+  /** The actual Host's installation signal cancels a close that wins remote readiness. */
+  readonly #control = new AbortController()
+  /** Original synchronous registration callback runs before the actual Host compiles providers. */
+  readonly #prepare: ((endpoint: IWorkerContractEndpoint) => unknown) | undefined
+  /** Repeated endpoint cleanup joins its one original close result. */
+  #closing: Promise<void> | undefined
+  /** A local close reason distinguishes successful cancellation from an independent opening failure. */
+  #closeReason: RpcLifecycleError | undefined
 
   /** Capture logical identity, then start the single canonical Host and its borrowed transport. */
   constructor(
-    port: IWebWorkerLikePort,
+    port: IWorkerMessagePort,
     options: IWorkerContractOptions,
     prepare?: (endpoint: IWorkerContractEndpoint) => unknown
   ) {
-    /** Preserve identity option reads before native preparation. */
-    const id = options.id ?? WorkerRpcIdentity.main
+    this.#id = options.id ?? WorkerRpcIdentity.main
     this.#targetId = options.targetId ?? WorkerRpcIdentity.worker
     this.#port = port
     this.#options = options
-    this.#opening = createRpcHost({
-      self: { name: id, instanceId: id },
-      provide: this.#providers,
-      plugins: [
-        workerBridgeFeature((owner) => this.#prepare(owner, prepare)),
-        dedicatedWorkerPlugin({
-          worker: {
-            postMessage: (message, transfer) => this.#port.postMessage(message, transfer),
-            addEventListener: (type, listener) => {
-              this.#port.addEventListener(type, listener)
-              // Native subscription must exist before disposal or raw delivery can begin.
-              if (type === 'message') this.#prepared.resolve(this.#preparedResult)
-            },
-            removeEventListener: (type, listener) => this.#port.removeEventListener(type, listener)
-          }
-        })
-      ]
-    })
-    // Request callers retain the rejected opening; this observer only releases local setup.
+    this.#prepare = prepare
+    /** Publish readiness ownership before caller preparation can synchronously call close. */
+    this.#opening = Promise.resolve().then(this.#open)
+    // Request callers retain the rejected opening; this observer releases local setup only.
     void this.#opening.catch((error) => this.#prepared.reject(error))
   }
 
@@ -98,15 +100,47 @@ class WorkerContractEndpoint implements IWorkerContractEndpoint {
     return this.#prepared.promise
   }
 
-  /** Perform synchronous managed registration before remote discovery begins. */
-  #prepare(
-    host: IRpcHost<unknown>,
-    prepare?: (endpoint: IWorkerContractEndpoint) => unknown
-  ): void {
-    this.#host = host
-    this.#preparedResult = prepare ? prepare(this) : this
+  /** Prepare local providers synchronously before starting the sole actual Host handshake. */
+  readonly #open = async (): Promise<IWorkerRpcHost> => {
+    this.#preparedResult = this.#prepare ? this.#prepare(this) : this
     this.#initializing = false
+    /** Providers and the native listener remain actual Host/Browser responsibilities. */
+    const host = await createRpcHost({
+      self: {
+        name: this.#id,
+        instanceId: this.#id
+      },
+      signal: this.#control.signal,
+      provide: this.#providers,
+      plugins: [
+        dedicatedWorkerPlugin({
+          worker: {
+            postMessage: this.#post,
+            addEventListener: this.#subscribe,
+            removeEventListener: this.#unsubscribe
+          }
+        })
+      ]
+    })
+    this.#host = host
+    /** Only methods registered during remote readiness still need actual directory publication. */
+    for (const method of this.#handlers.keys()) this.#install(method)
+    return host
   }
+
+  /** Keep the actual borrowed native receiver and original transfer ownership. */
+  readonly #post: IWorkerMessagePort['postMessage'] = (message, transfer) =>
+    this.#port.postMessage(message, transfer)
+
+  /** Local managed delivery can begin as soon as the actual native message listener exists. */
+  readonly #subscribe: IWorkerMessagePort['addEventListener'] = (type, listener) => {
+    this.#port.addEventListener(type, listener)
+    if (type === 'message') this.#prepared.resolve(this.#preparedResult)
+  }
+
+  /** Native transport cleanup removes the exact listener from its original port. */
+  readonly #unsubscribe: IWorkerMessagePort['removeEventListener'] = (type, listener) =>
+    this.#port.removeEventListener(type, listener)
 
   /** Decode per handler invocation and preserve callback order and the final result. */
   async #invoke(method: string, payload: unknown, signal: INativeAbortSignal): Promise<unknown> {
@@ -120,6 +154,7 @@ class WorkerContractEndpoint implements IWorkerContractEndpoint {
   /** Update the actual Host directory; this bridge never creates a second endpoint. */
   #install(method: string): void {
     if (this.#installed.has(method)) return
+    if (!this.#initializing && !this.#host) return
     this.#installed.add(method)
     /** One provider serves both initial and later registration. */
     const provider = async (payload: unknown, context: IRpcContext) =>
@@ -133,19 +168,25 @@ class WorkerContractEndpoint implements IWorkerContractEndpoint {
     for (let index = 0; index < segments.length - 1; index++)
       group = (group[segments[index]!] ??= Object.create(null)) as IWorkerProviders
     group[segments.at(-1)!] = provider
-    if (!this.#initializing) this.#host.provide(definition)
+    if (!this.#initializing) this.#host!.provide(definition)
   }
 
-  /** Wait for remote readiness before sending the encoded computation to the captured peer. */
+  /** Wait for remote readiness before sending to the captured peer through its actual namespace. */
   request: IWorkerContractEndpoint['request'] = (payload, options) =>
     this.#opening
-      .then(() =>
-        this.#host.send(this.#targetId, WorkerRpcIdentity.call, encodeWorkerValue(payload), {
-          signal: options?.signal,
-          /** Omission historically means no application deadline. */
-          timeoutMs: this.#options.timeoutMs ?? false
-        })
-      )
+      .then((host) => {
+        /** Read the live request budget once, retaining omission as no application deadline. */
+        const ms = this.#options.timeoutMs
+        return host.worker.send(
+          this.#targetId,
+          WorkerRpcIdentity.call,
+          encodeWorkerValue(payload),
+          {
+            signal: options?.signal,
+            timeout: ms === undefined ? false : timeout({ ms })
+          }
+        )
+      })
       .then(decodeWorkerValue)
 
   /** Notifications share the same Host and complete at its physical write boundary. */
@@ -153,7 +194,8 @@ class WorkerContractEndpoint implements IWorkerContractEndpoint {
     /** Explicit target selection is captured before asynchronous readiness. */
     const targetId = options?.targetId ?? this.#targetId
     return this.#opening.then(
-      () => this.#host.notify(method, encodeWorkerValue(payload), { targetId }) as Promise<void>
+      (host) =>
+        host.worker.notify(method, encodeWorkerValue(payload), { targetId }) as Promise<void>
     )
   }
 
@@ -178,24 +220,53 @@ class WorkerContractEndpoint implements IWorkerContractEndpoint {
     }
   }
 
-  /** The actual Host retains cleanup ownership and the original cleanup result. */
-  close = (): Promise<void> => this.#host.close()
+  /** Close the actual Host, or cancel its original construction before remote readiness. */
+  close = (): Promise<void> => {
+    if (this.#closing) return this.#closing
+    if (this.#host) return (this.#closing = this.#host.close())
+    /** Publish cleanup before abort invokes arbitrary actual native cleanup callbacks. */
+    const completion = deferred<void>()
+    this.#closing = completion.promise
+    this.#closeReason = new RpcLifecycleError(StoreWorkerErrorText.disposed)
+    this.#control.abort(this.#closeReason)
+    void this.#closeOpening().then(completion.resolve, completion.reject)
+    return this.#closing
+  }
+
+  /** Host rollback owns failed preparation; suppress only this endpoint's exact intentional abort. */
+  async #closeOpening(): Promise<void> {
+    try {
+      const host = await this.#opening
+      await host.close()
+    } catch (error) {
+      if (error instanceof RpcConstructionError && error.cause === this.#closeReason) {
+        /** Construction already owns the original native receipts, including late rollback cleanup. */
+        const failures = error.cleanupPromise ? await error.cleanupPromise : error.cleanupErrors
+        if (failures.length === 1) throw failures[0]!.error
+        if (failures.length > 1)
+          throw attachSecondaryErrors(
+            failures[0]!.error,
+            failures.slice(1).map((entry) => entry.error)
+          )
+      } else if (error !== this.#closeReason) throw error
+    }
+  }
 }
 
 /** Create a Worker bridge without transferring physical port ownership. */
 export function createWorkerContractEndpoint(
-  port: IWebWorkerLikePort,
+  port: IWorkerMessagePort,
   endpointOptions?: IWorkerContractOptions
 ): Promise<IWorkerContractEndpoint>
 /** Managed raw callbacks register providers during local setup before remote handshaking. */
 export function createWorkerContractEndpoint<T>(
-  port: IWebWorkerLikePort,
+  port: IWorkerMessagePort,
   endpointOptions: IWorkerContractOptions,
   prepare: (endpoint: IWorkerContractEndpoint) => T
 ): Promise<T>
 /** The named bridge keeps local preparation separate from the one Host's remote readiness. */
 export function createWorkerContractEndpoint(
-  port: IWebWorkerLikePort,
+  port: IWorkerMessagePort,
   endpointOptions: IWorkerContractOptions = {},
   prepare?: (endpoint: IWorkerContractEndpoint) => unknown
 ): Promise<unknown> {
@@ -234,7 +305,7 @@ function encodeWorkerValue(value: unknown): IRpcPortableValue {
     const output: Record<string, IRpcPortableValue> = {}
     for (const key of Object.keys(value as object))
       output[key] = encodeWorkerValue((value as Record<string, unknown>)[key])
-    return normalizePortable(output)
+    return normalizeRpcPortable(output)
   }
   return { $worker: 'undefined' } as unknown as IRpcPortableValue
 }

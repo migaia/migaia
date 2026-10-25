@@ -1,29 +1,24 @@
-import { RpcTransportMode } from '@migaia/rpc-host/plugin'
+/** Acquire borrowed ServiceWorker endpoints and retire only their exact native Client routes. */
+import { defineTransportPlugin } from '@migaia/rpc-host/sdk'
+import type { IRpcTransportPlugin, IRpcTransportSetupContext } from '@migaia/rpc-host/sdk'
+import type { IRpcSessionHandle } from '@migaia/rpc-contract/interfaces'
 import {
-  createAdapterDeployment,
-  createAdapterMessageHandshakeBudget,
-  createEventTargetMessageResource,
-  defineTransportPlugin,
-  type IAdapterDeploymentAccept,
-  type IAdapterDeploymentContext,
-  type IAdapterMessageResource,
-  type IRuntimePeerSourceResult,
-  type IRpcTransportPlugin
-} from '@migaia/rpc-host/plugin'
-import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'
-import { systemScheduler } from '@migaia/utils/scheduler'
-import { createServiceWorkerTransport } from './adapters/service-worker.js'
+  RpcBrowserErrorCode,
+  RpcCoreErrorCode,
+  RPC_ENDPOINT_ERROR_SOURCE
+} from '@migaia/rpc-contract/error-code'
+import { attachErrorIdentity } from '@migaia/utils/error'
+import { createServiceWorkerCarrier } from './adapters/service-worker.js'
 import type {
   IServiceWorkerMessageReceiver,
   IServiceWorkerMessageTarget
 } from './adapters/service-worker.js'
-import { projectBrowserPeerPort } from './peer-port.js'
+import { attachBrowserCarrier } from './native-message.js'
 import { createBrowserPeerError } from './peer-error.js'
-import { createBrowserTransportError } from './error.js'
+import { createBrowserTransportError, normalizeBrowserHandshakeFailure } from './error.js'
 import { BrowserRpcErrorText } from './error-text.js'
 import { BrowserPeerErrorText } from '../error-text.js'
-import { RpcBrowserErrorCode } from '../error-code.js'
-import { BrowserPeerEvent } from './peer-text.js'
+import { BrowserPeerEvent, BrowserNamespace } from './peer-text.js'
 import { ServiceWorkerPluginText } from './service-worker-text.js'
 import type {
   IServiceWorkerClientEvent,
@@ -31,14 +26,14 @@ import type {
   IServiceWorkerPluginOptions
 } from './service-worker-types.js'
 
-/** The native Client, not the application envelope, selects one raw preparation and listener set. */
+/** Native Client routing retains only its held lookup operation, exact receiver and Host handle. */
 type IServiceWorkerClientSession = {
-  resource?: IAdapterMessageResource
   opening: Promise<void>
-  listeners: Set<(event: MessageEvent<unknown>) => void>
+  handle?: IRpcSessionHandle
+  receive?: (event: MessageEvent<unknown>) => void
 }
 
-/** Native borrowed targets expose only postMessage; receiver subscription is a separate operation. */
+/** Native shape admission does not rely on the current browser realm's constructor identity. */
 function isTarget(value: unknown): value is IServiceWorkerMessageTarget {
   return (
     value !== null &&
@@ -46,8 +41,7 @@ function isTarget(value: unknown): value is IServiceWorkerMessageTarget {
     typeof Reflect.get(value, 'postMessage') === 'function'
   )
 }
-
-/** A missing page container rejects synchronously, before any message or native subscription. */
+/** Native receiving authority is separate from outgoing ServiceWorker/Client postMessage. */
 function isReceiver(value: unknown): value is IServiceWorkerMessageReceiver {
   return (
     value !== null &&
@@ -57,233 +51,179 @@ function isReceiver(value: unknown): value is IServiceWorkerMessageReceiver {
   )
 }
 
-/** The same original initial/ACK owner consumes the SDK's one finite preparation budget. */
-async function openResource(
-  resource: IAdapterMessageResource,
-  context: IAdapterDeploymentContext,
-  first?: () => void
-): Promise<IRuntimePeerSourceResult> {
-  /** Initial exchange and capability acceptance share the same absolute deadline. */
-  const budget = createAdapterMessageHandshakeBudget(systemScheduler, context.connectTimeoutMs)
-  try {
-    /** Capture attaches synchronously before the first held native event is replayed. */
-    const identity = resource.exchangeIdentity(context, context.signal, budget)
-    first?.()
-    /** The accepted peer identity comes only from this source-filtered raw handshake. */
-    const peerId = await identity
-    return await resource.open({
-      peerId,
-      scheduler: systemScheduler,
-      offer: context.capabilities,
-      control: rpcMessageCapabilityControl,
-      signal: context.signal,
-      handshakeBudget: budget
-    })
-  } catch (primary) {
-    try {
-      await resource.close()
-    } catch (cleanup) {
-      context.report(cleanup)
-    }
-    throw primary
-  }
-}
-
-/** Each native Client owns its original raw resource; Host remains the sole endpoint/session owner. */
-/** Allocate only the native listener's original membership and cleanup storage. */
-function serviceWorkerClientListenerState(
-  scope: IServiceWorkerClientsScope,
-  context: IAdapterDeploymentContext,
-  accept: IAdapterDeploymentAccept
-) {
-  /**
-   * This map routes native Client events only; it stores no provider directory or endpoint
-   * identity.
-   */
-  const sessions = new Map<string, IServiceWorkerClientSession>()
-  /** Closing stops native acceptance before joining the existing raw preparation operations. */
-  let closed = false
-  /** Concurrent Host cleanup joins the same subscription/resource retirement Promise. */
-  const closing = undefined as Promise<void> | undefined
-  return { scope, context, accept, sessions, closed, closing }
-}
-
-/** Own one native browser listener while the Host keeps accepted endpoint and directory ownership. */
+/** Retain the original native Clients lookup and per-Client isolation; Host owns every RPC table. */
 class ServiceWorkerClientListener {
-  /** Native membership, pending preparation and the one close receipt belong to this listener. */
-  #state: ReturnType<typeof serviceWorkerClientListenerState>
-  /** Create storage before native callbacks can publish any accepted resource. */
-  constructor(
-    scope: IServiceWorkerClientsScope,
-    context: IAdapterDeploymentContext,
-    accept: IAdapterDeploymentAccept
-  ) {
-    this.#state = serviceWorkerClientListenerState(scope, context, accept)
+  /** The actual worker global owns one message subscription and Client resolution. */
+  readonly #scope: IServiceWorkerClientsScope
+  /** Actual installed host provides the only Session identity and lifecycle authority. */
+  readonly #context: IRpcTransportSetupContext
+  /** This is the existing native Client id routing map, never a provider or peer directory. */
+  readonly #sessions = new Map<string, IServiceWorkerClientSession>()
+  /** Shutdown revokes native acquisition synchronously and publishes its one joining Promise. */
+  #closing: Promise<void> | undefined
+
+  /** Install the original worker-global listener without fabricating an idle termination signal. */
+  constructor(scope: IServiceWorkerClientsScope, context: IRpcTransportSetupContext) {
+    this.#scope = scope
+    this.#context = context
+    scope.addEventListener(BrowserPeerEvent.message, this.#message)
   }
-  /** Attach native acceptance and retain the original rollback and close semantics. */
-  open() {
-    this.#state.scope.addEventListener(BrowserPeerEvent.message, this.#onMessage)
-    return {
-      /**
-       * Host close removes listeners/resources but never terminates the borrowed native
-       * worker/client.
-       */
-      close: (): Promise<void> => {
-        if (this.#state.closing) return this.#state.closing
-        this.#state.closed = true
-        this.#state.scope.removeEventListener(BrowserPeerEvent.message, this.#onMessage)
-        this.#state.closing = Promise.allSettled([
-          ...[...this.#state.sessions.values()].map((session) => session.resource?.close()),
-          ...[...this.#state.sessions.values()].map((session) => session.opening)
-        ]).then((results) => {
-          this.#state.sessions.clear()
-          for (const result of results)
-            if (result.status === 'rejected') this.#report(result.reason)
-        })
-        return this.#state.closing
-      }
-    }
-  }
-  /** Send native preparation failures to the deployment reporter without replacing their identity. */
-  #report = (error: unknown): void => this.#state.context.report(error)
-  /**
-   * Snapshot native listeners so a receiver installed during handoff does not observe the same
-   * frame twice.
-   */
-  #dispatch = (session: IServiceWorkerClientSession, event: IServiceWorkerClientEvent): void => {
-    /** Native dispatch must not also invoke a receiver installed during this frame's handoff. */
-    const listeners = [...session.listeners]
-    for (const listener of listeners) listener(event)
-  }
-  /** Resolve the genuine native Client before opening its one source-filtered raw resource. */
-  #onMessage = (event: IServiceWorkerClientEvent): void => {
-    if (this.#state.closed) return
+  /** Native Client metadata alone selects its original pending or accepted resource. */
+  readonly #message = (event: IServiceWorkerClientEvent): void => {
+    if (this.#closing) return
     try {
-      /** Native source identity is read once before selecting or constructing any capture owner. */
+      /** Native source/id reads precede payload access and asynchronous Clients.get. */
       const source = event.source
+      /** An actual browser Client id is not an accepted RPC peer id. */
       const id = source && Reflect.get(source, 'id')
-      if (typeof id !== 'string' || id.length === 0) return
-      /** Existing accepted and preparing sessions retain their original native resource. */
-      let session = this.#state.sessions.get(id)
-      if (session) this.#dispatch(session, event)
+      if (typeof id !== 'string' || !id) return
+      /** A single original record is inserted before the real Clients lookup can suspend. */
+      let record = this.#sessions.get(id)
+      if (record) record.receive?.(event)
       else {
-        /**
-         * The original first native event is held only until Clients.get resolves its actual
-         * target.
-         */
-        const created: IServiceWorkerClientSession = {
-          listeners: new Set(),
-          opening: Promise.resolve()
-        }
-        session = created
-        this.#state.sessions.set(id, created)
-        created.opening = Promise.resolve()
-          .then(async () => {
-            /** Native Clients is the authority for the current addressable reply object. */
-            const client = await this.#state.scope.clients.get(id)
-            if (this.#state.closed || !isTarget(client) || client.id !== id) {
-              if (this.#state.sessions.get(id) === created) this.#state.sessions.delete(id)
-              return
-            }
-            /** Separate receiver operations expose only this native Client's filtered events. */
-            const receiver: IServiceWorkerMessageReceiver = {
-              addEventListener: (_type, listener) => created.listeners.add(listener),
-              removeEventListener: (_type, listener) => created.listeners.delete(listener)
-            }
-            /** Existing sourceProof rejects mismatched native Client metadata before raw capture. */
-            const resource = createEventTargetMessageResource(
-              projectBrowserPeerPort(
-                createServiceWorkerTransport({ target: client, receiver, peerId: id })
-              )
-            )
-            created.resource = resource
-            /** Core owns handshake, accepted capabilities and the one Host endpoint's new session. */
-            const channel = await openResource(resource, this.#state.context, () =>
-              this.#dispatch(created, event)
-            )
-            if (this.#state.closed) {
-              await channel.close?.()
-              return
-            }
-            await (0, this.#state.accept)(channel)
-          })
-          .catch(async (error: unknown) => {
-            if (this.#state.sessions.get(id) === created) this.#state.sessions.delete(id)
-            try {
-              await created.resource?.close()
-            } catch (cleanup) {
-              this.#report(cleanup)
-            }
-            if (!this.#state.closed) this.#report(error)
-          })
+        record = { opening: Promise.resolve() }
+        this.#sessions.set(id, record)
+        record.opening = this.#open(id, record, event).catch((error: unknown) => {
+          if (this.#sessions.get(id) === record) this.#sessions.delete(id)
+          if (!this.#closing) this.#context.report(error)
+        })
       }
-      /** Native lifetime extension joins this Client's real preparation; no extra keepalive exists. */
-      event.waitUntil?.(session.opening)
+      event.waitUntil?.(record.opening)
     } catch (cause) {
-      this.#report(
+      this.#context.report(
         createBrowserTransportError(BrowserRpcErrorText.serviceWorkerSourceReadFailed, cause)
       )
     }
   }
-}
-
-/** Attach the one native listener without creating another Host or endpoint. */
-function listenClients(
-  scope: IServiceWorkerClientsScope,
-  context: IAdapterDeploymentContext,
-  accept: IAdapterDeploymentAccept
-) {
-  return new ServiceWorkerClientListener(scope, context, accept).open()
-}
-
-/** Define a cold page-to-worker or native Clients listener without creating a complete Peer. */
-export function serviceWorkerPlugin(options: IServiceWorkerPluginOptions): IRpcTransportPlugin {
-  /** Invalid or conflicting sources retain the browser package's original synchronous admission. */
-  const configured = options as IServiceWorkerPluginOptions | undefined
-  const target = configured?.serviceWorker
-  const clients = configured?.clients
   /**
-   * The native container receives replies; the ServiceWorker target itself never receives
-   * listeners.
+   * Resolve the actual native reply target, install capture, then hand over the original first
+   * event.
    */
+  async #open(
+    id: string,
+    record: IServiceWorkerClientSession,
+    first: IServiceWorkerClientEvent
+  ): Promise<void> {
+    /** Clients, rather than application metadata, supplies the current native reply object. */
+    const target = await this.#scope.clients.get(id)
+    if (this.#closing || !isTarget(target) || target.id !== id) {
+      if (this.#sessions.get(id) === record) this.#sessions.delete(id)
+      return
+    }
+    /** Each record projects only its native filtered event slot, not another subscription registry. */
+    const receiver: IServiceWorkerMessageReceiver = {
+      addEventListener: (type, listener) => {
+        if (type === BrowserPeerEvent.message) record.receive = listener
+      },
+      removeEventListener: (type, listener) => {
+        if (type === BrowserPeerEvent.message && record.receive === listener)
+          record.receive = undefined
+      }
+    }
+    /** SDK and Host retain codec, handshake and exact Session lifetime. */
+    const carrier = createServiceWorkerCarrier({ target, receiver, peerId: id }, this.#context)
+    try {
+      record.handle = this.#context.attach(carrier)
+      record.receive?.(first)
+      await record.handle.ready
+      /** Retirement deletes only this original native record; it never follows a successor handle. */
+      void record.handle.closed.then(
+        () => {
+          if (this.#sessions.get(id) === record) this.#sessions.delete(id)
+        },
+        (error: unknown) => {
+          if (this.#sessions.get(id) === record) this.#sessions.delete(id)
+          this.#context.report(error)
+        }
+      )
+    } catch (primary) {
+      try {
+        await carrier.close(primary)
+      } catch (cleanup) {
+        this.#context.report(cleanup)
+      }
+      throw normalizeBrowserHandshakeFailure(primary)
+    }
+  }
+  /** Close only native subscriptions and this plugin's actual accepted/awaiting connections. */
+  readonly close = (): Promise<void> =>
+    (this.#closing ??= Promise.resolve().then(async () => {
+      /** The original native remover failure cannot prevent sibling resources from being released. */
+      const failures: unknown[] = []
+      try {
+        this.#scope.removeEventListener(BrowserPeerEvent.message, this.#message)
+      } catch (error) {
+        failures.push(error)
+      }
+      /** Pending native lookups and already-attached handles belong to the same original records. */
+      const records = [...this.#sessions.values()]
+      /** Real detach begins before waiting for original preparation failures. */
+      const pending: Promise<void>[] = []
+      for (const record of records)
+        pending.push(
+          record.handle ? this.#context.detach(record.handle) : Promise.resolve(),
+          record.opening
+        )
+      /** Preserve the original detach/opening interleaving and aggregate failure order. */
+      const results = await Promise.allSettled(pending)
+      for (const result of results) if (result.status === 'rejected') failures.push(result.reason)
+      this.#sessions.clear()
+      if (failures.length === 1) throw failures[0]
+      if (failures.length > 1)
+        throw attachErrorIdentity(
+          new AggregateError(failures, BrowserPeerErrorText.listenerCleanupFailed, {
+            cause: failures[0]
+          }),
+          { source: RPC_ENDPOINT_ERROR_SOURCE, code: RpcCoreErrorCode.transport }
+        )
+    }))
+}
+
+/** Capture either an actual page target/container or native worker Clients scope, without IO. */
+export function serviceWorkerPlugin<const N extends string = 'serviceWorker'>(
+  options: IServiceWorkerPluginOptions & Readonly<{ namespace?: N }>
+): IRpcTransportPlugin<NoInfer<N>> {
+  /** Native page receive owner stays independent of the outgoing ServiceWorker. */
   const receiver =
-    configured?.receiver ??
+    options?.receiver ??
     (globalThis as unknown as { navigator?: { serviceWorker?: IServiceWorkerMessageReceiver } })
       .navigator?.serviceWorker
+  /** Native Client resolution is used only on the worker side. */
+  const clients = options?.clients
+  /** Source selection remains exclusive and synchronous as in the previous public factory. */
+  const target = options?.serviceWorker
   if (
     (target !== undefined) === (clients !== undefined) ||
     (target !== undefined && (!isTarget(target) || !isReceiver(receiver))) ||
     (clients !== undefined &&
       (!isReceiver(clients) ||
         typeof clients.clients?.get !== 'function' ||
-        configured?.receiver !== undefined))
+        options.receiver !== undefined))
   )
     throw createBrowserPeerError(
       RpcBrowserErrorCode.invalidPeerSource,
       BrowserPeerErrorText.invalidPeerSource
     )
-  /** A cold recipe borrows its exact original native target and opens only canonical raw resources. */
-  const deployment = createAdapterDeployment({
-    runtimeKey: 'thread',
-    runtimeFamily: createServiceWorkerTransport,
-    open: (context) =>
-      openResource(
-        createEventTargetMessageResource(
-          projectBrowserPeerPort(
-            createServiceWorkerTransport({ target: target!, receiver: receiver! })
-          )
-        ),
-        context
-      ),
-    ...(clients
-      ? { listen: async (context, accept) => listenClients(clients, context, accept) }
-      : {})
-  })
+  /** Cold acquisition borrows these exact admitted native sources without rereading caller getters. */
+  const coldContext = { clients, target, receiver }
   return defineTransportPlugin({
-    name: configured!.name ?? ServiceWorkerPluginText.name,
-    mode: clients ? RpcTransportMode.listen : RpcTransportMode.connect,
-    ...(configured!.expose ? { expose: configured!.expose } : {}),
-    ...(configured!.connect ? { connect: configured!.connect } : {}),
-    deployment
+    name: options.name ?? ServiceWorkerPluginText.name,
+    namespace: (options.namespace ?? BrowserNamespace.service) as N,
+    expose: options.expose,
+    features: options.features,
+    handshakeTimeoutMs: options.connect?.timeoutMs,
+    open: (context) => {
+      if (!coldContext.clients)
+        return attachBrowserCarrier(
+          createServiceWorkerCarrier(
+            { target: coldContext.target!, receiver: coldContext.receiver! },
+            context
+          ),
+          context
+        )
+      /** The one native listener belongs to this installation and remains borrowed. */
+      const listener = new ServiceWorkerClientListener(coldContext.clients, context)
+      return { dispose: listener.close }
+    }
   })
 }

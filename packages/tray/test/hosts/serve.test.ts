@@ -1,3 +1,4 @@
+import { TrayInternal } from '../../src/hosts/constants.js'
 import { describe, expect, it } from 'vitest'
 import { defineHost } from '@migaia/plugin-host'
 import { assembled, fixture, liveThreads, processAlive, until } from './helper.js'
@@ -55,8 +56,8 @@ describe('Tray child topology', () => {
           config: { label: 'input' }
         })
         /** RPC family accessor comes from the runtime declaration, not a mock transport. */
-        const outlet = host[definition.runtime]
-        expect((await outlet.list()).connections).toHaveLength(1)
+        const outlet = host[`${TrayInternal.namespacePrefix}child`]
+        expect((await outlet.members.list()).connections).toHaveLength(1)
         for (let count = 0; count < 3; count += 1) {
           expect(await remote.request('node.svc.hello')).toMatchObject({
             id: 'child',
@@ -70,14 +71,14 @@ describe('Tray child topology', () => {
         expect(info.generation).toBe((await tray.get('child')).unit.generation)
         pid = info.pid
         await expect(
-          outlet.request('child', 'trayChild.init', {
+          outlet.request(TrayInternal.init, {
             id: 'child',
             host: definition.name,
             generation: info.generation
           })
         ).rejects.toMatchObject({ code: 'TRAY_CHILD_STATE_INVALID' })
         await expect(
-          outlet.request('child', 'trayChild.init', {
+          outlet.request(TrayInternal.init, {
             id: 'child',
             host: 'foreign',
             generation: info.generation
@@ -88,7 +89,7 @@ describe('Tray child topology', () => {
           code: 'TRAY_PATH_NOT_EXPOSED'
         })
         await tray.remove('child')
-        expect(await (host[definition.runtime]?.list() ?? [])).toEqual([])
+        expect(host[`${TrayInternal.namespacePrefix}child`]).toBeUndefined()
         if (definition.runtime === 'thread') expect(await liveThreads()).toEqual(beforeThreads)
         if (definition.runtime === 'process')
           await until(

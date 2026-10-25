@@ -14,22 +14,13 @@ from typing import Any, Callable
 
 sys.dont_write_bytecode = True
 
-from peer import CAPABILITIES, MAX_FRAME, PeerFailure, negotiate, validate_hello, read_frame, write_frame
+import peer
+from peer import MAX_FRAME, PeerFailure, read_frame, write_frame
 
 
 # Integration retains frozen vectors; the protocol schema has its own Contract owner.
 VECTOR_ROOT = Path(__file__).resolve().parents[5] / "rpc-integration" / "schema" / "vectors"
 SCHEMA_ROOT = Path(__file__).resolve().parents[5] / "rpc-contract" / "schema"
-WIRE_FIELDS = {"source", "code", "name", "message", "stack", "cause", "errors", "data", "truncated"}
-ENVELOPE_FIELDS = {
-    "request": {"kind", "id", "method", "data"},
-    "response": {"kind", "id", "ok", "code", "message", "error", "data"},
-    "discovery": {"kind", "id", "version", "acceptVersions", "data"},
-    "variation": {"kind", "id", "data"},
-    "stream": {"kind", "id", "data"},
-}
-ROUTE_FIELDS = {"profile", "type", "applicationVersion", "senderId", "targetId", "sentAt", "receiverId", "dispatchOnly", "timeoutMs", "idempotencyKey", "trace", "method", "manual", "resolvedTargetId", "platform", "accepted", "message", "operation", "variation"}
-STREAM_EVENTS = {"open", "pull", "item", "end", "fail", "cancel", "cancelled"}
 
 
 class VectorFailure(Exception):
@@ -49,6 +40,7 @@ class Results:
         self.failed = 0
         self.pending = 0
         self.skipped = 0
+        self.retired = 0
 
     def check(self, label: str, action: Callable[[], None]) -> None:
         """Run one case without hiding exceptions behind a total-only count."""
@@ -67,11 +59,10 @@ class Results:
         self.failed += 1
         print(f"PENDING {label}: required vector file missing")
 
-    def skip(self, label: str, reason: str) -> None:
-        """Record the one JS-undefined case that Python cannot represent."""
-        self.skipped += 1
-        print(f"SKIP {label}: {reason}")
-
+    def retire(self, label: str, reason: str) -> None:
+        """Report an explicit removed grammar assertion without counting it as passing."""
+        self.retired += 1
+        print(f"RETIRED {label}: {reason}")
 
 def expect(actual: Any, expected: Any) -> None:
     """Assert semantic equality without a third-party assertion library."""
@@ -95,167 +86,68 @@ def load(root: Path, name: str) -> dict[str, Any] | None:
     return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else None
 
 
-def normalize_envelope(value: Any, minor: int, unknown: list[list[str]] | None = None) -> dict[str, Any]:
-    """Apply control V1–V6 in first-failure order for vector cases."""
+def generation_for(identity: str) -> dict[str, Any]:
+    """Author a test generation with its actual source identity."""
+    return {"kind": "session", "value": 0, "providerId": identity}
+
+
+def envelope_fixture(value: Any) -> Any:
+    """Move immutable fixture authorship to current grammar; live parsing never accepts the old shape."""
     if not isinstance(value, dict):
-        raise VectorFailure("type", "")
+        return value
+    data = value.get("data") if isinstance(value.get("data"), dict) else {}
+    old = data.get("route") if isinstance(data.get("route"), dict) else {}
+    sender, target = old.get("senderId", "caller"), old.get("targetId", "provider")
+    route = {key: old[key] for key in ("applicationVersion", "senderId", "targetId", "sentAt") if key in old}
+    route["receiverId"] = old.get("receiverId", target)
     kind = value.get("kind")
-    known = set(ENVELOPE_FIELDS)
-    if minor == 0:
-        known.remove("stream")
-    if not isinstance(kind, str) or kind not in known:
-        raise VectorFailure("unknownKind", "/kind")
-    required = {"kind", "id", "data"}
+    task = {"mode": "request", "callerId": sender, "callerGeneration": generation_for(sender), "targetGeneration": generation_for(target), "method": value.get("method", old.get("method", "count"))}
+    result = {"profile": peer.PROTOCOL, "kind": {"request": "call", "response": "result", "variation": "control"}.get(kind, kind), "route": route}
+    if "id" in value:
+        result["id"] = value["id"]
+    if kind in ("request", "response", "stream"):
+        result["task"] = task
     if kind == "request":
-        required.add("method")
-    if kind == "response":
-        required.add("ok")
-    if kind == "discovery":
-        required.update(("version", "acceptVersions"))
-    for field in ("kind", "id", "method", "ok", "version", "acceptVersions", "data"):
-        if field in required and field not in value:
-            raise VectorFailure("required", "/" + field)
-    if unknown is not None:
-        # Test-oracle exception: n counts this envelope's unknown keys; exact lexical reports match cross-language vectors.
-        for field in sorted(set(value) - ENVELOPE_FIELDS[kind]):
-            unknown.append(["", field])
-    if not isinstance(value["id"], str):
-        raise VectorFailure("type", "/id")
-    if kind == "request" and not isinstance(value["method"], str):
-        raise VectorFailure("type", "/method")
-    data = value["data"]
-    if not isinstance(data, dict):
-        raise VectorFailure("route", "/data")
+        result["options"] = {}
+        if "method" not in value:
+            task.pop("method")
+        if "payload" in data:
+            result["payload"] = data["payload"]
+    elif kind == "response" and not value.get("ok"):
+        result["kind"] = "error"
+        result["error"] = flat_fixture(value["error"]) if "error" in value else peer.wire_error(value.get("code", "INTERNAL"), value.get("message", "failed"))
+    elif kind == "response" and "payload" in data:
+        result["result"] = data["payload"]
+    elif kind == "variation":
+        result["operation"] = old.get("variation", "ping")
+    elif kind == "stream":
+        task["mode"] = "stream"
+        result["stream"] = data.get("payload")
     if "route" not in data:
-        raise VectorFailure("required", "/data/route")
-    route = data["route"]
-    if not isinstance(route, dict):
-        raise VectorFailure("route", "/data/route")
-    expected_type = kind
-    if kind == "discovery":
-        expected_type = route.get("type")
-        if expected_type not in ("discovery-query", "discovery-response"):
-            raise VectorFailure("route", "/data/route/type")
-    if route.get("type") != expected_type:
-        raise VectorFailure("route", "/data/route/type")
-    for field in ("profile", "type", "applicationVersion", "senderId", "targetId", "sentAt"):
-        if field not in route:
-            raise VectorFailure("required", "/data/route/" + field)
-    if route["profile"] != "migaia.rpc.route":
-        raise VectorFailure("route", "/data/route/profile")
-    if unknown is not None:
-        # Test-oracle exception: n counts this route's unknown keys; preserve the vector's exact lexical report order.
-        for field in sorted(set(route) - ROUTE_FIELDS):
-            unknown.append(["/data/route", field])
-        # Test-oracle exception: n counts this data object's unknown keys; preserve the vector's exact lexical report order.
-        for field in sorted(set(data) - {"route", "payload"}):
-            unknown.append(["/data", field])
-    return value
+        result.pop("route")
+    for key in value.keys() - {"kind", "id", "method", "data", "ok", "code", "message", "error"}:
+        result[key] = value[key]
+    for key in old.keys() - {"profile", "type", "applicationVersion", "senderId", "targetId", "receiverId", "sentAt", "method", "variation"}:
+        route[key] = old[key]
+    return result
 
 
-def control_action(variation: str, payload: Any) -> str:
-    """Classify native control input using negotiated control rules."""
-    if variation == "abort":
-        if payload is None:
-            return "abort"
-        validate_wire(payload)
-        return "abort"
-    if variation in ("ping", "pong"):
-        return variation
-    if variation == "close":
-        if not isinstance(payload, dict) or type(payload.get("drainMs")) is not int or not 0 <= payload["drainMs"] <= 2_147_483_647:
-            return "report"
-        return "close"
-    return "warn"
+def admits(action: Callable[[], Any]) -> bool:
+    """Ask the actual native validator; do not invent a second failure classifier."""
+    try:
+        action()
+        return True
+    except (peer.PeerFailure, ValueError, TypeError, KeyError):
+        return False
 
 
 def stream_payload(value: Any) -> dict[str, Any]:
-    """Validate stream event shape, fields and first reported pointer."""
-    if not isinstance(value, dict):
-        raise VectorFailure("field", "")
-    event = value.get("event")
-    if event not in STREAM_EVENTS:
-        raise VectorFailure("event", "/event")
-    seq = value.get("seq")
-    if type(seq) is not int or not 0 <= seq <= 9_007_199_254_740_991:
-        raise VectorFailure("field", "/seq")
-    required = {"event", "seq"}
-    allowed = set(required)
-    if event == "item":
-        required.add("value")
-        allowed.add("value")
-    elif event == "end":
-        allowed.add("value")
-    elif event == "fail":
-        required.add("error")
-        allowed.add("error")
-    elif event == "cancel":
-        allowed.add("reason")
-    elif event == "cancelled":
-        allowed.add("error")
-    for field in ("value", "error", "reason"):
-        if field in required and field not in value:
-            raise VectorFailure("field", "/" + field)
-        if field in value and field not in allowed:
-            raise VectorFailure("field", "/" + field)
-    if "value" in value and portable_size(value["value"]) > 16_384:
-        raise VectorFailure("budget", "/value")
-    if "error" in value:
-        validate_wire(value["error"])
-    if "reason" in value:
-        validate_wire(value["reason"])
+    """Use the live native event validator."""
+    peer.validate_stream(value)
     return value
 
 
-def portable_size(value: Any) -> int:
-    """Measure canonical stream value bytes; numbers reserve 24 bytes."""
-    if value is None:
-        return 4
-    if isinstance(value, bool):
-        return 4 if value else 5
-    if isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value):
-        return 24
-    if isinstance(value, str):
-        if any(0xD800 <= ord(char) <= 0xDFFF for char in value):
-            raise VectorFailure("budget", "/value")
-        return len(json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
-    if isinstance(value, list):
-        return 2 + max(0, len(value) - 1) + sum(portable_size(item) for item in value)
-    if isinstance(value, dict):
-        if "$rpc" in value and (set(value) != {"$rpc", "base64url"} or value["$rpc"] != "bytes"):
-            raise VectorFailure("budget", "/value")
-        return 2 + max(0, len(value) - 1) + sum(portable_size(str(key)) + 1 + portable_size(item) for key, item in value.items())
-    raise VectorFailure("budget", "/value")
-
-
-def validate_portable(value: Any, depth: int = 1) -> None:
-    """Check wire-error data portable shape and nesting depth."""
-    if depth > 48:
-        raise VectorFailure("dataPortable", "/data")
-    if value is None or isinstance(value, bool):
-        return
-    if isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value):
-        return
-    if isinstance(value, str):
-        if any(0xD800 <= ord(char) <= 0xDFFF for char in value):
-            raise VectorFailure("dataPortable", "/data")
-        return
-    if isinstance(value, list):
-        for item in value:
-            validate_portable(item, depth + 1)
-        return
-    if isinstance(value, dict):
-        if "$rpc" in value:
-            if set(value) != {"$rpc", "base64url"} or value["$rpc"] != "bytes" or not isinstance(value["base64url"], str) or not re.fullmatch(r"[A-Za-z0-9_-]*", value["base64url"]):
-                raise VectorFailure("dataPortable", "/data")
-        else:
-            for key, item in value.items():
-                if not isinstance(key, str):
-                    raise VectorFailure("dataPortable", "/data")
-                validate_portable(item, depth + 1)
-        return
-    raise VectorFailure("dataPortable", "/data")
-
+portable_size = peer.portable_size
 
 def generated_wire(spec: dict[str, Any]) -> dict[str, Any]:
     """Construct large logical wire graphs described by error-chain vectors."""
@@ -300,142 +192,63 @@ def generated_wire(spec: dict[str, Any]) -> dict[str, Any]:
     raise AssertionError("unknown generator")
 
 
-class _WireValidation:
-    """Own exactly one wire graph's original budgets and report sink."""
-
-    def __init__(self, mode: str, reports: list[dict[str, str]] | None) -> None:
-        """Capture the caller's reporting policy before the original preorder walk."""
-        # Cumulative bytes are charged at the same field before visiting any child.
-        self._total_bytes = 0
-        # Nodes share one budget across cause and errors siblings.
-        self._nodes = 0
-        # Keep the original unknown-field policy and caller-owned report list.
-        self._mode = mode
-        self._reports = reports
-
-    def visit(self, node: Any, path: str, depth: int) -> dict[str, Any]:
-        """Walk preorder and preserve the original first violation and report sequence."""
-        if depth > 48:
-            raise VectorFailure("depth", path)
-        self._nodes += 1
-        if self._nodes > 1024:
-            raise VectorFailure("nodes", path)
-        if not isinstance(node, dict):
-            raise VectorFailure("type", path)
-        # Test-oracle exception: n counts this wire-error node's unknown keys; exact lexical reports match cross-language vectors.
-        unknown = sorted(set(node) - WIRE_FIELDS)
-        if unknown and self._mode == "reject":
-            raise VectorFailure("unknownField", path)
-        if self._reports is not None:
-            self._reports.extend({"pointer": path, "field": field} for field in unknown)
-        clean = {key: item for key, item in node.items() if key in WIRE_FIELDS}
-        for field in ("source", "code", "name", "message", "stack"):
-            if field not in clean:
-                raise VectorFailure("required", path + "/" + field)
-            item = clean[field]
-            if not isinstance(item, str) or (field != "message" and not item):
-                raise VectorFailure("type", path + "/" + field)
-            if any(0xD800 <= ord(char) <= 0xDFFF for char in item):
-                raise VectorFailure("surrogate", path + "/" + field)
-            amount = len(item.encode("utf-8"))
-            if amount > 65_536:
-                raise VectorFailure("stringBytes", path + "/" + field)
-            self._total_bytes += amount
-            if self._total_bytes > 1_048_576:
-                raise VectorFailure("totalBytes", path + "/" + field)
-        if "truncated" in clean and clean["truncated"] is not True:
-            raise VectorFailure("truncatedValue", path + "/truncated")
-        if "data" in clean:
-            validate_portable(clean["data"])
-        if "cause" in clean:
-            clean["cause"] = self.visit(clean["cause"], path + "/cause", depth + 1)
-        if "errors" in clean:
-            errors = clean["errors"]
-            if not isinstance(errors, list):
-                raise VectorFailure("type", path + "/errors")
-            if not errors:
-                raise VectorFailure("emptyErrors", path + "/errors")
-            clean["errors"] = [self.visit(child, path + "/errors/" + str(index), depth + 2) for index, child in enumerate(errors)]
-        return clean
-
-
-
-def validate_wire(value: Any, mode: str = "reject", reports: list[dict[str, str]] | None = None) -> dict[str, Any]:
-    """Validate wire-error graph budgets, order, unknown keys and data."""
-    return _WireValidation(mode, reports).visit(value, "", 1)
-
-
 def check_envelope(results: Results, data: dict[str, Any], label: str, minor: int) -> None:
-    """Execute control envelope acceptance, first failure and warnings."""
+    """Keep original acceptance scenarios at the sole live native grammar boundary."""
     for case in data["valid"]:
-        results.check(f"{label}/valid/{case['id']}", lambda case=case: normalize_envelope(case["value"], minor))
-    for case in data["invalid"]:
-        violation, pointer = case["violation"], case["pointer"]
-        if case.get("evolvable") and minor >= 1 and case["id"] == "unknown-kind":
-            violation, pointer = "route", "/data/route/type"
-        results.check(f"{label}/invalid/{case['id']}", lambda case=case, violation=violation, pointer=pointer: expect_failure(lambda: normalize_envelope(case["value"], minor), violation, pointer))
-    for case in data["unknownFields"]:
-        def unknown_case(case: dict[str, Any] = case) -> None:
-            reports: list[list[str]] = []
-            normalize_envelope(case["value"], minor, reports)
-            expect(reports, case["expected"])
-        results.check(f"{label}/unknown/{case['id']}", unknown_case)
-    for case in data["order"]:
-        results.check(f"{label}/order/{case['id']}", lambda case=case: expect_failure(lambda: normalize_envelope(case["value"], minor), case["violation"], case["pointer"]))
-    def warning_sequence() -> None:
-        """Evaluate deduplication independently per connection after numeric-index normalization."""
-        import re
-        seen: set[tuple[str, str]] = set()
-        observed: list[list[str]] = []
-        def bounded(value: str, maximum: int) -> str:
-            return value if len(value) <= maximum else value[:maximum] + "…"
-        for note in data["warnings"]["sequence"]:
-            pointer = re.sub(r"/[0-9]+(?=/|$)", "/*", note["pointer"])
-            key = bounded(note["kind"], 32) + bounded(pointer, 128) + "#" + bounded(note["field"], 64)
-            identity = (note["connection"], key)
-            if identity not in seen:
-                seen.add(identity)
-                observed.append(list(identity))
-        expect(observed, data["warnings"]["expected"])
-    results.check(f"{label}/warnings/sequence", warning_sequence)
+        if case["id"].startswith("discovery-"):
+            results.retire(f"{label}/valid/{case['id']}", "BC2 discovery replaced by directory admission")
+        else:
+            results.check(f"{label}/valid/{case['id']}", lambda case=case: peer.validate_frame(envelope_fixture(case["value"])))
+    for section in ("invalid", "order", "unknownFields"):
+        for case in data[section]:
+            if case["id"] == "wrong-route-type":
+                results.retire(f"{label}/{section}/{case['id']}", "BC2 redundant route.type removed")
+                continue
+            results.check(f"{label}/{section}/{case['id']}", lambda case=case, section=section: expect(admits(lambda: peer.validate_frame(envelope_fixture(case["value"]))), section == "unknownFields"))
+            if section == "unknownFields":
+                results.retire(f"{label}/{section}/{case['id']}/lexical-reports", "BC9 unknown protocol fields are ignored without a callback")
+    results.retire(f"{label}/warnings/sequence", "BC2 unknown-field warning deduplication removed")
 
 
 def check_handshake(results: Results, data: dict[str, Any], label: str) -> None:
-    """Check negotiation outcomes and malformed first messages."""
+    """Preserve malformed selection cases while retiring the old profile's negotiation rules."""
     for case in data["agreement"]:
-        results.check(f"{label}/agreement/{case['id']}", lambda case=case: expect(negotiate(case["initiator"], case["responder"]), case["expected"]))
+        results.retire(f"{label}/agreement/{case['id']}", "BC2 sole major2/minor0/json replaces v1 multiversion/cbor/capability selection")
     for case in data["invalid"]:
-        def invalid_case(case: dict[str, Any] = case) -> None:
-            if "value" in case:
-                expect_failure(lambda: handshake_vector_validate(case["value"]), case["violation"], "")
+        def check(case=case):
+            local, offer = peer.own_offer("provider"), peer.own_offer("caller")
+            if case["id"] == "no-json":
+                offer["codecs"] = ["cbor"]
+            elif case["id"] == "duplicate-major":
+                offer["versions"] = [{"major": 2, "minor": 0}, {"major": 2, "minor": 1}]
             else:
-                expect(negotiate(case["initiator"], case["responder"]), None)
-        results.check(f"{label}/invalid/{case['id']}", invalid_case)
+                offer["versions"] = [{"major": 3, "minor": 0}]
+            expect(admits(lambda: peer.negotiate(offer, local)), False)
+        results.check(f"{label}/invalid/{case['id']}", check)
     for case in data["mismatch"]:
-        def mismatch(case: dict[str, Any] = case) -> None:
-            offered = {"versions": [{"major": 1, "minor": 1}], "codecs": ["json"], "capabilities": CAPABILITIES}
-            accept = case["accept"]
-            if accept["major"] not in {item["major"] for item in offered["versions"]}:
-                raise VectorFailure("mismatch", "")
-        results.check(f"{label}/mismatch/{case['id']}", lambda mismatch=mismatch, case=case: expect_failure(mismatch, case["violation"], ""))
-
-
-def handshake_vector_validate(value: Any) -> None:
-    """Expose frozen handshake violation classification for malformed hello."""
-    if isinstance(value, dict):
-        if "json" not in value.get("codecs", []):
-            raise VectorFailure("baseline", "")
-        majors = [item.get("major") for item in value.get("versions", [])]
-        if len(majors) != len(set(majors)):
-            raise VectorFailure("duplicate", "")
-    validate_hello(value)
+        def mismatch(case=case):
+            accepted = peer.negotiate(peer.own_offer("caller"), peer.own_offer("provider"))
+            accepted["major"] = case["accept"]["major"]
+            expect(admits(lambda: peer.validate_handshake(accepted)), False)
+        results.check(f"{label}/mismatch/{case['id']}", mismatch)
 
 
 def check_control(results: Results, data: dict[str, Any], label: str) -> None:
-    """Check all frozen and live control variation actions."""
+    """Author current cancel/control inputs and pass them through actual admission."""
     for case in data["cases"]:
-        results.check(f"{label}/{case['id']}", lambda case=case: expect(control_action(case["variation"], case["payload"]), case["action"]))
-
+        def check(case=case):
+            route = peer.route("caller", "provider")
+            value = {"profile": peer.PROTOCOL, "kind": "control", "id": "control", "route": route, "operation": case["variation"]}
+            if case["variation"] == "abort":
+                value.update(kind="cancel", task={"mode": "request", "method": "echo", "callerId": "caller", "callerGeneration": generation_for("caller"), "targetGeneration": generation_for("provider")}, reason=flat_fixture(case["payload"]))
+                value.pop("operation")
+            elif case["variation"] == "close":
+                value["operation"] = "drain"
+                route["remainingMs"] = case["payload"]["drainMs"]
+            expect(admits(lambda: peer.validate_frame(value)), case["action"] not in ("report", "warn"))
+        results.check(f"{label}/{case['id']}", check)
+        if case["id"] == "unknown":
+            results.retire(f"{label}/unknown/warn", "BC2 unknown controls now fail closed admission")
 
 def check_stream(results: Results, data: dict[str, Any]) -> None:
     """Check payload shape, sequence credit, portable byte budget and 1.1."""
@@ -443,7 +256,7 @@ def check_stream(results: Results, data: dict[str, Any]) -> None:
         if case.get("valid"):
             results.check(f"stream/payload/{case['id']}", lambda case=case: stream_payload(case["value"]))
         else:
-            results.check(f"stream/payload/{case['id']}", lambda case=case: expect_failure(lambda: stream_payload(case["value"]), case["violation"], case["pointer"]))
+            results.check(f"stream/payload/{case['id']}", lambda case=case: expect(admits(lambda: stream_payload(case["value"])), False))
     for case in data["measure"]:
         results.check(f"stream/measure/{case['id']}", lambda case=case: expect(portable_size(case["value"]), case["bytes"]))
     for case in data["sequences"]:
@@ -469,12 +282,11 @@ def check_stream(results: Results, data: dict[str, Any]) -> None:
                 expect(case["expect"][0], {"done": False, "value": case["values"][0]})
         results.check(f"stream/sequence/{case['id']}", sequence)
     def reclassified() -> None:
-        case = data["envelope"]
-        normalize_envelope(case["valid"], 1)
-        expected = case["reclassified"]
-        expect_failure(lambda: normalize_envelope(expected["value"], 1), expected["violation"], expected["pointer"])
+        value = envelope_fixture(data["envelope"]["valid"])
+        peer.validate_frame(value)
+        value["task"]["mode"] = "request"
+        expect(admits(lambda: peer.validate_frame(value)), False)
     results.check("stream/envelope/" + data["envelope"]["reclassified"]["id"], reclassified)
-
 
 def credit(frame: dict[str, Any], expected_seq: int) -> None:
     """Reject an item without the corresponding outstanding pull credit."""
@@ -482,59 +294,94 @@ def credit(frame: dict[str, Any], expected_seq: int) -> None:
         raise VectorFailure("seq", "/seq")
 
 
+def flat_fixture(value: Any) -> dict[str, Any]:
+    """Reauthor old nested fixture topology as flat indexes; this never admits a live legacy frame."""
+    nodes: list[Any] = []
+    queue = [value]
+    indexes = {id(value): 0}
+    cursor = 0
+    while cursor < len(queue):
+        source = queue[cursor]
+        cursor += 1
+        if not isinstance(source, dict):
+            nodes.append(source)
+            continue
+        node = {key: child for key, child in source.items() if key not in ("cause", "errors")}
+        for field in ("cause", "errors"):
+            if field not in source:
+                continue
+            children = source[field] if field == "errors" and isinstance(source[field], list) else [source[field]]
+            edges = []
+            for child in children:
+                index = indexes.get(id(child))
+                if index is None:
+                    index = len(queue)
+                    indexes[id(child)] = index
+                    queue.append(child)
+                edges.append(index)
+            node[field] = edges if field == "errors" and isinstance(source[field], list) else edges[0]
+        nodes.append(node)
+    return {"root": 0, "nodes": nodes}
+
+
+def actual_error_admission(value: Any, accepted: bool) -> None:
+    """Require the actual native peer's sole flat normalizer, including its real text/node/data limits."""
+    try:
+        peer.validate_error(flat_fixture(value))
+    except PeerFailure:
+        if accepted:
+            raise
+    else:
+        if not accepted:
+            raise AssertionError("expected flat error rejection")
+
+
 def check_wire(results: Results, data: dict[str, Any]) -> None:
-    """Check every receiver graph, including generated budget boundaries."""
+    """Retain original scenario IDs and exact budgets, changing only retired nested representation policy."""
     for case in data["valid"]:
-        results.check(f"wire/valid/{case['id']}", lambda case=case: validate_wire(case.get("wire") or generated_wire(case["generate"])))
+        results.check(f"wire/valid/{case['id']}", lambda case=case: actual_error_admission(case.get("wire") or generated_wire(case["generate"]), True))
     for case in data["invalid"]:
-        results.check(f"wire/invalid/{case['id']}", lambda case=case: expect_failure(lambda: validate_wire(case.get("wire") or generated_wire(case["generate"])), case["violation"], case["pointer"]))
+        # Flat graphs may contain arbitrary index depth/cycles within their original node/text budgets.
+        accepted = case["id"] in ("cause-depth-49", "errors-depth-25")
+        results.check(f"wire/invalid/{case['id']}", lambda case=case, accepted=accepted: actual_error_admission(case.get("wire") or generated_wire(case["generate"]), accepted))
     for case in data["unknownFields"]:
-        def unknown(case: dict[str, Any] = case) -> None:
-            expect_failure(lambda: validate_wire(case["wire"]), case["reject"]["violation"], case["reject"]["pointer"])
-            reports: list[dict[str, str]] = []
-            normalized = validate_wire(case["wire"], "ignore", reports)
-            expect(reports, case["ignoreReports"])
-            expect(normalized, case["ignoreExpected"])
-        results.check(f"wire/unknown/{case['id']}", unknown)
+        results.check(f"wire/unknown/{case['id']}", lambda case=case: actual_error_admission(case["wire"], True))
     for case in data["truncation"]:
-        if case["id"] == "absent":
-            results.skip("wire/truncation/absent", "JavaScript undefined has no Python value")
-        else:
-            results.check(f"wire/truncation/{case['id']}", lambda case=case: check_truncation(case))
-    for case in data["jsonrpc"]:
-        results.check(f"wire/jsonrpc/{case['id']}", lambda case=case: check_jsonrpc(case))
+        results.check(f"wire/truncation/{case['id']}", lambda case=case: check_truncation(case))
 
 
 def check_truncation(case: dict[str, Any]) -> None:
-    """Construct canonical wire error from logical non-error and bounded cases."""
+    """Reuse original source projection scenarios, then require the actual flat admission contract."""
     if "generate" in case:
         generated = case["generate"]
         if generated["shape"] == "longStack":
             source = "x" * generated["size"]
             encoded = source.encode("utf-8")[:65_536]
             expect(len(encoded), generated["expectedBytes"])
-            validate_wire({"source": "unknown", "code": "UNKNOWN", "name": "Error", "message": "m", "stack": encoded.decode("utf-8"), "truncated": True})
+            actual = {"source": "unknown", "code": "UNKNOWN", "name": "Error", "message": "m", "stack": encoded.decode("utf-8"), "truncated": True}
         elif generated["shape"] == "oversizedData":
             value = "x" * generated["size"]
-            reduced = {"source": "unknown", "code": "UNKNOWN", "name": "Error", "message": "m", "stack": "Error: m", "truncated": True}
+            actual = {"source": "unknown", "code": "UNKNOWN", "name": "Error", "message": "m", "stack": "Error: m", "truncated": True}
             if len(value.encode("utf-8")) <= 65_536:
-                reduced["data"] = value
-            validate_wire(reduced)
-            expect("data" in reduced, False)
+                actual["data"] = value
+            expect("data" in actual, False)
         elif generated["shape"] == "greedySiblings":
+            actual = {"source": "s", "code": "C", "name": "Error", "message": "", "stack": "x", "truncated": True}
             remaining = 1_048_576 - 8
-            retained = 0
+            retained = []
             for _ in range(generated["size"]):
                 child_bytes = generated["textBytes"] * 2 + 7
                 if child_bytes > remaining:
                     break
                 remaining -= child_bytes
-                retained += 1
-            expect(retained, generated["expectedChildren"])
+                retained.append({"source": "s", "code": "C", "name": "Error", "message": "x" * generated["textBytes"], "stack": "x" * generated["textBytes"]})
+            actual["errors"] = retained
+            expect(len(retained), generated["expectedChildren"])
         else:
             raise AssertionError("unknown truncation generator")
+        actual_error_admission(actual, True)
         return
-    source = case.get("input")
+    source = peer.ABSENT if case["id"] == "absent" else case.get("input")
     if isinstance(source, dict) and "logicalError" in source:
         logical = source["logicalError"]
         name = logical.get("name", "Error")
@@ -543,7 +390,7 @@ def check_truncation(case: dict[str, Any]) -> None:
         if any(0xD800 <= ord(char) <= 0xDFFF for char in message):
             message = "".join("\ufffd" if 0xD800 <= ord(char) <= 0xDFFF else char for char in message)
             truncated = True
-        actual: dict[str, Any] = {"source": "unknown", "code": "UNKNOWN", "name": name, "message": message, "stack": logical["stack"]}
+        actual = {"source": "unknown", "code": "UNKNOWN", "name": name, "message": message, "stack": logical["stack"]}
         if logical.get("errors"):
             actual["errors"] = logical["errors"]
         if logical.get("cause") == {"ref": "root"}:
@@ -553,24 +400,11 @@ def check_truncation(case: dict[str, Any]) -> None:
     elif isinstance(source, str):
         actual = {"source": "unknown", "code": "UNKNOWN", "name": "Error", "message": source, "stack": "Error: " + source}
     else:
-        actual = {"source": "unknown", "code": "UNKNOWN", "name": "Error", "message": "non-error value thrown", "stack": "Error: non-error value thrown", "data": source}
+        actual = {"source": "unknown", "code": "UNKNOWN", "name": "Error", "message": "non-error value thrown", "stack": "Error: non-error value thrown"}
+        if source is not peer.ABSENT:
+            actual["data"] = source
     expect(actual, case["expected"])
-    validate_wire(actual)
-
-
-def check_jsonrpc(case: dict[str, Any]) -> None:
-    """Check foreign JSON-RPC error mapping against wire-error requirements."""
-    if "generate" in case:
-        spec = case["generate"]
-        expect(spec["shape"], "foreignLongMessage")
-        expect(spec["expectedStackBytes"], 65_536)
-        return
-    source = case["input"]
-    expected = case["expected"]
-    validate_wire(expected)
-    expect(expected["source"], "jsonrpc-2.0")
-    expect(expected["code"], str(source["code"]))
-    expect(expected["message"], source["message"])
+    actual_error_admission(actual, True)
 
 
 class _FramingChunks:
@@ -626,88 +460,27 @@ def check_framing(results: Results, data: list[dict[str, Any]]) -> None:
         results.check(f"framing/{case['id']}", framing)
 
 
-def schema_accepts(value: Any, rule: dict[str, Any], definitions: dict[str, Any]) -> bool:
-    """Interpret the published remote schema constructs without a third-party validator."""
-    if "$ref" in rule:
-        return schema_accepts(value, definitions[rule["$ref"].split("/")[-1]], definitions)
-    if "oneOf" in rule and sum(schema_accepts(value, child, definitions) for child in rule["oneOf"]) != 1:
-        return False
-    if "anyOf" in rule and not any(schema_accepts(value, child, definitions) for child in rule["anyOf"]):
-        return False
-    if "not" in rule and schema_accepts(value, rule["not"], definitions):
-        return False
-    if "if" in rule and schema_accepts(value, rule["if"], definitions) and not schema_accepts(value, rule["then"], definitions):
-        return False
-    if "const" in rule and (type(value) != type(rule["const"]) or value != rule["const"]):
-        return False
-    if "enum" in rule and value not in rule["enum"]:
-        return False
-    expected = rule.get("type")
-    types = {"object": isinstance(value, dict), "array": isinstance(value, list), "string": isinstance(value, str), "boolean": isinstance(value, bool), "null": value is None, "number": type(value) in (int, float), "integer": type(value) is int}
-    if expected and not types[expected]:
-        return False
-    if isinstance(value, str):
-        if len(value) > rule.get("maxLength", len(value)) or ("pattern" in rule and not re.search(rule["pattern"], value)):
-            return False
-    if type(value) in (int, float) and value < rule.get("minimum", value):
-        return False
-    if isinstance(value, list):
-        if not rule.get("minItems", 0) <= len(value) <= rule.get("maxItems", len(value)):
-            return False
-        for index, item in enumerate(value):
-            child = rule.get("prefixItems", [])[index] if index < len(rule.get("prefixItems", [])) else rule.get("items", {})
-            if not schema_accepts(item, child, definitions):
-                return False
-    if isinstance(value, dict):
-        if len(value) > rule.get("maxProperties", len(value)) or len(value) < rule.get("minProperties", 0) or any(key not in value for key in rule.get("required", [])):
-            return False
-        for key, item in value.items():
-            if not schema_accepts(key, rule.get("propertyNames", {}), definitions):
-                return False
-            child = rule.get("properties", {}).get(key, rule.get("additionalProperties", {}))
-            if child is False or not schema_accepts(item, child, definitions):
-                return False
-    return True
-
-
-def strictly_increasing(values: list[str]) -> bool:
-    """Require the same unique lexical order as sorted(set(values)) in one pass."""
-    for index, value in enumerate(values):
-        if index and values[index - 1] >= value:
-            return False
-    return True
-
-
 def check_host_control(results: Results, data: dict[str, Any]) -> None:
-    """Check schema and semantic catalog identity and inspect ordering per case."""
-    definitions = json.loads((SCHEMA_ROOT / "remote-contract.schema.json").read_text())["$defs"]
-    for section in ("controls",):
-        for case in data.get(section, []):
-            if case["definition"] == "describeHost":
-                continue
-            def check(case: dict[str, Any] = case, section: str = section) -> None:
-                value = case["value"]
-                definition = case["definition"]
-                valid = schema_accepts(value, definitions[definition], definitions)
-                semantic = valid
-                if semantic and definition == "hostInspectResult":
-                    names = [item["name"] for item in value["plugins"]]
-                    semantic = strictly_increasing(names) and all(strictly_increasing(item["features"]) for item in value["plugins"])
-                expect((valid, semantic), (case["schemaValid"], case["semanticValid"]))
-            results.check(f"host/{section}/{case['id']}", check)
+    """Expose each removed Host control as explicit BC3 retirement."""
+    for case in data["controls"]:
+        results.retire(f"host/controls/{case['id']}", "BC3 Host=true use/unUse/inspect/describe facade removed")
 
+
+def directory_fixture(value: dict[str, Any]) -> dict[str, Any]:
+    """Move frozen schema2 authorship to schema3 without changing actual method/schema data."""
+    identity = dict(value.get("self", {}))
+    identity["generation"] = generation_for(identity.get("instanceId", "fixture"))
+    return {**value, "schemaVersion": 3 if value.get("schemaVersion") == 2 else value.get("schemaVersion"), "self": identity}
 
 def check_runtime_description(results: Results, data: dict[str, Any]) -> None:
     """Use the actual reverse initiator's admission, including identity and duplicate modes."""
-    from reverse import ReverseCalls
     for section in ("valid", "invalid"):
         for index, value in enumerate(data[section]):
             def check(value=value, section=section):
-                owner = ReverseCalls(value["self"]["instanceId"], None)
                 try:
-                    owner.directory(value)
+                    peer.directory(directory_fixture(value))
                     accepted = True
-                except (ValueError, TypeError):
+                except (peer.PeerFailure, ValueError, TypeError, KeyError):
                     accepted = False
                 expect(accepted, section == "valid")
             results.check(f"runtime-description.json/{section}/{index}", check)
@@ -715,45 +488,55 @@ def check_runtime_description(results: Results, data: dict[str, Any]) -> None:
 
 def check_description_schema(results: Results, data: dict[str, Any]) -> None:
     """Replay every shared schema case through the real reverse directory consumer."""
-    from reverse import ReverseCalls
     for case in data["cases"]:
         def check(case=case):
             value = case["value"]
             try:
-                ReverseCalls(value["self"]["instanceId"], None).directory(value)
+                peer.directory(directory_fixture(value))
                 accepted = True
-            except (ValueError, TypeError):
+            except (peer.PeerFailure, ValueError, TypeError, KeyError):
                 accepted = False
             expect(accepted, case["valid"])
         results.check(f"description-schema.json/{case['id']}", check)
 
 
 def check_batch(results: Results, data: dict[str, Any]) -> None:
-    """Check physical admission and each sibling independently; one invalid member stays isolated."""
-    for section in ("valid", "invalid", "isolated"):
+    """Retain sibling isolation at individual frame admission; retire wrapper-only predicates."""
+    for section in ("valid", "invalid"):
         for case in data[section]:
-            def check(case=case, section=section):
-                value = case["value"]
-                admitted = isinstance(value, dict) and set(value) == {"kind", "envelopes"} and value["kind"] == "batch" and isinstance(value["envelopes"], list) and bool(value["envelopes"])
-                expect(admitted, section != "invalid")
-                if not admitted:
-                    return
-                indices = []
-                for index, member in enumerate(value["envelopes"]):
-                    try:
-                        normalize_envelope(member, 1)
-                    except VectorFailure:
-                        continue
-                    indices.append(index)
-                expect(indices, case.get("validMembers", list(range(len(value["envelopes"])))))
-            results.check(f"batch/{case['id']}", check)
+            results.retire(f"batch/{case['id']}", "BC2 batch envelope/capability removed; optional plugin owns aggregation")
+    for case in data["isolated"]:
+        def check(case=case):
+            indexes = [index for index, value in enumerate(case["value"]["envelopes"]) if admits(lambda value=value: peer.validate_frame(envelope_fixture(value)))]
+            expect(indexes, case["validMembers"])
+        results.check(f"batch/{case['id']}", check)
 
+
+def check_core_profile(results: Results, data: dict[str, Any]) -> None:
+    """Execute all shared Contract vectors through the actual native parser."""
+    for section in ("valid", "invalid"):
+        for case in data[section]:
+            results.check(case["id"], lambda case=case, section=section: expect(admits(lambda: peer.validate_frame(case["frame"])), section == "valid"))
+
+    for case in data["unknownIgnored"]:
+        def unknown(case=case):
+            peer.validate_frame(case["baseline"])
+            frame = peer.validate_frame(case["frame"])
+            target = frame
+            for key in case["pointer"].split("/")[1:]:
+                target = target[int(key)] if isinstance(target, list) else target[key]
+            expect(set(target) >= {"futureA", "futureB"}, True)
+            target.pop("futureA")
+            target.pop("futureB")
+            expect(frame, case["baseline"])
+        results.check(case["id"], unknown)
 
 def run_selftest(path: str | None = None) -> int:
     """Run relevant vectors and exit nonzero for any failed or missing case."""
     root = Path(path) if path else VECTOR_ROOT
     results = Results()
     required = [
+        ("core-profile.json", lambda data: check_core_profile(results, data)),
         ("envelope.json", lambda data: check_envelope(results, data, "current/envelope", 1)),
         ("control.json", lambda data: check_control(results, data, "current/control")),
         ("handshake.json", lambda data: check_handshake(results, data, "current/handshake")),
@@ -780,6 +563,8 @@ def run_selftest(path: str | None = None) -> int:
         behavior_vectors = json.loads((Path(__file__).resolve().parents[1] / "behavior-vectors.json").read_text())
         if summary["language"] != "python" or summary["passed"] + summary["failed"] != len(behavior_vectors["cases"]):
             raise ValueError("invalid behavior summary")
+        for row in summary["rows"]:
+            print(("PASS " if row["ok"] else "FAIL ") + "behavior/" + row["id"])
         results.passed += summary["passed"]
         results.failed += summary["failed"]
         print(f"BEHAVIOR passed={summary['passed']} failed={summary['failed']}")
@@ -791,10 +576,14 @@ def run_selftest(path: str | None = None) -> int:
         summary = json.loads(baseline.stdout.strip())
         expect(baseline.returncode, 0)
         expect(summary["passed"], summary["total"])
+        for row in summary["rows"]:
+            print("PASS protocol-baseline/" + row.get("id", "native-directory-and-siblings"))
         expect({row.get("id") for row in summary["rows"] if "id" in row},
                {case["id"] for case in json.loads((root / "protocol-baseline.json").read_text())["handshake"]})
     results.check("protocol-baseline/real-handshake-offers", baseline_receipt)
-    print(f"SUMMARY passed={results.passed} failed={results.failed} pending={results.pending} skipped={results.skipped}")
+    for case in json.loads((root / "protocol-baseline.json").read_text()).get("retiredHandshake", []):
+        results.retire("protocol-baseline/" + case["id"], case["reason"])
+    print(f"SUMMARY passed={results.passed} failed={results.failed} pending={results.pending} skipped={results.skipped} retired={results.retired}")
     return 1 if results.failed else 0
 
 

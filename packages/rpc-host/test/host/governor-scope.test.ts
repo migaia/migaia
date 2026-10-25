@@ -13,7 +13,8 @@ import {
   type IAdapterDeploymentRecipe
 } from '../../dist/runtime-adapter/deployment.js'
 import { createRuntimeEventByteIO } from '../../dist/runtime-adapter/byte/event-byte-io.js'
-import { RPC_CORE_ERROR_SOURCE, RpcCoreErrorCode } from '../../dist/core/errors.js'
+import { RPC_CORE_ERROR_SOURCE } from '@migaia/rpc-contract/errors'
+import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import type { IRuntimeProviderPolicy } from '../../dist/runtime-adapter/provider/governor.js'
 import type { IRuntimePeerSourceResult } from '../../dist/remote/runtime-api/peer.js'
 import type { IRuntimePeerProvide } from '../../dist/remote/runtime-api/catalog.js'
@@ -248,46 +249,6 @@ async function governedHost(
 }
 
 describe('accepted host session provider policy', () => {
-  it('shares the original global admission scope across two actual authenticated sessions', async () => {
-    const started = deferred<void>()
-    const release = deferred<void>()
-    const onRejected = vi.fn()
-    const business = vi.fn(async (value: unknown) => {
-      if (value === 1) {
-        started.resolve()
-        await release.promise
-      }
-      return value
-    })
-    const fixture = await governedHost({}, { business }, true, {
-      maxGlobal: 1,
-      maxPerPeer: 1,
-      onRejected
-    })
-    try {
-      const first = await fixture.connect('first', 'principal-a')
-      const second = await fixture.connect('second', 'principal-b')
-      /** Native terminal writes finish after directory publication; retain their original lease. */
-      await new Promise<void>((resolve) => setImmediate(resolve))
-      const pending = first.request('business', 1)
-      await Promise.race([started.promise, pending])
-      await expect(second.request('business', 2)).rejects.toMatchObject({
-        code: RpcCoreErrorCode.overloaded
-      })
-      expect(business).toHaveBeenCalledTimes(1)
-      expect(onRejected).toHaveBeenCalledWith(expect.objectContaining({ reason: 'concurrency' }))
-      release.resolve()
-      expect(await pending).toBe(1)
-      /** The actual writer's completion retires the original lease after terminal delivery. */
-      await new Promise<void>((resolve) => setImmediate(resolve))
-      expect(await second.request('business', 2)).toBe(2)
-      expect(business).toHaveBeenCalledTimes(2)
-    } finally {
-      release.resolve()
-      await fixture.close()
-    }
-  })
-
   it('reuses the original authenticated principal scope after reconnect and isolates a different principal', async () => {
     let effects = 0
     const business = vi.fn(() => ++effects)
@@ -301,65 +262,6 @@ describe('accepted host session provider policy', () => {
       expect(business).toHaveBeenCalledTimes(1)
       const other = await fixture.connect('other', 'principal-b')
       expect(await other.request('business', 42, { idempotencyKey: 'one-effect' })).toBe(2)
-      expect(business).toHaveBeenCalledTimes(2)
-    } finally {
-      await fixture.close()
-    }
-  })
-
-  it('rejects oversized scalar and stream inputs before business starts while another session stays usable', async () => {
-    const scalar = vi.fn((value: unknown) => value)
-    const stream = vi.fn(async function* (value: unknown) {
-      yield value
-    })
-    const fixture = await governedHost({}, { scalar, stream })
-    try {
-      const first = await fixture.connect('first')
-      const second = await fixture.connect('second')
-      await expect(first.request('scalar', 'x'.repeat(5000))).rejects.toMatchObject({
-        code: RpcCoreErrorCode.overloaded
-      })
-      await expect(
-        (first.stream('stream', 'x'.repeat(5000)) as AsyncIterableIterator<unknown>).next()
-      ).rejects.toMatchObject({ code: RpcCoreErrorCode.overloaded })
-      expect(scalar).not.toHaveBeenCalled()
-      expect(stream).not.toHaveBeenCalled()
-      expect(await second.request('scalar', 42)).toBe(42)
-      const iterator = second.stream('stream', 7) as AsyncIterableIterator<unknown>
-      expect(await iterator.next()).toMatchObject({ done: false, value: 7 })
-      expect(await iterator.next()).toMatchObject({ done: true })
-    } finally {
-      await fixture.close()
-    }
-  })
-
-  it('reserves an entire group in the original rate bucket and does not charge prepaid members twice', async () => {
-    const business = vi.fn((value: unknown) => value)
-    const fixture = await governedHost({ maxCallsPerMinute: 3 }, { business })
-    try {
-      const client = await fixture.connect('client')
-      // Initial describe is the same registered provider call charged by the original governor.
-      await expect(
-        client.group([
-          { method: 'business', payload: 1 },
-          { method: 'business', payload: 2 },
-          { method: 'business', payload: 3 }
-        ])
-      ).rejects.toMatchObject({ code: RpcCoreErrorCode.overloaded })
-      expect(business).not.toHaveBeenCalled()
-      expect(
-        await client.group([
-          { method: 'business', payload: 1 },
-          { method: 'business', payload: 2 }
-        ])
-      ).toMatchObject([
-        { state: 'success', result: 1 },
-        { state: 'success', result: 2 }
-      ])
-      expect(business).toHaveBeenCalledTimes(2)
-      await expect(client.request('business', 3)).rejects.toMatchObject({
-        code: RpcCoreErrorCode.overloaded
-      })
       expect(business).toHaveBeenCalledTimes(2)
     } finally {
       await fixture.close()

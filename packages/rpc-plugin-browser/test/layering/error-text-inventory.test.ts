@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { BrowserRpcErrorText } from '../../src/browser/error-text.js'
+import { BrowserRpcErrorText } from '../../dist/browser/error-text.js'
 
 describe('error text inventory', () => {
   it('preserves every browser error text from the pre-migration inventory', () => {

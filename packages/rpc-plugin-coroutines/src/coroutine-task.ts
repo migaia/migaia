@@ -1,10 +1,15 @@
+/** Borrow one physical channel per supervised task; token custody and cleanup stay native. */
 import type { INativeAbortSignal } from '@migaia/utils/promise'
+import type { IRpcLaunchFacts } from '@migaia/rpc-host/sdk'
 import type { ICoroutineTask } from '@migaia/supervision/coroutine'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { attachErrorIdentity } from '@migaia/utils/error'
-import { ERROR_SOURCE, RpcCoroutineErrorCode } from './error-code.js'
+import {
+  RPC_COROUTINE_ERROR_SOURCE as ERROR_SOURCE,
+  RpcCoroutineErrorCode
+} from '@migaia/rpc-contract/error-code'
 import { CoroutineErrorText } from './error-text.js'
-import { IpcReporterContext } from '@migaia/rpc-host/plugin'
+import { IpcReporterContext } from '@migaia/rpc-host/sdk'
 
 /** Opaque connection belongs to one task generation and reveals no physical port operation. */
 export type ICoroutineConnect = Readonly<{ readonly __coroutineConnect: unique symbol }>
@@ -44,10 +49,20 @@ export type ICoroutineUserTask = (context: ICoroutineTaskContext) => PromiseLike
 export type ICoroutineReplaceSpec = Readonly<{ task: ICoroutineUserTask }>
 
 /** Exact connection identity reveals only its original task-side port to the family recipe. */
-const coroutinePorts = new WeakMap<ICoroutineConnect, ICoroutineMessagePort>()
+const coroutinePorts = new WeakMap<ICoroutineConnect, ICoroutineConnection>()
 
-/** Exact supervisor identity preserves the family reporter for outlet task replacement. */
-const coroutineReporters = new WeakMap<object, (error: unknown) => void>()
+/** Exact token custody retains only its original port and trusted native bootstrap facts. */
+export type ICoroutineConnection = Readonly<{
+  port: ICoroutineMessagePort
+  facts?: IRpcLaunchFacts
+}>
+
+/** Cold task configuration is explicit input to each independent native generation. */
+type ICoroutineTaskInput = Readonly<{
+  task: ICoroutineUserTask
+  report(error: unknown): void
+  facts?: () => IRpcLaunchFacts
+}>
 
 /** A source failure changes domain and native type only at this package's admission boundary. */
 export function createCoroutineSourceError(): TypeError {
@@ -58,24 +73,11 @@ export function createCoroutineSourceError(): TypeError {
 }
 
 /** Resolve a genuine task connection before any physical resource is opened. */
-export function portOf(connect: ICoroutineConnect): ICoroutineMessagePort {
+export function connectionOf(connect: ICoroutineConnect): ICoroutineConnection {
   /** Ordinary caller objects cannot claim a task's original physical port. */
-  const port = coroutinePorts.get(connect)
-  if (!port) throw createCoroutineSourceError()
-  return port
-}
-
-/** Register only the family-created supervisor, without adding execution or connection state. */
-export function registerCoroutineReporter(
-  supervisor: object,
-  report: (error: unknown) => void
-): void {
-  coroutineReporters.set(supervisor, report)
-}
-
-/** Replacement reuses the exact registration's reporter rather than accepting caller ownership. */
-export function reporterOf(supervisor: object): (error: unknown) => void {
-  return coroutineReporters.get(supervisor)!
+  const connection = coroutinePorts.get(connect)
+  if (!connection) throw createCoroutineSourceError()
+  return connection
 }
 
 /**
@@ -84,31 +86,43 @@ export function reporterOf(supervisor: object): (error: unknown) => void {
  */
 export function wrapCoroutineTask(
   task: ICoroutineUserTask,
-  report: (error: unknown) => void
+  report: (error: unknown) => void,
+  facts?: () => IRpcLaunchFacts
 ): ICoroutineTask<ICoroutineMessagePort> {
-  return async (context) => {
-    /** The supervisor owns this task generation; the wrapper owns only its physical channel. */
-    const { port1, port2 } = new (
-      globalThis as unknown as Readonly<{ MessageChannel: ICoroutineMessageChannelConstructor }>
-    ).MessageChannel()
-    /** The task receives a frozen token whose physical port stays in this lower module. */
-    const connect = Object.freeze({}) as ICoroutineConnect
-    coroutinePorts.set(connect, port2)
-    context.expose(port1)
-    try {
-      await task(
-        Object.freeze({ signal: context.signal, heartbeat: () => context.heartbeat(), connect })
-      )
-    } finally {
-      for (const port of [port1, port2]) {
+  /** One explicit invocation input keeps the wrapper from capturing three independent owners. */
+  const input = { task, report, facts }
+  return (context) => runCoroutineTask(input, context)
+}
+
+/** The original native generation owns expose/heartbeat; this invocation owns channel cleanup. */
+async function runCoroutineTask(
+  input: ICoroutineTaskInput,
+  context: Parameters<ICoroutineTask<ICoroutineMessagePort>>[0]
+): Promise<void> {
+  /** The supervisor owns this task generation; the wrapper owns only its physical channel. */
+  const { port1, port2 } = new (
+    globalThis as unknown as Readonly<{ MessageChannel: ICoroutineMessageChannelConstructor }>
+  ).MessageChannel()
+  /** The task receives a frozen token whose physical port stays in this lower module. */
+  const connect = Object.freeze({}) as ICoroutineConnect
+  coroutinePorts.set(
+    connect,
+    Object.freeze({ port: port2, ...(input.facts ? { facts: input.facts() } : {}) })
+  )
+  context.expose(port1)
+  try {
+    await input.task(
+      Object.freeze({ signal: context.signal, heartbeat: () => context.heartbeat(), connect })
+    )
+  } finally {
+    for (const port of [port1, port2]) {
+      try {
+        port.close()
+      } catch (error) {
         try {
-          port.close()
-        } catch (error) {
-          try {
-            report(error)
-          } catch (failure) {
-            hostRethrowReporter(failure, IpcReporterContext)
-          }
+          input.report(error)
+        } catch (failure) {
+          hostRethrowReporter(failure, IpcReporterContext)
         }
       }
     }

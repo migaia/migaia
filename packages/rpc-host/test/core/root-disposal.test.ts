@@ -8,7 +8,7 @@ import {
 } from '@migaia/plugin-host'
 import type { IPluginHostCore } from '@migaia/plugin-host'
 
-import { RpcLifecycleError } from '../../dist/core/errors.js'
+import { RpcLifecycleError } from '@migaia/rpc-contract/errors'
 import { type IRpcTransport } from '../../dist/core/transport.js'
 import { translateEndpointDisposalError } from '../../dist/core/internal/disposal-translation.js'
 import { connect } from '../../dist/core/middleware/connect.js'

@@ -8,9 +8,9 @@ import {
   type ICoroutineSupervisorPolicy,
   type ICoroutineReplaceSpec,
   type ICoroutinePluginOptions
-} from '../../dist/index.js'
+} from '@migaia/rpc-plugin-coroutines'
 import type * as Host from '@migaia/rpc-host'
-import type * as Sdk from '@migaia/rpc-host/plugin'
+import type * as Sdk from '@migaia/rpc-host/sdk'
 
 /** Public signal is the host AbortSignal that supervision's native controller produces. */
 declare const signal: INativeAbortSignal

@@ -1,8 +1,8 @@
 import { threadId } from 'node:worker_threads'
 import { loadavg } from 'node:os'
 import { performance } from 'node:perf_hooks'
-import { RpcCoreErrorText } from '../../dist/core/error-text.js'
-import { RpcCoreErrorCode } from '../../dist/core/errors.js'
+import { RpcCoreErrorText } from '@migaia/rpc-contract/errors'
+import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { RpcDebugProperty } from '../../dist/core/internal/test-observer.js'
 
 /**

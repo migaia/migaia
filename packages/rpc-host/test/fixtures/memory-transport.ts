@@ -2,7 +2,9 @@ import { deferTask, systemScheduler, type IScheduler } from '@migaia/utils/sched
 import { resolveSchedulerOption } from '@migaia/lifecycle/scheduler'
 import type { IRpcCarrierProbe } from '../../dist/core/probe/types.js'
 import { carrierSizeBytes } from '../../dist/core/adapters/probe-content.js'
-import { createRpcTransportError, RpcCoreErrorCode, tagRpcError } from '../../dist/core/errors.js'
+import { createRpcTransportError } from '../../dist/host/error-owner.js'
+import { tagRpcError } from '@migaia/rpc-contract/errors'
+import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { RpcAdapterErrorText } from '../../dist/core/adapters/error-text.js'
 import { MemoryTransportText } from './memory-text.ts'
 

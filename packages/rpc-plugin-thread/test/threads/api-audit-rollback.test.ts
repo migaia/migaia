@@ -1,6 +1,6 @@
 import { MessageChannel } from 'node:worker_threads'
 import { expect, it } from 'vitest'
-import { createAdapterWebThreadLauncher as createWebThreadLauncher } from '../../dist/threads/web-launcher.js'
+import { createWebThreadLauncher } from '../../dist/threads/web-launcher.js'
 
 it('rolls back the actual acquired Worker when its first physical write fails', async () => {
   /** The native I/O failure must remain the same primary exception after rollback. */

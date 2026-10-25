@@ -1,12 +1,5 @@
-import type { ERROR_SOURCE, IRpcContractErrorCode } from './error-code.js'
-
-/** Stable component descriptor shared by protocol, codec, and framer identities. */
-export type IRpcDescriptor<TId extends string, TVersion extends number> = Readonly<{
-  /** Stable lowercase component token; independent of the npm package version. */
-  id: TId
-  /** Positive safe-integer component revision agreed by its implementation. */
-  version: TVersion
-}>
+/** Pure portable-value, error-projection and shape-diagnostic types; no legacy protocol or framer. */
+import type { ERROR_SOURCE, IRpcContractErrorCode } from '../error-code.js'
 
 /** Portable binary value represented without runtime-specific typed arrays. */
 export type IRpcPortableBytes = Readonly<{
@@ -99,143 +92,16 @@ export type IRpcErrorWireSummary = Readonly<{
 
 /** Caller-owned data maps select error presentation and diagnostics; they grant no runtime rights. */
 export type IRpcErrorWireMetadata = Readonly<{
-  /** Optional caller-owned presentation lookup; omission uses ordinary error projection. */
-  summaries?: Pick<WeakMap<Error, IRpcErrorWireSummary>, 'get'>
+  /** Caller-owned exact-reference presentation; factories may mint only into this explicit map. */
+  summaries?: Pick<WeakMap<Error, IRpcErrorWireSummary>, 'get' | 'set'>
   /** Optional route lookup for exact Error references; it grants no forwarding authority. */
-  routes?: Pick<WeakMap<Error, readonly string[]>, 'get'>
-}>
-
-/** A deserializer can retain admitted routes in this actual map supplied by its caller. */
-export type IRpcErrorWireRouteStore = Pick<WeakMap<Error, readonly string[]>, 'set'>
-
-/** JSON-RPC error object carrying the canonical error payload in its data. */
-export type IRpcJsonRpcErrorObject = Readonly<{
-  /** JSON-RPC integer error code, independent of the semantic code inside the extension. */
-  code: number
-  /** Display message exposed by the JSON-RPC error object. */
-  message: string
-  /** Optional portable data, including the canonical migaiaWireError extension when present. */
-  data?: IRpcWirePortableValue
+  routes?: Pick<WeakMap<Error, readonly string[]>, 'get' | 'set'>
 }>
 
 /** Optional warning hook for fields a protocol minor version may add later. */
 export type IRpcEnvelopeOptions = Readonly<{
   /** Optional additive-field observer; omission silently ignores allowed unknown fields. */
   onUnknownField?: (pointer: string, field: string) => void
-}>
-
-/** Runtime protocol descriptor that normalizes untrusted semantic input. */
-export type IRpcProtocol<
-  TEnvelope extends object,
-  TId extends string,
-  TVersion extends number
-> = IRpcDescriptor<TId, TVersion> &
-  Readonly<{
-    /** Validates/snapshots a semantic value or throws its contract owner's classified failure. */
-    normalize: (value: unknown, options?: IRpcEnvelopeOptions) => TEnvelope
-  }>
-
-/** Encoded representation category used for codec/framer compatibility admission. */
-export type IRpcEncodedType = 'unknown' | 'string' | 'uint8array'
-
-/** Generic framing boundary; semantic contracts do not depend on a transport. */
-export type IRpcFramer<
-  TEncoded,
-  TFrame,
-  TId extends string,
-  TVersion extends number
-> = IRpcDescriptor<TId, TVersion> &
-  Readonly<{
-    /** Representation accepted before this framer cuts physical fragments. */
-    inputEncodedType: IRpcEncodedType
-    /** Representation emitted to the carrier; unknown may include native fragment records. */
-    outputEncodedType: IRpcEncodedType
-    /** Frames one encoded message, preserving context identity and enforcing construction limits. */
-    frame: (value: TEncoded, context: IRpcFrameContext) => readonly TFrame[]
-    /** Admits one fragment and returns pending, complete or a classified rejection. */
-    accept: (frame: TFrame, context: IRpcFrameContext) => IRpcFrameAcceptResult<TEncoded>
-    /** Releases retained assemblies/timers; later admission follows the framer's terminal rules. */
-    close: (reason?: unknown) => void
-  }>
-
-/** Carrier-supplied assembly identity; it does not authenticate a remote sender by itself. */
-export type IRpcFrameContext = Readonly<{
-  /** Original connection/source namespace used to isolate otherwise equal message ids. */
-  source: string
-  /** Message identifier for framing and whole-message ingress correlation. */
-  messageId: string
-}>
-/** Pure admission outcome; rejected carries an Error rather than throwing that framing failure. */
-export type IRpcFrameAcceptResult<TEncoded> =
-  | Readonly<{
-      /** Assembly is retained but not yet complete. */
-      status: 'pending'
-    }>
-  | Readonly<{
-      /** All required fragments have been admitted in order. */
-      status: 'complete'
-      /** Reassembled encoded value, still awaiting semantic decoding/validation. */
-      value: TEncoded
-    }>
-  | Readonly<{
-      /** This physical message was rejected. */
-      status: 'rejected'
-      /** Classified framing/limit/expiry error for the caller to handle. */
-      error: Error
-    }>
-
-/** Stable string fragment wire shape; `source` is supplied by the transport boundary. */
-export type IRpcStringFrame = Readonly<{
-  /** Fragment grammar discriminator; distinct from a semantic envelope kind. */
-  kind: 'rpc.frame.v1'
-  /** Stable message identifier shared by every fragment. */
-  messageId: string
-  /** Zero-based fragment position; native reassembly requires ordered delivery. */
-  index: number
-  /** Total fragment count, bounded before assembly retention. */
-  count: number
-  /** Complete string length in UTF-16 code units, matching the native string-framer quota. */
-  length: number
-  /** This fragment's string slice, not a separately encoded JSON document. */
-  data: string
-}>
-
-/** Stable binary fragment wire shape used by binary transports. */
-export type IRpcBinaryFrame = Readonly<{
-  /** Native fragment grammar discriminator. */
-  kind: 'rpc.frame.v1'
-  /** Identifier shared by all fragments within one source namespace. */
-  messageId: string
-  /** Zero-based ordered fragment position. */
-  index: number
-  /** Bounded total fragment count. */
-  count: number
-  /** Complete message byte length declared before reassembly. */
-  length: number
-  /** This fragment's byte slice. */
-  data: Uint8Array
-}>
-
-/** Resource limits applied before a framer allocates or retains fragment state. */
-export type IRpcFramerOptions = Readonly<{
-  /** Defaults to 16384 units: UTF-16 code units for strings, bytes for Uint8Array messages. */
-  chunkBytes?: number
-  /** Defaults to 16777216 units, with the same string/byte distinction as chunkBytes. */
-  maxMessageBytes?: number
-  /** Defaults to 4096 fragments per message; must be a positive safe integer. */
-  maxChunks?: number
-  /** Defaults to 67108864 retained units across assemblies; at least maxMessageBytes. */
-  maxBufferedBytes?: number
-  /** Defaults to 256 simultaneous source/message assemblies. */
-  maxConcurrentMessages?: number
-  /** Defaults to 30000 ms; positive safe-integer retention lifetime for an incomplete assembly. */
-  assemblyTimeoutMs?: number
-  /** Retained configuration option; current assembly expiry is driven by schedule, not this clock. */
-  now?: () => number
-  /** Optional timer admission callback; omission uses the host timeout path. */
-  schedule?: (callback: () => void, delayMs: number) => unknown
-  /** Optional cancellation for scheduled handles; omission uses the host timeout cancellation. */
-  cancel?: (handle: unknown) => void
 }>
 
 /** Error shape used by callers that need a package code without replacing native Error. */

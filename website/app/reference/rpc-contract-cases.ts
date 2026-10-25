@@ -3,8 +3,33 @@ import type { ICaseDoc, IText } from './contract.js'
 /** Localizes explanations while preserving executable public-entry examples. */
 const t = (en: string, zh: string): IText => ({ en, zh })
 
-/** Contract data, error projection and physical assembly remain separate from request execution. */
+/** Pure snapshots, standalone error trees and the sole flat protocol graph stay separate. */
 export const rpcContractCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  serializeRpcWireError: [
+    {
+      title: t('Keep one shared cause in the flat error graph', '在平面错误图中保持共享原因'),
+      problem: t(
+        'A batch failure has the same RangeError as its primary cause and its first aggregate child. A nested-only serialization can duplicate that object and lose the shared relationship. The sole wire graph uses node indexes, while its receiver restores native classes and original stack strings.',
+        '批量失败把同一范围错误用作主原因和首个聚合子项。只用嵌套序列化会复制该对象并丢失共享关系。唯一线上错误图使用节点索引，接收方恢复原生类型及原堆栈字符串。'
+      ),
+      example: `import {
+  serializeRpcWireError, deserializeRpcWireError
+} from '@migaia/rpc-contract/protocol'
+
+const cause = new RangeError('sample limit')
+const original = new AggregateError([cause], 'sample operation', { cause })
+const wire = serializeRpcWireError(original, { report: console.error })
+const restored = deserializeRpcWireError(wire)
+if (restored instanceof AggregateError) {
+  console.log(restored.cause === restored.errors[0])
+  console.log(restored.stack === original.stack)
+}`,
+      result: t(
+        'Both lines print true. The restored cause and aggregate child share one new receiving-side identity; their original sender stack is preserved. These objects are not === their sending-side originals. Graph normalization also checks indices and aggregate budgets, beyond what JSON Schema alone proves.',
+        '两行均输出真值。恢复后的原因及聚合子项共享一个新的接收端身份，并保留原发送方堆栈；它们与发送方原对象不是同一身份。错误图规范化还检查索引和累计预算，超出单独数据模式所能证明的范围。'
+      )
+    }
+  ],
   normalizePortable: [
     {
       title: t('Capture data before the caller changes it', '在调用者修改前捕获数据'),
@@ -75,44 +100,6 @@ export const rpcContractCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
       result: t(
         'Prints `Error UNKNOWN` and `1 message true`. A wire error is still returned, and the report identifies the unreadable message field with the exact original TypeError.\n\nreport is required and receives pointer, field and the original failure synchronously. These records are local diagnostic evidence, not extra wire fields. Untagged errors use the unknown source/code fallback; unreadable fields follow the bounded serializer policy.',
         '逐行输出 `Error UNKNOWN`、`1 message true`，仍返回线上错误，报告指出不可读的消息字段并保留原始 `TypeError`。\n\n`report` 必填，同步收到指针、字段和原始失败；这些记录是本地诊断依据，不是额外线上字段，未编码错误使用未知来源与错误码兜底，不可读字段遵守有界序列化策略。'
-      )
-    }
-  ],
-  createStringFramer: [
-    {
-      title: t(
-        'Keep equal message identifiers from different peers separate',
-        '隔离不同对端的相同消息标识'
-      ),
-      problem: t(
-        'Two peers each send a fragmented message named job. Their chunks can interleave, but completing one message must not concatenate bytes from the other peer.\n\nA buffer map keyed only by messageId merges unrelated senders. Even ordered chunks then produce a plausible but incorrect combined value, or consume another sender assembly state.\n\ncreateStringFramer retains assemblies by source and messageId together. Set chunkBytes to 2, interleave the two first fragments, then finish each source separately and close the framer.',
-        '两个对端分别发送标识为 `job` 的分片消息，分片可能交错，但完成一条消息时不能拼入另一个对端的数据。\n\n只用 `messageId` 建缓冲表会合并无关发送方，即使分片有序也可能得到看似合法的错误组合，或消费另一个发送方的组装状态。\n\n`createStringFramer` 共同使用 `source` 与 `messageId` 保存组装状态，把 `chunkBytes` 设为 `2`，交错接收两条首片，再分别完成并关闭分帧器。'
-      ),
-      example: t(
-        "import { createStringFramer } from '@migaia/rpc-contract/framing'\n\nconst framer = createStringFramer({ chunkBytes: 2 })\nconst a = { source: 'peer-a', messageId: 'job' }\nconst b = { source: 'peer-b', messageId: 'job' }\nconst first = framer.frame('abcd', a)\nconst second = framer.frame('wxyz', b)\nconsole.log(framer.accept(first[0]!, a).status, framer.accept(second[0]!, b).status)\nconst completedA = framer.accept(first[1]!, a)\nconst completedB = framer.accept(second[1]!, b)\nconsole.log(completedA.status === 'complete' ? completedA.value : completedA.status)\nconsole.log(completedB.status === 'complete' ? completedB.value : completedB.status)\nframer.close()",
-        "import { createStringFramer } from '@migaia/rpc-contract/framing'\n\nconst framer = createStringFramer({ chunkBytes: 2 })\nconst a = { source: 'peer-a', messageId: 'job' }\nconst b = { source: 'peer-b', messageId: 'job' }\nconst first = framer.frame('abcd', a)\nconst second = framer.frame('wxyz', b)\nconsole.log(framer.accept(first[0]!, a).status, framer.accept(second[0]!, b).status)\nconst completedA = framer.accept(first[1]!, a)\nconst completedB = framer.accept(second[1]!, b)\nconsole.log(completedA.status === 'complete' ? completedA.value : completedA.status)\nconsole.log(completedB.status === 'complete' ? completedB.value : completedB.status)\nframer.close()"
-      ),
-      result: t(
-        'Prints `pending pending`, `abcd`, then `wxyz`. Both partial assemblies coexist despite sharing job as messageId, and each complete result contains only its own source data.\n\nThe caller owns trusted source attribution and message correlation; frame data does not authenticate a peer. This string profile counts UTF-16 code units despite the chunkBytes option name, requires ordered delivery, and releases retained timers through close().',
-        '逐行输出 `pending pending`、`abcd`、`wxyz`，相同消息标识的两条部分组装可并存，完成结果分别只含自身来源的数据。\n\n调用者负责可信来源归属和消息关联，分片数据不认证对端；字符串形态虽用 `chunkBytes` 名称，实际按 UTF-16 码元计数，要求有序交付，并通过 `close()` 释放保留计时器。'
-      )
-    },
-    {
-      title: t(
-        'Reject out-of-order chunks and close partial assemblies',
-        '拒绝乱序分片并关闭未完成组装'
-      ),
-      problem: t(
-        'A receiver sees the second fragment before the first, then shuts down after receiving only a prefix. It needs an explicit rejection result and a way to release the unfinished assembly.\n\nJoining whichever fragments arrive produces reordered payloads. Keeping the prefix after shutdown leaves assembly buffers and timeout ownership alive beyond the receiver lifetime.\n\ncreateStringFramer.accept returns pending, complete or rejected. Submit the out-of-order fragment, start a valid prefix, then call close() before another accept to observe the terminal ingress boundary.',
-        '接收器先看到第二片，随后只取得前缀便关闭，需要明确的拒绝结果，也需要释放未完成组装的方式。\n\n按到达顺序直接拼接会形成乱序载荷，关闭后继续保存前缀则让缓冲与超时归属超出接收器生命周期。\n\n`createStringFramer.accept` 返回 `pending`、`complete` 或 `rejected`；先提交乱序片，再接收合法首片，随后关闭并再次接收，观察接收终态边界。'
-      ),
-      example: t(
-        "import { createStringFramer } from '@migaia/rpc-contract/framing'\n\nconst framer = createStringFramer({ chunkBytes: 2 })\nconst context = { source: 'peer-a', messageId: 'job' }\nconst frames = framer.frame('abcd', context)\nconst early = framer.accept(frames[1]!, context)\nconsole.log(early.status, early.status === 'rejected' ? (early.error as Error & { code: string }).code : '')\nconsole.log(framer.accept(frames[0]!, context).status)\nframer.close()\nconst closed = framer.accept(frames[1]!, context)\nconsole.log(closed.status, closed.status === 'rejected' ? (closed.error as Error & { code: string }).code : '')",
-        "import { createStringFramer } from '@migaia/rpc-contract/framing'\n\nconst framer = createStringFramer({ chunkBytes: 2 })\nconst context = { source: 'peer-a', messageId: 'job' }\nconst frames = framer.frame('abcd', context)\nconst early = framer.accept(frames[1]!, context)\nconsole.log(early.status, early.status === 'rejected' ? (early.error as Error & { code: string }).code : '')\nconsole.log(framer.accept(frames[0]!, context).status)\nframer.close()\nconst closed = framer.accept(frames[1]!, context)\nconsole.log(closed.status, closed.status === 'rejected' ? (closed.error as Error & { code: string }).code : '')"
-      ),
-      result: t(
-        'Prints `rejected INVALID_FRAME`, `pending`, then `rejected INVALID_FRAME`. The early second fragment is refused; after a valid prefix, close() prevents further acceptance.\n\nInvalid incoming fragments return categorized rejections, while invalid construction limits throw. close() clears assemblies and timers; this framer does not reorder or retry delivery, and frame-size, chunk-count and concurrency limits still apply.',
-        '逐行输出 `rejected INVALID_FRAME`、`pending`、`rejected INVALID_FRAME`，过早的第二片被拒绝，合法前缀之后的关闭也阻止继续接收。\n\n非法入站分片返回带分类的拒绝结果，非法构造限制则抛错；`close()` 清理组装与计时器，此分帧器不负责重排或重试，消息大小、分片数与并发限制仍然生效。'
       )
     }
   ]

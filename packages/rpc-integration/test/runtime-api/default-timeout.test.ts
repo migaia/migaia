@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { it, vi } from 'vitest'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { RpcCoreErrorCode } from '../../../rpc-host/dist/core/errors.js'
+import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import type { IRpcContext } from '../../../rpc-host/dist/core/typing.js'
 import {
   createRuntimePeer,

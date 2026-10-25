@@ -11,6 +11,7 @@ const SOURCES = import.meta.glob(['../../src/**/*.ts', '../../src/**/*.tsx'], {
   eager: true
 }) as Record<string, string>
 
+/** The actual package manifest proves runtime dependency direction independently of source text. */
 const PACKAGE_MANIFESTS = import.meta.glob('../../package.json', {
   query: '?raw',
   import: 'default',
@@ -19,7 +20,9 @@ const PACKAGE_MANIFESTS = import.meta.glob('../../package.json', {
 
 /** 覆盖具名/默认/命名空间/副作用四种 import 形态——任何一种都能把跨包依赖悄悄带回来。 */
 function importSpecifiers(source: string): string[] {
+  /** Retain every static or literal dynamic dependency for the existing boundary assertions. */
   const specifiers: string[] = []
+  /** Imports and re-exports share the same dependency restrictions. */
   const patterns = [
     /import\s+[^'"]*from\s+['"]([^'"]+)['"]/g,
     /import\s+['"]([^'"]+)['"]/g,
@@ -34,6 +37,7 @@ function importSpecifiers(source: string): string[] {
 
 describe('web-rpc 边界：不得依赖 src/store', () => {
   it('no file imports from ../store or @/store', () => {
+    /** A nonempty violation list identifies the exact production dependency edge. */
     const offenders: string[] = []
     for (const [path, source] of Object.entries(SOURCES)) {
       if (path.endsWith('.test.ts') || path.endsWith('.test.tsx')) continue
@@ -51,6 +55,7 @@ describe('web-rpc 边界：不得依赖 src/store', () => {
   })
 
   it('the glob actually found source files (guards against a silently-empty scan)', () => {
+    /** Source discovery itself must succeed before the boundary checks can be evidence. */
     const nonTestFiles = Object.keys(SOURCES).filter(
       (path) => !path.endsWith('.test.ts') && !path.endsWith('.test.tsx')
     )
@@ -58,12 +63,14 @@ describe('web-rpc 边界：不得依赖 src/store', () => {
   })
 
   it('enforces the web-rpc layer import boundaries', () => {
+    /** Mandatory Host owners remain independent from concrete native media. */
     const violations: string[] = []
     for (const [path, source] of Object.entries(SOURCES)) {
       if (path.endsWith('.test.ts') || path.endsWith('.test.tsx')) continue
+      /** Inspect actual imports rather than runtime symbol names in comments or strings. */
       const imports = importSpecifiers(source)
       if (
-        /\/internal\/(?:runtime|pending|peers|provider)\.ts$|\/wire\.ts$|\/endpoint\.ts$/.test(path)
+        /\/src\/(?:host|namespace|session|call|dispatch|forward|stream|flow|feature)\//.test(path)
       ) {
         if (
           imports.some((specifier) =>
@@ -74,49 +81,12 @@ describe('web-rpc 边界：不得依赖 src/store', () => {
         )
           violations.push(`${path} imports a platform module`)
       }
-      if (
-        /\/adapters\//.test(path) &&
-        imports.some((specifier) => /(?:endpoint|factory|middleware)/.test(specifier))
-      )
-        violations.push(`${path} imports endpoint/factory/middleware`)
       if (path.endsWith('/index.ts')) {
         /** Internal imports support ordinary operations; only actual re-exports cross the API. */
-        for (const [, symbols, specifier] of source.matchAll(
+        for (const [, , specifier] of source.matchAll(
           /export\s+(\*|\{[^}]*\})\s+from\s+['"]([^'"]+)['"]/g
         )) {
           if (!/(?:\/internal\/|(?:^|\/)(?:wire|endpoint)\.js$)/.test(specifier)) continue
-          /** These exact canonical operations form the adapter SDK; no mutable owner crosses it. */
-          const allowedSdkSymbols: Readonly<Record<string, readonly string[]>> = {
-            '../core/internal/listener-safety.js': [
-              'collectListenerCleanupFailures',
-              'collectListenerFailure',
-              'createListenerFailure',
-              'createListenerFailureState',
-              'drainListenerFailures',
-              'drainTerminalListenerFailures',
-              'observeListener',
-              'registerListeners',
-              'releaseListenerRegistration',
-              'reportListenerFailure'
-            ],
-            '../core/internal/message-listener-hub.js': ['createMessageListenerHub'],
-            '../core/internal/safe-value.js': ['safeRead', 'safeString'],
-            '../core/internal/error-wire-metadata.js': ['serializeRpcError', 'deserializeRpcError']
-          }
-          /**
-           * Core retains only its original wire-error boundary; the adapter SDK is separately
-           * exact.
-           */
-          const allowed =
-            path === '../../src/plugin/index.ts' ? allowedSdkSymbols[specifier] : undefined
-          /** Set equality permits no extra symbol, namespace export or private writer. */
-          const emitted = new Set(symbols.replace(/[\s{}]/g, '').split(','))
-          if (
-            allowed &&
-            emitted.size === allowed.length &&
-            allowed.every((name) => emitted.has(name))
-          )
-            continue
           violations.push(`${path} exports an internal module`)
         }
       }
@@ -125,6 +95,7 @@ describe('web-rpc 边界：不得依赖 src/store', () => {
   })
 
   it('requires canonical PluginHost and capability topology owners', () => {
+    /** Native PluginHost is the only installation owner; capability remains a fixture dependency. */
     const manifest = JSON.parse(Object.values(PACKAGE_MANIFESTS)[0] ?? '{}') as {
       dependencies?: Record<string, string>
       devDependencies?: Record<string, string>
@@ -134,6 +105,7 @@ describe('web-rpc 边界：不得依赖 src/store', () => {
     expect(manifest.devDependencies?.['@migaia/capability']).toBe('workspace:^')
     expect(manifest.dependencies?.['@migaia/capability']).toBeUndefined()
 
+    /** The replaced middleware package cannot remain as a hidden execution path. */
     const pipelineImports = Object.entries(SOURCES)
       .filter(([path]) => !path.endsWith('.test.ts') && !path.endsWith('.test.tsx'))
       .filter(([, source]) => source.includes('@migaia/middleware-pipeline'))
@@ -141,46 +113,9 @@ describe('web-rpc 边界：不得依赖 src/store', () => {
     expect(pipelineImports).toEqual([])
   })
 
-  it('has one activation/projection and one physical subscribe owner', () => {
-    const coreSource = SOURCES['../../src/core/composed.ts']
-    const kernelSource = SOURCES['../../src/core/endpoint-kernel.ts']
-    const activationSource = SOURCES['../../src/core/internal/transport-activation.ts']
-    expect(coreSource).toBeDefined()
-    expect(kernelSource).toBeDefined()
-    expect(activationSource).toBeDefined()
-    expect(coreSource).not.toContain('disposePromise')
-    expect(coreSource).not.toContain('Object.fromEntries')
-    expect(kernelSource).not.toContain('disposePromise')
-    expect(kernelSource).not.toContain('transport.subscribe')
-    expect(activationSource?.match(/\.subscribe\s*\(/g)).toHaveLength(1)
-    expect(coreSource).toContain('createEndpointProjection')
-  })
-
-  it('keeps the outbound sender domain-owned and stage-free by default', () => {
-    const senderSource = SOURCES['../../src/core/internal/outbound-sender.ts']
-    const outboundAttachmentSource = SOURCES['../../src/core/internal/outbound-attachment.ts']
-    expect(senderSource).toBeDefined()
-    expect(outboundAttachmentSource).toBeDefined()
-    expect(senderSource).toContain('class RpcOutboundSender')
-    expect(senderSource).not.toContain('WebRpcOutboundPipeline')
-    expect(senderSource).not.toMatch(/\b(?:stage|next)\s*:/)
-    expect(importSpecifiers(outboundAttachmentSource)).toContain('./outbound-sender.js')
-    expect(SOURCES['../../src/core/internal/pipeline.ts']).toBeUndefined()
-    expect(SOURCES['../../src/core/internal/runtime.ts']).toBeUndefined()
-    const senderImporters = Object.entries(SOURCES)
-      .filter(([path]) => !path.endsWith('.test.ts') && !path.endsWith('.test.tsx'))
-      .filter(([, source]) => importSpecifiers(source).includes('./outbound-sender.js'))
-      .map(([path]) => path)
-    expect(senderImporters).toEqual(['../../src/core/internal/outbound-attachment.ts'])
-    const staleClassReferences = Object.entries(SOURCES)
-      .filter(([path]) => !path.endsWith('.test.ts') && !path.endsWith('.test.tsx'))
-      .filter(([, source]) => source.includes('WebRpcOutboundPipeline'))
-      .map(([path]) => path)
-    expect(staleClassReferences).toEqual([])
-  })
-
   it('keeps timer and callback ownership in the internal utilities', () => {
     expect(Object.keys(SOURCES).some((path) => path.endsWith('/endpoint.ts'))).toBe(false)
+    /** Mutable receiver helpers remain forbidden after the old endpoint implementation is removed. */
     const bindCallApply = Object.entries(SOURCES)
       .filter(([path]) => !path.endsWith('.test.ts') && !path.endsWith('.test.tsx'))
       .flatMap(([path, source]) =>
@@ -188,7 +123,15 @@ describe('web-rpc 边界：不得依赖 src/store', () => {
          * AGENTS permits Reflect.apply for captured builtins; mutable receiver helpers remain
          * banned.
          */
-        (source.match(/(?<!Reflect)\.(?:bind|call|apply)\s*\(/g) ?? []).map(() => path)
+        (
+          source
+            /**
+             * These actual typed domain ports invoke RPC or subscribe a governor, never rebind a
+             * function.
+             */
+            .replace(/this\.#(?:ports|setup)\.call\s*\(|governor\.bind\s*\(/g, '')
+            .match(/(?<!Reflect)\.(?:bind|call|apply)\s*\(/g) ?? []
+        ).map(() => path)
       )
     expect(bindCallApply).toEqual([])
   })

@@ -3,7 +3,7 @@ import { it } from 'vitest'
 import { identityCodec } from '@migaia/serialize/codecs/identity/v1'
 import { normalizeRpcEnvelope, rpcProtocolV1, type IRpcEnvelope } from '@migaia/rpc-contract'
 import { messageFramerV1 } from '@migaia/rpc-contract/framing'
-import { RpcTransportError } from '../../../dist/core/errors.js'
+import { RpcTransportError } from '@migaia/rpc-contract/errors'
 import { RpcOutboundSender } from '../../../dist/core/internal/outbound-sender.js'
 import type { IRpcSelectedComponents } from '../../../dist/core/internal/endpoint-options.js'
 

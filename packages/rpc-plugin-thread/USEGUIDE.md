@@ -1,99 +1,110 @@
-# thread plugin 使用指南
+# Thread 使用指南
 
 [README](./README.md) · [English](./USEGUIDE.en.md)
 
-本包为 Node、Bun、Deno 的实际线程提供 transport plugin。浏览器 Worker、SharedWorker 与页面端口使用 [browser 指南](../rpc-plugin-browser/USEGUIDE.md)，不要依赖服务器 guard 猜浏览器来源。
+Contract 只定义纯协议和接口；Host 拥有会话、目录、provider 与调用生命周期；Thread transport 获取和监管真实 Worker。flow plugin 通过固定消息介入点提供 auth、chunk、batch、probe；feature 提供所属 plugin 的 timeout、retry 或 pool。一个 Host 可以按不同命名空间安装多个 transport；本指南只需要 Thread。
 
-## 从实际 Worker 开始
+## 显式父子入口
 
-保存为独立 ESM 入口，Node 24 可直接运行 TypeScript；其他工具链先编译。父端显式 spawn，子端用真实 bootstrap 接父端：
-
-```ts doc-test=check
-import { createRpcHost } from '@migaia/rpc-host'
-import { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'
-
-if (await isThreadChild()) {
-  await createRpcHost({
-    plugins: [threadPlugin({ connectToParent: true })],
-    provide: { double: (value: number) => value * 2 }
-  })
-} else {
-  const host = await createRpcHost<{ double(value: number): number }>({
-    plugins: [threadPlugin({ spawn: true, connect: { timeoutMs: 1500 } })]
-  })
-  try {
-    console.log(await host.request('double', 21))
-  } finally {
-    await host.close()
-  }
-}
-```
-
-父端输出 42。显式入口可用 spawn:new URL('./worker.js',import.meta.url)。provide 可含生成器，父子都可反向调用同一会话。self 是应用握手身份，不应从原生端口或环境字符串伪造；省略时使用原 launcher/bootstrap 的独立身份。
-
-## 逐项结果、提前结束与调用取消
+父入口使用真实 `worker.js`，并将完整策略实例装在 transport 的 `features`。声明远端类型时同时保留 `typeof plugins`，以保留 namespace 和成员控制的类型。
 
 ```ts doc-test=check
-import type { IRpcHost } from '@migaia/rpc-host'
+import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
+import { threadPlugin } from '@migaia/rpc-plugin-thread'
+import { timeout, retry } from '@migaia/rpc-host/features'
 
 type IWorkerApi = {
-  worker: { values(end: number): AsyncIterable<number>; wait(value: number): number }
+  values(end: number): AsyncIterable<number>
+  wait(value: number): number
+  bytes(value: Uint8Array<ArrayBuffer>): number
 }
-export async function consume(host: IRpcHost<IWorkerApi>) {
-  const stream = host.peers.worker.values(3)
+
+const plugins = [
+  threadPlugin({
+    name: 'worker',
+    spawn: new URL('./worker.js', import.meta.url),
+    features: [timeout({ ms: 1500 }), retry({ attempts: 2 })]
+  })
+] as const
+
+type IThreadHost = IRpcHost<IWorkerApi, typeof plugins>
+
+export function open() {
+  return createRpcHost<IWorkerApi, typeof plugins>({ plugins })
+}
+
+export async function firstValue(host: IThreadHost) {
+  const stream = host.thread.peers.worker.values(3)
   try {
     return await stream.next()
   } finally {
     await stream.return?.()
   }
 }
-export async function cancel(host: IRpcHost<IWorkerApi>) {
-  const controller = new AbortController()
-  const pending = host.send('worker', 'wait', 1, { signal: controller.signal, timeoutMs: 1500 })
-  controller.abort()
-  return await pending
+
+export function work(host: IThreadHost, signal: AbortSignal) {
+  return host.thread.send('worker', 'wait', 21, {
+    signal,
+    timeout: timeout({ ms: 500 }),
+    retry: false
+  })
+}
+
+export function sendBytes(host: IThreadHost, bytes: Uint8Array<ArrayBuffer>) {
+  return host.thread.send('worker', 'bytes', bytes, { transfer: [bytes.buffer] })
+}
+
+export async function inspectAndRestart(host: IThreadHost) {
+  const before = await host.thread.members.get('worker')
+  await host.thread.members.restart('worker')
+  return before
 }
 ```
 
-helper 的 host 声明包含当前直连 worker。流 next/return/throw 仍是原迭代器；提前 return 结束对应业务流，不终止整个 Worker。调用 signal 与 task/Worker 寿命不是同一层。处理方必须读取其 context.signal，取消不能抢占同步死循环。
-
-notify 只等物理发送，request 等业务结果。多个当前直连的无目标调用按 host 广播规则返回；需要一个标量用 send(nameOrId,method,payload)。持有的 peers.worker 方法绑定原代，重启后旧函数拒绝；重新读取当前目录取得新能力。
-
-## 崩溃、重启与结果对账
+`worker.js` 对应的子入口如下。用工具链编译 ESM，或为支持原生 TypeScript 的运行环境选实际 `.ts` 入口。相对字符串以实际主入口解析；需要固定基准时使用短配置 `{ entry, base }`。
 
 ```ts doc-test=check
-import { retryFeature, timeoutFeature } from '@migaia/rpc-host/features'
+import { createRpcHost } from '@migaia/rpc-host'
+import { threadPlugin } from '@migaia/rpc-plugin-thread'
 
-export const recoveryFeatures = [retryFeature(), timeoutFeature({ ms: 1500 })]
+await createRpcHost({
+  plugins: [threadPlugin({ connectToParent: true })],
+  provide: {
+    values: async function* (end: number) {
+      for (let value = 0; value < end; value += 1) yield value
+    },
+    wait: (value: number) => value,
+    bytes: (value: Uint8Array) => value.byteLength
+  }
+})
 ```
 
-安装到同一 host.plugins。原 supervisor 决定是否及何时自动重启；retryFeature 使用原代次、声明、幂等性与期限判断请求可否重试，不另建重启器。未确认执行可能得到 REMOTE_RESULT_UNKNOWN；没有此策略的原传输失败仍保持原错误。不能看到连接恢复就盲目重发非幂等调用。
+`spawn` 与 `connectToParent` 必须恰选一个。短配置支持 `entry/name/data/limits` 和调用方提供的原生 launcher、budget、scheduler；完整 `IThreadSpawn` 保留所选原生监管配方。`name` 是注册名，`namespace` 决定 `host.<ns>`。父子身份与 generation 来自真实 bootstrap；显式 `self` 必须与实际来源一致。
 
-connect.timeoutMs 是 identity/能力握手的共享预算，调用 timeoutMs 只控制对应业务等待。启动超时、停止、资源预算、heap/权限限制仍由所选原生来源及 supervisor 配置负责。一个关闭的 host 不可复活；使用新 host 才建立新的所有权。
+## 调用与策略
 
-## 克隆与 ownership transfer
+`host.thread.request` 无目标时按当前直连集合调用；`send(nameOrId, method, payload, options)` 选择一个目标。`notify` 使用 `{ targetId }` 选择目标，只等实际物理写出，不等 provider 完成或 ACK。普通 namespace 有多个直连时，无目标调用返回各目标独立的结果。
 
-```ts doc-test=check
-import type { IRpcHost } from '@migaia/rpc-host'
+`timeout`、`retry` 只能是完整 feature 实例或 `false`。优先级为单次调用、transport 安装值、链路策略 plugin。上例单次调用使用 500 ms timeout，并关闭该次 retry；没有选中的策略就不自动启用。原生启动、health、stop 与业务调用的期限各有原 owner，不能用业务 timeout 推断它们的时钟。
 
-type IWorkerApi = { worker: { bytes(value: Uint8Array): number } }
-export async function sendOwnedBytes(host: IRpcHost<IWorkerApi>, bytes: Uint8Array<ArrayBuffer>) {
-  return await host.send('worker', 'bytes', bytes, { transfer: [bytes.buffer] })
-}
-```
+Thread 的 `spec.limits.callWallTimeMs` 围住整个 originating 调用，包括 retry/backoff；同一原生 registration 保留其初始已准入 spec 的上限，重启或替换不会偷偷换掉该配置。较短的业务 timeout 仍可提前结束调用，`timeout: false` 不能取消该原生上限。未设置原生上限时，`timeout: false` 不自动添加期限。
 
-这段 helper 只有在实际会话具备 native carrier、双方协商能力及受支持认证配置时才能成功。未认证 RPC transfer 会在原准入边界拒绝，不因为底层有 postMessage 就授权。需要普通复制时不传 transfer list。失败后检查原 buffer 是否仍由本端拥有；不要自行假定 detach 或业务完成。
+`signal` 协作取消业务；处理方通过 context.signal 观察。取消不会抢占同步循环，也不等于终止 Worker。原生重启策略来自 supervisor，retry 只在实际支持的代次与业务声明条件下决定调用是否重放。未确认结果可能已执行，不能将恢复连接当成安全重试授权。
 
-## 原生错误与资源观测
+## 流、transfer 与观察
 
-rpc.transport.thread 标记线程边界；rpc.endpoint 与 rpc.remote 保留调用及托管错误。跨 Worker 的标准错误表示保留 source/code/name/message/stack/cause 与 aggregate members，但不保留任意自定义类原型。按这些身份处理，不匹配消息。
+示例通过当前 `host.thread.peers.worker` 取得绑定该代的流能力。结束或提前退出时调用 `return()`；持有旧代方法不能在重启后自动变成新代方法，应重新读取当前目录。
 
-原生采样针对实际选中的 Worker isolate。heap/CPU 字段只有原生 API 支持时才存在，线程共享进程 PID，不能把父进程 RSS 当成线程内存。替换期间正在等待的采样保持原代，不能悄悄重选新 handle。
+`transfer` 传原始 ArrayBuffer，而非另造 backing。成功原生 handoff 可能转移所有权；普通复制则省略 transfer。认证通过独立 auth flow plugin 安装，应用应使用实际载体支持的组合；不要从一个底层 `postMessage` 方法推导额外认证或能力承诺。
 
-## 交给宿主与关闭
+自定义载体的真实接入路径是 `@migaia/rpc-host/sdk`；只读原始载体与流程观察使用 `@migaia/rpc-host/plugins/probe`。线程资源查询只报告实际原生采样；线程共享进程 PID，不以进程 RSS 冒充单个线程内存。
 
-普通 PluginHost 安装 threadPlugin 后，原 thread outlet 管理 stop/restart/replace、ready/exit 和 generation。name 是安装名；实际远端 self.name 是另一项身份。应用使用宿主既有控制，不重建监督或把完整旧调用对象当 source。
+原生 `messageerror` 只报告一次该诊断，不关闭仍合法的连接；诊断字符串转换失败先报告带原 cause 的转换错误。只读 probe 回调失败保留 `TRANSPORT` 与原 cause，不阻止原生投递。没有真实原生错误的主动重启/替换不会伪造 TRANSPORT cause；REMOTE_CLOSED 的代次信息仍保留。
 
-host.close 先沿原 drain 处理已接纳工作，再释放所拥有 Worker。terminate 请求至多一次，exited 只在真正 native exit 后结算；旧代晚到结果不重开已经关闭的连接。取消一个调用、关闭一个流、关闭 host 与杀 Worker 是不同责任。
+重启后重新按 namespace 发起的无目标调用读取当时 accepted 集合；空集合使用正常 fanout 结果。此前持有的函数仍绑定原代，退场后拒绝 `TARGET_UNKNOWN`，不会自动指向新 Worker。
 
-本包仅提供根入口的 threadPlugin/isThreadChild、选项与错误。短配置覆盖常见应用；自定义原始部署由 host `/plugin` SDK 接纳。浏览器使用 browser plugin。
+## 成员管理与关闭
+
+`host.thread.members` 提供 `list/get/stop/kill/restart/replace/on/watch`。查询可使用当前实例 ID 或注册名；stop/restart/replace 需要实际受管来源，borrowed 来源不能凭空获得 supervisor。事件与查询的身份来自原注册及实际 accepted session。
+
+调用结束、流结束、namespace.close、Host.close 和 native kill 是不同层的操作。应用先结束自己持有的流与业务，再关闭 Host；原生资源沿实际归属释放。错误 source 可能为 `rpc.transport.thread`、`rpc.endpoint` 或 `rpc.remote`，应保留并检查其 code/cause/error graph，而非通过消息文本分类。

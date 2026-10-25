@@ -1,33 +1,15 @@
+/** Keep removed aliases and private authentication helpers outside the published Host root. */
 // @ts-expect-error nonce generation is owned by the internal authentication module.
-import { createAuthenticationNonce } from '../../dist/index.js'
+import { createAuthenticationNonce } from '@migaia/rpc-host'
 // @ts-expect-error use the canonical IRpcError contract.
-import type { IRpcPublicError } from '../../dist/index.js'
-// @ts-expect-error use IRpcPlatformValue from the canonical constant/type owner.
-import type { IRpcPlatform } from '../../dist/index.js'
-// @ts-expect-error use IRpcTransportTopologyValue from the canonical constant/type owner.
-import type { IRpcTransportTopology } from '../../dist/index.js'
-// @ts-expect-error middleware inference is private to the endpoint factories.
-import type { IFactoryDiscoveryMode } from '../../dist/index.js'
-// @ts-expect-error middleware inference is private to the endpoint factories.
-import type { IFactoryPingCapability } from '../../dist/index.js'
-// @ts-expect-error fluent return inference is private to the endpoint factories.
-import type { IRecursiveProvideSurface } from '../../dist/core/composed.js'
-// @ts-expect-error root projection is private to the endpoint factories.
-import type { IRpcRootProjection } from '../../dist/core/composed.js'
-// @ts-expect-error disposal projection is private to the endpoint factories.
-import type { IRpcKernelSurface } from '../../dist/core/composed.js'
+import type { IRpcPublicError } from '@migaia/rpc-host'
+// @ts-expect-error Carrier platform values belong to the contract interfaces, outside the Host root.
+import type { IRpcPlatform } from '@migaia/rpc-host'
+// @ts-expect-error Carrier topology values belong to the contract interfaces, outside the Host root.
+import type { IRpcTransportTopology } from '@migaia/rpc-host'
 
 /** Using every negative import prevents unused-binding diagnostics from masking its export check. */
-type IRemovedBindings = [
-  IRpcPublicError,
-  IRpcPlatform,
-  IRpcTransportTopology,
-  IFactoryDiscoveryMode<[]>,
-  IFactoryPingCapability<[]>,
-  IRecursiveProvideSurface<Record<never, never>>,
-  IRpcRootProjection<Record<never, never>>,
-  IRpcKernelSurface
-]
+type IRemovedBindings = [IRpcPublicError, IRpcPlatform, IRpcTransportTopology]
 /** Compile-only consumption, without invoking or recreating any retired operation. */
 declare const removed: IRemovedBindings
 void removed

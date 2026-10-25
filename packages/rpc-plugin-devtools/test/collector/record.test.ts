@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { devtoolsPlugin, RpcDevtoolsErrorCode, RPC_DEVTOOLS_SOURCE } from '../../src/index.js'
+import {
+  devtoolsPlugin,
+  RpcDevtoolsErrorCode,
+  RPC_DEVTOOLS_SOURCE
+} from '@migaia/rpc-plugin-devtools'
 import { CollectorFixture, collectorView } from './fixture.js'
 
 describe('collector recording', () => {

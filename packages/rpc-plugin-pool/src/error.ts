@@ -1,4 +1,12 @@
-import { RPC_POOL_ERROR_SOURCE, RpcPoolErrorCode, type IRpcPoolErrorCode } from './error-code.js'
+/**
+ * Attaches centralized Pool identities to native errors and preserves the original queued-abort
+ * cause. Error text remains owned by the Pool contract.
+ */
+import {
+  RPC_POOL_ERROR_SOURCE,
+  RpcPoolErrorCode,
+  type IRpcPoolErrorCode
+} from '@migaia/rpc-contract/error-code'
 import { RpcPoolText } from './text.js'
 
 /** Attach a registered code without replacing the native error, stack, or original cause. */

@@ -1,9 +1,7 @@
 import { expectTypeOf } from 'vitest'
-import { runtimeTestHost } from '../../../rpc-host/test/runtime-api/public-host.js'
-/** Canonical ordinary-Host registration metadata retains actual outlet lifecycle events. */
-const host = runtimeTestHost({
-  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
-})
-expectTypeOf(host.thread!.on).toBeFunction()
-expectTypeOf(host.thread!.watch).toBeFunction()
-host.thread!.on('ready', () => undefined)
+import type { IRpcNativeMemberControls } from '@migaia/rpc-host/sdk'
+/** BC1 moves native lifecycle events to the actual transport-owned members extension. */
+declare const members: IRpcNativeMemberControls<'thread'>
+expectTypeOf(members.on).toBeFunction()
+expectTypeOf(members.watch).toBeFunction()
+members.on('ready', () => undefined)

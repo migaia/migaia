@@ -7,8 +7,8 @@ import { StandardCapability } from '@migaia/supervision'
 import { ProcessCapability } from '@migaia/supervision/process'
 import { createNodeProcessLauncher } from '../../../rpc-plugin-process/dist/process/adapters/node-child-process.js'
 import { createBunProcessLauncher } from '../../../rpc-plugin-process/dist/process/adapters/bun-spawn.js'
-import { createNodeThreadLauncher } from '../../../rpc-plugin-thread/dist/threads/adapters/node.js'
-import { createAdapterWebThreadLauncher as createWebThreadLauncher } from '../../../rpc-plugin-thread/dist/threads/web-launcher.js'
+import { createNodeThreadLauncher } from '../../../rpc-plugin-thread/dist/threads/node-launcher.js'
+import { createWebThreadLauncher } from '../../../rpc-plugin-thread/dist/threads/web-launcher.js'
 
 /** The same unpackaged admission gate runs before the real business and performance runners. */
 const admission = await import(

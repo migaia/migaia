@@ -7,35 +7,27 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { inspect } from 'node:util'
 import { describe, expect, it, vi } from 'vitest'
-import { serializeRpcError, createRpcHello } from '@migaia/rpc-contract'
-import { encodeRpcStreamFrame } from '@migaia/rpc-contract/framing/stream'
-import { RpcProcessErrorCode } from '@migaia/rpc-plugin-process'
-import { createNativeProcessOffer } from '../../../rpc-plugin-process/dist/process/offer.js'
-import { createProcessTransport } from '../../../rpc-plugin-process/dist/process/handshake.js'
-import { createProcessResilience } from '../../../rpc-plugin-process/dist/process/resilience/index.js'
+import { serializeRpcError } from '@migaia/rpc-contract/errors'
+import { RpcProbeLifecycle } from '@migaia/rpc-contract/interfaces'
+import { createRpcHost } from '@migaia/rpc-host'
+import { auth } from '@migaia/rpc-host/plugins/auth'
+import { probe } from '@migaia/rpc-host/plugins/probe'
+import { timeout } from '@migaia/rpc-host/features/timeout'
+import { encodeRpcStreamFrame } from '@migaia/rpc-host/sdk'
+import { processPlugin, RpcProcessErrorCode } from '@migaia/rpc-plugin-process'
+import { ipcLog, type IIpcLogContext } from '@migaia/rpc-plugin-process/features'
+import { dialProcessByteChannel } from '../../../rpc-plugin-process/dist/process/adapters/node-socket.js'
+import type { IProcessByteChannel } from '../../../rpc-plugin-process/dist/process/types.js'
 import {
-  dialProcessByteChannel,
-  listenProcessByteChannel
-} from '../../../rpc-plugin-process/dist/process/adapters/node-socket.js'
-import {
-  client,
   peers,
   evidence,
   wireFrames,
   deployment,
-  installBusinessClient,
-  businessFeature
+  installBusinessClient
 } from './fixtures/conformance-business.js'
-import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
+import { type IScheduler } from '@migaia/utils/scheduler'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { deferred } from '@migaia/utils/promise'
-import { matrixEndpoint } from './matrix-fixture.js'
-import { serveProcessSessions } from '../../../rpc-plugin-process/dist/process/plugin/serve.js'
-import {
-  createRuntimePeer,
-  readRuntimePeerConnection,
-  prepareRuntimePeerSourceContext
-} from '../../../rpc-host/dist/remote/runtime-api/peer.js'
 
 /** Observe actual child descriptors; lsof is never used as a simulated admission counter. */
 function descriptors(pid: number): number {
@@ -44,80 +36,33 @@ function descriptors(pid: number): number {
     .filter((line) => /^f\d/.test(line)).length
 }
 
-/** Existing deployment helper provides the authenticated facade while retaining its physical port. */
+/** Borrow the existing real native recipe and retain its original raw replay receipt. */
 async function observedClient(token: string, address: string, scheduler?: IScheduler) {
-  /** Production deployment retains encoded outbound bytes for replay injection. */
   const fixture = deployment(fixturePeer, false, token, address)
   if (fixture.selected.kind !== 'connect')
     throw new TypeError('isolation observer requires connect deployment')
-  /** The canonical establish callback remains the channel owner. */
-  const establish = fixture.selected.establish
-  /** This observer only exposes the existing physical port for a literal captured-frame replay. */
-  let raw: Awaited<ReturnType<typeof dialProcessByteChannel>> | undefined
   const selected = {
     ...fixture.selected,
-    supervision: { ...fixture.selected.supervision, ...(scheduler ? { scheduler } : {}) },
-    establish: async (
-      channel: Parameters<typeof establish>[0],
-      context: Parameters<typeof establish>[1]
-    ) => {
-      raw = channel as typeof raw
-      return establish(channel, context)
-    }
+    supervision: { ...fixture.selected.supervision, ...(scheduler ? { scheduler } : {}) }
   }
-  if (scheduler) {
-    /**
-     * This deadline oracle needs the actual Core endpoint clock; the public Host owns a system
-     * clock.
-     */
-    const signal = new AbortController().signal
-    const channel = await selected.establish(await selected.dial(address, signal), {
-      role: 'initiator',
-      signal,
-      scheduler,
-      token,
-      session: { connectionId: 'deadline-caller', sessionId: 'deadline-caller' },
-      offer: {
-        ...selected.offer!,
-        capabilities: prepareRuntimePeerSourceContext({ name: 'caller', instanceId: 'caller' })
-          .capabilities
-      }
-    })
-    /**
-     * Reuse the actual accepted channel and production Peer owner without a second endpoint or
-     * dispatcher.
-     */
-    const active = await createRuntimePeer(
-      {
-        self: { name: 'caller', instanceId: 'caller' },
-        report: (error) => {
-          fixture.reports.push(error)
-        }
-      },
-      { channel }
-    )
-    const accepted = readRuntimePeerConnection(active)
-    return {
-      ...fixture,
-      raw: raw!,
-      runtime: {
-        endpoint: accepted.endpoint,
-        oneWay: accepted.endpoint,
-        stream: accepted.endpoint.stream
-      },
-      feature: businessFeature(active),
-      close: active.close
-    }
-  }
-  /** The actual ordinary Host shares the same native client owner as the foreign business matrix. */
   const installed = await installBusinessClient(fixture, selected)
-  return {
-    ...fixture,
-    raw: raw!,
-    runtime: installed.runtime,
-    feature: businessFeature(installed.active),
-    close: installed.close
-  }
+  return { ...fixture, ...installed, raw: fixture.rawChannels[0]! }
+}
+/** The same native acquisition path serves all original isolation socket callers. */
+async function client(_peer: typeof fixturePeer, _host: boolean, token: string, address: string) {
+  return observedClient(token, address)
+}
+/** One already-open raw socket remains fixture-owned while public Host performs the real handshake. */
+async function connectRaw(raw: IProcessByteChannel, token: string, reports: unknown[]) {
+  return installBusinessClient(
+    { reports },
+    {
+      kind: 'connect',
+      address: 'native-isolation-raw',
+      token,
+      dial: async () => raw
+    }
+  )
 }
 
 /** One new fixture is an actual Node child using public process and PluginHost implementations. */
@@ -234,74 +179,80 @@ class IsolationListener {
 }
 
 /** Query receipts through the same publicly installed proxy that performs business work. */
-async function stats(active: Pick<Awaited<ReturnType<typeof client>>, 'feature'>): Promise<IStats> {
-  return (await active.feature.request(['stats'])) as IStats
+async function stats(
+  active: Pick<Awaited<ReturnType<typeof client>>, 'namespace'>
+): Promise<IStats> {
+  return (await active.namespace.request('p.f.request', ['stats'])) as IStats
 }
 
 describe('real process session and principal isolation', () => {
   it('no-token native listener never constructs an endpoint or publishes a service', async () => {
     /** The reverse-registration socket is owned by the original authenticated listener. */
     const directory = await mkdtemp(join(tmpdir(), 'rpc-hi-reverse-'))
-    /** Native authentication must finish before this real endpoint constructor can run. */
-    const endpointFactory = vi.fn((channel: Parameters<typeof matrixEndpoint>[0]) =>
-      matrixEndpoint(channel)
-    )
     /** No unauthorized candidate may publish a real provider service. */
     const ready = vi.fn()
     /** Responder reports preserve native authentication error identity. */
     const reports: unknown[] = []
-    /** Native required authentication rejects absent credentials before any Host adoption path. */
-    const verify = (auth: unknown) => {
-      if (auth !== 'reverse-required') throw new TypeError('reverse credential required')
+    /** Required authentication remains strict on the actual installed auth owner. */
+    const verify = (value: unknown) => {
+      if (value !== 'reverse-required') throw new TypeError('reverse credential required')
       return 'approved-principal'
     }
-    /** The canonical governor owns authentication and never offers an unauthenticated candidate. */
-    const resilience = createProcessResilience({
-      scheduler: systemScheduler,
+    const service = await createRpcHost({
+      self: { name: 'server', instanceId: 'server' },
+      plugins: [
+        auth({
+          verifyCredentials(value) {
+            verify(value)
+          }
+        }),
+        probe({
+          stages: ['peer'],
+          emit(view) {
+            if (view.lifecycle === RpcProbeLifecycle.ready) ready()
+          }
+        }),
+        processPlugin({
+          listen: join(directory, 'reverse.sock'),
+          token: 'reverse-required',
+          verify
+        })
+      ],
       report: (error) => reports.push(error)
     })
-    const service = await serveProcessSessions(
-      {
-        kind: 'listener',
-        address: join(directory, 'reverse.sock'),
-        listen: listenProcessByteChannel,
-        verify,
-        offer: createNativeProcessOffer({ peer: { id: 'server', runtime: 'node' } }),
-        createConnectionContext: () => ({
-          peerId: 'caller',
-          ipc: { connectionId: 'reverse', sessionId: 'reverse', log: () => undefined }
-        }),
-        scheduler: systemScheduler
-      },
-      endpointFactory,
-      ready,
-      resilience,
-      (error) => {
-        reports.push(error)
-      }
-    )
-    /** This actual reverse candidate sends a valid native hello without an auth field. */
+    /** This real initiator sends its canonical hello without installing credentials. */
     const raw = await dialProcessByteChannel({ address: join(directory, 'reverse.sock') })
+    let candidate: Awaited<ReturnType<typeof createRpcHost>> | undefined
     try {
       await expect(
-        createProcessTransport(raw, {
-          role: 'initiator',
-          peerId: 'server',
-          offer: createNativeProcessOffer({ peer: { id: 'caller', runtime: 'node' } }),
-          report: (error) => reports.push(error),
-          ipc: { connectionId: 'missing-auth', sessionId: 'missing-auth', log: () => undefined }
+        createRpcHost({
+          self: { name: 'caller', instanceId: 'caller' },
+          plugins: [
+            processPlugin({
+              connect: {
+                target: {
+                  kind: 'connect',
+                  address: 'missing-auth',
+                  token: 'fixture-connect-input',
+                  dial: async () => raw
+                }
+              }
+            })
+          ],
+          report: (error) => reports.push(error)
+        }).then((value) => {
+          candidate = value
+          return value
         })
       ).rejects.toMatchObject({
         code: 'HANDSHAKE_REJECTED',
         cause: { code: 'PROCESS_CHANNEL_AUTH_REJECTED' }
       })
-      expect(endpointFactory).not.toHaveBeenCalled()
       expect(ready).not.toHaveBeenCalled()
       writeFileSync(
         join(evidence, 'isolation-reverse.receipt.json'),
         JSON.stringify(
           {
-            endpoints: endpointFactory.mock.calls.length,
             publications: ready.mock.calls.length,
             reports: reports.map((error) => serializeRpcError(error, { report: () => undefined }))
           },
@@ -310,10 +261,9 @@ describe('real process session and principal isolation', () => {
         )
       )
     } finally {
+      await candidate?.close()
       await raw.close()
       await service.close()
-      await resilience.close()
-      /** The listener closes before its fixture-created rendezvous directory is removed. */
       await rm(directory, { recursive: true, force: true })
     }
   })
@@ -321,33 +271,22 @@ describe('real process session and principal isolation', () => {
     /** Two admitted physical connections fill the real production governor configured capacity. */
     const peer = await listener('flood')
     /** The provider's descriptor baseline includes two established sockets. */
-    const sessions = [
-      await client(fixturePeer, false, peer.tokens.alice, peer.address),
-      await client(fixturePeer, false, peer.tokens.bob, peer.address)
-    ]
+    const sessions: Awaited<ReturnType<typeof client>>[] = []
     /** Refused ports remain fixture-owned until finally, even if their remote end already closes. */
     const refused: Awaited<ReturnType<typeof dialProcessByteChannel>>[] = []
     /** Channel establishment errors preserve native public error identity. */
     const reports: unknown[] = []
     try {
+      for (const token of [peer.tokens.alice, peer.tokens.bob])
+        sessions.push(await client(fixturePeer, false, token, peer.address))
       const baseline = descriptors(peer.child.pid!)
       for (let index = 0; index < 12; index++) {
         const raw = await dialProcessByteChannel({ address: peer.address })
         refused.push(raw)
         await expect(
-          createProcessTransport(raw, {
-            role: 'initiator',
-            peerId: 'ts-peer',
-            offer: createNativeProcessOffer({
-              peer: { id: 'caller', runtime: 'node' },
-              auth: peer.tokens.alice
-            }),
-            ipc: {
-              connectionId: `flood-${index}`,
-              sessionId: `flood-${index}`,
-              log: () => undefined
-            },
-            report: (error) => reports.push(error)
+          connectRaw(raw, peer.tokens.alice, reports).then(async (active) => {
+            await active.close()
+            return active
           })
         ).rejects.toMatchObject({ code: 'PROCESS_CHANNEL_CLOSED' })
       }
@@ -358,10 +297,10 @@ describe('real process session and principal isolation', () => {
           (value) => (value as { wire: { code: string } }).wire.code === 'PROCESS_CONNECTION_LIMIT'
         )
       ).toHaveLength(12)
-      expect(await sessions[0]!.feature.request(['still-alice'])).toMatchObject({
+      expect(await sessions[0]!.namespace.request('p.f.request', ['still-alice'])).toMatchObject({
         session: { principalId: 'alice' }
       })
-      expect(await sessions[1]!.feature.request(['still-bob'])).toMatchObject({
+      expect(await sessions[1]!.namespace.request('p.f.request', ['still-bob'])).toMatchObject({
         session: { principalId: 'bob' }
       })
       writeFileSync(
@@ -397,11 +336,26 @@ describe('real process session and principal isolation', () => {
       raws.push(raw)
       const closed = new Promise<void>((resolve) => raw.onClose(() => resolve()))
       raw.onData((chunk) => received.push(chunk.slice()))
-      const hello = JSON.parse(
-        createRpcHello(
-          createNativeProcessOffer({ peer: { id: 'caller', runtime: 'node' }, auth: sentinel })
-        )
-      )
+      const hello = {
+        profile: 'migaia.rpc/2',
+        kind: 'handshake',
+        step: 'hello',
+        peer: { id: 'caller', runtime: 'node' },
+        versions: [{ major: 2, minor: 0 }],
+        codecs: ['json'],
+        extensions: [],
+        auth: sentinel,
+        directory: {
+          schemaVersion: 3,
+          self: {
+            name: 'caller',
+            instanceId: 'caller',
+            generation: { kind: 'connection', value: 0 },
+            applicationVersion: '0.0.0'
+          },
+          methods: []
+        }
+      }
       hello.kind = sentinel
       await raw.write(encodeRpcStreamFrame(new TextEncoder().encode(JSON.stringify(hello))))
       await closed
@@ -410,24 +364,15 @@ describe('real process session and principal isolation', () => {
       invalid.onData((chunk) => received.push(chunk.slice()))
       let failure: unknown
       await expect(
-        createProcessTransport(invalid, {
-          role: 'initiator',
-          peerId: 'ts-peer',
-          offer: createNativeProcessOffer({
-            peer: { id: 'caller', runtime: 'node' },
-            auth: sentinel,
-            capabilities: ['runtime-api@1']
-          }),
-          ipc: {
-            connectionId: 'verifier-denied',
-            sessionId: 'verifier-denied',
-            log: () => undefined
-          },
-          report: (error) => reports.push(error)
-        }).catch((error) => {
-          failure = error
-          throw error
-        })
+        connectRaw(invalid, sentinel, reports)
+          .then(async (active) => {
+            await active.close()
+            return active
+          })
+          .catch((error) => {
+            failure = error
+            throw error
+          })
       ).rejects.toMatchObject({
         code: 'HANDSHAKE_REJECTED',
         cause: { code: 'PROCESS_CHANNEL_AUTH_REJECTED' }
@@ -446,7 +391,7 @@ describe('real process session and principal isolation', () => {
       valid = await client(fixturePeer, false, peer.tokens.alice, peer.address)
       const receipt = await stats(valid)
       noSecret(receipt, sentinel)
-      expect(await valid.feature.request(['after-invalid'])).toMatchObject({
+      expect(await valid.namespace.request('p.f.request', ['after-invalid'])).toMatchObject({
         session: { principalId: 'alice' }
       })
       writeFileSync(
@@ -464,13 +409,16 @@ describe('real process session and principal isolation', () => {
     /** Same route sender on two authenticated sockets exposes an accidental global replay ledger. */
     const peer = await listener('replay')
     /** Both proxies have caller route identity but different physical session identities. */
-    const first = await observedClient(peer.tokens.alice, peer.address)
-    const second = await observedClient(peer.tokens.bob, peer.address)
+    const sessions: Awaited<ReturnType<typeof observedClient>>[] = []
     try {
-      const result = (await first.feature.request(['original'])) as IResult
+      sessions.push(await observedClient(peer.tokens.alice, peer.address))
+      sessions.push(await observedClient(peer.tokens.bob, peer.address))
+      const first = sessions[0]!
+      const second = sessions[1]!
+      const result = (await first.namespace.request('p.f.request', ['original'])) as IResult
       const request = first.sent.find((chunk) =>
         wireFrames([chunk]).some(
-          (frame) => frame.kind === 'request' && JSON.stringify(frame.data).includes('original')
+          (frame) => frame.kind === 'call' && JSON.stringify(frame.payload).includes('original')
         )
       )!
       expect(request).toBeDefined()
@@ -478,9 +426,11 @@ describe('real process session and principal isolation', () => {
       const id = wireFrames([request])[0].id
       expect(id).toEqual(expect.any(String))
       await first.raw.write(request)
-      expect(((await first.feature.request(['stats'])) as IStats).executions).toBe(1)
+      expect(((await first.namespace.request('p.f.request', ['stats'])) as IStats).executions).toBe(
+        1
+      )
       await second.raw.write(request)
-      const receipt = (await second.feature.request(['stats'])) as IStats
+      const receipt = (await second.namespace.request('p.f.request', ['stats'])) as IStats
       expect(receipt.executions).toBe(2)
       expect(receipt.contexts.map((context) => context.principalId)).toEqual(['alice', 'bob'])
       expect(receipt.contexts[0]!.sessionId).toBe(result.session.sessionId)
@@ -497,7 +447,7 @@ describe('real process session and principal isolation', () => {
         JSON.stringify(receipt, null, 2)
       )
     } finally {
-      await Promise.allSettled([first.close(), second.close()])
+      await Promise.allSettled(sessions.map((session) => session.close()))
       await peer.close()
     }
   })
@@ -511,46 +461,31 @@ describe('real process session and principal isolation', () => {
       false,
       token
     )
-    /** The production establish hook receives the canonical stderr source and identity. */
-    const establish = fixture.selected.establish
-    /**
-     * IPC records are observed independently of raw stderr; raw contains the intended adversarial
-     * bytes.
-     */
-    const records: unknown[] = []
-    /** Active generation identity comes from production process binding. */
-    let identity: { connectionId: string; sessionId: string; processId?: string } | undefined
-    const selected = {
-      ...fixture.selected,
-      establish: (
-        raw: Parameters<typeof establish>[0],
-        context: Parameters<typeof establish>[1]
-      ) => {
-        identity = context.session
-        if (raw.kind !== 'byte') throw new TypeError('isolation stderr requires byte channel')
-        raw.onData((chunk) => fixture.stdout.push(chunk.slice()))
-        return createProcessTransport(raw, {
-          role: 'initiator',
-          peerId: fixturePeer.id,
-          offer: context.offer!,
-          scheduler: context.scheduler,
-          signal: context.signal as AbortSignal,
-          report: (error) => fixture.reports.push(error),
-          ipc: {
-            ...context.session,
-            stderr: context.stderr,
-            log: (record) => {
-              records.push(record)
-            }
-          }
-        })
+    /** Native installation facts remain independent from the records under assertion. */
+    const observed: {
+      records: unknown[]
+      identity?: { connectionId: string; sessionId?: string }
+    } = { records: [] }
+    /** Delegate to the same actual log feature after borrowing its real native context once. */
+    const logging = ipcLog({
+      report: (record) => {
+        observed.records.push(record)
       }
-    }
-    /** This original native source uses the same actual ordinary Host client as all business peers. */
-    const installed = await installBusinessClient(fixture, selected)
+    })
+    const installed = await installBusinessClient(fixture, fixture.selected, [
+      {
+        ...logging,
+        install(context: IIpcLogContext) {
+          observed.identity = { connectionId: context.connectionId, sessionId: context.sessionId }
+          return logging.install(context)
+        }
+      }
+    ])
+    /** Actual launched PID is sampled from the original handle, independently from IPC records. */
+    const identity = { ...observed.identity, processId: String(fixture.handles[0]!.identity.pid) }
+    const records = observed.records
     try {
-      const feature = businessFeature(installed.active)
-      expect(await feature.request(['stderr'])).toBe(true)
+      expect(await installed.namespace.request('p.f.request', ['stderr'])).toBe(true)
       const stderr = records.filter((record) => (record as { name: string }).name === 'ipc.stderr')
       expect(stderr.length).toBeGreaterThanOrEqual(Math.ceil(token.length / 3))
       expect(stderr).toEqual(
@@ -585,7 +520,7 @@ describe('real process session and principal isolation', () => {
       /** Same method/key in concurrent sessions must coalesce into one provider execution. */
       const [first, second, other] = (await Promise.all(
         sessions.map((session) =>
-          session.feature.request(['same'], { idempotencyKey: 'stable-key' })
+          session.namespace.request('p.f.request', ['same'], { idempotencyKey: 'stable-key' })
         )
       )) as IResult[]
       expect(second).toEqual(first)
@@ -595,27 +530,33 @@ describe('real process session and principal isolation', () => {
       expect((await stats(sessions[1]!)).executions).toBe(2)
       await sessions[0]!.close()
       expect(
-        await sessions[1]!.feature.request(['same'], { idempotencyKey: 'stable-key' })
+        await sessions[1]!.namespace.request('p.f.request', ['same'], {
+          idempotencyKey: 'stable-key'
+        })
       ).toEqual(first)
       /** A released borrowed socket leaves both the shared cache and its external provider alive. */
       expect(peer.child.exitCode).toBeNull()
       /** Two independent provider calls receive their own session cancellation signal. */
       const controller = new AbortController()
       /** This cancellation targets only Alice's second physical session. */
-      const waiting = sessions[1]!.feature.request([['wait', 'alice-wait']], {
+      const waiting = sessions[1]!.namespace.request('p.f.request', [['wait', 'alice-wait']], {
         signal: controller.signal
       })
       /** Bob's simultaneous request returns independently. */
-      const bob = (await sessions[2]!.feature.request(['bob-live'])) as IResult
+      const bob = (await sessions[2]!.namespace.request('p.f.request', ['bob-live'])) as IResult
       controller.abort(new RangeError('alice-only-cancel'))
       await expect(waiting).rejects.toMatchObject({ code: 'CANCELLED' })
       /** Subsequent request observes the second session instead of cached first-session context. */
-      const alice = (await sessions[1]!.feature.request(['alice-live'])) as IResult
+      const alice = (await sessions[1]!.namespace.request('p.f.request', ['alice-live'])) as IResult
       expect(alice.session.sessionId).not.toBe(first!.session.sessionId)
       expect(alice.session.sessionId).not.toBe(bob.session.sessionId)
       /** Target one-way and stream calls also receive physical-session context. */
-      await sessions[1]!.feature.oneWay(['one-way'])
-      for await (const value of sessions[2]!.feature.generator(['stream']))
+      await sessions[1]!.namespace.notify('p.f.oneWay', ['one-way'])
+      /** The real unique method returns one iterator; no per-session facade is reconstructed. */
+      const stream = sessions[2]!.namespace.stream('p.f.generator', ['stream'])
+      if (!(Symbol.asyncIterator in stream))
+        throw new TypeError('isolation requires one stream target')
+      for await (const value of stream)
         expect((value as IResult).session.sessionId).toBe(bob.session.sessionId)
       /** Provider receipts, rather than sender Promise, prove the target received context. */
       const receipt = await stats(sessions[2]!)
@@ -653,38 +594,36 @@ describe('real process session and principal isolation', () => {
       /** Two independently installed facades borrow the same provider PID. */
       /** Caller timers remain unadvanced; only the actual child's local deadline can fire. */
       const callerScheduler = createManualScheduler()
-      const first = await observedClient(peer.tokens.alice, peer.address, callerScheduler)
-      const other = await observedClient(peer.tokens.bob, peer.address)
-      /**
-       * These callbacks observe actual remote socket EOF rather than disposal requested by the
-       * test.
-       */
-      const offenderClosed = vi.fn()
-      const otherClosed = vi.fn()
-      first.raw.onClose(offenderClosed)
-      other.raw.onClose(otherClosed)
-      const sessions: Array<{
-        feature: Awaited<ReturnType<typeof client>>['feature']
-        close(): Promise<unknown>
-      }> = [first, other]
+      const sessions: Awaited<ReturnType<typeof observedClient>>[] = []
+      /** Actual business operations remain joined by finally when a later admission fails. */
+      const pending: Promise<unknown>[] = []
       /**
        * Finally may release a failed oracle's local waits without changing the deadline
        * observation.
        */
       const controller = new AbortController()
-      /** Core calls use the already-installed channel and avoid proxy retry of completed timeouts. */
-      const pending = Array.from({ length: 3 }, (_, index) =>
-        first.runtime.endpoint
-          .send(fixturePeer.id, 'p.f.request', [['wait', `timeout-${index}`]], {
-            timeoutMs: 30,
-            signal: controller.signal
-          })
-          .then(
-            (value) => value,
-            (error: unknown) => error
-          )
-      )
       try {
+        sessions.push(await observedClient(peer.tokens.alice, peer.address, callerScheduler))
+        sessions.push(await observedClient(peer.tokens.bob, peer.address))
+        const first = sessions[0]!
+        const other = sessions[1]!
+        /** Observe original remote EOF rather than disposal requested by this test. */
+        const offenderClosed = vi.fn()
+        const otherClosed = vi.fn()
+        first.raw.onClose(offenderClosed)
+        other.raw.onClose(otherClosed)
+        for (let index = 0; index < 3; index++)
+          pending.push(
+            first.namespace
+              .request('p.f.request', [['wait', `timeout-${index}`]], {
+                timeout: timeout({ ms: 30, scheduler: callerScheduler }),
+                signal: controller.signal
+              })
+              .then(
+                (value) => value,
+                (error: unknown) => error
+              )
+          )
         await vi.waitFor(() => expect(offenderClosed).toHaveBeenCalledTimes(1))
         /** EOF naturally rejects every core caller before finally performs any cancellation. */
         const outcomes = await Promise.all(pending)
@@ -720,7 +659,9 @@ describe('real process session and principal isolation', () => {
         expect(callerScheduler.now()).toBe(0)
         expect(otherClosed).not.toHaveBeenCalled()
         /** The peer still serves the unaffected session without rebuilding its shared target. */
-        const unaffected = (await sessions[1]!.feature.request(['after-timeouts'])) as IResult
+        const unaffected = (await sessions[1]!.namespace.request('p.f.request', [
+          'after-timeouts'
+        ])) as IResult
         expect((await stats(sessions[1]!)).replacements).toBe(0)
         expect(peer.child.exitCode).toBeNull()
         await sessions[0]!.close()
@@ -740,26 +681,26 @@ describe('real process session and principal isolation', () => {
       /** Explicit health has no dependency on the consecutive-timeout policy under test above. */
       const peer = await listener(mode)
       /** These actual sockets expose whether shared or per-connection fallback closes them. */
-      const first = await observedClient(peer.tokens.alice, peer.address)
-      const other = await observedClient(peer.tokens.bob, peer.address)
-      /** Physical EOF callbacks observe production close without requesting disposal. */
-      const firstClosed = vi.fn()
-      const otherClosed = vi.fn()
-      first.raw.onClose(firstClosed)
-      other.raw.onClose(otherClosed)
-      /** New described sessions are released together with the initial facade owners. */
-      const sessions: Array<{
-        feature: Awaited<ReturnType<typeof client>>['feature']
-        close(): Promise<unknown>
-      }> = [first, other]
+      const sessions: Awaited<ReturnType<typeof client>>[] = []
       try {
-        const initial = (await first.feature.request(['identity'])) as IResult
-        const unaffected = (await other.feature.request(['other-identity'])) as IResult
-        await first.feature.request([['health', initial.session.connectionId]])
+        sessions.push(await observedClient(peer.tokens.alice, peer.address))
+        sessions.push(await observedClient(peer.tokens.bob, peer.address))
+        const first = sessions[0]!
+        const other = sessions[1]!
+        /** Physical EOF callbacks observe production close without requesting disposal. */
+        const firstClosed = vi.fn()
+        const otherClosed = vi.fn()
+        first.raw.onClose(firstClosed)
+        other.raw.onClose(otherClosed)
+        const initial = (await first.namespace.request('p.f.request', ['identity'])) as IResult
+        const unaffected = (await other.namespace.request('p.f.request', [
+          'other-identity'
+        ])) as IResult
+        await first.namespace.request('p.f.request', [['health', initial.session.connectionId]])
         await vi.waitFor(() => expect(firstClosed).toHaveBeenCalledTimes(1))
         if (mode === 'per-connection') {
           expect(otherClosed).not.toHaveBeenCalled()
-          expect(await other.feature.request(['other-instance'])).toMatchObject({
+          expect(await other.namespace.request('p.f.request', ['other-instance'])).toMatchObject({
             revision: unaffected.revision,
             session: unaffected.session
           })
@@ -768,7 +709,9 @@ describe('real process session and principal isolation', () => {
           await vi.waitFor(() => expect(otherClosed).toHaveBeenCalledTimes(1))
           const successor = await client(fixturePeer, false, peer.tokens.bob, peer.address)
           sessions.push(successor)
-          const value = (await successor.feature.request(['replacement'])) as IResult
+          const value = (await successor.namespace.request('p.f.request', [
+            'replacement'
+          ])) as IResult
           expect(value.revision).toBe(1)
           const receipt = await stats(successor)
           expect(receipt.replacements).toBe(1)

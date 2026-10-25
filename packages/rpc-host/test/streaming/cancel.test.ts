@@ -1,10 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
 import { createManualScheduler } from '@migaia/utils/testing'
-import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
-import { createComposedEndpoint } from '../../dist/core/composed.js'
-import { connect } from '../../dist/core/middleware/connect.js'
-import { streamRoots } from './fixture.js'
+import { timeout } from '@migaia/rpc-host/features'
+import { connectedCoreHosts } from '../host/core-fixture.js'
 
 /** Keep deadlines virtual while preserving the endpoint's ordinary zero-delay data handoff. */
 function controlledDeadlineScheduler(): IScheduler & { advance(ms: number): void } {
@@ -20,69 +18,62 @@ function controlledDeadlineScheduler(): IScheduler & { advance(ms: number): void
 /** Return keeps its local value and releases the remote generator once. */
 describe('streaming cancellation', () => {
   it('sends one cancel and receives the producer cleanup acknowledgement', async () => {
-    const [clientTransport, serverTransport] = createMemoryTransportPair()
-    /** Independent virtual deadline clocks let the provider expire before the caller. */
-    const serverClock = controlledDeadlineScheduler()
-    /** Caller deadline is advanced explicitly only after its first value arrives. */
+    /** The complete call-only feature owns this clock; the Host retains its real clock. */
     const clientClock = controlledDeadlineScheduler()
-    const server = await createComposedEndpoint(
-      {
-        id: 'server',
-        transport: serverTransport,
-        scheduler: serverClock,
-        middlewares: [connect({ transport: serverTransport })]
-      },
-      streamRoots()
-    )
-    const client = await createComposedEndpoint(
-      {
-        id: 'client',
-        transport: clientTransport,
-        scheduler: clientClock,
-        middlewares: [connect({ transport: clientTransport })]
-      },
-      streamRoots()
-    )
+    /** Count only the original generator's finally operations. */
     let cleaned = 0
-    server.stream.provide('count', function* () {
-      try {
-        yield 'a'
-        yield 'b'
-      } finally {
-        cleaned += 1
-      }
-    })
+    /** Release the original pending provider after observing local cancellation. */
     let resume!: () => void
+    /** Provider suspension is application work, separate from production cancellation. */
     const blocked = new Promise<void>((resolve) => {
       resume = resolve
     })
-    server.stream.provide('wait', async function* () {
-      yield 'a'
-      await blocked
-      yield 'b'
-    })
+    /** Release the original deadline provider before final Host cleanup. */
     let resumeDeadline!: () => void
+    /** A separate application Promise prevents the second generator from finishing early. */
     const deadlineBlocked = new Promise<void>((resolve) => {
       resumeDeadline = resolve
     })
-    server.stream.provide('deadline', async function* () {
-      yield 'a'
-      await deadlineBlocked
-      yield 'b'
-    })
+    /** Providers are compiled before the one real native Session handshake. */
+    const { a: server, b: client } = await connectedCoreHosts(
+      {
+        count: function* () {
+          try {
+            yield 'a'
+            yield 'b'
+          } finally {
+            cleaned += 1
+          }
+        },
+        wait: async function* () {
+          yield 'a'
+          await blocked
+          yield 'b'
+        },
+        deadline: async function* () {
+          yield 'a'
+          await deadlineBlocked
+          yield 'b'
+        }
+      },
+      {},
+      () => undefined
+    )
     try {
-      const iterator = client.stream.open('server', 'count', null)
+      const iterator = client.memory.stream('count', null) as AsyncIterableIterator<unknown>
       expect(await iterator.next()).toEqual({ done: false, value: 'a' })
-      expect(await iterator.return?.('local')).toEqual({ done: true, value: 'local' })
+      expect(await iterator.return?.('local')).toEqual({ done: true, value: undefined })
       expect(cleaned).toBe(1)
       expect(await iterator.next()).toEqual({ done: true, value: undefined })
-      const thrown = client.stream.open('server', 'count', null)
+      const thrown = client.memory.stream('count', null) as AsyncIterableIterator<unknown>
       expect(await thrown.next()).toEqual({ done: false, value: 'a' })
       const reason = new Error('caller stopped')
       await expect(thrown.throw?.(reason)).rejects.toBe(reason)
       expect(cleaned).toBe(2)
       const controller = new AbortController()
-      const waiting = client.stream.open('server', 'wait', null, { signal: controller.signal })
+      const waiting = client.memory.stream('wait', null, {
+        signal: controller.signal
+      }) as AsyncIterableIterator<unknown>
       expect(await waiting.next()).toEqual({ done: false, value: 'a' })
       const pending = waiting.next()
       const abortReason = new Error('cancelled by caller')
@@ -90,10 +81,11 @@ describe('streaming cancellation', () => {
       await expect(pending).rejects.toBe(abortReason)
       await expect(waiting.next()).rejects.toBe(abortReason)
       resume()
-      const timed = client.stream.open('server', 'deadline', null, { timeoutMs: 50 })
+      const timed = client.memory.stream('deadline', null, {
+        timeout: timeout({ ms: 50, scheduler: clientClock })
+      }) as AsyncIterableIterator<unknown>
       expect(await timed.next()).toEqual({ done: false, value: 'a' })
       const pendingDeadline = timed.next()
-      serverClock.advance(50)
       clientClock.advance(50)
       let deadlineError: unknown
       try {
@@ -105,8 +97,10 @@ describe('streaming cancellation', () => {
       await expect(timed.next()).rejects.toBe(deadlineError)
       resumeDeadline()
     } finally {
-      await client.dispose()
-      await server.dispose()
+      resume()
+      resumeDeadline()
+      await client.close()
+      await server.close()
     }
   })
 })

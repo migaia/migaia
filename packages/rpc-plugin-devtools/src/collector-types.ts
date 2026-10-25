@@ -1,10 +1,11 @@
+/** Defines caller-owned collector options and APIs separately from native transport acquisition. */
 import type {
   IRpcProbe,
   IRpcProbeEventView,
   IRpcProbeStageName,
   RpcProbeStage
-} from '@migaia/rpc-host/probe'
-import type { IRuntimePeerProvide } from '@migaia/rpc-host/plugin'
+} from '@migaia/rpc-host/plugins/probe'
+import type { IRpcProvide } from '@migaia/rpc-host'
 import type {
   IRpcDevtoolsDescribe,
   IRpcDevtoolsPage,
@@ -16,7 +17,7 @@ import type { IRpcDevtoolsRecord } from './contract/record.js'
 
 /** Configure bounded observation storage without creating a Peer, transport or persistence owner. */
 export type IRpcDevtoolsOptions = Readonly<{
-  /** Defaults to message and peer; pass physical stages here or use setStages() to enable them. */
+  /** Defaults to message, peer and forward; select physical stages here or with setStages(). */
   stages?: readonly IRpcProbeStageName[]
   /** Explicit captured stages, default none; capture must be a subset of subscribed stages. */
   capture?: readonly IRpcProbeStageName[]
@@ -42,8 +43,8 @@ export type IRpcDevtoolsOptions = Readonly<{
 export type IRpcDevtools = IRpcProbe &
   Readonly<{
     /**
-     * Consume a reusable Core view now; metadata is copied, nested error/content/detail retain
-     * references.
+     * Consume a reusable Core view now; scalar metadata and borrowed route are snapshotted, while
+     * nested error/content/detail retain references.
      */
     emit(view: IRpcProbeEventView): void
     /** Read retained history after a sequence cursor; locally captured content is available. */
@@ -85,5 +86,5 @@ export type IRpcDevtools = IRpcProbe &
     /** Synchronously retire storage and wake watches; idempotent, without closing any serving Peer. */
     close(): void
     /** Nested provide object; wire content is hidden unless exposeContent is true. */
-    readonly service: IRuntimePeerProvide
+    readonly service: IRpcProvide
   }>

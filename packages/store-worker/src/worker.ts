@@ -1,10 +1,9 @@
-import { WorkerMessagePort } from './worker-message-event.js'
+import { WorkerMessagePort, type IWorkerMessagePort } from './worker-message-event.js'
 import type { IAbortSignal, INativeAbortSignal } from '@migaia/utils/promise'
 import type { IRuntime } from '@migaia/reactive'
 import { defaultRuntime } from '@migaia/reactive'
 import { Resource, type IResourceOptions } from '@migaia/resource'
 import { createWorkerContractEndpoint, type IWorkerContractEndpoint } from './worker-contract.js'
-import type { IWebWorkerLikePort } from '@migaia/rpc-host/plugin'
 import { toManagedRpcHandler, type IManagedRpcHandler } from './managed-rpc-handler.js'
 import { createStoreWorkerError, STORE_WORKER_SOURCE, StoreWorkerErrorCode } from './errors.js'
 import { StoreWorkerErrorText } from './error-text.js'
@@ -13,7 +12,7 @@ import { snapshotOwnDescriptors } from '@migaia/utils/object'
 
 export type { IManagedRpcHandler } from './managed-rpc-handler.js'
 /** Borrowed Web-worker-shaped message port; logical adapter disposal does not terminate its host. */
-export type IWorkerPort = IWebWorkerLikePort
+export type IWorkerPort = IWorkerMessagePort
 
 /** Rejects JavaScript-boundary null/non-object option values before property access. */
 function assertWorkerOptions(options: unknown): asserts options is object {

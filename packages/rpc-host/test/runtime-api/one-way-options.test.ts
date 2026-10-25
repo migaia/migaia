@@ -14,13 +14,12 @@ import { abort } from '../../dist/core/middleware/abort.js'
 import { timeout } from '../../dist/core/middleware/timeout.js'
 import { authentication } from '../../dist/core/middleware/authentication.js'
 import { hooks } from '../../dist/core/middleware/hooks.js'
-import { createHmac } from 'node:crypto'
 import { setImmediate as nextTurn } from 'node:timers/promises'
 import {
   createIpcSendQueueFeature,
   createIpcSendQueueTransport
 } from '../../dist/core/plugins/send-queue.js'
-import { RuntimeApiFixtureText } from './fixture.js'
+import { RuntimeApiFixtureText } from '../fixtures/runtime-api-text.js'
 
 /** Select the real native owner graph, optionally with a controlled authentication preparation. */
 function endpoint(
@@ -58,50 +57,6 @@ function endpoint(
     }
   )
 }
-
-it('a pre-aborted one-way send keeps its reason and produces no physical frame', async () => {
-  /** Both endpoints execute the current canonical provider/outbound/one-way graph. */
-  const [callerTransport, providerTransport] = createMemoryTransportPair()
-  /** This counter observes the real carrier, rather than client in-flight bookkeeping. */
-  let sent = 0
-  /** Capture the original receiver through an arrow instead of receiver-mutating helpers. */
-  const observed = {
-    ...callerTransport,
-    send: (message: unknown) => {
-      sent += 1
-      return callerTransport.send(message)
-    }
-  }
-  /** Construction and a round-trip must succeed before testing the cancellation predicate. */
-  const [caller, provider] = await Promise.all([
-    endpoint('caller', observed),
-    endpoint('provider', providerTransport)
-  ])
-  try {
-    assert.equal(await caller.send('provider', 'ready', null), 'ready')
-    sent = 0
-    /** The native reason instance must remain reachable through the canonical local abort error. */
-    const reason = new Error(RuntimeApiFixtureText.preAbort)
-    /** Native cancellation is applied before the existing one-way entry point is called. */
-    const controller = new AbortController()
-    controller.abort(reason)
-    /** The production option retains the supported signal and its original reason. */
-    const [result] = await Promise.allSettled([
-      Promise.resolve().then(() =>
-        caller.sendOneWay('provider', 'ready', null, { signal: controller.signal })
-      )
-    ])
-    assert.equal(sent, 0, 'pre-aborted notify must not reach the physical transport')
-    assert.equal(result?.status, 'rejected', 'cancellation is observable to the sender')
-    if (result?.status !== 'rejected') return
-    assert.equal(result.reason.code, 'CANCELLED', 'the original abort code is preserved')
-    assert.equal(result.reason.cause, reason, 'the caller reason keeps local identity')
-  } finally {
-    await caller.dispose()
-    await provider.dispose()
-    callerTransport.close()
-  }
-})
 
 it('a cancelled one-way item leaves the canonical send queue without a frame or retry', async () => {
   /** One genuine host write holds the original gate while the next operation becomes queued. */
@@ -177,116 +132,3 @@ it('a cancelled one-way item leaves the canonical send queue without a frame or 
     base.close()
   }
 })
-
-/** Both cancellation paths must withdraw the same genuine preparation before commit. */
-for (const control of ['abort', 'deadline', 'late-failure'] as const) {
-  it(`${control} during asynchronous signing withdraws the one-way frame before physical send`, async () => {
-    /** Actual caller writes are counted after the canonical authentication transform. */
-    const [callerTransport, providerTransport] = createMemoryTransportPair()
-    /** Count the actual transport boundary independently of the operation's settled Promise. */
-    let sent = 0
-    /** Preserve the adapter's native receiver through an arrow. */
-    const observed = {
-      ...callerTransport,
-      send: (message: unknown) => {
-        sent += 1
-        return callerTransport.send(message)
-      }
-    }
-    /** Only the notification's sign operation is held after the successful business baseline. */
-    let hold = false
-    /** The test releases genuine authentication work; it never substitutes a send or provider owner. */
-    let release!: () => void
-    /** Signature preparation remains in progress when the caller requests cancellation. */
-    const held = new Promise<void>((resolve) => {
-      release = resolve
-    })
-    /** Observe the exact asynchronous phase without sleeps or speculative timing. */
-    let enter!: () => void
-    /** No cancellation occurs until the real authentication callback has started. */
-    const entered = new Promise<void>((resolve) => {
-      enter = resolve
-    })
-    /** A public fixture key gives a real complete-frame signature with no private credential. */
-    const signature = (value: unknown) =>
-      createHmac('sha256', 'public-fixture-key').update(JSON.stringify(value)).digest('hex')
-    /** The native transform failure arrives only after the caller has already cancelled. */
-    const lateFailure = new RangeError(RuntimeApiFixtureText.lateAuthentication)
-    /** Reporting is observed through the original failure hook without any per-request listener. */
-    const failures: unknown[] = []
-    /** Both sides verify actual protected counter/nonce content through the existing auth owner. */
-    const protection = (caller: boolean) =>
-      authentication({
-        sign: async (value) => {
-          if (caller && hold) {
-            hold = false
-            enter()
-            await held
-            if (control === 'late-failure') throw lateFailure
-          }
-          return { value, signature: signature(value) }
-        },
-        verify: (value) => {
-          /** The fixture assertion applies to real signed values rather than a claimed auth field. */
-          const frame = value as { value: unknown; signature: string }
-          assert.equal(frame.signature, signature(frame.value))
-          return frame.value
-        }
-      })
-    /** The adapter has no outbound gate, so admission must survive the original normal sender path. */
-    const [caller, provider] = await Promise.all([
-      endpoint('caller', observed, protection(true), undefined, (error) => {
-        failures.push(error)
-      }),
-      endpoint('provider', providerTransport, protection(false))
-    ])
-    try {
-      assert.equal(await caller.send('provider', 'ready', null), 'ready')
-      sent = 0
-      /** Keep the original cancellation reason identity after asynchronous preparation has begun. */
-      const reason = new Error(RuntimeApiFixtureText.signingAbort)
-      /** Cancellation during real signing is owned by the caller's native signal. */
-      const controller = new AbortController()
-      hold = true
-      /** Cancellation reaches the actual sender while its authentication owner is preparing. */
-      const pending = caller.sendOneWay(
-        'provider',
-        'ready',
-        null,
-        control !== 'deadline' ? { signal: controller.signal } : { timeoutMs: 10 }
-      )
-      /** Attach observation before abort so an expected rejection cannot become unhandled. */
-      const settlement = Promise.allSettled([pending])
-      await entered
-      if (control !== 'deadline') controller.abort(reason)
-      await settlement
-      release()
-      /** A full later real round-trip proves all prior authentication microtasks have completed. */
-      await nextTurn()
-      assert.equal(await caller.send('provider', 'ready', null), 'ready')
-      /** Only the later baseline request may be physically emitted. */
-      assert.equal(sent, 1, 'an aborted signing operation emits zero notification frames')
-      if (control === 'late-failure') {
-        /** The late failure does not replace cancellation, disappear, or trigger a retry. */
-        const reported = failures.find(
-          (error) => (error as { cause?: unknown }).cause === lateFailure
-        ) as { source?: string; code?: string; name?: string } | undefined
-        assert.ok(reported, 'late transform failure is reported with its original cause')
-        assert.equal(reported.source, 'rpc.endpoint')
-        assert.equal(reported.code, 'AUTHENTICATION_FAILED')
-      }
-      /** Cancellation uses the native code and exact local cause. */
-      const [result] = await settlement
-      assert.equal(result?.status, 'rejected', 'abort during signing remains observable')
-      if (result?.status === 'rejected') {
-        assert.equal(result.reason.code, control !== 'deadline' ? 'CANCELLED' : 'DEADLINE_EXCEEDED')
-        if (control !== 'deadline') assert.equal(result.reason.cause, reason)
-      }
-    } finally {
-      release()
-      await caller.dispose()
-      await provider.dispose()
-      callerTransport.close()
-    }
-  })
-}

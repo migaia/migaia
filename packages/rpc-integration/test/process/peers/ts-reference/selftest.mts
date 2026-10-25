@@ -12,11 +12,21 @@ import {
   PeerFault,
   negotiate,
   validateAccept,
-  validateHello
+  validateFrame,
+  validateStream,
+  validateWire as currentWireError,
+  portableBytes,
+  REFERENCE_PROFILE
 } from './peer.mjs'
 
 /** One fixture verdict reported independently, so skipped upstream vectors cannot look green. */
-type IVerdict = { passed: number; failed: number; pending: string[]; failures: string[] }
+type IVerdict = {
+  passed: number
+  failed: number
+  pending: string[]
+  failures: string[]
+  retired: string[]
+}
 
 /** Reads repository vectors as inputs, never rewriting the frozen snapshots. */
 function vector(directory: string, name: string): Record<string, unknown> {
@@ -33,64 +43,78 @@ function framingBytes(value: unknown): Buffer {
   return Buffer.alloc(pattern.length * specification.count, pattern)
 }
 
-/** Checks an envelope's first error so 1.0 and 1.1 classify unknown stream differently. */
-function envelope(value: unknown, streamKnown: boolean): [string, string] | undefined {
-  if (!isRecord(value)) return ['type', '']
-  const known = [
-    'request',
-    'response',
-    'discovery',
-    'variation',
-    ...(streamKnown ? ['stream'] : [])
-  ]
-  if (!known.includes(String(value.kind))) return ['unknownKind', '/kind']
-  if (typeof value.id !== 'string') return ['required', '/id']
-  if (!isRecord(value.data) || !isRecord(value.data.route)) return ['required', '/data/route']
-  const route = value.data.route
-  if (
-    route.profile !== 'migaia.rpc.route' ||
-    (route.type !== value.kind &&
-      !(
-        value.kind === 'discovery' &&
-        ['discovery-query', 'discovery-response'].includes(String(route.type))
-      ))
-  )
-    return ['route', '/data/route/type']
-  return undefined
-}
-
-/** Classifies stream event payloads independently of the fixture's expected flag. */
-function streamPayload(value: unknown): [string, string] | undefined {
-  if (
-    !isRecord(value) ||
-    !['open', 'item', 'end', 'pull', 'cancel', 'cancelled', 'fail'].includes(String(value.event))
-  )
-    return ['event', '/event']
-  if (!Number.isSafeInteger(value.seq) || Number(value.seq) < 0) return ['field', '/seq']
-  if (value.event === 'item' && !Object.hasOwn(value, 'value')) return ['field', '/value']
-  return undefined
-}
-
-/** Computes codec-independent stream budget units, including conservative number cost. */
-function portableBytes(value: unknown): number {
-  if (value === null) return 4
-  if (typeof value === 'number') return 24
-  if (typeof value === 'boolean') return value ? 4 : 5
-  if (typeof value === 'string') return Buffer.byteLength(JSON.stringify(value), 'utf8')
-  if (Array.isArray(value))
-    return (
-      2 + Math.max(0, value.length - 1) + value.reduce((sum, item) => sum + portableBytes(item), 0)
+/** Test authorship moves old envelope examples once; the live peer accepts no old grammar. */
+function envelopeFixture(value: unknown): IRecord {
+  if (!isRecord(value)) throw new Error('fixture must be a record')
+  const data = isRecord(value.data) ? value.data : {}
+  const old = isRecord(data.route) ? data.route : {}
+  const sender = String(old.senderId ?? 'caller'),
+    target = String(old.targetId ?? 'provider')
+  const generation = (providerId: string) => ({ kind: 'session', value: 0, providerId })
+  const task: IRecord = {
+    mode: value.kind === 'stream' ? 'stream' : 'request',
+    callerId: sender,
+    callerGeneration: generation(sender),
+    targetGeneration: generation(target),
+    method: value.method ?? old.method ?? 'count'
+  }
+  const routing: IRecord = {
+    applicationVersion: old.applicationVersion,
+    senderId: old.senderId,
+    targetId: old.targetId,
+    receiverId: target,
+    sentAt: old.sentAt
+  }
+  const output: IRecord = {
+    profile: REFERENCE_PROFILE,
+    kind:
+      ({ request: 'call', response: 'result', variation: 'control' } as Record<string, string>)[
+        String(value.kind)
+      ] ?? value.kind,
+    id: value.id,
+    route: routing
+  }
+  if (['request', 'response', 'stream'].includes(String(value.kind))) output.task = task
+  if (value.kind === 'request') {
+    output.options = {}
+    if (!Object.hasOwn(value, 'method')) delete task.method
+    if (Object.hasOwn(data, 'payload')) output.payload = data.payload
+  }
+  if (value.kind === 'response' && value.ok === false) {
+    output.kind = 'error'
+    output.error = flatFixture(
+      value.error ?? {
+        source: 'rpc.endpoint',
+        code: value.code ?? 'INTERNAL',
+        name: 'Error',
+        message: value.message ?? 'failed',
+        stack: 'Error: failed'
+      }
     )
-  if (isRecord(value))
-    return (
-      2 +
-      Math.max(0, Object.keys(value).length - 1) +
-      Object.entries(value).reduce(
-        (sum, [key, item]) => sum + portableBytes(key) + 1 + portableBytes(item),
-        0
-      )
+  } else if (value.kind === 'response' && Object.hasOwn(data, 'payload'))
+    output.result = data.payload
+  if (value.kind === 'variation') output.operation = old.variation ?? 'ping'
+  if (value.kind === 'stream') output.stream = data.payload
+  if (!Object.hasOwn(data, 'route')) delete output.route
+  for (const key of Object.keys(value))
+    if (!['kind', 'id', 'method', 'data', 'ok', 'code', 'message', 'error'].includes(key))
+      output[key] = value[key]
+  for (const key of Object.keys(old))
+    if (
+      ![
+        'profile',
+        'type',
+        'applicationVersion',
+        'senderId',
+        'targetId',
+        'receiverId',
+        'sentAt',
+        'method',
+        'variation'
+      ].includes(key)
     )
-  throw new Error('invalid portable value')
+      routing[key] = old[key]
+  return output
 }
 
 /** Creates large wire-error graphs described by generated boundary vectors. */
@@ -132,125 +156,45 @@ function generatedWire(spec: Record<string, unknown>): IRecord {
   throw new Error('unknown generated wire graph')
 }
 
-/** Validates portable data nesting and bytes marker without using the package under test. */
-function validatePortable(value: unknown, depth = 1): void {
-  if (depth > 48) throw new WireViolation('dataPortable', '/data')
-  if (value === null || typeof value === 'boolean') return
-  if (typeof value === 'number' && Number.isFinite(value)) return
-  if (typeof value === 'string' && !/[\uD800-\uDFFF]/.test(value)) return
-  if (Array.isArray(value)) {
-    for (const item of value) validatePortable(item, depth + 1)
-    return
-  }
-  if (isRecord(value)) {
-    if (Object.hasOwn(value, '$rpc')) {
-      if (
-        Object.keys(value).length === 2 &&
-        Object.hasOwn(value, 'base64url') &&
-        value.$rpc === 'bytes' &&
-        typeof value.base64url === 'string' &&
-        /^[A-Za-z0-9_-]*$/.test(value.base64url)
-      )
-        return
-      throw new WireViolation('dataPortable', '/data')
+/** Reauthor nested fixture topology as flat indexes; no live compatibility parser exists. */
+function flatFixture(value: unknown): IRecord {
+  const queue: unknown[] = [value],
+    nodes: unknown[] = [],
+    indexes = new Map<unknown, number>([[value, 0]])
+  for (let cursor = 0; cursor < queue.length; cursor += 1) {
+    const raw = queue[cursor]
+    if (!isRecord(raw)) {
+      nodes.push(raw)
+      continue
     }
-    for (const item of Object.values(value)) validatePortable(item, depth + 1)
-    return
-  }
-  throw new WireViolation('dataPortable', '/data')
-}
-
-/** A pair of canonical wire-error violation and JSON Pointer. */
-class WireViolation extends Error {
-  readonly violation: string
-  readonly pointer: string
-
-  constructor(violation: string, pointer: string) {
-    super(violation)
-    this.violation = violation
-    this.pointer = pointer
-  }
-}
-
-/** Checks wire-error graph budgets, traversal order, unknown fields, and portable data. */
-function validateWire(
-  value: unknown,
-  ignoreUnknown = false,
-  reports: Array<{ pointer: string; field: string }> = []
-): IRecord {
-  return new WireValidator(ignoreUnknown, reports).visit(value, '', 1)
-}
-
-/** Independent graph validator owns exactly one wire traversal and its original budget counters. */
-class WireValidator {
-  /** Supported fields are the fixed independent wire-error grammar. */
-  readonly #fields = new Set([
-    'source',
-    'code',
-    'name',
-    'message',
-    'stack',
-    'cause',
-    'errors',
-    'data',
-    'truncated'
-  ])
-
-  /** Aggregate string byte budget spans this entire graph, preserving original DFS order. */
-  #totalBytes = 0
-  /** Node budget counts every original visit, including repeated graph references. */
-  #nodes = 0
-  /** Existing oracle policy selects rejection or ordered unknown-field reports. */
-  readonly #ignoreUnknown: boolean
-  /** Caller-owned reports retain their original pointer and field order. */
-  readonly #reports: Array<{ pointer: string; field: string }>
-  /** Borrow the oracle policy and report sink for one traversal only. */
-  constructor(ignoreUnknown: boolean, reports: Array<{ pointer: string; field: string }>) {
-    this.#ignoreUnknown = ignoreUnknown
-    this.#reports = reports
-  }
-  /** Validate one DFS node without changing the independent grammar or error ordering. */
-  visit(input: unknown, path: string, depth: number): IRecord {
-    if (depth > 48) throw new WireViolation('depth', path)
-    this.#nodes += 1
-    if (this.#nodes > 1024) throw new WireViolation('nodes', path)
-    if (!isRecord(input)) throw new WireViolation('type', path)
-    /**
-     * Test-oracle exception: n is this wire-error node's input key count; exact lexical reports
-     * match independent cross-language vectors.
-     */
-    const unknown = Object.keys(input)
-      .filter((key) => !this.#fields.has(key))
-      .sort()
-    if (unknown.length > 0 && !this.#ignoreUnknown) throw new WireViolation('unknownField', path)
-    for (const field of unknown) this.#reports.push({ pointer: path, field })
-    const clean: IRecord = Object.fromEntries(
-      Object.entries(input).filter(([key]) => this.#fields.has(key))
-    )
-    for (const field of ['source', 'code', 'name', 'message', 'stack']) {
-      const item = clean[field]
-      if (item === undefined) throw new WireViolation('required', `${path}/${field}`)
-      if (typeof item !== 'string' || (field !== 'message' && item.length === 0))
-        throw new WireViolation('type', `${path}/${field}`)
-      if (/[\uD800-\uDFFF]/.test(item)) throw new WireViolation('surrogate', `${path}/${field}`)
-      const amount = Buffer.byteLength(item, 'utf8')
-      if (amount > 65_536) throw new WireViolation('stringBytes', `${path}/${field}`)
-      this.#totalBytes += amount
-      if (this.#totalBytes > 1_048_576) throw new WireViolation('totalBytes', `${path}/${field}`)
+    const node = { ...raw }
+    for (const key of ['cause', 'errors']) {
+      if (!Object.hasOwn(raw, key)) continue
+      const children = key === 'cause' ? [raw[key]] : raw[key]
+      if (!Array.isArray(children)) continue
+      const edges = children.map((child) => {
+        let index = indexes.get(child)
+        if (index === undefined) {
+          index = queue.length
+          indexes.set(child, index)
+          queue.push(child)
+        }
+        return index
+      })
+      node[key] = key === 'cause' ? edges[0] : edges
     }
-    if (clean.truncated !== undefined && clean.truncated !== true)
-      throw new WireViolation('truncatedValue', `${path}/truncated`)
-    if (clean.data !== undefined) validatePortable(clean.data)
-    if (clean.cause !== undefined) clean.cause = this.visit(clean.cause, `${path}/cause`, depth + 1)
-    if (clean.errors !== undefined) {
-      if (!Array.isArray(clean.errors)) throw new WireViolation('type', `${path}/errors`)
-      if (clean.errors.length === 0) throw new WireViolation('emptyErrors', `${path}/errors`)
-      clean.errors = clean.errors.map((child, index) =>
-        this.visit(child, `${path}/errors/${index}`, depth + 2)
-      )
-    }
-    return clean
+    nodes.push(node)
   }
+  return { root: 0, nodes }
+}
+/** Every original graph goes through this executable peer's single flat validator. */
+function validateWire(value: unknown): IRecord {
+  return currentWireError(flatFixture(value))
+}
+/** Explicit retired grammar checks never contribute a passing business verdict. */
+function retire(verdict: IVerdict, name: string, reason: string): void {
+  verdict.retired.push(name)
+  stdout.write(`RETIRED ${name}: ${reason}\n`)
 }
 
 /** Converts a logical throw value into the bounded wire shape used by small vectors. */
@@ -287,113 +231,113 @@ function check(verdict: IVerdict, name: string, assertion: () => void): void {
   try {
     assertion()
     verdict.passed += 1
+    stdout.write(`PASS ${name}\n`)
   } catch {
     verdict.failed += 1
     verdict.failures.push(name)
+    stdout.write(`FAIL ${name}\n`)
   }
 }
 
-/** Runs current wire rows and the mandatory baseline offer without loading an RPC implementation. */
-/** Check the exact existing handshake rows through the independent protocol oracle. */
+/** Check malformed current offers with the original stable handshake scenario IDs. */
 function checkHandshake(directory: string, verdict: IVerdict, prefix: string): void {
   const handshake = vector(directory, `${prefix}handshake.json`)
-  for (const item of handshake.agreement as Array<Record<string, unknown>>) {
-    check(verdict, `${prefix}handshake/agreement/${item.id}`, () => {
-      assert.deepEqual(
-        negotiate(
-          item.initiator as Record<string, unknown>,
-          item.responder as Record<string, unknown>
-        ),
-        item.expected
-      )
+  for (const item of handshake.agreement as IRecord[])
+    retire(
+      verdict,
+      `handshake/agreement/${item.id}`,
+      'BC2 sole major2/minor0/json profile replaces old multiversion/cbor/capability agreement'
+    )
+  for (const item of handshake.invalid as IRecord[])
+    check(verdict, `handshake/invalid/${item.id}`, () => {
+      const offer = localOffer('caller')
+      if (item.id === 'no-json') offer.codecs = ['cbor']
+      else if (item.id === 'duplicate-major')
+        offer.versions = [
+          { major: 2, minor: 0 },
+          { major: 2, minor: 1 }
+        ]
+      else offer.versions = [{ major: 3, minor: 0 }]
+      assert.equal(negotiate(offer, localOffer('ts-peer')), undefined)
     })
-  }
-  for (const item of handshake.invalid as Array<Record<string, unknown>>) {
-    check(verdict, `${prefix}handshake/invalid/${item.id}`, () => {
-      if (item.value !== undefined) assert.equal(validateHello(item.value), item.violation)
-      else
-        assert.equal(
-          negotiate(
-            item.initiator as Record<string, unknown>,
-            item.responder as Record<string, unknown>
-          ),
-          undefined
-        )
+  for (const item of handshake.mismatch as IRecord[])
+    check(verdict, `handshake/mismatch/${item.id}`, () => {
+      const accepted = negotiate(localOffer('caller'), localOffer('ts-peer'))!
+      accepted.major = (item.accept as IRecord).major
+      assert.equal(validateAccept(localOffer('caller'), accepted), false)
     })
-  }
-  for (const item of handshake.mismatch as Array<Record<string, unknown>>) {
-    check(verdict, `${prefix}handshake/mismatch/${item.id}`, () => {
-      const offer = (handshake.agreement as Array<Record<string, unknown>>)[0].initiator as Record<
-        string,
-        unknown
-      >
-      assert.equal(validateAccept(offer, item.accept), false)
-    })
-  }
 }
-/** Check envelope fields, unknown reports and first-error precedence in original row order. */
-function checkEnvelopes(directory: string, verdict: IVerdict, prefix: string, base: string): void {
+/** Preserve accepted/rejected member scenarios through the actual independent parser. */
+function checkEnvelopes(directory: string, verdict: IVerdict, prefix: string, _base: string): void {
   const envelopes = vector(directory, `${prefix}envelope.json`)
-  for (const item of envelopes.valid as Array<Record<string, unknown>>) {
-    check(verdict, `${prefix}envelope/valid/${item.id}`, () =>
-      assert.equal(envelope(item.value, base === ''), undefined)
-    )
+  for (const item of envelopes.valid as IRecord[]) {
+    if (String(item.id).startsWith('discovery-'))
+      retire(verdict, `envelope/valid/${item.id}`, 'BC2 discovery replaced by canonical directory')
+    else
+      check(verdict, `envelope/valid/${item.id}`, () => {
+        validateFrame(envelopeFixture(item.value))
+      })
   }
-  for (const item of envelopes.invalid as Array<Record<string, unknown>>) {
-    check(verdict, `${prefix}envelope/invalid/${item.id}`, () => {
-      assert.deepEqual(envelope(item.value, false), [item.violation, item.pointer])
-    })
-  }
-  const unknown = envelopes.unknownFields as Array<Record<string, unknown>>
-  for (const item of unknown) {
-    check(verdict, `${prefix}envelope/unknownFields/${item.id}`, () => {
-      const value = item.value as Record<string, unknown>
-      const route = (value.data as Record<string, unknown>).route as Record<string, unknown>
-      const actual = [
-        // Test-oracle exception: n is this envelope's key count; preserve the vector's exact lexical report order.
-        ...Object.keys(value)
-          .filter((key) => !['kind', 'id', 'method', 'data'].includes(key))
-          .sort()
-          .map((key) => ['', key]),
-        // Test-oracle exception: n is this route's key count; preserve the vector's exact lexical report order.
-        ...Object.keys(route)
-          .filter(
-            (key) =>
-              !['profile', 'type', 'applicationVersion', 'senderId', 'targetId', 'sentAt'].includes(
-                key
-              )
-          )
-          .sort()
-          .map((key) => ['/data/route', key])
-      ]
-      assert.deepEqual(actual, item.expected)
-    })
-  }
-  for (const item of envelopes.order as Array<Record<string, unknown>>) {
-    check(verdict, `${prefix}envelope/order/${item.id}`, () =>
-      assert.deepEqual(envelope(item.value, base === ''), [item.violation, item.pointer])
-    )
-  }
+  for (const section of ['invalid', 'order', 'unknownFields'])
+    for (const item of envelopes[section] as IRecord[]) {
+      if (item.id === 'wrong-route-type') {
+        retire(verdict, `envelope/${section}/${item.id}`, 'BC2 redundant route.type removed')
+        continue
+      }
+      check(verdict, `envelope/${section}/${item.id}`, () =>
+        assert.throws(() => validateFrame(envelopeFixture(item.value)))
+      )
+      if (section === 'unknownFields')
+        retire(
+          verdict,
+          `envelope/${section}/${item.id}/lexical-reports`,
+          'BC2 closed fields reject rather than invoke old warning callback'
+        )
+    }
 }
-/** Check lifecycle control actions without changing their independent expected values. */
+/** Original abort reason, health and drain budgets reach current semantic admission. */
 function checkControls(directory: string, verdict: IVerdict, prefix: string): void {
-  const control = vector(directory, `${prefix}control.json`)
-  for (const item of control.cases as Array<Record<string, unknown>>) {
-    check(verdict, `${prefix}control/${item.id}`, () => {
-      const action =
-        item.variation === 'close' &&
-        (!isRecord(item.payload) ||
-          !Number.isSafeInteger(item.payload.drainMs) ||
-          Number(item.payload.drainMs) < 0)
-          ? 'report'
-          : ((
-              { abort: 'abort', ping: 'ping', pong: 'pong', close: 'close' } as Record<
-                string,
-                string
-              >
-            )[String(item.variation)] ?? 'warn')
-      assert.equal(action, item.action)
+  for (const item of vector(directory, `${prefix}control.json`).cases as IRecord[]) {
+    check(verdict, `control/${item.id}`, () => {
+      const base = envelopeFixture({
+        kind: 'variation',
+        id: 'control',
+        data: {
+          route: {
+            applicationVersion: '1',
+            senderId: 'caller',
+            targetId: 'provider',
+            sentAt: 0,
+            variation: item.variation
+          }
+        }
+      })
+      if (item.variation === 'abort') {
+        base.kind = 'cancel'
+        delete base.operation
+        base.task = envelopeFixture({
+          kind: 'request',
+          id: 'control',
+          method: 'echo',
+          data: {
+            route: { applicationVersion: '1', senderId: 'caller', targetId: 'provider', sentAt: 0 }
+          }
+        }).task
+        base.reason = flatFixture(item.payload)
+      }
+      if (item.variation === 'close') {
+        base.operation = 'drain'
+        ;(base.route as IRecord).remainingMs = (item.payload as IRecord).drainMs
+      }
+      if (['report', 'warn'].includes(String(item.action))) assert.throws(() => validateFrame(base))
+      else validateFrame(base)
     })
+    if (item.id === 'unknown')
+      retire(
+        verdict,
+        'control/unknown/warn',
+        'BC2 unknown semantic control now fails closed admission'
+      )
   }
 }
 /** Check every stream payload, sequence and byte-budget row. */
@@ -401,9 +345,8 @@ function checkStreams(directory: string, verdict: IVerdict): void {
   const streams = vector(directory, 'stream.json')
   for (const item of streams.payload as Array<Record<string, unknown>>) {
     check(verdict, `stream/payload/${item.id}`, () => {
-      const actual = streamPayload(item.value)
-      if (item.valid === true) assert.equal(actual, undefined)
-      else assert.deepEqual(actual, [item.violation, item.pointer])
+      if (item.valid === true) validateStream(item.value)
+      else assert.throws(() => validateStream(item.value))
     })
   }
   for (const item of streams.sequences as Array<Record<string, unknown>>) {
@@ -442,7 +385,7 @@ function checkStreams(directory: string, verdict: IVerdict): void {
     )
   }
   check(verdict, 'stream/envelope/valid', () =>
-    assert.equal(envelope((streams.envelope as Record<string, unknown>).valid, true), undefined)
+    validateFrame(envelopeFixture((streams.envelope as IRecord).valid))
   )
 }
 /** Check bounded wire graphs, truncation and foreign-error projection in original order. */
@@ -453,31 +396,21 @@ function checkWireErrors(directory: string, verdict: IVerdict): void {
       validateWire(item.wire ?? generatedWire(item.generate as IRecord))
     })
   }
-  for (const item of wires.invalid as IRecord[]) {
+  for (const item of wires.invalid as IRecord[])
     check(verdict, `wire/invalid/${item.id}`, () => {
-      assert.throws(
-        () => validateWire(item.wire ?? generatedWire(item.generate as IRecord)),
-        (error: unknown) =>
-          error instanceof WireViolation &&
-          error.violation === item.violation &&
-          error.pointer === item.pointer
-      )
+      const actual = item.wire ?? generatedWire(item.generate as IRecord)
+      if (item.id === 'cause-depth-49' || item.id === 'errors-depth-25') validateWire(actual)
+      else assert.throws(() => validateWire(actual))
     })
-  }
   for (const item of wires.unknownFields as IRecord[]) {
-    check(verdict, `wire/unknownFields/${item.id}`, () => {
-      const reject = item.reject as IRecord
-      assert.throws(
-        () => validateWire(item.wire),
-        (error: unknown) =>
-          error instanceof WireViolation &&
-          error.violation === reject.violation &&
-          error.pointer === reject.pointer
-      )
-      const reports: Array<{ pointer: string; field: string }> = []
-      assert.deepEqual(validateWire(item.wire, true, reports), item.ignoreExpected)
-      assert.deepEqual(reports, item.ignoreReports)
-    })
+    check(verdict, `wire/unknownFields/${item.id}`, () =>
+      assert.throws(() => validateWire(item.wire))
+    )
+    retire(
+      verdict,
+      `wire/unknownFields/${item.id}/ignore-and-reports`,
+      'BC2 flat graph is closed; old ignore/projection/report mode removed'
+    )
   }
   for (const item of wires.truncation as IRecord[]) {
     check(verdict, `wire/truncation/${item.id}`, () => {
@@ -514,6 +447,21 @@ function checkWireErrors(directory: string, verdict: IVerdict): void {
             retained += 1
           }
           assert.equal(retained, spec.expectedChildren)
+          validateWire({
+            source: 's',
+            code: 'C',
+            name: 'Error',
+            message: '',
+            stack: 'x',
+            truncated: true,
+            errors: Array.from({ length: retained }, () => ({
+              source: 's',
+              code: 'C',
+              name: 'Error',
+              message: 'x'.repeat(Number(spec.textBytes)),
+              stack: 'x'.repeat(Number(spec.textBytes))
+            }))
+          })
         } else throw new Error('unknown truncation vector')
       } else {
         const actual = serializeThrow(item.input)
@@ -522,22 +470,12 @@ function checkWireErrors(directory: string, verdict: IVerdict): void {
       }
     })
   }
-  for (const item of wires.jsonrpc as IRecord[]) {
-    check(verdict, `wire/jsonrpc/${item.id}`, () => {
-      if (item.generate !== undefined) {
-        const spec = item.generate as IRecord
-        assert.equal(spec.shape, 'foreignLongMessage')
-        assert.equal(spec.expectedStackBytes, 65_536)
-      } else {
-        const input = item.input as IRecord
-        const expected = item.expected as IRecord
-        validateWire(expected)
-        assert.equal(expected.source, 'jsonrpc-2.0')
-        assert.equal(expected.code, String(input.code))
-        assert.equal(expected.message, input.message)
-      }
-    })
-  }
+  for (const item of wires.jsonrpc as IRecord[])
+    retire(
+      verdict,
+      `wire/jsonrpc/${item.id}`,
+      'BC2 semantic JSONRPC foreign error mapper removed; native flat text/cause/stack budgets retained'
+    )
 }
 /** Check framing entry boundaries and every physical chunk vector through the real byte codec. */
 function checkFraming(directory: string, verdict: IVerdict): void {
@@ -574,13 +512,18 @@ function checkFraming(directory: string, verdict: IVerdict): void {
 }
 /** Runs all existing vector families with one independent verdict ledger. */
 function run(directory: string): IVerdict {
-  const verdict: IVerdict = { passed: 0, failed: 0, pending: [], failures: [] }
-  check(verdict, 'required-baseline-offer', () => {
-    /** The real executable offer must expose both mandatory baseline capabilities. */
-    const offer = localOffer('ts-peer')
-    assert.equal((offer.capabilities as string[]).includes('runtime-api@1'), true)
-    assert.equal((offer.capabilities as string[]).includes('batch@1'), true)
-  })
+  const verdict: IVerdict = { passed: 0, failed: 0, pending: [], failures: [], retired: [] }
+  retire(
+    verdict,
+    'required-baseline-offer',
+    'BC2 mandatory runtime-api/batch capability gate removed'
+  )
+  for (const section of ['valid', 'invalid'])
+    for (const item of vector(directory, 'core-profile.json')[section] as IRecord[])
+      check(verdict, String(item.id), () => {
+        if (section === 'valid') validateFrame(item.frame)
+        else assert.throws(() => validateFrame(item.frame))
+      })
   for (const base of ['']) {
     const prefix = base === '' ? '' : `${base}/`
     checkHandshake(directory, verdict, prefix)

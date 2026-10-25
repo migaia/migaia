@@ -33,7 +33,7 @@ import { readRuntimePeerConnection } from '../../dist/remote/runtime-api/peer.js
 import type { RpcOutboundAttachment } from '../../dist/core/internal/outbound-attachment.js'
 import { runtimeSources, RUNTIME_API_FIXTURE_BASE_CAPABILITIES } from '../runtime-api/fixture.js'
 import { RpcCapability } from '@migaia/rpc-contract'
-import { RpcRemoteError, RpcTimeoutError, RpcAbortError } from '../../dist/core/errors.js'
+import { RpcRemoteError, RpcTimeoutError, RpcAbortError } from '@migaia/rpc-contract/errors'
 import { registerBatchAgreement } from '../../dist/core/internal/batch-frame.js'
 import type { RpcOutboundSender } from '../../dist/core/internal/outbound-sender.js'
 import type { ProviderAdmissionRegistry } from '../../dist/core/internal/provider-admission.js'

@@ -1,21 +1,26 @@
+/**
+ * Projects original stderr observations into bounded fixed-text IPC records and owns their
+ * subscription/timer retirement. Raw child bytes stay with the native supervision reader.
+ */
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { systemScheduler, type IScheduledTask, type IScheduler } from '@migaia/utils/scheduler'
-import type { IIpcLogInstallation } from '@migaia/rpc-host/plugin'
-import { IpcLogEventName } from '@migaia/rpc-host/plugin'
-import { IpcReporterContext } from '@migaia/rpc-host/plugin'
+import type { ipcLog } from '../features/log.js'
+import { IpcLogEventName } from '../features/flow-control.js'
+import { IpcReporterContext } from '@migaia/rpc-host/sdk'
 import {
   CHILD_STDERR_REDACTED,
   PROCESS_STDERR_EVENT_BUDGET,
   PROCESS_STDERR_INTERVAL_MS
 } from './constants.js'
 import type { IProcessCommonOptions } from './types.js'
-import type { IRuntimeByteConnection } from '@migaia/rpc-host/plugin'
+/** The concrete log installation owns its sink and exact observer remover. */
+type IProcessLog = ReturnType<ReturnType<typeof ipcLog>['install']>['value']
 
 /** Project the existing reader into a bounded session log without retaining or delaying bytes. */
 /** Own one session's stderr budget, timer and exact native unsubscription. */
 class ProcessStderrLog {
   /** Original log installation receives only the existing redacted records. */
-  #install: IIpcLogInstallation
+  #install: IProcessLog
   /** The session identity and native source remain the original process options. */
   #ipc: IProcessCommonOptions['ipc']
   /** Secondary reporter failures retain their existing host observation policy. */
@@ -36,7 +41,7 @@ class ProcessStderrLog {
   #unsubscribe: () => void
   /** Register only after all counters and lifecycle callbacks belong to this instance. */
   constructor(
-    install: IIpcLogInstallation,
+    install: IProcessLog,
     ipc: IProcessCommonOptions['ipc'],
     report: (error: unknown) => void,
     scheduler: IScheduler = systemScheduler
@@ -121,38 +126,10 @@ class ProcessStderrLog {
 
 /** Project the original stderr reader into its bounded redacted session log. */
 export function attachIpcStderr(
-  install: IIpcLogInstallation,
+  install: IProcessLog,
   ipc: IProcessCommonOptions['ipc'],
   report: (error: unknown) => void,
   scheduler: IScheduler = systemScheduler
 ): () => void {
   return ipc.stderr ? new ProcessStderrLog(install, ipc, report, scheduler).close : () => undefined
-}
-
-/** Attach this actual stderr owner to one constructed Core connection, with original rollback. */
-export function attachProcessChannelStderr<T extends IRuntimeByteConnection>(
-  channel: T,
-  options: IProcessCommonOptions
-): T {
-  try {
-    /** The exact selected log installation shares the existing queue/close resource lifetime. */
-    const unsubscribe = attachIpcStderr(channel.log, options.ipc, options.report, channel.scheduler)
-    channel.ownClose({ close: unsubscribe })
-    return channel
-  } catch (primary) {
-    /** Secondary cleanup/report failures never replace the original construction failure. */
-    const report = (error: unknown): void => {
-      try {
-        options.report(error)
-      } catch (failure) {
-        hostRethrowReporter(failure, IpcReporterContext)
-      }
-    }
-    try {
-      void channel.close().catch(report)
-    } catch (cleanup) {
-      report(cleanup)
-    }
-    throw primary
-  }
 }

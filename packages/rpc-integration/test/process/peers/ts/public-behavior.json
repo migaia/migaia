@@ -21,11 +21,7 @@
     "cause": {
       "source": "rpc.endpoint",
       "code": "INTERNAL",
-      "cause": {
-        "source": "rpc.endpoint",
-        "code": "INTERNAL",
-        "message": "peer cause"
-      }
+      "message": "peer cause"
     }
   },
   "cancel": {

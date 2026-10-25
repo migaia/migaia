@@ -1,12 +1,8 @@
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { describe, expect, it } from 'vitest'
 import { MessageChannel } from 'node:worker_threads'
-import {
-  readRuntimeCarrier,
-  RpcRuntimeKind,
-  rpcMessageCapabilityControl,
-  type IRpcRuntimeEnvelope
-} from '@migaia/rpc-contract/runtime'
+import { RpcWireKind } from '@migaia/rpc-contract/protocol'
+import { workerFrames } from './worker-frame.js'
 import type { ISerializeChunk, ISerializeParser } from '@migaia/serialize'
 import { SerializeChunkKind } from '@migaia/serialize'
 import { WorkerAdapter, createWorkerHandler, workerComputed } from '../src/index'
@@ -344,14 +340,36 @@ describe('store-worker exports', () => {
         entered()
         await held
       })
-      const workerPostsBeforeNotice = workerPosts.length
+      /** BC2 directory publication is metadata traffic, not a provider completion or notify ACK. */
+      const beforeNotice = await workerFrames(workerPosts)
+      const workerPostsBeforeNotice = beforeNotice.filter(
+        (frame) => frame.kind !== RpcWireKind.directory
+      ).length
       await client.notify('sent', 'notice')
       await entering
       expect(received).toEqual(['sent'])
-      expect(workerPosts).toHaveLength(workerPostsBeforeNotice)
+      /** Count every physical frame except the canonical metadata publication for this registration. */
+      const delivered = await workerFrames(workerPosts)
+      expect(delivered.filter((frame) => frame.kind !== RpcWireKind.directory)).toHaveLength(
+        workerPostsBeforeNotice
+      )
+      console.info(
+        '[store-worker native directory]',
+        JSON.stringify(
+          delivered
+            .filter((frame) => frame.kind === RpcWireKind.directory)
+            .map((frame) => ({
+              kind: frame.kind,
+              name: frame.directory.self.name,
+              methods: frame.directory.methods.map((method) => method.name)
+            }))
+        )
+      )
       release()
       await new Promise<void>((resolve) => setTimeout(resolve, 0))
-      expect(workerPosts).toHaveLength(workerPostsBeforeNotice)
+      expect(
+        (await workerFrames(workerPosts)).filter((frame) => frame.kind !== RpcWireKind.directory)
+      ).toHaveLength(workerPostsBeforeNotice)
       postFailure = new Error('worker post failure')
       const failure = await client.notify('fails', 'notice').catch((error: unknown) => error)
       expect(failure).toMatchObject({ cause: postFailure })
@@ -451,15 +469,10 @@ describe('store-worker exports', () => {
   it('settles a close-before-ready stream without sending a worker frame', async () => {
     /** Initial negotiation is distinct from the original zero-business-send guarantee. */
     const frames: unknown[] = []
-    let sends = 0
     const worker = workerParser({
       worker: {
         postMessage: (message) => {
           frames.push(message)
-          /** Only actual business invocation carriers count as the cancelled worker request. */
-          const selected = readRuntimeCarrier(message)
-          if (selected && (selected.frame as IRpcRuntimeEnvelope).kind === RpcRuntimeKind.call)
-            sends++
         },
         addEventListener: () => undefined,
         removeEventListener: () => undefined
@@ -475,8 +488,12 @@ describe('store-worker exports', () => {
     expect(worker.dispose!()).toBe(firstDispose)
     await expect(pending).rejects.toMatchObject({ name: 'RpcLifecycleError' })
     await firstDispose
+    /** BC2 removes the private ready ACK; close wins before any actual Host frame is written. */
+    const prepared = await workerFrames(frames)
+    /** Count actual admitted business frames after all original cleanup has completed. */
+    const sends = prepared.filter((frame) => frame.kind === RpcWireKind.call).length
     expect(sends).toBe(0)
-    expect(frames).toEqual([{ kind: rpcMessageCapabilityControl.ready }])
+    expect(prepared).toEqual([])
   })
   it('rejects null options at worker entry points with a tagged configuration error', () => {
     expect(() => new WorkerAdapter(fakePort(), null as never)).toThrow(

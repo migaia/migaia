@@ -8,6 +8,7 @@ await createRpcHost({
   provide: {
     double: (value) => value * 2,
     child: () => child,
+    echo: (value) => value,
     flags: () => process.execArgv
   },
   plugins: [threadPlugin({ connectToParent: true })]

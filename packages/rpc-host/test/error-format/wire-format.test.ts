@@ -1,17 +1,14 @@
-import { createRuntimeEndpointComposition } from '../../dist/core/runtime-api-endpoint.js'
+/** Original wire-error business graphs use genuine public namespaces and canonical serialization. */
 import { describe, expect, it, vi } from 'vitest'
-import { serializeRpcError } from '@migaia/rpc-contract'
-import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
+import { serializeRpcError, RpcLifecycleError } from '@migaia/rpc-contract/errors'
+import { timeout } from '@migaia/rpc-host/features/timeout'
+import { connectedCoreHosts } from '../host/core-fixture.js'
 
-import { RpcLifecycleError, RpcRemoteError } from '../../dist/core/errors.js'
-import { abort } from '../../dist/core/middleware/abort.js'
-import { connect } from '../../dist/core/middleware/connect.js'
-
-import type { IRpcHookEvent } from '../../dist/core/typing.js'
+/** The actual public report port lends native coded errors directly, without a retired hook wrapper. */
+type IReportedError = Error & { readonly code?: string }
 
 describe('one RPC wire error format', () => {
   it('delivers bounded errors, data, and stack on both paths with exact failure reports', async () => {
-    const [clientTransport, serverTransport] = createMemoryTransportPair()
     let errorChildren: Error = new Error('leaf')
     for (let index = 0; index < 31; index += 1)
       errorChildren = new AggregateError([errorChildren], `level ${index}`)
@@ -26,56 +23,42 @@ describe('one RPC wire error format', () => {
     const observedAborts: unknown[] = []
     let slowStarted: (() => void) | undefined
     let slowAborted: (() => void) | undefined
-    const server = await createRuntimeEndpointComposition(
+    /** Each original endpoint retains its independently selected public diagnostic port. */
+    const serverFailures: IReportedError[] = []
+    /** Caller cancellation serialization must not be mixed with provider failure reports. */
+    const clientFailures: IReportedError[] = []
+    /** Both actual Hosts run the same original carrier, Session and wire error projection. */
+    const { a: server, b: client } = await connectedCoreHosts(
       {
-        id: 'wire-limits-server',
-        transport: serverTransport,
-        middlewares: [connect({ transport: serverTransport }), abort()],
-        provider: {
-          fail: (context) => {
-            throw originals[context.data as number]
-          },
-          slow: async (context) => {
-            const signal = context.signal
-            slowStarted?.()
-            if (!signal.aborted)
-              await new Promise<void>((resolve) => {
-                signal.addEventListener('abort', () => resolve(), { once: true })
-              })
-            observedAborts.push(signal.reason)
-            slowAborted?.()
-            return context.success(undefined)
-          }
+        fail: (value) => {
+          throw originals[value as number]
+        },
+        slow: async (_value, context) => {
+          const signal = context.signal
+          slowStarted?.()
+          if (!signal.aborted)
+            await new Promise<void>((resolve) => {
+              signal.addEventListener('abort', () => resolve(), { once: true })
+            })
+          observedAborts.push(signal.reason)
+          slowAborted?.()
         }
       },
-      { agreement: { capabilities: [] }, peerId: '' }
-    ).installing
-    const client = await createRuntimeEndpointComposition(
-      {
-        id: 'wire-limits-client',
-        transport: clientTransport,
-        middlewares: [connect({ transport: clientTransport }), abort()]
-      },
-      { agreement: { capabilities: [] }, peerId: '' }
-    ).installing
-    const serverFailures: IRpcHookEvent[] = []
-    const clientFailures: IRpcHookEvent[] = []
-    server.hooks.on((event) => {
-      if (event.name === 'failure') serverFailures.push(event)
-    })
-    client.hooks.on((event) => {
-      if (event.name === 'failure') clientFailures.push(event)
-    })
+      {},
+      (error) => serverFailures.push(error as IReportedError),
+      undefined,
+      (error) => clientFailures.push(error as IReportedError)
+    )
     try {
       for (let index = 0; index < originals.length; index += 1) {
         let received: unknown
         try {
-          await client.send('wire-limits-server', 'fail', index, { timeoutMs: 2000 })
+          await client.memory.send('a', 'fail', index, { timeout: timeout({ ms: 2000 }) })
         } catch (error) {
           received = error
         }
-        expect(received).toBeInstanceOf(RpcRemoteError)
-        const cause = (received as RpcRemoteError).cause as Error
+        expect(received).toBeInstanceOf(Error)
+        const cause = received as Error
         expect(cause).toBeInstanceOf(Error)
         restoredResponses.push(cause)
         if (index === 0) {
@@ -106,9 +89,7 @@ describe('one RPC wire error format', () => {
         'INTERNAL',
         'INTERNAL'
       ])
-      expect(
-        serverFailures.filter((event) => event.code === 'INTERNAL').map((event) => event.error)
-      ).toEqual(originals)
+      expect(serverFailures.filter((event) => event.code === 'INTERNAL')).toEqual(originals)
       expect(clientFailures).toHaveLength(0)
       for (let index = 0; index < originals.length; index += 1) {
         const started = new Promise<void>((resolve) => {
@@ -118,9 +99,9 @@ describe('one RPC wire error format', () => {
           slowAborted = resolve
         })
         const controller = new AbortController()
-        const pending = client.send('wire-limits-server', 'slow', null, {
+        const pending = client.memory.send('a', 'slow', null, {
           signal: controller.signal,
-          timeoutMs: false
+          timeout: false
         })
         pending.catch(() => undefined)
         await started
@@ -141,13 +122,12 @@ describe('one RPC wire error format', () => {
       expect(clientFailures.map((event) => event.code)).toEqual(['PAYLOAD_INVALID'])
       expect(serverFailures).toHaveLength(4)
     } finally {
-      await client.dispose()
-      await server.dispose()
+      await client.close()
+      await server.close()
     }
   })
 
   it('returns an unidentified provider error and a bounded cause chain before timeout', async () => {
-    const [clientTransport, serverTransport] = createMemoryTransportPair()
     let chain: Error = new Error('leaf')
     for (let index = 0; index < 59; index += 1) {
       const parent = new Error(`parent ${index}`)
@@ -155,42 +135,27 @@ describe('one RPC wire error format', () => {
       chain = parent
     }
     const deepError = chain
-    const server = await createRuntimeEndpointComposition(
-      {
-        id: 'wire-boundary-server',
-        transport: serverTransport,
-        middlewares: [connect({ transport: serverTransport }), abort()],
-        provider: {
-          plain: () => {
-            throw new Error('plain')
-          },
-          deep: () => {
-            throw deepError
-          }
-        }
+    /** These real provider exceptions pass through the sole new-profile error graph boundary. */
+    const { a: server, b: client } = await connectedCoreHosts({
+      plain: () => {
+        throw new Error('plain')
       },
-      { agreement: { capabilities: [] }, peerId: '' }
-    ).installing
-    const client = await createRuntimeEndpointComposition(
-      {
-        id: 'wire-boundary-client',
-        transport: clientTransport,
-        middlewares: [connect({ transport: clientTransport }), abort()]
-      },
-      { agreement: { capabilities: [] }, peerId: '' }
-    ).installing
+      deep: () => {
+        throw deepError
+      }
+    })
     try {
       await expect(
-        client.send('wire-boundary-server', 'plain', null, { timeoutMs: 2000 })
-      ).rejects.toMatchObject({ cause: { source: 'unknown', code: 'UNKNOWN' } })
+        client.memory.send('a', 'plain', null, { timeout: timeout({ ms: 2000 }) })
+      ).rejects.toMatchObject({ source: 'rpc.endpoint', code: 'INTERNAL' })
       let received: unknown
       try {
-        await client.send('wire-boundary-server', 'deep', null, { timeoutMs: 2000 })
+        await client.memory.send('a', 'deep', null, { timeout: timeout({ ms: 2000 }) })
       } catch (error) {
         received = error
       }
-      expect(received).toBeInstanceOf(RpcRemoteError)
-      let node: unknown = (received as RpcRemoteError).cause
+      expect(received).toBeInstanceOf(Error)
+      let node: unknown = received
       let count = 0
       while (node instanceof Error) {
         count += 1
@@ -202,13 +167,12 @@ describe('one RPC wire error format', () => {
       }
       expect(count).toBe(48)
     } finally {
-      await client.dispose()
-      await server.dispose()
+      await client.close()
+      await server.close()
     }
   })
 
   it('restores cause, AggregateError children, and cleanup errors from a provider failure', async () => {
-    const [clientTransport, serverTransport] = createMemoryTransportPair()
     const original = new RpcLifecycleError(
       'outer',
       new AggregateError([new TypeError('a'), new RangeError('b')], 'agg'),
@@ -223,47 +187,31 @@ describe('one RPC wire error format', () => {
     const abortedPromise = new Promise<void>((resolve) => {
       aborted = resolve
     })
-    const server = await createRuntimeEndpointComposition(
-      {
-        id: 'wire-server',
-        transport: serverTransport,
-        middlewares: [connect({ transport: serverTransport }), abort()],
-        provider: {
-          fail: () => {
-            throw original
-          },
-          slow: async (context) => {
-            started?.()
-            if (!context.signal.aborted)
-              await new Promise<void>((resolve) => {
-                context.signal.addEventListener('abort', () => resolve(), { once: true })
-              })
-            receivedAbort = context.signal.reason
-            aborted?.()
-            return context.success(undefined)
-          }
-        }
+    /** Provider failure and cancellation use the same admitted Session in opposite directions. */
+    const { a: server, b: client } = await connectedCoreHosts({
+      fail: () => {
+        throw original
       },
-      { agreement: { capabilities: [] }, peerId: '' }
-    ).installing
-    const client = await createRuntimeEndpointComposition(
-      {
-        id: 'wire-client',
-        transport: clientTransport,
-        middlewares: [connect({ transport: clientTransport }), abort()]
-      },
-      { agreement: { capabilities: [] }, peerId: '' }
-    ).installing
+      slow: async (_value, context) => {
+        started?.()
+        if (!context.signal.aborted)
+          await new Promise<void>((resolve) => {
+            context.signal.addEventListener('abort', () => resolve(), { once: true })
+          })
+        receivedAbort = context.signal.reason
+        aborted?.()
+      }
+    })
     try {
-      const response = client.send('wire-server', 'fail', null, { timeoutMs: 2000 })
+      const response = client.memory.send('a', 'fail', null, { timeout: timeout({ ms: 2000 }) })
       let received: unknown
       try {
         await response
       } catch (error) {
         received = error
       }
-      expect(received).toBeInstanceOf(RpcRemoteError)
-      const cause = (received as RpcRemoteError).cause
+      expect(received).toBeInstanceOf(Error)
+      const cause = received as Error
       expect(cause).toBeInstanceOf(Error)
       expect(cause).toMatchObject({ name: 'RpcLifecycleError', code: 'ENDPOINT_DISPOSED' })
       const reports: unknown[] = []
@@ -275,9 +223,9 @@ describe('one RPC wire error format', () => {
         'cleanup'
       )
       const controller = new AbortController()
-      const pending = client.send('wire-server', 'slow', null, {
+      const pending = client.memory.send('a', 'slow', null, {
         signal: controller.signal,
-        timeoutMs: false
+        timeout: false
       })
       pending.catch(() => undefined)
       await startedPromise
@@ -290,8 +238,8 @@ describe('one RPC wire error format', () => {
       ).toEqual(serializeRpcError(original, { report: (failure) => reports.push(failure) }))
       expect(reports).toHaveLength(0)
     } finally {
-      await client.dispose()
-      await server.dispose()
+      await client.close()
+      await server.close()
     }
   })
 })

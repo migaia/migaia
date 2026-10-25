@@ -1,34 +1,39 @@
+/**
+ * Compile public RPC archive contracts; namespace and complete feature types are the actual
+ * consumer boundary.
+ */
 import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
-import { defineFeaturePlugin, type IRpcFeaturePlugin } from '@migaia/rpc-host/plugin'
-import { timeoutFeature } from '@migaia/rpc-host/features'
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
+import type { IRpcCallFeature } from '@migaia/rpc-contract/interfaces'
+import { timeout as namedTimeout, retry } from '@migaia/rpc-host/features'
 import timeout from '@migaia/rpc-host/features/timeout'
 import { processPlugin } from '@migaia/rpc-plugin-process'
 import { threadPlugin } from '@migaia/rpc-plugin-thread'
 import { dedicatedWorkerPlugin } from '@migaia/rpc-plugin-browser'
 import { coroutinePlugin, type ICoroutineConnect } from '@migaia/rpc-plugin-coroutines'
-import { poolPlugin, type IRpcPoolControls } from '@migaia/rpc-plugin-pool'
+import { pool, type IRpcPoolControls } from '@migaia/rpc-plugin-pool'
 import { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'
 
 // @ts-expect-error Complete endpoint factories are not a public Host entry.
 import { createEndpoint } from '@migaia/rpc-host'
-// @ts-expect-error Full endpoint presets remain private kernel owners.
+// @ts-expect-error Full endpoint presets were deleted by BC3.
 import { createFullEndpoint } from '@migaia/rpc-host'
 // @ts-expect-error One-way endpoint construction is not a second public entry.
 import { createFullOneWayEndpoint } from '@migaia/rpc-host'
-// @ts-expect-error Runtime Peer construction is private to the canonical Host owner.
-import { createRuntimePeer } from '@migaia/rpc-host/plugin'
-// @ts-expect-error Managed Peer construction remains private to native orchestration.
-import { createManagedRuntimePeer } from '@migaia/rpc-host/plugin'
+// @ts-expect-error Per-session Peer constructors were deleted by BC3.
+import { createRuntimePeer } from '@migaia/rpc-host/sdk'
+// @ts-expect-error Managed Peer constructors were deleted by BC3.
+import { createManagedRuntimePeer } from '@migaia/rpc-host/sdk'
 // @ts-expect-error The legacy runtime plugin is replaced by registered transport definitions.
-import { createRuntimePlugin } from '@migaia/rpc-host/plugin'
-// @ts-expect-error Remote host construction remains private to protocol regressions.
-import { createRemoteHost } from '@migaia/rpc-host/plugin'
+import { createRuntimePlugin } from '@migaia/rpc-host/sdk'
+// @ts-expect-error Remote host constructors were deleted by BC3.
+import { createRemoteHost } from '@migaia/rpc-host/sdk'
 // @ts-expect-error Remote plugin construction is not a user or author public entry.
-import { createRemotePlugin } from '@migaia/rpc-host/plugin'
-// @ts-expect-error Standalone serve constructors remain private to protocol owners.
-import { serveRemoteHost } from '@migaia/rpc-host/plugin'
-// @ts-expect-error Standalone serve constructors remain private to protocol owners.
-import { serveRemotePlugin } from '@migaia/rpc-host/plugin'
+import { createRemotePlugin } from '@migaia/rpc-host/sdk'
+// @ts-expect-error Standalone serve constructors were deleted by BC3.
+import { serveRemoteHost } from '@migaia/rpc-host/sdk'
+// @ts-expect-error Standalone serve constructors were deleted by BC3.
+import { serveRemotePlugin } from '@migaia/rpc-host/sdk'
 // @ts-expect-error Endpoint preset subpaths no longer compete with createRpcHost.
 import { createComposedEndpoint } from '@migaia/rpc-host/composed'
 // @ts-expect-error Endpoint preset subpaths no longer compete with createRpcHost.
@@ -44,7 +49,10 @@ type IWorkerApi = Readonly<{
   values(value: number): AsyncIterable<number>
 }>
 /** Target names belong to the application declaration, independently of transport construction. */
-declare const host: IRpcHost<Readonly<{ worker: IWorkerApi }>>
+declare const host: IRpcHost<
+  Readonly<{ worker: IWorkerApi }>,
+  readonly [ReturnType<typeof processPlugin<'process'>>]
+>
 /** This opaque connection is supplied by the actual coroutine task, never forged by a consumer. */
 declare const connect: ICoroutineConnect
 
@@ -68,25 +76,34 @@ async function verifyPackedHostContracts(): Promise<void> {
     fullPreset
   ]
   /** Explicit direct calls retain the declared scalar result. */
-  const scalar: number = await host.send('worker', 'echo', 21)
+  const scalar: number = await host.process.send('worker', 'echo', 21)
   void scalar
   // @ts-expect-error An undeclared direct target cannot borrow another target's surface.
-  host.send('another', 'echo', 21)
+  host.process.send('another', 'echo', 21)
   // @ts-expect-error A scalar payload is not replaced by an unrelated string.
-  host.send('worker', 'echo', 'wrong')
+  host.process.send('worker', 'echo', 'wrong')
   // @ts-expect-error The iterable declaration cannot be invoked through a scalar call.
-  host.send('worker', 'values', 1)
+  host.process.send('worker', 'values', 1)
   /** The same timeout definition supports the aggregate and individual feature imports. */
-  const features: readonly IRpcFeaturePlugin[] = [
-    timeoutFeature({ ms: 1000 }),
-    timeout({ ms: 1000 })
-  ]
+  const features: readonly IRpcCallFeature[] = [namedTimeout({ ms: 1000 }), retry({ attempts: 2 })]
+  /**
+   * The direct timeout entry keeps the same complete feature contract without a duplicate
+   * installation.
+   */
+  const directTimeout: IRpcCallFeature = timeout({ ms: 1000 })
+  void directTimeout
   /** Author definitions remain the explicit SDK boundary instead of endpoint constructors. */
-  const authorFeature = defineFeaturePlugin({ name: 'packed-author-feature' })
+  const authorFeature = defineFlowPlugin({
+    name: 'packed-author-feature',
+    setup: authorSetup
+  })
   /** A pool definition exposes the original installation-specific controls. */
-  const pool = poolPlugin({ size: 3 })
+  const pooled = pool({ size: 3 })
   /** Controls use the actual Host identity and preserve their own terminal stats/close surface. */
-  const controls: IRpcPoolControls = pool.controls(host)
+  const pooledTransport = coroutinePlugin({ spawn: async () => undefined, features: [pooled] })
+  /** Only this actual transport's projected namespace exposes installed pool controls. */
+  const pooledHost = undefined as unknown as IRpcHost<IWorkerApi, readonly [typeof pooledTransport]>
+  const controls: IRpcPoolControls = pooledHost.coroutine.pool
   void controls.stats()
   /** A collector is owned explicitly by its feature instance. */
   const devtools = devtoolsPlugin()
@@ -102,9 +119,36 @@ async function verifyPackedHostContracts(): Promise<void> {
   void dedicatedWorkerPlugin({ worker })
   void coroutinePlugin({ connectToParent: connect })
   /** Generic Host construction retains the caller's capability declaration. */
-  const created: IRpcHost<IWorkerApi> = await createRpcHost<IWorkerApi>({
-    plugins: [processPlugin({ spawn: './worker.mjs' }), timeoutFeature({ ms: 1000 })]
+  const transport = processPlugin({ spawn: './worker.mjs', features })
+  const created = await createRpcHost<
+    IWorkerApi,
+    readonly [typeof transport, typeof authorFeature]
+  >({
+    plugins: [transport, authorFeature]
   })
+  /** Existing application extension values stay correlated with the installed namespace. */
+  const nativeFoo: 1 = created.process.foo
+  /** Literal result inference survives the real emitted author declarations. */
+  const nativeBar: 'packed-bar' = created.process.bar()
+  void [nativeFoo, nativeBar, created.process.custom()]
+  // @ts-expect-error Unpublished native extension keys cannot appear on a namespace.
+  void created.process.missingNativeKey
   await created.close()
+  // @ts-expect-error Root call aliases were removed by BC1.
+  void created.request('echo', 1)
+  // @ts-expect-error Per-call timeout requires a complete feature or false.
+  host.process.send('worker', 'echo', 1, { timeout: 100 })
+  // @ts-expect-error Per-call retry requires a complete feature or false.
+  host.process.send('worker', 'echo', 1, { retry: { attempts: 2 } })
+  void host.process.send('worker', 'echo', 1, { timeout: false, retry: retry({ attempts: 2 }) })
 }
 void verifyPackedHostContracts
+
+/** The real flow SDK owns setup; this compile-only application contributes a native extension. */
+function authorSetup() {
+  return { hooks: {}, namespaceExtensions: authorNamespaceExtensions }
+}
+/** These exact literal values retain the old application surface after BC1 namespace projection. */
+function authorNamespaceExtensions() {
+  return { foo: 1 as const, bar: () => 'packed-bar' as const, custom: () => 'packed-custom' }
+}

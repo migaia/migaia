@@ -1,5 +1,12 @@
+/**
+ * Tags native browser peer admission errors with Contract identities while preserving decoder
+ * causes.
+ */
 import { attachErrorIdentity } from '@migaia/utils/error'
-import { ERROR_SOURCE, type IRpcBrowserErrorCode } from '../error-code.js'
+import {
+  RPC_BROWSER_ERROR_SOURCE as ERROR_SOURCE,
+  type IRpcBrowserErrorCode
+} from '@migaia/rpc-contract/error-code'
 
 /** Native TypeError and its exact decoder cause survive package-local admission tagging. */
 export function createBrowserPeerError(

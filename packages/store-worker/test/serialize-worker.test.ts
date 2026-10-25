@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { RPC_CORE_ERROR_SOURCE, RpcLifecycleError } from '@migaia/rpc-host'
+import { RpcLifecycleError } from '@migaia/rpc-contract/errors'
+import { RPC_ENDPOINT_ERROR_SOURCE } from '@migaia/rpc-contract/error-code'
 import { StoreWorkerErrorCode } from '../src/error-code.js'
 import { workerParser } from '../src/serialize/worker.js'
 
@@ -103,7 +104,7 @@ describe('workerParser lifecycle', () => {
     const failure = await first.catch((error: unknown) => error)
     expect(failure).toMatchObject({
       name: 'RpcLifecycleError',
-      source: RPC_CORE_ERROR_SOURCE,
+      source: RPC_ENDPOINT_ERROR_SOURCE,
       code: 'ENDPOINT_DISPOSED',
       cause: endpointPrimary
     })
@@ -143,7 +144,7 @@ describe('workerParser lifecycle', () => {
     expect(cleanupErrors).toHaveLength(2)
     expect(cleanupErrors[0]).toBe(endpointCleanupError)
     expect(cleanupErrors[0]).toMatchObject({
-      source: RPC_CORE_ERROR_SOURCE,
+      source: RPC_ENDPOINT_ERROR_SOURCE,
       code: 'ENDPOINT_DISPOSED',
       cause: endpointPrimary,
       cleanupErrors: [{ resource: 'transport subscription', error: endpointPrimary }]
@@ -174,7 +175,7 @@ describe('workerParser lifecycle', () => {
 
     await expect(parser.dispose?.()).rejects.toMatchObject({
       name: 'RpcLifecycleError',
-      source: RPC_CORE_ERROR_SOURCE,
+      source: RPC_ENDPOINT_ERROR_SOURCE,
       code: 'ENDPOINT_DISPOSED',
       message: 'Endpoint disposal completed with cleanup errors',
       cause: endpointPrimary,

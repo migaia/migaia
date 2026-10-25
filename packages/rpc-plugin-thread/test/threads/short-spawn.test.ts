@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { describe, expect, it, vi } from 'vitest'
-import { createRpcHost } from '@migaia/rpc-host'
+import { createRpcHost, defaultRpcReporter } from '@migaia/rpc-host'
 import { threadPlugin } from '@migaia/rpc-plugin-thread'
 import { isThreadChild } from '../../src/threads/child.js'
 import { expandThreadSpawn } from '../../src/threads/short-spawn.js'
@@ -35,8 +35,8 @@ function runEval(entry: string | URL): Record<string, unknown> {
     const peer = await createRpcHost({ plugins: [threadPlugin({ spawn: ${spawn} })] });
     try {
       console.log(JSON.stringify({
-        value: await peer.request('double', 21),
-        flags: await peer.request('flags')
+        value: await peer.thread.request('double', 21),
+        flags: await peer.thread.request('flags')
       }));
     } finally { await peer.close(); }
   `
@@ -74,7 +74,11 @@ describe('thread source shorthand', () => {
     /** Native path conversion preserves a real filesystem basename rather than parsing it as a URI. */
     const path = fileURLToPath(new URL('./fixtures/', import.meta.url)) + 'worker #1?.mjs'
     /** Expansion performs no filesystem read or Worker construction for this nonexistent fixture. */
-    const source = await expandThreadSpawn({ spawn: path }, threadRuntimeResource)
+    const source = await expandThreadSpawn(
+      { spawn: path },
+      threadRuntimeResource,
+      defaultRpcReporter
+    )
     expect(source.spec.entry).toBe(pathToFileURL(path).href)
   })
 
@@ -128,7 +132,11 @@ describe('thread source shorthand', () => {
       /** A query/fragment is part of the exact browser module URL rather than an inferred path. */
       const entry = new URL('https://example.test/worker.js?revision=1#module')
       /** Inspect expansion only: no browser Worker can run in this native test process. */
-      const source = await expandThreadSpawn({ spawn: entry }, threadRuntimeResource)
+      const source = await expandThreadSpawn(
+        { spawn: entry },
+        threadRuntimeResource,
+        defaultRpcReporter
+      )
       expect(source.spec.entry).toBe(entry.href)
       expect(source.supervisor?.isolation).toBe('best-effort')
       expect(source.launcher.capabilities).toMatchObject({ termination: 'unsupported' })

@@ -10,7 +10,7 @@ import type { IRpcMiddleware, IRpcPlugin, IRpcPluginInstallResult } from '../../
 import type { IRpcHookEvent } from '../../dist/core/typing.js'
 import type { IRpcPluginConstraint } from '../../dist/core/internal/plugin-contract.js'
 import type { IPluginHostDisposalResult } from '@migaia/plugin-host'
-import { RpcCoreErrorCode } from '../../dist/core/errors.js'
+import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 
 type IObservedHost = {
   readonly config: { readonly get: (path: string) => unknown }

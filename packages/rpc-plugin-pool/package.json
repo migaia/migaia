@@ -44,6 +44,7 @@
   },
   "devDependencies": {
     "@migaia/plugin-host": "workspace:^",
+    "@migaia/rpc-contract": "workspace:*",
     "@migaia/rpc-host": "workspace:*",
     "@migaia/rpc-plugin-coroutines": "workspace:*",
     "@migaia/rpc-plugin-process": "workspace:*",
@@ -53,6 +54,7 @@
     "vitest": "^4.1.10"
   },
   "peerDependencies": {
+    "@migaia/rpc-contract": "workspace:*",
     "@migaia/rpc-host": "workspace:*"
   },
   "peerDependenciesMeta": {},

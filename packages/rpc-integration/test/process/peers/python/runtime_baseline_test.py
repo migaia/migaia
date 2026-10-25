@@ -1,82 +1,91 @@
-"""Unit checks for the Python fixture's runtime-baseline directory and capability claims."""
+"""Original runtime-baseline business assertions at the canonical native entry."""
 import unittest
 import io
-import json
 import peer
-from business import Business, native_response, serve, bridge_write, bridge_read
+from business import Business, native_response, serve
 from reverse import ReverseCalls
 
 
-class RuntimeBaseline(unittest.TestCase):
-    """Assert installed behavior independently of upstream frozen protocol vectors."""
+def request(identifier, method, local, remote, payload=None, mode="request"):
+    """Author the actual admitted operation, preserving exact caller and target generation facts."""
+    return {"profile": peer.PROTOCOL, "kind": "call", "id": identifier,
+            "route": peer.route(remote["instanceId"], local["instanceId"]), "options": {}, "payload": payload,
+            "task": {"mode": mode, "method": method, "callerId": remote["instanceId"],
+                     "callerGeneration": remote["generation"], "targetGeneration": local["generation"]}}
 
-    def test_offered_baseline(self):
-        self.assertTrue({"runtime-api@1", "batch@1"} <= set(peer.own_offer()["capabilities"]))
+
+class RuntimeBaseline(unittest.TestCase):
+    """Keep original native identity, registry, receipt, error, mode and cleanup checks."""
+
+    # test_offered_baseline's only assertion was the removed runtime-api/batch capability gate (BC2).
 
     def test_actual_v2_directory(self):
-        value, error = Business(False).invoke("migaia.remote.runtime.describe", None)
-        self.assertIsNone(error)
+        """The same actual provider catalog is now schema3 and is published in handshake."""
+        value = Business().description()
         self.assertEqual(set(value), {"schemaVersion", "self", "methods"})
-        self.assertEqual(value["schemaVersion"], 2)
+        self.assertEqual(value["schemaVersion"], 3)
         self.assertEqual(value["self"]["instanceId"], "python-peer")
+        peer.generation(value["self"]["generation"])
         self.assertTrue(any(m["name"] == "echo" and m["supportedModes"] == ["request", "notify"] for m in value["methods"]))
 
     def test_retired_describe_is_not_a_provider(self):
-        value, error = Business(False).invoke("migaia.remote.describe", None)
+        value, error = Business().invoke("migaia.remote.describe", None)
         self.assertIsNone(value)
         self.assertIsNotNone(error)
 
     def test_fault_providers_remain_in_the_actual_registry(self):
-        business = Business(False)
+        business = Business()
         names = {method["name"] for method in business.description()["methods"]}
         for name in ("peer.pause", "peer.busy", "peer.crash"):
             self.assertIn(name, names)
             self.assertIn(name, business.providers)
 
     def test_bridge_v2_batch_and_notification_share_business_state(self):
-        """Real Content-Length input retains v2 admission and ordered batch side effects."""
+        """Keep strict token validation and original ordered siblings over genuine native frames (BC2 bridge retired)."""
         reader, writer = io.BytesIO(), io.BytesIO()
-        hello = {**peer.own_offer("parent"), "auth": "unit-token", "capabilities": [
-            "runtime-api@1", "batch@1", "jsonrpc-bridge@1", "abort@1", "wire-error@1"]}
-        bridge_write(reader, {"jsonrpc": "2.0", "id": "hello", "method": "migaia.hello",
-                              "params": {"hello": json.dumps(hello)}})
-        bridge_write(reader, [
-            {"jsonrpc": "2.0", "id": "directory", "method": "migaia.describe", "params": {"args": []}},
-            {"jsonrpc": "2.0", "method": "migaia.invoke", "params": {"method": "p.f.oneWay", "args": ["receipt"]}},
-            {"jsonrpc": "2.0", "id": "missing", "method": "migaia.invoke", "params": {"method": "absent", "args": []}},
-            {"jsonrpc": "2.0", "id": "received", "method": "migaia.invoke", "params": {"method": "peer.received", "args": []}}
-        ])
+        hello = {**peer.own_offer("parent"), "auth": "unit-token"}
+        local = Business().identity
+        remote = hello["directory"]["self"]
+        peer.write_json(reader, hello)
+        confirmation = peer.negotiate(peer.own_offer("python-peer"), hello)
+        confirmation["auth"] = hello["auth"]
+        peer.write_json(reader, confirmation)
+        for value in (request("notify", "p.f.oneWay", local, remote, ["receipt"], "notify"),
+                      request("missing", "absent", local, remote, []),
+                      request("received", "peer.received", local, remote, [])):
+            peer.write_json(reader, value)
         reader.seek(0)
-        serve(reader, writer, False, "unit-token", bridge=True)
+        serve(reader, writer, "unit-token")
         writer.seek(0)
-        agreed = json.loads(bridge_read(writer)["result"]["reply"])
-        self.assertTrue({"runtime-api@1", "batch@1"} <= set(agreed["capabilities"]))
-        responses = bridge_read(writer)
-        self.assertEqual([reply["id"] for reply in responses], ["directory", "missing", "received"])
-        directory = responses[0]["result"]
-        self.assertEqual(directory["schemaVersion"], 2)
-        self.assertFalse(any("stream" in method["supportedModes"] for method in directory["methods"]))
-        self.assertEqual(responses[1]["error"]["data"]["migaiaWireError"]["code"], "PROVIDER_NOT_FOUND")
-        self.assertEqual(responses[2]["result"], {"count": 1, "values": ["receipt"]})
-        self.assertIsNone(bridge_read(writer))
+        offered = peer.decode_frame(peer.read_frame(writer))
+        agreed = peer.decode_frame(peer.read_frame(writer))
+        self.assertEqual(agreed["step"], "accept")
+        self.assertEqual(offered["directory"], agreed["directory"])
+        self.assertEqual(offered["directory"]["schemaVersion"], 3)
+        responses = [peer.decode_frame(peer.read_frame(writer)) for _ in range(2)]
+        self.assertEqual([reply["id"] for reply in responses], ["missing", "received"])
+        self.assertEqual(responses[0]["error"]["nodes"][0]["code"], "PROVIDER_NOT_FOUND")
+        self.assertEqual(responses[1]["result"], {"count": 1, "values": ["receipt"]})
+        self.assertIsNone(peer.read_frame(writer))
 
     def test_reverse_mode_whitelist(self):
-        calls = ReverseCalls("parent", native_response)
-        calls.whitelist = calls.directory({"schemaVersion": 2, "self": {"name": "parent", "instanceId": "parent"},
-            "methods": [{"name": "notifyOnly", "supportedModes": ["notify"], "modeSource": "declared"}]})
-        message = {"kind": "request", "id": "unit-reverse", "method": "peer.reverse", "data": {
-            "route": peer.route("request", "parent", "python-peer"), "payload": {"method": "notifyOnly"}}}
-        self.assertEqual(calls.start(message)[0]["code"], "CAPABILITY_UNSUPPORTED")
+        local, remote = Business().identity, peer.own_offer("parent")["directory"]
+        remote["methods"] = [{"name": "notifyOnly", "supportedModes": ["notify"], "modeSource": "declared"}]
+        calls = ReverseCalls(local, remote, native_response)
+        message = request("unit-reverse", "peer.reverse", local, remote["self"])
+        answer = calls.start(message, {"method": "notifyOnly"})
+        self.assertEqual(answer[0]["error"]["nodes"][0]["code"], "CAPABILITY_UNSUPPORTED")
         self.assertEqual(calls.pending, {})
 
     def test_reverse_close_releases_pending_once(self):
-        calls = ReverseCalls("parent", native_response)
-        message = {"kind": "request", "id": "unit-reverse", "method": "peer.reverse", "data": {
-            "route": peer.route("request", "parent", "python-peer"), "payload": {"method": "parentEcho"}}}
-        self.assertEqual(calls.start(message)[0]["method"], "migaia.remote.runtime.describe")
+        local, remote = Business().identity, peer.own_offer("parent")["directory"]
+        remote["methods"] = [{"name": "parentEcho", "supportedModes": ["request"], "modeSource": "declared"}]
+        calls = ReverseCalls(local, remote, native_response)
+        message = request("unit-reverse", "peer.reverse", local, remote["self"])
+        self.assertEqual(calls.start(message, {"method": "parentEcho"})[0]["task"]["method"], "parentEcho")
         self.assertEqual(calls.close()[0]["id"], "unit-reverse")
         self.assertEqual(calls.pending, {})
-        self.assertIsNone(calls.whitelist)
+        self.assertEqual(calls.whitelist, {})
         self.assertEqual(calls.close(), [])
 
 

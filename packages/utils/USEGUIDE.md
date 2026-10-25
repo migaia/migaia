@@ -1675,6 +1675,8 @@ type IConfigConflictDecision =
 
 当某个键在双方都存在、且不属于以上任何自动合并分支（例如两侧都是不可合并的原始值）时，若提供了 `onConflict`，会调用它并传入 `IConfigConflictContext`（`path`：当前键的完整路径；`left`：左侧/已有值；`right`：右侧/新值），其返回值 `IConfigConflictDecision` 决定最终结果：`{ kind: 'left' }` 保留左值、`{ kind: 'right' }` 采用右值、`{ kind: 'delete' }` 删除该键、`{ kind: 'value', value }` 采用自定义值。`onConflict` 必须**同步**返回（返回 Promise 会抛 `code: 'CONFIG_CONFLICT'`；返回值不是上述四种 `kind` 之一同样抛 `CONFIG_CONFLICT`）。未提供 `onConflict` 时右侧直接覆盖左侧（标准合并语义）。`right === CONFIG_DELETE` 会删除目标键（可用于合并阶段裁剪掉某个来源写入的默认值）。
 
+数组采用 concat 或 mergeByIndex 时，同一次合并使用私有累计数组；`onConflict` 当场读取当前累计内容，保留的引用会随后续合并更新。回调只读取累计值并返回决策；直接修改累计数组（包括写入、delete、修改 length 或 freeze）属于不支持的用法。需要替换时返回 `{ kind: 'value', value }`。实现不为直接修改增加运行时检查或拒绝逻辑。
+
 ```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 const defaults = ownConfig({
   retries: 1,

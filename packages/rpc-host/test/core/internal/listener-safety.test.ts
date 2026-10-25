@@ -9,11 +9,8 @@ import {
   reportListenerFailure
 } from '../../../dist/core/internal/listener-safety.js'
 import { releaseListeners } from '../../../dist/core/internal/listener-safety.js'
-import {
-  RPC_CORE_ERROR_SOURCE,
-  RpcCoreErrorCode,
-  RpcLifecycleError
-} from '../../../dist/core/errors.js'
+import { RPC_CORE_ERROR_SOURCE, RpcLifecycleError } from '@migaia/rpc-contract/errors'
+import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 
 describe('listener safety', () => {
   it('preserves an exact pre-tagged WebRPC error at a different cleanup boundary', () => {

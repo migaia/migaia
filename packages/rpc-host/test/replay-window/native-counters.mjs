@@ -1,6 +1,6 @@
 import { RequestReplayLedger } from '../../dist/core/internal/request-replay-ledger.js'
 import { ReplayWindow } from '../../dist/core/internal/replay.js'
-import { defaultRpcId } from '../../dist/core/internal/id.js'
+import { defaultRpcId } from '../../dist/host/identity.js'
 
 /** Isolated diagnostic counters never enter the formal timing run. */
 const counts = {

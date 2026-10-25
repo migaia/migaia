@@ -1,25 +1,23 @@
 import { runInNewContext } from 'node:vm'
 import { describe, expect, it } from 'vitest'
 import {
-  RpcCoreErrorCode,
   isRpcErrorInstance,
   isRpcRemoteError,
   isRpcTimeoutError,
+  identifyRpcBoundaryFailure,
+  deserializeRpcError,
   RPC_CORE_ERROR_SOURCE
-} from '../../dist/core/errors.js'
-import { deserializeRpcError } from '../../dist/core/internal/error-wire-metadata.js'
+} from '@migaia/rpc-contract/errors'
+import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
+import { RpcError, RpcRemoteError, RpcTimeoutError } from '@migaia/rpc-contract/errors'
 import {
-  RpcError,
-  RpcRemoteError,
-  RpcTimeoutError,
   createRpcTimeoutError,
   createRpcError,
   createRpcRemoteError,
   isLocalRpcError,
   localRpcErrorCode
-} from '../../dist/core/errors.js'
-import { tagRpcError } from '../../dist/core/errors.js'
-import { createListenerFailure } from '../../dist/core/internal/listener-safety.js'
+} from '../../dist/host/error-owner.js'
+import { tagRpcError } from '@migaia/rpc-contract/errors'
 import { attachErrorIdentity } from '@migaia/utils/error'
 
 /** A real independent realm supplies native Error objects rather than local class instances. */
@@ -37,11 +35,11 @@ describe('coded error families', () => {
     RpcCoreErrorCode.endpointDisposed,
     RpcCoreErrorCode.overloaded
   ] as const)(
-    'public listener helper and native diagnostic tag with code %s cannot mint local control identity',
+    'public boundary helper and native diagnostic tag with code %s cannot mint local control identity',
     (code) => {
-      /** This is the real ordinary public helper, not a private mint factory. */
+      /** The original single-native-error branch tags this same instance without private minting. */
       const original = new RangeError('listener fixture')
-      const helper = createListenerFailure([original], { code })!
+      const helper = identifyRpcBoundaryFailure(original, code, original.message)
       expect(helper).toBe(original)
       expect(helper).toMatchObject({ source: RPC_CORE_ERROR_SOURCE, code })
       expect(localRpcErrorCode(helper)).toBeUndefined()

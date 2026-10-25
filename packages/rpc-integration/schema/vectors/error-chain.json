@@ -244,8 +244,8 @@
       "wire": {
         "foo": 1
       },
-      "violation": "unknownField",
-      "pointer": ""
+      "violation": "required",
+      "pointer": "/source"
     },
     {
       "id": "cause-depth-49",
@@ -350,20 +350,6 @@
           "x": 2
         }
       },
-      "reject": {
-        "violation": "unknownField",
-        "pointer": "/cause"
-      },
-      "ignoreReports": [
-        {
-          "pointer": "/cause",
-          "field": "x"
-        },
-        {
-          "pointer": "/cause",
-          "field": "z"
-        }
-      ],
       "ignoreExpected": {
         "source": "s",
         "code": "C",

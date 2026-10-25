@@ -1,5 +1,7 @@
-export { chunkFeature } from './chunk.js'
-export { authFeature } from './auth.js'
-export { retryFeature } from './retry.js'
-export { timeoutFeature, type ITimeoutFeatureOptions } from './timeout.js'
-export { typegenFeature, type ITypegenFeatureOptions, type ITypegenOutput } from './typegen.js'
+/**
+ * Publishes the complete timeout and retry call-feature factories through the package feature
+ * entry. The implementations own their call policies; this entry only defines the supported export
+ * boundary.
+ */
+export { retry, type IRetryFeatureOptions } from './retry.js'
+export { timeout, type ITimeoutFeatureOptions } from './timeout.js'

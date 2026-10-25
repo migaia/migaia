@@ -1,3 +1,7 @@
+/**
+ * Consumes Node/Bun child-discovery markers within the actual process and opens its original
+ * stdio/bootstrap IO. Discovery selects native acquisition without granting RPC authentication.
+ */
 import { detectServerRuntime } from '@migaia/utils'
 import type { IAdapterProcessRuntimeIO } from '../runtime-loader.js'
 import { PROCESS_RUNTIME_API_ENV, PROCESS_RUNTIME_API_BOOTSTRAP_TIMEOUT_MS } from '../constants.js'
@@ -22,6 +26,9 @@ class NativeNodeProcessRuntimeIO implements IAdapterProcessRuntimeIO {
     const runtime = detectServerRuntime() === 'bun' ? 'bun' : 'node'
     return { marker, runtime }
   }
+
+  /** Preserve the native child guard's actual process-exit operation. */
+  readonly exit = (code: 0 | 1): void => process.exit(code)
 
   /** Open this process's actual stdin/stdout through the existing native byte operation. */
   open() {

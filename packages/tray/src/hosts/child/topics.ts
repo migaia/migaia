@@ -4,6 +4,13 @@ import { toWire } from '../portable.js'
 import { assertTopic, type ITrayTopicDelivery, type ITrayTopicListener } from '../topics.js'
 import type { ITrayRuntimeOutlet } from '../runtime.js'
 
+/** One listener owns only its original local remover and idempotent last-listener cleanup. */
+type ITopicSubscription = {
+  topic: string
+  release(): void
+  removed?: Promise<void>
+}
+
 /** Each child generation owns one local hub and first/last relay membership transitions. */
 export function createChildTopics(
   outlet: () => ITrayRuntimeOutlet,
@@ -35,7 +42,7 @@ class ChildTopics {
   publish = async (topic: string, payload?: unknown): Promise<void> => {
     assertTopic(topic)
     const value = toWire(payload)
-    await this.#outlet().request(TrayInternal.connection, TrayInternal.publish, {
+    await this.#outlet().request(TrayInternal.publish, {
       topic,
       ...(value === undefined ? {} : { payload: value })
     })
@@ -52,10 +59,7 @@ class ChildTopics {
     })
     let pending = this.#memberships.get(topic)
     if (this.#hub.size(topic) === 1) {
-      pending = (async () => {
-        if (pending) await pending
-        await this.#outlet().request(TrayInternal.connection, TrayInternal.subscribe, { topic })
-      })()
+      pending = this.#join(topic, pending)
       this.#memberships.set(topic, pending)
     }
     try {
@@ -66,26 +70,40 @@ class ChildTopics {
         this.#memberships.delete(topic)
       throw error
     }
-    /** One off receipt releases only this listener and shares its last-listener relay Promise. */
-    let removed: Promise<void> | undefined
-    return () => {
-      removed ??= (async () => {
-        release()
-        if (this.#hub.size(topic) !== 0) return
-        const previous = this.#memberships.get(topic)
-        const leaving = (async () => {
-          await previous
-          await this.#outlet().request(TrayInternal.connection, TrayInternal.unsubscribe, { topic })
-        })()
-        const completion = leaving.finally(() => {
-          if (this.#hub.size(topic) === 0 && this.#memberships.get(topic) === completion)
-            this.#memberships.delete(topic)
-        })
-        this.#memberships.set(topic, completion)
-        await completion
-      })()
-      return removed
-    }
+    /** One explicit registration keeps the original cached off Promise without nested components. */
+    const registration: ITopicSubscription = { topic, release }
+    return () => (registration.removed ??= this.#leave(registration))
+  }
+
+  /** A new first listener waits for the original preceding membership before registering again. */
+  async #join(topic: string, previous?: Promise<void>): Promise<void> {
+    if (previous) await previous
+    await this.#outlet().request(TrayInternal.subscribe, { topic })
+  }
+
+  /** Last-listener removal preserves the original release-before-remote-unsubscribe sequence. */
+  async #leave(registration: ITopicSubscription): Promise<void> {
+    registration.release()
+    /** Only the last local listener owns the existing remote membership transition. */
+    const topic = registration.topic
+    if (this.#hub.size(topic) !== 0) return
+    /** Capture the exact old transition before publishing this listener's completion. */
+    const previous = this.#memberships.get(topic)
+    /** Actual remote completion remains distinct from the local listener's idempotent off result. */
+    const leaving = this.#unsubscribe(topic, previous)
+    /** A later first listener must never have its replacement membership erased by this cleanup. */
+    const completion = leaving.finally(() => {
+      if (this.#hub.size(topic) === 0 && this.#memberships.get(topic) === completion)
+        this.#memberships.delete(topic)
+    })
+    this.#memberships.set(topic, completion)
+    await completion
+  }
+
+  /** Wait for the exact preceding registration before sending the original remote leave request. */
+  async #unsubscribe(topic: string, previous?: Promise<void>): Promise<void> {
+    await previous
+    await this.#outlet().request(TrayInternal.unsubscribe, { topic })
   }
   /** Freeze authenticated metadata once in the receiving realm before local fan-out. */
   deliver = (input: ITrayTopicDelivery): void => {

@@ -1,12 +1,13 @@
-import { ERROR_SOURCE as RPC_PROCESS_ERROR_SOURCE } from '../error-code.js'
-import { RpcProcessErrorText } from '../error-text.js'
-import { attachErrorIdentity } from '@migaia/utils/error'
+/** Retain Unix inode ownership evidence and recover only the same abandoned native listener. */
+import { deferred } from '@migaia/utils/promise'
+import { attachSecondaryErrors } from '@migaia/utils/error'
+import { createProcessError } from '../error.js'
 import { randomUUID } from 'node:crypto'
 import { createConnection } from 'node:net'
 import { constants } from 'node:fs'
 import { link, lstat, open, readFile, unlink } from 'node:fs/promises'
 import { dirname } from 'node:path'
-import { RpcProcessErrorCode } from '../error-code.js'
+import { RpcProcessErrorCode } from '@migaia/rpc-contract/error-code'
 
 /** A service's own inode evidence is persisted beside its protected Unix socket. */
 export type IUnixSocketRecord = Readonly<{
@@ -48,18 +49,24 @@ async function readRecord(path: string): Promise<IUnixSocketRecord | undefined> 
 
 /** A successful connection proves an active listener without sending protocol bytes. */
 async function hasListener(path: string): Promise<boolean> {
-  return new Promise<boolean>((resolve, reject) => {
-    const socket = createConnection({ path })
-    socket.once('connect', () => {
-      socket.destroy()
-      resolve(true)
+  /** The local socket and its completion belong only to this read-only listener check. */
+  const completion = deferred<boolean>()
+  try {
+    /** One explicit record supplies both callbacks without retaining another listener scope. */
+    const operation = { socket: createConnection({ path }), completion }
+    operation.socket.once('connect', () => {
+      operation.socket.destroy()
+      operation.completion.resolve(true)
     })
-    socket.once('error', (error: NodeJS.ErrnoException) => {
-      socket.destroy()
-      if (error.code === 'ECONNREFUSED') resolve(false)
-      else reject(error)
+    operation.socket.once('error', (error: NodeJS.ErrnoException) => {
+      operation.socket.destroy()
+      if (error.code === 'ECONNREFUSED') operation.completion.resolve(false)
+      else operation.completion.reject(error)
     })
-  })
+  } catch (error) {
+    completion.reject(error)
+  }
+  return completion.promise
 }
 
 /** Compare identity and inode before deleting an abandoned path. */
@@ -88,19 +95,13 @@ async function assertPrivateDirectory(path: string): Promise<void> {
     (stat.mode & 0o777) !== 0o700 ||
     (typeof process.getuid === 'function' && stat.uid !== process.getuid())
   )
-    throw attachErrorIdentity(new Error(RpcProcessErrorText.listenFailed), {
-      source: RPC_PROCESS_ERROR_SOURCE,
-      code: RpcProcessErrorCode.listenFailed
-    })
+    throw createProcessError(RpcProcessErrorCode.listenFailed)
 }
 
 /** Delete only a stale socket whose complete sidecar belongs to this exact service. */
 export async function prepareUnixSocketPath(path: string, serviceId: string): Promise<void> {
   if (typeof serviceId !== 'string' || serviceId.length === 0)
-    throw attachErrorIdentity(new Error(RpcProcessErrorText.listenFailed), {
-      source: RPC_PROCESS_ERROR_SOURCE,
-      code: RpcProcessErrorCode.listenFailed
-    })
+    throw createProcessError(RpcProcessErrorCode.listenFailed)
   await assertPrivateDirectory(path)
   let stat: Awaited<ReturnType<typeof lstat>>
   try {
@@ -118,37 +119,16 @@ export async function prepareUnixSocketPath(path: string, serviceId: string): Pr
         )
           return
       }
-      throw attachErrorIdentity(new Error(RpcProcessErrorText.listenFailed), {
-        source: RPC_PROCESS_ERROR_SOURCE,
-        code: RpcProcessErrorCode.listenFailed
-      })
+      throw createProcessError(RpcProcessErrorCode.listenFailed)
     }
-    throw ((originalCause: unknown) =>
-      attachErrorIdentity(
-        new Error(
-          RpcProcessErrorText.listenFailed,
-          originalCause === undefined ? undefined : { cause: originalCause }
-        ),
-        { source: RPC_PROCESS_ERROR_SOURCE, code: RpcProcessErrorCode.listenFailed }
-      ))(error)
+    throw createProcessError(RpcProcessErrorCode.listenFailed, error)
   }
   const record = await readRecord(path)
   if (!record || record.serviceId !== serviceId || !matches(record, path, stat))
-    throw attachErrorIdentity(new Error(RpcProcessErrorText.listenFailed), {
-      source: RPC_PROCESS_ERROR_SOURCE,
-      code: RpcProcessErrorCode.listenFailed
-    })
-  if (await hasListener(path))
-    throw attachErrorIdentity(new Error(RpcProcessErrorText.listenFailed), {
-      source: RPC_PROCESS_ERROR_SOURCE,
-      code: RpcProcessErrorCode.listenFailed
-    })
+    throw createProcessError(RpcProcessErrorCode.listenFailed)
+  if (await hasListener(path)) throw createProcessError(RpcProcessErrorCode.listenFailed)
   const current = await lstat(path)
-  if (!matches(record, path, current))
-    throw attachErrorIdentity(new Error(RpcProcessErrorText.listenFailed), {
-      source: RPC_PROCESS_ERROR_SOURCE,
-      code: RpcProcessErrorCode.listenFailed
-    })
+  if (!matches(record, path, current)) throw createProcessError(RpcProcessErrorCode.listenFailed)
   await unlink(path)
   await unlink(recordPath(path))
 }
@@ -161,10 +141,7 @@ export async function recordUnixSocketOwner(
   await assertPrivateDirectory(path)
   const stat = await lstat(path)
   if (!stat.isSocket() || stat.isSymbolicLink())
-    throw attachErrorIdentity(new Error(RpcProcessErrorText.listenFailed), {
-      source: RPC_PROCESS_ERROR_SOURCE,
-      code: RpcProcessErrorCode.listenFailed
-    })
+    throw createProcessError(RpcProcessErrorCode.listenFailed)
   const record: IUnixSocketRecord = {
     serviceId,
     path,
@@ -180,16 +157,29 @@ export async function recordUnixSocketOwner(
     0o600
   )
   try {
-    await file.writeFile(JSON.stringify(record))
-    await file.sync()
-  } finally {
+    try {
+      await file.writeFile(JSON.stringify(record))
+      await file.sync()
+    } catch (primary) {
+      /** A failed write still closes this exact descriptor once before temporary-path rollback. */
+      try {
+        await file.close()
+      } catch (cleanup) {
+        throw attachSecondaryErrors(primary, [cleanup])
+      }
+      throw primary
+    }
+    /** The successful-write branch owns the same one close before publishing its stable link. */
     await file.close()
-  }
-  try {
     await link(temporary, recordPath(path))
-  } catch (error) {
-    await unlink(temporary)
-    throw error
+  } catch (primary) {
+    /** Roll back only the temporary file actually acquired above, never a linked owner or socket. */
+    try {
+      await unlink(temporary)
+    } catch (cleanup) {
+      throw attachSecondaryErrors(primary, [cleanup])
+    }
+    throw primary
   }
   await unlink(temporary)
   return record

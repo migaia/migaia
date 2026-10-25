@@ -13,7 +13,7 @@ import {
   createNodeThreadChannelFactory
 } from '../../../rpc-plugin-thread/dist/threads/adapters/node.js'
 import { readRuntimePeerConnection } from '../../../rpc-host/dist/remote/runtime-api/peer.js'
-import { RpcCoreErrorCode } from '../../../rpc-host/dist/core/errors.js'
+import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 
 /** A genuine Worker replacement changes the installed method set and one actual route mode. */
 const entry = fileURLToPath(new URL('./fixtures/directory-worker.mjs', import.meta.url))

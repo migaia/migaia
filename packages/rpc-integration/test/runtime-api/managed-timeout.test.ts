@@ -11,7 +11,7 @@ import {
   createNodeThreadLauncher,
   createNodeThreadChannelFactory
 } from '../../../rpc-plugin-thread/dist/threads/adapters/node.js'
-import { RpcCoreErrorCode } from '../../../rpc-host/dist/core/errors.js'
+import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { RpcStreamOwner } from '../../../rpc-host/dist/core/internal/stream/owner.js'
 
 /** Both cases load the same actual managed Worker and original launcher/channel/registration. */

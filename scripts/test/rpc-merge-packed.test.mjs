@@ -29,15 +29,9 @@ const checks = [
   'subpath-imports',
   'obsolete-subpaths',
   'identity-observer-hidden',
-  'define-feature-docs',
   'composed-runtime-hidden',
   'legacy-envelope-rejection',
-  'contract-normalize',
-  'legacy-codec-rejection',
-  'canonical-protocol',
-  'root-entry',
-  'canonical-chunk',
-  'type-contract-tsc',
+  'type-contract-bun',
   'selective-browser'
 ]
 const obsolete = [
@@ -59,7 +53,12 @@ const obsolete = [
   './features/control',
   './adapters/message-port',
   './adapters/web-worker',
-  './internal/chunk-attachment'
+  './internal/chunk-attachment',
+  './plugin',
+  './probe',
+  './features/auth',
+  './features/chunk',
+  './features/typegen'
 ]
 
 /** Read the packed script's literal obsolete-subpath probe instead of matching comments. */
@@ -111,19 +110,20 @@ test('packed consumer runs every preserved check against all current RPC owners'
     })
   )
   /** Packed imports must retain every reviewed runtime name count, including schema defaults. */
-  const expected = owners.flatMap((owner) =>
-    Object.entries(baseline['@migaia/' + owner]).map(([key, names]) => [
-      '@migaia/' + owner + (key === '.' ? '' : key.slice(1)),
-      names.length
-    ])
+  const expected = []
+  for (const owner of owners)
+    for (const [key, names] of Object.entries(baseline['@migaia/' + owner]))
+      expected.push(['@migaia/' + owner + (key === '.' ? '' : key.slice(1)), names.length])
+  expected.push(
+    ['@migaia/rpc-contract/schema/wire-error', 1],
+    ['@migaia/rpc-contract/schema/protocol', 1]
   )
-  expected.push(['@migaia/rpc-contract/schema/wire-error', 1])
   assert.equal(subpaths.size, expected.length)
   for (const [name, count] of expected) assert.equal(subpaths.get(name), count, name)
   assert.equal(subpaths.has('@migaia/rpc-bridge-jsonrpc'), false)
   assert.deepEqual([...obsoleteProbe(script)].sort(), [...obsolete].sort())
   assert.ok(script.includes('const publicRoot'))
   assert.ok(script.includes('publicRoot.createRpcHost'))
-  assert.ok(script.includes('dist/contract/'))
+  assert.ok(script.includes('@migaia/rpc-contract/protocol'))
   assert.ok(script.includes('@migaia/rpc-host'))
 })

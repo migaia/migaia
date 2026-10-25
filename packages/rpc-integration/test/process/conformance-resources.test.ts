@@ -88,7 +88,9 @@ async function rotations(perLanguage: number) {
     const pid = active.handles[0]!.identity.pid!
     try {
       expect(budget.inUse).toBeLessThanOrEqual(2)
-      expect(await active.feature.request([`resource-${index}`])).toBe(`resource-${index}`)
+      expect(await active.namespace.request('p.f.request', [`resource-${index}`])).toBe(
+        `resource-${index}`
+      )
     } finally {
       await active.close()
       for (const handle of active.handles) await handle.exited
@@ -151,7 +153,7 @@ describe('actual language process resource ownership', () => {
       )
       const observer: IResourceObserver = await createMacPidObserver([process.pid])
       try {
-        expect(await active.runtime.endpoint.send(peer.id, 'peer.pause', [])).toBe('ACK')
+        expect(await active.namespace.request('peer.pause', [])).toBe('ACK')
         const started = Date.now()
         let status: number | undefined
         do {
@@ -161,7 +163,9 @@ describe('actual language process resource ownership', () => {
         } while (status !== 4 && Date.now() - started < 1000)
         expect(status).toBe(4)
         process.kill(pid, 'SIGCONT')
-        expect(await active.feature.request(['reader-resumed'])).toBe('reader-resumed')
+        expect(await active.namespace.request('p.f.request', ['reader-resumed'])).toBe(
+          'reader-resumed'
+        )
         expect(active.handles).toHaveLength(1)
       } finally {
         process.kill(pid, 'SIGCONT')
@@ -173,7 +177,7 @@ describe('actual language process resource ownership', () => {
   it('TS EOF and owner release close the actual public service once and abort its pending provider', async () => {
     /** Physical EOF prevents a caller abort frame from disguising missing provider ownership. */
     const active = await client(peers[3]!, false, randomUUID())
-    const waiting = active.runtime.endpoint.send('ts-peer', 'peer.wait', []).catch((error) => error)
+    const waiting = active.namespace.request('peer.wait', []).catch((error) => error)
     try {
       await new Promise((resolve) => setTimeout(resolve, 20))
       await active.rawChannels[0]!.close()
@@ -288,7 +292,9 @@ describe('actual language process resource ownership', () => {
       expect(budget.pending).toBe(0)
       for (const item of active) {
         expect(item.handles).toHaveLength(1)
-        expect(await item.feature.request(['budget-still-alive'])).toBe('budget-still-alive')
+        expect(await item.namespace.request('p.f.request', ['budget-still-alive'])).toBe(
+          'budget-still-alive'
+        )
       }
     } finally {
       for (const item of active) {

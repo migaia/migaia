@@ -1,5 +1,6 @@
 import { createRpcHost } from '@migaia/rpc-host'
 import { threadPlugin } from '@migaia/rpc-plugin-thread'
+import { auth } from '@migaia/rpc-host/plugins/auth'
 import { workerData } from 'node:worker_threads'
 import { readThreadBootstrap } from '../../../dist/threads/bootstrap.js'
 import { createFixtureAuthentication } from './dx-authentication.mjs'
@@ -9,7 +10,6 @@ const { data } = readThreadBootstrap(workerData)
 /** Provider count proves signature failures occur before application execution. */
 let calls = 0
 await createRpcHost({
-  ...(data.signed ? { authentication: createFixtureAuthentication() } : {}),
   provide: {
     bytes: {
       inspect: (buffer) => {
@@ -20,5 +20,8 @@ await createRpcHost({
     }
   },
   report: (error) => process.stderr.write(`${error?.stack ?? String(error)}\n`),
-  plugins: [threadPlugin({ connectToParent: true })]
+  plugins: [
+    ...(data.signed ? [auth(createFixtureAuthentication())] : []),
+    threadPlugin({ connectToParent: true })
+  ]
 })

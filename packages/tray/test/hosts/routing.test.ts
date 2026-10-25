@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { defineProbe } from '@migaia/rpc-host/probe'
+import { defineProbe } from '@migaia/rpc-host/plugins/probe'
+import { RpcWireKind, type IRpcEnvelope } from '@migaia/rpc-contract/protocol'
 import { setTimeout as delay } from 'node:timers/promises'
 import { fixture, until } from './helper.js'
 
@@ -299,12 +300,10 @@ describe('mesh routing and admission accounting', () => {
       stages: ['envelope'],
       capture: ['envelope'],
       emit: (event) => {
-        /** Native call envelopes and V1 requests carry the same portable application data. */
-        const content = event.content as any
-        if (event.method === 'trayRelay.routed' && content?.kind === 'runtime-call')
+        /** The canonical call envelope lends the original portable application payload. */
+        const content = event.content as IRpcEnvelope
+        if (event.method === 'trayRelay.routed' && content?.kind === RpcWireKind.call)
           envelopes.push(content.payload)
-        else if (event.method === 'trayRelay.routed' && content?.kind === 'request')
-          envelopes.push(content.data.payload)
       }
     })
     const tray = api.createTray({

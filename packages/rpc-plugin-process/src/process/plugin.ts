@@ -1,315 +1,295 @@
-import { RpcTransportMode } from '@migaia/rpc-host/plugin'
+/** Install one native Process recipe and its features; the Host owns Sessions and all RPC work. */
+import { detectServerRuntime } from '@migaia/utils'
 import {
-  createAdapterDeployment,
-  createAdapterSourceConfigurationError,
   defineTransportPlugin,
-  holdAdapterByteBootstrapSource,
-  RpcPlatform,
-  RuntimePluginKey,
-  type IAdapterDeploymentContext,
-  type IAdapterManagedDeployment,
-  type IRpcConnectOptions,
+  RpcNativeFeatureKind,
+  RpcNativePoolMember,
+  type IRpcTransportSetupContext,
   type IRpcTransportPlugin,
-  type IRemoteBinding
-} from '@migaia/rpc-host/plugin'
-import { getProcessByteAdapter } from './adapter.js'
-import { NativeProcessRuntimeLoader } from './runtime-loader.js'
+  type IRpcNativeMemberControls,
+  type IRpcNativePoolEvents,
+  type IRpcNativeTransportFeature
+} from '@migaia/rpc-host/sdk'
+import { RpcError, RuntimeApiErrorText } from '@migaia/rpc-contract/errors'
+import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
+import { PROCESS_NAMESPACE } from './constants.js'
+import { isProcessChild } from './child.js'
+import { NativeProcessRuntimeLoader, type IAdapterProcessRuntimeModule } from './runtime-loader.js'
 import { openAutomaticProcessIO } from './automatic-peer.js'
 import { invalidProcessRuntimeBootstrap } from './runtime-bootstrap.js'
-import { isProcessChild } from './child.js'
-import { normalizeProcessSources, type IProcessShortSpawn } from './adapters/short-source.js'
+import {
+  normalizeProcessSources,
+  type IProcessShortSpawn,
+  type IProcessShortSourceOptions,
+  type IProcessSourceOptions
+} from './adapters/short-source.js'
 import {
   createSpawnProcessBinding,
   createConnectProcessBinding,
   reportSafely
 } from './plugin/binding.js'
-import { ProcessPluginWire } from './plugin/constants.js'
-import { createNativeProcessOffer } from './offer.js'
-import { openProcessListenerDeployment } from './runtime-listener.js'
-import { readProcessFeatureConfiguration } from '../features/metadata.js'
-import { ProcessChannelDiagnostics } from './diagnostics.js'
-import { RpcProcessErrorText } from './error-text.js'
-import type { IProcessCommonOptions } from './types.js'
-import type { IRuntimeProcessPeerOptions } from './runtime-peer.js'
-import type { IProcessPluginEstablish, IConnectProcessPluginDeployment } from './plugin/types.js'
+import { serveProcessSessions } from './plugin/serve.js'
+import type { IProcessFeature, IProcessServeChildIngress } from './plugin/types.js'
 
-/** Native process sources retain their existing short/full source grammar. */
-export type IProcessSpawnSource = NonNullable<IRuntimeProcessPeerOptions['spawn']>
-export type IProcessConnectSource = NonNullable<IRuntimeProcessPeerOptions['connect']>
-export type IProcessListenSource = NonNullable<IRuntimeProcessPeerOptions['listen']>
-/** Connection labels remain native-owned while callers select existing queue and logging policy. */
-type IProcessIpcConfiguration = Partial<
-  Pick<IProcessCommonOptions['ipc'], 'maxPendingData' | 'maxPendingControl' | 'log'>
->
-/** Local host configuration and original native source defaults stay ordinary cold options. */
-export type IProcessPluginCommonOptions = Omit<
-  IRuntimeProcessPeerOptions,
-  'spawn' | 'connect' | 'listen' | 'endpointFactory'
-> &
-  Omit<IProcessShortSpawn, 'entry'> &
+/** Source grammar is native short/full acquisition rather than a callback returning an endpoint. */
+export type IProcessSpawnSource = NonNullable<IProcessSourceOptions['spawn']>
+/** Connection recipes keep the original exact local address and dialer. */
+export type IProcessConnectSource = NonNullable<IProcessSourceOptions['connect']>
+/** Listener recipes retain the original actual bind/accept owner. */
+export type IProcessListenSource = NonNullable<IProcessSourceOptions['listen']>
+/** Cold configuration captures native defaults before installation in the one actual Host. */
+export type IProcessPluginCommonOptions = Omit<IProcessShortSpawn, 'entry'> &
+  IProcessShortSourceOptions &
   Readonly<{
     name?: string
+    namespace?: string
     expose?: readonly string[]
-    ipc?: IProcessIpcConfiguration
+    features?: readonly IProcessFeature[]
+    report?(error: unknown): void
+    parentLoss?: IProcessServeChildIngress['parentLoss']
   }>
-/** Exactly one physical source is admitted synchronously; timeout-only connect decorates any mode. */
+/** The original connect decorator sets a handshake budget; only target selects a native source. */
+export type IProcessConnectDeadline = Readonly<{ timeoutMs?: number }>
+/** Exactly one physical source is selected synchronously before native resources are acquired. */
 export type IProcessPluginOptions = IProcessPluginCommonOptions &
   (
     | Readonly<{
         spawn: IProcessSpawnSource
-        connect?: IRpcConnectOptions
+        connect?: IProcessConnectDeadline
         listen?: never
         connectToParent?: never
       }>
     | Readonly<{
-        connect: IRpcConnectOptions & { target: IProcessConnectSource }
+        connect: IProcessConnectDeadline & { target: IProcessConnectSource }
         spawn?: never
         listen?: never
         connectToParent?: never
       }>
     | Readonly<{
         listen: IProcessListenSource
-        connect?: IRpcConnectOptions
         spawn?: never
+        connect?: IProcessConnectDeadline
         connectToParent?: never
       }>
     | Readonly<{
         connectToParent: true
-        connect?: IRpcConnectOptions
         spawn?: never
+        connect?: IProcessConnectDeadline
         listen?: never
       }>
   )
+/** Native controls are contributed through the same unique namespace extension channel. */
+export type IProcessNamespaceExtensions = Readonly<{ members: IRpcNativeMemberControls<'process'> }>
 
-/** Exact installed feature objects override only the corresponding original IPC fields. */
-function processIpc(
-  options: IProcessIpcConfiguration | undefined,
-  context: IAdapterDeploymentContext
-): IProcessIpcConfiguration {
-  const ipc = { ...options }
-  for (const feature of context.features ?? []) {
-    const configured = readProcessFeatureConfiguration(feature)
-    if (configured?.sendQueue?.maxPendingData !== undefined)
-      ipc.maxPendingData = configured.sendQueue.maxPendingData
-    if (configured?.sendQueue?.maxPendingControl !== undefined)
-      ipc.maxPendingControl = configured.sendQueue.maxPendingControl
-    if (configured?.log) ipc.log = configured.log.report
+/** Native discovery and its original bootstrap tail transfer once to the child Session admission. */
+async function openParentProcessRaw(
+  module: IAdapterProcessRuntimeModule,
+  discovery: ReturnType<IAdapterProcessRuntimeModule['processRuntimeIO']['discover']>
+) {
+  /** The original native receiver remains responsible for opening actual runtime streams. */
+  const opened = await openAutomaticProcessIO({
+    ...discovery,
+    open: () => module.processRuntimeIO.open()
+  })
+  if (!opened.bootstrap) {
+    await opened.channel.close()
+    invalidProcessRuntimeBootstrap()
   }
-  return ipc
+  return { raw: opened.channel, bootstrap: opened.bootstrap }
 }
 
-/** Forward native preparation values into the original default/custom establish callback. */
-function processEstablish(
-  original: IProcessPluginEstablish,
-  context: IAdapterDeploymentContext,
-  ipc: IProcessIpcConfiguration
-): IProcessPluginEstablish {
-  return (raw, prepared) =>
-    original(raw, { ...prepared, handshakeTimeoutMs: context.connectTimeoutMs, ipc })
-}
-
-/** Reuse the existing native binding; supervision and generation publication stay canonical. */
-async function processManaged(
-  options: IRuntimeProcessPeerOptions,
-  defaults: IProcessPluginCommonOptions,
-  context: IAdapterDeploymentContext
-): Promise<IAdapterManagedDeployment> {
-  const loaded = new NativeProcessRuntimeLoader().load()
-  if (!loaded) throw createAdapterSourceConfigurationError()
-  const module = await loaded
-  const discovery = module.processRuntimeIO.discover()
-  const resolved = await normalizeProcessSources(
-    { ...options, report: options.report ?? context.configuredReport },
-    discovery.runtime,
-    { context },
-    defaults
-  )
-  const ipc = processIpc(defaults.ipc, context)
-  const spawn = typeof resolved.spawn === 'object' ? resolved.spawn : undefined
-  const connect = typeof resolved.connect === 'object' ? resolved.connect : undefined
-  if (!spawn && !connect) throw createAdapterSourceConfigurationError()
-  const offer =
-    spawn?.offer ??
-    connect?.offer ??
-    createNativeProcessOffer({
-      peer: { id: context.self.instanceId, runtime: discovery.runtime },
-      auth: spawn?.token ?? connect?.token,
-      capabilities: context.capabilities
-    })
-  const report = options.report ?? context.report
-  if (spawn) {
-    /**
-     * A genuine prewarm pool owns its exact launcher/spec/budget; adoption must retain that
-     * original owner.
-     */
-    const launcher =
-      spawn.wire === ProcessPluginWire.jsonrpc || spawn.supervision.prewarm !== undefined
-        ? spawn.supervision.launcher
-        : context.launcher!(spawn.supervision.launcher, spawn.supervision.id)
-    const binding = createSpawnProcessBinding(
-      {
-        ...spawn,
-        offer,
-        establish: processEstablish(spawn.establish, context, ipc),
-        supervision: { ...spawn.supervision, launcher }
-      },
-      report
+/** This native installation opens original IO; Host alone attaches and admits actual Sessions. */
+class ProcessInstallation {
+  /** The complete native recipe and feature instances are cold captured configuration. */
+  readonly #options: IProcessPluginOptions
+  /** Capture no socket, process, reader or supervisor until the actual install begins. */
+  constructor(options: IProcessPluginOptions) {
+    this.#options = Object.freeze({ ...options })
+  }
+  /** Attach a genuine automatic parent or a managed native source under one actual namespace. */
+  readonly open = async (context: IRpcTransportSetupContext) => {
+    /** The caller's configured native reporter remains the original diagnostic sink. */
+    const nativeContext = this.#options.report
+      ? { ...context, report: this.#options.report }
+      : context
+    /** Unsupported parent/listener sources expose no repeatable acquisition capability. */
+    const feature = this.#options.features?.find(
+      (value) => value.kind === RpcNativeFeatureKind.pool
     )
+    if (feature?.kind === RpcNativeFeatureKind.pool) {
+      /** The complete feature returns its original controls and one resource disposer. */
+      const installed = await feature.install({
+        ...nativeContext,
+        memberKind: 'process',
+        ...(this.#options.spawn || (this.#options.connect && 'target' in this.#options.connect)
+          ? { openMember: this.#openMember }
+          : {})
+      })
+      return {
+        namespaceExtensions: installed.value as IProcessNamespaceExtensions,
+        dispose: installed.dispose
+      }
+    }
+    /** Runtime selection remains the original lazy native Node/Bun/Deno module loader. */
+    const loaded = new NativeProcessRuntimeLoader().load()
+    if (!loaded)
+      throw new RpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.sourceInvalid)
+    /** This module owns actual stdio discovery and platform-specific final exit. */
+    const module = await loaded
+    /** Consumed native markers remain local to this process before opening any child IO. */
+    const discovery = module.processRuntimeIO.discover()
+    if (this.#options.connectToParent) {
+      /** Parent guard is constructed by serve before this callback begins its bootstrap wait. */
+      const ingress: IProcessServeChildIngress = {
+        kind: 'child',
+        channelKind: 'byte',
+        parentLoss: this.#options.parentLoss ?? { exit: module.processRuntimeIO.exit },
+        openRaw: () => openParentProcessRaw(module, discovery)
+      }
+      return this.#serve(ingress, nativeContext)
+    }
+    /**
+     * Ordinary defaults expand only the selected source and preserve original launcher/spec
+     * objects.
+     */
+    const sources = await this.#normalize(nativeContext, discovery.runtime)
+    if (sources.listen) return this.#serve(sources.listen, nativeContext)
+    /** Ordinary installation publishes the actual source's one passive members receiver. */
+    const source = await this.#source(nativeContext, sources)
     return {
-      binding: binding as unknown as IRemoteBinding<unknown, unknown>,
-      execution: binding.supervisor as unknown as NonNullable<
-        IAdapterManagedDeployment['execution']
-      >,
-      bindEndpoint: (channel, endpoint, onExecution) =>
-        binding.bindEndpoint(channel, endpoint, onExecution),
-      beforeRelease: () => binding.drainCurrent(),
-      callDeadlineCapMs: spawn.supervision.spec.limits?.callWallTimeMs
+      namespaceExtensions: { members: source.members!.value },
+      dispose: () => source.close()
     }
   }
-  const binding = createConnectProcessBinding(
-    {
-      ...connect!,
-      offer,
-      supervision:
-        connect!.supervision ??
-        (defaults.supervision as IConnectProcessPluginDeployment['supervision']),
-      establish: processEstablish(connect!.establish, context, ipc)
-    },
-    report
-  )
-  return {
-    binding: binding as unknown as IRemoteBinding<unknown, unknown>,
-    bindEndpoint: (channel, endpoint, onExecution) =>
-      binding.bindEndpoint(channel, endpoint, onExecution),
-    beforeRelease: () => binding.drainCurrent()
+  /** Repeating shorthand expansion retains each original default budget and private bootstrap. */
+  #normalize(context: IRpcTransportSetupContext, runtime: string) {
+    return normalizeProcessSources(
+      {
+        ...this.#options,
+        report: this.#options.report ?? context.configuredReport,
+        connect:
+          this.#options.connect && 'target' in this.#options.connect
+            ? this.#options.connect.target
+            : undefined
+      },
+      runtime,
+      this.#options
+    )
+  }
+  /** Both acquisition paths use the same original native binding and shared SDK generation. */
+  async #source(
+    context: IRpcTransportSetupContext,
+    sources: Awaited<ReturnType<typeof normalizeProcessSources>>,
+    events?: IRpcNativePoolEvents
+  ) {
+    /** Name remains distinct from the original supervisor id and actual instance fingerprint. */
+    const name = this.#options.name ?? PROCESS_NAMESPACE
+    /** Both spawn and connect reuse the same SDK generation owner and actual native supervisor. */
+    const source = sources.spawn
+      ? createSpawnProcessBinding(sources.spawn, context, name, this.#options.features, events)
+      : sources.connect
+        ? createConnectProcessBinding(
+            {
+              ...sources.connect,
+              supervision:
+                sources.connect.supervision ??
+                (this.#options
+                  .supervision as import('./plugin/types.js').IConnectProcessPluginDeployment['supervision'])
+            },
+            context,
+            name,
+            this.#options.features,
+            events
+          )
+        : undefined
+    if (!source)
+      throw new RpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.sourceInvalid)
+    try {
+      await source.generation.open()
+    } catch (primary) {
+      try {
+        await source.close()
+      } catch (cleanup) {
+        reportSafely(context.report, cleanup)
+      }
+      throw primary
+    }
+    return source
+  }
+  /** Pool repeats only the real managed recipe; private Session attachment is supplied by SDK. */
+  readonly #openMember = async (
+    context: IRpcTransportSetupContext,
+    events: IRpcNativePoolEvents
+  ) => {
+    const loaded = new NativeProcessRuntimeLoader().load()
+    if (!loaded)
+      throw new RpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.sourceInvalid)
+    /** The genuine platform module supplies the original source normalization defaults. */
+    const module = await loaded
+    /** One native source owns the original supervisor, raw channel and cleanup. */
+    const source = await this.#source(
+      context,
+      await this.#normalize(context, module.processRuntimeIO.discover().runtime),
+      events
+    )
+    return new RpcNativePoolMember({
+      record: source.record,
+      native: source.generation,
+      close: () => source.close()
+    })
+  }
+  /** Listener and child acquisition borrow the same actual native serve/cascade/EOF owner. */
+  async #serve(
+    ingress: Parameters<typeof serveProcessSessions>[0],
+    context: IRpcTransportSetupContext
+  ) {
+    /** Per-connection features execute only when this original ingress adopts its real raw channel. */
+    const sessions = await serveProcessSessions(ingress, context, {
+      features: this.#options.features
+    })
+    return { namespaceExtensions: { members: sessions.members }, dispose: sessions.close }
   }
 }
 
-/** Define a reusable cold native transport; opening happens only in the genuine Host lifecycle. */
-export function processPlugin(options: IProcessPluginOptions): IRpcTransportPlugin {
+/** Define the cold process transport; ambiguous or unsupported sources reject before native launch. */
+export function processPlugin<
+  const N extends string = typeof PROCESS_NAMESPACE,
+  E extends object = Record<never, never>
+>(
+  options: IProcessPluginOptions &
+    Readonly<{
+      namespace?: N
+      features?: readonly (
+        | Exclude<IProcessFeature, IRpcNativeTransportFeature>
+        | IRpcNativeTransportFeature<E>
+      )[]
+    }>
+): IRpcTransportPlugin<N, IProcessNamespaceExtensions & E> {
+  /** Runtime input may arrive from plain JavaScript; capture its four existing physical source arms. */
   const configured = options as IProcessPluginOptions & { connectToParent?: unknown }
-  const spawn = configured?.spawn
-  const listen = configured?.listen
-  const connect = configured?.connect
-  const target = connect && 'target' in connect ? connect.target : undefined
-  const parent = configured?.connectToParent
+  /** Native source selection is independent from routing metadata or an incoming peer claim. */
+  const choices = [
+    configured?.spawn,
+    configured?.connect && 'target' in configured.connect ? configured.connect.target : undefined,
+    configured?.listen,
+    configured?.connectToParent === true ? true : undefined
+  ]
   if (
-    (parent !== undefined && parent !== true) ||
-    [spawn, target, listen, parent === true ? true : undefined].filter(
-      (source) => source !== undefined
-    ).length !== 1 ||
-    (parent === true && !isProcessChild())
+    !detectServerRuntime() ||
+    choices.filter((value) => value !== undefined).length !== 1 ||
+    choices.some((value) => value === null || typeof value === 'function') ||
+    (configured?.connectToParent !== undefined && configured.connectToParent !== true) ||
+    (configured.connectToParent === true && !isProcessChild())
   )
-    throw createAdapterSourceConfigurationError()
-  const {
-    spawn: _spawn,
-    listen: _listen,
-    connect: _connect,
-    connectToParent: _parent,
-    ...defaults
-  } = configured
-  const captured = Object.freeze({
-    ...defaults,
-    spawn,
-    listen,
-    connect: target
-  }) as IRuntimeProcessPeerOptions
-  const source = spawn ?? target
-  const mode =
-    parent === true
-      ? RpcTransportMode['connect-to-parent']
-      : listen !== undefined
-        ? RpcTransportMode.listen
-        : spawn !== undefined
-          ? RpcTransportMode.spawn
-          : RpcTransportMode.connect
-  const deployment = createAdapterDeployment({
-    runtimeKey: RuntimePluginKey.process,
-    runtimeFamily: getProcessByteAdapter(),
-    runtimeOptions: captured,
-    open:
-      typeof source === 'function'
-        ? (context) => source(context)
-        : async () => {
-            throw createAdapterSourceConfigurationError()
-          },
-    ...(parent === true
-      ? {
-          bootstrap: async (context: IAdapterDeploymentContext) => {
-            const loaded = new NativeProcessRuntimeLoader().load()
-            if (!loaded) throw createAdapterSourceConfigurationError()
-            const module = await loaded
-            const discovery = module.processRuntimeIO.discover()
-            const opened = await openAutomaticProcessIO({
-              ...discovery,
-              open: () => module.processRuntimeIO.open()
-            })
-            try {
-              if (!opened.bootstrap) invalidProcessRuntimeBootstrap()
-              return holdAdapterByteBootstrapSource(opened.channel, {
-                runtime: discovery.runtime,
-                platform: RpcPlatform.process,
-                diagnostics: ProcessChannelDiagnostics,
-                expectedStringText: RpcProcessErrorText.expectedString,
-                bootstrapInvalidText: RpcProcessErrorText.runtimeBootstrapInvalid,
-                ipc: processIpc(defaults.ipc, context)
-              })
-            } catch (primary) {
-              try {
-                await opened.channel.close()
-              } catch (cleanup) {
-                reportSafely(context.report, cleanup)
-              }
-              throw primary
-            }
-          }
-        }
-      : listen !== undefined
-        ? {
-            listen: async (context, accept) => {
-              const loaded = new NativeProcessRuntimeLoader().load()
-              if (!loaded) throw createAdapterSourceConfigurationError()
-              const module = await loaded
-              const discovery = module.processRuntimeIO.discover()
-              const resolved = await normalizeProcessSources(
-                captured,
-                discovery.runtime,
-                { context },
-                defaults
-              )
-              if (!resolved.listen || typeof resolved.listen !== 'object')
-                throw createAdapterSourceConfigurationError()
-              const ingress = resolved.listen
-              const originalContext = ingress.createConnectionContext
-              return openProcessListenerDeployment(
-                defaults,
-                {
-                  ...ingress,
-                  createConnectionContext: (pending) => {
-                    const prepared = originalContext(pending)
-                    return {
-                      ...prepared,
-                      ipc: { ...prepared.ipc, ...processIpc(defaults.ipc, context) }
-                    }
-                  }
-                },
-                context,
-                accept
-              )
-            }
-          }
-        : typeof source !== 'function'
-          ? {
-              managed: (context: IAdapterDeploymentContext) =>
-                processManaged(captured, defaults, context)
-            }
-          : {})
-  })
+    throw new RpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.sourceInvalid)
+  /** One native installation publishes its original member controls at this explicit namespace. */
+  const installation = new ProcessInstallation(configured)
   return defineTransportPlugin({
-    name: defaults.name ?? RuntimePluginKey.process,
-    expose: defaults.expose,
-    mode,
-    connect,
-    deployment
-  })
+    name: configured.name ?? PROCESS_NAMESPACE,
+    namespace: (configured.namespace ?? PROCESS_NAMESPACE) as N,
+    expose: configured.expose,
+    features: configured.features,
+    nameAdmissionTimeoutMs: configured.connect?.timeoutMs,
+    open: installation.open
+  }) as IRpcTransportPlugin<N, IProcessNamespaceExtensions & E>
 }

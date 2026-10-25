@@ -1,118 +1,112 @@
-# RPC pool guide
+# Pool usage guide
 
-[中文](./USEGUIDE.md) · [Overview](./README.en.md) · [Shared call rules](../rpc-host/USEGUIDE.en.md)
+[中文](./USEGUIDE.md) · [Overview](./README.en.md) · [Host calls](../rpc-host/USEGUIDE.en.md)
 
-poolPlugin is a feature installed with one transport that can repeatedly open independent members. The original scheduler owns capacity, bounded FIFO, leases, resizing, and draining. Native process, thread, or cooperative owners continue supervising members.
+Contract defines pure protocol rules and interfaces. Host owns sessions, providers, and call settlement; transports acquire and supervise real native resources. Flow plugins provide auth, chunk, batch, and probe at message hooks. The complete `pool` transport feature owns only same-carrier member scheduling, FIFO, resize, and drain. Timeout/retry features own their respective call policies.
 
-## Start with three real threads
+## Install on the transport
 
-Save this as an independent ESM TypeScript entry using a supporting Node toolchain. Parent and child use the same file, but only the parent installs the pool.
+The parent example uses three real Thread members. A Host may install transports in distinct namespaces; this example installs only `thread`, and the pool does not mix carrier kinds.
 
 ```ts doc-test=check
-import { createRpcHost } from '@migaia/rpc-host'
-import { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'
-import { poolPlugin } from '@migaia/rpc-plugin-pool'
+import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
+import { threadPlugin } from '@migaia/rpc-plugin-thread'
+import { pool, RPC_POOL_PEER_ID } from '@migaia/rpc-plugin-pool'
+import { timeout, retry } from '@migaia/rpc-host/features'
 
-if (await isThreadChild()) {
-  await createRpcHost({
-    plugins: [threadPlugin({ connectToParent: true })],
-    provide: { double: (value: number) => value * 2 }
+type IWorkerApi = { work(value: number): number; values(end: number): AsyncIterable<number> }
+
+const plugins = [
+  threadPlugin({
+    spawn: new URL('./worker.js', import.meta.url),
+    features: [pool({ size: 3, maxQueue: 32 }), timeout({ ms: 1500 }), retry({ attempts: 2 })]
   })
-} else {
-  const pool = poolPlugin({ size: 3, maxQueue: 32 })
-  const host = await createRpcHost<{ double(value: number): number }>({
-    plugins: [threadPlugin({ spawn: true }), pool]
+] as const
+
+type IPoolHost = IRpcHost<IWorkerApi, typeof plugins>
+
+export function open() {
+  return createRpcHost<IWorkerApi, typeof plugins>({ plugins })
+}
+
+export function work(host: IPoolHost, signal: AbortSignal) {
+  return host.thread.send(RPC_POOL_PEER_ID, 'work', 21, {
+    signal,
+    timeout: timeout({ ms: 1000 }),
+    retry: false
   })
-  try {
-    console.log(await host.request('double', 21))
-    console.log(await host.send('pool', 'double', 21))
-    await pool.controls(host).resize(2)
-    console.log(pool.controls(host).stats().targetSize)
-  } finally {
-    await host.close()
-  }
 }
-```
 
-Output is 42, 42, then 2. Each call executes exactly once and returns a scalar. This host has one call endpoint; all three members retain real native lifetimes and supervised leases.
-
-## One logical target
-
-The only public target is pool, also exported as RPC_POOL_PEER_ID. Hidden members do not appear in direct targets or host.peers. Do not address them by native IDs.
-
-Untargeted request, notify, stream, group, and outcome each make one scheduling choice. send('pool', method, payload) also returns a scalar, without a broadcast array. A group runs entirely on one member. outcome selects one member rather than searching every member's result store.
-
-Supported sources include spawned process/thread/coroutine members and process connect sources that can establish independent connections repeatedly. listen and connectToParent reject with POOL_TRANSPORT_UNSUPPORTED before any member opens; neither is an independent member factory.
-
-## Capacity and queueing
-
-| Option        | Rule                                                                               |
-| ------------- | ---------------------------------------------------------------------------------- |
-| size          | Required positive integer; installation waits for the target member count          |
-| maxQueue      | Default 256, nonnegative integer; 0 provides no waiting slots                      |
-| idleTimeoutMs | Omit to disable idle retirement; otherwise finite, positive, at most 2147483647 ms |
-| scheduler     | Owns existing idle timers, not native supervision or call deadlines                |
-
-Each member lends one client slot at a time. Busy operations enter the bounded FIFO. queued counts accepted entries without a member; inFlight counts occupied client slots, not provider or CPU concurrency. A full queue rejects before business execution rather than silently expanding.
-
-A call signal can cancel a waiting entry. Cancellation after business starts follows original call semantics and does not prove absence of remote side effects. Original call owners retain deadline and connection preparation behavior; there is no separate pool timeout mechanism.
-
-```ts doc-test=check
-import type { IRpcHost } from '@migaia/rpc-host'
-
-export async function cancellableWork(
-  host: IRpcHost<{ work(value: number): number }>,
-  signal: AbortSignal
-) {
-  return await host.send('pool', 'work', 21, { signal, timeoutMs: 1000 })
-}
-```
-
-## Stream slot ownership
-
-Streams are lazy: first next acquires a member. Completion, return, throw, or settled cancellation releases the slot. An unstarted iterator occupies no member. A partially consumed stream that is neither continued nor returned prevents that slot from draining.
-
-```ts doc-test=check
-import type { IRpcHost } from '@migaia/rpc-host'
-
-export async function firstPoolValue(
-  host: IRpcHost<{ pool: { values(end: number): AsyncIterable<number> } }>
-) {
-  const stream = host.peers.pool.values(10)
+export async function firstValue(host: IPoolHost) {
+  const stream = host.thread.peers.pool.values(10)
   try {
     return await stream.next()
   } finally {
     await stream.return?.()
   }
 }
-```
 
-Returning a stream releases that call and its slot, not the whole pool. Shrinking does not interrupt a stream that already occupies a slot.
+export async function shrink(host: IPoolHost) {
+  await host.thread.pool.resize(1)
+  return { stats: host.thread.pool.stats(), members: await host.thread.members.list() }
+}
 
-## Bind controls to the actual host
-
-Retain the object returned by const pool = poolPlugin(...), then use pool.controls(actualHost). Installations of that object are isolated by actual host identity. Do not pass a plain object, another host's proxy, or a copied plugin.
-
-```ts doc-test=check
-import type { IRpcPoolControls } from '@migaia/rpc-plugin-pool'
-
-export async function shrink(controls: IRpcPoolControls) {
-  await controls.resize(1)
-  const snapshot = controls.stats()
-  return { target: snapshot.targetSize, busy: snapshot.inFlight, waiting: snapshot.queued }
+export async function closeIdlePool(host: IPoolHost) {
+  await host.thread.pool.close()
+  await host.close()
 }
 ```
 
-stats returns a new frozen snapshot containing targetSize, memberCount, inFlight, queued, and state. memberCount includes retiring/closing members still retained for cleanup; it need not immediately equal targetSize. The safe host.describe result includes pool statistics.
+The corresponding `worker.js` is a separate child entry. Only the parent installs pool; the child joins its actual parent.
 
-resize processes changes in call order, retiring idle members before waiting for busy ones. Expansion opens only missing members. Failure preserves the primary error and restores the old target. Idle retirement keeps targetSize; later demand replenishes members through the original factory.
+```ts doc-test=check
+import { createRpcHost } from '@migaia/rpc-host'
+import { threadPlugin } from '@migaia/rpc-plugin-thread'
 
-## Drain and failures
+await createRpcHost({
+  plugins: [threadPlugin({ connectToParent: true })],
+  provide: {
+    work: (value: number) => value * 2,
+    values: async function* (end: number) {
+      for (let value = 0; value < end; value += 1) yield value
+    }
+  }
+})
+```
 
-controls.close synchronously stops new admission, drains previously accepted operations and acquisitions, then closes members. Repeated calls share one Promise. There is no additional pool drain timeout. Let active streams finish or return them; close does not consume an unlimited business stream for you.
+The factory is `pool(options)`. Controls are published on that installation's `host.thread.pool` and `host.thread.members`, rather than queried from the factory object. `features` accepts complete pool, timeout, and retry instances; per-call timeout/retry accepts complete instances or `false`.
 
-host.close drains the logical pool before releasing hidden members. controls.close alone closes the pool, so the application must still close its host and release other features and resources.
+## One logical target
 
-Partial construction attempts cleanup of every opened member and preserves the input-order primary error. Later cleanup errors do not replace it and remain reachable through errors/cause or reporting. close attempts every member; CLOSE_FAILED AggregateError retains original failures. A terminal pool does not reopen.
+The business directory exposes only `pool` (exported as `RPC_POOL_PEER_ID`), without direct targets for private members. `host.thread.send('pool', ...)` reserves one member; untargeted request/notify/stream/group also selects once. `members` administers actual native resources, rather than providing a business shortcut to hidden members.
 
-The pool source is rpc.pool: INVALID_OPTIONS, POOL_TRANSPORT_UNSUPPORTED, POOL_CLOSED, QUEUE_FULL, CALL_ABORTED, and CLOSE_FAILED. Business and native transport failures retain their owning identities. The pool does not replay calls automatically. Use the host's original retry policy only with an explicit business idempotency decision.
+A whole group stays on one member. `outcome` requires the idempotency plugin and also selects one member, without searching every member's store. Pool itself adds no deduplication, idempotency guarantee, or business retry.
+
+A source must repeatedly acquire independent members: Thread/Coroutine spawn, Process spawn or connect. Listener/connectToParent sources reject before native acquisition; pool does not clone one parent connection into several members. Custom native deployment uses `@migaia/rpc-host/sdk`.
+
+## Capacity, queues, and cancellation
+
+| Option          | Rule                                                                       |
+| --------------- | -------------------------------------------------------------------------- |
+| `size`          | Required positive integer; initial installation waits for target readiness |
+| `maxQueue`      | Default 256; nonnegative integer; 0 disables queueing                      |
+| `idleTimeoutMs` | Omitted disables it; positive finite milliseconds, at most 2147483647      |
+| `scheduler`     | Owns idle retirement timing only, not native supervision or call deadlines |
+
+Each member lends one client slot at a time. Busy operations enter bounded FIFO; a full queue rejects with QUEUE_FULL. `signal` cancels a waiting entry. After start, cancellation follows the original call path and does not establish that remote effects never occurred.
+
+Stats is a new frozen snapshot: targetSize, memberCount, inFlight, queued, state. `queued` counts waiting entries without an assigned member. `inFlight` counts client slots, not provider or CPU concurrency. memberCount includes retirees still being cleaned up, so it need not equal targetSize at every instant.
+
+## Streams, resize, and drain
+
+A stream acquires its slot on the first `next()`. Completion, early return, or settled throw/cancellation releases it. An application-held unfinished stream can prevent that slot from draining. Ending a stream does not close the entire pool.
+
+`resize` serializes target changes in call order. Shrink prefers idle members and waits for occupied members to finish. Expansion acquires only missing members; failure preserves the primary and restores the old target while still open. Idle retirement leaves targetSize unchanged, and later demand refills it.
+
+Explicit `host.thread.pool.close()` stops new admission, waits for accepted work and member acquisition, then attempts member cleanup. Repeated calls share the close Promise. Pool adds no drain timeout. Finish held work and streams, explicitly await pool closure, then finish Host cleanup; `closeIdlePool` shows this order when no work is held.
+
+## Errors and observation
+
+Pool-owned source is `rpc.pool`: INVALID_OPTIONS, POOL_TRANSPORT_UNSUPPORTED, POOL_CLOSED, QUEUE_FULL, CALL_ABORTED, CLOSE_FAILED. Business/native errors retain their owner's source/code/cause; pool does not replay them automatically.
+
+Partial construction cleans up acquired members while preserving the original primary. Secondary cleanup failures remain reachable through the error graph or reports. Member-close failures retain original errors and the first cause in a CLOSE_FAILED AggregateError, and a closed pool does not reopen. Use `@migaia/rpc-host/plugins/probe` for readonly observation instead of another diagnostics or message parser inside pool.

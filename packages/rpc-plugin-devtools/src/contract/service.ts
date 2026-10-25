@@ -1,4 +1,5 @@
-import type { IRpcProbeDescriptor } from '@migaia/rpc-host/probe'
+/** Defines collector query, watch, statistics and lifecycle service shapes for Host providers. */
+import type { IRpcProbeDescriptor } from '@migaia/rpc-host/plugins/probe'
 import type { IRpcDevtoolsWireEvent } from './wire.js'
 
 /** Query limits are at most 1,000; filters are applied to one collector's retained sequence. */

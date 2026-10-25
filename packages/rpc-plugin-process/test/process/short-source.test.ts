@@ -1,7 +1,6 @@
-import { createRpcHost } from '@migaia/rpc-host'
+import { createRpcHost, defaultRpcReporter } from '@migaia/rpc-host'
 import { processPlugin } from '@migaia/rpc-plugin-process'
 import { describe, expect, it, vi } from 'vitest'
-import { defaultRpcReporter } from '@migaia/rpc-host/plugin'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { dirname, join } from 'node:path'
@@ -25,8 +24,8 @@ describe('short Process sources', () => {
       plugins: [processPlugin({ spawn: serviceEntry })]
     })
     try {
-      expect(await peer.request('math.double', 21)).toBe(42)
-      expect(await peer.request('child')).toBe(true)
+      expect(await peer.process.request('math.double', 21)).toBe(42)
+      expect(await peer.process.request('child')).toBe(true)
     } finally {
       await peer.close()
     }
@@ -66,7 +65,7 @@ describe('short Process sources', () => {
        */
       const program = `Promise.all([import('@migaia/rpc-host'), import('@migaia/rpc-plugin-process')]).then(async ([{ createRpcHost }, { processPlugin }]) => {
       const peer = await createRpcHost({ plugins: [processPlugin({ spawn: ${JSON.stringify(entry)} })] });
-      try { process.stdout.write(JSON.stringify({ value: await peer.request('math.double', 21), flags: await peer.request('flags') })); }
+      try { process.stdout.write(JSON.stringify({ value: await peer.process.request('math.double', 21), flags: await peer.process.request('flags') })); }
       finally { await peer.close(); }
     })`
       try {
@@ -118,7 +117,7 @@ describe('short Process sources', () => {
       })
       const client = await clientPromise
       try {
-        expect(await client.request('math.double', 21)).toBe(42)
+        expect(await client.process.request('math.double', 21)).toBe(42)
         const address = `/tmp/migaia-rpc-${userInfo().uid}/${createHash('sha256').update(name).digest('hex').slice(0, 24)}.sock`
         expect((await lstat(dirname(address))).mode & 0o777).toBe(0o700)
         expect((await lstat(address)).mode & 0o777).toBe(0o600)
@@ -183,7 +182,7 @@ describe('short Process sources', () => {
           ]
         })
         try {
-          expect(await client.request('math.double', 2)).toBe(4)
+          expect(await client.process.request('math.double', 2)).toBe(4)
         } finally {
           await client.close()
         }

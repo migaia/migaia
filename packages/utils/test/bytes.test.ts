@@ -247,3 +247,26 @@ describe('byte primitives', () => {
     expect(forgedBufferAccepted).toBe(false)
   })
 })
+
+// RPC-TEST-CCDBF0994A49-C006: original supported atoms received at their canonical owner; old alias/key facets stay NoPASS.
+it('reuses the canonical intrinsic brand across realms and subclasses', () => {
+  const foreignBytes = runInNewContext('new Uint8Array([1])') as Uint8Array
+  class ByteSubclass extends Uint8Array {}
+  const hostileBytes = new Uint8Array([1])
+  let constructorReads = 0
+  Object.defineProperty(hostileBytes, 'constructor', {
+    get: () => {
+      constructorReads += 1
+      throw new Error('constructor getter must not run')
+    }
+  })
+
+  expect(isUint8Array(new Uint8Array([1]))).toBe(true)
+  expect(isUint8Array(foreignBytes)).toBe(true)
+  expect(isUint8Array(new ByteSubclass(1))).toBe(true)
+  expect(isUint8Array(hostileBytes)).toBe(true)
+  expect(constructorReads).toBe(0)
+  expect(isUint8Array(new Uint16Array([1]))).toBe(false)
+  expect(isUint8Array(new DataView(new ArrayBuffer(1)))).toBe(false)
+  expect(isUint8Array(null)).toBe(false)
+})

@@ -3,16 +3,12 @@ import { Worker, threadId } from 'node:worker_threads'
 import { PluginHost, defineFeature, definePlugin } from '@migaia/plugin-host'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { createRpcHost } from '@migaia/rpc-host'
-import {
-  defineFeaturePlugin,
-  type IRpcTransportPlugin,
-  type IRpcHostMember
-} from '@migaia/rpc-host/plugin'
+import { pool } from '../../../rpc-plugin-pool/dist/index.js'
 import * as thread from '@migaia/rpc-plugin-thread'
-import * as node from '../../dist/threads/adapters/node.js'
+import * as node from '../../dist/threads/node-launcher.js'
 
 /** Runtime lookup makes the first preimplementation failure exercise the actual built root. */
-const threadPlugin = Reflect.get(thread, 'threadPlugin') as (options: any) => IRpcTransportPlugin
+const threadPlugin = thread.threadPlugin
 /** Every new business call runs through a genuine independent native Worker host. */
 const child = new URL('./fixtures/host-plugin-child.mts', import.meta.url)
 
@@ -40,12 +36,18 @@ describe('native thread transport plugin', () => {
       report: () => undefined
     })
     try {
-      expect(await host.request('echo', 21)).toBe(21)
-      expect(await host.request('reverse', 21)).toBe(42)
-      expect(await collect(host.stream('sequence') as AsyncIterable<unknown>)).toEqual([1, 2])
-      expect(await collect(host.stream('reverseStream') as AsyncIterable<unknown>)).toEqual([3, 4])
-      expect(await host.request('identity')).toMatchObject({ pid: process.pid, child: true })
-      expect(((await host.request('identity')) as { threadId: number }).threadId).not.toBe(threadId)
+      expect(await host.thread.request('echo', 21)).toBe(21)
+      expect(await host.thread.request('reverse', 21)).toBe(42)
+      expect(await collect(host.thread.stream('sequence') as AsyncIterable<unknown>)).toEqual([
+        1, 2
+      ])
+      expect(await collect(host.thread.stream('reverseStream') as AsyncIterable<unknown>)).toEqual([
+        3, 4
+      ])
+      expect(await host.thread.request('identity')).toMatchObject({ pid: process.pid, child: true })
+      expect(((await host.thread.request('identity')) as { threadId: number }).threadId).not.toBe(
+        threadId
+      )
     } finally {
       await host.close()
       expect(terminated).toHaveBeenCalledTimes(1)
@@ -55,7 +57,7 @@ describe('native thread transport plugin', () => {
 
   it('rejects all invalid sources synchronously with the original error and no Worker', () => {
     for (const options of [{}, { spawn: true, connectToParent: true }, { connectToParent: true }]) {
-      expect(() => threadPlugin(options)).toThrow(
+      expect(() => threadPlugin(options as Parameters<typeof threadPlugin>[0])).toThrow(
         expect.objectContaining({
           name: 'RpcError',
           source: 'rpc.endpoint',
@@ -67,27 +69,22 @@ describe('native thread transport plugin', () => {
   })
 
   it('opens the same cold spawn definition as three independently owned native Workers', async () => {
-    const members: IRpcHostMember[] = []
-    const assemble = defineFeaturePlugin(() => ({
-      name: 'native-thread-members',
-      async assemble(context) {
-        for (let index = 0; index < 3; index++) members.push(await context.openMember())
-        return members[0]!
-      }
-    }))()
     const host = await createRpcHost({
-      plugins: [threadPlugin({ spawn: child }), assemble],
+      plugins: [threadPlugin({ spawn: child, features: [pool({ size: 3 })] })],
       report: () => undefined
     })
     try {
       const ids = await Promise.all(
-        members.map(
-          async (member) => ((await member.request('identity')) as { threadId: number }).threadId
+        [0, 1, 2].map(
+          async () => ((await host.thread.request('identity')) as { threadId: number }).threadId
         )
       )
       expect(new Set(ids).size).toBe(3)
-      await members[0]!.close()
-      expect(await members[1]!.request('echo', 42)).toBe(42)
+      /** BC7 keeps exact native isolation through the actual member controls. */
+      const first = (await host.thread.members.list()).connections[0]!.identity
+      if (!('instanceId' in first)) return expect.unreachable()
+      await host.thread.members.stop(first.instanceId)
+      expect(await host.thread.request('echo', 42)).toBe(42)
     } finally {
       await host.close()
     }
@@ -106,9 +103,9 @@ describe('native thread transport plugin', () => {
     await host.use(threadPlugin({ name: 'native', spawn: child, expose: ['math.double'] }))
     try {
       const outlet = Reflect.get(host, 'thread') as {
-        request(name: string, method: string, payload?: unknown): Promise<unknown>
+        send(name: string, method: string, payload?: unknown): Promise<unknown>
       }
-      expect(await outlet.request('native', 'exposed', 21)).toBe(42)
+      expect(await outlet.send('native', 'exposed', 21)).toBe(42)
       expect(await host.unUse('native')).toMatchObject({ ok: true })
       expect(mathHandle.getFeature('value').double(3)).toBe(6)
     } finally {

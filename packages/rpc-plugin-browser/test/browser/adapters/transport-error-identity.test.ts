@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { createRtcDataChannelTransport } from '../../../src/browser/adapters/rtc-data-channel.js'
-import { createSharedWorkerTransport } from '../../../src/browser/adapters/shared-worker.js'
-import { createWebWorkerTransport } from '@migaia/rpc-host/plugin'
+import { createRtcDataChannelCarrier } from '../../../dist/browser/adapters/rtc-data-channel.js'
+import { createSharedWorkerCarrier } from '../../../dist/browser/adapters/shared-worker.js'
+import {
+  createDedicatedWorkerCarrier,
+  subscribeWorkerErrors
+} from '../../../dist/browser/adapters/dedicated-worker.js'
 
 type IListener = (event: unknown) => void
 
@@ -51,15 +54,24 @@ function rtcChannel() {
 }
 
 describe('browser native transport error identity', () => {
-  it('tags an already closed RTC channel with the original native text', () => {
-    const transport = createRtcDataChannelTransport({
-      readyState: 'closed',
-      send() {},
-      addEventListener() {},
-      removeEventListener() {}
-    })
+  it('tags an already closed RTC channel with the original native text', async () => {
+    /** Native terminal state is captured by the actual RTC carrier before receiver acquisition. */
+    const carrier = createRtcDataChannelCarrier(
+      {
+        readyState: 'closed',
+        send() {},
+        addEventListener() {},
+        removeEventListener() {}
+      },
+      { report: () => undefined }
+    )
+    /** The actual late receiver observes the same original native Error. */
     const observed: unknown[] = []
-    transport.onTransportError?.((error) => observed.push(error))
+    carrier.subscribe({
+      frame: () => undefined,
+      error: () => undefined,
+      close: (error) => observed.push(error)
+    })
     expect(observed).toHaveLength(1)
     expect(observed[0]).toMatchObject({
       source: 'rpc.endpoint',
@@ -67,14 +79,22 @@ describe('browser native transport error identity', () => {
       message: 'RTCDataChannel closed'
     })
     expect((observed[0] as Error).constructor).toBe(Error)
+    await carrier.close()
   })
 
-  it('converts a non-Error RTC terminal event to a tagged native Error', () => {
+  it('converts a non-Error RTC terminal event to a tagged native Error', async () => {
+    /** This original fixture supplies a real native terminal callback and remover failure. */
     const fixture = rtcChannel()
-    const transport = createRtcDataChannelTransport(fixture.channel)
+    /** Native cleanup diagnostics flow through the actual SDK reporter, without test aggregation. */
     const observed: unknown[] = []
-    transport.onTransportError?.((error) => observed.push(error))
+    /** SDK holds the exact disposer returned by the native RTC owner. */
+    const carrier = createRtcDataChannelCarrier(fixture.channel, {
+      report: (error) => observed.push(error)
+    })
+    carrier.subscribe({ frame: () => undefined, error: () => undefined, close: () => undefined })
     fixture.emit({ type: 'close' })
+    await carrier.close().catch(() => undefined)
+    /** The real native owner's cleanup aggregate keeps the original terminal Error first. */
     const aggregate = observed[0] as AggregateError
     expect(aggregate.errors[0]).toMatchObject({
       source: 'rpc.endpoint',
@@ -84,75 +104,112 @@ describe('browser native transport error identity', () => {
     expect(aggregate.errors[0].constructor).toBe(Error)
   })
 
-  it('preserves a hostile Worker message read as cause of the native error', () => {
-    const listeners = new Map<string, (event: Event) => void>()
-    const transport = createWebWorkerTransport({
-      postMessage() {},
-      addEventListener(type, listener) {
-        listeners.set(type, listener)
+  it('preserves a hostile Worker message read as cause of the native error', async () => {
+    /** Actual native acquisition installs the same callbacks used by dedicatedWorkerPlugin. */
+    const listeners = new Map<string, (event: MessageEvent<unknown>) => void>()
+    /** No native Worker is owned or terminated by this real carrier. */
+    const carrier = createDedicatedWorkerCarrier(
+      {
+        postMessage() {},
+        addEventListener(type, listener) {
+          listeners.set(type, listener)
+        },
+        removeEventListener(type) {
+          listeners.delete(type)
+        }
       },
-      removeEventListener(type) {
-        listeners.delete(type)
-      }
-    })
+      { report: () => undefined }
+    )
+    /** The actual SDK error callback receives this native failure before physical retirement. */
     const observed: unknown[] = []
+    /** The same original failure must remain directly on cause. */
     const original = new Error('read failed')
-    transport.onTransportError?.((error) => observed.push(error))
-    transport.subscribe(() => undefined)
+    carrier.subscribe({
+      frame: () => undefined,
+      error: (error) => observed.push(error),
+      close: () => undefined
+    })
     listeners.get('message')?.({
       get data(): never {
         throw original
       }
-    } as unknown as Event)
+    } as unknown as MessageEvent<unknown>)
     expect(observed).toHaveLength(1)
     expect(observed[0]).toMatchObject({
       source: 'rpc.endpoint',
       code: 'TRANSPORT',
       cause: original
     })
+    await carrier.close()
   })
 
-  it('tags SharedWorker messageerror and both Worker failure events', () => {
-    const listeners = new Map<string, (event: Event) => void>()
+  it('tags SharedWorker messageerror and both Worker failure events', async () => {
+    /** Each actual native event is classified by its real acquisition owner. */
+    const listeners = new Map<string, (event: MessageEvent<unknown>) => void>()
+    /** Native registration/removal is observable without a second transport facade. */
     const port = {
       postMessage() {},
-      addEventListener(type: string, listener: (event: Event) => void) {
+      addEventListener(type: string, listener: (event: MessageEvent<unknown>) => void) {
         listeners.set(type, listener)
       },
       removeEventListener(type: string) {
         listeners.delete(type)
       }
     }
-    const shared = createSharedWorkerTransport(port)
+    /** The SharedWorker factory lends its true native error source to SDK. */
+    const shared = createSharedWorkerCarrier(port, { report: () => undefined })
+    /** One native messageerror remains one original coded Error. */
     const sharedErrors: unknown[] = []
-    shared.onTransportError?.((error) => sharedErrors.push(error))
-    shared.subscribe(() => undefined)
-    listeners.get('messageerror')?.(new Event('messageerror'))
+    shared.subscribe({
+      frame: () => undefined,
+      error: (error) => sharedErrors.push(error),
+      close: () => undefined
+    })
+    listeners.get('messageerror')?.(new Event('messageerror') as MessageEvent<unknown>)
     expect(sharedErrors).toHaveLength(1)
     expect(sharedErrors[0]).toMatchObject({ source: 'rpc.endpoint', code: 'TRANSPORT' })
+    await shared.close()
 
     listeners.clear()
-    const worker = createWebWorkerTransport(port)
+    /** This production native helper owns the two independent Worker event mappings. */
     const workerErrors: unknown[] = []
-    worker.onTransportError?.((error) => workerErrors.push(error))
-    listeners.get('error')?.(new Event('error'))
-    listeners.get('messageerror')?.(new Event('messageerror'))
+    /** Directly exercise the same acquisition that the actual Worker carrier calls once. */
+    const stop = subscribeWorkerErrors(
+      port,
+      (error) => workerErrors.push(error),
+      () => undefined
+    )
+    listeners.get('error')?.(new Event('error') as MessageEvent<unknown>)
+    listeners.get('messageerror')?.(new Event('messageerror') as MessageEvent<unknown>)
     expect(workerErrors).toHaveLength(2)
     for (const error of workerErrors) {
       expect(error).toMatchObject({ source: 'rpc.endpoint', code: 'TRANSPORT' })
       expect((error as Error).constructor).toBe(Error)
     }
+    stop()
   })
 
-  it('tags an extensible RTC error once and replays that same object', () => {
+  it('tags an extensible RTC error once and replays that same object', async () => {
+    /** Original RTC native callback and remover failure remain the complete fixture. */
     const fixture = rtcChannel()
-    const transport = createRtcDataChannelTransport(fixture.channel)
+    /** Exact original terminal identity and stack remain the observable business contract. */
     const original = new Error('terminal failure')
+    /** The native constructor stack must never be regenerated during error tagging. */
     const stack = original.stack
+    /** Initial cleanup report and late terminal replay have distinct actual destinations. */
     const received: unknown[] = []
-    transport.onTransportError?.((failure) => received.push(failure))
+    /** The actual RTC carrier performs tagging and lends its original remover to SDK. */
+    const carrier = createRtcDataChannelCarrier(fixture.channel, {
+      report: (failure) => received.push(failure)
+    })
+    carrier.subscribe({ frame: () => undefined, error: () => undefined, close: () => undefined })
     fixture.emit(original)
-    transport.onTransportError?.((failure) => received.push(failure))
+    await carrier.close().catch(() => undefined)
+    carrier.subscribe({
+      frame: () => undefined,
+      error: () => undefined,
+      close: (failure) => received.push(failure)
+    })
     expect(received).toHaveLength(2)
     const aggregate = received[0] as AggregateError
     expect(aggregate.errors[0]).toBe(original)
@@ -166,15 +223,27 @@ describe('browser native transport error identity', () => {
   it.each([
     Object.freeze(new Error('frozen terminal')),
     new DOMException('dom terminal', 'OperationError')
-  ])('wraps an untaggable RTC error and retains its cause', (original) => {
+  ])('wraps an untaggable RTC error and retains its cause', async (original) => {
+    /** Existing native event/remover observations remain unchanged for both original classes. */
     const fixture = rtcChannel()
-    const transport = createRtcDataChannelTransport(fixture.channel)
+    /** Actual cleanup reporting and late terminal replay must share one native wrapper. */
     const received: unknown[] = []
+    /** Preserve exact native stack and own-property surface, including numeric DOMException.code. */
     const stack = original.stack
+    /** Error tagging must never add keys to the original untaggable native failure. */
     const keys = Reflect.ownKeys(original)
-    transport.onTransportError?.((failure) => received.push(failure))
+    /** The native RTC owner is the same constructor used by the real cold transport plugin. */
+    const carrier = createRtcDataChannelCarrier(fixture.channel, {
+      report: (failure) => received.push(failure)
+    })
+    carrier.subscribe({ frame: () => undefined, error: () => undefined, close: () => undefined })
     fixture.emit(original)
-    transport.onTransportError?.((failure) => received.push(failure))
+    await carrier.close().catch(() => undefined)
+    carrier.subscribe({
+      frame: () => undefined,
+      error: () => undefined,
+      close: (failure) => received.push(failure)
+    })
     const aggregate = received[0] as AggregateError
     const wrapper = aggregate.errors[0]
     expect(wrapper).not.toBe(original)

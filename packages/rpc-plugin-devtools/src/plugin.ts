@@ -1,32 +1,52 @@
-import { defineFeaturePlugin, type IRpcFeaturePlugin } from '@migaia/rpc-host/plugin'
+/** One genuine flow installation lends readonly probe events to the original caller-owned collector. */
+import {
+  defineFlowPlugin,
+  type IRpcFlowPlugin,
+  type IRpcFlowSetupContext,
+  type IRpcFlowInstallation
+} from '@migaia/rpc-host/sdk'
+import { createProbeEmitter } from '@migaia/rpc-host/plugins/probe'
+import { systemScheduler } from '@migaia/utils/scheduler'
 import { createRpcDevtools } from './collector/devtools.js'
 import { CollectorText } from './collector/text.js'
 import type { IRpcDevtools, IRpcDevtoolsOptions } from './collector-types.js'
 
-/** Native feature metadata exposes one caller-owned collector without owning any host lifetime. */
-export type IDevtoolsPlugin = IRpcFeaturePlugin &
+/** Native metadata retains the caller's collector; each installed emitter has its own lifetime. */
+export type IDevtoolsPlugin = IRpcFlowPlugin &
   Readonly<{ collector: IRpcDevtools }> &
   Pick<IRpcDevtools, 'query' | 'watch' | 'stats' | 'describe' | 'close'>
 
-/** Only the five read/lifetime projections accompany the original registered probe object. */
-type IDevtoolsSurface = Readonly<{ collector: IRpcDevtools }> &
-  Pick<IRpcDevtools, 'query' | 'watch' | 'stats' | 'describe' | 'close'>
+/** The actual receiving installation owns its emitter; the caller retains the collector lifetime. */
+function setupDevtools(
+  collector: IRpcDevtools,
+  context: IRpcFlowSetupContext
+): IRpcFlowInstallation {
+  /** Reuse canonical sampling, capture, dynamic masks, reusable views and observer isolation. */
+  const emitter = createProbeEmitter(
+    [collector],
+    systemScheduler.now,
+    () => context.self!().instanceId,
+    context.report
+  )
+  return { hooks: { observe: emitter.observe }, dispose: () => emitter.dispose() }
+}
 
-/** Configure one collector per call; the module-level factory supplies the shared feature identity. */
-export const devtoolsPlugin: (options?: IRpcDevtoolsOptions) => IDevtoolsPlugin =
-  defineFeaturePlugin<IRpcDevtoolsOptions | undefined, IDevtoolsSurface>((options) => {
-    /** The canonical collector owns storage, registered probe stages and its explicit close. */
-    const collector = createRpcDevtools(options)
-    return {
+/** Construct one original collector and publish its methods on the actual frozen native definition. */
+export function devtoolsPlugin(options?: IRpcDevtoolsOptions): IDevtoolsPlugin {
+  /** This caller-owned collector can aggregate several hosts without borrowing their lifetimes. */
+  const collector = createRpcDevtools(options)
+  return defineFlowPlugin(
+    {
       name: CollectorText.pluginName,
-      probe: collector,
-      surface: {
-        collector,
-        query: (input) => collector.query(input),
-        watch: (input) => collector.watch(input),
-        stats: () => collector.stats(),
-        describe: () => collector.describe(),
-        close: () => collector.close()
-      }
+      setup: (context) => setupDevtools(collector, context)
+    },
+    {
+      collector,
+      query: collector.query,
+      watch: collector.watch,
+      stats: collector.stats,
+      describe: collector.describe,
+      close: collector.close
     }
-  })
+  )
+}

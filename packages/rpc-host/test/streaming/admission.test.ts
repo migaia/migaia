@@ -1,4 +1,4 @@
-import { createRpcError } from '../../dist/core/errors.js'
+import { createRpcError } from '../../dist/host/error-owner.js'
 import { describe, expect, it } from 'vitest'
 import { normalizeRpcEnvelope, RpcRouteProfile, RpcStreamLimit } from '@migaia/rpc-contract'
 import type { IEndpointKernelHost, IEndpointKernelRoute } from '../../dist/core/endpoint-kernel.js'
@@ -8,7 +8,7 @@ import type {
   IRpcOutboundOperationsPort
 } from '../../dist/core/internal/plugin-shared-keys.js'
 import { RpcStreamOwner } from '../../dist/core/internal/stream/owner.js'
-import { RpcCoreErrorCode } from '../../dist/core/errors.js'
+import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { RpcStreamErrorText } from '../../dist/core/internal/stream/error-text.js'
 
 /** Uses the stream ports directly because IPC queue admission belongs to its later leaf. */

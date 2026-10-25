@@ -1,53 +1,25 @@
 import assert from 'node:assert/strict'
-import { connected, legacyEndpoint } from './fixture.js'
 import { it } from 'vitest'
-import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
-import { prepareRuntimeProviderAssembly } from '../../dist/remote/runtime-api/peer.js'
-import { compileRuntimeMethods } from '../../dist/remote/runtime-api/catalog.js'
+import { connectedCoreHosts } from '../host/core-fixture.js'
 
 it('the automatic nested doc.save route executes the explicitly provided parent method', async () => {
-  /** Both physical sides and all imported owners are real, successfully constructed baseline code. */
-  const [parentTransport, childTransport] = createMemoryTransportPair()
   /** Count actual execution independently from response settlement. */
   let calls = 0
-  /** The parent business object uses its captured receiver, as the new automatic provide will. */
+  /** Both admitted public paths invoke this same original business method. */
   const doc = {
     save: () => {
       calls += 1
       return 'saved'
     }
   }
-  /** The baseline's fixed contract exposes a three-segment wire name instead of the desired route. */
-  const [parent, child] = await Promise.all([
-    legacyEndpoint('parent', parentTransport),
-    legacyEndpoint('child', childTransport)
-  ])
-  /** Canonical provider compilation preserves the independent three-segment wire oracle. */
-  const assembly = prepareRuntimeProviderAssembly({
-    methods: compileRuntimeMethods(
-      { doc: { api: doc } },
-      {
-        schemaVersion: 1,
-        plugin: 'doc',
-        features: { api: { methods: { save: { mode: 'request', idempotent: false } } } }
-      }
-    ),
-    streams: false,
-    generations: false,
-    supports: () => false,
-    remoteNode: () => undefined,
-    bindRemoteNode: () => undefined,
-    describe: () => undefined
-  })
-  assembly.install(parent as unknown as Parameters<typeof assembly.install>[0])
-  /** The GREEN fixture selects the new shared owner; the executed legacy RED snapshot is archived. */
-  const automatic = await connected({ doc }, {})
+  /** The old redundant endpoint setup is replaced by one genuine nested provider publication. */
+  const fixture = await connectedCoreHosts({ doc: { ...doc, api: doc } }, {}, () => undefined)
   try {
-    /** A successful legacy call proves setup and the provider business are functional. */
-    assert.equal(await child.send('parent', 'doc.api.save', []), 'saved')
+    /** Preserve the independent successful three-segment route before the desired logical route. */
+    assert.equal(await fixture.b.memory.send('a', 'doc.api.save', []), 'saved')
     calls = 0
-    /** The desired automatic logical route must succeed; a real provider rejection is business RED. */
-    const [actual] = await Promise.allSettled([automatic.peers[1].request('doc.save', [])])
+    /** Only the actual namespace request can supply the successful business result. */
+    const [actual] = await Promise.allSettled([fixture.b.memory.request('doc.save', [])])
     assert.deepEqual(
       actual,
       { status: 'fulfilled', value: 'saved' },
@@ -55,22 +27,14 @@ it('the automatic nested doc.save route executes the explicitly provided parent 
     )
     assert.equal(calls, 1, 'parent business method executes exactly once')
   } finally {
-    await automatic.close()
-    await parent.dispose()
-    await child.dispose()
-    parentTransport.close()
+    await fixture.close()
   }
 })
 
 it('a scalar request of a generator returns PAYLOAD_INVALID with the original normalization cause', async () => {
-  /** The old scalar provider is deliberately exercised through its real request/result owner. */
-  const [parentTransport, childTransport] = createMemoryTransportPair()
   /** Execution evidence distinguishes result rejection from a missing provider or setup error. */
   let generatorCalls = 0
-  /**
-   * A function returning an iterator is legal application code, but its scalar result is not
-   * portable.
-   */
+  /** Iterator results remain invalid scalar values even though stream calls support them. */
   const feature = {
     scalar: () => 'ready',
     values: () => {
@@ -78,42 +42,12 @@ it('a scalar request of a generator returns PAYLOAD_INVALID with the original no
       return [1, 2][Symbol.iterator]()
     }
   }
-  /** All original baseline imports and both endpoints must finish construction first. */
-  const [parent, child] = await Promise.all([
-    legacyEndpoint('parent', parentTransport),
-    legacyEndpoint('child', childTransport)
-  ])
-  /** Both baseline and automatic calls use the genuine provider/result normalizer. */
-  const assembly = prepareRuntimeProviderAssembly({
-    methods: compileRuntimeMethods(
-      { p: { f: feature } },
-      {
-        schemaVersion: 1,
-        plugin: 'p',
-        features: {
-          f: {
-            methods: {
-              scalar: { mode: 'request', idempotent: false },
-              values: { mode: 'request', idempotent: false }
-            }
-          }
-        }
-      }
-    ),
-    streams: false,
-    generations: false,
-    supports: () => false,
-    remoteNode: () => undefined,
-    bindRemoteNode: () => undefined,
-    describe: () => undefined
-  })
-  assembly.install(parent as unknown as Parameters<typeof assembly.install>[0])
-  /** Only the new result wrapper may change the scalar normalization failure classification. */
-  const automatic = await connected({ p: { f: feature } }, {})
+  /** Both scalar control and rejection use the same actual public provider/result owner. */
+  const fixture = await connectedCoreHosts({ p: { f: feature } }, {}, () => undefined)
   try {
-    assert.equal(await child.send('parent', 'p.f.scalar', []), 'ready')
-    /** Await a real provider result failure; only the business error-code assertion is RED. */
-    const [result] = await Promise.allSettled([automatic.peers[1].request('p.f.values', [])])
+    assert.equal(await fixture.b.memory.send('a', 'p.f.scalar', []), 'ready')
+    /** Await a real provider result failure; no legacy endpoint or synthetic rejection is used. */
+    const [result] = await Promise.allSettled([fixture.b.memory.request('p.f.values', [])])
     assert.equal(generatorCalls, 1, 'the existing business method actually executed')
     assert.equal(result?.status, 'rejected', 'a generator is not silently drained as a scalar')
     if (result?.status !== 'rejected') return
@@ -124,9 +58,6 @@ it('a scalar request of a generator returns PAYLOAD_INVALID with the original no
     )
     assert.ok(result.reason.cause, 'the normalization error remains reachable')
   } finally {
-    await automatic.close()
-    await parent.dispose()
-    await child.dispose()
-    parentTransport.close()
+    await fixture.close()
   }
 })

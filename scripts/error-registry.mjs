@@ -142,12 +142,13 @@ const DEFERRED_STORAGE_PREFIX = 'storage-'
  * @param {string} file Absolute declaration path.
  * @param {string} text Already loaded declaration text.
  * @param {string} root Repository root that owns the package directory.
+ * @param {string} [tableSource] Explicit per-table domain for a centralized declaration.
  * @returns {string} Registry source.
  * @throws {Error} Missing or malformed non-exempt domain with its stable diagnostic code.
  */
-const sourceFor = (file, text, root) => {
+const sourceFor = (file, text, root, tableSource) => {
   /** Empty is a declared invalid value, distinct from a missing declaration. */
-  const declaredSource = text.match(/^export const ERROR_SOURCE = '([^']*)'/m)?.[1]
+  const declaredSource = tableSource ?? text.match(/^export const ERROR_SOURCE = '([^']*)'/m)?.[1]
   /** Only the direct package directory selects the temporary storage exemption. */
   const path = relative(root, file)
   const parts = path.split('/')
@@ -194,8 +195,28 @@ export const collectErrorRegistry = (root = repositoryRoot) => {
     /** Re-exports and empty tables own no codes and therefore need no source declaration. */
     const entries = [...text.matchAll(entryPattern)]
     if (entries.length === 0) continue
-    const source = sourceFor(file, text, root)
+    /** Flat constant tables are the canonical error-code declaration syntax. */
+    const tables = []
+    for (const table of text.matchAll(
+      /(?:\/\*\*((?:(?!\*\/)[\s\S])*?)\*\/\s*)?export const [A-Za-z][A-Za-z0-9]*\s*=\s*\{([\s\S]*?)\}\s*(?:as const)?/g
+    )) {
+      /** Read each table annotation once rather than rescanning it for every code. */
+      const tableSource = table[1]?.match(/@error-source[ \t]*([^\s*]*)/)?.[1]
+      tables.push({
+        start: table.index,
+        end: table.index + table[0].length,
+        source: tableSource === undefined ? undefined : sourceFor(file, text, root, tableSource)
+      })
+    }
+    /** Entries and table spans are ordered, so attribution is one linear merge. */
+    let tableIndex = 0
+    /** Lazily read the legacy default only when an untagged table actually needs it. */
+    let fileSource
     for (const match of entries) {
+      while (tableIndex < tables.length && tables[tableIndex].end <= match.index) tableIndex += 1
+      /** A code outside a tagged table continues to use the established file-level contract. */
+      const table = tables[tableIndex]?.start <= match.index ? tables[tableIndex] : undefined
+      const source = table?.source ?? (fileSource ??= sourceFor(file, text, root))
       const scenario = firstSentence(match[1] ?? '')
       if (scenario.length === 0) {
         const path = relative(root, file)

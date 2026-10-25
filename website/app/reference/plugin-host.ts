@@ -2259,6 +2259,32 @@ for (const error of result.cleanupErrors) logger.warn(readPluginHostDisposalProv
             '本宿主上所有适配器共享的运行时节点 id。'
           )
         },
+        report: {
+          summary: t(
+            'Optional synchronous outlet that lets a domain adapter send its original failure to the configured Host diagnostic callback. It is absent when the Host uses its default diagnostic, leaving the receiving domain to choose its own default reporter.',
+            '可选的同步出口，让领域适配器把原始失败交给宿主配置的诊断回调。宿主使用默认诊断时不提供此出口，由接收领域沿用自身默认报告器。'
+          ),
+          default: t(
+            'Undefined unless the Host was constructed with a custom diagnostic callback.',
+            '仅当宿主构造时配置自定义诊断回调才提供，默认值为 `undefined`。'
+          ),
+          params: {
+            error: t(
+              'Original thrown or rejected value from the adapter, forwarded as the diagnostic failure without replacing its identity.',
+              '适配器抛出或拒绝的原始值，作为诊断失败传递，不替换其身份。'
+            )
+          },
+          returns: t(
+            'No result; diagnostic delivery uses the owning Host outlet and does not settle or retry the adapter operation.',
+            '无返回结果；诊断投递使用所属宿主的出口，不会结算或重试适配器操作。'
+          ),
+          example: `const integration = getPluginRuntimeIntegration(core)
+try {
+  await connection.close()
+} catch (error) {
+  integration.report?.(error)
+}`
+        },
         matchesHost: {
           summary: t(
             'Tells whether a host object is the host this core belongs to; grants no mutation right.',

@@ -139,12 +139,12 @@ function createConsumerFixture() {
 }
 
 /** Copies the four admitted package publications into an isolated packed-like consumer. */
-function createActualPackageFixture() {
+function createActualPackageFixture(selectedPackages) {
   const root = mkdtempSync(join(tmpdir(), 'migaia-tree-shaking-packages-'))
   const consumer = join(root, 'consumer')
   const packDirectory = join(root, 'packs')
   mkdirSync(packDirectory, { recursive: true })
-  const packageNames = [
+  const packageNames = selectedPackages ?? [
     'plugin-host',
     'logger',
     'tray',
@@ -244,17 +244,16 @@ for (const style of ['named', 'default']) {
       /** Both supported import forms retain a callable factory rather than a dead bare import. */
       const source =
         style === 'named'
-          ? "import { timeoutFeature } from '@migaia/rpc-host/features'; export { timeoutFeature }"
-          : "import timeoutFeature from '@migaia/rpc-host/features/timeout'; export { timeoutFeature }"
+          ? "import { timeout } from '@migaia/rpc-host/features'; export { timeout }"
+          : "import timeout from '@migaia/rpc-host/features/timeout'; export { timeout }"
       /** Actual bundler output proves retained implementations, independently of export baselines. */
       const result = await buildConsumer(fixture.consumer, source)
       /** Ignore erased barrels while keeping every rendered canonical owner visible. */
       const retained = packageModules({ ...result, modules: result.retainedModules }, 'rpc-host')
       assert.ok(retained.includes('dist/features/timeout.js'), JSON.stringify(retained))
       assert.equal(
-        retained.filter((name) =>
-          /^dist\/features\/(?:auth|chunk|retry|typegen)(?:-render)?\.js$/.test(name)
-        ).length,
+        retained.filter((name) => /^dist\/(?:features\/retry(?:-.*)?\.js|plugins\/)/.test(name))
+          .length,
         0,
         JSON.stringify(retained)
       )
@@ -275,9 +274,257 @@ for (const style of ['named', 'default']) {
       const entry = join(fixture.consumer, 'timeout-identity.mjs')
       writeFileSync(
         entry,
-        "import { strict as assert } from 'node:assert'; import { timeoutFeature } from '@migaia/rpc-host/features'; import direct from '@migaia/rpc-host/features/timeout'; assert.equal(timeoutFeature, direct)"
+        "import { strict as assert } from 'node:assert'; import { timeout } from '@migaia/rpc-host/features'; import direct from '@migaia/rpc-host/features/timeout'; assert.equal(timeout, direct)"
       )
       execFileSync(process.execPath, [entry], { cwd: fixture.consumer, stdio: 'pipe' })
+    } finally {
+      rmSync(fixture.root, { recursive: true, force: true })
+    }
+  })
+}
+
+test('RPC error-code subpath retains no protocol, codec or portable implementation', async () => {
+  /** A real archive isolates this subpath from any workspace source or Host forwarding entry. */
+  const fixture = createActualPackageFixture(['rpc-contract'])
+  try {
+    /** Retaining the full exported table prevents a constant-folded empty bundle proving nothing. */
+    const result = await buildConsumer(
+      fixture.consumer,
+      "import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'; export { RpcCoreErrorCode }"
+    )
+    /** The code table is the only rendered module in this actual packed consumer graph. */
+    const retained = packageModules({ ...result, modules: result.retainedModules }, 'rpc-contract')
+    assert.deepEqual(retained, ['dist/error-code.js'])
+    assert.equal(result.retainedModules.length, 1, JSON.stringify(result.retainedModules))
+    assert.match(result.code, /HOST_NAMESPACE_DUPLICATE/)
+    /** The runtime-neutral package explicitly permits elimination of every unreferenced owner. */
+    const manifest = JSON.parse(
+      readFileSync(join(fixture.consumer, 'node_modules/@migaia/rpc-contract/package.json'), 'utf8')
+    )
+    assert.equal(manifest.sideEffects, false)
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true })
+  }
+})
+
+for (const style of ['named', 'default']) {
+  test(`RPC chunk plugin retains only its own optional implementation through ${style} import`, async () => {
+    /** Both entry styles resolve the same real archives and existing inward dependencies. */
+    const fixture = createActualPackageFixture()
+    try {
+      /** Retain the complete factory so elimination must follow actual optional-owner references. */
+      const source =
+        style === 'named'
+          ? "import { chunk } from '@migaia/rpc-host/plugins'; export { chunk }"
+          : "import chunk from '@migaia/rpc-host/plugins/chunk'; export { chunk }"
+      /** Rendered module provenance distinguishes shared mandatory owners from unrelated plugins. */
+      const result = await buildConsumer(fixture.consumer, source)
+      /** Only the chosen plugin may contribute optional implementation bytes. */
+      const retained = packageModules({ ...result, modules: result.retainedModules }, 'rpc-host')
+      assert.ok(retained.some((name) => name.startsWith('dist/plugins/chunk/')))
+      assert.deepEqual(
+        retained.filter((name) => /^dist\/plugins\/(?!chunk\/)|^dist\/features\//.test(name)),
+        []
+      )
+      /**
+       * An actual consumer also proves aggregate and direct exports preserve native factory
+       * identity.
+       */
+      const entry = join(fixture.consumer, 'chunk-identity.mjs')
+      writeFileSync(
+        entry,
+        "import { strict as assert } from 'node:assert'; import { chunk } from '@migaia/rpc-host/plugins'; import direct from '@migaia/rpc-host/plugins/chunk'; assert.equal(chunk, direct)"
+      )
+      execFileSync(process.execPath, [entry], { cwd: fixture.consumer, stdio: 'pipe' })
+    } finally {
+      rmSync(fixture.root, { recursive: true, force: true })
+    }
+  })
+}
+
+/** Each remaining Host optional owner is selected through both declared publication forms. */
+const rpcOptionalSelections = [
+  { factory: 'auth', folder: 'auth', kind: 'plugins' },
+  { factory: 'batch', folder: 'batch', kind: 'plugins' },
+  { factory: 'idempotency', folder: 'idempotency', kind: 'plugins' },
+  { factory: 'limits', folder: 'limits', kind: 'plugins' },
+  { factory: 'schema', folder: 'schema', kind: 'plugins' },
+  { factory: 'probe', folder: 'probe', kind: 'plugins' },
+  { factory: 'typegen', folder: 'typegen', kind: 'plugins' },
+  { factory: 'linkPolicy', folder: 'link-policy', kind: 'plugins' },
+  { factory: 'retry', folder: 'retry', kind: 'features' }
+]
+for (const selection of rpcOptionalSelections) {
+  for (const style of ['named', 'default']) {
+    test(`RPC ${selection.factory} retains only its optional owner through ${style} import`, async () => {
+      /** Real archives include only this public graph's existing inward dependencies. */
+      const fixture = createActualPackageFixture([
+        'rpc-contract',
+        'rpc-host',
+        'plugin-host',
+        'lifecycle',
+        'serialize',
+        'supervision',
+        'utils',
+        'capability',
+        'event-subscriber',
+        'middleware-pipeline'
+      ])
+      try {
+        /** Keeping the factory itself prevents an empty constant-folded output from passing. */
+        const entry = '@migaia/rpc-host/' + selection.kind
+        /** The direct path uses its real default rather than a compatibility alias. */
+        const direct = entry + '/' + selection.folder
+        /** Consumer source selects exactly one complete implementation. */
+        const source =
+          style === 'named'
+            ? `import { ${selection.factory} } from '${entry}'; export { ${selection.factory} }`
+            : `import value from '${direct}'; export { value }`
+        /** Rendered provenance distinguishes live bytes from zero-byte aggregate entries. */
+        const result = await buildConsumer(fixture.consumer, source)
+        /** The precise selected implementation and its local text share one owning path. */
+        const allowed =
+          selection.kind === 'plugins'
+            ? new RegExp('^dist/plugins/' + selection.folder + '/')
+            : /^dist\/features\/retry(?:-text)?\.js$/
+        /** Existing mandatory Host/SDK modules may be shared; optional owners must remain isolated. */
+        const retained = packageModules({ ...result, modules: result.retainedModules }, 'rpc-host')
+        assert.ok(
+          retained.some((name) => allowed.test(name)),
+          JSON.stringify(retained)
+        )
+        assert.deepEqual(
+          retained.filter(
+            (name) => /^(?:dist\/plugins\/|dist\/features\/)/.test(name) && !allowed.test(name)
+          ),
+          []
+        )
+        /** Actual consumer imports also retain the same original factory identity. */
+        const identity = join(fixture.consumer, 'selected-owner-identity.mjs')
+        writeFileSync(
+          identity,
+          `import { strict as assert } from 'node:assert'; import { ${selection.factory} as named } from '${entry}'; import direct from '${direct}'; assert.equal(named, direct)`
+        )
+        execFileSync(process.execPath, [identity], { cwd: fixture.consumer, stdio: 'pipe' })
+      } finally {
+        rmSync(fixture.root, { recursive: true, force: true })
+      }
+    })
+  }
+}
+
+/** Native feature leaves keep their genuine shared lane owner without retaining process IO. */
+const rpcProcessSelections = [
+  { factory: 'flowControl', folder: 'flow-control', allowed: ['flow-control'] },
+  { factory: 'sendQueue', folder: 'send-queue', allowed: ['send-queue', 'flow-control'] },
+  { factory: 'ipcLog', folder: 'log', allowed: ['log'] }
+]
+for (const selection of rpcProcessSelections) {
+  for (const style of ['named', 'default']) {
+    test(`RPC carrier process ${selection.factory} isolates ${style} feature import`, async () => {
+      /** Actual extracted runtime dependencies are the same inward graph as the packed gate. */
+      const fixture = createActualPackageFixture([
+        'rpc-contract',
+        'rpc-host',
+        'rpc-plugin-process',
+        'plugin-host',
+        'lifecycle',
+        'serialize',
+        'supervision',
+        'utils',
+        'capability',
+        'event-subscriber',
+        'middleware-pipeline'
+      ])
+      try {
+        /** Process publishes one aggregate and one default leaf for each complete feature. */
+        const entry = '@migaia/rpc-plugin-process/features'
+        /** The exact public leaf resolves from this archive's export map. */
+        const direct = entry + '/' + selection.folder
+        /** Retain the selected factory so the compiler cannot erase its real implementation. */
+        const source =
+          style === 'named'
+            ? `import { ${selection.factory} } from '${entry}'; export { ${selection.factory} }`
+            : `import value from '${direct}'; export { value }`
+        /** Provenance contains rendered bytes only, excluding zero-byte aggregate nodes. */
+        const result = await buildConsumer(fixture.consumer, source)
+        /** Shared text owns diagnostics; sendQueue genuinely borrows the sole flow admission owner. */
+        const allowed = new Set([
+          'dist/features/text.js',
+          ...selection.allowed.map((name) => 'dist/features/' + name + '.js')
+        ])
+        /** No native acquisition or unrelated feature implementation is required by this import. */
+        const retained = packageModules(
+          { ...result, modules: result.retainedModules },
+          'rpc-plugin-process'
+        )
+        assert.ok(retained.includes('dist/features/' + selection.folder + '.js'))
+        assert.deepEqual(
+          retained.filter((name) => !allowed.has(name)),
+          []
+        )
+        /** Native ESM consumers receive the same factory through both published routes. */
+        const identity = join(fixture.consumer, 'process-feature-identity.mjs')
+        writeFileSync(
+          identity,
+          `import { strict as assert } from 'node:assert'; import { ${selection.factory} as named } from '${entry}'; import direct from '${direct}'; assert.equal(named, direct)`
+        )
+        execFileSync(process.execPath, [identity], { cwd: fixture.consumer, stdio: 'pipe' })
+      } finally {
+        rmSync(fixture.root, { recursive: true, force: true })
+      }
+    })
+  }
+}
+
+/** Browser's single public aggregate must remove each of the other six actual carrier factories. */
+const rpcBrowserSelections = [
+  { factory: 'windowPlugin', folder: 'window' },
+  { factory: 'dedicatedWorkerPlugin', folder: 'dedicated-worker' },
+  { factory: 'sharedWorkerPlugin', folder: 'shared-worker' },
+  { factory: 'serviceWorkerPlugin', folder: 'service-worker' },
+  { factory: 'broadcastChannelPlugin', folder: 'broadcast-channel' },
+  { factory: 'rtcDataChannelPlugin', folder: 'rtc-data-channel' },
+  { factory: 'webTransportPlugin', folder: 'web-transport' }
+]
+for (const selection of rpcBrowserSelections) {
+  test(`RPC carrier browser ${selection.factory} isolates its root import`, async () => {
+    /** Only real publications supply the selected native factory and common mandatory contracts. */
+    const fixture = createActualPackageFixture([
+      'rpc-contract',
+      'rpc-host',
+      'rpc-plugin-browser',
+      'plugin-host',
+      'lifecycle',
+      'serialize',
+      'supervision',
+      'utils',
+      'capability',
+      'event-subscriber',
+      'middleware-pipeline'
+    ])
+    try {
+      /** The only Browser entry is its public aggregate; no private or fabricated leaf is used. */
+      const result = await buildConsumer(
+        fixture.consumer,
+        `import { ${selection.factory} } from '@migaia/rpc-plugin-browser'; export { ${selection.factory} }`
+      )
+      /** Common listener/codec modules may be shared, while foreign carrier factories must vanish. */
+      const retained = packageModules(
+        { ...result, modules: result.retainedModules },
+        'rpc-plugin-browser'
+      )
+      assert.deepEqual(
+        retained.filter((name) => name.endsWith('-plugin.js')),
+        ['dist/browser/' + selection.folder + '-plugin.js']
+      )
+      /** Runtime identity is checked in a separate real Node consumer of the same extracted archive. */
+      const identity = join(fixture.consumer, 'browser-factory-identity.mjs')
+      writeFileSync(
+        identity,
+        `import { strict as assert } from 'node:assert'; import * as first from '@migaia/rpc-plugin-browser'; import * as second from '@migaia/rpc-plugin-browser'; assert.equal(typeof first.${selection.factory}, 'function'); assert.equal(first.${selection.factory}, second.${selection.factory})`
+      )
+      execFileSync(process.execPath, [identity], { cwd: fixture.consumer, stdio: 'pipe' })
     } finally {
       rmSync(fixture.root, { recursive: true, force: true })
     }

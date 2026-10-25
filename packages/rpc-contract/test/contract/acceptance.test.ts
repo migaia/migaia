@@ -2,18 +2,8 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { createContext, runInContext } from 'node:vm'
 import { describe, expect, it } from 'vitest'
-import {
-  createDescriptor,
-  deserializeRpcError,
-  normalizePortable,
-  normalizeRpcEnvelope,
-  serializeRpcError
-} from '../../dist/contract/index.js'
-import {
-  bindRpcFrameIngress,
-  createBinaryFramer,
-  createStringFramer
-} from '../../dist/contract/framing/index.js'
+import { normalizePortable } from '@migaia/rpc-contract/portable'
+import { deserializeRpcError, serializeRpcError } from '@migaia/rpc-contract/errors'
 
 const packageRoot = dirname(dirname(dirname(decodeURI(import.meta.url).replace(/^file:\/\//u, ''))))
 
@@ -25,15 +15,18 @@ function sourceFiles(root: string): string[] {
   })
 }
 
-describe('architecture and export boundary', () => {
-  it('publishes only runtime-neutral contract/framing exports with an explicit dependency allowlist', () => {
+describe('pure contract acceptance', () => {
+  it('publishes only runtime-neutral pure contract/protocol exports with an explicit dependency allowlist', () => {
     const metadata = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8')) as {
       dependencies?: Record<string, string>
       exports?: Record<string, unknown>
     }
     expect(metadata.exports).toMatchObject({
       '.': expect.any(Object),
-      './framing': expect.any(Object)
+      './protocol': expect.any(Object),
+      './interfaces': expect.any(Object),
+      './portable': expect.any(Object),
+      './errors': expect.any(Object)
     })
     /**
      * Portable traversal moves inward to serialize; platform and unrelated package imports stay
@@ -43,11 +36,11 @@ describe('architecture and export boundary', () => {
       '@migaia/serialize',
       '@migaia/utils/bytes',
       '@migaia/utils/error',
-      '@migaia/utils/function',
-      '@migaia/utils/string'
+      '@migaia/utils/string',
+      '@migaia/utils/promise'
     ])
     const bareSpecifiers = new Set<string>()
-    for (const path of sourceFiles(join(packageRoot, 'src', 'contract'))) {
+    for (const path of sourceFiles(join(packageRoot, 'src'))) {
       const source = readFileSync(path, 'utf8')
       for (const match of source.matchAll(
         /(?:import|export)\s+(?:[^'";]*?\s+from\s*)?['"]([^'"]+)['"]|import\s*\(\s*['"]([^'"]+)['"]\s*\)/gu
@@ -58,79 +51,7 @@ describe('architecture and export boundary', () => {
     }
     expect(bareSpecifiers).toEqual(allowedBareSpecifiers)
   })
-})
 
-describe('descriptor identity', () => {
-  it('freezes exact identities and rejects invalid versions before publication', () => {
-    const descriptor = createDescriptor('test.protocol', 7)
-    expect(Object.isFrozen(descriptor)).toBe(true)
-    expect(descriptor).toEqual({ id: 'test.protocol', version: 7 })
-    const invalid = [0, -1, Number.NaN, Number.POSITIVE_INFINITY, 1.5, Number.MAX_SAFE_INTEGER + 1]
-    for (const version of invalid)
-      expect(() => createDescriptor('test.protocol', version)).toThrow()
-    expect(() => createDescriptor('Bad Protocol', 1)).toThrow()
-  })
-})
-
-describe('hostile normalization', () => {
-  it('snapshots every envelope getter once and fails closed with causes', () => {
-    const reads = new Map<string, number>()
-    const input = {
-      get kind() {
-        reads.set('kind', (reads.get('kind') ?? 0) + 1)
-        return 'request'
-      },
-      get id() {
-        reads.set('id', (reads.get('id') ?? 0) + 1)
-        return 'request-1'
-      },
-      get method() {
-        reads.set('method', (reads.get('method') ?? 0) + 1)
-        return 'ping'
-      },
-      get data() {
-        reads.set('data', (reads.get('data') ?? 0) + 1)
-        return {
-          route: {
-            profile: 'migaia.rpc.route',
-            type: 'request',
-            applicationVersion: '1.0',
-            senderId: 'sender',
-            targetId: 'target',
-            sentAt: 0
-          }
-        }
-      }
-    }
-    expect(normalizeRpcEnvelope(input)).toMatchObject({ kind: 'request', id: 'request-1' })
-    expect([...reads.values()]).toEqual([1, 1, 1, 1])
-
-    const original = new Error('getter failed')
-    const hostile = {
-      kind: 'request',
-      id: 'request-2',
-      method: 'ping',
-      get data() {
-        throw original
-      }
-    }
-    try {
-      normalizeRpcEnvelope(hostile)
-      expect.unreachable('hostile getter must fail')
-    } catch (error) {
-      expect((error as Error & { cause?: unknown }).cause).toBe(original)
-    }
-    expect(() => normalizeRpcEnvelope({ kind: 'forged', id: '1', data: null })).toThrow()
-    const foreignPrototype = Object.create({ inherited: true }) as Record<string, unknown>
-    foreignPrototype.kind = 'request'
-    foreignPrototype.id = '1'
-    foreignPrototype.method = 'ping'
-    foreignPrototype.data = null
-    expect(() => normalizeRpcEnvelope(foreignPrototype)).toThrow()
-  })
-})
-
-describe('portable vectors', () => {
   it('accepts canonical values and rejects the complete forbidden matrix', () => {
     const vectors = JSON.parse(
       readFileSync(
@@ -159,9 +80,7 @@ describe('portable vectors', () => {
     ]
     for (const value of invalid) expect(() => normalizePortable(value)).toThrow()
   })
-})
 
-describe('serialized error graphs', () => {
   it('preserves foreign realm identity, stack, cause order, and aggregate errors', () => {
     const context = createContext({})
     const remote = runInContext(
@@ -189,212 +108,5 @@ describe('serialized error graphs', () => {
     expect(restored.stack).toBe(wire.stack)
     expect((restored as Error & { cause: Error }).cause).toBeInstanceOf(RangeError)
     expect((restored as Error & { errors: Error[] }).errors[0]?.message).toBe('cleanup')
-  })
-})
-
-describe('framing matrix', () => {
-  it('prepares native ingress once without reflecting opaque custom frames', () => {
-    const framer = createStringFramer({ chunkBytes: 2 })
-    const context = { source: 'source-a', messageId: 'native' } as const
-    const frame = framer.frame('abcd', context)[0] as Record<string, unknown>
-    const reads = new Map<string, number>()
-    const hostile = Object.defineProperties(
-      {},
-      Object.fromEntries(
-        Object.keys(frame).map((key) => [
-          key,
-          {
-            enumerable: true,
-            get() {
-              reads.set(key, (reads.get(key) ?? 0) + 1)
-              return frame[key]
-            }
-          }
-        ])
-      )
-    )
-    const prepare = bindRpcFrameIngress(framer.accept)
-    expect(Object.isExtensible(prepare)).toBe(true)
-    Object.defineProperty(prepare, 'clientTag', { value: 'retained' })
-    expect((prepare as typeof prepare & { clientTag: string }).clientTag).toBe('retained')
-    expect(prepare.nativeOutputDomain).toBeUndefined()
-    const prepared = prepare(hostile as never, context)
-    expect(prepared.messageId).toBe('native')
-    expect([...reads.values()]).toEqual([1, 1, 1, 1, 1, 1])
-    expect(framer.accept(prepared.frame, context).status).toBe('pending')
-    const spread = { ...framer }
-    const native = bindRpcFrameIngress(spread.accept, spread.frame)
-    expect(native(hostile as never, context).messageId).toBe('native')
-    expect(native.nativeOutputDomain).toEqual({
-      kind: 'carrier-or-fragment',
-      carrierEncodedType: 'string'
-    })
-    expect(Object.isFrozen(native.nativeOutputDomain)).toBe(true)
-    expect(Object.getOwnPropertyDescriptor(native, 'nativeOutputDomain')).toMatchObject({
-      enumerable: true,
-      configurable: false,
-      writable: false
-    })
-    const binary = createBinaryFramer({ chunkBytes: 2 })
-    expect(bindRpcFrameIngress(binary.accept, binary.frame).nativeOutputDomain).toEqual({
-      kind: 'carrier-or-fragment',
-      carrierEncodedType: 'uint8array'
-    })
-    const opaqueReads = { value: 0 }
-    const opaque = {
-      get kind() {
-        opaqueReads.value += 1
-        return 'rpc.frame.v1'
-      }
-    }
-    const wrapped: typeof framer.accept = (value, inner) => framer.accept(value, inner)
-    const customFrame = (value: string) => [value] as const
-    expect(bindRpcFrameIngress(framer.accept, customFrame).nativeOutputDomain).toBeUndefined()
-    expect(bindRpcFrameIngress(wrapped, customFrame)(opaque as never, context).frame).toBe(opaque)
-    expect(bindRpcFrameIngress(wrapped, customFrame).nativeOutputDomain).toBeUndefined()
-    expect(bindRpcFrameIngress(wrapped, framer.frame).nativeOutputDomain).toEqual({
-      kind: 'carrier-or-fragment',
-      carrierEncodedType: 'string'
-    })
-    expect(opaqueReads.value).toBe(0)
-    expect(
-      bindRpcFrameIngress((() => ({ status: 'pending' })) as never)(
-        { nope: true } as never,
-        context
-      )
-    ).toMatchObject({ frame: { nope: true }, messageId: 'whole' })
-    const original = new Error('getter')
-    let throwingReads = 0
-    const throwing = {
-      get kind() {
-        throwingReads += 1
-        throw original
-      }
-    }
-    expect(() => prepare(throwing as never, context)).toThrow(
-      expect.objectContaining({ cause: original })
-    )
-    expect(throwingReads).toBe(1)
-    throwingReads = 0
-    expect(framer.accept(throwing as never, context)).toMatchObject({
-      status: 'rejected',
-      error: { code: 'INVALID_FRAME', source: 'rpc.contract', cause: original }
-    })
-    expect(throwingReads).toBe(1)
-  })
-  it('covers empty, exact-boundary, fragmentation, order, duplicate, and limits', () => {
-    const exact = createStringFramer({ chunkBytes: 2 })
-    const exactContext = { source: 'source-a', messageId: 'exact' } as const
-    expect(exact.frame('ab', exactContext)).toEqual(['ab'])
-    expect(exact.accept('ab', exactContext)).toEqual({ status: 'complete', value: 'ab' })
-    expect(exact.frame('', exactContext)).toEqual([''])
-
-    const framer = createStringFramer({ chunkBytes: 2, maxMessageBytes: 4 })
-    const context = { source: 'source-a', messageId: 'fragmented' } as const
-    const frames = framer.frame('abcd', context)
-    expect(framer.accept(frames[1]!, context).status).toBe('rejected')
-    expect(framer.accept(frames[0]!, context).status).toBe('pending')
-    expect(framer.accept(frames[0]!, context).status).toBe('rejected')
-    expect(framer.accept(frames[1]!, context)).toEqual({ status: 'complete', value: 'abcd' })
-    expect(framer.accept(frames[0]!, context).status).toBe('rejected')
-
-    const binary = createBinaryFramer({ chunkBytes: 2, maxMessageBytes: 4 })
-    const binaryContext = { source: 'source-a', messageId: 'binary' } as const
-    const binaryFrames = binary.frame(new Uint8Array([1, 2, 3, 4]), binaryContext)
-    expect(binary.accept({ ...binaryFrames[0]!, index: 9 }, binaryContext).status).toBe('rejected')
-    expect(() => binary.frame(new Uint8Array([1, 2, 3, 4, 5]), binaryContext)).toThrow()
-  })
-})
-
-describe('framing races and cleanup', () => {
-  it('keeps NUL-delimited source/message pairs collision-free and drains resources', () => {
-    const timers: Array<() => void> = []
-    let cancelled = 0
-    const framer = createStringFramer({
-      chunkBytes: 2,
-      schedule: (callback) => {
-        timers.push(callback)
-        return timers.length
-      },
-      cancel: () => {
-        cancelled += 1
-      }
-    })
-    const first = { source: 'left', messageId: 'right\u0000tail' } as const
-    const second = { source: 'left\u0000right', messageId: 'tail' } as const
-    const firstFrames = framer.frame('abcd', first)
-    const secondFrames = framer.frame('efgh', second)
-    expect(framer.accept(firstFrames[0]!, first)).toEqual({ status: 'pending' })
-    expect(framer.accept(secondFrames[0]!, second)).toEqual({ status: 'pending' })
-    expect(framer.accept(firstFrames[1]!, first)).toEqual({ status: 'complete', value: 'abcd' })
-    expect(framer.accept(secondFrames[1]!, second)).toEqual({ status: 'complete', value: 'efgh' })
-    expect(cancelled).toBe(2)
-    for (const timer of timers) timer()
-    expect(framer.accept(firstFrames[0]!, first).status).toBe('rejected')
-    expect(framer.accept(secondFrames[0]!, second).status).toBe('rejected')
-    framer.close()
-    expect(cancelled).toBe(2)
-  })
-
-  it('isolates sources, bounds concurrency, and keeps cleanup failures secondary', () => {
-    const pendingTimers: Array<() => void> = []
-    const reported: unknown[] = []
-    const previousReporter = (globalThis as unknown as { reportError?: (value: unknown) => void })
-      .reportError
-    ;(globalThis as unknown as { reportError?: (value: unknown) => void }).reportError = (
-      error
-    ) => {
-      reported.push(error)
-    }
-    try {
-      const framer = createStringFramer({
-        chunkBytes: 2,
-        maxConcurrentMessages: 1,
-        schedule: (callback) => {
-          pendingTimers.push(callback)
-          return pendingTimers.length
-        },
-        cancel: () => {
-          throw new Error('cleanup failed')
-        }
-      })
-      const first = { source: 'source-a', messageId: 'same' } as const
-      const second = { source: 'source-b', messageId: 'same' } as const
-      const firstFrames = framer.frame('abcd', first)
-      const secondFrames = framer.frame('efgh', second)
-      expect(framer.accept(firstFrames[0]!, first)).toEqual({ status: 'pending' })
-      expect(framer.accept(secondFrames[0]!, second).status).toBe('rejected')
-      expect(framer.accept(firstFrames[1]!, first)).toEqual({ status: 'complete', value: 'abcd' })
-      expect(reported).toHaveLength(1)
-      pendingTimers[0]?.()
-      expect(framer.accept(firstFrames[0]!, first).status).toBe('rejected')
-      framer.close('race complete')
-      expect(framer.accept(secondFrames[0]!, second).status).toBe('rejected')
-      expect(reported).toHaveLength(1)
-    } finally {
-      ;(globalThis as unknown as { reportError?: (value: unknown) => void }).reportError =
-        previousReporter
-    }
-  })
-
-  it('expires missing fragments and rejects late completion without rebuilding state', () => {
-    let expire: (() => void) | undefined
-    const framer = createStringFramer({
-      chunkBytes: 2,
-      schedule: (callback) => {
-        expire = callback
-        return 1
-      },
-      cancel: () => undefined
-    })
-    const context = { source: 'source-a', messageId: 'deadline' } as const
-    const frames = framer.frame('abcd', context)
-    expect(framer.accept(frames[0]!, context)).toEqual({ status: 'pending' })
-    expire?.()
-    const late = framer.accept(frames[1]!, context)
-    expect(late.status).toBe('rejected')
-    expect((late as { status: 'rejected'; error: Error }).error).toMatchObject({
-      code: 'FRAME_ASSEMBLY_EXPIRED'
-    })
   })
 })

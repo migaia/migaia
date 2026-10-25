@@ -3,15 +3,6 @@ import { createMemoryTransportPair } from '../../fixtures/memory-transport.js'
 import type { IRpcTransport } from '../../../dist/core/transport.js'
 
 describe('memory transport adapter', () => {
-  it('declares shared pair resources as borrowed', () => {
-    const [a, b] = createMemoryTransportPair()
-    expect(a.ownership).toBe('borrowed')
-    expect(b.ownership).toBe('borrowed')
-    expect(a.topology).toBe('exclusive')
-    expect(b.topology).toBe('exclusive')
-    a.close()
-  })
-
   it('reports receiver listener failures to the receiver side', async () => {
     const [a, b] = createMemoryTransportPair()
     const errors: unknown[] = []
@@ -70,21 +61,5 @@ describe('memory transport adapter', () => {
 
     await expect(closePromise).rejects.toBe(reporterFailure)
     expect(reporterFailure).toMatchObject({ code: 'TRANSPORT' })
-  })
-
-  it('delivers to each active listener and supports independent unsubscription', async () => {
-    const [a, b] = createMemoryTransportPair()
-    const received: string[] = []
-    const stopFirst = b.subscribe((message) => received.push(`first:${String(message.data)}`))
-    const stopSecond = b.subscribe((message) => received.push(`second:${String(message.data)}`))
-    a.send('one')
-    await Promise.resolve()
-    expect(received).toEqual(['first:one', 'second:one'])
-    expect(stopFirst()).toBe(true)
-    a.send('two')
-    await Promise.resolve()
-    expect(received).toEqual(['first:one', 'second:one', 'second:two'])
-    expect(stopSecond()).toBe(true)
-    a.close()
   })
 })

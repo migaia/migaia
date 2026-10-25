@@ -1,6 +1,6 @@
-import type { IRpcAuthenticationConfig } from '@migaia/rpc-host'
+import type { IRpcAuthenticationOptions } from '@migaia/rpc-host/plugins/auth'
 
 /** The shared native Worker fixture supplies only ordinary sign/verify credentials. */
 export function createFixtureAuthentication(): Required<
-  Pick<IRpcAuthenticationConfig, 'sign' | 'verify'>
+  Pick<IRpcAuthenticationOptions, 'sign' | 'verify'>
 >
