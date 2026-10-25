@@ -133,6 +133,12 @@ type IConfigWatcher = {
 /** Marker returned by the path rebuild when a delete targets a missing path (no change). */
 const UNCHANGED: unique symbol = Symbol('UNCHANGED')
 
+/** Only records created for the current unpublished environment draft may be updated in place. */
+type IEnvConstructionContext = {
+  /** Borrowed coerce values remain outside this set and retain the original per-edge copy policy. */
+  readonly owned: WeakSet<object>
+}
+
 /** Creates a coded native error without replacing its native type. */
 function ownerError(
   Constructor: TypeErrorConstructor | ErrorConstructor,
@@ -242,17 +248,31 @@ function copyRecord(node: object): Record<string, unknown> {
 
 /**
  * Rebuilds one container along `segments` with copy-on-write. Missing intermediates become plain
- * records. A delete of a missing path returns `UNCHANGED`.
+ * records. A delete of a missing path returns `UNCHANGED`. Environment construction may reuse only
+ * records already owned by its unpublished draft; ordinary writes retain copy-on-write.
  */
-function rebuild(node: unknown, segments: readonly string[], value: unknown, at: string): unknown {
+function rebuild(
+  node: unknown,
+  segments: readonly string[],
+  value: unknown,
+  at: string,
+  construction?: IEnvConstructionContext
+): unknown {
   if (segments.length === 0) return value
+  // All callers use toSegments and parseConfigPath's fixed default maxPathLength of 4096
+  // (config.ts). Suffix and diagnostic-prefix copies have that fixed bound, independent of env width.
   /** Current segment and its remaining path. */
   const [segment, ...rest] = segments
   /** Owned child at this segment, if any. */
   const child = ownValue(node, segment)
   if (node === undefined) {
     if (value === CONFIG_DELETE) return UNCHANGED
-    return { [segment]: rebuild(undefined, rest, value, `${at}.${segment}`) }
+    /** Missing records belong only to this construction, never to a supplied coerce value. */
+    const record = {
+      [segment]: rebuild(undefined, rest, value, `${at}.${segment}`, construction)
+    }
+    construction?.owned.add(record)
+    return record
   }
   if (Array.isArray(node)) {
     if (!isIndex(segment))
@@ -268,7 +288,13 @@ function rebuild(node: unknown, segments: readonly string[], value: unknown, at:
       return [...node.slice(0, index), ...node.slice(index + 1)]
     }
     /** Rebuilt child; unchanged children keep the original array. */
-    const next = rebuild(child.found ? child.value : undefined, rest, value, `${at}.${segment}`)
+    const next = rebuild(
+      child.found ? child.value : undefined,
+      rest,
+      value,
+      `${at}.${segment}`,
+      construction
+    )
     if (next === UNCHANGED) return UNCHANGED
     /** Copy-on-write array; the original stays untouched. */
     const copy = [...node]
@@ -289,16 +315,23 @@ function rebuild(node: unknown, segments: readonly string[], value: unknown, at:
     return copy
   }
   /** Rebuilt child. */
-  const next = rebuild(child.found ? child.value : undefined, rest, value, `${at}.${segment}`)
+  const next = rebuild(
+    child.found ? child.value : undefined,
+    rest,
+    value,
+    `${at}.${segment}`,
+    construction
+  )
   if (next === UNCHANGED) return UNCHANGED
-  /** Copy-on-write record. */
-  const copy = copyRecord(node)
+  /** Only an unexposed private draft avoids copying its growing record; borrowed records detach. */
+  const copy = construction?.owned.has(node) ? node : copyRecord(node)
   Object.defineProperty(copy, segment, {
     configurable: true,
     enumerable: true,
     value: next,
     writable: true
   })
+  construction?.owned.add(copy)
   return copy
 }
 
@@ -552,6 +585,8 @@ export class ConfigOwner<T extends IConfigRecord = IConfigRecord> {
       )
     /** Nested root built from every matching key. */
     let root: unknown = {}
+    /** Construction owns only this root and later path records, never callback-provided objects. */
+    const construction: IEnvConstructionContext = { owned: new WeakSet([root as object]) }
     for (const name of orderStringKeys(Object.keys(env))) {
       /** Raw string value; non-strings are skipped like unset variables. */
       const raw = env[name]
@@ -576,7 +611,7 @@ export class ConfigOwner<T extends IConfigRecord = IConfigRecord> {
           )
         prefixNode = existing.value
       }
-      root = rebuild(root, path, coerce ? coerce(raw, path) : raw, 'env')
+      root = rebuild(root, path, coerce ? coerce(raw, path) : raw, 'env', construction)
     }
     return new ConfigOwner(root as T, options)
   }

@@ -283,6 +283,23 @@ describe('ConfigOwner', () => {
     )
   })
 
+  it('detaches borrowed environment records before extending a draft path', () => {
+    /** A callback-owned value may also be lent to another environment path. */
+    const borrowed = Object.freeze({ base: 1 })
+    /** Extending A must leave both the original record and its B alias untouched. */
+    const owner = ConfigOwner.fromEnv(
+      { A: 'shared', A__extra: '2', B: 'shared' },
+      { coerce: (raw) => (raw === 'shared' ? borrowed : Number(raw)) }
+    )
+    /** The final snapshot retains the original per-edge copy-on-write result. */
+    const view = owner.toJSON()
+    expect(view.A).toEqual({ base: 1, extra: 2 })
+    expect(view.B).toEqual({ base: 1 })
+    expect(view.A).not.toBe(view.B)
+    expect(borrowed).toEqual({ base: 1 })
+    expect(Object.isFrozen(borrowed)).toBe(true)
+  })
+
   it('keeps state private and the prototype frozen', () => {
     /** Owner under test. */
     const owner = createOwner()
