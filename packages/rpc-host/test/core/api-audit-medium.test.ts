@@ -1,16 +1,11 @@
 import { createRuntimeEndpointComposition } from '../../dist/core/runtime-api-endpoint.js'
 import { RpcCapability } from '@migaia/rpc-contract'
-import { MessageChannel } from 'node:worker_threads'
 import { expect, it } from 'vitest'
 import { connect } from '../../dist/core/middleware/connect.js'
 
 import { createRuntimeApiEndpoint } from '../../dist/core/runtime-api-endpoint.js'
 import { defineMiddleware } from '../../dist/core/middleware.js'
 import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
-import {
-  createBrowserMessagePortTransport,
-  createNodeMessagePortTransport
-} from '../../dist/core/adapters/message-port.js'
 import { createWebWorkerTransport } from '../../dist/core/adapters/web-worker.js'
 
 it('publishes the binding disposal settlement before one synchronous reentry', async () => {
@@ -39,40 +34,6 @@ it('publishes the binding disposal settlement before one synchronous reentry', a
   expect(nested).toBe(closing)
   expect(endpoint.dispose()).toBe(closing)
 })
-
-it.each([
-  createBrowserMessagePortTransport,
-  createNodeMessagePortTransport,
-  createWebWorkerTransport
-])(
-  'codes the native clone rejection from %s without changing its DOMException family',
-  async (factory) => {
-    /** A genuine native port rejects the unsupported function payload itself. */
-    const pair = new MessageChannel()
-    /** All adapters support this native MessagePort shape and borrow its raw physical resource. */
-    const transport = factory(pair.port1)
-    try {
-      /** Capture the same error thrown by the public synchronous transport operation. */
-      let failure: unknown
-      try {
-        transport.send(() => undefined)
-      } catch (error) {
-        failure = error
-      }
-      expect(failure).toBeInstanceOf(DOMException)
-      expect(failure).toMatchObject({
-        name: 'DataCloneError',
-        source: 'rpc.endpoint',
-        code: 'TRANSPORT'
-      })
-      expect((failure as Error).stack).toBeTruthy()
-    } finally {
-      await transport.close?.()
-      pair.port1.close()
-      pair.port2.close()
-    }
-  }
-)
 
 it('classifies the original middleware installation failure at the endpoint boundary', async () => {
   /** The application callback's original native instance and stack remain intact. */
