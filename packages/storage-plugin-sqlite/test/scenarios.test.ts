@@ -29,8 +29,23 @@ it('backs up and vacuums the actual database while rejecting an occupied connect
   })
   const store = host.backend('sqlite')
   await store.set('sentinel', 'kept')
+  /** Observe execution after preparation, preserving the statement's real native run result. */
+  const executed: string[] = []
+  const prepare = connection.prepare
+  vi.spyOn(connection, 'prepare').mockImplementation((text) => {
+    /** The native connection still owns all read methods and the actual maintenance statement. */
+    const statement = prepare(text)
+    return {
+      ...statement,
+      run: (...values) => {
+        executed.push(text)
+        return statement.run(...values)
+      }
+    }
+  })
   const target = join(directory, 'backup.sqlite')
   await store.api.maintenance.backup(target)
+  expect(executed).toContain('VACUUM INTO ?')
   const copy = nodeSqliteDriver(target)
   const copied = await createStorageHost({
     plugins: [sqliteBackendPlugin({ driver: copy })] as const
@@ -42,6 +57,7 @@ it('backs up and vacuums the actual database while rejecting an occupied connect
     await copy.dispose()
   }
   await store.api.maintenance.vacuum()
+  expect(executed).toContain('VACUUM')
   expect(await store.get('sentinel')).toBe('kept')
   await expect(store.api.maintenance.backup(target)).rejects.toMatchObject({
     code: 'SQLITE_FAILED',

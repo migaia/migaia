@@ -138,7 +138,9 @@ describe('native SQLite installation', () => {
     let now = Date.now()
     const clock = vi.spyOn(Date, 'now').mockImplementation(() => now)
     onTestFinished(() => clock.mockRestore())
-    const { store } = await installed({ memory: true })
+    /** Actual statements distinguish the TTL port from a client-only deadline map. */
+    const native: string[] = []
+    const { store } = await installed({ memory: true, native })
     await store.set('text-expiry', 'old')
     await store.setBytes('bytes-expiry', new Uint8Array([1]))
     await store.putRecord({ value: 'old' }, 'record-expiry')
@@ -150,6 +152,8 @@ describe('native SQLite installation', () => {
       expect(await store.use(ttl).expire(target, 25.5)).toBe(true)
       expect(await store.use(ttl).remaining(target)).toBe(25.5)
     }
+    for (const table of ['migaia_text', 'migaia_bytes', 'migaia_records'])
+      expect(native).toContainEqual(expect.stringContaining(`UPDATE "${table}" SET expires_at=?`))
     /** Every ordinary same-channel overwrite keeps its existing live deadline. */
     await store.set('text-expiry', 'updated')
     await store.setBytes('bytes-expiry', new Uint8Array([2]))
@@ -224,8 +228,12 @@ describe('native SQLite installation', () => {
 
   it('updates native counters atomically and keeps canonical text and TTL semantics', async () => {
     /** Real native operations and failures share the same root text mutation owner. */
-    const { store } = await installed({ memory: true })
+    const native: string[] = []
+    const { store } = await installed({ memory: true, native })
     expect(await store.use(counter).increment('visits')).toBe(1)
+    expect(native).toContain('BEGIN IMMEDIATE')
+    expect(native).toContainEqual(expect.stringContaining('INSERT INTO "migaia_text"('))
+    expect(native).toContain('COMMIT')
     await Promise.all(Array.from({ length: 100 }, () => store.use(counter).increment('visits')))
     expect(await store.get('visits')).toBe('101')
     await store.use(ttl).expire(lockKey.text('visits'), 60_000)
@@ -592,18 +600,32 @@ describe('native SQLite installation', () => {
   })
 
   it('uses the actual host, three channels, sync and metadata with atomic replacement', async () => {
-    const { store } = await installed()
+    /** The existing driver observer records execution, including cached synchronous statements. */
+    const native: string[] = []
+    const { store } = await installed({ native })
     await store.set('text', 'a\u0000\ud800')
+    expect(native).toContainEqual(expect.stringContaining('INSERT INTO "migaia_text"('))
+    native.length = 0
     expect(store.sync.get('text')).toBe('a\u0000\ud800')
+    expect(native).toContainEqual(
+      expect.stringContaining('SELECT value,expires_at FROM "migaia_text"')
+    )
+    native.length = 0
     expect(store.sync.keys()).toEqual(['text'])
+    expect(native).toContainEqual(expect.stringContaining('SELECT key FROM "migaia_text"'))
     const bytes = new Uint8Array([1, 2])
     await store.setBytes('bytes', bytes)
     bytes[0] = 9
     expect(await store.getBytes('bytes')).toEqual(new Uint8Array([1, 2]))
     await store.putRecord({ nested: new Map([['key', new Set([1, 2])]]) }, [1, 'record'])
+    expect(native).toContainEqual(expect.stringContaining('INSERT INTO "migaia_records"('))
+    native.length = 0
     expect(await store.getRecord([1, 'record'])).toEqual({
       nested: new Map([['key', new Set([1, 2])]])
     })
+    expect(native).toContainEqual(
+      expect.stringContaining('SELECT value,expires_at FROM "migaia_records"')
+    )
     await store.metadata.set('\ud800\u0000', { keep: true })
     await expect(store.setBytes('text', new Uint8Array([5]))).rejects.toMatchObject({
       source: '@migaia/storage-plugin-sqlite',
@@ -613,6 +635,10 @@ describe('native SQLite installation', () => {
     expect(await store.get('text')).toBeNull()
     expect(await store.getBytes('text')).toEqual(new Uint8Array([5]))
     await store.clearAll()
+    for (const table of ['migaia_text', 'migaia_bytes', 'migaia_records'])
+      expect(native).toContainEqual(
+        expect.stringContaining(`DELETE FROM "${table}" WHERE org_id=?`)
+      )
     expect(await store.getBytes('text')).toBeNull()
     expect(await store.getRecord([1, 'record'])).toBeUndefined()
     expect(await store.metadata.get('\ud800\u0000')).toEqual({ keep: true })
@@ -620,7 +646,9 @@ describe('native SQLite installation', () => {
   })
 
   it('commits and rolls back SQL and all channels on the same native connection', async () => {
-    const { store } = await installed()
+    /** Native control statements and caller SQL must execute on the same injected connection. */
+    const native: string[] = []
+    const { store } = await installed({ native })
     await store.sql`CREATE TABLE users(id INTEGER PRIMARY KEY,name TEXT)`.run()
     const primary = new Error('rollback marker')
     await expect(
@@ -632,6 +660,9 @@ describe('native SQLite installation', () => {
         throw primary
       })
     ).rejects.toMatchObject({ code: 'TRANSACTION_FAILED', cause: primary })
+    expect(native).toContain('CREATE TABLE users(id INTEGER PRIMARY KEY,name TEXT)')
+    expect(native).toContain('INSERT INTO users(id,name) VALUES(?,?)')
+    expect(native).toContain('ROLLBACK')
     expect(await store.sql`SELECT * FROM users`.all()).toEqual([])
     expect(await store.get('count')).toBeNull()
     const marker = { value: 1 }
@@ -697,7 +728,9 @@ describe('native SQLite installation', () => {
   })
 
   it('keeps canonical key order and real query/transaction capability projections', async () => {
-    const { store } = await installed({ memory: true })
+    /** Iteration and fluent records both read actual native rows rather than a value cache. */
+    const native: string[] = []
+    const { store } = await installed({ memory: true, native })
     const keys: IStorageKey[] = [
       2,
       -2,
@@ -713,6 +746,9 @@ describe('native SQLite installation', () => {
     const actual: IStorageKey[] = []
     for await (const [key] of store.iterateRecords()) actual.push(key)
     expect(actual).toEqual(keys.toSorted(compareStorageKeys))
+    expect(native).toContainEqual(
+      expect.stringContaining('SELECT key,value,expires_at FROM "migaia_records"')
+    )
     expect(
       await store
         .use(records)
