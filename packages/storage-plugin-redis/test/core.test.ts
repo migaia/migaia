@@ -58,10 +58,27 @@ for (const url of [process.env.MIGAIA_REDIS_URL, process.env.MIGAIA_VALKEY_URL])
         await store.putRecord({ value: 3 }, ['record', 1])
         expect(await store.getRecord(['record', 1])).toEqual({ value: 3 })
         expect(queued.filter((command) => command === 'SET')).toHaveLength(3)
+        commands.length = 0
+        queued.length = 0
         await store.use(kv).setMany([
           { key: 'group:a', value: '1' },
           { key: 'group:b', value: '2' }
         ])
+        expect(queued.filter((command) => command === 'SET')).toHaveLength(2)
+        commands.length = 0
+        expect(await store.has('group:a')).toBe(true)
+        expect(commands).toContain('GET')
+        commands.length = 0
+        expect(await store.keys()).toContain('group:a')
+        expect(commands).toContain('ZRANGEBYLEX')
+        queued.length = 0
+        expect(await store.removeMany(['group:b', 'missing'])).toBe(1)
+        expect(queued).toContain('DEL')
+        await store.set('group:b', '2')
+        queued.length = 0
+        await store.remove('group:b')
+        expect(queued).toContain('DEL')
+        await store.set('group:b', '2')
         expect(await store.use(kv).getMany(['group:a', 'missing', 'group:a'])).toEqual([
           '1',
           undefined,
@@ -123,7 +140,18 @@ for (const url of [process.env.MIGAIA_REDIS_URL, process.env.MIGAIA_VALKEY_URL])
         expect(await store.get('text')).toBe('\0\ud800')
         expect(await peer.get('text')).toBe('other organization')
         expect(await peer.getRecord(['record', 1])).toEqual({ value: 9 })
+        commands.length = 0
+        queued.length = 0
+        await peer.clearValues()
+        expect(commands).toContain('ZRANGEBYLEX')
+        expect(queued).toContain('DEL')
+        expect(await peer.get('text')).toBeNull()
+        commands.length = 0
+        queued.length = 0
         await peer.clearAll()
+        expect(commands).toContain('ZRANGEBYLEX')
+        expect(queued).toContain('DEL')
+        expect(await peer.getRecord(['record', 1])).toBeUndefined()
         expect(await peer.get('text')).toBeNull()
         expect(await store.get('text')).toBe('\0\ud800')
         const rejection = new RangeError('fixture late listener'),
