@@ -62,7 +62,8 @@ it('C123 keeps native installation pending and business gated until final commit
   /** Declaration and genuine native execution authority use the same public SDK boundary. */
   const rpc = rpcHostPipelines(
     () => native,
-    (name) => native.pipeline(name)
+    (name) => native.pipeline(name),
+    ['memory']
   )
   /** Mutation deadlines are disabled only through the real native Host's public options. */
   const native = defineHost({
@@ -133,7 +134,8 @@ it('C124 installs one actual native carrier receiver and keeps its subscription 
   /** Lazy owner capture does not access this handle before its native construction completes. */
   const rpc = rpcHostPipelines(
     () => native,
-    (name) => native.pipeline(name)
+    (name) => native.pipeline(name),
+    ['memory']
   )
   /** This is the actual native owner, not a reconstructed RPC activation port. */
   const native = defineHost({
