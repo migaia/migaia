@@ -1,3 +1,4 @@
+/** Admit one child's declared Feature paths and coordinate its original initialization/cleanup. */
 import {
   defineFeature,
   definePlugin,
@@ -29,6 +30,8 @@ export function createChildDispatcher(
 class ChildDispatcher {
   /** Original branded DSL definition owns exposed business paths. */
   readonly #definition: IAnyTrayHost
+  /** The immutable branded declaration is indexed once instead of scanned on each invocation. */
+  readonly #exposes: ReadonlySet<string>
   /** Plain native Host remains the canonical plugin transaction owner. */
   readonly #host: ITrayRuntimeHost
   /** Current accepted outlet is borrowed for child-to-parent operations. */
@@ -58,6 +61,7 @@ class ChildDispatcher {
     report: (error: unknown) => void
   ) {
     this.#definition = definition
+    this.#exposes = new Set(definition.exposes)
     this.#host = host
     this.#outlet = outlet
     this.#exit = exit
@@ -150,13 +154,7 @@ class ChildDispatcher {
   #invoke = (input: ITrayInvocation, context?: IRpcContext): unknown => {
     /** Path components are the DSL's plugin, Feature and method namespaces. */
     const [plugin, feature, method, extra] = input.path.split('.')
-    if (
-      extra ||
-      !plugin ||
-      !feature ||
-      !method ||
-      !this.#definition.exposes.includes(`${plugin}.${feature}`)
-    )
+    if (extra || !plugin || !feature || !method || !this.#exposes.has(`${plugin}.${feature}`))
       throw createTrayError(TrayErrorCode.pathNotExposed)
     /** PluginHost owns live Feature availability and registration identity. */
     const target = this.#handles.get(plugin)?.getFeature(feature) as
