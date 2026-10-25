@@ -40,7 +40,7 @@ import {
 } from '@migaia/rpc-host/sdk'
 import type { IRpcSessionHandle, IRpcSessionView } from '@migaia/rpc-contract/interfaces'
 import { RpcProcessErrorCode } from '@migaia/rpc-contract/error-code'
-import { createProcessError } from '../error.js'
+import { createProcessCleanupError, createProcessError } from '../error.js'
 import { createProcessCarrier } from '../carrier.js'
 import {
   acceptProcessConnectionBootstrap,
@@ -132,6 +132,7 @@ type IProcessSupervisorPorts<TUnit extends object, TSpec> = Readonly<{
   providerId: string
   health(unit: TUnit, signal: IAbortSignal): Promise<void>
   drain(unit: TUnit, remainingMs: number): Promise<void>
+  close(unit: TUnit): Promise<void>
   launch(
     launcher: IUnitLauncher<TSpec, TUnit>,
     spec: TSpec,
@@ -149,6 +150,8 @@ type IProcessBindingOptions<TUnit extends object, TSpec> = Readonly<{
   create(ports: IProcessSupervisorPorts<TUnit, TSpec>): ISupervisor<TUnit, TSpec>
   openRaw(unit: TUnit, signal: IAbortSignal): Promise<IProcessByteChannel | IProcessMessageChannel>
   expectedPeerId?(unit: TUnit): string
+  /** A native execution unit supplies its actual exit fact without waiting in the transport. */
+  terminalReason?(unit: TUnit): Promise<unknown>
   prepareReplacement?(spec: unknown): TSpec
   stderr?: (listener: (chunk: Uint8Array) => void) => () => void
   /** Original native source configuration supplies its connection token only to private admission. */
@@ -185,6 +188,7 @@ export class ProcessBinding<TUnit extends object, TSpec> {
       providerId: this.#providerId,
       health: this.#health,
       drain: this.#drain,
+      close: this.#closeSession,
       launch: this.#launch
     })
     this.generation = new RpcMemberGeneration({
@@ -296,6 +300,12 @@ export class ProcessBinding<TUnit extends object, TSpec> {
     const session = this.#sessions.get(unit)
     if (session) await this.#options.context.drain(session, remainingMs)
   }
+  /** The same accepted Session finishes closing before its actual execution unit is terminated. */
+  readonly #closeSession = async (unit: TUnit): Promise<void> => {
+    /** Retain the original receipt even if a same-name replacement is already published. */
+    const session = this.#sessions.get(unit)
+    if (session) await this.#options.context.detach(session)
+  }
   /** Adopt one original native channel and roll it back if carrier construction fails. */
   readonly #openCarrier = async (unit: TUnit, signal: IAbortSignal) => {
     /** Acquired raw IO stays with this exact native execution unit. */
@@ -344,6 +354,9 @@ export class ProcessBinding<TUnit extends object, TSpec> {
       return {
         carrier: createProcessCarrier(raw, this.#options.context, {
           id,
+          terminalReason: this.#options.terminalReason
+            ? () => this.#options.terminalReason!(unit)
+            : undefined,
           features: this.#options.features,
           ipc: {
             connectionId: id,
@@ -440,6 +453,36 @@ type IProcessSpawnRecipe<THandle extends IProcessHandle> = Readonly<{
   ports: IProcessSupervisorPorts<THandle, IProcessSpec>
 }>
 
+/** Preserve drain and caller-hook order, then join Session closing before actual native stop. */
+async function beforeProcessTerminate<TUnit>(
+  ports: Readonly<{
+    drain(unit: TUnit, remainingMs: number): Promise<void>
+    close(unit: TUnit): Promise<void>
+  }>,
+  unit: TUnit,
+  signal: AbortSignal,
+  remainingMs: () => number,
+  stop?: Readonly<{
+    beforeTerminate?(unit: TUnit, signal: AbortSignal, remainingMs: () => number): unknown
+  }>
+): Promise<void> {
+  /** Independent drain/hook and close failures keep their original order and exact objects. */
+  const errors: unknown[] = []
+  try {
+    await ports.drain(unit, remainingMs())
+    if (!signal.aborted) await stop?.beforeTerminate?.(unit, signal, remainingMs)
+  } catch (error) {
+    errors.push(error)
+  }
+  try {
+    await ports.close(unit)
+  } catch (error) {
+    errors.push(error)
+  }
+  if (errors.length === 1) throw errors[0]
+  if (errors.length > 1) throw createProcessCleanupError(errors)
+}
+
 /** Caller output runs before forwarding the same stderr chunk to its original optional log owner. */
 function processSpawnOutput<THandle extends IProcessHandle>(
   recipe: IProcessSpawnRecipe<THandle>,
@@ -489,11 +532,14 @@ function createSpawnProcessSupervisor<THandle extends IProcessHandle>(
     },
     stop: {
       ...recipe.source.supervision.stop,
-      beforeTerminate: async (unit, signal, remainingMs) => {
-        await recipe.ports.drain(unit, remainingMs())
-        if (!signal.aborted)
-          await recipe.source.supervision.stop?.beforeTerminate?.(unit, signal, remainingMs)
-      }
+      beforeTerminate: (unit, signal, remainingMs) =>
+        beforeProcessTerminate(
+          recipe.ports,
+          unit,
+          signal,
+          remainingMs,
+          recipe.source.supervision.stop
+        )
     },
     output: {
       ...recipe.source.supervision.output,
@@ -525,6 +571,13 @@ export function createSpawnProcessBinding<THandle extends IProcessHandle>(
     scheduler,
     kind: 'spawn',
     token: source.token,
+    terminalReason: (unit) =>
+      unit.exited.then((exit) =>
+        createProcessError(RpcProcessErrorCode.channelClosed, exit, {
+          exitCode: exit.code,
+          signal: exit.signal
+        })
+      ),
     stderr: stderr.subscribe,
     openRaw: async (unit, signal) => {
       /** Full native recipes retain the original physical-kind admission and rollback. */
@@ -670,11 +723,14 @@ function createConnectProcessSupervisor(
       },
       stop: {
         ...recipe.source.supervision?.stop,
-        beforeTerminate: async (unit, signal, remainingMs) => {
-          await recipe.ports.drain(unit, remainingMs())
-          if (!signal.aborted)
-            await recipe.source.supervision?.stop?.beforeTerminate?.(unit, signal, remainingMs)
-        }
+        beforeTerminate: (unit, signal, remainingMs) =>
+          beforeProcessTerminate(
+            recipe.ports,
+            unit,
+            signal,
+            remainingMs,
+            recipe.source.supervision?.stop
+          )
       }
     }
   )

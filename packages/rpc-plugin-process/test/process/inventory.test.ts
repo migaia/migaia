@@ -27,7 +27,13 @@ describe('process channel upstream inventory', () => {
     expect(RpcWireVersion).toMatchObject({ major: 2, minor: 0 })
     expect(RpcWireJsonCodec).toBe('json')
     // BC2 makes control and stream core grammar rather than opt-in v1 capability strings.
-    expect(RpcWireControlOperation).toEqual({ ping: 'ping', pong: 'pong', drain: 'drain' })
+    // BC12 appends graceful close while preserving the original three control operations.
+    expect(RpcWireControlOperation).toEqual({
+      ping: 'ping',
+      pong: 'pong',
+      drain: 'drain',
+      close: 'close'
+    })
     expect(RpcWireKind.stream).toBe('stream')
   })
 })

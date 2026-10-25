@@ -108,6 +108,14 @@ describe('process carrier observation', () => {
     try {
       expect(pair.carriers[0]!.observation?.subscribe).toBeTypeOf('function')
       expect(pair.carriers[1]!.observation?.subscribe).toBeTypeOf('function')
+      /** The actual native carrier alone grants bounded closing writes and Process liquidation. */
+      const original = new Error('actual byte quota refusal')
+      expect(pair.carriers[0]!.closingWrites).toBe(true)
+      expect(pair.carriers[0]!.mapRetirement!('liquidated', original)).toMatchObject({
+        code: 'PROCESS_LIQUIDATED',
+        cause: original
+      })
+      expect(pair.carriers[0]!.mapRetirement!('idle', original)).toBe(original)
       /** Direct observation preserves the original repeated-removal contract. */
       const dispose = pair.carriers[0]!.observation!.subscribe(probe)
       dispose()
@@ -128,6 +136,14 @@ describe('process carrier observation', () => {
     ]).open()
     try {
       expect(pair.carriers[0]!.observation?.subscribe).toBeTypeOf('function')
+      /** Whole-message Process sources publish the same genuine transport capability and mapper. */
+      const original = new Error('actual message quota refusal')
+      expect(pair.carriers[0]!.closingWrites).toBe(true)
+      expect(pair.carriers[0]!.mapRetirement!('liquidated', original)).toMatchObject({
+        code: 'PROCESS_LIQUIDATED',
+        cause: original
+      })
+      expect(pair.carriers[0]!.mapRetirement!('idle', original)).toBe(original)
       /** The cold probe still calls observe directly without a Host probe plugin. */
       const dispose = pair.carriers[0]!.observation!.subscribe(probe)
       dispose()

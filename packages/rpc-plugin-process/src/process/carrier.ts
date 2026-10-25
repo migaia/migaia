@@ -16,6 +16,7 @@ import {
   RpcCarrierTopology,
   RpcCarrierEncoding,
   RpcProbeDirection,
+  RpcSessionRetirement,
   type IRpcCarrier,
   type IRpcCarrierWriteOptions,
   type IRpcWriteAdmission
@@ -26,7 +27,12 @@ import { ProcessFeatureName } from '../features/text.js'
 import type { IProcessFeatureContext } from '../features/metadata.js'
 import type { IProcessFeature } from './plugin/types.js'
 import { attachIpcStderr } from './stderr.js'
-import { createProcessChannelClosedError, createProcessCleanupError } from './error.js'
+import {
+  createProcessChannelClosedError,
+  createProcessCleanupError,
+  createProcessError
+} from './error.js'
+import { RpcProcessErrorCode } from '@migaia/rpc-contract/error-code'
 import type { IProcessByteChannel, IProcessMessageChannel, IProcessCommonOptions } from './types.js'
 
 /** One actual native connection owns its installed feature resources and diagnostic labels. */
@@ -34,7 +40,16 @@ export type IProcessCarrierOptions = Readonly<{
   id: string
   features?: readonly IProcessFeature[]
   ipc?: IProcessCommonOptions['ipc']
+  /** Only actual spawned units lend their original native exit receipt to Session's close budget. */
+  terminalReason?: IRpcCarrier['terminalReason']
 }>
+
+/** Only the actual Process carrier maps an explicit governor liquidation into its native domain. */
+function mapProcessRetirement(kind: RpcSessionRetirement, error: unknown): unknown {
+  return kind === RpcSessionRetirement.liquidated
+    ? createProcessError(RpcProcessErrorCode.liquidated, error)
+    : error
+}
 
 /** Translate only an actual native write failure at this Process-owned carrier boundary. */
 async function writeProcessFrame(write: () => void | Promise<void>): Promise<void> {
@@ -270,6 +285,9 @@ export function createProcessCarrier(
     if (raw.kind === 'byte')
       return createRpcByteCarrier({
         id: options.id,
+        closingWrites: true,
+        mapRetirement: mapProcessRetirement,
+        terminalReason: options.terminalReason,
         report: context.report,
         reserveWrite: features.reserveWrite,
         observation: raw.observation,
@@ -294,6 +312,9 @@ export function createProcessCarrier(
     const connection = { raw, features, observation }
     return createRpcMessageCarrier({
       id: options.id,
+      closingWrites: true,
+      mapRetirement: mapProcessRetirement,
+      terminalReason: options.terminalReason,
       report: context.report,
       reserveWrite: features.reserveWrite,
       nativeBinary: false,

@@ -264,7 +264,7 @@ export function processPlugin<
         | IRpcNativeTransportFeature<E>
       )[]
     }>
-): IRpcTransportPlugin<N, IProcessNamespaceExtensions & E> {
+): IRpcTransportPlugin<N, IProcessNamespaceExtensions & E, true> {
   /** Runtime input may arrive from plain JavaScript; capture its four existing physical source arms. */
   const configured = options as IProcessPluginOptions & { connectToParent?: unknown }
   /** Native source selection is independent from routing metadata or an incoming peer claim. */
@@ -287,9 +287,10 @@ export function processPlugin<
   return defineTransportPlugin({
     name: configured.name ?? PROCESS_NAMESPACE,
     namespace: (configured.namespace ?? PROCESS_NAMESPACE) as N,
+    closingWrites: true,
     expose: configured.expose,
     features: configured.features,
     nameAdmissionTimeoutMs: configured.connect?.timeoutMs,
     open: installation.open
-  }) as IRpcTransportPlugin<N, IProcessNamespaceExtensions & E>
+  }) as IRpcTransportPlugin<N, IProcessNamespaceExtensions & E, true>
 }
