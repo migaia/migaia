@@ -30,13 +30,16 @@ export class ProviderCatalog {
     entries: ReadonlyMap<string, IProviderMethodEntry>,
     previous?: ProviderRegistration
   ): ProviderRegistration {
-    return new ProviderRegistration(
+    /** Cold handshake descriptions must expose the same reserved entries that lookup can admit. */
+    const registration = new ProviderRegistration(
       this.methods,
       entries,
       this.reservations,
       previous,
       this.#refresh
     )
+    this.#refresh()
+    return registration
   }
 
   /** Published methods win; an exact native reservation may wait on its existing install gate. */
@@ -46,7 +49,11 @@ export class ProviderCatalog {
 
   /** Publication and withdrawal update one cached projection and drop only genuinely empty scopes. */
   readonly #refresh = (): void => {
-    this.description = Object.freeze(Array.from(this.methods.values(), this.#describe))
+    /** Published entries win during replacement; pending-only methods borrow their native gate. */
+    const description = Array.from(this.methods.values(), this.#describe)
+    for (const [name, registration] of this.reservations)
+      if (!this.methods.has(name)) description.push(this.#describe(registration.get(name)!))
+    this.description = Object.freeze(description)
     if (this.methods.size === 0 && this.reservations.size === 0) this.#onEmpty()
   }
 
