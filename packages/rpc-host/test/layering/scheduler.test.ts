@@ -1,138 +1,46 @@
-import { createRuntimeEndpointComposition } from '../../dist/core/runtime-api-endpoint.js'
-import { RpcCapability } from '@migaia/rpc-contract'
-import { readFileSync, readdirSync } from 'node:fs'
+/** Actual feature and native Host clocks replace the removed kernel/time-port configuration. */
+import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { parseSync, Visitor } from 'oxc-parser'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { expect, it, vi } from 'vitest'
+import { defineHost, definePlugin } from '@migaia/plugin-host'
+import { createRpcHost } from '@migaia/rpc-host'
+import { timeout } from '@migaia/rpc-host/features/timeout'
+import { idempotency } from '@migaia/rpc-host/plugins/idempotency'
+import { RpcTimeoutError } from '@migaia/rpc-contract/errors'
+import { deferred } from '@migaia/utils/promise'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { createManualScheduler } from '@migaia/utils/testing'
+import { connectedCoreHosts, coreMemoryServer } from '../host/core-fixture.js'
 
-import { RpcConfigurationError, RpcTimeoutError } from '@migaia/rpc-contract/errors'
-import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
-import { abort } from '../../dist/core/middleware/abort.js'
-import { defineMiddleware } from '../../dist/core/middleware.js'
-import { connect } from '../../dist/core/middleware/connect.js'
-import { timeout } from '../../dist/core/middleware/timeout.js'
-import { createEndpointTimePort } from '../../dist/core/internal/time-port.js'
-import type { IRpcTransport } from '../../dist/core/transport.js'
-
-/** Captures scheduler identity at all three ownership boundaries. */
-const schedulerCalls = vi.hoisted(() => ({
-  kernel: [] as unknown[],
-  kernelTime: [] as unknown[],
-  webRpcHost: [] as unknown[],
-  pluginHost: [] as unknown[]
-}))
-
-vi.mock('../../dist/core/endpoint-kernel.js', async () => {
-  const actual = await vi.importActual<typeof import('../../dist/core/endpoint-kernel.js')>(
-    '../../dist/core/endpoint-kernel.js'
+it('injects manual time into a real public RPC attempt deadline', async () => {
+  /** The complete feature owns its original monotonic scheduler and timer receipt. */
+  const scheduler = createManualScheduler()
+  /** Actual provider entry separates clock progression from native handshake setup. */
+  const entered = deferred<void>()
+  /** Final cleanup releases the original business Promise even after the caller has timed out. */
+  const finish = deferred<void>()
+  /** Genuine public provider execution remains active until its original native completion. */
+  const peers = await connectedCoreHosts(
+    {},
+    {
+      echo: async () => {
+        entered.resolve()
+        await finish.promise
+        return 'done'
+      }
+    }
   )
-  return {
-    ...actual,
-    createEndpointKernel: (...args: Parameters<typeof actual.createEndpointKernel>) => {
-      schedulerCalls.kernel.push(args[2])
-      const kernel = actual.createEndpointKernel(...args)
-      schedulerCalls.kernelTime.push(kernel.time.scheduler)
-      return kernel
-    }
-  }
-})
-
-vi.mock('../../dist/core/internal/web-rpc-plugin-host.js', async () => {
-  const actual = await vi.importActual<
-    typeof import('../../dist/core/internal/web-rpc-plugin-host.js')
-  >('../../dist/core/internal/web-rpc-plugin-host.js')
-  return {
-    ...actual,
-    createWebRpcPluginHost: (...args: Parameters<typeof actual.createWebRpcPluginHost>) => {
-      schedulerCalls.webRpcHost.push(args[4].scheduler)
-      return actual.createWebRpcPluginHost(...args)
-    }
-  }
-})
-
-vi.mock('@migaia/plugin-host', async () => {
-  const actual = await vi.importActual<typeof import('@migaia/plugin-host')>('@migaia/plugin-host')
-  return {
-    ...actual,
-    defineHost: (options: Parameters<typeof actual.defineHost>[0]) => {
-      schedulerCalls.pluginHost.push(options.host?.scheduler)
-      return actual.defineHost(options)
-    }
-  }
-})
-
-/** Runtime-neutral core source root for the global-time bypass oracle. */
-const coreRoot = join(import.meta.dirname, '../../src/core')
-
-/** Recursively lists executable source files without generated declarations. */
-function sources(directory: string): string[] {
-  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
-    const path = join(directory, entry.name)
-    if (entry.isDirectory()) return sources(path)
-    return entry.name.endsWith('.ts') && !entry.name.endsWith('.d.ts') ? [path] : []
-  })
-}
-
-/** A transport that never delivers, leaving outbound deadline ownership observable. */
-function silentTransport(): IRpcTransport {
-  return {
-    platform: 'Memory',
-    ownership: 'borrowed',
-    topology: 'exclusive',
-    send() {},
-    subscribe() {
-      return () => undefined
-    }
-  }
-}
-
-/** Lets queued delivery and provider continuations settle without advancing scheduler time. */
-async function flushMicrotasks(): Promise<void> {
-  for (let index = 0; index < 12; index += 1) await Promise.resolve()
-}
-
-afterEach(() => vi.useRealTimers())
-
-describe('endpoint scheduler ownership', () => {
-  it('owns manual timer order, cancellation, and disposal through one time port', () => {
-    const scheduler = createManualScheduler()
-    const time = createEndpointTimePort(scheduler)
-    expect(time.scheduler).toBe(scheduler)
-    const fired: string[] = []
-    time.setTimeout(() => fired.push('first'), 50)
-    const cancelled = time.setTimeout(() => fired.push('cancelled'), 50)
-    time.setTimeout(() => fired.push('second'), 50)
-    time.clearTimeout(cancelled)
-    scheduler.advance(49)
-    expect(fired).toEqual([])
-    scheduler.advance(1)
-    expect(fired).toEqual(['first', 'second'])
-    time.setTimeout(() => fired.push('disposed'), 100)
-    time.dispose()
-    expect(scheduler.pendingCount).toBe(0)
-    time.setTimeout(() => fired.push('after dispose'), 1)
-    scheduler.advance(101)
-    expect(fired).toEqual(['first', 'second'])
-  })
-
-  it('injects manual time into an endpoint deadline and rejects malformed schedulers', async () => {
-    const scheduler = createManualScheduler()
-    const transport = silentTransport()
-    const endpoint = await createRuntimeEndpointComposition(
-      {
-        id: 'manual-time-client',
-        transport,
-        scheduler,
-        middlewares: [connect({ transport }), timeout()]
-      },
-      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
-    ).installing
-    const pending = endpoint.send('missing-server', 'echo', null, { timeoutMs: 50 })
+  try {
+    /** Only this one actual attempt uses the explicitly supplied feature clock. */
+    const pending = peers.a.memory.send('b', 'echo', null, {
+      timeout: timeout({ ms: 50, scheduler, report: () => undefined })
+    })
+    /** Observe the original failure before any timer fires. */
     const result = pending.catch((error: unknown) => error)
+    await entered.promise
     scheduler.advance(49)
-    await Promise.resolve()
+    /** A deadline may not settle before the final millisecond of the original budget. */
     let settled = false
     void result.then(() => {
       settled = true
@@ -141,278 +49,201 @@ describe('endpoint scheduler ownership', () => {
     expect(settled).toBe(false)
     scheduler.advance(1)
     expect(await result).toBeInstanceOf(RpcTimeoutError)
-    await endpoint.dispose()
-    expect(scheduler.pendingCount).toBe(0)
+  } finally {
+    finish.resolve()
+    await peers.close()
+  }
+  expect(scheduler.pendingCount).toBe(0)
+})
 
-    for (const invalid of [
-      { now: () => 1 },
-      { now: () => Number.NaN, schedule: scheduler.schedule }
-    ]) {
-      const failure = await createRuntimeEndpointComposition(
-        {
-          id: 'invalid-scheduler',
-          transport: silentTransport(),
-          scheduler: invalid as typeof scheduler,
-          middlewares: [connect()]
-        },
-        { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
-      ).installing.catch((error: unknown) => error)
-      expect(failure).toBeInstanceOf(RpcConfigurationError)
-      expect(failure).toMatchObject({ code: 'INVALID_CONFIG' })
+it('times out construction through the original native Host injected scheduler', async () => {
+  /** The sole native Host owns the same actual mutation clock as ordinary plugins. */
+  const scheduler = createManualScheduler()
+  /** There is no RPC kernel or timeout translation layer around native installation. */
+  const host = defineHost({
+    host: { scheduler, execution: { mutationTimeoutMs: 100, pipelineDrainTimeoutMs: false } }
+  })
+  /** The real install hook intentionally never completes its setup work. */
+  const stall = definePlugin({
+    name: 'scheduler-stall',
+    install: () => new Promise<Record<string, never>>(() => undefined)
+  })
+  /** Native operation timeout retains its original public error code. */
+  const result = host.use(stall).catch((error: unknown) => error)
+  for (let turn = 0; turn < 40 && scheduler.pendingCount === 0; turn++) await Promise.resolve()
+  expect(scheduler.pendingCount).toBeGreaterThan(0)
+  scheduler.advance(100)
+  /** The original code oracle still executes after actual native timeout cleanup. */
+  const failure = await result
+  expect(scheduler.pendingCount).toBe(0)
+  try {
+    expect(failure).toMatchObject({ code: 'MUTATION_EXECUTION_TIMEOUT' })
+  } finally {
+    await host.dispose()
+  }
+})
+
+it('retains the supplied native scheduler clock without freezing the caller object', async () => {
+  /** Only this real native constructor chooses the manual clock. */
+  const scheduler = createManualScheduler()
+  scheduler.advance(42)
+  /** Native setup observes its actual attempt clock and deadline. */
+  const observed: number[] = []
+  /** The real Host borrows the unchanged supplied object. */
+  const host = defineHost({
+    host: { scheduler, execution: { mutationTimeoutMs: 100, pipelineDrainTimeoutMs: false } }
+  })
+  /** A genuine plugin setup reads the actual native operation's clock. */
+  const plugin = definePlugin({
+    name: 'clock-reader',
+    setup(context) {
+      observed.push(context.operation.now())
+      return {}
+    },
+    install() {
+      return {}
     }
   })
-
-  it('times out construction through the injected scheduler', async () => {
-    const scheduler = createManualScheduler()
-    const transport = silentTransport()
-    const stall = defineMiddleware('scheduler-stall', () => ({
-      install: () => new Promise<Record<string, never>>(() => undefined)
-    }))
-    const pending = createRuntimeEndpointComposition(
-      {
-        id: 'scheduler-construction',
-        transport,
-        scheduler,
-        construction: { timeoutMs: 100 },
-        middlewares: [connect({ transport }), stall]
-      },
-      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
-    ).installing
-    const result = pending.catch((error: unknown) => error)
-    for (let index = 0; index < 40 && scheduler.pendingCount === 0; index += 1)
-      await Promise.resolve()
-    expect(scheduler.pendingCount).toBeGreaterThan(0)
-    scheduler.advance(100)
-    expect(await result).toMatchObject({ code: 'MUTATION_EXECUTION_TIMEOUT' })
-    expect(scheduler.pendingCount).toBe(0)
-  })
-
-  it('preserves original scheduler identity through kernel and PluginHost', async () => {
-    const scheduler = createManualScheduler()
-    const transport = silentTransport()
-    const injected = await createRuntimeEndpointComposition(
-      {
-        id: 'scheduler-injected-identity',
-        transport,
-        scheduler,
-        middlewares: [connect({ transport })]
-      },
-      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
-    ).installing
-    expect(schedulerCalls.kernel.at(-1)).toBe(scheduler)
-    expect(schedulerCalls.kernelTime.at(-1)).toBe(scheduler)
-    expect(schedulerCalls.webRpcHost.at(-1)).toBe(scheduler)
-    expect(schedulerCalls.pluginHost.at(-1)).toBe(scheduler)
+  try {
+    await host.use(plugin)
+    expect(observed).toEqual([42])
     expect(Object.isFrozen(scheduler)).toBe(false)
-    await injected.dispose()
+  } finally {
+    await host.dispose()
+  }
+  expect(scheduler.pendingCount).toBe(0)
+})
 
-    const defaultTransport = silentTransport()
-    const defaultEndpoint = await createRuntimeEndpointComposition(
-      {
-        id: 'scheduler-default-identity',
-        transport: defaultTransport,
-        middlewares: [connect({ transport: defaultTransport })]
-      },
-      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
-    ).installing
-    expect(schedulerCalls.kernel.at(-1)).toBeUndefined()
-    expect(schedulerCalls.kernelTime.at(-1)).toBe(systemScheduler)
-    expect(schedulerCalls.webRpcHost.at(-1)).toBeUndefined()
-    expect(schedulerCalls.pluginHost.at(-1)).toBeUndefined()
-    await defaultEndpoint.dispose()
+it('timestamps failed responses and expires installed replay policy using manual time', async () => {
+  /** Monotonic policy time stays independent from the original diagnostic wall timestamp. */
+  const scheduler = createManualScheduler()
+  /** The current policy reads the native monotonic capability; no fake store claim is injected. */
+  const monotonic = vi.spyOn(performance, 'now').mockImplementation(() => scheduler.now())
+  /** The existing wall-clock backend supplies the pinned original response timestamp. */
+  const wall = vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_042)
+  /**
+   * Optional replay belongs to the actual idempotency plugin rather than the removed default
+   * kernel.
+   */
+  const server = coreMemoryServer('scheduler-server')
+  /** Original provider execution count remains independent from replay responses. */
+  const business = vi.fn((_payload, context) =>
+    context.failed('expected failure', 'EXPECTED_FAILURE')
+  )
+  /** A real accepted contract grants only this genuine idempotent operation. */
+  const host = await createRpcHost({
+    ...server.options,
+    plugins: [idempotency(), server.transport],
+    provide: { api: { fail: business } },
+    contract: {
+      schemaVersion: 1,
+      plugin: 'api',
+      features: { shape: { methods: { fail: { mode: 'request', idempotent: true } } } }
+    }
   })
-
-  it('timestamps failed responses and expires replay using manual time', async () => {
-    const scheduler = createManualScheduler()
-    /** Diagnostic wall clock; wire sentAt comes from it, never from the manual scheduler. */
-    const wallClock = { timestamp: () => 1_700_000_000_042 }
-    const [clientBase, serverBase] = createMemoryTransportPair()
-    const requests: unknown[] = []
-    const responses: unknown[] = []
-    const clientTransport: IRpcTransport = {
-      ...clientBase,
-      send(message, options) {
-        if ((message as { kind?: unknown }).kind === 'request') requests.push(message)
-        return clientBase.send(message, options)
-      }
-    }
-    const serverTransport: IRpcTransport = {
-      ...serverBase,
-      send(message, options) {
-        if ((message as { kind?: unknown }).kind === 'response') responses.push(message)
-        return serverBase.send(message, options)
-      }
-    }
-    let calls = 0
-    const server = await createRuntimeEndpointComposition(
-      {
-        id: 'scheduler-server',
-        transport: serverTransport,
-        scheduler,
-        wallClock,
-        provider: {
-          fail: (context) => {
-            calls += 1
-            return context.failed('expected failure', 'EXPECTED_FAILURE')
-          }
-        },
-        middlewares: [connect({ transport: serverTransport })]
-      },
-      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
-    ).installing
-    const client = await createRuntimeEndpointComposition(
-      {
-        id: 'scheduler-client',
-        transport: clientTransport,
-        scheduler,
-        wallClock,
-        middlewares: [connect({ transport: clientTransport })]
-      },
-      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
-    ).installing
+  /** Both actual public Hosts complete their real handshakes before manual policy time advances. */
+  const client = await server.connect('scheduler-client')
+  try {
     scheduler.advance(42)
-    await expect(client.send('scheduler-server', 'fail', null)).rejects.toBeDefined()
-    expect(calls).toBe(1)
-    expect(requests).toHaveLength(1)
-    expect((responses[0] as { data?: { route?: { sentAt?: number } } }).data?.route?.sentAt).toBe(
-      1_700_000_000_042
-    )
-    await clientBase.send(requests[0])
-    await flushMicrotasks()
-    expect(calls).toBe(1)
-    scheduler.advance(310_001)
-    await clientBase.send(requests[0])
-    await flushMicrotasks()
-    expect(calls).toBe(2)
-    await client.dispose()
-    await server.dispose()
-    expect(scheduler.pendingCount).toBe(0)
-  })
-
-  it('expires an early abort before a delayed provider request arrives', async () => {
-    const scheduler = createManualScheduler()
-    /** Diagnostic wall clock; the abort variation sentAt comes from it. */
-    const wallClock = { timestamp: () => 1_700_000_000_050 }
-    const [clientBase, serverTransport] = createMemoryTransportPair()
-    let heldRequest: unknown
-    let abortTimestamp: number | undefined
-    const clientTransport: IRpcTransport = {
-      ...clientBase,
-      send(message, options) {
-        const frame = message as {
-          kind?: unknown
-          data?: { route?: { sentAt?: number; variation?: string } }
-        }
-        if (frame.kind === 'request') {
-          heldRequest = message
-          return
-        }
-        if (frame.kind === 'variation' && frame.data?.route?.variation === 'abort')
-          abortTimestamp = frame.data.route.sentAt
-        return clientBase.send(message, options)
-      }
-    }
-    let providerAborted: boolean | undefined
-    const server = await createRuntimeEndpointComposition(
-      {
-        id: 'early-abort-server',
-        transport: serverTransport,
-        scheduler,
-        wallClock,
-        provider: {
-          observe: (context) => {
-            providerAborted = context.signal.aborted
-            return context.success('completed')
-          }
-        },
-        middlewares: [connect({ transport: serverTransport }), abort()]
-      },
-      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
-    ).installing
-    const client = await createRuntimeEndpointComposition(
-      {
-        id: 'early-abort-client',
-        transport: clientTransport,
-        scheduler,
-        wallClock,
-        middlewares: [connect({ transport: clientTransport }), abort(), timeout()]
-      },
-      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
-    ).installing
-    const pending = client.send('early-abort-server', 'observe', null, { timeoutMs: 50 })
-    for (let index = 0; index < 80 && heldRequest === undefined; index += 1) await Promise.resolve()
-    expect(heldRequest).toBeDefined()
-    scheduler.advance(50)
-    await expect(pending).rejects.toBeInstanceOf(RpcTimeoutError)
-    await flushMicrotasks()
-    expect(abortTimestamp).toBe(1_700_000_000_050)
-    scheduler.advance(310_001)
-    await clientBase.send(heldRequest)
-    for (let index = 0; index < 80 && providerAborted === undefined; index += 1)
-      await Promise.resolve()
-    expect(providerAborted).toBe(false)
-    await client.dispose()
-    await server.dispose()
-    expect(scheduler.pendingCount).toBe(0)
-  })
-
-  it('leaves no global Date or old timer owners in core source', () => {
-    const systemOwners = new Set<string>()
-    for (const path of sources(coreRoot)) {
-      new Visitor({
-        Identifier(node) {
-          expect(node.name, path).not.toMatch(
-            /^(Date|createRuntimeTimer|waitWithSignal|ControlTaskRegistry)$/u
-          )
-          if (node.name === 'systemScheduler') systemOwners.add(path.replace(`${coreRoot}/`, ''))
-        }
-      }).visit(parseSync(path, readFileSync(path, 'utf8')).program)
-    }
-    // Only the endpoint kernel selects a default scheduler in shipped Core source.
-    expect([...systemOwners]).toEqual(['endpoint-kernel.ts'])
-  })
-
-  it('retains very long endpoint deadlines and requests unref for system timers', async () => {
-    vi.useFakeTimers()
-    const transport = silentTransport()
-    const endpoint = await createRuntimeEndpointComposition(
-      {
-        id: 'scheduler-long-deadline',
-        transport,
-        middlewares: [connect({ transport }), timeout()]
-      },
-      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
-    ).installing
-    const result = endpoint
-      .send('missing-server', 'echo', null, {
-        timeoutMs: 2_147_483_648
+    await expect(
+      client.host.memory.send('scheduler-server', 'api.fail', null, {
+        idempotencyKey: 'original-replay'
       })
-      .then(
-        () => 'resolved',
-        () => 'rejected'
-      )
-    let settled = false
-    void result.then(() => {
-      settled = true
-    })
-    vi.advanceTimersByTime(1000)
-    await flushMicrotasks()
-    expect(settled).toBe(false)
-    await endpoint.dispose()
+    ).rejects.toBeDefined()
+    expect(business).toHaveBeenCalledTimes(1)
+    /** Only one original physical business call is emitted before any replay. */
+    const requests = client.pair[1].written.filter((frame) => frame.kind === 'call')
+    expect(requests).toHaveLength(1)
+    /** Actual physical result/error frames retain the original diagnostic wall time. */
+    const responses = client.pair[0].written.filter((frame) => frame.kind === 'error')
+    expect(responses[0]!.route.sentAt).toBe(1_700_000_000_042)
+    await expect(
+      client.host.memory.send('scheduler-server', 'api.fail', null, {
+        idempotencyKey: 'original-replay'
+      })
+    ).rejects.toBeDefined()
+    expect(business).toHaveBeenCalledTimes(1)
+    scheduler.advance(310_001)
+    await expect(
+      client.host.memory.send('scheduler-server', 'api.fail', null, {
+        idempotencyKey: 'original-replay'
+      })
+    ).rejects.toBeDefined()
+    expect(business).toHaveBeenCalledTimes(2)
+  } finally {
+    await Promise.all([client.host.close(), host.close()])
+    monotonic.mockRestore()
+    wall.mockRestore()
+  }
+  expect(scheduler.pendingCount).toBe(0)
+})
 
-    vi.useRealTimers()
-    const unref = vi.fn()
-    const schedule = vi.spyOn(systemScheduler, 'schedule').mockImplementation(() => ({
-      cancel() {},
-      unref
-    }))
-    try {
-      const port = createEndpointTimePort(systemScheduler)
-      port.setTimeout(() => undefined, 10)
-      expect(unref).toHaveBeenCalledTimes(1)
-      port.dispose()
-    } finally {
-      schedule.mockRestore()
-    }
+it('leaves no global Date or retired timer owners in migrated original core execution owners', () => {
+  /** Only these direct old core execution descendants inherit the original static boundary. */
+  const owners = [
+    'dispatch/invocation.ts',
+    'dispatch/context.ts',
+    'call/table.ts',
+    'call/record.ts',
+    'call/invocation.ts',
+    'stream/consumer.ts',
+    'stream/producer.ts'
+  ]
+  // These seven fixed paths map old provider-executor/client/stream owners; SDK/Session were outside old core.
+  for (const owner of owners) {
+    /** The old runtime-api assembly/default kernel path is separately retired in the local ledger. */
+    const path = join(import.meta.dirname, '../../src', owner)
+    new Visitor({
+      Identifier(node) {
+        expect(node.name, path).not.toMatch(
+          /^(Date|createRuntimeTimer|waitWithSignal|ControlTaskRegistry)$/u
+        )
+      }
+    }).visit(parseSync(path, readFileSync(path, 'utf8')).program)
+  }
+})
+
+it('retains very long attempt deadlines and original system timer unref', async () => {
+  /** This clock proves the original >32-bit budget remains pending after only one second. */
+  const scheduler = createManualScheduler()
+  /** Completion remains the actual native operation, independent from the feature's timer. */
+  const finish = deferred<string>()
+  /** Only a real complete timeout feature owns this timer and original call Promise. */
+  const feature = timeout({ ms: 2_147_483_648, scheduler, report: () => undefined })
+  /** The existing feature boundary directly consumes its genuine attempt execution port. */
+  const pending = feature.run({
+    signal: new AbortController().signal,
+    invoke: () => finish.promise
   })
+  /** Original settlement must not wrap the long deadline down to a short timer. */
+  let settled = false
+  void pending.then(
+    () => {
+      settled = true
+    },
+    () => {
+      settled = true
+    }
+  )
+  scheduler.advance(1000)
+  await Promise.resolve()
+  expect(settled).toBe(false)
+  finish.resolve('done')
+  await pending
+  expect(scheduler.pendingCount).toBe(0)
+  /** Original unref remains an explicit native receipt oracle rather than a fabricated return value. */
+  const unref = vi.fn()
+  /** The same system scheduler backend remains the actual default selected by timeout(). */
+  const schedule = vi
+    .spyOn(systemScheduler, 'schedule')
+    .mockImplementation(() => ({ cancel() {}, unref }))
+  try {
+    await timeout({ ms: 10 }).run({
+      signal: new AbortController().signal,
+      invoke: async () => 'done'
+    })
+    expect(unref).toHaveBeenCalledTimes(1)
+  } finally {
+    schedule.mockRestore()
+  }
 })

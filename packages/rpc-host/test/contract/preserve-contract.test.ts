@@ -1,27 +1,25 @@
+/** Byte order and binding receivers use the current codec and authentication owners. */
 import assert from 'node:assert/strict'
 import { it } from 'vitest'
-import { normalizePortable, type IRpcEnvelope } from '@migaia/rpc-contract'
-import {
-  createOutboundEnvelope,
-  materializeOutboundJson
-} from '../../dist/core/internal/outbound-envelope.js'
-import {
-  createRuntimeBytePipeline,
-  runtimeMessagePipeline as messageProcessPipeline
-} from '../../dist/runtime-adapter/byte/pipeline.js'
-import { createRuntimeObjectPipeline } from '../../dist/runtime-adapter/object/pipeline.js'
+import { normalizePortable } from '@migaia/rpc-contract'
+import type { IRpcEnvelope } from '@migaia/rpc-contract/protocol'
+import { jsonParser } from '@migaia/serialize/plugins'
+import { RpcJsonCarrierCodec } from '../../dist/sdk/carrier/json-codec.js'
 import {
   wrapAuthenticationEnvelope,
-  readAuthenticationEnvelope,
-  RpcAuthenticationEnvelope
-} from '../../dist/core/middleware/authentication-envelope.js'
+  readAuthenticationEnvelope
+} from '../../dist/plugins/auth/envelope.js'
+import { AuthenticationRepresentation } from '../../dist/plugins/auth/representation.js'
+import { RpcAuthenticationEnvelope } from '../../dist/plugins/auth/constants.js'
+import { codecContext, request } from '../core/fixtures/outbound-proof-candidate.js'
 
-/** Preserve byte-for-byte vectors through the same canonical generic codec. */
-const remoteProcessJsonCodec = createRuntimeBytePipeline('json-wire-fixture').codec
+/** The standalone public serialize parser receives its actual immutable fixture context. */
+const serializeContext = { signal: new AbortController().signal, context: 'wire-order-fixture' }
 
-/** Build an ordinary legal envelope without minting any private outbound snapshot provenance. */
-function createPlainEnvelope(reads: string[]): IRpcEnvelope {
-  /** Reused children expose traversal order and prove each occurrence is read independently. */
+it('current JSON preparation retains own field and getter order without a second caller traversal', async () => {
+  /** Reused children retain original descriptor order at each independently captured occurrence. */
+  const reads: string[] = []
+  /** Both occurrences belong to the original caller graph, never a test-owned snapshot. */
   const shared = {
     get z() {
       reads.push('shared.z')
@@ -32,85 +30,58 @@ function createPlainEnvelope(reads: string[]): IRpcEnvelope {
       return 4
     }
   }
-  return {
-    kind: 'request',
-    id: 'plain-wire',
-    method: 'echo',
-    data: {
-      route: {
-        profile: 'migaia.rpc.route',
-        type: 'request',
-        applicationVersion: '1',
-        senderId: 'a',
-        targetId: 'b',
-        sentAt: 0
+  /** One legal current envelope exercises exactly the original payload property arrangement. */
+  const envelope: IRpcEnvelope = {
+    ...request(),
+    payload: {
+      get b() {
+        reads.push('b')
+        return shared
       },
-      payload: {
-        get b() {
-          reads.push('b')
-          return shared
-        },
-        get '10'() {
-          reads.push('10')
-          return 10
-        },
-        get a() {
-          reads.push('a')
-          return shared
-        },
-        get '2'() {
-          reads.push('2')
-          return 2
-        }
+      get '10'() {
+        reads.push('10')
+        return 10
+      },
+      get a() {
+        reads.push('a')
+        return shared
+      },
+      get '2'() {
+        reads.push('2')
+        return 2
       }
     }
   }
-}
+  /** The actual executing codec is the sole sender capture and JSON projection owner. */
+  const codec = new RpcJsonCarrierCodec()
+  /** Successful preparation is reused by each actual encoding without re-reading caller getters. */
+  const prepared = await codec.prepare(envelope, codecContext)
+  assert.deepEqual(reads, ['2', '10', 'b', 'shared.z', 'shared.a', 'a', 'shared.z', 'shared.a'])
+  /** The selected serialize JSON implementation is the canonical byte-for-byte output oracle. */
+  const expected = JSON.stringify(prepared.message)
+  assert.deepEqual(jsonParser().encode(prepared.message, serializeContext), ['text', expected])
+  assert.equal(codec.encode(prepared, codecContext).data, expected)
+  assert.equal(codec.encode(prepared, codecContext).data, expected)
+  assert.equal(
+    JSON.stringify((prepared.message as Extract<IRpcEnvelope, { kind: 'call' }>).payload),
+    '{"2":2,"10":10,"b":{"z":3,"a":4},"a":{"z":3,"a":4}}'
+  )
+  assert.deepEqual(reads, ['2', '10', 'b', 'shared.z', 'shared.a', 'a', 'shared.z', 'shared.a'])
+})
 
-it('ordinary byte and object fallbacks retain own field and getter order', () => {
-  /** Both actual descriptors consume the same unowned caller envelope through their fallback. */
-  const reads: string[] = []
-  /** Plain input retains integer-key enumeration and reversed text-key insertion at two levels. */
-  const envelope = createPlainEnvelope(reads)
-  /** One portable admission precedes each format's own projection of the original getters. */
-  const admittedReads = ['2', '10', 'b', 'shared.z', 'shared.a', 'a', 'shared.z', 'shared.a']
-  /** Both canonical descriptors preserve the admitted portable input's own-key order. */
-  const objectCodec = createRuntimeObjectPipeline('json-wire-fixture').codec
-  /** The byte fallback delegates to the selected JSON codec's property enumeration order. */
-  const wire = remoteProcessJsonCodec.encode(envelope)
-  assert.equal(
-    wire,
-    '{"kind":"request","id":"plain-wire","method":"echo","data":{"route":{"profile":"migaia.rpc.route","type":"request","applicationVersion":"1","senderId":"a","targetId":"b","sentAt":0},"payload":{"2":2,"10":10,"b":{"z":3,"a":4},"a":{"z":3,"a":4}}}}'
-  )
-  assert.deepEqual(reads, [...admittedReads, ...admittedReads], 'byte admission and projection')
-  reads.length = 0
-  /** Object materialization retains the same traversal while integer output keys enumerate first. */
-  const object = objectCodec.encode(envelope)
-  assert.equal(
-    JSON.stringify(object),
-    '{"kind":"request","id":"plain-wire","method":"echo","data":{"route":{"profile":"migaia.rpc.route","type":"request","applicationVersion":"1","senderId":"a","targetId":"b","sentAt":0},"payload":{"2":2,"10":10,"b":{"z":3,"a":4},"a":{"z":3,"a":4}}}}'
-  )
-  assert.deepEqual(reads, [...admittedReads, ...admittedReads], 'object admission and projection')
-  /** Caller getter failure stays outside either format's error-normalization boundary. */
+it('retains the exact original payload getter failure through current preparation', async () => {
+  /** This is the real media codec rather than a legacy fallback alias. */
+  const codec = new RpcJsonCarrierCodec()
+  /** Original getter failure remains the exact observable thrown value through real admission. */
   const original = new Error('plain envelope getter failed')
-  /** The failing data getter is reachable during the same ordinary admission path. */
+  /** The same original hostile getter reaches the current metadata capture boundary. */
   const failing: IRpcEnvelope = {
-    ...envelope,
-    data: {
-      ...envelope.data,
-      get payload(): never {
-        throw original
-      }
+    ...request(),
+    get payload(): never {
+      throw original
     }
   }
-  assert.throws(
-    () => remoteProcessJsonCodec.encode(failing),
-    (error) => error === original
-  )
-  assert.throws(
-    () => objectCodec.encode(failing),
-    (error) => error === original
-  )
+  await assert.rejects(codec.prepare(failing, codecContext), (error) => error === original)
 })
 
 it('two portable inputs preserve null prototypes, frozen own snapshots and shared getter order', () => {
@@ -184,13 +155,10 @@ it('two portable inputs preserve null prototypes, frozen own snapshots and share
   assert.equal(Object.isFrozen((outputs[1]!.second as Record<string, unknown>).child), true)
 })
 
-it('process JSON and Worker signer input preserve integer keys, own text-key order and getter order', () => {
-  /**
-   * Deliberately reversed text keys and integer keys distinguish semantic sorting from insertion
-   * order.
-   */
+it('process JSON and signer metadata preserve integer keys, own text-key order and one getter capture', async () => {
+  /** Reversed text keys and integer keys distinguish ordinary enumeration from sorting. */
   const reads: string[] = []
-  /** Two-level caller data distinguishes graph traversal from metadata-only work. */
+  /** The original two-level caller graph is captured by the executing codec once. */
   const payload = {
     get z() {
       reads.push('z')
@@ -209,48 +177,29 @@ it('process JSON and Worker signer input preserve integer keys, own text-key ord
       return 2
     }
   }
-  /** Canonical outbound owner mints the private snapshot consumed by actual codecs. */
-  const envelope = createOutboundEnvelope({
-    kind: 'request',
-    id: 'fixture-wire',
-    method: 'echo',
-    data: {
-      route: {
-        profile: 'migaia.rpc.route',
-        type: 'request',
-        applicationVersion: '1',
-        senderId: 'a',
-        targetId: 'b',
-        sentAt: 0
-      },
-      payload
-    }
-  })
+  /** Actual media preparation replaces the removed owned-envelope factory. */
+  const codec = new RpcJsonCarrierCodec()
+  /** No payload getter is read by this fixture before the real codec does so. */
+  const prepared = await codec.prepare({ ...request(), payload }, codecContext)
   assert.deepEqual(reads, ['2', '10', 'z', 'a'], 'caller getter order unchanged')
-  /** Actual process codec output is compared byte-for-byte with the preserved wire spelling. */
-  const wire = remoteProcessJsonCodec.encode(envelope) as string
-  /** Pinned complete wire vector includes integer-key enumeration and own text-key order. */
-  const expected =
-    '{"kind":"request","id":"fixture-wire","method":"echo","data":{"route":{"profile":"migaia.rpc.route","type":"request","applicationVersion":"1","senderId":"a","targetId":"b","sentAt":0},"payload":{"2":2,"10":10,"z":1,"a":{"z":3,"a":2}}}}'
-  assert.equal(wire, expected, 'exact process JSON wire')
-  assert.equal(remoteProcessJsonCodec.encode(envelope), expected, 'prepared owned JSON wire')
-  assert.deepEqual(materializeOutboundJson(envelope), JSON.parse(expected))
+  /** The unchanged serialize encoder is the full current-profile byte oracle. */
+  const expected = JSON.stringify(prepared.message)
+  assert.deepEqual(jsonParser().encode(prepared.message, serializeContext), ['text', expected])
+  assert.equal(codec.encode(prepared, codecContext).data, expected, 'exact process JSON wire')
+  assert.equal(codec.encode(prepared, codecContext).data, expected, 'prepared JSON wire')
   assert.equal(
-    JSON.stringify(createRuntimeObjectPipeline('json-wire-fixture').codec.encode(envelope)),
-    expected,
-    'owned object codec keeps own key order'
+    JSON.stringify((prepared.message as Extract<IRpcEnvelope, { kind: 'call' }>).payload),
+    '{"2":2,"10":10,"z":1,"a":{"z":3,"a":2}}'
   )
-  assert.equal(
-    messageProcessPipeline.codec.encode(envelope),
-    envelope,
-    'Worker identity codec retains admitted snapshot'
-  )
-  /** Public fixture nonce pins signed grammar without any real credential. */
+  /** The fixture nonce is public, deterministic data rather than a credential. */
   const nonce = 'a'.repeat(32)
-  /** Actual authentication wrapper receives the exact process wire string. */
-  const processSignedInput = wrapAuthenticationEnvelope(wire, nonce, 1n)
+  /** Authentication binds the same prepared metadata instead of a second business projection. */
+  const binding = wrapAuthenticationEnvelope(prepared.message, nonce, 1n)
+  assert.equal(binding.payload, prepared.message, 'binding retains original prepared metadata')
+  /** Explicit string callbacks receive the canonical prefix and original five binding fields. */
+  const representation = new AuthenticationRepresentation('string')
   assert.equal(
-    processSignedInput,
+    representation.bound(binding),
     RpcAuthenticationEnvelope.prefix +
       JSON.stringify({
         authentication: RpcAuthenticationEnvelope.kind,
@@ -261,28 +210,27 @@ it('process JSON and Worker signer input preserve integer keys, own text-key ord
       }),
     'exact signer string input'
   )
-  /** Identity carrier signs the existing admitted snapshot without extra caller reads. */
-  const workerSignedInput = wrapAuthenticationEnvelope(envelope, nonce, 1n) as { payload: unknown }
-  assert.equal(
-    workerSignedInput.payload,
-    envelope,
-    'Worker signer receives original admitted snapshot'
-  )
   assert.deepEqual(reads, ['2', '10', 'z', 'a'], 'signing does not re-read caller getters')
 })
 
-it('string and Uint8Array signed grammar keeps binding fields, category and strict version admission', () => {
-  /** Public fixture nonce pins signed grammar without any real credential. */
+it('string and Uint8Array signed metadata keep binding fields, category and strict version admission', () => {
+  /** Original binding bytes stay deterministic across the two supported callback categories. */
   const nonce = 'b'.repeat(32)
-  for (const payload of ['signed-text', new Uint8Array([0, 127, 255])]) {
-    /** Canonical protected value retains its original transform category. */
-    const signed = wrapAuthenticationEnvelope(payload, nonce, 23n)
-    assert.equal(signed instanceof Uint8Array, payload instanceof Uint8Array)
-    /** Decode fixture bytes only to assert the complete signed grammar. */
+  for (const encoding of ['string', 'uint8array'] as const) {
+    /** The real representation owner controls the configured transform category. */
+    const representation = new AuthenticationRepresentation(encoding)
+    /** Binary business metadata has already been prepared before authentication executes. */
+    const payload = { text: 'signed-text', bytes: [0, 127, 255] }
+    /** The actual authentication owner mints the original nonce/counter field order. */
+    const binding = wrapAuthenticationEnvelope(payload, nonce, 23n)
+    /** Public callback inputs preserve their configured string or byte category. */
+    const signed = representation.bound(binding)
+    assert.equal(signed instanceof Uint8Array, encoding === 'uint8array')
+    /** Decode fixture bytes only to inspect the exact signed binding. */
     const text =
       signed instanceof Uint8Array ? new TextDecoder().decode(signed) : (signed as string)
     assert.ok(text.startsWith(RpcAuthenticationEnvelope.prefix))
-    /** Read each canonical binding field and its payload from the protected vector. */
+    /** Actual signed JSON preserves the five stable binding fields in their original order. */
     const bound = JSON.parse(text.slice(RpcAuthenticationEnvelope.prefix.length))
     assert.deepEqual(Object.keys(bound), [
       'authentication',
@@ -296,15 +244,23 @@ it('string and Uint8Array signed grammar keeps binding fields, category and stri
       version: 1,
       nonce,
       counter: '23',
-      payload: payload instanceof Uint8Array ? [...payload] : payload
+      payload:
+        encoding === 'uint8array'
+          ? Array.from(new TextEncoder().encode(JSON.stringify(payload)))
+          : JSON.stringify(payload)
     })
-    assert.deepEqual(readAuthenticationEnvelope(signed).payload, payload)
-    /** A cryptographically signed future version remains grammatically unsupported. */
+    assert.deepEqual(
+      representation.metadata(readAuthenticationEnvelope(representation.plaintext(signed)).payload),
+      payload
+    )
+    /** Unsupported binding versions retain the original public authentication error code. */
     const tampered = RpcAuthenticationEnvelope.prefix + JSON.stringify({ ...bound, version: 2 })
     assert.throws(
       () =>
         readAuthenticationEnvelope(
-          payload instanceof Uint8Array ? new TextEncoder().encode(tampered) : tampered
+          representation.plaintext(
+            encoding === 'uint8array' ? new TextEncoder().encode(tampered) : tampered
+          )
         ),
       { code: 'AUTHENTICATION_FAILED' },
       'unsupported signed version fails closed'

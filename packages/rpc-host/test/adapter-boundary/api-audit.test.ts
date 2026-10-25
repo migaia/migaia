@@ -1,36 +1,30 @@
 import { expect, it, vi } from 'vitest'
-import { createRuntimeByteConnection } from '../../dist/runtime-adapter/byte/handshake.js'
-import { createRuntimeMessageConnection } from '../../dist/runtime-adapter/message/connection.js'
-import { connectionOptions, diagnostics, duplex, reaches } from './audit-byte-fixture.js'
-import { createRpcHost } from '../../dist/index.js'
-import { defineTransportPlugin } from '../../dist/plugin/define.js'
-import { defineByteAdapter } from '../../dist/runtime-adapter/definition.js'
+import { createRpcHost } from '@migaia/rpc-host'
+import {
+  createRpcByteCarrier,
+  createRpcMessageCarrier,
+  defineTransportPlugin
+} from '@migaia/rpc-host/sdk'
+import { auth } from '@migaia/rpc-host/plugins/auth'
+import { duplex, reaches } from './audit-byte-fixture.js'
 
 it('refuses a pre-aborted peer signal before opening its byte source', async () => {
-  /** A complete byte source remains available, but cancellation must prevent acquisition. */
+  /** Physical acquisition is separate from cold native plugin definition. */
   const physical = duplex()
-  /** Opening is counted separately from handshake writes. */
-  const open = vi.fn(() => physical.ports[0]!)
-  /** This real public definition performs ordinary source admission. */
-  const adapter = defineByteAdapter({ open })
-  /** The original native cancellation reason remains the public rejection object. */
+  /** Actual acquisition remains uncalled when the public caller is already cancelled. */
+  const open = vi.fn(async () => ({ dispose: () => undefined }))
+  /** The original native reason must remain the public cancellation cause. */
   const original = new Error('audit cancel before opening')
-  /** Cancel before calling the factory to test its earliest supported admission boundary. */
+  /** This controller is already terminal before the Host may install native resources. */
   const controller = new AbortController()
   controller.abort(original)
-  /** Observe immediately so both the fixed and broken constructions can be safely reclaimed. */
+  /** Observe the real construction failure without introducing another cancellation owner. */
   const attempt = Promise.resolve()
     .then(() =>
       createRpcHost({
         self: { name: 'local', instanceId: 'local' },
         signal: controller.signal,
-        plugins: [
-          defineTransportPlugin({
-            name: 'audit',
-            mode: 'connect',
-            deployment: adapter.deployment({ connect: {}, peerId: 'remote' })
-          })
-        ]
+        plugins: [defineTransportPlugin({ name: 'audit', namespace: 'byte', open })]
       })
     )
     .catch((error: unknown) => error)
@@ -46,27 +40,31 @@ it('refuses a pre-aborted peer signal before opening its byte source', async () 
 })
 
 it('aborts and physically releases an in-progress byte handshake', async () => {
-  /** No responder is started: the actual outgoing hello remains pending for its peer reply. */
+  /** The original raw stream stays silent; only the real local hello can be written. */
   const physical = duplex()
-  /** Observe the genuine first write rather than waiting for an arbitrary timeout. */
+  /** The first actual byte handoff starts cancellation, independently from any timer. */
   let written!: () => void
-  /** This gate owns only the test observation of the real writer. */
+  /** This barrier observes physical work without manufacturing accepted Session readiness. */
   const firstWrite = new Promise<void>((resolve) => {
     written = resolve
   })
-  /** Retain the supported writer's closure and preserve its physical byte delivery. */
+  /** Preserve the native writer, including its original frame delivery. */
   const write = physical.ports[0]!.write
-  vi.spyOn(physical.ports[0]!, 'write').mockImplementation(async (bytes) => {
+  vi.spyOn(physical.ports[0]!, 'write').mockImplementation(async (bytes, options) => {
     written()
-    await write(bytes)
+    await write(bytes, options)
   })
-  /** The caller cancels only this construction's handshake. */
+  /** One original caller controller owns construction cancellation. */
   const controller = new AbortController()
-  /** The definition supplies actual held byte I/O without a fabricated agreement. */
-  const adapter = defineByteAdapter({ open: () => physical.ports[0]! })
-  /** Settlement is recorded before the finally block manually closes either physical side. */
+  /** Original caller cancellation remains reachable after the real native rollback. */
+  const original = new Error('audit cancel active handshake')
+  /** The native caller signal owns this actual abort subscription remover. */
+  const remove = vi.spyOn(controller.signal, 'removeEventListener')
+  /** Observe the actual public failure separately from physical close counts. */
+  let failure: unknown
+  /** Public settlement must precede manual fixture cleanup. */
   let settled = false
-  /** Observe all outcomes so a broken implementation cannot leave an unhandled construction. */
+  /** The SDK attaches one real acquired carrier and waits for its actual handshake only. */
   const attempt = Promise.resolve()
     .then(() =>
       createRpcHost({
@@ -75,126 +73,138 @@ it('aborts and physically releases an in-progress byte handshake', async () => {
         plugins: [
           defineTransportPlugin({
             name: 'audit',
-            mode: 'connect',
-            deployment: adapter.deployment({ connect: {}, peerId: 'remote' })
+            namespace: 'byte',
+            async open(context) {
+              const carrier = createRpcByteCarrier({
+                id: 'local-byte',
+                io: physical.ports[0]!,
+                report: context.report
+              })
+              await context.attach(carrier, { expectedPeerId: 'remote' }).ready
+              return { dispose: () => undefined }
+            }
           })
         ]
       })
     )
     .then(
-      (peer) => {
+      (host) => {
         settled = true
-        return peer.close()
+        return host.close()
       },
-      () => {
+      (error: unknown) => {
+        failure = error
         settled = true
       }
     )
   try {
     await firstWrite
-    controller.abort(new Error('audit cancel active handshake'))
+    controller.abort(original)
     await new Promise<void>((resolve) => setImmediate(resolve))
     expect(settled).toBe(true)
     expect(physical.states[0]!.closes).toBe(1)
+    expect(reaches(failure, original)).toBe(true)
+    expect(remove).toHaveBeenCalledWith('abort', expect.any(Function))
+    expect(physical.states[0]!.data.size).toBe(0)
   } finally {
     physical.close()
     await attempt
+    remove.mockRestore()
   }
 })
 
 it('releases remaining IPC resources and the physical stream after an owned close fails', async () => {
-  /** Both sides complete the public control exchange before cleanup is admitted. */
+  /** SDK carrier cleanup owns the actual acquired native subscription removers. */
   const physical = duplex()
-  /** Preserve this actual failure while proving later releases still execute. */
+  /** This original cleanup failure must remain the single public rejection instance. */
   const original = new Error('audit owned close failed')
-  /** The existing connection owner releases registered resources in acquisition order. */
+  /** Actual release order remains observable at the native resource boundary. */
   const released: string[] = []
+  /** Original listener removal is retained while observing failure and later cleanup. */
+  const onData = physical.ports[0]!.onData
+  /** Native LIFO removes close/error subscriptions before the original byte reader. */
+  const onClose = physical.ports[0]!.onClose
+  vi.spyOn(physical.ports[0]!, 'onData').mockImplementation((listener) => {
+    const remove = onData(listener)
+    return () => {
+      remove()
+      released.push('second')
+    }
+  })
+  vi.spyOn(physical.ports[0]!, 'onClose').mockImplementation((listener) => {
+    const remove = onClose(listener)
+    return () => {
+      remove()
+      released.push('first')
+      throw original
+    }
+  })
+  /** This actual factory acquires both listeners before its one close transaction can begin. */
+  const left = createRpcByteCarrier({
+    id: 'cleanup-byte',
+    io: physical.ports[0]!,
+    report: () => undefined
+  })
   try {
-    /** Actual negotiated connections own their independent physical streams. */
-    const [left, right] = await Promise.all([
-      createRuntimeByteConnection(
-        physical.ports[0]!,
-        { ...connectionOptions('left', 'right'), role: 'initiator' },
-        diagnostics
-      ),
-      createRuntimeByteConnection(
-        physical.ports[1]!,
-        { ...connectionOptions('right', 'left'), role: 'responder', auth: { mode: 'none' } },
-        diagnostics
-      )
-    ])
-    left.ownClose({
-      close() {
-        released.push('first')
-        throw original
-      }
-    })
-    left.ownClose({
-      close() {
-        released.push('second')
-      }
-    })
-    /** The first close Promise remains stable even when the cleanup transaction rejects. */
     const closing = left.close()
     expect(left.close()).toBe(closing)
     await expect(closing).rejects.toBe(original)
     expect(released).toEqual(['first', 'second'])
     expect(physical.states[0]!.closes).toBe(1)
     expect(physical.states[0]!.data.size).toBe(0)
-    await right.close()
   } finally {
     physical.close()
   }
 })
 
 it('contains a transport error listener failure and still closes the message port once', async () => {
-  /** These sets observe the actual structural port subscriptions. */
+  /** Original native listener sets expose actual SDK remover behavior. */
   const messages = new Set<(value: unknown) => void>()
-  /** Physical terminal callbacks have a separate remover. */
+  /** Terminal listeners have an independent original disposer. */
   const closes = new Set<(reason?: unknown) => void>()
-  /** Native release is independently counted, rather than inferred from logical closed state. */
+  /** Physical release is counted separately from logical closure. */
   const close = vi.fn()
-  /** Listener failures use the existing connection reporter, as on byte carriers. */
+  /** The actual carrier reporter must retain the failing listener by exact identity. */
   const report = vi.fn()
-  /** A supported whole-message port needs no handshake for the fixed capability subset. */
-  const io = {
-    kind: 'message' as const,
-    send() {},
-    onMessage(listener: (value: unknown) => void) {
-      messages.add(listener)
-      return () => {
-        messages.delete(listener)
-      }
-    },
-    onClose(listener: (reason?: unknown) => void) {
-      closes.add(listener)
-      return () => {
-        closes.delete(listener)
-      }
-    },
-    close
-  }
-  /** This public source owns the transport's actual close operation. */
-  const connection = await createRuntimeMessageConnection(
-    io,
-    { ...connectionOptions('message', 'other', report), offer: ['batch@1'] },
-    diagnostics
-  )
-  /** The exact callback failure must be reported without blocking physical teardown. */
-  const original = new Error('audit transport listener failed')
-  /** The synchronous callback reenters the same close owner before throwing. */
-  let nested: Promise<void> | undefined
-  /** Bound the fixture to one reentry even when running against the broken implementation. */
-  let reentered = false
-  connection.transport.onTransportError?.(() => {
-    if (!reentered) {
-      reentered = true
-      nested = connection.close()
-      void nested.catch(() => {})
+  /** This remains a raw physical source; Session and request behavior are not fabricated. */
+  const connection = createRpcMessageCarrier({
+    id: 'message',
+    report,
+    io: {
+      send() {},
+      onMessage(listener) {
+        messages.add(listener)
+        return () => {
+          messages.delete(listener)
+        }
+      },
+      onClose(listener) {
+        closes.add(listener)
+        return () => {
+          closes.delete(listener)
+        }
+      },
+      close
     }
-    throw original
   })
-  /** The source wrapper awaits the one physical teardown even when a listener reenters it. */
+  /** Public observer failure cannot prevent native resource release. */
+  const original = new Error('audit transport listener failed')
+  /** Reentrant close borrows the same native carrier completion. */
+  let nested: Promise<void> | undefined
+  /** The fixture reenters once without creating another close lifecycle. */
+  let reentered = false
+  connection.subscribe({
+    frame() {},
+    error() {},
+    close() {
+      if (!reentered) {
+        reentered = true
+        nested = connection.close()
+        void nested.catch(() => undefined)
+      }
+      throw original
+    }
+  })
   const closing = connection.close()
   await closing
   await nested
@@ -205,39 +215,52 @@ it('contains a transport error listener failure and still closes the message por
 })
 
 it('keeps the verifier failure out of every report, cause and peer rejection', async () => {
-  /** Real control bytes, not a forged agreement, connect the two supported public operations. */
+  /** Real byte IO and bilateral Session handshakes carry the actual rejection. */
   const physical = duplex()
-  /** Stands in for a verifier exception that carries the offered token. */
+  /** The offered verifier failure deliberately contains a private diagnostic marker. */
   const original = new Error('AUDIT_ONLY_PRIVATE_VERIFIER_FAILURE')
-  /** Reports must still arrive, but without the verifier exception (handshake redaction). */
+  /** Both actual reporters must receive only the established redacted diagnostics. */
   const reports: unknown[] = []
-  /** Observe actual reject bytes while preserving the real ordered writer. */
+  /** Observe real rejection bytes while leaving the original framing/write implementation intact. */
   const writes = vi.spyOn(physical.ports[1]!, 'write')
   try {
-    /** Both construction rejections settle and release their handshake timers. */
-    const result = await Promise.allSettled([
-      createRuntimeByteConnection(
-        physical.ports[0]!,
-        { ...connectionOptions('left', 'right'), role: 'initiator' },
-        diagnostics
-      ),
-      createRuntimeByteConnection(
-        physical.ports[1]!,
-        {
-          ...connectionOptions('right', 'left', (error) => {
+    const result = await Promise.allSettled(
+      [0, 1].map((index) =>
+        createRpcHost({
+          self: {
+            name: index === 0 ? 'left' : 'right',
+            instanceId: index === 0 ? 'left' : 'right'
+          },
+          report: (error) => {
             reports.push(error)
-          }),
-          role: 'responder',
-          auth: {
-            mode: 'required',
-            verify() {
-              throw original
-            }
-          }
-        },
-        diagnostics
+          },
+          plugins: [
+            ...(index === 1
+              ? [
+                  auth({
+                    verifyCredentials() {
+                      throw original
+                    }
+                  })
+                ]
+              : []),
+            defineTransportPlugin({
+              name: 'audit',
+              namespace: 'byte',
+              async open(context) {
+                const carrier = createRpcByteCarrier({
+                  id: `byte-${index}`,
+                  io: physical.ports[index]!,
+                  report: context.report
+                })
+                await context.attach(carrier).ready
+                return { dispose: () => undefined }
+              }
+            })
+          ]
+        })
       )
-    ])
+    )
     expect(result.map((value) => value.status)).toEqual(['rejected', 'rejected'])
     expect(reports.length).toBeGreaterThan(0)
     expect(reports.some((error) => reaches(error, original))).toBe(false)

@@ -1,651 +1,568 @@
-import { createRuntimeEndpointComposition } from '../../src/core/runtime-api-endpoint.js'
-
-import { connect } from '../../src/core/middleware/connect.js'
+/** Native acquisition owners and the real ProbeEmitter receive every original observation oracle. */
 import { EventEmitter } from 'node:events'
 import { MessageChannel } from 'node:worker_threads'
 import { describe, expect, it, vi } from 'vitest'
-import type { IRpcCarrierProbe } from '../../src/core/probe/index.js'
-import type { IRpcTransport } from '../../src/core/transport.js'
-import type { IRpcProvider } from '../../src/core/typing.js'
-import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
+import { createRpcHost } from '@migaia/rpc-host'
+import { defineTransportPlugin } from '@migaia/rpc-host/sdk'
 import {
-  createNodeMessagePortTransport,
-  createBrowserMessagePortTransport
-} from '../../src/core/adapters/message-port.js'
-import { createWebWorkerTransport } from '../../src/core/adapters/web-worker.js'
+  createProbeEmitter,
+  defineProbe,
+  RpcProbeStage,
+  type IRpcProbeEventView
+} from '@migaia/rpc-host/plugins/probe'
+import type {
+  IRpcCarrier,
+  IRpcCarrierFrame,
+  IRpcCarrierObservationEvent,
+  IRpcCarrierWriteOptions
+} from '@migaia/rpc-contract/interfaces'
+import { createNodeThreadCarrier } from '../../../rpc-plugin-thread/dist/threads/channel.js'
+import { createSharedWorkerCarrier } from '../../../rpc-plugin-browser/dist/browser/adapters/shared-worker.js'
+import { createDedicatedWorkerCarrier } from '../../../rpc-plugin-browser/dist/browser/adapters/dedicated-worker.js'
+import type { IBrowserEventPort } from '../../../rpc-plugin-browser/dist/browser/native-message.js'
+import { MemoryCarrier } from '../fixtures/core-carrier.js'
 
-/** Snapshot only the reusable detail map; captured payload identity remains observable. */
-function recorder(capturing = false) {
-  /** Retain synchronous probe output while captured content keeps its original identity. */
-  const events: {
-    direction: number
-    size: number
-    carrier: string
-    detail: unknown
-    content: unknown
-  }[] = []
-  /** Install the direct carrier contract so assertions do not depend on probe-core instrumentation. */
-  const probe: IRpcCarrierProbe = {
-    capturing,
-    emit(direction, size, carrier, detail, content) {
-      events.push({ direction, size, carrier, detail: detail && { ...detail }, content })
+/** Only original native callback registrations and native structured-clone delivery live here. */
+class NativeMessages {
+  /** Node acquisition uses the actual EventEmitter callback form. */
+  readonly node = Object.assign(new EventEmitter(), {
+    postMessage: (value: unknown, transfer?: readonly unknown[]) => this.#post(value, transfer)
+  })
+  /** Browser acquisition uses actual EventTarget delivery rather than translated Node callbacks. */
+  readonly #events = new EventTarget()
+  /** The fixture records actual native callback custody without implementing a second dispatcher. */
+  readonly #listeners = new Map<string, Set<EventListener>>()
+  /** Late subscription checks count only actual native registration. */
+  readonly add = vi.fn((type: string, listener: EventListener) => {
+    this.#events.addEventListener(type, listener)
+    let group = this.#listeners.get(type)
+    if (!group) this.#listeners.set(type, (group = new Set()))
+    group.add(listener)
+  })
+  /** Real browser source operations retain their original native receiver. */
+  readonly web: IBrowserEventPort = {
+    postMessage: (value, transfer) => this.#post(value, transfer),
+    start() {},
+    addEventListener: this.add,
+    removeEventListener: (type, listener) => {
+      this.#events.removeEventListener(type, listener)
+      this.#listeners.get(type)?.delete(listener)
     }
   }
-  return { events, probe }
+  /** Inspect native custody without granting Session or observation authority. */
+  count(type: string): number {
+    return this.#listeners.get(type)?.size ?? 0
+  }
+  /** Structured clone is the actual native transfer boundary; delivery follows its original task. */
+  #post(value: unknown, transfer?: readonly unknown[]): void {
+    /** The cloned physical frame, rather than captured content, feeds native delivery. */
+    const data = structuredClone(value, { transfer: transfer as Transferable[] | undefined })
+    queueMicrotask(() => {
+      this.node.emit('message', data)
+      this.#events.dispatchEvent(new MessageEvent('message', { data }))
+    })
+  }
 }
 
-/** Controlled native delivery preserves structured-clone transfer detachment. */
-function fixture(kind: 'node' | 'browser' | 'worker') {
-  /**
-   * EventTarget delivery keeps browser and Worker adapter behavior aligned with native message
-   * events.
-   */
-  const messages = new EventTarget()
-  /** EventEmitter I/O retains Node message shape and exposes the actual physical transfer operation. */
-  const native = Object.assign(new EventEmitter(), {
-    postMessage(message: unknown, transfer?: readonly unknown[]) {
-      /**
-       * Native clone output preserves physical postMessage delivery and transfer detachment in the
-       * fixture.
-       */
-      const data = structuredClone(message, { transfer: transfer as Transferable[] | undefined })
-      queueMicrotask(() => {
-        native.emit('message', data)
-        messages.dispatchEvent(new MessageEvent('message', { data }))
-      })
-    }
-  })
-  /** The held port exposes physical messaging and native hook ownership without a runtime launcher. */
-  const port = {
-    postMessage: native.postMessage,
-    start: () => undefined,
-    close: () => undefined,
-    addEventListener: (event: string, listener: EventListener) =>
-      messages.addEventListener(event, listener),
-    removeEventListener: (event: string, listener: EventListener) =>
-      messages.removeEventListener(event, listener)
+/** One synchronous projection records original payload identity and bytes before actual detach. */
+type IRecorded = Readonly<{
+  direction: number
+  size: number
+  detail: IRpcProbeEventView['detail']
+  content: unknown
+  beforeTransfer?: readonly number[]
+}>
+
+/** Canonical public ProbeEmitter remains the sole filtering/capture owner. */
+class ProbeCapture {
+  /** Observations are never used to deliver business frames. */
+  readonly events: IRecorded[] = []
+  /** The actual public emitter owns mask selection, capture and callback errors. */
+  readonly #emitter
+  /** Construct no transport observation facade or captured-byte delivery path. */
+  constructor(capturing = false) {
+    this.#emitter = createProbeEmitter(
+      [
+        defineProbe({
+          stages: ['carrier'],
+          capture: capturing ? ['carrier'] : [],
+          emit: this.#record
+        })
+      ],
+      () => 0,
+      'native-observe',
+      () => undefined
+    )
   }
-  /** Exercise the final carrier boundary so observation assertions cover actual native I/O. */
-  const transport: IRpcTransport =
-    kind === 'node'
-      ? createNodeMessagePortTransport(native)
-      : kind === 'browser'
-        ? createBrowserMessagePortTransport(port)
-        : createWebWorkerTransport(port)
-  return transport
+  /** Native events enter the public capture implementation unchanged. */
+  readonly receive = (event: IRpcCarrierObservationEvent): void => {
+    this.#emitter.emit({ ...event, stage: RpcProbeStage.carrier })
+  }
+  /** Current frame containers are projected only at the assertion boundary. */
+  readonly #record = (view: IRpcProbeEventView): void => {
+    /** Original bytes are read synchronously before the native postMessage handoff. */
+    const data = (view.content as IRpcCarrierFrame | undefined)?.data
+    this.events.push({
+      direction: view.direction,
+      size: view.sizeBytes,
+      detail: view.detail && { ...view.detail },
+      content: data,
+      beforeTransfer:
+        data instanceof ArrayBuffer
+          ? Array.from(new Uint8Array(data))
+          : data instanceof Uint8Array
+            ? Array.from(data)
+            : undefined
+    })
+  }
+  /** Release the actual emitter's stage subscriptions. */
+  close(): void {
+    this.#emitter.dispose()
+  }
+}
+
+/** Fixed source kinds select genuine current native owners; no retired transport methods are added. */
+const kinds = ['node', 'browser', 'worker'] as const
+
+/** Each concrete source acquires its real SDK carrier and native observation capability. */
+function open(
+  kind: (typeof kinds)[number],
+  native: NativeMessages,
+  report: (error: unknown) => void
+): IRpcCarrier {
+  if (kind === 'node') return createNodeThreadCarrier(native.node, 'node-native', report)
+  if (kind === 'browser') return createSharedWorkerCarrier(native.web, { report })
+  return createDedicatedWorkerCarrier(native.web, { report })
 }
 
 describe('Core physical carrier observation', () => {
   it('memory observes each physical delivery once with original content and no detail keys', async () => {
-    const [left, right] = createMemoryTransportPair()
-    /**
-     * Keep emitted observations so direction, capture identity and disposal can be asserted
-     * independently.
-     */
-    const observed = recorder(true)
-    left.observe!(observed.probe)
-    right.observe!(observed.probe)
-    /**
-     * Count business message delivery independently of observation callbacks and reporting
-     * failures.
-     */
+    /** Original reference delivery uses the existing real carrier fixture. */
+    const left = new MemoryCarrier('left'),
+      right = new MemoryCarrier('right')
+    left.link(right)
+    right.link(left)
+    /** One actual public capture receives both physical directions. */
+    const observed = new ProbeCapture(true)
+    left.observation.subscribe(observed.receive)
+    right.observation.subscribe(observed.receive)
+    /** Actual physical delivery is independent from observation. */
     const receive = vi.fn()
-    right.subscribe(receive)
-    /** Native payload anchors content-reference assertions across physical send and receive. */
+    right.subscribe({ frame: receive, close() {}, error() {} })
+    /** Native payload identity remains the original caller object. */
     const payload = { value: 7 }
-    left.send(payload)
-    await Promise.resolve()
-    expect(receive).toHaveBeenCalledExactlyOnceWith({ data: payload })
-    expect(observed.events).toEqual([
-      { direction: 0, size: -1, carrier: 'Memory', detail: undefined, content: payload },
-      { direction: 1, size: -1, carrier: 'Memory', detail: undefined, content: payload }
-    ])
-    expect(observed.events[0]!.content).toBe(payload)
-    left.close()
-    left.observe!(observed.probe)
-    expect(() => left.send(payload)).toThrow()
-    expect(observed.events).toHaveLength(2)
-  })
-  it('memory isolates both probe failures and disposes same-probe generations', async () => {
-    const [left, right] = createMemoryTransportPair()
-    /**
-     * Keep emitted observations so direction, capture identity and disposal can be asserted
-     * independently.
-     */
-    const observed = recorder()
-    /** This older disposer must not retire a newer installation of the same probe object. */
-    const obsolete = left.observe!(observed.probe)
-    /** The latest installation owns disposal even when the same probe object is installed again. */
-    const current = left.observe!(observed.probe)
-    obsolete()
-    /**
-     * Count business message delivery independently of observation callbacks and reporting
-     * failures.
-     */
-    const receive = vi.fn()
-    right.subscribe(receive)
-    left.send(1)
-    await Promise.resolve()
-    expect(observed.events).toHaveLength(1)
-    expect(observed.events[0]!.content).toBeUndefined()
-    current()
-    current()
-    left.send(2)
-    await Promise.resolve()
-    expect(observed.events).toHaveLength(1)
-    /**
-     * Original failure identity must remain reachable through reporting without failing message
-     * delivery.
-     */
-    const cause = new Error('memory probe failure')
-    /** Record failure delivery so reporting count and original error identity can be asserted. */
-    const errors = vi.fn()
-    /**
-     * Release the sender diagnostic registration before pair shutdown emits its ordinary terminal
-     * error.
-     */
-    const removeLeft = left.onListenerError!(errors)
-    /**
-     * Release the receiver diagnostic registration before pair shutdown emits its ordinary terminal
-     * error.
-     */
-    const removeRight = right.onListenerError!(errors)
-    /**
-     * Install the direct carrier contract so assertions do not depend on probe-core
-     * instrumentation.
-     */
-    const probe = {
-      capturing: false,
-      emit() {
-        throw cause
-      }
+    /** BC2 adds only the actual current carrier frame container. */
+    const frame: IRpcCarrierFrame = { kind: 'message', data: payload }
+    try {
+      await left.write(frame)
+      expect(receive).toHaveBeenCalledExactlyOnceWith(frame)
+      expect(
+        observed.events.map(({ direction, size, detail, content }) => ({
+          direction,
+          size,
+          detail,
+          content
+        }))
+      ).toEqual([
+        { direction: 0, size: -1, detail: undefined, content: payload },
+        { direction: 1, size: -1, detail: undefined, content: payload }
+      ])
+      expect(observed.events[0]!.content).toBe(payload)
+      expect(left.observation.facts.platform).toBe('Memory')
+      expect(right.observation.facts.platform).toBe('Memory')
+      await left.close()
+      left.observation.subscribe(observed.receive)
+      await expect(left.write(frame)).rejects.toBeDefined()
+      expect(observed.events).toHaveLength(2)
+    } finally {
+      await Promise.all([left.close(), right.close()])
+      observed.close()
     }
-    left.observe!(probe)
-    right.observe!(probe)
-    left.send(3)
-    await Promise.resolve()
-    expect(receive).toHaveBeenCalledTimes(3)
-    expect(errors).toHaveBeenCalledTimes(2)
-    for (const [error] of errors.mock.calls)
-      expect(error).toMatchObject({ source: 'rpc.endpoint', code: 'TRANSPORT', cause })
-    removeLeft()
-    removeRight()
-    left.close()
   })
-  it.each(['node', 'browser', 'worker'] as const)(
-    '%s emits exact bytes and transfers without changing delivery',
-    async (kind) => {
-      /** Exercise the final carrier boundary so observation assertions cover actual native I/O. */
-      const transport = fixture(kind)
-      /**
-       * Keep emitted observations so direction, capture identity and disposal can be asserted
-       * independently.
-       */
-      const observed = recorder(true)
-      transport.observe!(observed.probe)
-      /**
-       * Count business message delivery independently of observation callbacks and reporting
-       * failures.
-       */
-      const receive = vi.fn()
-      /**
-       * Release message delivery independently of the observation disposer and native port
-       * ownership.
-       */
-      const unsubscribe = transport.subscribe(receive)
-      /** Native byte payload proves transfer detachment and captured byte preservation together. */
+
+  it('memory disposes same-probe generations without changing business delivery', async () => {
+    /** Both actual physical endpoints keep their original delivery and observation owner. */
+    const left = new MemoryCarrier('left'),
+      right = new MemoryCarrier('right')
+    left.link(right)
+    right.link(left)
+    /** Metadata-only capture never reads business payload. */
+    const observed = new ProbeCapture()
+    /** Same callback replacement gives each admission an exact original remover. */
+    const obsolete = left.observation.subscribe(observed.receive)
+    /** The current record is independent from that older remover. */
+    const current = left.observation.subscribe(observed.receive)
+    await obsolete()
+    /** Actual business deliveries remain counted outside capture. */
+    const receive = vi.fn()
+    right.subscribe({ frame: receive, close() {}, error() {} })
+    try {
+      await left.write({ kind: 'message', data: 1 })
+      expect(observed.events).toHaveLength(1)
+      expect(observed.events[0]!.content).toBeUndefined()
+      await current()
+      await current()
+      await left.write({ kind: 'message', data: 2 })
+      expect(observed.events).toHaveLength(1)
+      expect(receive).toHaveBeenCalledTimes(2)
+    } finally {
+      await Promise.all([left.close(), right.close()])
+      observed.close()
+    }
+  })
+
+  it.each(kinds)('%s emits exact bytes and transfers without changing delivery', async (kind) => {
+    /** The native source is the actual owner of structured-clone transfer. */
+    const carrier = open(kind, new NativeMessages(), () => undefined)
+    /** Public capture observes native send before detach and native receive afterwards. */
+    const observed = new ProbeCapture(true)
+    carrier.observation!.subscribe(observed.receive)
+    /** Delivery comes only from native callbacks. */
+    const receive = vi.fn()
+    carrier.subscribe({ frame: receive, close() {}, error() {} })
+    try {
+      /** Original transferred bytes retain their exact native detachment effect. */
       const bytes = new Uint8Array([7, 8, 9])
-      transport.send(bytes, { transfer: [bytes.buffer] })
+      /** The real physical operation accepts a current frame container. */
+      const pending = carrier.write({ kind: 'message', data: bytes }, { transfer: [bytes.buffer] })
       expect(bytes.byteLength).toBe(0)
-      await Promise.resolve()
+      expect(observed.events[0]!.beforeTransfer).toEqual([7, 8, 9])
+      await pending
       expect(receive).toHaveBeenCalledTimes(1)
       expect(observed.events).toHaveLength(2)
-      expect(observed.events.map((event) => [event.direction, event.size, event.detail])).toEqual([
-        [0, 3, { transfers: 1 }],
-        [1, 3, { transfers: -1 }]
+      expect(
+        observed.events.map((event) => [event.direction, event.size, event.detail?.transfers])
+      ).toEqual([
+        [0, -1, 1],
+        [1, -1, -1]
       ])
-      expect(Array.from(observed.events[0]!.content as Uint8Array)).toEqual([7, 8, 9])
       expect(observed.events[1]!.content).toBe(receive.mock.calls[0]![0].data)
-      unsubscribe()
-      await transport.close?.()
+    } finally {
+      await carrier.close()
+      observed.close()
     }
-  )
-  it.each(['node', 'browser', 'worker'] as const)(
-    '%s keeps non-transferred content by reference',
-    async (kind) => {
-      /** Exercise the final carrier boundary so observation assertions cover actual native I/O. */
-      const transport = fixture(kind)
-      /**
-       * Keep emitted observations so direction, capture identity and disposal can be asserted
-       * independently.
-       */
-      const observed = recorder(true)
-      transport.observe!(observed.probe)
-      /**
-       * Release the existing message or diagnostic registration without claiming physical port
-       * closure.
-       */
-      const remove = transport.subscribe(() => undefined)
-      /** Native payload anchors content-reference assertions across physical send and receive. */
-      const payload = { bytes: new Uint8Array([1, 2]) }
-      transport.send(payload)
+  })
+
+  it.each(kinds)('%s keeps non-transferred content by reference', async (kind) => {
+    /** No transfer is requested from the actual source. */
+    const carrier = open(kind, new NativeMessages(), () => undefined)
+    /** The public capture policy retains original object roots by reference. */
+    const observed = new ProbeCapture(true)
+    carrier.observation!.subscribe(observed.receive)
+    carrier.subscribe({ frame() {}, close() {}, error() {} })
+    /** Original nested native storage is ordinary structured-clone data. */
+    const payload = { bytes: new Uint8Array([1, 2]) }
+    try {
+      await carrier.write({ kind: 'message', data: payload })
       expect(observed.events[0]!.content).toBe(payload)
-      await Promise.resolve()
-      remove()
-      await transport.close?.()
+    } finally {
+      await carrier.close()
+      observed.close()
     }
-  )
-  it.each(['node', 'browser', 'worker'] as const)(
-    '%s isolates probe emit/capturing failures and retires generations',
-    async (kind) => {
-      /** Exercise the final carrier boundary so observation assertions cover actual native I/O. */
-      const transport = fixture(kind)
-      /**
-       * Keep emitted observations so direction, capture identity and disposal can be asserted
-       * independently.
-       */
-      const observed = recorder()
-      /** This older disposer must not retire a newer installation of the same probe object. */
-      const obsolete = transport.observe!(observed.probe)
-      /** The latest installation owns disposal even when the same probe object is installed again. */
-      const current = transport.observe!(observed.probe)
-      obsolete()
-      obsolete()
-      /**
-       * Count business message delivery independently of observation callbacks and reporting
-       * failures.
-       */
-      const receive = vi.fn()
-      /**
-       * Release the existing message or diagnostic registration without claiming physical port
-       * closure.
-       */
-      const remove = transport.subscribe(receive)
-      transport.send(7)
-      await Promise.resolve()
+  })
+
+  it.each(kinds)('%s isolates raw observer failure and retires generations', async (kind) => {
+    /** Physical reporting remains the original native acquisition report port. */
+    const errors = vi.fn()
+    /** The real selected owner wraps or passes its original observer error policy. */
+    const carrier = open(kind, new NativeMessages(), errors)
+    /** Metadata-only recording proves capture selection rather than test-side filtering. */
+    const observed = new ProbeCapture()
+    /** Obsolete removers cannot remove a current subscription using the same callback. */
+    const obsolete = carrier.observation!.subscribe(observed.receive)
+    /** Only this record owns the current native observation callback. */
+    const current = carrier.observation!.subscribe(observed.receive)
+    await obsolete()
+    await obsolete()
+    /** Business delivery count is independent from reporting. */
+    const receive = vi.fn()
+    carrier.subscribe({ frame: receive, close() {}, error() {} })
+    try {
+      await carrier.write({ kind: 'message', data: 7 })
       expect(observed.events).toHaveLength(2)
       expect(observed.events.every((event) => event.content === undefined)).toBe(true)
-      current()
-      current()
-      transport.send(8)
-      await Promise.resolve()
+      await current()
+      await current()
+      await carrier.write({ kind: 'message', data: 8 })
       expect(observed.events).toHaveLength(2)
-      /**
-       * Original failure identity must remain reachable through reporting without failing message
-       * delivery.
-       */
+      /** The original native error instance must remain reachable on every report. */
       const cause = new TypeError('probe failure')
-      /** Record failure delivery so reporting count and original error identity can be asserted. */
-      const errors = vi.fn()
-      /** Release this diagnostic registration after its reporting or retirement assertions finish. */
-      const removeError = transport.onListenerError!(errors)
-      for (const probe of [
-        {
-          capturing: false,
-          emit() {
-            throw cause
-          }
-        },
-        {
-          get capturing(): boolean {
-            throw cause
-          },
-          emit() {}
-        }
-      ]) {
-        transport.observe!(probe)
-        transport.send(9)
-        await Promise.resolve()
-      }
-      expect(receive).toHaveBeenCalledTimes(4)
-      expect(errors).toHaveBeenCalledTimes(4)
+      carrier.observation!.subscribe(() => {
+        throw cause
+      })
+      await carrier.write({ kind: 'message', data: 9 })
+      expect(receive).toHaveBeenCalledTimes(3)
+      expect(errors).toHaveBeenCalledTimes(2)
       for (const [error] of errors.mock.calls)
-        expect(error).toMatchObject({ source: 'rpc.endpoint', code: 'TRANSPORT', cause })
-      /** A fresh recorder detects any observation that escapes adapter retirement. */
-      const final = recorder()
-      transport.observe!(final.probe)
-      await transport.close?.()
-      transport.observe!(final.probe)
-      remove()
-      removeError()
+        expect.soft(error).toMatchObject({ source: 'rpc.endpoint', code: 'TRANSPORT', cause })
+      /** Retired native sources cannot emit after their listeners are removed. */
+      const final = new ProbeCapture()
+      carrier.observation!.subscribe(final.receive)
+      await carrier.close()
+      carrier.observation!.subscribe(final.receive)
+      await expect(carrier.write({ kind: 'message', data: 10 })).rejects.toBeDefined()
       expect(final.events).toHaveLength(0)
+      final.close()
+    } finally {
+      await carrier.close()
+      observed.close()
     }
-  )
-  it.each(['node', 'browser', 'worker'] as const)(
+  })
+
+  it.each(kinds)(
     '%s reads transfer once and preserves its getter failure identity',
     async (kind) => {
-      /** Exercise the final carrier boundary so observation assertions cover actual native I/O. */
-      const transport = fixture(kind)
-      /**
-       * Keep emitted observations so direction, capture identity and disposal can be asserted
-       * independently.
-       */
-      const observed = recorder(true)
-      transport.observe!(observed.probe)
-      /**
-       * Retain listener-error reports while the real Client and Provider request continues to
-       * resolve.
-       */
+      /** Only the genuine SDK/native source reads the real transfer option. */
       const reports = vi.fn()
-      /**
-       * Release the observation-error reporter after proving native getter failures bypass that
-       * sink.
-       */
-      const removeReport = transport.onListenerError!(reports)
-      /**
-       * Release the existing message or diagnostic registration without claiming physical port
-       * closure.
-       */
-      const remove = transport.subscribe(() => undefined)
-      /** Native byte payload proves transfer detachment and captured byte preservation together. */
-      const bytes = new Uint8Array([9, 1])
-      /** The decoy backing detects whether observation reads the transfer getter a second time. */
-      const retained = new Uint8Array([2, 4])
-      /**
-       * Keep the intended native list so an extra getter read cannot silently select the decoy
-       * backing.
-       */
+      /** Native acquisition owns original diagnostic reporting. */
+      const carrier = open(kind, new NativeMessages(), reports)
+      /** Public recording preserves only actual callback evidence. */
+      const observed = new ProbeCapture(true)
+      carrier.observation!.subscribe(observed.receive)
+      carrier.subscribe({ frame() {}, close() {}, error() {} })
+      /** Original backing detaches; a second getter read would select a different retained backing. */
+      const bytes = new Uint8Array([9, 1]),
+        retained = new Uint8Array([2, 4])
+      /** The exact original list is lent to native postMessage. */
       const transfer = [bytes.buffer]
-      /** Count transfer getter evaluation across observation and the native send boundary. */
+      /** Alternating values reveal accidental duplicate acquisition of the transfer field. */
       let reads = 0
-      /** An alternating transfer getter reveals any extra read that changes native detachment. */
-      const options = {
+      /** SDK write remains the real asynchronous carrier boundary. */
+      const options: IRpcCarrierWriteOptions = {
         get transfer() {
-          reads += 1
+          reads++
           return reads === 1 ? transfer : [retained.buffer]
         }
       }
-      transport.send(bytes, options)
-      expect(reads).toBe(1)
-      expect(bytes.byteLength).toBe(0)
-      expect(retained.byteLength).toBe(2)
-      expect(Array.from(observed.events[0]!.content as Uint8Array)).toEqual([9, 1])
-      expect(observed.events[0]!.detail).toEqual({ transfers: 1 })
-      /**
-       * Original failure identity must remain reachable through reporting without failing message
-       * delivery.
-       */
-      const cause = new TypeError('native transfer getter failure')
-      /** Retain the exact transfer getter failure to distinguish it from a probe-reporting wrapper. */
-      let caught: unknown
       try {
-        transport.send(retained, {
-          get transfer(): readonly ArrayBuffer[] {
-            throw cause
-          }
-        })
-      } catch (error) {
-        caught = error
+        /** Synchronous handoff happens before the returned write Promise settles. */
+        const pending = carrier.write({ kind: 'message', data: bytes }, options)
+        expect(reads).toBe(1)
+        expect(bytes.byteLength).toBe(0)
+        expect(retained.byteLength).toBe(2)
+        expect(observed.events[0]!.beforeTransfer).toEqual([9, 1])
+        expect(observed.events[0]!.detail?.transfers).toBe(1)
+        expect(observed.events).toHaveLength(1)
+        await pending
+        /** Native getter exceptions retain the exact original TypeError at the new Promise boundary. */
+        const cause = new TypeError('native transfer getter failure')
+        await expect(
+          carrier.write(
+            { kind: 'message', data: retained },
+            {
+              get transfer(): readonly ArrayBuffer[] {
+                throw cause
+              }
+            }
+          )
+        ).rejects.toBe(cause)
+        expect(reports).not.toHaveBeenCalled()
+      } finally {
+        await carrier.close()
+        observed.close()
       }
-      expect(caught).toBe(cause)
-      expect(reports).not.toHaveBeenCalled()
-      expect(observed.events).toHaveLength(1)
-      await Promise.resolve()
-      remove()
-      removeReport()
-      await transport.close?.()
     }
   )
+
   it('retains nested transfer containers by reference after native detachment', async () => {
-    /** Exercise the final carrier boundary so observation assertions cover actual native I/O. */
-    const transport = fixture('node')
-    /**
-     * Keep emitted observations so direction, capture identity and disposal can be asserted
-     * independently.
-     */
-    const observed = recorder(true)
-    transport.observe!(observed.probe)
-    /**
-     * Release the existing message or diagnostic registration without claiming physical port
-     * closure.
-     */
-    const remove = transport.subscribe(() => undefined)
-    /** Nested native bytes detach without requiring a scan or copy of their captured container. */
-    const bytes = new Uint8Array([2, 3, 4])
-    /** Capture retains this sibling and its enclosing container under the nested-transfer ruling. */
-    const retained = { safe: true }
-    /** Native payload anchors content-reference assertions across physical send and receive. */
+    /** Genuine Node native IO is the original structured-clone boundary. */
+    const carrier = open('node', new NativeMessages(), () => undefined)
+    /** Capture intentionally retains nested containers by reference. */
+    const observed = new ProbeCapture(true)
+    carrier.observation!.subscribe(observed.receive)
+    carrier.subscribe({ frame() {}, close() {}, error() {} })
+    /** The original backing and ordinary sibling must remain visible through their original aliases. */
+    const bytes = new Uint8Array([2, 3, 4]),
+      retained = { safe: true }
+    /** Original repeated backing references all detach together. */
     const payload = { retained, bytes, nested: [bytes.buffer] }
-    transport.send(payload, { transfer: [bytes.buffer] })
-    /** The captured original container exposes native detachment through its unchanged aliases. */
-    const content = observed.events[0]!.content as typeof payload
-    expect(content).toBe(payload)
-    expect(content.retained).toBe(retained)
-    expect(content.bytes).toBe(bytes)
-    expect(content.nested).toBe(payload.nested)
-    expect(content.bytes.buffer).toBe(content.nested[0])
-    expect(content.nested[0]!.byteLength).toBe(0)
-    expect(bytes.byteLength).toBe(0)
-    await Promise.resolve()
-    remove()
-    await transport.close?.()
+    try {
+      await carrier.write({ kind: 'message', data: payload }, { transfer: [bytes.buffer] })
+      /** Assertions inspect the actual public captured payload projection. */
+      const content = observed.events[0]!.content as typeof payload
+      expect(content).toBe(payload)
+      expect(content.retained).toBe(retained)
+      expect(content.bytes).toBe(bytes)
+      expect(content.nested).toBe(payload.nested)
+      expect(content.bytes.buffer).toBe(content.nested[0])
+      expect(content.nested[0]!.byteLength).toBe(0)
+      expect(bytes.byteLength).toBe(0)
+    } finally {
+      await carrier.close()
+      observed.close()
+    }
   })
+
   it('retains cyclic Map and Set container identities while nested backings detach', async () => {
-    /** Exercise the final carrier boundary so observation assertions cover actual native I/O. */
-    const transport = fixture('node')
-    /**
-     * Keep emitted observations so direction, capture identity and disposal can be asserted
-     * independently.
-     */
-    const observed = recorder(true)
-    transport.observe!(observed.probe)
-    /**
-     * Release the existing message or diagnostic registration without claiming physical port
-     * closure.
-     */
-    const remove = transport.subscribe(() => undefined)
-    /** The nested backing detaches natively while its captured cyclic container remains original. */
+    /** The actual native source clones arbitrary structured-clone container graphs. */
+    const carrier = open('node', new NativeMessages(), () => undefined)
+    /** Public capture borrows original cyclic roots without a second graph traversal. */
+    const observed = new ProbeCapture(true)
+    carrier.observation!.subscribe(observed.receive)
+    carrier.subscribe({ frame() {}, close() {}, error() {} })
+    /** The transferred backing belongs to the original shared graph. */
     const buffer = new Uint8Array([5, 7]).buffer
-    /** No captured sibling is copied when a nested transferable detaches at the native boundary. */
+    /** The sibling remains the original application object. */
     const retained = { unchanged: true }
-    /** Native payload anchors content-reference assertions across physical send and receive. */
+    /** Cyclic aliases test identity without using captured output for physical delivery. */
     const payload: {
       buffer: ArrayBuffer
       self?: unknown
       map: Map<unknown, unknown>
       set: Set<unknown>
       retained: typeof retained
-    } = {
-      buffer,
-      map: new Map(),
-      set: new Set(),
-      retained
-    }
+    } = { buffer, map: new Map(), set: new Set(), retained }
     payload.self = payload
     payload.map.set(buffer, payload)
     payload.set.add(buffer)
     payload.set.add(payload)
-    transport.send(payload, { transfer: [buffer] })
-    /** Cycles and collection members retain their exact original references, including detachment. */
-    const content = observed.events[0]!.content as typeof payload
-    expect(buffer.byteLength).toBe(0)
-    expect(content).toBe(payload)
-    expect(content.buffer).toBe(buffer)
-    expect(content.map).toBe(payload.map)
-    expect(content.set).toBe(payload.set)
-    expect(content.self === content).toBe(true)
-    expect(content.map.get(content.buffer)).toBe(content)
-    expect(content.set.has(content.buffer)).toBe(true)
-    expect(content.set.has(content)).toBe(true)
-    expect(content.retained).toBe(retained)
-    expect(content.buffer.byteLength).toBe(0)
-    await Promise.resolve()
-    remove()
-    await transport.close?.()
-  })
-  it('throwing probes report listener errors while a real endpoint request resolves', async () => {
-    const [clientWire, serverWire] = createMemoryTransportPair()
-    /**
-     * Original failure identity must remain reachable through reporting without failing message
-     * delivery.
-     */
-    const cause = new TypeError('endpoint probe failure')
-    /**
-     * Retain listener-error reports while the real Client and Provider request continues to
-     * resolve.
-     */
-    const reports = vi.fn()
-    clientWire.onListenerError!(reports)
-    serverWire.onListenerError!(reports)
-    /** Count real provider execution to prove probe failures leave the business request intact. */
-    const provide = vi.fn<IRpcProvider>((context) => context.success(14))
-    /** A real Provider Endpoint proves throwing carrier probes cannot suppress business execution. */
-    const server = await createRuntimeEndpointComposition(
-      {
-        id: 'probe-server',
-        transport: serverWire,
-        middlewares: [connect({ transport: serverWire })],
-        provider: { double: provide }
-      },
-      { agreement: { capabilities: [] }, peerId: '' }
-    ).installing
-    /** A real outbound Endpoint proves observation failures do not reject the business RPC. */
-    const client = await createRuntimeEndpointComposition(
-      {
-        id: 'probe-client',
-        transport: clientWire,
-        middlewares: [connect({ transport: clientWire })]
-      },
-      { agreement: { capabilities: [] }, peerId: '' }
-    ).installing
-    /**
-     * Install the direct carrier contract so assertions do not depend on probe-core
-     * instrumentation.
-     */
-    const probe = {
-      capturing: false,
-      emit() {
-        throw cause
-      }
-    }
-    clientWire.observe!(probe)
-    serverWire.observe!(probe)
     try {
-      await expect(client.send('probe-server', 'double', 7)).resolves.toBe(14)
+      await carrier.write({ kind: 'message', data: payload }, { transfer: [buffer] })
+      /** The observer receives original references, including the actual detached backing. */
+      const content = observed.events[0]!.content as typeof payload
+      expect(buffer.byteLength).toBe(0)
+      expect(content).toBe(payload)
+      expect(content.buffer).toBe(buffer)
+      expect(content.map).toBe(payload.map)
+      expect(content.set).toBe(payload.set)
+      expect(content.self === content).toBe(true)
+      expect(content.map.get(content.buffer)).toBe(content)
+      expect(content.set.has(content.buffer)).toBe(true)
+      expect(content.set.has(content)).toBe(true)
+      expect(content.retained).toBe(retained)
+      expect(content.buffer.byteLength).toBe(0)
+    } finally {
+      await carrier.close()
+      observed.close()
+    }
+  })
+
+  it('throwing raw probes report native errors while a real public RPC request resolves', async () => {
+    /** Real native ports provide both independent physical directions. */
+    const ports = new MessageChannel()
+    /** Original diagnostic identity stays with the actual native acquisition. */
+    const reports = vi.fn()
+    /** Each source lends its genuine raw observation capability and SDK codec. */
+    const carriers = [
+      createNodeThreadCarrier(ports.port1, 'left', reports),
+      createNodeThreadCarrier(ports.port2, 'right', reports)
+    ]
+    /** Business execution is counted independently from native observation failure. */
+    const provide = vi.fn(() => 14)
+    /** Both actual public Hosts attach their original carriers concurrently. */
+    const pending = carriers.map((carrier, index) =>
+      createRpcHost({
+        self: {
+          name: index === 0 ? 'probe-client' : 'probe-server',
+          instanceId: index === 0 ? 'probe-client' : 'probe-server'
+        },
+        report: reports,
+        provide: index === 0 ? {} : { double: provide },
+        plugins: [
+          defineTransportPlugin({
+            name: 'probe-native',
+            namespace: 'memory',
+            async open(context) {
+              await context.attach(carrier).ready
+              return { dispose() {} }
+            }
+          })
+        ]
+      })
+    )
+    /** Original native callback errors never become business failures. */
+    const cause = new TypeError('endpoint probe failure')
+    /** Keep real ready Hosts for deterministic cleanup on either construction branch. */
+    const hosts = await Promise.all(pending)
+    for (const carrier of carriers)
+      carrier.observation!.subscribe(() => {
+        throw cause
+      })
+    try {
+      await expect(hosts[0]!.memory.send('probe-server', 'double', 7)).resolves.toBe(14)
       expect(provide).toHaveBeenCalledTimes(1)
       expect(reports.mock.calls.length).toBeGreaterThanOrEqual(4)
       for (const [error] of reports.mock.calls)
         expect(error).toMatchObject({ source: 'rpc.endpoint', code: 'TRANSPORT', cause })
     } finally {
-      await client.dispose()
-      await server.dispose()
+      await Promise.all(hosts.map((host) => host.close()))
+      ports.port1.close()
+      ports.port2.close()
     }
   })
-  it('Node native close retires observation and preserves terminal replay through ordinary disposers', () => {
-    /**
-     * The held port exposes physical messaging and native hook ownership without a runtime
-     * launcher.
-     */
-    const port = Object.assign(new EventEmitter(), { postMessage: vi.fn() })
-    /** Exercise the final carrier boundary so observation assertions cover actual native I/O. */
-    const transport = createNodeMessagePortTransport(port)
-    /**
-     * Keep emitted observations so direction, capture identity and disposal can be asserted
-     * independently.
-     */
-    const observed = recorder()
-    transport.observe!(observed.probe)
-    /** Release the original message registration through its supported idempotent disposer. */
-    const removeMessage = transport.subscribe(() => undefined)
-    /** Record failure delivery so reporting count and original error identity can be asserted. */
+
+  it('Node native close retires observation and preserves terminal replay through ordinary disposers', async () => {
+    /** The fixture exposes actual native callback custody. */
+    const native = new NativeMessages()
+    /** The real Node IO supplies native terminal error selection. */
+    const carrier = open('node', native, () => undefined)
+    /** Metadata observation must not escape native close. */
+    const observed = new ProbeCapture()
+    carrier.observation!.subscribe(observed.receive)
+    /** The original terminal instance remains the late receiver's replay object. */
     const errors = vi.fn()
-    /**
-     * Release the existing message or diagnostic registration without claiming physical port
-     * closure.
-     */
-    const remove = transport.onTransportError!(errors)
-    port.emit('close')
-    expect(transport.closed).toBe(true)
-    /** Keep the original native terminal error instance for exact late-listener replay assertions. */
+    /** Current receiver removal remains separately idempotent. */
+    const remove = carrier.subscribe({ frame() {}, close: errors, error() {} })
+    native.node.emit('close')
+    await carrier.close()
+    /** Only actual native close supplied this object. */
     const terminal = errors.mock.calls[0]![0]
-    transport.observe!(observed.probe)
-    port.emit('message', 7)
+    carrier.observation!.subscribe(observed.receive)
+    native.node.emit('message', { kind: 'message', data: 7 })
     expect(observed.events).toHaveLength(0)
-    removeMessage()
-    removeMessage()
-    remove()
-    /**
-     * A listener registered after native retirement must receive the retained terminal error
-     * instance.
-     */
+    await remove()
+    await remove()
+    /** A late receiver does not reacquire physical native listeners. */
     const late = vi.fn()
-    /** Release the replay-only listener after verifying it acquired no new native hooks. */
-    const removeLate = transport.onTransportError!(late)
+    carrier.subscribe({ frame() {}, close: late, error() {} })
     expect(late).toHaveBeenCalledExactlyOnceWith(terminal)
     for (const event of ['message', 'messageerror', 'close'])
-      expect(port.listenerCount(event)).toBe(0)
-    removeLate()
+      expect(native.node.listenerCount(event)).toBe(0)
+    observed.close()
   })
-  it('Worker explicit close prevents late error registration from attaching native hooks', async () => {
-    /** The fixture owns native EventTarget dispatch without a platform-specific Worker. */
-    const events = new EventTarget()
-    /** Count native hook acquisition so late error registration cannot reacquire a retired Worker. */
-    const add = vi.fn((type: string, listener: EventListener) =>
-      events.addEventListener(type, listener)
-    )
-    /**
-     * The held port exposes physical messaging and native hook ownership without a runtime
-     * launcher.
-     */
-    const port = {
-      postMessage: vi.fn(),
-      addEventListener: add,
-      removeEventListener: (type: string, listener: EventListener) =>
-        events.removeEventListener(type, listener)
-    }
-    /** Exercise the final carrier boundary so observation assertions cover actual native I/O. */
-    const transport = createWebWorkerTransport(port)
-    /**
-     * Release the existing message or diagnostic registration without claiming physical port
-     * closure.
-     */
-    const remove = transport.onTransportError!(() => undefined)
-    expect(add).toHaveBeenCalledTimes(2)
-    await transport.close!()
-    remove()
-    /**
-     * A listener registered after native retirement must receive the retained terminal error
-     * instance.
-     */
-    const late = transport.onTransportError!(() => undefined)
-    expect(add).toHaveBeenCalledTimes(2)
-    late()
+
+  it('Worker explicit close prevents late receiver registration from attaching native hooks', async () => {
+    /** The borrowed source keeps its native EventTarget registrations observable. */
+    const native = new NativeMessages()
+    /** The real Worker owner installs only its original message/error/messageerror listeners. */
+    const carrier = open('worker', native, () => undefined)
+    expect(native.count('error')).toBe(1)
+    expect(native.count('messageerror')).toBe(1)
+    /** Current carrier construction also acquires its sole message receiver up front. */
+    const count = native.add.mock.calls.length
+    await carrier.close()
+    carrier.subscribe({ frame() {}, close() {}, error() {} })
+    expect(native.add).toHaveBeenCalledTimes(count)
+    expect(native.count('message')).toBe(0)
+    expect(native.count('error')).toBe(0)
+    expect(native.count('messageerror')).toBe(0)
   })
+
   it('observes real Node MessageChannel transfer before detachment', async () => {
-    /** A real MessageChannel proves the adapter preserves native ArrayBuffer transfer detachment. */
+    /** Physical native ports independently prove delivery and actual backing transfer. */
     const ports = new MessageChannel()
-    /**
-     * The sending channel supplies the final public transport used by the native transfer
-     * assertion.
-     */
-    const left = createNodeMessagePortTransport(ports.port1)
-    /** The receiving channel proves physical delivery through the final public transport. */
-    const right = createNodeMessagePortTransport(ports.port2)
-    /**
-     * Keep emitted observations so direction, capture identity and disposal can be asserted
-     * independently.
-     */
-    const observed = recorder(true)
-    left.observe!(observed.probe)
-    right.observe!(observed.probe)
-    /**
-     * Resolve only from the actual native receiver so preserved capture bytes cannot stand in for
-     * delivery.
-     */
-    const received = new Promise<unknown>((resolve) =>
-      right.subscribe((message) => resolve(message.data))
+    /** Each genuine native source owns its existing observation implementation. */
+    const left = createNodeThreadCarrier(ports.port1, 'left', () => undefined),
+      right = createNodeThreadCarrier(ports.port2, 'right', () => undefined)
+    /** The public emitter records each actual native callback in direction order. */
+    const observed = new ProbeCapture(true)
+    left.observation!.subscribe(observed.receive)
+    right.observation!.subscribe(observed.receive)
+    /** Only the real native receiver may resolve the business delivery Promise. */
+    const received = new Promise<IRpcCarrierFrame>((resolve) =>
+      right.subscribe({ frame: resolve, close() {}, error() {} })
     )
     try {
-      /** Native byte payload proves transfer detachment and captured byte preservation together. */
+      /** Original bytes detach only at the real native handoff. */
       const bytes = new Uint8Array([4, 5])
-      left.send(bytes.buffer, { transfer: [bytes.buffer] })
+      await left.write({ kind: 'message', data: bytes.buffer }, { transfer: [bytes.buffer] })
       expect(bytes.byteLength).toBe(0)
-      expect(Array.from(new Uint8Array(observed.events[0]!.content as ArrayBuffer))).toEqual([4, 5])
-      expect(Array.from(new Uint8Array((await received) as ArrayBuffer))).toEqual([4, 5])
+      expect(observed.events[0]!.beforeTransfer).toEqual([4, 5])
+      expect(Array.from(new Uint8Array((await received).data as ArrayBuffer))).toEqual([4, 5])
       expect(observed.events.map((event) => event.direction)).toEqual([0, 1])
     } finally {
-      await left.close?.()
-      await right.close?.()
+      await Promise.all([left.close(), right.close()])
+      observed.close()
       ports.port1.close()
       ports.port2.close()
     }

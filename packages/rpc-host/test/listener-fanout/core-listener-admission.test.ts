@@ -1,229 +1,75 @@
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+/** Current native observation and carrier owners retain listener cleanup without endpoint hooks. */
+import { EventEmitter } from 'node:events'
 import { describe, expect, it, vi } from 'vitest'
+import { RpcCarrierObservation } from '@migaia/rpc-host/sdk'
 import {
-  createBrowserMessagePortTransport,
-  createNodeMessagePortTransport
-} from '../../dist/core/adapters/message-port.js'
-import { HookRegistry } from '../../dist/core/internal/hooks.js'
+  RpcCarrierEncoding,
+  RpcCarrierPlatform,
+  RpcCarrierTopology
+} from '@migaia/rpc-contract/interfaces'
+import { createNodeThreadCarrier } from '../../../rpc-plugin-thread/dist/threads/channel.js'
 
-/** A structural Node port that exposes exactly the listeners installed by the adapter. */
-function createNodePort() {
-  /** Multiple callbacks per event reveal duplicate native registration. */
-  const listeners = new Map<string, Set<(...args: unknown[]) => void>>()
-  return {
-    port: {
-      postMessage() {},
-      on(event: string, listener: (...args: unknown[]) => void) {
-        let group = listeners.get(event)
-        if (group === undefined) {
-          group = new Set()
-          listeners.set(event, group)
-        }
-        group.add(listener)
-      },
-      off(event: string, listener: (...args: unknown[]) => void) {
-        listeners.get(event)?.delete(listener)
-      }
+it('keeps obsolete observation removers from withdrawing a newer identical callback', async () => {
+  /** The current observation owner holds exact subscription records rather than legacy hook maps. */
+  const observation = new RpcCarrierObservation(
+    {
+      platform: RpcCarrierPlatform.memory,
+      topology: RpcCarrierTopology.exclusive,
+      encodedType: RpcCarrierEncoding.any
     },
-    emit(event: string, value?: unknown) {
-      for (const listener of Array.from(listeners.get(event) ?? [])) listener(value)
-    },
-    count(event: string) {
-      return listeners.get(event)?.size ?? 0
-    }
-  }
-}
+    () => undefined
+  )
+  /** The same original callback is intentionally reused across two different registrations. */
+  const hook = vi.fn()
+  /** Replacing a record retires this earlier remover. */
+  const stale = observation.subscribe(hook)
+  await stale()
+  /** A later registration owns its distinct current record even with the same callback. */
+  const current = observation.subscribe(hook)
+  await stale()
+  observation.emit(0, {})
+  expect(hook).toHaveBeenCalledOnce()
+  await current()
+  await current()
+  observation.emit(0, {})
+  expect(hook).toHaveBeenCalledOnce()
+})
 
-/** A browser port with observable message and diagnostic registrations. */
-function createBrowserPort() {
-  /** Native listeners stay separate from the channel's error listeners. */
-  const listeners = new Map<string, Set<(event: unknown) => void>>()
-  return {
-    port: {
-      postMessage() {},
-      start() {},
-      close() {},
-      addEventListener(event: string, listener: (value: unknown) => void) {
-        let group = listeners.get(event)
-        if (group === undefined) {
-          group = new Set()
-          listeners.set(event, group)
-        }
-        group.add(listener)
-      },
-      removeEventListener(event: string, listener: (value: unknown) => void) {
-        listeners.get(event)?.delete(listener)
-      }
-    },
-    emit(event: string, value: unknown) {
-      for (const listener of Array.from(listeners.get(event) ?? [])) listener(value)
-    }
-  }
-}
-
-describe('core listener admission', () => {
-  it('removes the HookRegistry identity map while preserving Set behavior', () => {
-    const registry = new HookRegistry()
-    const hook = vi.fn()
-    const first = registry.add(hook)
-    const duplicate = registry.add(hook)
-    expect(registry.size).toBe(1)
-    registry.emit({} as never)
-    expect(hook).toHaveBeenCalledOnce()
-    duplicate()
-    first()
-    expect(registry.size).toBe(0)
-    const fresh = registry.add(hook)
-    duplicate()
-    expect(registry.size).toBe(1)
-    registry.emit({} as never)
-    expect(hook).toHaveBeenCalledTimes(2)
-    registry.clear()
-    fresh()
-    expect(registry.size).toBe(0)
-    /** The source condition rejects a second registration state owner in RPC. */
-    const source = readFileSync(
-      resolve(import.meta.dirname, '../../src/core/internal/hooks.ts'),
-      'utf8'
-    )
-    expect(source).not.toContain('#registrations')
-    expect(source).not.toContain('new Map<IRpcHook')
-  })
-
-  it('keeps stale transport disposers from removing a new admission', () => {
-    /** Node transport errors must keep both native error hooks after stale disposal. */
-    const node = createNodePort()
-    const nodeTransport = createNodeMessagePortTransport(node.port)
-    const nodeError = vi.fn()
-    const oldNode = nodeTransport.onTransportError!(nodeError)
-    oldNode()
-    nodeTransport.onTransportError!(nodeError)
-    oldNode()
-    node.emit('messageerror')
-    expect(nodeError).toHaveBeenCalledOnce()
-    expect(node.count('messageerror')).toBe(1)
-    expect(node.count('close')).toBe(1)
-
-    /** The listener-error path uses the same generation-safe admission. */
-    const nodeListenerError = vi.fn()
-    const oldNodeListener = nodeTransport.onListenerError!(nodeListenerError)
-    oldNodeListener()
-    nodeTransport.onListenerError!(nodeListenerError)
-    oldNodeListener()
-    nodeTransport.subscribe(() => {
-      throw new Error('fixture listener failure')
-    })
-    node.emit('message', 'value')
-    expect(nodeListenerError).toHaveBeenCalledOnce()
-
-    /** Browser transport and listener errors retain their legacy boolean disposer result. */
-    const browser = createBrowserPort()
-    const browserTransport = createBrowserMessagePortTransport(browser.port)
-    const browserError = vi.fn()
-    const oldBrowser = browserTransport.onTransportError!(browserError)
-    oldBrowser()
-    browserTransport.onTransportError!(browserError)
-    oldBrowser()
-    browserTransport.subscribe(() => undefined)
-    browser.emit('messageerror', {})
-    expect(browserError).toHaveBeenCalledOnce()
-
-    const browserListenerError = vi.fn()
-    const oldBrowserListener = browserTransport.onListenerError!(browserListenerError)
-    oldBrowserListener()
-    browserTransport.onListenerError!(browserListenerError)
-    oldBrowserListener()
-    browserTransport.subscribe(() => {
-      throw new Error('fixture browser listener failure')
-    })
-    browser.emit('message', { data: 'value' })
-    expect(browserListenerError).toHaveBeenCalledOnce()
-
-    const repeated = browserTransport.onTransportError!(browserError)
-    const duplicate = browserTransport.onTransportError!(browserError)
-    expect(repeated()).toBe(true)
-    expect(repeated()).toBe(false)
-    expect(duplicate()).toBe(false)
-  })
-
-  it('preserves ordered isolation, delayed failure drain, and terminal replay', () => {
-    /** A duplicate reporter is delivered once and cannot interrupt later reporters. */
-    for (const kind of ['node', 'browser'] as const) {
-      const fixture = kind === 'node' ? createNodePort() : createBrowserPort()
-      const transport =
-        kind === 'node'
-          ? createNodeMessagePortTransport(
-              fixture.port as ReturnType<typeof createNodePort>['port']
-            )
-          : createBrowserMessagePortTransport(
-              fixture.port as ReturnType<typeof createBrowserPort>['port']
-            )
-      const order: string[] = []
-      const first = () => {
-        order.push('first')
-        throw new Error('fixture reporter failure')
-      }
-      const stopFirst = transport.onTransportError!(first)
-      transport.onTransportError!(() => order.push('second'))
-      transport.onTransportError!(first)
-      if (kind === 'browser') transport.subscribe(() => undefined)
-      fixture.emit('messageerror', {})
-      expect(order).toEqual(['first', 'second'])
-      let drained: unknown
-      try {
-        stopFirst()
-      } catch (error) {
-        drained = error
-      }
-      expect(drained).toMatchObject({ code: 'TRANSPORT' })
-    }
-
-    /** Node's terminal close is replayed to listeners added after closure. */
-    const node = createNodePort()
-    const transport = createNodeMessagePortTransport(node.port)
-    transport.onTransportError!(() => undefined)
-    node.emit('close')
+describe('actual Node message source retirement', () => {
+  it('replays the exact original native close error without reacquiring listeners', async () => {
+    /** Native registrations remain observable without a transport compatibility object. */
+    const port = Object.assign(new EventEmitter(), { postMessage: vi.fn() })
+    /** The real platform IO and SDK carrier own their original subscription/remover chain. */
+    const carrier = createNodeThreadCarrier(port, 'listener-close', () => undefined)
+    /** One actual Session-style receiver observes the original terminal object. */
+    const closed = vi.fn()
+    carrier.subscribe({ frame: () => undefined, close: closed, error: () => undefined })
+    port.emit('close')
+    await carrier.close()
+    /** Original native terminal text remains stable after the synthetic RPC scope disappears. */
+    const terminal = closed.mock.calls[0]![0]
+    expect(terminal).toMatchObject({ message: '[rpc] message port closed' })
+    /** A late receiver reads the same terminal instance without native registration. */
     const late = vi.fn()
-    transport.onTransportError!(late)
-    expect(late).toHaveBeenCalledOnce()
-    expect(late.mock.calls[0]?.[0]).toMatchObject({ message: '[rpc] message port closed' })
+    carrier.subscribe({ frame: () => undefined, close: late, error: () => undefined })
+    expect(late).toHaveBeenCalledExactlyOnceWith(terminal)
+    for (const event of ['message', 'messageerror', 'close'])
+      expect(port.listenerCount(event)).toBe(0)
+    await expect(carrier.write({ kind: 'message', data: 'late' })).rejects.toBe(terminal)
   })
 
-  it('owns every MessagePort error text without changing messages', () => {
-    /** Source scanning distinguishes a canonical text reference from an inline message. */
-    const source = readFileSync(
-      resolve(import.meta.dirname, '../../src/core/adapters/message-port.ts'),
-      'utf8'
-    )
-    expect(source).not.toMatch(/new (?:Error|RpcTransportError)\(\s*[`'"]/)
-
-    const browser = createBrowserPort()
-    const browserTransport = createBrowserMessagePortTransport(browser.port)
-    const browserErrors: unknown[] = []
-    browserTransport.onTransportError!((error) => browserErrors.push(error))
-    browserTransport.subscribe(() => undefined)
-    browser.emit('messageerror', {})
-    expect(browserErrors[0]).toMatchObject({
-      message: '[rpc] browser message port could not deserialize a message'
-    })
-    browserTransport.close!()
-    expect(() => browserTransport.send('late')).toThrow('[rpc] browser message port is closed')
-    expect(() => browserTransport.subscribe(() => undefined)).toThrow(
-      '[rpc] browser message port is closed'
-    )
-
-    const node = createNodePort()
-    const nodeTransport = createNodeMessagePortTransport(node.port)
-    const nodeErrors: unknown[] = []
-    nodeTransport.onTransportError!((error) => nodeErrors.push(error))
-    node.emit('messageerror', 'x')
-    expect(nodeErrors[0]).toMatchObject({
+  it('keeps original native deserialization text and releases its diagnostic listener', async () => {
+    /** Native event data retains the original deserialization diagnostic spelling. */
+    const port = Object.assign(new EventEmitter(), { postMessage: vi.fn() })
+    /** The acquisition report port observes physical diagnostics without closing delivery. */
+    const reports = vi.fn()
+    /** Current ThreadNativeIO is the canonical owner of the moved MessagePort behavior. */
+    const carrier = createNodeThreadCarrier(port, 'listener-messageerror', reports)
+    port.emit('messageerror', 'x')
+    expect(reports.mock.calls[0]![0]).toMatchObject({
       message: '[rpc] message port could not deserialize a message: x'
     })
-    node.emit('close')
-    expect(nodeErrors[1]).toMatchObject({ message: '[rpc] message port closed' })
-    expect(() => nodeTransport.send('late')).toThrow('[rpc] message port is closed')
-    expect(() => nodeTransport.subscribe(() => undefined)).toThrow('[rpc] message port is closed')
+    await carrier.close()
+    expect(port.listenerCount('messageerror')).toBe(0)
   })
 })

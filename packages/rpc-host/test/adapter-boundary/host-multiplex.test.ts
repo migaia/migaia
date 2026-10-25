@@ -1,256 +1,174 @@
-import { describe, expect, it, vi } from 'vitest'
-import { identityCodec } from '@migaia/serialize/codecs/identity/v1'
-import { defineJsonCodec } from '@migaia/serialize/codecs/json'
-import { createStringFramer, messageFramerV1 } from '@migaia/rpc-contract/framing'
-import { RpcBatchPhysical, RpcCapability } from '@migaia/rpc-contract'
-import type { IRpcInboundMessage, IRpcSendOptions } from '../../dist/core/transport.js'
-import type { IRuntimePeerSourceResult } from '@migaia/rpc-host/plugin'
-import { createHostMultiplexTransport } from '../../dist/runtime-adapter/host-multiplex.js'
-import { createMessageReceiveHandoff } from '../../dist/runtime-adapter/message/handoff.js'
-import { systemScheduler } from '@migaia/utils/scheduler'
+/** Genuine namespaces and Sessions replace the removed logical transport multiplex adapter. */
+import { expect, it, vi } from 'vitest'
+import { MessageChannel, type MessagePort } from 'node:worker_threads'
+import { createRpcHost } from '@migaia/rpc-host'
+import {
+  RpcJsonCarrierCodec,
+  createRpcMessageCarrier,
+  defineTransportPlugin,
+  type IRpcMessageIO
+} from '@migaia/rpc-host/sdk'
+import { coreMemoryServer } from '../host/core-fixture.js'
 
-/** The physical channel retains its own selected codec/framer and terminal close owner. */
-function physical(peerId: string, pipeline: IRuntimePeerSourceResult['pipeline']) {
-  /** The mux borrows exactly these native subscriptions. */
-  const incoming = new Set<(message: IRpcInboundMessage) => void>()
-  /** Physical failures concern only this source. */
-  const errors = new Set<(error: unknown) => void>()
-  /** Captured sends prove each original physical pipeline and transfer list are used. */
-  const sent: { frame: unknown; options?: IRpcSendOptions }[] = []
-  /** Activation is owned by the original cold handoff. */
-  const activateReceive = vi.fn()
-  /** The receipt owner, never the mux detach operation, closes this connection. */
-  const close = vi.fn(async () => undefined)
-  /** A complete source fixture uses the same channel contract as the actual native adapters. */
-  const channel: IRuntimePeerSourceResult = {
-    transport: {
-      platform: 'Memory',
-      send: (frame, options) => {
-        sent.push({ frame, options })
-      },
-      subscribe(listener) {
-        incoming.add(listener)
-        return () => {
-          incoming.delete(listener)
-        }
-      },
-      onTransportError(listener) {
-        errors.add(listener)
-        return () => {
-          errors.delete(listener)
-        }
-      }
-    },
-    peerId,
-    scheduler: systemScheduler,
-    agreement: { source: 'static', codec: pipeline.codec.id, capabilities: [RpcCapability.batch] },
-    pipeline,
-    features: [],
-    activateReceive,
-    close
+/** The original native MessagePort owns delivery; SDK alone owns its subscriptions and close. */
+class FailingMessageIO implements IRpcMessageIO {
+  /** This is the actual native endpoint whose error callback initiates the physical failure. */
+  readonly #port: MessagePort
+  /** Retain no protocol state or receive queue outside the canonical carrier. */
+  constructor(port: MessagePort) {
+    this.#port = port
   }
-  return { channel, incoming, errors, sent, activateReceive, close }
-}
-
-/** One ordinary request uses only envelope routing, leaving semantic admission to the endpoint. */
-function request(targetId: string, id: string) {
-  return {
-    kind: 'request',
-    id,
-    method: 'echo',
-    data: { route: { senderId: 'host', targetId }, payload: id }
+  /** Preserve the actual native structured-clone operation and optional transfer list. */
+  send(value: unknown, transfer?: readonly ArrayBuffer[]): void {
+    this.#port.postMessage(value, transfer === undefined ? undefined : [...transfer])
   }
-}
-
-describe('host physical channel multiplexing', () => {
-  it('releases the original cold receive handoff only after the logical channel activates', async () => {
-    /** The native callbacks belong to the existing bootstrap handoff, not to a new mux queue. */
-    const native = new Set<(message: IRpcInboundMessage) => void>()
-    /** Retain the one early application frame with the same owner used by actual message adapters. */
-    const handoff = createMessageReceiveHandoff<IRpcInboundMessage>({
-      add(listener) {
-        native.add(listener)
-      },
-      remove(listener) {
-        native.delete(listener)
-      },
-      observeFailure() {
-        return () => undefined
-      }
-    })
-    /** The held physical channel still owns its codec/framer and terminal resource receipt. */
-    const source = physical('a', { codec: identityCodec, framer: messageFramerV1 })
-    /** A native frame arrives before endpoint installation has acquired its receiver. */
-    const early = { data: request('host', 'early') }
-    for (const listener of native) listener(early)
-    /** This adapter borrows the original handoff operations. */
-    const channel = {
-      ...source.channel,
-      transport: {
-        ...source.channel.transport,
-        subscribe(listener: (message: IRpcInboundMessage) => void) {
-          handoff.subscribe(listener)
-          return () => handoff.unsubscribe(listener)
-        }
-      },
-      activateReceive: () => handoff.activateReceive()
+  /** Release only the exact original message callback. */
+  onMessage(listener: (value: unknown) => void): () => void {
+    this.#port.on('message', listener)
+    return () => {
+      this.#port.off('message', listener)
     }
-    /** One real logical subscription exists before activation releases captured traffic. */
-    const mux = createHostMultiplexTransport({ name: 'host', instanceId: 'host' }, vi.fn())
-    /** The endpoint callback must see exactly the original one queued application frame. */
-    const received = vi.fn()
-    mux.channel.transport.subscribe(received)
-    mux.attach(channel)
-    expect(received).not.toHaveBeenCalled()
-    mux.channel.activateReceive?.()
-    mux.channel.activateReceive?.()
-    expect(received).toHaveBeenCalledTimes(1)
-    expect(received).toHaveBeenCalledWith(
-      expect.objectContaining({ data: early.data, peerId: 'a' })
-    )
-    await mux.close()
-    expect(native.size).toBe(0)
-    handoff.close()
-  })
+  }
+  /** Native EOF remains a different event from physical error. */
+  onClose(listener: (reason?: unknown) => void): () => void {
+    this.#port.on('close', listener)
+    return () => {
+      this.#port.off('close', listener)
+    }
+  }
+  /** Physical errors reach the existing carrier error port with their exact native instance. */
+  onError(listener: (error: unknown) => void): () => void {
+    this.#port.on('error', listener)
+    return () => {
+      this.#port.off('error', listener)
+    }
+  }
+  /** The SDK carrier owns the once-only native close invocation. */
+  close(): void {
+    this.#port.close()
+  }
+}
 
-  it('routes two different physical pipelines in both directions with private source proof', async () => {
-    /** Independent string framing must not share partial assemblies with the object channel. */
-    const json = defineJsonCodec({ version: 1 })
-    /** Small fragments exercise actual pending/complete reassembly. */
-    const stringFramer = createStringFramer({ chunkBytes: 8 })
-    /** The string source performs actual JSON conversion. */
-    const a = physical('a', {
-      codec: json as IRuntimePeerSourceResult['pipeline']['codec'],
-      framer: stringFramer as IRuntimePeerSourceResult['pipeline']['framer']
-    })
-    /** The second source retains whole object identity. */
-    const b = physical('b', { codec: identityCodec, framer: messageFramerV1 })
-    /** Report failures without changing their original identity. */
-    const report = vi.fn()
-    /** The mux itself owns no endpoint or provider catalog. */
-    const mux = createHostMultiplexTransport({ name: 'host', instanceId: 'host' }, report)
-    /** Deliveries preserve their physical source rather than trusting any envelope sender field. */
-    const received: IRpcInboundMessage[] = []
-    mux.channel.transport.subscribe((message) => {
-      received.push(message)
-    })
-    /** Detachment belongs only to this borrowed source registration. */
-    const detachA = mux.attach(a.channel)
-    expect(a.activateReceive).not.toHaveBeenCalled()
-    mux.channel.activateReceive?.()
-    expect(a.activateReceive).toHaveBeenCalledTimes(1)
-    mux.attach(b.channel)
-    expect(b.activateReceive).toHaveBeenCalledTimes(1)
-    await mux.channel.transport.send(request('a', 'one'))
-    await mux.channel.transport.send(request('b', 'two'))
-    expect(a.sent.length).toBeGreaterThan(1)
-    expect(b.sent).toHaveLength(1)
-    expect(b.sent[0]!.frame).toEqual(request('b', 'two'))
-    for (const { frame } of a.sent)
-      for (const listener of a.incoming) listener({ data: frame, peerId: 'forged' })
-    for (const listener of b.incoming) listener({ data: b.sent[0]!.frame })
-    expect(received.map(({ data }) => data)).toEqual([request('a', 'one'), request('b', 'two')])
-    expect(received.map(({ peerId }) => peerId)).toEqual(['a', 'b'])
-    expect(mux.channel.transport.sourceProof?.(received[0]!.source)).toBe(true)
-    expect(mux.channel.transport.sourceProof?.({})).toBe(false)
-    detachA()
-    detachA()
-    expect(mux.channel.transport.sourceProof?.(received[0]!.source)).toBe(false)
-    expect(a.incoming.size).toBe(0)
-    expect(a.close).not.toHaveBeenCalled()
-    await mux.close()
-    expect(b.incoming.size).toBe(0)
-    expect(b.close).not.toHaveBeenCalled()
-    expect(report).not.toHaveBeenCalled()
+it('routes two actual physical codec selections without sharing peer identity or business data', async () => {
+  /** Actual JSON execution remains on the text carrier's codec rather than a mux projection. */
+  const text = coreMemoryServer('host', 'host', 'text', [], [], {
+    create: () => new RpcJsonCarrierCodec(),
+    nativeBinary: false
   })
-
-  it('preserves runtime root routing, transfer identity and independently accepted capabilities', async () => {
-    /** Transfer ownership belongs to the physical sender, so the list is forwarded unchanged. */
-    const source = physical('a', { codec: identityCodec, framer: messageFramerV1 })
-    /** The full logical agreement must not manufacture capabilities on this actual peer. */
-    const mux = createHostMultiplexTransport({ name: 'host', instanceId: 'host' }, vi.fn())
-    mux.attach(source.channel)
-    /** This root-level route is the existing runtime profile, distinct from legacy data.route. */
-    const frame = { profile: 'migaia.rpc.runtime-api/1', id: 'runtime', route: { targetId: 'a' } }
-    /** Native ownership inputs remain the exact original physical send options. */
-    const options = { transfer: [new ArrayBuffer(8)] }
-    await mux.channel.transport.send(frame, options)
-    expect(source.sent[0]).toEqual({ frame, options })
-    expect(source.sent[0]!.options).toBe(options)
-    expect(mux.supports('a', RpcCapability.batch)).toBe(true)
-    expect(mux.supports('a', 'missing')).toBe(false)
-    expect(mux.supports('missing', RpcCapability.batch)).toBe(false)
-    /** Negotiated strings cannot confer native transfer ownership on a forged physical adapter. */
-    const forged = physical('forged', { codec: identityCodec, framer: messageFramerV1 })
-    mux.attach({
-      ...forged.channel,
-      agreement: {
-        source: 'static',
-        codec: identityCodec.id,
-        capabilities: [RpcCapability.nativeBinary, RpcCapability.transfer]
+  /** The opposite namespace uses its original whole-object carrier codec. */
+  const object = coreMemoryServer('host', 'host', 'object')
+  /** The same actual report port observes both local and remote native deliveries. */
+  const report = vi.fn()
+  /** One public Host owns both native namespaces and no transport facade. */
+  const host = await createRpcHost({
+    self: { name: 'host', instanceId: 'host' },
+    plugins: [text.transport, object.transport],
+    report
+  })
+  /** Original target-specific business values are recorded by real remote providers. */
+  const received: string[] = []
+  /** The first accepted peer retains its actual text medium. */
+  const a = await text.connect('a', {
+    report,
+    provide: {
+      echo: (value: string) => {
+        received.push(value)
+        return value
       }
-    })
-    expect(mux.supports('forged', RpcCapability.nativeBinary)).toBe(false)
-    expect(mux.supports('forged', RpcCapability.transfer)).toBe(false)
-    await mux.close()
+    }
   })
+  /** A separate physical codec retains its own receiver and native lifetime. */
+  const b = await object.connect('b', {
+    report,
+    provide: {
+      echo: (value: string) => {
+        received.push(value)
+        return value
+      }
+    }
+  })
+  /** Physical send inspection observes the selected output instead of re-encoding it in the test. */
+  const textWrites = vi.spyOn(a.pair[0], 'write')
+  /** Object delivery remains independent from the text framing implementation. */
+  const objectWrites = vi.spyOn(b.pair[0], 'write')
+  try {
+    expect(await host.text.send('a', 'echo', 'one')).toBe('one')
+    expect(await host.object.send('b', 'echo', 'two')).toBe('two')
+    expect(received).toEqual(['one', 'two'])
+    expect(objectWrites).toHaveBeenCalledTimes(1)
+    expect(report).not.toHaveBeenCalled()
+    expect([text.lookup('a')!.view.peerId, object.lookup('b')!.view.peerId]).toEqual(['a', 'b'])
+    expect(textWrites.mock.calls.some(([frame]) => typeof frame.data === 'string')).toBe(true)
+    expect(objectWrites.mock.calls.some(([frame]) => typeof frame.data === 'object')).toBe(true)
+    expect(text.lookup('b')).toBeUndefined()
+    expect(object.lookup('a')).toBeUndefined()
+  } finally {
+    textWrites.mockRestore()
+    objectWrites.mockRestore()
+    await Promise.all([host.close(), a.host.close(), b.host.close()])
+  }
+})
 
-  it('routes opaque protected frames by the sender selection and partitions mixed-target batches', async () => {
-    /** Protected values need not expose any semantic fields to the physical boundary. */
-    const a = physical('a', { codec: identityCodec, framer: messageFramerV1 })
-    /** A distinct source must never receive another target's protected frame. */
-    const b = physical('b', { codec: identityCodec, framer: messageFramerV1 })
-    /** Real endpoint routing remains outside this adapter-only check. */
-    const mux = createHostMultiplexTransport({ name: 'host', instanceId: 'host' }, vi.fn())
-    mux.attach(a.channel)
-    mux.attach(b.channel)
-    await mux.channel.transport.send('opaque protected frame', { targetId: 'a' })
-    expect(a.sent[0]!.frame).toBe('opaque protected frame')
-    expect(b.sent).toHaveLength(0)
-    await expect(mux.channel.transport.send('opaque without selection')).rejects.toMatchObject({
-      code: 'CAPABILITY_UNSUPPORTED'
-    })
-    await mux.channel.transport.send({
-      kind: RpcBatchPhysical.kind,
-      envelopes: [request('a', 'first'), request('b', 'second'), request('a', 'third')]
-    })
-    expect(a.sent[1]!.frame).toEqual({
-      kind: RpcBatchPhysical.kind,
-      envelopes: [request('a', 'first'), request('a', 'third')]
-    })
-    expect(b.sent[0]!.frame).toEqual({
-      kind: RpcBatchPhysical.kind,
-      envelopes: [request('b', 'second')]
-    })
-    /** Logical and channel close share one exact Promise and never close the original receipts. */
-    const closed = mux.close()
-    expect(mux.close()).toBe(closed)
-    expect(mux.channel.close()).toBe(closed)
+it('retires only a failed physical Session while its other accepted peer remains writable', async () => {
+  /** Both real peers share one namespace but keep different original carrier/Session owners. */
+  const server = coreMemoryServer('host')
+  /** Reports retain the same native Error object when a physical source actually fails. */
+  const report = vi.fn()
+  /** No separate host-multiplex transport is constructed. */
+  const host = await createRpcHost({ ...server.options, report })
+  /** Both native endpoints subscribe before either actual Host begins its handshake. */
+  const ports = new MessageChannel()
+  /** The failing local carrier is lent by its actual native source. */
+  const local = createRpcMessageCarrier({
+    id: 'physical-local',
+    io: new FailingMessageIO(ports.port1),
+    report
+  })
+  /** The remote source is independently owned by its own public Host. */
+  const remote = createRpcMessageCarrier({
+    id: 'physical-remote',
+    io: new FailingMessageIO(ports.port2),
+    report: () => undefined
+  })
+  /** Real SDK attachment performs both original Session admissions. */
+  const a = await createRpcHost({
+    self: { name: 'a', instanceId: 'a' },
+    provide: { echo: (value: string) => value },
+    report: () => undefined,
+    plugins: [
+      defineTransportPlugin({
+        name: 'fault-native',
+        namespace: 'memory',
+        async open(context) {
+          const accepted = server.accept(local)
+          const connected = context.attach(remote)
+          await Promise.all([accepted.ready, connected.ready])
+          return { dispose: () => undefined }
+        }
+      })
+    ]
+  })
+  /** Positive delivery proves B's live state after A is physically retired. */
+  const writeB = vi.fn((value: string) => value)
+  /** The second accepted peer has its own native subscription and close operation. */
+  const b = await server.connect('b', { provide: { echo: writeB } })
+  /** The original native cause reaches the actual installed Session receiver directly. */
+  const cause = new Error('physical departure')
+  try {
+    /** The original failing event reaches Session.error, rather than the distinct graceful EOF path. */
+    const closed = server.lookup('a')!.handle.closed
+    ports.port1.emit('error', cause)
     await closed
-    expect(a.close).not.toHaveBeenCalled()
-    expect(b.close).not.toHaveBeenCalled()
-  })
-
-  it('detaches only a physically failed source and reports the original failure', async () => {
-    /** Each peer has separate actual physical failure hooks. */
-    const a = physical('a', { codec: identityCodec, framer: messageFramerV1 })
-    /** Failure of A must leave B routable. */
-    const b = physical('b', { codec: identityCodec, framer: messageFramerV1 })
-    /** The actual cause remains observable through the existing reporter. */
-    const report = vi.fn()
-    /** No logical endpoint is created for this isolated resource check. */
-    const mux = createHostMultiplexTransport({ name: 'host', instanceId: 'host' }, report)
-    mux.attach(a.channel)
-    mux.attach(b.channel)
-    /** The physical adapter supplies this exact original error object. */
-    const cause = new Error('physical departure')
-    for (const listener of Array.from(a.errors)) listener(cause)
+    expect(server.lookup('a')).toBeUndefined()
+    expect(await host.memory.send('b', 'echo', 'live')).toBe('live')
+    expect(writeB).toHaveBeenCalledTimes(1)
+    expect(ports.port1.listenerCount('message')).toBe(0)
+    expect(b.pair[0].unsubscribed).toBe(0)
+    // Preserve the original native report oracle; any failure remains explicit in the local ledger.
     expect(report).toHaveBeenCalledWith(cause)
-    expect(a.incoming.size).toBe(0)
-    expect(mux.supports('a', RpcCapability.batch)).toBe(false)
-    await mux.channel.transport.send(request('b', 'live'))
-    expect(b.sent).toHaveLength(1)
-    expect(a.close).not.toHaveBeenCalled()
-    await mux.close()
-  })
+  } finally {
+    await Promise.all([a.close(), b.host.close(), host.close()])
+    ports.port1.close()
+    ports.port2.close()
+  }
 })

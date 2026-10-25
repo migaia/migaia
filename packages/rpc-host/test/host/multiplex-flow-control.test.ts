@@ -1,101 +1,71 @@
-import { describe, expect, it, vi } from 'vitest'
+/** Process-owned feature execution replaces the removed host-multiplex/outbound-gate adapters. */
+import { expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
-import { systemScheduler } from '@migaia/utils/scheduler'
-import { identityCodec } from '@migaia/serialize/codecs/identity/v1'
-import { messageFramerV1 } from '@migaia/rpc-contract/framing'
-import { normalizeRpcEnvelope } from '@migaia/rpc-contract'
-import { createHostMultiplexTransport } from '../../dist/runtime-adapter/host-multiplex.js'
-import { attachIpcConnection } from '../../dist/runtime-adapter/byte/ipc-connection.js'
-import { readOutboundGate } from '../../dist/core/internal/outbound-gate.js'
-import { envelope } from '../core/fixtures/physical-batch-envelope.js'
-import type { IRpcTransport } from '../../dist/core/transport.js'
+import {
+  sendQueue,
+  ipcLog,
+  IpcSendClass,
+  type IProcessFeatureContext
+} from '../../../rpc-plugin-process/dist/features/index.js'
 
-/** Native IPC construction retains the existing gate, log sink and physical close receipt. */
-function connection(peerId: string, send: IRpcTransport['send']) {
-  /** One actual canonical installation supplies capacity; the mux must not build another queue. */
-  const records = vi.fn()
-  /** This native sender is intentionally controllable without replacing the canonical gate. */
-  const ipc = attachIpcConnection(
-    { platform: 'Memory', send, subscribe: () => () => undefined },
-    {
-      connectionId: peerId,
-      sessionId: peerId,
-      maxPendingData: 1,
-      maxPendingControl: 1,
-      log: records
-    },
-    vi.fn()
-  )
+/** Each original native connection lends its actual identity and cancellation/report ports. */
+function nativeContext(connectionId: string): IProcessFeatureContext {
   return {
-    ipc,
-    records,
-    channel: {
-      ...ipc,
-      peerId,
-      scheduler: systemScheduler,
-      agreement: { source: 'static' as const, codec: identityCodec.id, capabilities: [] },
-      pipeline: { codec: identityCodec, framer: messageFramerV1 }
-    }
+    owner: connectionId,
+    connectionId,
+    sessionId: connectionId,
+    signal: new AbortController().signal,
+    report: () => undefined
   }
 }
 
-describe('host multiplexed IPC admission', () => {
-  it('uses each original envelope gate and log once while an unrelated physical peer remains writable', async () => {
-    /** One physical send remains busy so the real configured data capacity is observable. */
-    const released = deferred<void>()
-    /** Native invocation is a positive control before attempting the second data envelope. */
-    const started = deferred<void>()
-    /** B has one occupied data lane; C has an independent original gate. */
-    const b = connection('b', () => {
+it('uses each original envelope gate and log once while an unrelated physical peer remains writable', async () => {
+  /** One original native completion remains unresolved while B owns its logical capacity. */
+  const released = deferred<void>()
+  /** The real executing feature signals only actual native sender entry. */
+  const started = deferred<void>()
+  /** B owns one native feature installation; C has a separate original installation. */
+  const bContext = nativeContext('b')
+  /** Capacity lives in the genuine process feature, never a host-side shadow gate. */
+  const b = sendQueue({ maxPendingData: 1, maxPendingControl: 1 }).install(bContext)
+  /** The unrelated source keeps its own native identity and admission resources. */
+  const c = sendQueue({ maxPendingData: 1, maxPendingControl: 1 }).install(nativeContext('c'))
+  /** Original logging observes the same actual executing gate. */
+  const records = vi.fn()
+  /** The real process logger borrows B's event stream without another capacity counter. */
+  const logging = ipcLog({ report: records }).install({
+    ...bContext,
+    gate: b.value,
+    onReportError: () => undefined
+  })
+  /** Native physical invocation is counted independently for the unrelated peer. */
+  const writeC = vi.fn()
+  /** Concrete native classification is a real input to the existing feature boundary. */
+  const data = { sendClass: IpcSendClass.data }
+  try {
+    expect(b.value).toBeDefined()
+    /** Accepted completion remains owned until this original native write settles. */
+    const pending = b.value.run(data, () => {
       started.resolve()
       return released.promise
     })
-    /** A separate peer must settle while B is still blocked. */
-    const writeC = vi.fn()
-    /** No shadow copy of B's capacity is used for C. */
-    const c = connection('c', writeC)
-    /** The logical transport retains only the existing physical receipts and subscriptions. */
-    const mux = createHostMultiplexTransport({ name: 'a', instanceId: 'a' }, vi.fn())
-    mux.attach(b.channel)
-    mux.attach(c.channel)
-    /** The same private gate port is consumed by the real core sender. */
-    const gate = readOutboundGate(mux.channel.transport)
-    try {
-      expect(gate).toBeDefined()
-      /** One admitted envelope covers all physical preparation and writing. */
-      const first = envelope('busy')
-      /** The sender's already selected target remains out of band at the physical boundary. */
-      const pending = gate!.run(first, () => mux.channel.transport.send(first, { targetId: 'b' }))
-      await started.promise
-      await expect(gate!.run(envelope('full'), vi.fn())).rejects.toMatchObject({
-        code: 'OVERLOADED'
-      })
-      /** A distinct target does not wait on B's accepted physical send. */
-      const base = envelope('independent')
-      /** Target selection is immutable when handed to the original gate. */
-      const other = normalizeRpcEnvelope({
-        ...base,
-        data: { ...base.data, route: { ...base.data.route, targetId: 'c' } }
-      })
-      await gate!.run(other, () => mux.channel.transport.send(other, { targetId: 'c' }))
-      expect(writeC).toHaveBeenCalledTimes(1)
-      expect(
-        b.records.mock.calls.filter(([record]) => record.name === 'ipc.backlog.rejected')
-      ).toHaveLength(1)
-      released.resolve()
-      await pending
-      expect(
-        b.records.mock.calls.filter(([record]) => record.name === 'ipc.backlog.high')
-      ).toHaveLength(1)
-      await mux.close()
-      /** Native cleanup belongs to the actual receipts and is not claimed by logical detach. */
-      await b.ipc.close()
-      await c.ipc.close()
-    } finally {
-      released.resolve()
-      await mux.close()
-      await b.ipc.close()
-      await c.ipc.close()
-    }
-  })
+    await started.promise
+    await expect(b.value.run(data, vi.fn())).rejects.toMatchObject({ code: 'OVERLOADED' })
+    await c.value.run(data, writeC)
+    expect(writeC).toHaveBeenCalledTimes(1)
+    expect(
+      records.mock.calls.filter(([record]) => record.name === 'ipc.backlog.rejected')
+    ).toHaveLength(1)
+    released.resolve()
+    await pending
+    expect(
+      records.mock.calls.filter(([record]) => record.name === 'ipc.backlog.high')
+    ).toHaveLength(1)
+  } finally {
+    released.resolve()
+    logging.dispose()
+    b.dispose()
+    c.dispose()
+    await Promise.all([b.value.whenIdle(), c.value.whenIdle()])
+  }
 })
