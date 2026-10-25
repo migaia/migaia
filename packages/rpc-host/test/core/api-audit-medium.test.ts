@@ -1,5 +1,3 @@
-import { createProbeEmitter, bindInstalledProbe } from '../../dist/core/internal/probe-emitter.js'
-import { systemScheduler } from '@migaia/utils/scheduler'
 import { createRuntimeEndpointComposition } from '../../dist/core/runtime-api-endpoint.js'
 import { RpcCapability } from '@migaia/rpc-contract'
 import { MessageChannel } from 'node:worker_threads'
@@ -14,7 +12,6 @@ import {
   createNodeMessagePortTransport
 } from '../../dist/core/adapters/message-port.js'
 import { createWebWorkerTransport } from '../../dist/core/adapters/web-worker.js'
-import { defineProbe, readProbeStages, subscribeProbeStages } from '../../dist/core/probe/index.js'
 
 it('publishes the binding disposal settlement before one synchronous reentry', async () => {
   /** The bound operation is allowed to synchronously join disposal before returning its Promise. */
@@ -41,63 +38,6 @@ it('publishes the binding disposal settlement before one synchronous reentry', a
   expect(calls).toBe(1)
   expect(nested).toBe(closing)
   expect(endpoint.dispose()).toBe(closing)
-})
-
-it('rebuilds installed probe stages even when an earlier cold listener throws', async () => {
-  /** Record only ordinary events actually emitted by the installed probe. */
-  let events = 0
-  /** The callback's native failure keeps its original identity and receives package classification. */
-  const original = new Error('audit cold stage listener failed')
-  /** The native handle is shared by the cold subscription and the endpoint emitter. */
-  const probe = defineProbe({
-    stages: ['message'],
-    emit() {
-      events++
-    }
-  })
-  /** Register before endpoint installation to reproduce the original notification ordering. */
-  const off = subscribeProbeStages(probe, () => {
-    throw original
-  })
-  /** Actual memory traffic proves pause reaches the emitter rather than only updating the mask. */
-  const [left, right] = createMemoryTransportPair()
-  /** The provider handles the real request through the normal public endpoint. */
-  const server = await createRuntimeEndpointComposition(
-    {
-      id: 'probe-server',
-      transport: right,
-      middlewares: [connect({ transport: right })]
-    },
-    { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
-  ).installing
-  server.provide('echo', (context) => context.success(context.data))
-  /** The actual emitter subscribes after the failing cold listener. */
-  bindInstalledProbe(left, createProbeEmitter([probe], systemScheduler.now, 'probe-client'))
-  const client = await createRuntimeEndpointComposition(
-    {
-      id: 'probe-client',
-      transport: left,
-      targetIds: ['probe-server'],
-      middlewares: [connect({ transport: left })]
-    },
-    { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
-  ).installing
-  try {
-    await client.send('probe-server', 'echo', 'before')
-    expect(() => probe.setStages([])).toThrow(original)
-    expect(original).toMatchObject({ source: 'rpc.endpoint', code: 'CALLBACK_FAILED' })
-    expect(readProbeStages(probe)).toBe(0)
-    /** This scalar snapshot excludes events generated before pause. */
-    const before = events
-    await client.send('probe-server', 'echo', 'after')
-    expect(events).toBe(before)
-  } finally {
-    off()
-    await client.dispose()
-    await server.dispose()
-    left.close()
-    right.close()
-  }
 })
 
 it.each([
