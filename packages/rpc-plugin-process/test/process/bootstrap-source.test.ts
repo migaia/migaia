@@ -3,12 +3,13 @@ import { PassThrough } from 'node:stream'
 import { expect, it } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
 import { defineTransportPlugin, RpcEventByteIO, encodeRpcStreamFrame } from '@migaia/rpc-host/sdk'
-import { deferred } from '@migaia/utils/promise'
+import { deferred, type IAbortSignal } from '@migaia/utils/promise'
 import type { IRpcSessionView } from '@migaia/rpc-contract/interfaces'
 import { receiveAdapterBootstrap } from '../../dist/process/bootstrap.js'
 import { serveProcessSessions } from '../../dist/process/plugin/serve.js'
 import { createProcessCarrier } from '../../dist/process/carrier.js'
 import { createProcessChannelClosedError } from '../../dist/process/error.js'
+import { acceptProcessConnectionBootstrap } from '../../dist/process/connection-bootstrap.js'
 import {
   PROCESS_RUNTIME_API_BOOTSTRAP_KIND,
   PROCESS_RUNTIME_API_BOOTSTRAP_VERSION
@@ -93,12 +94,27 @@ class NativeBootstrapFixture {
       await this.parentIO.write(
         encodeRpcStreamFrame(new TextEncoder().encode(JSON.stringify(bootstrap)))
       )
+      /** The genuine native token gate precedes the separate semantic Session on these same bytes. */
+      const admitted = await this.admit(context.signal)
       /** Session owns the one semantic handshake, accepted metadata and actual carrier lifetime. */
-      const handle = context.attach(createProcessCarrier(this.parentIO, context, { id: 'parent' }))
+      const handle = context.attach(
+        createProcessCarrier(admitted.channel, context, { id: 'parent' }),
+        undefined,
+        admitted.connectionContext
+      )
       this.accepted = await handle.ready
       return { dispose: () => context.detach(handle) }
     }
   })
+
+  /** Complete actual parent token admission without creating a semantic Session for mismatch cases. */
+  admit(signal: IAbortSignal) {
+    return acceptProcessConnectionBootstrap(
+      this.parentIO,
+      { token: bootstrap.token, expectedPeerId: childSelf.instanceId },
+      { signal, report: this.#report }
+    )
+  }
 
   /** Child serve owns cancellation before its original native bootstrap acquisition can await. */
   readonly child = defineTransportPlugin({
@@ -214,6 +230,8 @@ it('rejects an explicit self mismatch and preserves cleanup failure reports', as
     await fixture.parentIO.write(
       encodeRpcStreamFrame(new TextEncoder().encode(JSON.stringify(bootstrap)))
     )
+    /** The child must pass the original private token gate before Host checks contradictory self. */
+    await fixture.admit(new AbortController().signal)
     await rejected
     expect(fixture.reports).toContain(cleanup)
     expect(fixture.childCloses).toBe(1)
