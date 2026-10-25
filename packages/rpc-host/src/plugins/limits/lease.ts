@@ -77,13 +77,11 @@ export class LimitsLease {
   /** Local timeout provenance comes from the mint owner, never writable source/code properties. */
   readonly #abort = (): void => {
     this.#unsubscribe()
-    if (
-      this.#timedOut ||
-      localRpcErrorCode(resolveAbortReason(this.#signal)) !== RpcCoreErrorCode.deadlineExceeded
-    )
-      return
+    /** The exact local deadline object must survive policy retirement and the later close frame. */
+    const reason = resolveAbortReason(this.#signal)
+    if (this.#timedOut || localRpcErrorCode(reason) !== RpcCoreErrorCode.deadlineExceeded) return
     this.#timedOut = true
-    this.#governor.timeout()
+    this.#governor.timeout(reason)
   }
 
   /** Remove exactly the observer attached to the actual provider signal. */

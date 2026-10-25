@@ -105,7 +105,6 @@ export class RpcLimitsFlow {
     const governor = this.#connection(context.carrierId)
     governor.bind(context.connectionSignal ?? context.signal)
     if (!this.#admission.acquireMany(keys, peerKey)) {
-      governor.violate()
       this.#notify(context, peerKey)
       /** The existing public quota summary belongs to this exact minted refusal only. */
       const error = createRpcError(
@@ -118,6 +117,7 @@ export class RpcLimitsFlow {
         RpcCoreErrorText.providerFailed,
         { preserveSerializedError: true }
       )
+      governor.violate(error)
       this.#publish?.({
         kind: RpcProbeObservationKind.event,
         namespace: context.namespace,

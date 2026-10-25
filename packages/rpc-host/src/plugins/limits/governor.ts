@@ -8,17 +8,18 @@ import type { IAbortSignal } from '@migaia/utils/promise'
 import { deferTask, type IScheduledTask, type IScheduler } from '@migaia/utils/scheduler'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { RpcCoreErrorText } from '@migaia/rpc-contract/errors'
-import { createRpcError } from '../../host/error-owner.js'
+import { RpcSessionRetirement } from '@migaia/rpc-contract/interfaces'
+import { createRpcError, createRpcLifecycleError } from '../../host/error-owner.js'
 import { registerLocalErrorWireSummary } from '../../host/error-wire-metadata.js'
 import { portableBytes } from '../../sdk/wire/portable-size.js'
-import { RpcLimitsRateWindowMs } from './constants.js'
+import { RpcLimitsIdleTimeoutText, RpcLimitsRateWindowMs } from './constants.js'
 import type { IRpcLimitsOptions } from './types.js'
 
 /** One actual connection lends only lifecycle, reporting and the existing scheduler. */
 export type ILimitsGovernorPorts = Readonly<{
   scheduler: IScheduler
   report(error: unknown): void
-  retire(carrierId: string, reason?: unknown): Promise<void>
+  retire(carrierId: string, reason?: unknown, kind?: RpcSessionRetirement): Promise<void>
   release(carrierId: string, governor: LimitsGovernor): void
 }>
 
@@ -101,7 +102,6 @@ export class LimitsGovernor {
             ) > this.#options.maxPayloadBytes!
         ))
     ) {
-      this.violate()
       /** A selected native diagnostic remains public attachment only, never local control proof. */
       const diagnostic = this.#options.overflow
       /** Preserve selected native codes while retaining the original correlated quota summary. */
@@ -120,6 +120,7 @@ export class LimitsGovernor {
         RpcCoreErrorText.providerFailed,
         { preserveSerializedError: true }
       )
+      this.violate(error)
       throw error
     }
     this.#calls += payloads.length
@@ -132,10 +133,12 @@ export class LimitsGovernor {
   }
 
   /** Native concurrency and quota refusals share the original consecutive-violation policy. */
-  violate(): void {
+  violate(error: unknown): void {
     this.#violations += 1
     if (this.#violations >= (this.#options.violationLimit ?? Infinity))
-      deferTask(this.#ports.scheduler, this.#requestClose)
+      deferTask(this.#ports.scheduler, () =>
+        this.#requestClose(error, RpcSessionRetirement.liquidated)
+      )
   }
 
   /** Lease activity begins only after rate and payload admission succeed. */
@@ -147,11 +150,13 @@ export class LimitsGovernor {
   }
 
   /** The lease already proved this is its one genuine local deadline. */
-  timeout(): void {
+  timeout(error: unknown): void {
     if (this.#closed) return
     this.#timeouts += 1
     if (this.#timeouts === this.#options.maxConsecutiveTimeouts)
-      deferTask(this.#ports.scheduler, this.#requestClose)
+      deferTask(this.#ports.scheduler, () =>
+        this.#requestClose(error, RpcSessionRetirement.liquidated)
+      )
   }
 
   /** Only successful uncancelled actual completion resets consecutive policy failures. */
@@ -182,8 +187,9 @@ export class LimitsGovernor {
   readonly #connectionClosed = (): void => this.close()
 
   /** The policy borrows exact carrier retirement and preserves any original cleanup failure. */
-  readonly #requestClose = (): void => {
-    if (!this.#closed) void this.#ports.retire(this.#carrierId).catch(this.#ports.report)
+  readonly #requestClose = (error: unknown, kind: RpcSessionRetirement): void => {
+    if (!this.#closed)
+      void this.#ports.retire(this.#carrierId, error, kind).catch(this.#ports.report)
   }
 
   /** A ready quiet connection with no real business may retire at its original idle deadline. */
@@ -202,7 +208,10 @@ export class LimitsGovernor {
         this.#idle = undefined
         if (this.#closed || this.#active > 0) return
         if (this.#ports.scheduler.now() - this.#lastInboundAt >= this.#options.idleTimeoutMs!)
-          this.#requestClose()
+          this.#requestClose(
+            createRpcLifecycleError(RpcLimitsIdleTimeoutText),
+            RpcSessionRetirement.idle
+          )
         else this.#scheduleIdle()
       },
       Math.max(0, this.#lastInboundAt + this.#options.idleTimeoutMs - this.#ports.scheduler.now())

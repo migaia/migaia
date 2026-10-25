@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
+import { createManualScheduler } from '@migaia/utils/testing'
 import { createRpcHost } from '@migaia/rpc-host'
 import { limits, type IRpcProviderRejection } from '@migaia/rpc-host/plugins/limits'
 import { deserializeRpcWireError } from '@migaia/rpc-contract/protocol'
 import { coreMemoryServer } from '../../host/core-fixture.js'
+import { LimitsGovernor } from '../../../dist/plugins/limits/governor.js'
 
 /** One real business hold keeps fixture state in an explicit owner rather than captured callbacks. */
 class HeldBusiness {
@@ -61,7 +63,7 @@ describe('limits provider concurrency observer', () => {
           await expect(client.host.memory.request('hold', null)).rejects.toMatchObject({
             code: 'OVERLOADED'
           })
-        await client.host.memory.send('hold', 'secret-fixture-payload')
+        await client.host.memory.notify('hold', 'secret-fixture-payload')
         await new Promise<void>((resolve) => setTimeout(resolve, 0))
         expect(observer).toHaveBeenCalledTimes(mode === 'none' ? 0 : 3)
         for (const [rejection] of observer.mock.calls) {
@@ -248,5 +250,73 @@ describe('limits accepted host policy', () => {
       await client.host.close()
       await server.close()
     }
+  })
+})
+
+describe('limits governor retirement reasons', () => {
+  it('retires quota violations with the exact original refusal and explicit liquidation kind', () => {
+    /** The existing deterministic scheduler executes the original deferred retirement callback. */
+    const scheduler = createManualScheduler()
+    /** Session retirement is borrowed unchanged; this assertion observes its genuine producer. */
+    const retire = vi.fn(async () => undefined)
+    /** One original governor owns the rate bucket and violation threshold. */
+    const governor = new LimitsGovernor(
+      'quota-source',
+      { maxCallsPerMinute: 1, violationLimit: 1 },
+      { scheduler, retire, report: () => undefined, release: () => undefined }
+    )
+    governor.reserve([null])
+    /** Catch retains identity of the actual error thrown by the quota admission owner. */
+    let original: unknown
+    try {
+      governor.reserve([null])
+    } catch (error) {
+      original = error
+    }
+    expect(original).toMatchObject({ code: 'OVERLOADED' })
+    scheduler.advance(0)
+    expect(retire).toHaveBeenCalledExactlyOnceWith('quota-source', original, 'liquidated')
+    governor.close()
+  })
+
+  it('passes the exact proven deadline object to liquidation without changing its cause', () => {
+    /** Timeout provenance is checked by the existing lease before this governor entry. */
+    const original = new Error('original provider deadline', { cause: new Error('business wait') })
+    /** Native scheduling and retirement are the same collaborators used by installed policy. */
+    const scheduler = createManualScheduler()
+    /** This receipt captures the original port arguments, not a reconstructed diagnostic. */
+    const retire = vi.fn(async () => undefined)
+    /** Only the selected consecutive-timeout threshold can invoke this retirement. */
+    const governor = new LimitsGovernor(
+      'deadline-source',
+      { maxConsecutiveTimeouts: 1 },
+      { scheduler, retire, report: () => undefined, release: () => undefined }
+    )
+    governor.timeout(original)
+    scheduler.advance(0)
+    expect(retire).toHaveBeenCalledExactlyOnceWith('deadline-source', original, 'liquidated')
+    governor.close()
+  })
+
+  it('retires an actually ready quiet source with an explicit idle lifecycle reason', () => {
+    /** Idle scheduling shares the original monotonic deadline and creates no parallel timer. */
+    const scheduler = createManualScheduler()
+    /** The real owner supplies both the local reason and the transport-neutral retirement kind. */
+    const retire = vi.fn(async () => undefined)
+    /** No active business lease prevents this configured idle deadline. */
+    const governor = new LimitsGovernor(
+      'idle-source',
+      { idleTimeoutMs: 10 },
+      { scheduler, retire, report: () => undefined, release: () => undefined }
+    )
+    governor.ready()
+    scheduler.advance(10)
+    expect(retire).toHaveBeenCalledExactlyOnceWith(
+      'idle-source',
+      expect.objectContaining({ code: 'ENDPOINT_DISPOSED', message: 'Connection idle timeout' }),
+      'idle'
+    )
+    expect(scheduler.pendingCount).toBe(0)
+    governor.close()
   })
 })
