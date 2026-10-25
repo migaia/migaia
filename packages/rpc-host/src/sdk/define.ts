@@ -12,6 +12,7 @@ import type {
   IRpcFlowPlugin,
   IRpcLinkPolicyDefinition,
   IRpcTransportPlugin,
+  IRpcTransportFeatureExtensions,
   IRpcTransportSetupContext
 } from './types.js'
 import { installRpcDefinition } from '../host/installation.js'
@@ -44,7 +45,7 @@ export function defineTransportPlugin<
 >(
   definition: IRpcTransportDefinition<F, E, IRpcTransportSetupContext> &
     Readonly<{ namespace: N; closingWrites?: A }>
-): IRpcTransportPlugin<N, E, A> {
+): IRpcTransportPlugin<N, E & IRpcTransportFeatureExtensions<F>, A> {
   /** Capture the caller's array once; installed feature instances retain their original identity. */
   const captured = Object.freeze({
     ...definition,
@@ -60,24 +61,16 @@ export function defineTransportPlugin<
   /** Native admission determines definition identity and public metadata semantics. */
   const plugin = definePlugin({ name: captured.name, install: new RpcDefinition(metadata).install })
   registerRpcDefinition(plugin, metadata)
-  return plugin as unknown as IRpcTransportPlugin<N, E, A>
+  return plugin as unknown as IRpcTransportPlugin<N, E & IRpcTransportFeatureExtensions<F>, A>
 }
 
 /** Each native flow install invokes setup anew, preventing cross-host sharing of optional state. */
 export function defineFlowPlugin<
   E extends object = Record<never, never>,
-  const N extends string = string,
   M extends object = Record<never, never>
->(
-  definition: IRpcFlowDefinition<E> & Readonly<{ namespaces?: readonly N[] }>,
-  metadata?: M
-): IRpcFlowPlugin<E, N> & Readonly<M> {
-  /** Namespace membership is configuration; hooks are produced later by the per-host setup. */
-  const captured = Object.freeze({
-    ...definition,
-    namespaces:
-      definition.namespaces === undefined ? undefined : Object.freeze([...definition.namespaces])
-  })
+>(definition: IRpcFlowDefinition<E>, metadata?: M): IRpcFlowPlugin<E> & Readonly<M> {
+  /** Observer configuration is cold; each host setup constructs its own actual installation. */
+  const captured = Object.freeze({ ...definition })
   /** Only the actual admitted definition object is recognized by createRpcHost. */
   const registration: IRpcDefinitionMetadata = {
     kind: RpcDefinitionKind.flow,
@@ -95,7 +88,7 @@ export function defineFlowPlugin<
   /** The shared native transaction calls this install in its real dependency order. */
   const plugin = definePlugin(native)
   registerRpcDefinition(plugin, registration)
-  return plugin as unknown as IRpcFlowPlugin<E, N> & Readonly<M>
+  return plugin as unknown as IRpcFlowPlugin<E> & Readonly<M>
 }
 
 /** Link policy composes complete feature behavior without introducing another intervention stage. */

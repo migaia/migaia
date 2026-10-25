@@ -9,10 +9,9 @@ import { RpcChunkPluginName } from './constants.js'
 import { RpcChunkFlow } from './flow.js'
 import type { IRpcChunkOptions } from './types.js'
 
-/** Scope and required negotiation are existing host declarations rather than plugin-side routing. */
+/** Required negotiation remains separate from transport-selected feature placement. */
 export type IRpcChunkFeatureOptions = Omit<IRpcChunkOptions, 'errorMetadata'> &
   Readonly<{
-    namespaces?: readonly string[]
     required?: boolean
   }>
 
@@ -22,7 +21,6 @@ export function chunk(options: IRpcChunkFeatureOptions = {}): IRpcFlowFeature {
   const captured = { ...options }
   return defineBuiltinFlowFeature('chunk', {
     name: RpcChunkPluginName,
-    namespaces: captured.namespaces,
     setup: (context) => new RpcChunkFlow(captured, context.signal, captured.required ?? false).value
   })
 }

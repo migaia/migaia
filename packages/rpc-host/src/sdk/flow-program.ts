@@ -1,5 +1,10 @@
 /** Compile cold placements and lend their actual native Feature outputs to one common adapter. */
-import { definePlugin, type IPluginHostCore, type IFeatureRecord } from '@migaia/plugin-host'
+import {
+  definePlugin,
+  type IPluginHostCore,
+  type IFeatureRecord,
+  type IDefinedPluginConstraint
+} from '@migaia/plugin-host'
 import { inspectFeatures } from '@migaia/plugin-host/composition'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
@@ -147,7 +152,7 @@ export class RpcFlowProgram {
   }
 
   /** Wrap every placement in the same genuine native plugin; no per-capability plugin exists. */
-  plugin(): IRpcFlowPlugin {
+  plugin(): IDefinedPluginConstraint<Record<never, never>, never, Record<never, never>> {
     /** Native Feature factories produce cold definitions before this actual install callback runs. */
     const metadata = { kind: RpcDefinitionKind.features, prepare: this.#prepare }
     /**
@@ -160,7 +165,11 @@ export class RpcFlowProgram {
       install: (core) => installRpcDefinition(core as unknown as IPluginHostCore, metadata)
     })
     registerRpcDefinition(plugin, metadata)
-    return plugin as unknown as IRpcFlowPlugin
+    return plugin as unknown as IDefinedPluginConstraint<
+      Record<never, never>,
+      never,
+      Record<never, never>
+    >
   }
 
   /**
@@ -277,6 +286,6 @@ export class RpcFlowProgram {
 export function rpcFlowPlugin(
   plugins: readonly IRpcHostPlugin[],
   namespaces: readonly string[] = []
-): IRpcFlowPlugin {
+): IDefinedPluginConstraint<Record<never, never>, never, Record<never, never>> {
   return new RpcFlowProgram(plugins, namespaces).plugin()
 }

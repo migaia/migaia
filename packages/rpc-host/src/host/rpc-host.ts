@@ -313,7 +313,7 @@ export class RpcHost {
      * Features.
      */
     const installed = await metadata.prepare(core, this.#controller.signal, context)
-    this.#flow.register(core, metadata.definition, installed)
+    this.#flow.register(core, installed)
   }
 
   /** Global close seals admission, joins native origin drains, then retires physical work. */

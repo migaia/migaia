@@ -8,8 +8,12 @@ import { createProbeEmitter } from '../../dist/plugins/probe/emitter.js'
 import { MemoryCarrier } from '../fixtures/core-carrier.js'
 import { describe, expect, it, vi } from 'vitest'
 import { createManualScheduler } from '@migaia/utils/testing'
-import { defineHost, definePlugin, type IPluginHostCore } from '@migaia/plugin-host'
-import { rpcHostPipelines, type IRpcFlowInstallation } from '@migaia/rpc-host/sdk'
+import { defineHost, definePlugin } from '@migaia/plugin-host'
+import {
+  defineFlowFeature,
+  rpcHostPipelines,
+  type IRpcFlowInstallation
+} from '@migaia/rpc-host/sdk'
 import { TOKEN, leaks } from '../../../rpc-contract/test/fixtures/handshake-privacy.js'
 
 import {
@@ -20,7 +24,11 @@ import {
 import { RpcCoreErrorCode, RpcContractErrorCode } from '@migaia/rpc-contract/error-code'
 import { SessionTable } from '../../dist/session/table.js'
 import { FlowRegistry } from '../../dist/flow/registry.js'
+import { rpcPipelineOwner } from '../../dist/sdk/flow-pipelines.js'
 import type { IRpcSessionTableOptions } from '../../dist/session/types.js'
+
+/** These two cold groups cover every physical namespace used by the actual Session fixtures. */
+const sessionNamespaces = ['process', 'thread'] as const
 
 /** One bounded host fixture owns the actual SessionTable and its narrow work callbacks. */
 class Host {
@@ -46,7 +54,8 @@ class Host {
     /** The SDK keeps declaration and execution authority paired without public raw metadata. */
     const rpc = rpcHostPipelines(
       () => native,
-      (name) => native.pipeline(name)
+      (name) => native.pipeline(name),
+      sessionNamespaces
     )
     /** Native construction declares the same seven payload/mode specifications as the real Host. */
     const native = defineHost({
@@ -58,16 +67,31 @@ class Host {
     native.useSync(
       definePlugin({
         name: 'session-flow',
-        install(core: IPluginHostCore) {
-          flow.register(core, { name: 'session-flow', setup: () => installed }, installed)
+        features: {
+          flow: defineFlowFeature({ name: 'session-flow', setup: () => installed })
+        },
+        install(core) {
+          if (installed.stages) {
+            /** The native Feature supplies its true cold definition; the fixture owns setup output. */
+            const entry = { definition: core.features.flow, installed }
+            flow.registerFeatures(
+              core,
+              new Map([
+                [sessionNamespaces[0], [entry]],
+                [sessionNamespaces[1], [entry]]
+              ])
+            )
+          } else flow.register(core, installed)
           return {}
         }
       })
     )
     flow.start()
+    /** The same genuine native owner serves every Session without rebuilding its authority port. */
+    const pipelines = rpc.domainCore()[rpcPipelineOwner]
     this.table = new SessionTable({
       flow,
-      pipelines: () => native,
+      pipelines: () => pipelines,
       self: () => this.directory.self,
       directory: () => this.directory,
       receive: this.receive,

@@ -17,42 +17,32 @@ export const RpcBuiltinFeature = {
 export type IRpcBuiltinFeature = keyof typeof RpcBuiltinFeature
 
 /** Snapshot a reusable definition without constructing its timers, stores or flow state. */
-function flowFeature<E extends object, N extends string>(
-  definition: IRpcFlowDefinition<E> & Readonly<{ namespaces?: readonly N[] }>,
+function flowFeature<E extends object>(
+  definition: IRpcFlowDefinition<E>,
   builtin?: IRpcBuiltinFeature
-): IRpcFlowFeature<E, N> {
+): IRpcFlowFeature<E> {
   /** The native constructor snapshots direct dependencies; the remaining configuration is immutable. */
-  const captured = Object.freeze({
-    ...definition,
-    namespaces:
-      definition.namespaces === undefined ? undefined : Object.freeze([...definition.namespaces])
-  })
+  const captured = Object.freeze({ ...definition })
   /** One registration later constructs this same cold output through the real native Feature graph. */
   const feature = defineFeature({
     dependencies: captured.dependencies,
     install: () => captured
   })
   registerRpcDefinition(feature, { kind: RpcDefinitionKind.feature, definition: captured, builtin })
-  return feature as IRpcFlowFeature<E, N>
+  return feature as IRpcFlowFeature<E>
 }
 
 /** Third-party information flow uses the same opaque Feature and the default plaintext position. */
-export function defineFlowFeature<
-  E extends object = Record<never, never>,
-  const N extends string = string
->(
-  definition: IRpcFlowDefinition<E> & Readonly<{ namespaces?: readonly N[] }>
-): IRpcFlowFeature<E, N> {
+export function defineFlowFeature<E extends object = Record<never, never>>(
+  definition: IRpcFlowDefinition<E>
+): IRpcFlowFeature<E> {
   return flowFeature(definition)
 }
 
 /** Internal factories supply only capability identity; this is not part of the public SDK entry. */
-export function defineBuiltinFlowFeature<
-  E extends object = Record<never, never>,
-  const N extends string = string
->(
+export function defineBuiltinFlowFeature<E extends object = Record<never, never>>(
   builtin: IRpcBuiltinFeature,
-  definition: IRpcFlowDefinition<E> & Readonly<{ namespaces?: readonly N[] }>
-): IRpcFlowFeature<E, N> {
+  definition: IRpcFlowDefinition<E>
+): IRpcFlowFeature<E> {
   return flowFeature(definition, builtin)
 }

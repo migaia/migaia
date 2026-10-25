@@ -6,10 +6,16 @@ import type { IRpcEnvelope, IRpcHello } from '@migaia/rpc-contract/protocol'
 import { RpcWireProfile } from '@migaia/rpc-contract/protocol'
 import { auth, type IRpcAuthenticationOptions } from '../../../dist/features/auth/index.js'
 import { setAuthenticationReplayCounter } from '../../../dist/features/auth/counter.js'
-import { readRpcDefinition } from '../../../dist/sdk/metadata.js'
+import { readRpcDefinition, RpcDefinitionKind } from '../../../dist/sdk/metadata.js'
 import { RpcJsonCarrierCodec } from '../../../dist/sdk/carrier/json-codec.js'
 import { FlowRegistry } from '../../../dist/flow/registry.js'
-import { RpcFlowPipelines, RpcFlowPoint } from '../../../dist/sdk/flow-pipelines.js'
+import {
+  rpcHostPipelines,
+  rpcPipelineOwner,
+  RpcFlowPoint
+} from '../../../dist/sdk/flow-pipelines.js'
+import { RpcFlowSetup } from '../../../dist/sdk/flow-setup.js'
+import type { IRpcFlowInstallation } from '../../../dist/sdk/types.js'
 
 /** Original correlations and own-key order are ordinary semantic fixtures, not another codec. */
 function message(id: string, payload: unknown = id): IRpcEnvelope {
@@ -38,9 +44,12 @@ function message(id: string, payload: unknown = id): IRpcEnvelope {
 
 /** Exercise genuine native setup, named pipelines and the actual executing codec. */
 async function fixture(options: IRpcAuthenticationOptions, nativeBinary = false) {
-  /** The real public factory captures original callback identity and paired-transform validation. */
-  const metadata = readRpcDefinition(auth(options))
-  if (metadata?.kind !== 'flow') throw new TypeError('expected actual auth flow')
+  /** The genuine native Feature retains original callbacks and paired-transform validation. */
+  const feature = auth(options)
+  /** Private builtin identity belongs to this actual factory, never a copied display name. */
+  const metadata = readRpcDefinition(feature)
+  if (metadata?.kind !== RpcDefinitionKind.feature)
+    throw new TypeError('expected actual auth feature')
   /** Physical source retirement remains distinct from installation rollback. */
   const source = new AbortController()
   /** Setup cleanup owns only this actual native installation. */
@@ -63,19 +72,18 @@ async function fixture(options: IRpcAuthenticationOptions, nativeBinary = false)
   })
   /** Actual executing codec policy is shared by prepare/decode and the one cached restore operation. */
   const codecContext = { codec: 'json', nativeBinary, maxFrameBytes: 16 * 1024 * 1024 }
-  /** Every case installs the actual hooks returned by the native factory. */
-  const installation = await metadata.definition.setup({
-    signal: setup.signal,
-    report: (error) => {
-      reports.push(error)
-    },
-    retire: async () => undefined,
-    call: async () => undefined
-  })
+  /** Native use() publishes the exact algorithm installation retained by the original counter seam. */
+  let installation!: IRpcFlowInstallation<object>
+  /** This namespace uses the same genuine group declaration and lazy owner as public SDK hosts. */
+  const rpc = rpcHostPipelines(
+    () => flow,
+    (name) => flow.pipeline(name),
+    ['test']
+  )
   /** Native plugin-host alone owns actual stage execution and immutable snapshots. */
   const flow = defineHost({
-    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } },
-    pipelines: RpcFlowPipelines
+    ...rpc,
+    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   })
   /** Production registration attaches the authentic setup's stages to this native install core. */
   const registry = new FlowRegistry((error) => {
@@ -84,13 +92,30 @@ async function fixture(options: IRpcAuthenticationOptions, nativeBinary = false)
   await flow.use(
     definePlugin({
       name: metadata.definition.name,
-      install(core) {
-        registry.register(core, metadata.definition, installation)
+      features: { flow: feature },
+      async install(core) {
+        /** Native Feature resolution supplies this original cold definition on the genuine core. */
+        const definition = core.features.flow
+        /** Canonical setup admits the exact algorithm instance into native cleanup ownership. */
+        installation = await new RpcFlowSetup(definition).prepare(core, setup.signal, {
+          signal: setup.signal,
+          report: (error) => {
+            reports.push(error)
+          },
+          retire: async () => undefined,
+          call: async () => undefined
+        })
+        registry.registerFeatures(
+          core,
+          new Map([['test', [{ definition, installed: installation, builtin: metadata.builtin }]]])
+        )
         return {}
       }
     })
   )
   registry.start()
+  /** The namespace-qualified execution port is borrowed unchanged from the genuine native host. */
+  const pipelines = rpc.domainCore()[rpcPipelineOwner]
   /** Physical facts and the exact codec operation are explicit inputs to tiny fixture callbacks. */
   const ports = { source, reports, codec, codecContext }
   /** The required restore port is the actual codec, never a successful admission stub. */
@@ -110,11 +135,11 @@ async function fixture(options: IRpcAuthenticationOptions, nativeBinary = false)
     restore: (prepared) => ports.codec.restore(prepared, ports.codecContext)
   })
   /** The fixture owns its actual executing path rather than several shared callback captures. */
-  const path = { codec, flow, codecContext, context }
+  const path = { codec, pipelines, codecContext, context }
   /** One ordinary outbound path runs prepare, hooks and encode with original identities. */
   const send = async (value: IRpcEnvelope): Promise<IRpcCarrierFrame> => {
     /** Native terminal returns the actual transformed prepared identity to the codec owner. */
-    const prepared = await path.flow.pipeline(RpcFlowPoint.envelopeOutbound).run(
+    const prepared = await path.pipelines.pipeline(RpcFlowPoint.envelopeOutbound, 'test').run(
       {
         prepared: await path.codec.prepare(value, path.codecContext),
         context: path.context('outbound')
@@ -130,7 +155,7 @@ async function fixture(options: IRpcAuthenticationOptions, nativeBinary = false)
     id = 'source'
   ) => {
     /** Restoration receives the same forwarded prepared object used by authentication. */
-    const prepared = await path.flow.pipeline(RpcFlowPoint.envelopeInbound).run(
+    const prepared = await path.pipelines.pipeline(RpcFlowPoint.envelopeInbound, 'test').run(
       {
         prepared: path.codec.decode(value, path.codecContext),
         context: path.context('inbound', signal, id)
@@ -147,6 +172,7 @@ async function fixture(options: IRpcAuthenticationOptions, nativeBinary = false)
     hashes,
     installation,
     flow,
+    pipelines,
     context,
     codec,
     codecContext,
@@ -381,16 +407,16 @@ it('retains the last uint64 allocation and sanitizes actual handshake verifier c
     }
   } as IRpcHello
   /** Outbound and inbound run the corresponding native handshake declarations. */
-  const offered = await credentials.flow
-    .pipeline(RpcFlowPoint.handshakeOutbound)
+  const offered = await credentials.pipelines
+    .pipeline(RpcFlowPoint.handshakeOutbound, 'test')
     .run(
       { handshake: hello, context: credentials.context('outbound') },
       async (payload) => payload.handshake
     )
   expect(offered).toMatchObject({ auth: secret })
   /** The sanitized rejection deliberately withholds the original secret-bearing native exception. */
-  const rejected = await credentials.flow
-    .pipeline(RpcFlowPoint.handshakeInbound)
+  const rejected = await credentials.pipelines
+    .pipeline(RpcFlowPoint.handshakeInbound, 'test')
     .run(
       { handshake: offered!, context: credentials.context('inbound') },
       async (payload) => payload.handshake
@@ -415,28 +441,28 @@ it('retains the last uint64 allocation and sanitizes actual handshake verifier c
   /** Exact original context identity is also lent to the inbound native verifier. */
   const sourceOne = perSource.context('inbound', undefined, 'source-one')
   expect(
-    await perSource.flow
-      .pipeline(RpcFlowPoint.handshakeOutbound)
+    await perSource.pipelines
+      .pipeline(RpcFlowPoint.handshakeOutbound, 'test')
       .run(
         { handshake: hello, context: perSource.context('outbound', undefined, 'source-one') },
         async (payload) => payload.handshake
       )
   ).toMatchObject({ auth: 'source-one' })
   expect(
-    await perSource.flow
-      .pipeline(RpcFlowPoint.handshakeOutbound)
+    await perSource.pipelines
+      .pipeline(RpcFlowPoint.handshakeOutbound, 'test')
       .run(
         { handshake: hello, context: perSource.context('outbound', undefined, 'source-two') },
         async (payload) => payload.handshake
       )
   ).toMatchObject({ auth: 'source-two' })
-  await perSource.flow
-    .pipeline(RpcFlowPoint.handshakeInbound)
+  await perSource.pipelines
+    .pipeline(RpcFlowPoint.handshakeInbound, 'test')
     .run({ handshake: hello, context: sourceOne }, async (payload) => payload.handshake)
   expect(verify.mock.calls[0]?.[2]).toBe(sourceOne)
   /** Resolver failures follow the same privacy boundary as native credential verification. */
-  const resolverFailure = await perSource.flow
-    .pipeline(RpcFlowPoint.handshakeOutbound)
+  const resolverFailure = await perSource.pipelines
+    .pipeline(RpcFlowPoint.handshakeOutbound, 'test')
     .run(
       { handshake: hello, context: perSource.context('outbound', undefined, 'failed-source') },
       async (payload) => payload.handshake

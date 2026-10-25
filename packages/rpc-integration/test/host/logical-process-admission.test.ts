@@ -3,10 +3,10 @@ import { MessageChannel, type MessagePort } from 'node:worker_threads'
 import { expect, it } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import { createRpcHost } from '@migaia/rpc-host'
-import { batch } from '@migaia/rpc-host/plugins/batch'
-import { chunk } from '@migaia/rpc-host/plugins/chunk'
+import { batch } from '@migaia/rpc-host/features/batch'
+import { chunk } from '@migaia/rpc-host/features/chunk'
 import {
-  defineFlowPlugin,
+  defineFlowFeature,
   defineTransportPlugin,
   RpcFlowPoint,
   type IRpcFlowStage,
@@ -171,7 +171,7 @@ class NativeProcessAdmissionPair {
     /** Both directions use their own genuine optional feature installations. */
     const flow = () => [chunk({ chunkBytes: 4096, maxMessageBytes: 64 * 1024 }), batch()]
     /** This observer only supplies a deterministic batch-entry barrier. */
-    const witness = defineFlowPlugin({
+    const witness = defineFlowFeature({
       name: 'logical-native-frame-entry',
       setup: () => ({ stages: { [RpcFlowPoint.frameOutbound]: this.#member } })
     })

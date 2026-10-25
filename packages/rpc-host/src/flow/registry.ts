@@ -4,7 +4,7 @@ import type { IRpcObservation } from '@migaia/rpc-contract/interfaces'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { tagRpcError } from '@migaia/rpc-contract/errors'
 import { HostErrorText } from '../host/error-text.js'
-import type { IRpcFlowDefinition, IRpcFlowInstallation } from '../sdk/types.js'
+import type { IRpcFlowInstallation } from '../sdk/types.js'
 import type { IRpcFlowEntry } from '../sdk/metadata.js'
 import {
   RpcFlowPoint,
@@ -65,19 +65,11 @@ export class FlowRegistry {
   }
 
   /** Register directly on the installing core; native generation rollback removes every stage. */
-  register(
-    core: IPluginHostCore,
-    definition: IRpcFlowDefinition<object>,
-    installed: IRpcFlowInstallation<object>
-  ): void {
+  register(core: IPluginHostCore, installed: IRpcFlowInstallation<object>): void {
     this.#assertMutable()
     if (Object.values(installed.stages ?? {}).some((stage) => stage !== undefined))
       invalidFlow(HostErrorText.flowFeatureRequired)
-    this.#remember(
-      core,
-      installed,
-      definition.namespaces === undefined ? undefined : new Set(definition.namespaces)
-    )
+    this.#remember(core, installed)
   }
 
   /**

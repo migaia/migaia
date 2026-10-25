@@ -7,8 +7,8 @@ import type { IAbortSignal } from '@migaia/utils/promise'
 import type { IRpcFramePayload, IRpcFrameWriteOptions } from '@migaia/rpc-contract/interfaces'
 import type { IRpcFlowStage } from '../../sdk/flow-pipelines.js'
 
-/** Existing namespace/required declarations scope optional physical batching at installation. */
-export type IRpcBatchOptions = Readonly<{ namespaces?: readonly string[]; required?: boolean }>
+/** Required negotiation remains independent from the transport-selected feature placement. */
+export type IRpcBatchOptions = Readonly<{ required?: boolean }>
 /** A logical member retains only its actual write facts and physical continuation until drain. */
 export type IRpcBatchInput = Readonly<{
   payload: IRpcFramePayload

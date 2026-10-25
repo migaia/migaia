@@ -5,6 +5,8 @@ import { describe, expect, it } from 'vitest'
 
 /** Real Worker entry whose generations can crash on request. */
 const entry = new URL('./fixtures/crash-worker.ts', import.meta.url)
+/** Each genuine transport generation owns its actual outcome feature installation. */
+const transport = threadPlugin({ spawn: entry, features: [idempotency()] })
 
 type ICrashApi = {
   thread(): number
@@ -14,10 +16,7 @@ type ICrashApi = {
 }
 
 /** Namespace typing borrows the actual installed transport and optional outcome feature. */
-type ICrashPlugins = readonly [
-  ReturnType<typeof threadPlugin<'thread'>>,
-  ReturnType<typeof idempotency<'thread'>>
-]
+type ICrashPlugins = readonly [typeof transport]
 /** Root methods are lifecycle only; all five original business shapes use the actual namespace. */
 type ICrashHost = Awaited<ReturnType<typeof createRpcHost<ICrashApi, ICrashPlugins>>>
 /** Every original shape must return a Promise rather than throw during native replacement. */
@@ -46,7 +45,7 @@ describe('crashed thread generation', () => {
     const reports: unknown[] = []
     const peer = await createRpcHost<ICrashApi, ICrashPlugins>({
       report: (error) => reports.push(error),
-      plugins: [threadPlugin({ spawn: entry }), idempotency({ namespaces: ['thread'] })]
+      plugins: [transport]
     })
     try {
       const first = await peer.thread.request('thread')

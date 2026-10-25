@@ -7,36 +7,42 @@ import type {
   IRpcFrameWriteOptions
 } from '@migaia/rpc-contract/interfaces'
 import { batch } from '../../../dist/features/batch/index.js'
-import { readRpcDefinition } from '../../../dist/sdk/metadata.js'
+import { readRpcDefinition, RpcDefinitionKind } from '../../../dist/sdk/metadata.js'
 import { FlowRegistry } from '../../../dist/flow/registry.js'
-import { RpcFlowPipelines, RpcFlowPoint } from '../../../dist/sdk/flow-pipelines.js'
+import {
+  rpcHostPipelines,
+  rpcPipelineOwner,
+  RpcFlowPoint
+} from '../../../dist/sdk/flow-pipelines.js'
+import { RpcFlowSetup } from '../../../dist/sdk/flow-setup.js'
+import type { IRpcFlowInstallation } from '../../../dist/sdk/types.js'
 
 /** The real native factory/setup is used by every owning physical-flow oracle. */
 async function fixture() {
-  /** Namespace declarations are tested through the same registration path as ordinary installation. */
-  const plugin = batch({ namespaces: ['test'], required: true })
-  /** Private native identity comes from the existing SDK owner, rather than invented config. */
-  const metadata = readRpcDefinition(plugin)
-  if (metadata?.kind !== 'flow') throw new TypeError('expected actual batch flow')
+  /** The native graph instantiates this genuine factory handle before its install callback. */
+  const feature = batch({ required: true })
+  /** Private builtin identity comes from the original factory, never its display name. */
+  const metadata = readRpcDefinition(feature)
+  if (metadata?.kind !== RpcDefinitionKind.feature)
+    throw new TypeError('expected actual batch feature')
   /** Physical source lifetime stays separate from caller cancellation. */
   const source = new AbortController()
   /** Installation cleanup owns its original setup signal. */
   const setup = new AbortController()
   /** Failures from independent inbound members remain observable. */
   const errors: unknown[] = []
-  /** Real setup returns the exact fixed hooks used by the ordinary host. */
-  const installation = await metadata.definition.setup({
-    signal: setup.signal,
-    report: (error) => {
-      errors.push(error)
-    },
-    retire: async () => undefined,
-    call: async () => undefined
-  })
+  /** Actual native preparation publishes this exact installation before use() completes. */
+  let installation!: IRpcFlowInstallation<object>
+  /** Qualified declarations and execution authority come from the same canonical SDK owner. */
+  const rpc = rpcHostPipelines(
+    () => flow,
+    (name) => flow.pipeline(name),
+    ['test', 'other']
+  )
   /** Native plugin-host owns the only snapshot, lease and multiple-submission execution path. */
   const flow = defineHost({
-    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } },
-    pipelines: RpcFlowPipelines
+    ...rpc,
+    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   })
   /** Production registration attaches actual setup stages through a genuine install core. */
   const registry = new FlowRegistry((error) => {
@@ -45,13 +51,32 @@ async function fixture() {
   await flow.use(
     definePlugin({
       name: metadata.definition.name,
-      install(core) {
-        registry.register(core, metadata.definition, installation)
+      features: { flow: feature },
+      async install(core) {
+        /** This is the original cold definition returned by the actual native Feature factory. */
+        const definition = core.features.flow
+        /** Canonical setup owns the acquired instance and its native cleanup receipt. */
+        installation = await new RpcFlowSetup(definition).prepare(core, setup.signal, {
+          signal: setup.signal,
+          report: (error) => {
+            errors.push(error)
+          },
+          retire: async () => undefined,
+          call: async () => undefined
+        })
+        /** Only genuine factory outputs enter this group; the other real lane remains empty. */
+        const groups = new Map([
+          ['test', [{ definition, installed: installation, builtin: metadata.builtin }]],
+          ['other', []]
+        ])
+        registry.registerFeatures(core, groups)
         return {}
       }
     })
   )
   registry.start()
+  /** Borrow typed execution from the same actual native Host owner, never a copied runner. */
+  const pipelines = rpc.domainCore()[rpcPipelineOwner]
   /** Each call borrows accepted facts while retaining its own original write options. */
   const context = (
     write?: IRpcFrameWriteOptions,
@@ -78,7 +103,7 @@ async function fixture() {
       }
     }
   })
-  return { source, installation, flow, registry, errors, context }
+  return { source, installation, flow, pipelines, registry, errors, context }
 }
 
 it('one physical batch settles every original member only at actual native drain and preserves failure identity', async () => {
@@ -103,18 +128,18 @@ it('one physical batch settles every original member only at actual native drain
     else if (physical.frames.length === 2) await physical.batchDrain.promise
   }
   /** Idle sending reaches physical IO immediately. */
-  const first = f.flow
-    .pipeline(RpcFlowPoint.frameOutbound)
+  const first = f.pipelines
+    .pipeline(RpcFlowPoint.frameOutbound, 'test')
     .run({ frame: { kind: 'message', data: 'first' }, ...f.context() }, write)
   expect(frames).toHaveLength(1)
   /** Independent completion remains pending until one actual shared native write settles. */
-  const one = f.flow
-    .pipeline(RpcFlowPoint.frameOutbound)
+  const one = f.pipelines
+    .pipeline(RpcFlowPoint.frameOutbound, 'test')
     .run({ frame: { kind: 'message', data: 'one' }, ...f.context() }, write)
     .catch((error: unknown) => error)
   /** A second logical message keeps a distinct completion and final encoded value. */
-  const two = f.flow
-    .pipeline(RpcFlowPoint.frameOutbound)
+  const two = f.pipelines
+    .pipeline(RpcFlowPoint.frameOutbound, 'test')
     .run({ frame: { kind: 'message', data: 'two' }, ...f.context() }, write)
     .catch((error: unknown) => error)
   /** Combined completion observes the original physical drain rather than buffer admission. */
@@ -143,8 +168,8 @@ it('one physical batch settles every original member only at actual native drain
   for (const failure of await Promise.all([one, two])) expect(failure).toBe(cause)
   await drained
   expect(idle).toBe(true)
-  await f.flow
-    .pipeline(RpcFlowPoint.frameOutbound)
+  await f.pipelines
+    .pipeline(RpcFlowPoint.frameOutbound, 'test')
     .run({ frame: { kind: 'message', data: 'recovered' }, ...f.context() }, write)
   expect(frames[2]).toEqual({ kind: 'message', data: 'recovered' })
   await f.installation.dispose?.()
@@ -174,13 +199,13 @@ it('queued cancellation removes only its member and transfer/opaque frames remai
     if (state.frames.length === 1) await state.held.promise
   }
   /** Idle physical send creates the only busy boundary. */
-  const first = f.flow
-    .pipeline(RpcFlowPoint.frameOutbound)
+  const first = f.pipelines
+    .pipeline(RpcFlowPoint.frameOutbound, 'test')
     .run({ frame: { kind: 'message', data: 'first' }, ...f.context() }, write)
   /** A cancelled queued call must emit no frame and no started callback. */
   const caller = new AbortController()
   /** The public CallRecord owns CANCELLED; a cancelled member's stage completes normally. */
-  const cancelled = f.flow.pipeline(RpcFlowPoint.frameOutbound).run(
+  const cancelled = f.pipelines.pipeline(RpcFlowPoint.frameOutbound, 'test').run(
     {
       frame: { kind: 'message', data: 'cancelled' },
       ...f.context({
@@ -195,7 +220,7 @@ it('queued cancellation removes only its member and transfer/opaque frames remai
   /** The original backing frame keeps its exact identity instead of joining a metadata aggregate. */
   const native: IRpcCarrierFrame = { kind: 'message', data: 'native', sidecars: transfer }
   /** Transfer is actual physical authority, never inferred from an encoded member. */
-  const boundary = f.flow.pipeline(RpcFlowPoint.frameOutbound).run(
+  const boundary = f.pipelines.pipeline(RpcFlowPoint.frameOutbound, 'test').run(
     {
       frame: native,
       ...f.context({
@@ -210,7 +235,7 @@ it('queued cancellation removes only its member and transfer/opaque frames remai
   /** Opaque custom codec values use their original singleton shape. */
   const opaque: IRpcCarrierFrame = { kind: 'message', data: { opaque: true } }
   /** Opaque output preserves order behind the native transfer boundary. */
-  const last = f.flow.pipeline(RpcFlowPoint.frameOutbound).run(
+  const last = f.pipelines.pipeline(RpcFlowPoint.frameOutbound, 'test').run(
     {
       frame: opaque,
       ...f.context({
@@ -248,7 +273,7 @@ it.each([1, 2])(
     /** Each original refusal is reported once without contaminating any sibling's traversal. */
     const cause = new Error('fixture refusal write failure')
     await expect(
-      f.flow.pipeline(RpcFlowPoint.frameInbound).run(
+      f.pipelines.pipeline(RpcFlowPoint.frameInbound, 'test').run(
         {
           frame: { kind: 'extension', extension: 'batch@1', data: { frames: members } },
           ...f.context(undefined, 'inbound')
@@ -281,13 +306,13 @@ it('physical retirement rejects queued members and joins the already started nat
     await held.promise
   }
   /** Observe rejections before the original source aborts. */
-  const first = f.flow
-    .pipeline(RpcFlowPoint.frameOutbound)
+  const first = f.pipelines
+    .pipeline(RpcFlowPoint.frameOutbound, 'test')
     .run({ frame: { kind: 'message', data: 'first' }, ...f.context() }, write)
     .catch((error: unknown) => error)
   /** Queued member retains no native write after source retirement. */
-  const queued = f.flow
-    .pipeline(RpcFlowPoint.frameOutbound)
+  const queued = f.pipelines
+    .pipeline(RpcFlowPoint.frameOutbound, 'test')
     .run({ frame: { kind: 'message', data: 'queued' }, ...f.context() }, write)
     .catch((error: unknown) => error)
   /** Both members keep the exact source reason, independent from a later native drain. */
@@ -324,21 +349,21 @@ it('cancellation during an async downstream hook falls back once without writing
     if (state.frames.length === 1) await state.firstDrain.promise
   }
   /** Idle traffic still reaches the native continuation without buffering. */
-  const first = f.flow
-    .pipeline(RpcFlowPoint.frameOutbound)
+  const first = f.pipelines
+    .pipeline(RpcFlowPoint.frameOutbound, 'test')
     .run({ frame: { kind: 'message', data: 'first' }, ...f.context() }, write)
   /** The caller remains cancellable until its actual original start callback. */
   const caller = new AbortController()
   /** Cancellation finishes the stage; the separate public case retains CANCELLED and its cause. */
-  const cancelled = f.flow
-    .pipeline(RpcFlowPoint.frameOutbound)
+  const cancelled = f.pipelines
+    .pipeline(RpcFlowPoint.frameOutbound, 'test')
     .run(
       { frame: { kind: 'message', data: 'cancelled' }, ...f.context({ signal: caller.signal }) },
       write
     )
   /** This unrelated member must still cross the original physical continuation exactly once. */
-  const survivor = f.flow
-    .pipeline(RpcFlowPoint.frameOutbound)
+  const survivor = f.pipelines
+    .pipeline(RpcFlowPoint.frameOutbound, 'test')
     .run({ frame: { kind: 'message', data: 'survivor' }, ...f.context() }, write)
   firstDrain.resolve()
   await first

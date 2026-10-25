@@ -12,5 +12,4 @@ export type IRpcMethodValidators = Readonly<{
 /** Parser state belongs to this installed plugin; method metadata in handshakes stays inert. */
 export type IRpcSchemaOptions = Readonly<{
   schemas?: Readonly<Record<string, IRpcMethodValidators>>
-  namespaces?: readonly string[]
 }>

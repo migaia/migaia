@@ -11,10 +11,9 @@ import { renderPeerDeclaration } from './render.js'
 export type ITypegenOutput = Readonly<{
   write(fileName: string, text: string): void | PromiseLike<void>
 }>
-/** One reusable definition scopes observations without sharing live installation state. */
+/** One reusable host-level observer definition never shares live installation state. */
 export type ITypegenOptions = Readonly<{
   out: ITypegenOutput
-  namespaces?: readonly string[]
 }>
 
 /** One installed observer owns only its output port and terminal guard. */
@@ -60,11 +59,10 @@ class TypegenObserver {
   }
 }
 
-/** Generate declarations from canonical accepted directories within the selected namespaces. */
+/** Generate declarations from canonical accepted directories observed by this host installation. */
 export function typegen(options: ITypegenOptions): IRpcFlowPlugin {
   return defineFlowPlugin({
     name: RpcTypegenName,
-    namespaces: options.namespaces,
     setup(context) {
       /** Every receiving host gets an independent observer and exact disposal receipt. */
       const observer = new TypegenObserver(options.out, context.report)

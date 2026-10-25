@@ -11,7 +11,6 @@ import type { IRpcIdempotencyStore, IRpcIdempotencyStoreOptions } from './store.
 /** Existing store capacities and scope callback move from host policy to this actual plugin. */
 export type IRpcIdempotencyOptions = IRpcIdempotencyStoreOptions &
   Readonly<{
-    namespaces?: readonly string[]
     store?: IRpcIdempotencyStore
     scope?(
       identity: Readonly<{

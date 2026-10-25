@@ -15,5 +15,5 @@ await createRpcHost({
     wait: () => new Promise<never>(() => {}),
     crash: () => process.exit(1)
   },
-  plugins: [threadPlugin({ connectToParent: true }), idempotency({ namespaces: ['thread'] })]
+  plugins: [threadPlugin({ connectToParent: true, features: [idempotency()] })]
 })

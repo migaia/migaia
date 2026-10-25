@@ -3,9 +3,15 @@ import { defineHost, definePlugin } from '@migaia/plugin-host'
 import { deferred } from '@migaia/utils/promise'
 import type { IRpcFlowContext, IRpcCarrierFrame } from '@migaia/rpc-contract/interfaces'
 import { chunk } from '../../../dist/features/chunk/index.js'
-import { readRpcDefinition } from '../../../dist/sdk/metadata.js'
+import { readRpcDefinition, RpcDefinitionKind } from '../../../dist/sdk/metadata.js'
 import { FlowRegistry } from '../../../dist/flow/registry.js'
-import { RpcFlowPipelines, RpcFlowPoint } from '../../../dist/sdk/flow-pipelines.js'
+import {
+  rpcHostPipelines,
+  rpcPipelineOwner,
+  RpcFlowPoint
+} from '../../../dist/sdk/flow-pipelines.js'
+import { RpcFlowSetup } from '../../../dist/sdk/flow-setup.js'
+import type { IRpcFlowInstallation } from '../../../dist/sdk/types.js'
 
 /** Actual accepted membership is explicit metadata; physical fragment data grants no authority. */
 function context(signal: AbortSignal, extensions: ReadonlySet<string>): IRpcFlowContext {
@@ -32,9 +38,8 @@ it('actual native chunk flow preserves negotiated split/reassembly, physical dra
   const timers = new Map<number, () => void>()
   /** Tokens are fixture observations, independent of physical message ids. */
   let token = 0
-  /** The public factory creates a genuine SDK native plugin identity. */
-  const plugin = chunk({
-    namespaces: ['test'],
+  /** The public factory creates a genuine opaque native Feature handle. */
+  const feature = chunk({
     required: true,
     chunkBytes: 2,
     maxMessageBytes: 8,
@@ -46,26 +51,26 @@ it('actual native chunk flow preserves negotiated split/reassembly, physical dra
       timers.delete(handle as number)
     }
   })
-  /** Read the actual registered native definition rather than constructing fake contribution config. */
-  const metadata = readRpcDefinition(plugin)
-  if (metadata?.kind !== 'flow') throw new TypeError('expected actual native flow definition')
+  /** The original factory supplies exact private builtin identity, not a name-based placement. */
+  const metadata = readRpcDefinition(feature)
+  if (metadata?.kind !== RpcDefinitionKind.feature)
+    throw new TypeError('expected actual native feature')
   /** Installation lifetime stays separate from the actual accepted source signal. */
   const setup = new AbortController()
   /** Existing report channel observes callback failures without changing delivery. */
   const errors: unknown[] = []
-  /** The same native setup returns the hooks registered by ordinary host installation. */
-  const installation = await metadata.definition.setup({
-    signal: setup.signal,
-    report: (error) => {
-      errors.push(error)
-    },
-    retire: async () => undefined,
-    call: async () => undefined
-  })
+  /** Actual SDK preparation assigns this installation before the genuine use() completes. */
+  let installation!: IRpcFlowInstallation<object>
+  /** Both qualified groups retain native declarations and their exact original execution owners. */
+  const rpc = rpcHostPipelines(
+    () => flow,
+    (name) => flow.pipeline(name),
+    ['test', 'other']
+  )
   /** The same native declarations own ordering, snapshots and both traversal directions. */
   const flow = defineHost({
-    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } },
-    pipelines: RpcFlowPipelines
+    ...rpc,
+    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   })
   /** Production registration receives a genuine native generation rather than a runner facade. */
   const registry = new FlowRegistry((error) => {
@@ -74,13 +79,32 @@ it('actual native chunk flow preserves negotiated split/reassembly, physical dra
   await flow.use(
     definePlugin({
       name: metadata.definition.name,
-      install(core) {
-        registry.register(core, metadata.definition, installation)
+      features: { flow: feature },
+      async install(core) {
+        /** Native Feature construction returns this original cold definition. */
+        const definition = core.features.flow
+        /** SDK setup retains the real native cleanup owner and original timer callbacks. */
+        installation = await new RpcFlowSetup(definition).prepare(core, setup.signal, {
+          signal: setup.signal,
+          report: (error) => {
+            errors.push(error)
+          },
+          retire: async () => undefined,
+          call: async () => undefined
+        })
+        /** The test group's exact installation leaves the separately declared other lane empty. */
+        const groups = new Map([
+          ['test', [{ definition, installed: installation, builtin: metadata.builtin }]],
+          ['other', []]
+        ])
+        registry.registerFeatures(core, groups)
         return {}
       }
     })
   )
   registry.start()
+  /** The same genuine owner retains each point payload axis while lending native execution. */
+  const pipelines = rpc.domainCore()[rpcPipelineOwner]
   expect(registry.extensions('test')).toEqual(['chunk@1'])
   expect(registry.requiredExtensions('test')).toEqual(['chunk@1'])
   expect(registry.extensions('other')).toEqual([])
@@ -93,8 +117,8 @@ it('actual native chunk flow preserves negotiated split/reassembly, physical dra
   /** Original encoded text matches the existing canonical assembly oracle. */
   const original: IRpcCarrierFrame = { kind: 'message', data: 'abcdefgh' }
   /** Returned completion must include all sequential writes, including the held first drain. */
-  const pending = flow
-    .pipeline(RpcFlowPoint.frameOutbound)
+  const pending = pipelines
+    .pipeline(RpcFlowPoint.frameOutbound, 'test')
     .run(
       { frame: original, context: context(source.signal, new Set(['chunk@1'])) },
       async ({ frame }) => {
@@ -112,46 +136,42 @@ it('actual native chunk flow preserves negotiated split/reassembly, physical dra
   /** Actual inbound hooks reuse the same original length/order/single-copy owner. */
   const delivered: IRpcCarrierFrame[] = []
   for (const frame of frames)
-    await flow
-      .pipeline(RpcFlowPoint.frameInbound)
-      .run(
-        {
-          frame,
-          context: { ...context(source.signal, new Set(['chunk@1'])), direction: 'inbound' }
-        },
-        async (payload) => {
-          delivered.push(payload.frame)
-        }
-      )
+    await pipelines.pipeline(RpcFlowPoint.frameInbound, 'test').run(
+      {
+        frame,
+        context: { ...context(source.signal, new Set(['chunk@1'])), direction: 'inbound' }
+      },
+      async (payload) => {
+        delivered.push(payload.frame)
+      }
+    )
   expect(delivered).toEqual([original])
   expect(timers.size).toBe(0)
   /** Optional absence keeps the original whole physical frame and identity. */
   const whole: IRpcCarrierFrame[] = []
-  await flow
-    .pipeline(RpcFlowPoint.frameOutbound)
+  await pipelines
+    .pipeline(RpcFlowPoint.frameOutbound, 'test')
     .run({ frame: original, context: context(source.signal, new Set()) }, async (payload) => {
       whole.push(payload.frame)
     })
   expect(whole[0]).toBe(original)
   /** A new real partial message retains one timer until its actual physical source retires. */
   const partial: IRpcCarrierFrame[] = []
-  await flow
-    .pipeline(RpcFlowPoint.frameOutbound)
+  await pipelines
+    .pipeline(RpcFlowPoint.frameOutbound, 'test')
     .run(
       { frame: original, context: context(source.signal, new Set(['chunk@1'])) },
       async (payload) => {
         partial.push(payload.frame)
       }
     )
-  await flow
-    .pipeline(RpcFlowPoint.frameInbound)
-    .run(
-      {
-        frame: partial[0]!,
-        context: { ...context(source.signal, new Set(['chunk@1'])), direction: 'inbound' }
-      },
-      async () => undefined
-    )
+  await pipelines.pipeline(RpcFlowPoint.frameInbound, 'test').run(
+    {
+      frame: partial[0]!,
+      context: { ...context(source.signal, new Set(['chunk@1'])), direction: 'inbound' }
+    },
+    async () => undefined
+  )
   expect(timers.size).toBe(1)
   source.abort()
   expect(timers.size).toBe(0)

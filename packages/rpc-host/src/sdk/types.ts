@@ -57,17 +57,20 @@ export type IRpcTransportPlugin<
 > = IRpcNamespacePlugin<N, E, 'transport', A>
 
 /** Native flow/link-policy definitions participate in the same installation and rollback. */
-export type IRpcFlowPlugin<
-  E extends object = Record<never, never>,
-  N extends string = string
-> = IRpcNamespacePlugin<N, E, 'flow', false>
+export type IRpcFlowPlugin<E extends object = Record<never, never>> = IRpcNamespacePlugin<
+  string,
+  E,
+  'flow',
+  false
+>
 
 /** Opaque native Features carry cold flow configuration; the generic SDK wrapper owns setup. */
-export type IRpcFlowFeature<
-  E extends object = Record<never, never>,
-  N extends string = string
-> = IFeature<Record<never, never>, IRpcFlowDefinition<E>, IFeatureDependencyRecord> &
-  Readonly<{ [rpcNamespaceSurface]: Readonly<{ kind: 'feature'; namespace: N; extensions: E }> }>
+export type IRpcFlowFeature<E extends object = Record<never, never>> = IFeature<
+  Record<never, never>,
+  IRpcFlowDefinition<E>,
+  IFeatureDependencyRecord
+> &
+  Readonly<{ [rpcNamespaceSurface]: Readonly<{ kind: 'feature'; extensions: E }> }>
 
 /**
  * Host accepts genuine SDK registrations only; structural metadata grants no installation
@@ -117,7 +120,6 @@ export type IRpcFlowInstallation<E extends object = Record<never, never>> = Read
 /** Cold reusable flow configuration constructs installation-local resources in its native hook. */
 export type IRpcFlowDefinition<E extends object = Record<never, never>> = Readonly<{
   name: string
-  namespaces?: readonly string[]
   /** The same native opaque Features determine dependency order inside each fixed stage position. */
   dependencies?: IFeatureDependencyRecord
   setup(context: IRpcFlowSetupContext): IRpcFlowInstallation<E> | Promise<IRpcFlowInstallation<E>>

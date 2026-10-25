@@ -17,7 +17,6 @@ export function limits(options: IRpcLimitsOptions = {}): IRpcFlowFeature {
   const captured = { ...options }
   return defineBuiltinFlowFeature('limits', {
     name: RpcLimitsPluginName,
-    namespaces: captured.namespaces,
     setup: (context) => new RpcLimitsFlow(captured, context).value
   })
 }

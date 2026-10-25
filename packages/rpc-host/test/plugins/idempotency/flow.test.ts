@@ -5,9 +5,15 @@ import { RpcDispatchDrop } from '@migaia/rpc-contract/interfaces'
 import type { IRpcEnvelope, IRpcOutcome } from '@migaia/rpc-contract/protocol'
 import { RpcWireProfile } from '@migaia/rpc-contract/protocol'
 import { idempotency, createRpcIdempotencyStore } from '../../../dist/features/idempotency/index.js'
-import { readRpcDefinition } from '../../../dist/sdk/metadata.js'
+import { readRpcDefinition, RpcDefinitionKind } from '../../../dist/sdk/metadata.js'
 import { FlowRegistry } from '../../../dist/flow/registry.js'
-import { RpcFlowPipelines, RpcFlowPoint } from '../../../dist/sdk/flow-pipelines.js'
+import {
+  rpcHostPipelines,
+  rpcPipelineOwner,
+  RpcFlowPoint
+} from '../../../dist/sdk/flow-pipelines.js'
+import { RpcFlowSetup } from '../../../dist/sdk/flow-setup.js'
+import type { IRpcFlowInstallation } from '../../../dist/sdk/types.js'
 
 it('actual optional idempotency dispatch observes sealed outcome and publishes only the native namespace lookup', async () => {
   /** The original store owns the only claim/seal/retention records. */
@@ -17,42 +23,61 @@ it('actual optional idempotency dispatch observes sealed outcome and publishes o
    * body.
    */
   const token = 'actual-admitted-scope'
-  /** Native factory metadata is genuine, rather than an invented hook installation. */
-  const metadata = readRpcDefinition(
-    idempotency({ store, namespaces: ['test'], scope: () => token })
-  )
-  if (metadata?.kind !== 'flow') throw new TypeError('expected actual idempotency flow')
+  /** The native graph owns this real Feature and the original custom scope callback. */
+  const feature = idempotency({ store, scope: () => token })
+  /** Placement identity is read from its authentic factory metadata, never a copied name. */
+  const metadata = readRpcDefinition(feature)
+  if (metadata?.kind !== RpcDefinitionKind.feature)
+    throw new TypeError('expected actual idempotency feature')
   /** Installation owns its exact ordinary cleanup signal. */
   const setup = new AbortController()
   /** Namespace lookup must originate a normal call through this existing host port. */
   const calls: unknown[] = []
-  /** Setup contributes only the exact native plugin hooks and namespace publication. */
-  const installation = await metadata.definition.setup({
-    signal: setup.signal,
-    report: () => undefined,
-    retire: async () => undefined,
-    call: async (namespace, command, options) => {
-      calls.push({ namespace, command, options })
-      return 'remote-outcome'
-    }
-  })
+  /** The genuine use() handoff supplies this exact setup result before any oracle runs. */
+  let installation!: IRpcFlowInstallation<object>
+  /** Both actual namespace declarations use the same native owner lookup as public SDK hosts. */
+  const rpc = rpcHostPipelines(
+    () => flow,
+    (name) => flow.pipeline(name),
+    ['test', 'other']
+  )
   /** Query dispatch uses the actual fixed slot, without executing another provider or claim path. */
   const flow = defineHost({
-    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } },
-    pipelines: RpcFlowPipelines
+    ...rpc,
+    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   })
   /** Production registration borrows this genuine native install core and its generation. */
   const registry = new FlowRegistry(() => undefined)
   await flow.use(
     definePlugin({
       name: metadata.definition.name,
-      install(core) {
-        registry.register(core, metadata.definition, installation)
+      features: { flow: feature },
+      async install(core) {
+        /** The genuine native Feature factory, rather than a private alias, returns this value. */
+        const definition = core.features.flow
+        /** Keep the pure lookup oracle's original borrowed call port under canonical SDK setup. */
+        installation = await new RpcFlowSetup(definition).prepare(core, setup.signal, {
+          signal: setup.signal,
+          report: () => undefined,
+          retire: async () => undefined,
+          call: async (namespace, command, options) => {
+            calls.push({ namespace, command, options })
+            return 'remote-outcome'
+          }
+        })
+        /** This real installation contributes only to test; other has an actual empty native lane. */
+        const groups = new Map([
+          ['test', [{ definition, installed: installation, builtin: metadata.builtin }]],
+          ['other', []]
+        ])
+        registry.registerFeatures(core, groups)
         return {}
       }
     })
   )
   registry.start()
+  /** The same genuine owner retains each point payload axis while lending native execution. */
+  const pipelines = rpc.domainCore()[rpcPipelineOwner]
   /** This selected generation was already admitted by the real Dispatcher before plugin dispatch. */
   const generation = { kind: 'session', value: 1, providerId: 'target-provider' } as const
   /**
@@ -112,8 +137,8 @@ it('actual optional idempotency dispatch observes sealed outcome and publishes o
   const result = {
     value: RpcDispatchDrop as import('@migaia/rpc-contract/interfaces').IRpcDispatchOutcome
   }
-  await flow
-    .pipeline(RpcFlowPoint.dispatchInbound)
+  await pipelines
+    .pipeline(RpcFlowPoint.dispatchInbound, 'test')
     .run({ context, outcome: result }, async (payload) => {
       fallbacks += 1
       payload.outcome.value = { kind: 'value', value: 'unexpected-provider' }
@@ -141,8 +166,8 @@ it('actual optional idempotency dispatch observes sealed outcome and publishes o
     }
   ])
   /** Existing scope compilation prevents this owner from adding query behavior to another namespace. */
-  await flow
-    .pipeline(RpcFlowPoint.dispatchInbound)
+  await pipelines
+    .pipeline(RpcFlowPoint.dispatchInbound, 'other')
     .run({ context: { ...context, namespace: 'other' }, outcome: result }, async (payload) => {
       payload.outcome.value = { kind: 'value', value: 'other' }
     })

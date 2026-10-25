@@ -70,7 +70,6 @@ class SchemaValidation {
 export function schema(options: IRpcSchemaOptions = {}): IRpcFlowFeature {
   return defineBuiltinFlowFeature('schema', {
     name: RpcSchemaName,
-    namespaces: options.namespaces,
     setup() {
       /** Every receiving host retains its own explicit validator, with no shared live registry. */
       const validation = new SchemaValidation(options)

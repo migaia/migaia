@@ -23,7 +23,6 @@ export function auth(options: IRpcAuthenticationOptions): IRpcFlowFeature {
   const captured = snapshotAuthenticationConfig(options)
   return defineBuiltinFlowFeature('auth', {
     name: RpcAuthenticationPluginName,
-    namespaces: captured.namespaces,
     setup: (context) => new RpcAuthenticationFlow(captured, context.signal, context.observe).value
   })
 }

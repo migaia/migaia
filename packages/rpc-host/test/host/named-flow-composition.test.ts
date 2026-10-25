@@ -1,22 +1,23 @@
 import { expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import { createRpcHost, RpcLifecycleError } from '@migaia/rpc-host'
-import { auth } from '@migaia/rpc-host/plugins/auth'
-import { chunk } from '@migaia/rpc-host/plugins/chunk'
-import { batch } from '@migaia/rpc-host/plugins/batch'
+import { auth } from '@migaia/rpc-host/features/auth'
+import { chunk } from '@migaia/rpc-host/features/chunk'
+import { batch } from '@migaia/rpc-host/features/batch'
 import {
-  defineFlowPlugin,
+  defineFlowFeature,
+  RpcFlowLayer,
   RpcFlowPoint,
   RpcJsonCarrierCodec,
-  type IRpcFlowPlugin
+  type IRpcFlowFeature
 } from '@migaia/rpc-host/sdk'
 import { coreMemoryServer } from './core-fixture.js'
 
 /** Keep all three genuine transformations installed on both actual public host owners. */
 async function composition(
   provide: Parameters<typeof createRpcHost>[0]['provide'],
-  beforeBatch: readonly IRpcFlowPlugin[] = [],
-  afterBatch: readonly IRpcFlowPlugin[] = []
+  plaintextFeatures: readonly IRpcFlowFeature[] = [],
+  wireFeatures: readonly IRpcFlowFeature[] = []
 ) {
   /** Physical string output exercises actual batching while long strings still use real chunks. */
   const server = coreMemoryServer('composition-server', 'composition-server', 'memory', [], [], {
@@ -40,7 +41,7 @@ async function composition(
   try {
     /** These extra genuine stages observe real suffix composition without replacing execution. */
     const client = await server.connect('composition-client', {
-      plugins: [...plugins(), ...beforeBatch, batch(), ...afterBatch],
+      plugins: [...plugins(), ...plaintextFeatures, batch(), ...wireFeatures],
       report: (error) => reports.push(error)
     })
     return { host, client, reports }
@@ -57,18 +58,27 @@ function admissionWitness() {
   /** Count only whole message submissions; chunk fragments have their own extension frames. */
   let count = 0
   /** This is a real flow definition using the production named-stage authoring boundary. */
-  const plugin = defineFlowPlugin({
+  const plugin = defineFlowFeature({
     name: 'composition-admission-witness',
     setup: () => ({
       stages: {
         [RpcFlowPoint.frameOutbound]: (payload, next) => {
+          /** Short messages synchronously enter the genuine Chunk/Batch suffix before this count. */
+          const traversal = next(payload)
           if (payload.frame.kind === 'message' && ++count === 3) entered.resolve()
-          return next(payload)
+          return traversal
         }
       }
     })
   })
-  return { plugin, entered: entered.promise }
+  return {
+    plugin,
+    entered: entered.promise,
+    /** Exclude the completed chunk workload before witnessing the three held-write submissions. */
+    reset() {
+      count = 0
+    }
+  }
 }
 
 it('public auth chunk and batch composition preserves provider rejection and independent requests', async () => {
@@ -105,6 +115,7 @@ it('public auth chunk and batch composition preserves provider rejection and ind
       ).length
     ).toBeGreaterThan(1)
     writing.mockClear()
+    witness.reset()
     f.client.pair[1].holdWrites()
     /** A real native write supplies backpressure; no private queue or runner is inserted. */
     const first = f.client.host.memory.send('composition-server', 'echo', 'busy')
@@ -183,16 +194,19 @@ it('public late batch cancellation keeps CANCELLED cause while the surviving mem
   /** Releasing this native suffix allows the original write-start membership guard to run. */
   const release = deferred<void>()
   /** No substitute continuation is used; native next owns the actual downstream branch. */
-  const delayed = defineFlowPlugin({
+  const delayed = defineFlowFeature({
     name: 'composition-held-batch-suffix',
     setup: () => ({
       stages: {
-        [RpcFlowPoint.frameOutbound]: async (payload, next) => {
-          if (payload.frame.kind === 'extension' && payload.frame.extension === 'batch@1') {
-            aggregate.resolve()
-            await release.promise
+        [RpcFlowPoint.frameOutbound]: {
+          layer: RpcFlowLayer.wire,
+          stage: async (payload, next) => {
+            if (payload.frame.kind === 'extension' && payload.frame.extension === 'batch@1') {
+              aggregate.resolve()
+              await release.promise
+            }
+            await next(payload)
           }
-          await next(payload)
         }
       }
     })

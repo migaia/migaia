@@ -17,7 +17,6 @@ export function batch(options: IRpcBatchOptions = {}): IRpcFlowFeature {
   const captured = { ...options }
   return defineBuiltinFlowFeature('batch', {
     name: RpcBatchPluginName,
-    namespaces: captured.namespaces,
     setup: (context) => new RpcBatchFlow(context.signal, captured.required ?? false).value
   })
 }

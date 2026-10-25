@@ -26,7 +26,6 @@ export type IRpcAuthenticationOptions = Readonly<{
   sign?: IRpcAuthenticationTransform
   verify?: IRpcAuthenticationTransform
   encodedType?: 'any' | 'string' | 'uint8array'
-  namespaces?: readonly string[]
   /** Active plus retained completed request IDs default to1024 per admitted direct peer. */
   maxReplayEntriesPerPeer?: number
   /** Replay capacity refusal borrows the original admitted-identity diagnostic contract. */

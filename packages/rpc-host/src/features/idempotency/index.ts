@@ -20,14 +20,13 @@ export type {
 export type { IRpcIdempotencyOptions, IRpcOutcomeLookup } from './types.js'
 
 /** Install the single claim/seal/query owner with body fingerprints in the object's own key order. */
-export function idempotency<const N extends string = string>(
-  options: IRpcIdempotencyOptions & Readonly<{ namespaces?: readonly N[] }> = {}
-): IRpcFlowFeature<Readonly<{ outcome: IRpcOutcomeLookup }>, N> {
+export function idempotency(
+  options: IRpcIdempotencyOptions = {}
+): IRpcFlowFeature<Readonly<{ outcome: IRpcOutcomeLookup }>> {
   /** Original store and scope capabilities are retained, rather than copied into host configuration. */
   const captured = { ...options }
   return defineBuiltinFlowFeature('idempotency', {
     name: RpcIdempotencyPluginName,
-    namespaces: captured.namespaces,
     setup: (context) => new RpcIdempotencyFlow(captured, context).value
   })
 }

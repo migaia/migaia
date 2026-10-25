@@ -25,7 +25,6 @@ export function snapshotAuthenticationConfig(
       sign: config.sign,
       verify: config.verify,
       encodedType: config.encodedType,
-      namespaces: config.namespaces,
       maxReplayEntriesPerPeer: config.maxReplayEntriesPerPeer,
       onRejected: config.onRejected,
       credentials: config.credentials,

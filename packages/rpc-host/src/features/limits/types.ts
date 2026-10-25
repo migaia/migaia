@@ -25,5 +25,4 @@ export type IRpcLimitsOptions = Readonly<{
   overflow?: IRpcLimitsOverflow
   onRejected?(rejection: IRpcProviderRejection): void | Promise<void>
   scheduler?: IScheduler
-  namespaces?: readonly string[]
 }>
