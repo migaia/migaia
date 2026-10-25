@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from 'vitest'
-import { IDBFactory, IDBKeyRange } from 'fake-indexeddb'
+import { describe, expect, it, vi, onTestFinished } from 'vitest'
+import { IDBFactory, IDBKeyRange, IDBObjectStore } from 'fake-indexeddb'
 import {
   asSecondaryIndexRecordStore,
   records,
@@ -53,9 +53,15 @@ describe('explicit entity Features over the web IndexedDB entry', () => {
       key: 'id',
       features: [entityQueryFeature()]
     }).connect(store)
+    /** Query execution must open the original records cursor after the seeded write. */
+    const nativeCursor = vi.spyOn(IDBObjectStore.prototype, 'openCursor')
+    onTestFinished(() => nativeCursor.mockRestore())
     expect(await querying.query().where('group', 'eq', 'one').select('id').all()).toEqual([
       { id: 'a' }
     ])
+    expect(nativeCursor.mock.contexts.map((store) => (store as IDBObjectStore).name)).toContain(
+      'records'
+    )
     expect(() => querying.query().index('absent' as never)).toThrow(
       expect.objectContaining(missing('indexes'))
     )
@@ -81,7 +87,21 @@ describe('explicit entity Features over the web IndexedDB entry', () => {
       features: [entityMigrationFeature()],
       migrations: { 2: (state) => ({ ...(state as IRow), group: 'migrated' }) }
     }).connect(store)
+    /** Migration must read and rewrite actual stored envelopes, not only return counters. */
+    const nativeCursor = vi.spyOn(IDBObjectStore.prototype, 'openCursor')
+    /** Native record writes distinguish the migration from later repository.get calls. */
+    const nativePut = vi.spyOn(IDBObjectStore.prototype, 'put')
+    onTestFinished(() => {
+      nativeCursor.mockRestore()
+      nativePut.mockRestore()
+    })
     expect(await repository.migrate({ batchSize: 1 })).toMatchObject({ eligible: 2, migrated: 2 })
+    expect(nativeCursor.mock.contexts.map((store) => (store as IDBObjectStore).name)).toContain(
+      'records'
+    )
+    expect(nativePut.mock.contexts.map((store) => (store as IDBObjectStore).name)).toContain(
+      'records'
+    )
     expect(await repository.get('a')).toEqual({ id: 'a', group: 'migrated' })
     expect(await repository.get('b')).toEqual({ id: 'b', group: 'migrated' })
     expect(() => repository.query()).toThrow(expect.objectContaining(missing('query')))
@@ -168,10 +188,19 @@ describe('explicit entity Features over the web IndexedDB entry', () => {
     /** Cursor source identity remains shared by branches of this one original query. */
     const query = repository.query()
     /** The first page supplies the canonical continuation token for the second branch. */
+    const nativeCursor = vi.spyOn(IDBObjectStore.prototype, 'openCursor')
+    onTestFinished(() => nativeCursor.mockRestore())
     const first = await query.page(1)
+    expect(nativeCursor.mock.contexts.map((store) => (store as IDBObjectStore).name)).toContain(
+      'records'
+    )
+    nativeCursor.mockClear()
     expect(first.items).toEqual([{ id: 'a', group: 'one' }])
     expect(first.next).toBeDefined()
     expect(await query.after(first.next!).all()).toEqual([{ id: 'b', group: 'two' }])
+    expect(nativeCursor.mock.contexts.map((store) => (store as IDBObjectStore).name)).toContain(
+      'records'
+    )
     await expect(store.use(records).query().page(1)).rejects.toMatchObject({
       source: STORAGE_WEB_SOURCE,
       code: WebErrorCode.indexedDbFeatureNotInstalled,

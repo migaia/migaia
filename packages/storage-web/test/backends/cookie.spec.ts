@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi, onTestFinished } from 'vitest'
 import { STORAGE_HOST_SOURCE } from '@migaia/storage-host'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { STORAGE_WEB_SOURCE } from '../../src/index.js'
@@ -430,9 +430,33 @@ describe('cookiesHost backend', () => {
     expect(lastAssignment).toContain('secure')
   })
   it('remove 后 get 返回 null', async () => {
-    const store = await createCookieTestStore({ namespace: 'ns', document: fakeCookieDocument() })
+    /** The injected Document port retains its genuine getter/setter behavior for this case. */
+    const document = fakeCookieDocument()
+    const store = await createCookieTestStore({ namespace: 'ns', document })
+    /** Independent read/write observations start only after public installation. */
+    const nativeRead = vi.spyOn(document, 'cookie', 'get')
+    /** Forwarding setter observation proves both ordinary KV and sync writes hit this cookie port. */
+    const nativeWrite = vi.spyOn(document, 'cookie', 'set')
+    onTestFinished(() => {
+      nativeRead.mockRestore()
+      nativeWrite.mockRestore()
+    })
     await store.set('k', 'v')
+    expect(nativeWrite).toHaveBeenCalledWith(expect.stringContaining('=v'))
+    nativeRead.mockClear()
+    expect(await store.get('k')).toBe('v')
+    expect(nativeRead).toHaveBeenCalled()
+    nativeWrite.mockClear()
+    store.sync.set('k', 'sync')
+    expect(nativeWrite).toHaveBeenCalledWith(expect.stringContaining('=sync'))
+    nativeRead.mockClear()
+    expect(store.sync.get('k')).toBe('sync')
+    expect(nativeRead).toHaveBeenCalled()
+    nativeWrite.mockClear()
     await store.remove('k')
+    expect(nativeWrite).toHaveBeenCalledWith(
+      expect.stringContaining('expires=Thu, 01 Jan 1970 00:00:00 GMT')
+    )
     await expect(store.get('k')).resolves.toBeNull()
   })
   it('固定 scope 用于 remove', async () => {

@@ -2,7 +2,7 @@ import { memoryTestFeatures } from '../helpers/memory-features.js'
 import { indexedDbTestFeatures } from '../helpers/indexed-db-features.js'
 // @vitest-environment node
 import { IDBFactory, IDBKeyRange, IDBObjectStore } from 'fake-indexeddb'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi, onTestFinished } from 'vitest'
 import { walkErrorCauses } from '@migaia/utils/error'
 import {
   createStorageHost,
@@ -55,7 +55,23 @@ describe('native IndexedDB Blob Feature', () => {
     expect(await left.api.native.name()).toBe('native-blobs/' + first)
     expect(await right.api.native.name()).toBe('native-blobs/' + second)
     const blob = new Blob(['original'], { type: 'text/plain' })
+    /** Observe the original engine only after installation and before the public Blob write. */
+    const nativePut = vi.spyOn(IDBObjectStore.prototype, 'put')
+    /** Blob reads must reach their own physical object store, separately from record reads. */
+    const nativeGet = vi.spyOn(IDBObjectStore.prototype, 'get')
+    onTestFinished(() => {
+      nativePut.mockRestore()
+      nativeGet.mockRestore()
+    })
     await root.api.blobs.put('avatar', blob)
+    expect(nativePut.mock.contexts.map((store) => (store as IDBObjectStore).name)).toContain(
+      '__migaia_blobs__'
+    )
+    nativeGet.mockClear()
+    expect(await (await root.api.blobs.get('avatar'))!.text()).toBe('original')
+    expect(nativeGet.mock.contexts.map((store) => (store as IDBObjectStore).name)).toContain(
+      '__migaia_blobs__'
+    )
     await left.transaction(async (scope) => {
       await scope.api.blobs.put('avatar', new Blob(['left']))
       expect(await scope.api.native.name()).toBe('native-blobs/' + first)
