@@ -20,6 +20,8 @@ export type IRpcSessionSelection = Readonly<{
 /** One transport-owned resource index resolves exact physical sessions across native replacement. */
 export type IRpcTargetSource = Readonly<{
   current(carrierId: string): IRpcSessionSelection | undefined
+  /** Borrow the exact physical Session's closing admission without another public source index. */
+  canKeepalive?(carrierId: string): boolean
   send(
     carrierId: string,
     frame: IRpcSemanticFrame,
@@ -40,6 +42,8 @@ export type IRpcPrivateSession = IRpcSessionHandle &
   Readonly<{
     carrierId: string
     current(): IRpcSessionSelection | undefined
+    /** The existing physical owner alone decides whether new closing keepalive work can enter. */
+    canKeepalive(): boolean
     send(frame: IRpcSemanticFrame, options?: IRpcCarrierWriteOptions): Promise<void>
     assertTransfer(options?: object): void
     ping(options?: IRpcPingOptions): Promise<void>

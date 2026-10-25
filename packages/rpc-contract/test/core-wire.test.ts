@@ -280,6 +280,42 @@ const vectors = JSON.parse(
 ) as ICoreProfileVectors
 
 describe('shared core profile foreign vectors', () => {
+  it('[CORE-R21-CLOSE-REASON] preserves the complete close graph without an ACK or task', () => {
+    /** The existing error graph retains shared references and a cycle across the close boundary. */
+    const reason = graph()
+    /** Close carries only existing lifecycle correlation and the optional canonical reason. */
+    const frame = {
+      profile: RpcWireProfile,
+      kind: 'control',
+      id: 'closing',
+      route: header().route,
+      operation: 'close',
+      reason
+    }
+    expect(normalizeRpcFrame(frame)).toBe(frame)
+    expect(Object.hasOwn(frame, 'task')).toBe(false)
+    /** Restore through the same existing public error owner used by every other terminal. */
+    const error = deserializeRpcWireError(reason)
+    expect(error).toBeInstanceOf(AggregateError)
+    expect(error).toMatchObject({
+      source: 'rpc.endpoint',
+      code: 'INTERNAL',
+      name: 'AggregateError',
+      message: 'outer',
+      stack: 'remote outer stack'
+    })
+    expect(error.cause).toBeInstanceOf(TypeError)
+    expect(error.cause).toMatchObject({
+      source: 'business',
+      code: 'FAILED',
+      name: 'TypeError',
+      message: 'inner',
+      stack: 'remote inner stack',
+      cause: error
+    })
+    expect((error as AggregateError).errors).toEqual([error.cause, error.cause])
+  })
+
   it('[CORE-R6-VECTOR-PROFILE] declares only the sole profile', () => {
     expect(vectors.profile).toBe(RpcWireProfile)
   })

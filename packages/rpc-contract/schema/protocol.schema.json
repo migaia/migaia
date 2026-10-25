@@ -1376,7 +1376,7 @@
           "$ref": "#/$defs/route"
         },
         "operation": {
-          "enum": ["ping", "pong", "drain"]
+          "enum": ["ping", "pong", "drain", "close"]
         },
         "reason": {
           "$ref": "#/$defs/errorGraph"

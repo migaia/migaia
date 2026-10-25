@@ -27,6 +27,16 @@ import { RpcStreamEvent } from '../wire/stream-constants.js'
 export const IpcSendClass = { data: 'data', control: 'control' } as const
 export type IpcSendClass = keyof typeof IpcSendClass
 
+/** Trusted policy retirement facts remain local; the physical carrier owns error-code mapping. */
+export const RpcSessionRetirement = {
+  /** A quiet, ready connection reached its configured idle deadline. */
+  idle: 'idle',
+  /** The original runtime governor reached its violation or timeout liquidation threshold. */
+  liquidated: 'liquidated'
+} as const
+/** Only explicit runtime policy producers can select these local retirement categories. */
+export type RpcSessionRetirement = keyof typeof RpcSessionRetirement
+
 /** Fixed semantic headers select local write facts without looking through an opaque codec frame. */
 export function rpcCarrierWriteFacts(
   value: IRpcSemanticFrame
@@ -149,6 +159,8 @@ export type IRpcWriteAdmission = Readonly<{
 
 /** Local send authority is separate from the serialized physical frame. */
 export type IRpcCarrierWriteOptions = Readonly<{
+  /** Session freezes this flag only for a keepalive write admitted while that Session is closing. */
+  keepalive?: boolean
   /** Session supplies the class before optional frame transformations; native IO never decodes it. */
   sendClass?: IpcSendClass
   /** Explicit caller correlation remains a local diagnostic fact, outside physical frame payloads. */
@@ -188,6 +200,16 @@ export type IRpcCarrierObservation = Readonly<{
  * and returns its one owned Promise; no request table or provider execution lives here.
  */
 export type IRpcCarrier = Readonly<{
+  /** The acquired native medium permits writes until Session completes its bounded closing phase. */
+  closingWrites?: true
+  /** Only the actual transport maps trusted policy retirement to its own native error domain. */
+  mapRetirement?(kind: RpcSessionRetirement, error: unknown): unknown
+  /**
+   * Borrow the native owner's terminal facts after a physical failure. Session joins this promise
+   * only within its existing closing budget; a medium that remains alive cannot delay close
+   * forever.
+   */
+  terminalReason?(): Promise<unknown>
   /** Only an actual raw native observer can advertise carrier-stage capability. */
   observation?: IRpcCarrierObservation
   /** Native storage and transferable handoff differ; reject unsupported explicit transfer here. */

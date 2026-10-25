@@ -45,6 +45,8 @@ export type IRpcFrameWriteOptions = Pick<
   'sendClass' | 'trace' | 'admission'
 > &
   Readonly<{
+    /** Session has admitted this write into its bounded closing FIFO, outside ordinary batch lanes. */
+    closing?: true
     /** False removes one logical member's signal while retaining the Session's close fence. */
     signal?: IAbortSignal | false
     /** Physical transfer authority retains the original native backing identities. */

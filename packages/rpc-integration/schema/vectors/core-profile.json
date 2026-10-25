@@ -1852,6 +1852,68 @@
         },
         "remainingMs": 0.5
       }
+    },
+    {
+      "id": "core-control-close",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "control",
+        "id": "control-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "operation": "close"
+      }
+    },
+    {
+      "id": "core-control-close-error-chain",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "control",
+        "id": "control-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "operation": "close",
+        "reason": {
+          "root": 0,
+          "nodes": [
+            {
+              "source": "rpc.endpoint",
+              "code": "ENDPOINT_DISPOSED",
+              "name": "AggregateError",
+              "message": "closing",
+              "stack": "AggregateError: closing\n    at remote:1:1",
+              "cause": 1,
+              "errors": [1, 2]
+            },
+            {
+              "source": "business",
+              "code": "STOPPED",
+              "name": "TypeError",
+              "message": "inner",
+              "stack": "TypeError: inner\n    at remote:2:1",
+              "cause": 2
+            },
+            {
+              "source": "native",
+              "code": "NATIVE_STOP",
+              "name": "Error",
+              "message": "native",
+              "stack": "Error: native\n    at remote:3:1",
+              "cause": 0
+            }
+          ]
+        }
+      }
     }
   ],
   "invalid": [
@@ -2919,6 +2981,53 @@
         },
         "remainingMs": 2147483648
       }
+    },
+    {
+      "id": "core-control-close-invalid-reason",
+      "frame": {
+        "profile": "migaia.rpc/2",
+        "kind": "control",
+        "id": "control-1",
+        "route": {
+          "applicationVersion": "core-vector/1",
+          "senderId": "peer-a",
+          "targetId": "peer-b",
+          "receiverId": "peer-b",
+          "sentAt": 0
+        },
+        "operation": "close",
+        "reason": {
+          "root": 0,
+          "nodes": [
+            {
+              "source": "rpc.endpoint",
+              "code": "ENDPOINT_DISPOSED",
+              "name": "AggregateError",
+              "message": "closing",
+              "stack": "AggregateError: closing\n    at remote:1:1",
+              "cause": 3,
+              "errors": [1, 2]
+            },
+            {
+              "source": "business",
+              "code": "STOPPED",
+              "name": "TypeError",
+              "message": "inner",
+              "stack": "TypeError: inner\n    at remote:2:1",
+              "cause": 2
+            },
+            {
+              "source": "native",
+              "code": "NATIVE_STOP",
+              "name": "Error",
+              "message": "native",
+              "stack": "Error: native\n    at remote:3:1",
+              "cause": 0
+            }
+          ]
+        }
+      },
+      "reason": "The close reason uses the existing bounded complete error graph; invalid cause indexes are rejected."
     }
   ],
   "unknownIgnored": [

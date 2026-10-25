@@ -66,6 +66,10 @@ export const RpcCoreErrorText = {
   endpointRegistrationFailed: 'Endpoint registration failed',
   /** Stable lifecycle rejection once the canonical kernel closes admission. */
   endpointDisposed: 'Endpoint disposed',
+  /** Session-owned R21 admission rejects excess keepalive bytes before queueing any frame. */
+  keepaliveQuotaExceeded: 'Keepalive byte quota exceeded',
+  /** Session closing byte and time budgets require positive integer configuration at admission. */
+  keepaliveInvalid: 'Keepalive limits must be positive integers',
   /** Stable lifecycle message when endpoint-owned resource release reports cleanup failures. */
   endpointDisposalCleanupFailed: 'Endpoint disposal completed with cleanup errors',
   /** Stable conflict text when two attachments claim the same decoded frame kind. */

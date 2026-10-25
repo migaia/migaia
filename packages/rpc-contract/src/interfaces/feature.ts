@@ -138,6 +138,8 @@ export type IRpcTransportDefinition<
   name: string
   /** One transport owns one unique host-local namespace. */
   namespace: string
+  /** Cold namespace publication may expose keepalive APIs before its first native connection. */
+  closingWrites?: true
   /**
    * Ordinary Hosts expose real native Feature methods; RPC hosts use their explicit provide
    * catalog.

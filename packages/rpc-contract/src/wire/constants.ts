@@ -16,7 +16,7 @@ export const RpcWireKind = {
   /** Cancellation of any written call, including one-way notifications. */ cancel: 'cancel',
   /** Credit-driven stream event for the original admitted task. */ stream: 'stream',
   /** Optional idempotency plugin lookup or observed store fact. */ outcome: 'outcome',
-  /** Host lifecycle ping, pong, and graceful drain. */ control: 'control',
+  /** Host lifecycle ping, pong, graceful drain, and final close reason. */ control: 'control',
   /** Host-owned replacement of the accepted method directory. */ directory: 'directory'
 } as const
 /** Logical modes retain the existing runtime task/generation contract. */
@@ -37,7 +37,13 @@ export const RpcWireHandshakeStep = {
 /** Frame plugins wrap opaque codec output without adding another semantic protocol. */
 export const RpcCarrierFrameKind = { message: 'message', extension: 'extension' } as const
 /** Control has no provider invocation or optional feature implementation. */
-export const RpcWireControlOperation = { ping: 'ping', pong: 'pong', drain: 'drain' } as const
+export const RpcWireControlOperation = {
+  ping: 'ping',
+  pong: 'pong',
+  drain: 'drain',
+  /** Final Session notification reuses reason's complete error graph and has no ACK. */
+  close: 'close'
+} as const
 /** Store continuity and step states preserve existing runtime result semantics. */
 export const RpcWireStepState = {
   success: 'success',

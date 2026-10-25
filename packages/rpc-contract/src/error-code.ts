@@ -233,6 +233,13 @@ export const RpcCoreErrorCode = {
   endpointDisposed: 'ENDPOINT_DISPOSED',
 
   /**
+   * A keepalive call admitted during Session closing exceeds its in-flight semantic byte quota. R21
+   * rejects the call immediately without queueing; the caller reduces the payload or waits for
+   * existing keepalive work to settle. The final close frame never consumes this quota.
+   */
+  keepaliveQuotaExceeded: 'KEEPALIVE_QUOTA_EXCEEDED',
+
+  /**
    * The caller's `AbortSignal` cancels a local send (`RpcAbortError`).
    *
    * The caller handles this cooperative cancellation separately from remote failures.
