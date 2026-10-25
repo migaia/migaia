@@ -7,7 +7,8 @@ import {
   normalizeRpcCallOptions,
   normalizeRpcTrace,
   normalizeRpcSteps,
-  type IRpcEnvelope
+  type IRpcEnvelope,
+  type IRpcStep
 } from '@migaia/rpc-contract/protocol'
 import { RpcCoreErrorCode, RpcRemoteLayerErrorCode } from '@migaia/rpc-contract/error-code'
 import { RpcProbeObservationKind, type IRpcAttemptOptions } from '@migaia/rpc-contract/interfaces'
@@ -61,6 +62,19 @@ export type {
 export function assertCallMethod(method: unknown): asserts method is string {
   if (typeof method !== 'string' || method.length === 0)
     throw createRpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.methodInvalid)
+}
+
+/** Local group admission retains its configuration family and the original sole validator cause. */
+function normalizeLocalGroupSteps(steps: readonly IRpcStep[]): readonly IRpcStep[] {
+  try {
+    return normalizeRpcSteps(steps, undefined, hostErrorWireMetadata)
+  } catch (cause) {
+    throw createRpcError(
+      RpcCoreErrorCode.invalidConfig,
+      RpcCoreErrorText.runtimeGroupStepsInvalid,
+      cause
+    )
+  }
 }
 
 /** A source-key index makes retiring k belonging calls O(k), independent of unrelated traffic. */
@@ -516,7 +530,7 @@ export class CallTable {
       )
     normalizeRpcCallOptions(wireOptions, command.mode, hostErrorWireMetadata)
     return command.mode === RpcCallMode.group
-      ? { ...command, steps: normalizeRpcSteps(command.steps, undefined, hostErrorWireMetadata) }
+      ? { ...command, steps: normalizeLocalGroupSteps(command.steps) }
       : command
   }
 
