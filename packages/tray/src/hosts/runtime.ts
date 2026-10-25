@@ -1,6 +1,10 @@
 /** Native namespaces own calls and member controls; Tray owns only its instance admission. */
 import type { IRpcNamespace, IRpcCallOptions } from '@migaia/rpc-host'
-import type { IRpcNativeMemberControls, RpcNativeMemberKind } from '@migaia/rpc-host/sdk'
+import type {
+  IRpcNativeMemberControls,
+  RpcNativeMemberKind,
+  rpcHostPipelines
+} from '@migaia/rpc-host/sdk'
 import { timeout } from '@migaia/rpc-host/features'
 import {
   coroutinePlugin,
@@ -19,9 +23,11 @@ export type ITrayRuntimeOutlet = IRpcNamespace &
   Readonly<{ members: IRpcNativeMemberControls<RpcNativeMemberKind> }>
 /** Business and RPC definitions share the original receiving native plugin-host. */
 export type ITrayRuntimeHost = IHostHandle<
-  Record<string, never>,
+  ReturnType<ReturnType<typeof rpcHostPipelines>['domainCore']>,
   never,
-  readonly IPluginConstraint<any>[]
+  readonly IPluginConstraint<any>[],
+  Record<never, never>,
+  ReturnType<typeof rpcHostPipelines>['pipelines']
 > &
   Partial<Record<string, ITrayRuntimeOutlet>>
 /** Parent and child install the same actual observer before native transport acquisition. */

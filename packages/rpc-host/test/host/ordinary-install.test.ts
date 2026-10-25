@@ -1,8 +1,13 @@
 /** Ordinary installation uses the receiving native core and its actual namespace publication. */
 import { defineHost, definePlugin, defineFeature } from '@migaia/plugin-host'
-import { defineTransportPlugin, defineFlowPlugin } from '@migaia/rpc-host/sdk'
+import {
+  defineTransportPlugin,
+  defineFlowPlugin,
+  rpcHostPipelines,
+  type IRpcFlowStage
+} from '@migaia/rpc-host/sdk'
 import type { IRpcNamespace } from '@migaia/rpc-host'
-import type { IRpcDispatchContext, IRpcDispatchOutcome } from '@migaia/rpc-contract/interfaces'
+import type { IRpcDispatchContext } from '@migaia/rpc-contract/interfaces'
 import { typegen } from '@migaia/rpc-host/plugins/typegen'
 import { limits } from '@migaia/rpc-host/plugins/limits'
 import { deferred, type IDeferred } from '@migaia/utils/promise'
@@ -12,9 +17,17 @@ import { coreMemoryServer } from './core-fixture.js'
 
 /** Native Host defaults remain the same as tray's receiving plugin-host runtime. */
 function ordinaryHost() {
-  return defineHost({
+  /** The single SDK function lends execution lazily while supplying the fixed declarations. */
+  const rpc = rpcHostPipelines(
+    () => host,
+    (name) => host.pipeline(name)
+  )
+  /** Native execution authority refers to this actual owner after construction completes. */
+  const host = defineHost({
+    ...rpc,
     host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   })
+  return host
 }
 
 /** Reuse the original acquisition callback while naming the real native replacement slot. */
@@ -32,20 +45,22 @@ function namespace(host: object): IRpcNamespace {
 
 /** A held real dispatch borrows its original continuation, without replacing provider execution. */
 function heldDispatch(
-  input: Readonly<{ entered: IDeferred<IRpcDispatchContext>; resume: Promise<void> }>
+  input: Readonly<{
+    entered: IDeferred<IRpcDispatchContext>
+    resume: Promise<void>
+    admitted?(): void
+  }>
 ) {
   /** Only this actual invocation waits; native unUse and physical source cleanup remain unchanged. */
-  const inbound = async (
-    context: IRpcDispatchContext,
-    next: () => Promise<IRpcDispatchOutcome>
-  ): Promise<IRpcDispatchOutcome> => {
-    input.entered.resolve(context)
+  const inbound: IRpcFlowStage<'dispatchInbound'> = async (payload, next) => {
+    input.admitted?.()
+    input.entered.resolve(payload.context)
     await input.resume
-    return next()
+    await next(payload)
   }
   return defineFlowPlugin({
     name: 'held-limits-dispatch',
-    setup: () => ({ hooks: { dispatch: { inbound } } })
+    setup: () => ({ stages: { dispatchInbound: inbound } })
   })
 }
 
@@ -59,6 +74,67 @@ const limitsService = definePlugin({
 })
 
 describe('ordinary native Host RPC installation', () => {
+  it('rejects missing SDK pipeline configuration before native acquisition', async () => {
+    /** A plain native Host has no RPC execution authority until explicitly configured. */
+    const host = defineHost({
+      host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
+    })
+    /** Cold SDK definition is real; its acquisition must remain untouched after admission failure. */
+    const open = vi.fn(() => ({ dispose: () => undefined }))
+    try {
+      await expect(
+        host.use(defineTransportPlugin({ name: 'unconfigured', namespace: 'worker', open }))
+      ).rejects.toMatchObject({
+        code: 'PLUGIN_INSTALL_FAILED',
+        cause: {
+          source: 'rpc.endpoint',
+          code: 'INVALID_CONFIG',
+          message: 'RPC native host must configure rpcHostPipelines with its actual pipeline owner'
+        }
+      })
+      expect(open).not.toHaveBeenCalled()
+    } finally {
+      await host.dispose()
+    }
+  })
+
+  it('rejects omitted pipeline declarations before native acquisition when domainCore is configured', async () => {
+    /** JavaScript may accidentally keep only domainCore while omitting the returned declarations. */
+    const rpc = rpcHostPipelines(
+      () => host,
+      (name) => host.pipeline(name as never) as never
+    )
+    /** This is a real native owner and callback; only its required construction declarations lack. */
+    const host = defineHost({
+      domainCore: rpc.domainCore,
+      host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
+    })
+    /** A cold genuine transport exposes any resource acquisition before declaration admission. */
+    const open = vi.fn(() => ({ dispose: () => undefined }))
+    try {
+      /** Box admission facts rather than formatting a native handle after finally disposes it. */
+      const outcome = await host
+        .use(defineTransportPlugin({ name: 'undeclared', namespace: 'worker', open }))
+        .then(
+          () => ({ accepted: true, acquisitions: open.mock.calls.length }),
+          (error: unknown) => ({ error })
+        )
+      expect(outcome).toMatchObject({
+        error: {
+          code: 'PLUGIN_INSTALL_FAILED',
+          cause: {
+            source: 'rpc.endpoint',
+            code: 'INVALID_CONFIG',
+            cause: { source: 'plugin.host', code: 'PIPELINE_UNKNOWN' }
+          }
+        }
+      })
+      expect(open).not.toHaveBeenCalled()
+    } finally {
+      await host.dispose()
+    }
+  })
+
   it('keeps old publication after candidate failure and retires it only after successful replacement', async () => {
     /** This actual native host owns both original and candidate installation transactions. */
     const host = ordinaryHost()
@@ -171,10 +247,12 @@ describe('ordinary native Host RPC installation', () => {
     const entered = deferred<IRpcDispatchContext>()
     /** Cleanup releases this same continuation even when a public assertion fails. */
     const resume = deferred<void>()
+    /** Observation begins at this same real dispatch seam, after provider lifetime setup. */
+    let additions: IMockInstance | undefined
     await host.use(
       limitsService,
       limits(),
-      heldDispatch({ entered, resume: resume.promise }),
+      heldDispatch({ entered, resume: resume.promise, admitted: () => additions?.mockClear() }),
       namedTransport(server)
     )
     /** This is a genuine connected public client, not a constructed flow context or fake signal. */
@@ -183,16 +261,25 @@ describe('ordinary native Host RPC installation', () => {
     const pending = namespace(client.host).request('limits-service.value')
     void pending.catch(() => undefined)
     /** The spy borrows the original Session signal without replacing any native listener method. */
-    let additions: IMockInstance | undefined
     try {
       /** Holding the outer hook proves limits has not yet attached an operation/source observer. */
       const context = await entered.promise
       expect(context.connectionSignal).toBeDefined()
       additions = vi.spyOn(context.connectionSignal!, 'addEventListener')
-      await host.unUse('limits')
-      additions.mockClear()
+      /** Native R5 withdrawal waits for this already borrowed snapshot before completing removal. */
+      let removed = false
+      /** Observe the actual public completion rather than reconstructing private lease state. */
+      const removing = host.unUse('limits').then((value) => {
+        removed = true
+        return value
+      })
+      await Promise.resolve()
+      expect(removed).toBe(false)
       resume.resolve()
       expect(await pending).toBe(42)
+      await removing
+      additions.mockClear()
+      expect(await namespace(client.host).request('limits-service.value')).toBe(42)
       expect(additions).not.toHaveBeenCalled()
     } finally {
       resume.resolve()

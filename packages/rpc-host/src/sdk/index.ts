@@ -4,7 +4,7 @@
  */
 export { defineTransportPlugin, defineFlowPlugin, defineLinkPolicy } from './define.js'
 export type * from './types.js'
-export { RpcFlowPoint, RpcFlowPipelines, rpcPipelineOwner } from './flow-pipelines.js'
+export { RpcFlowPoint, rpcHostPipelines } from './flow-pipelines.js'
 export type {
   IRpcFlowStage,
   IRpcFlowStages,

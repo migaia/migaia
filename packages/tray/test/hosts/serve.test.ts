@@ -1,6 +1,7 @@
 import { TrayInternal } from '../../src/hosts/constants.js'
 import { describe, expect, it } from 'vitest'
 import { defineHost } from '@migaia/plugin-host'
+import { rpcHostPipelines } from '@migaia/rpc-host/sdk'
 import { assembled, fixture, liveThreads, processAlive, until } from './helper.js'
 
 describe('Tray child topology', () => {
@@ -11,8 +12,14 @@ describe('Tray child topology', () => {
       const dispatcherUrl = new URL('../../src/hosts/child/dispatch.ts', import.meta.url).href
       /** Runtime declarations remain genuine branded host values. */
       const api = await fixture()
+      /** This local genuine Host supplies the same native execution declarations as child serve. */
+      const rpc = rpcHostPipelines(
+        () => local,
+        (name) => local.pipeline(name)
+      )
       /** PluginHost owns Feature activation and the dispatcher registration. */
       const local = defineHost({
+        ...rpc,
         host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
       })
       /** Invalid first init must reject before child client construction or RPC access. */

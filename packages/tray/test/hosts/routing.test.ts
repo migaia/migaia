@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { defineProbe } from '@migaia/rpc-host/plugins/probe'
+import { rpcHostPipelines } from '@migaia/rpc-host/sdk'
 import { RpcWireKind, type IRpcEnvelope } from '@migaia/rpc-contract/protocol'
 import { setTimeout as delay } from 'node:timers/promises'
 import { fixture, until } from './helper.js'
@@ -259,7 +260,13 @@ describe('mesh routing and admission accounting', () => {
       async () => {},
       () => {}
     )
+    /** Genuine native configuration keeps relay fixture typing on the actual RPC host boundary. */
+    const rpc = rpcHostPipelines(
+      () => host,
+      (name) => host.pipeline(name)
+    )
     const host = defineHost({
+      ...rpc,
       host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
     })
     try {

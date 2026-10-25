@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
+import { defineHost } from '@migaia/plugin-host'
+import { rpcHostPipelines, RpcFlowPoint } from '@migaia/rpc-host/sdk'
 import {
   normalizeRpcFrame,
   deserializeRpcWireError,
@@ -20,6 +22,16 @@ import { createRpcError, createRpcSchemaValidationError } from '../../dist/host/
 
 /** One actual pair of owner ports models synchronous carrier handoff without a second RPC algorithm. */
 class OwnerPair {
+  /** Lazy execution access is evaluated only after this actual native handle exists. */
+  readonly #rpc = rpcHostPipelines(
+    () => this.#native,
+    (name) => this.#native.pipeline(name)
+  )
+  /** Genuine native stages execute the same provider pipeline as the public Host. */
+  readonly #native = defineHost({
+    ...this.#rpc,
+    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
+  })
   /** Distinct accepted task generations fence client and server completion paths. */
   readonly clientGeneration: IRpcGeneration = {
     kind: 'session',
@@ -62,6 +74,10 @@ class OwnerPair {
 
   /** Connect actual new owners at their explicit IO boundary; semantic admission stays canonical. */
   constructor(forward?: IProviderForwardPort, failOpen?: unknown) {
+    this.#native.pipeline(RpcFlowPoint.dispatchInbound).use(async (payload, next) => {
+      this.completions.push(payload.context.completion)
+      await next(payload)
+    })
     this.#failOpen = failOpen
     this.source = {
       namespace: 'test',
@@ -112,10 +128,7 @@ class OwnerPair {
       calls: this.calls,
       self: this.serverSelf,
       send: this.serverSend,
-      dispatch: (context, next) => {
-        this.completions.push(context.completion)
-        return next()
-      },
+      pipelines: () => this.#native,
       notify: async () => undefined,
       forward: forward ?? {
         resolveEntry: () => undefined,
@@ -187,6 +200,7 @@ class OwnerPair {
     this.dispatcher.close(reason)
     this.calls.close(reason)
     await Promise.all([this.clientStreams.close(reason), this.serverStreams.close(reason)])
+    await this.#native.dispose()
   }
 }
 
@@ -631,13 +645,17 @@ describe('C2 ProviderDispatcher / Forwarder / StreamChannel owners', () => {
         extensions: new Set<string>()
       }
     }
+    /** Canonical Session retirement removes this actual selection before notifying Forwarder. */
+    const current: { selection: typeof selection | undefined } = { selection }
     /** Actual downstream operation ports record the selected method and shrinking route budget. */
     const sent: { method?: string; options?: ICallLocalOptions }[] = []
     /** One Forwarder owns the cold direct-directory index consumed by Dispatcher local misses. */
     const forwarder = new Forwarder({
       nodeId: () => '22222222222222222222222222222222',
-      resolve: (_namespace, name) => (name === selection.view.name ? selection : undefined),
-      current: (carrierId) => (carrierId === selection.carrierId ? selection : undefined),
+      resolve: (_namespace, name) =>
+        name === current.selection?.view.name ? current.selection : undefined,
+      current: (carrierId) =>
+        carrierId === current.selection?.carrierId ? current.selection : undefined,
       sourceNodeId: (carrierId) =>
         carrierId === 'binding'
           ? '11111111111111111111111111111111'
@@ -670,6 +688,7 @@ describe('C2 ProviderDispatcher / Forwarder / StreamChannel owners', () => {
       })
     ).rejects.toMatchObject({ code: RpcCoreErrorCode.forwardLoop })
     expect(sent).toHaveLength(1)
+    current.selection = undefined
     forwarder.retired('downstream')
     await expect(pair.request('alice.group.thing.get')).rejects.toMatchObject({
       code: RpcCoreErrorCode.targetUnknown

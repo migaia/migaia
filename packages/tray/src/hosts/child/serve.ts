@@ -1,4 +1,5 @@
 import { defineHost } from '@migaia/plugin-host'
+import { rpcHostPipelines } from '@migaia/rpc-host/sdk'
 import { probe } from '@migaia/rpc-host/plugins/probe'
 import { deferred } from '@migaia/utils/promise'
 import type { ICoroutineConnect } from '@migaia/rpc-plugin-coroutines'
@@ -20,8 +21,14 @@ export async function serveChild(
 ): Promise<{ host: ITrayRuntimeHost; exited: Promise<void> }> {
   /** Branding must come from the same shared host-definition module in this realm. */
   const admitted = readHost(definition)
+  /** Native construction receives declarations and lazy execution authority through one SDK call. */
+  const rpc = rpcHostPipelines(
+    () => host,
+    (name) => host.pipeline(name)
+  )
   /** PluginHost cleanup diagnostics retain their native errors on the configured reporter. */
   const host = defineHost({
+    ...rpc,
     host: {
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
       diagnostic: (_message, _code, error) => {

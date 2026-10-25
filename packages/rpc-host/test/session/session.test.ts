@@ -9,7 +9,7 @@ import { MemoryCarrier } from '../fixtures/core-carrier.js'
 import { describe, expect, it, vi } from 'vitest'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { defineHost, definePlugin, type IPluginHostCore } from '@migaia/plugin-host'
-import { RpcFlowPipelines, type IRpcFlowInstallation } from '@migaia/rpc-host/sdk'
+import { rpcHostPipelines, type IRpcFlowInstallation } from '@migaia/rpc-host/sdk'
 import { TOKEN, leaks } from '../../../rpc-contract/test/fixtures/handshake-privacy.js'
 
 import {
@@ -43,9 +43,14 @@ class Host {
     options?: Pick<IRpcSessionTableOptions, 'scheduler' | 'handshakeTimeoutMs'>
   ) {
     this.directory = directory(id, name)
+    /** The SDK keeps declaration and execution authority paired without public raw metadata. */
+    const rpc = rpcHostPipelines(
+      () => native,
+      (name) => native.pipeline(name)
+    )
     /** Native construction declares the same seven payload/mode specifications as the real Host. */
     const native = defineHost({
-      pipelines: RpcFlowPipelines,
+      ...rpc,
       host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
     })
     /** Facts and stages are registered from the actual installing native core, never a fake core. */

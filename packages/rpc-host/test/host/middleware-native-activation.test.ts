@@ -1,11 +1,7 @@
 /** Original middleware activation observations use one genuine native install transaction. */
 import { defineFeature, defineHost, definePlugin } from '@migaia/plugin-host'
-import type {
-  IRpcCarrierReceiver,
-  IRpcDispatchContext,
-  IRpcDispatchOutcome
-} from '@migaia/rpc-contract/interfaces'
-import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
+import type { IRpcCarrierReceiver } from '@migaia/rpc-contract/interfaces'
+import { rpcHostPipelines } from '@migaia/rpc-host/sdk'
 import { deferred, type IDeferred } from '@migaia/utils/promise'
 import { expect, it, vi } from 'vitest'
 import { MemoryCarrier } from '../fixtures/core-carrier.js'
@@ -62,26 +58,15 @@ function finalParticipant(input: IActivationInput) {
   })
 }
 
-/** Observe actual incoming dispatch after its original continuation has entered the native gate. */
-function dispatchObservation(entered: IDeferred<void>) {
-  /** The existing flow hook only observes the genuine continuation; it never holds or replaces it. */
-  const inbound = (
-    _context: IRpcDispatchContext,
-    next: () => Promise<IRpcDispatchOutcome>
-  ): Promise<IRpcDispatchOutcome> => {
-    const completion = next()
-    entered.resolve()
-    return completion
-  }
-  return defineFlowPlugin({
-    name: 'activation-dispatch-observation',
-    setup: () => ({ hooks: { dispatch: { inbound } } })
-  })
-}
-
 it('C123 keeps native installation pending and business gated until final commit', async () => {
+  /** Declaration and genuine native execution authority use the same public SDK boundary. */
+  const rpc = rpcHostPipelines(
+    () => native,
+    (name) => native.pipeline(name)
+  )
   /** Mutation deadlines are disabled only through the real native Host's public options. */
   const native = defineHost({
+    ...rpc,
     host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   })
   /** The existing genuine listener keeps its original accepted-session and physical IO owner. */
@@ -102,18 +87,11 @@ it('C123 keeps native installation pending and business gated until final commit
   const subscription = vi
     .spyOn(MemoryCarrier.prototype, 'subscribe')
     .mockImplementation(observeSubscription)
-  /** A genuine inbound flow notification proves the public call reached the original gate. */
-  const dispatched = deferred<void>()
   /** Preserve the original distinction between entering activation and finishing installation. */
   let settled = false
   /** Observe rejection immediately while retaining the actual native transaction completion. */
   const installing = native
-    .use(
-      provider(input),
-      dispatchObservation(dispatched),
-      input.server.transport,
-      finalParticipant(input)
-    )
+    .use(provider(input), input.server.transport, finalParticipant(input))
     .then((result) => {
       settled = true
       return result
@@ -129,7 +107,10 @@ it('C123 keeps native installation pending and business gated until final commit
     /** This new public witness is independent of the old fixture's physical-send counter. */
     const pending = input.client!.host.memory.request('activation-provider.echo', 'before-commit')
     void pending.catch(() => undefined)
-    await Promise.race([dispatched.promise, pending])
+    /** Cold native stages publish at commit; real carrier ingress proves the pending gate first. */
+    await vi.waitFor(() =>
+      expect(input.client!.pair[1].written.some((frame) => frame.kind === 'call')).toBe(true)
+    )
     expect(input.dispatches).toBe(0)
     expect(settled).toBe(false)
     input.gate!.resolve()
@@ -149,8 +130,14 @@ it('C123 keeps native installation pending and business gated until final commit
 })
 
 it('C124 installs one actual native carrier receiver and keeps its subscription active', async () => {
+  /** Lazy owner capture does not access this handle before its native construction completes. */
+  const rpc = rpcHostPipelines(
+    () => native,
+    (name) => native.pipeline(name)
+  )
   /** This is the actual native owner, not a reconstructed RPC activation port. */
   const native = defineHost({
+    ...rpc,
     host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   })
   /** The same real final participant completes without a gate in the successful installation. */

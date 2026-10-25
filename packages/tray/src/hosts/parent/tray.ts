@@ -5,6 +5,7 @@ import { defaultRpcReporter } from '@migaia/rpc-host'
 import { probe, type IRpcProbe } from '@migaia/rpc-host/plugins/probe'
 import {
   RpcMemberEventName,
+  rpcHostPipelines,
   type IRpcMemberEvent,
   type IRpcMemberConnectionDetail
 } from '@migaia/rpc-host/sdk'
@@ -138,8 +139,15 @@ class TrayRuntime<
     /** One reporter carries native notices and contained lifecycle/relay failures. */
     this.#report = this.#options.report ?? defaultRpcReporter
 
+    /** This exact parent's handle lends execution only when native installation requests its core. */
+    const rpc = rpcHostPipelines(
+      () => this.#host,
+      (name) => this.#host.pipeline(name)
+    )
+
     /** Parent PluginHost remains separate from every instance's plain PluginHost. */
     this.#host = defineHost({
+      ...rpc,
       host: {
         execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
         diagnostic: (_message, _code, error) => {

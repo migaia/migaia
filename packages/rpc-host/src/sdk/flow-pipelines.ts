@@ -12,6 +12,9 @@ import type {
   IRpcFramePayload,
   IRpcDispatchPayload
 } from '@migaia/rpc-contract/interfaces'
+import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
+import { tagRpcError } from '@migaia/rpc-contract/errors'
+import { HostErrorText } from '../host/error-text.js'
 
 /** These fixed keys connect native registration and the corresponding RPC execution owners. */
 export const RpcFlowPoint = {
@@ -87,3 +90,34 @@ export const rpcPipelineOwner = Symbol('rpc-pipeline-owner')
 export type IRpcNativePipelineCore = Readonly<{
   [rpcPipelineOwner]: IRpcPipelineOwner & Readonly<{ host: object }>
 }>
+
+/**
+ * Supplies native pipeline declarations and the matching domain core without constructing a Host.
+ * Owner lookup stays lazy until installation, so functional handles and protected class accessors
+ * can lend their real execution authority after construction. Registration still verifies Host
+ * identity before resource acquisition.
+ */
+export function rpcHostPipelines(
+  getHost: () => object,
+  pipeline: IRpcPipelineOwner['pipeline']
+): Readonly<{
+  pipelines: typeof RpcFlowPipelines
+  domainCore(): IRpcNativePipelineCore
+}> {
+  return Object.freeze({
+    pipelines: RpcFlowPipelines,
+    /** Each native registration receives only its actual owner's explicitly lent execution port. */
+    domainCore: (): IRpcNativePipelineCore => {
+      try {
+        // RpcFlowPoint declares exactly seven fixed names; lookup takes no execution snapshot/lease.
+        for (const name of Object.values(RpcFlowPoint)) pipeline(name)
+      } catch (cause) {
+        throw tagRpcError(
+          new TypeError(HostErrorText.nativePipelinesRequired, { cause }),
+          RpcCoreErrorCode.invalidConfig
+        )
+      }
+      return { [rpcPipelineOwner]: { host: getHost(), pipeline } }
+    }
+  })
+}
