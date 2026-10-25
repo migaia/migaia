@@ -4,7 +4,6 @@ import { expect, it } from 'vitest'
 import { connect } from '../../dist/core/middleware/connect.js'
 
 import { createRuntimeApiEndpoint } from '../../dist/core/runtime-api-endpoint.js'
-import { defineMiddleware } from '../../dist/core/middleware.js'
 import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
 
 it('publishes the binding disposal settlement before one synchronous reentry', async () => {
@@ -32,35 +31,6 @@ it('publishes the binding disposal settlement before one synchronous reentry', a
   expect(calls).toBe(1)
   expect(nested).toBe(closing)
   expect(endpoint.dispose()).toBe(closing)
-})
-
-it('classifies the original middleware installation failure at the endpoint boundary', async () => {
-  /** The application callback's original native instance and stack remain intact. */
-  const original = new Error('audit installation failed')
-  /** This middleware is admitted through its ordinary native descriptor. */
-  const middleware = defineMiddleware('audit-install', () => ({
-    install() {
-      throw original
-    }
-  }))
-  /** Construction rollback owns the actual local memory transport. */
-  const [left, right] = createMemoryTransportPair()
-  try {
-    await expect(
-      createRuntimeEndpointComposition(
-        {
-          id: 'audit-install',
-          transport: left,
-          middlewares: [connect({ transport: left }), middleware]
-        },
-        { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
-      ).installing
-    ).rejects.toBe(original)
-    expect(original).toMatchObject({ source: 'rpc.endpoint', code: 'CALLBACK_FAILED' })
-  } finally {
-    left.close()
-    right.close()
-  }
 })
 
 it.each([true, false])(

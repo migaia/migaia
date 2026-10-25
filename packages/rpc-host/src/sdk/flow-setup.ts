@@ -2,6 +2,8 @@
 import type { IPluginHostCore } from '@migaia/plugin-host'
 import { attachSecondaryErrors, UtilsAbortError } from '@migaia/utils/error'
 import { raceWithAbort, type IAbortSignal, type INativeAbortSignal } from '@migaia/utils/promise'
+import { identifyRpcBoundaryFailure, RpcCoreErrorText } from '@migaia/rpc-contract/errors'
+import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { createRpcAbortError } from '../host/error-owner.js'
 import type { IRpcFlowDefinition, IRpcFlowInstallation, IRpcFlowSetupContext } from './types.js'
 
@@ -88,8 +90,12 @@ class RpcFlowSetupAttempt {
       }
       return installed
     } catch (error) {
-      this.#failure = error
-      throw error
+      this.#failure = identifyRpcBoundaryFailure(
+        error,
+        RpcCoreErrorCode.callbackFailed,
+        RpcCoreErrorText.callbackFailed
+      )
+      throw this.#failure
     }
   }
 }
