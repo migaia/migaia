@@ -448,7 +448,6 @@ describe('Resource-backed queries', () => {
       store,
       controller,
       consistency: { mode: 'push', visibility: 'instance' },
-      subscribe: undefined,
       report: () => undefined
     })
     try {
@@ -755,7 +754,6 @@ describe('Resource-backed queries', () => {
       store,
       controller,
       consistency: { mode: 'push', visibility: 'instance' },
-      subscribe: undefined,
       report: () => undefined
     })
     const order: string[] = []

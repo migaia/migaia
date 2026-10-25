@@ -193,7 +193,7 @@ function createReactiveFeature(
   /** Constructor admission selects these original ports before any source can subscribe. */
   const scheduler = featureExpose.getScheduler()
   const signal = featureExpose.getLifecycle().signal
-  const service = createStorageReactiveService(scheduler)
+  const service = createStorageReactiveService()
   const reporter = createStorageOperationReporter()
   /** No callback runs until the one stable listener is attached below. */
   const context = { featureExpose, scheduler, signal, service, reporter } as IReactiveFeatureContext
@@ -259,7 +259,6 @@ function createReactiveLiveQuery<TQuery extends IQueryShape>(
         store,
         controller,
         consistency: nativeConsistency(context.featureExpose.getKind(), controller !== undefined),
-        subscribe: undefined,
         report: (error) => reportCleanupError(context.reporter, error)
       })
       context.adapter.startSource()

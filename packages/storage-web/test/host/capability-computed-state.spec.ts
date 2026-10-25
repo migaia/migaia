@@ -54,7 +54,6 @@ describe('Host capability and computed state', () => {
         store,
         controller: controller!,
         consistency: { mode: 'push', visibility: 'forged' as never },
-        subscribe: undefined,
         report: () => undefined
       })
     ).toThrowError('reactive feature is invalid')

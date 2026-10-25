@@ -22,8 +22,8 @@ describe('reactive Feature', () => {
     const create = reactiveModule.createStorageReactiveService
     const factory = vi
       .spyOn(reactiveModule, 'createStorageReactiveService')
-      .mockImplementation((scheduler) => {
-        const service = create(scheduler)
+      .mockImplementation(() => {
+        const service = create()
         services.push(service)
         return service
       })
@@ -67,8 +67,8 @@ describe('reactive Feature', () => {
     const create = reactiveModule.createStorageReactiveService
     const factory = vi
       .spyOn(reactiveModule, 'createStorageReactiveService')
-      .mockImplementation((scheduler) => {
-        const service = create(scheduler)
+      .mockImplementation(() => {
+        const service = create()
         services.push(service)
         return service
       })

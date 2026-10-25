@@ -1,26 +1,8 @@
 import type { IAbortSignal, INativeAbortSignal } from '@migaia/utils/promise'
-import type { IScheduler } from '@migaia/utils/scheduler'
 import type { IReactiveComputed, IRuntime } from '@migaia/reactive'
 import type { IStorageBase, IStorageChange } from '@migaia/storage-contract'
 
-/** Reactive source metadata consumed only by the Host adapter materializer. */
-export type IStorageReactiveSourceDisposer = () => void | Promise<void>
-
-/** Exact store/context passed to an advanced adapter source at synchronous admission. */
-export type IStorageReactiveSubscribeContext<TStore extends IStorageBase = IStorageBase> = {
-  /** Exact Store registered by this backend plugin. */
-  readonly store: TStore
-  /** Host-snapshotted scheduler shared with source timing and installation deadlines. */
-  readonly scheduler: IScheduler
-  /** Source lifetime cancellation; subscriptions must release their resources when retired. */
-  readonly signal: INativeAbortSignal
-  /** Report source failures without changing an already committed storage write. */
-  readonly report: (error: unknown) => void
-  /** Undefined invalidates all queries on this adapter; a known change permits scope filtering. */
-  readonly onChange: (change?: IStorageChange) => void
-}
-
-/** Reactive consistency and optional source hook retained in private feature metadata. */
+/** Reactive consistency observation domain retained in private feature metadata. */
 export type IStorageReactiveVisibility =
   | 'instance'
   | 'document-eventual'
@@ -28,8 +10,8 @@ export type IStorageReactiveVisibility =
   | 'origin-js-visible-eventual'
   | 'origin-eventual'
 
-/** Reactive consistency and optional source hook retained in private feature metadata. */
-export type IStorageReactiveFeatureMetadata<TStore extends IStorageBase = IStorageBase> = {
+/** Reactive consistency retained in private feature metadata. */
+export type IStorageReactiveFeatureMetadata = {
   /**
    * Push uses notifications only; hybrid adds periodic reconciliation; polling uses periodic
    * reconciliation.
@@ -42,13 +24,6 @@ export type IStorageReactiveFeatureMetadata<TStore extends IStorageBase = IStora
    * custom-adapter interval.
    */
   readonly pollIntervalMs?: number
-  /**
-   * Optional source hook; admission requires a synchronous disposer. Promise-like results are
-   * rejected and observed for late cleanup.
-   */
-  readonly subscribe?: (
-    context: IStorageReactiveSubscribeContext<TStore>
-  ) => IStorageReactiveSourceDisposer | PromiseLike<unknown>
 }
 
 /**

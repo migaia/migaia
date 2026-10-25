@@ -1,10 +1,8 @@
 import { entityTestFeatures } from './helpers/entity-features.js'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { IDBFactory, IDBKeyRange, IDBObjectStore } from 'fake-indexeddb'
-import { createRuntime } from '@migaia/reactive'
 import { createIndexedDbTestStore } from './helpers/installed-backends.js'
 import { defineEntity } from '@migaia/storage-host/entity'
-import { createReactiveServiceFixture } from './helpers/reactive-service.js'
 
 /** A complete injected IDB factory delays only delivery of its real open-success event. */
 class DelayedFactory extends IDBFactory {
@@ -173,56 +171,6 @@ describe('storage-web confirmed audit suspicions', () => {
       })
     } finally {
       await store.dispose()
-    }
-  })
-
-  it('coarse push invalidation refreshes scoped queries without fabricating a change', async () => {
-    /** The installed public feature supplies exactly one source callback. */
-    let invalidate!: () => void
-    /** The application source can detect a change without knowing a storage payload. */
-    let value = 'before'
-    /** Count actual requests, not private invalidation bookkeeping. */
-    let calls = 0
-    /** The original service borrows an actual Feature-owned store and controller. */
-    const { host, store, controller, service } = await createReactiveServiceFixture({
-      id: 'audit-coarse',
-      attach: false
-    })
-    const adapter = service.registerAdapter({
-      backendId: 'audit-coarse',
-      store,
-      controller,
-      consistency: { mode: 'push', visibility: 'instance' },
-      subscribe: (context) => {
-        invalidate = () => context.onChange()
-        return () => {}
-      },
-      report: () => {}
-    })
-    adapter.startSource()
-    /** Unknown changes must invalidate even when a known change would be filtered out. */
-    const query = service.createQuery({
-      backendId: 'audit-coarse',
-      runtime: createRuntime(),
-      scope: 'scoped',
-      matches: () => false,
-      query() {
-        calls += 1
-        return value
-      }
-    })
-    try {
-      await query.ready
-      value = 'after'
-      invalidate()
-      await vi.waitFor(() => expect(query.state.value).toMatchObject({ value: 'after' }), {
-        timeout: 250,
-        interval: 5
-      })
-      expect(calls).toBe(2)
-    } finally {
-      await query.dispose()
-      await host.dispose()
     }
   })
 })

@@ -1,10 +1,6 @@
 import { createEventChannel } from '@migaia/event-subscriber'
-import {
-  createAbortController,
-  createSyncLifecycleScope,
-  createLifecycleScope
-} from '@migaia/lifecycle'
-import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
+import { createSyncLifecycleScope, createLifecycleScope } from '@migaia/lifecycle'
+import type { IScheduler } from '@migaia/utils/scheduler'
 import { asyncDisposeKey } from '@migaia/plugin-host'
 import { Resource } from '@migaia/resource'
 import type { IReactiveComputed, IRuntime } from '@migaia/reactive'
@@ -30,8 +26,7 @@ import type {
   ILiveQueryState,
   ILiveQueryStateView,
   IReactiveConsistency,
-  IStorageReactiveFeatureMetadata,
-  IStorageReactiveSourceDisposer
+  IStorageReactiveFeatureMetadata
 } from './types.js'
 import { isStorageReactiveVisibility, LiveQueryStateStatus } from './state-constants.js'
 
@@ -67,16 +62,11 @@ export type IStorageReactiveService = {
     readonly store: IStorageBase
     readonly controller?: IBackendChangeController
     readonly consistency: IStorageReactiveFeatureMetadata
-    readonly subscribe: IStorageReactiveFeatureMetadata['subscribe']
     readonly report: (error: unknown) => void
   }) => IStorageReactiveAdapter
   readonly createQuery: <T>(
     input: IStorageReactiveQueryInput<T>
   ) => ILiveQuery<T> & IStorageResource
-  readonly acquireQuery: (
-    backendId: string,
-    terminal?: IStorageReactiveQueryTerminal
-  ) => IStorageReactiveQueryLease
   readonly dispose: () => Promise<void>
 }
 
@@ -103,9 +93,6 @@ export type IStorageReactiveQueryInput<T> = {
 
 /** One reactive Feature service owns its adapter registry and asynchronous lifecycle. */
 type IReactiveServiceContext = {
-  /** Original scheduler is captured before native construction begins. */
-  readonly scheduler: IScheduler
-
   /** Stable explicit service-disposal promise shared by callers. */
   serviceDisposePromise: Promise<void> | undefined
 
@@ -119,11 +106,9 @@ type IReactiveServiceContext = {
   serviceRecord: object
 }
 /** Construct one Feature-local adapter registry under the original asynchronous lifecycle. */
-export function createStorageReactiveService(
-  scheduler: IScheduler = systemScheduler
-): IStorageReactiveService {
+export function createStorageReactiveService(): IStorageReactiveService {
   /** Initialize native facts in original construction order before publishing any port. */
-  const serviceState = { scheduler } as IReactiveServiceContext
+  const serviceState = {} as IReactiveServiceContext
 
   serviceState.adapters = new Map<string, IStorageReactiveAdapter>()
 
@@ -141,27 +126,10 @@ export function createStorageReactiveService(
       readonly store: IStorageBase
       readonly controller?: IBackendChangeController
       readonly consistency: IStorageReactiveFeatureMetadata
-      readonly subscribe: IStorageReactiveFeatureMetadata['subscribe']
       readonly report: (error: unknown) => void
     }) => registerAdapter(serviceState, input),
     createQuery: <T>(input: IStorageReactiveQueryInput<T>) =>
       createReactiveQuery(serviceState.adapters, serviceState.serviceScope, input),
-    acquireQuery: (backendId, terminal) => {
-      if (serviceState.serviceScope.lifecycle !== 'open')
-        throw new StorageError(
-          StorageErrorCode.reactiveAdapterNotInstalled,
-          {},
-          StorageErrorText.reactiveAdapterNotInstalled
-        )
-      const adapter = serviceState.adapters.get(backendId)
-      if (adapter === undefined)
-        throw new StorageError(
-          StorageErrorCode.reactiveAdapterNotInstalled,
-          {},
-          StorageErrorText.reactiveAdapterNotInstalled
-        )
-      return adapter.acquireQuery(terminal)
-    },
     dispose: () => disposeReactiveService(serviceState)
   }
 }
@@ -185,7 +153,6 @@ type IReactiveAdapterContext = {
     readonly store: IStorageBase
     readonly controller?: IBackendChangeController
     readonly consistency: IStorageReactiveFeatureMetadata
-    readonly subscribe: IStorageReactiveFeatureMetadata['subscribe']
     readonly report: (error: unknown) => void
   }
 
@@ -198,20 +165,14 @@ type IReactiveAdapterContext = {
   /** Original synchronous owner preserves source-before-query teardown in the same turn. */
   adapterScope: ReturnType<typeof createSyncLifecycleScope>
 
-  /** Source cancellation is selected before the original source disposer is invoked. */
-  sourceAbort: ReturnType<typeof createAbortController>
-
   /** Canonical event channel owns invalidation fanout and subscription ordering. */
   invalidations: ReturnType<typeof createEventChannel<IStorageChange | undefined>>
 
   /** Stable source resource has the highest teardown priority within the adapter. */
   sourceRecord: object
 
-  /** Native source disposer retained even when acquisition finishes after sealing. */
-  sourceStop: IStorageReactiveSourceDisposer | undefined
-
-  /** Tracks whether native source teardown has already been selected. */
-  sourceStopCalled: boolean
+  /** Native controller subscription is released before the adapter's admitted queries. */
+  sourceStop: (() => void) | undefined
 
   /** Stable native source cleanup settlement shared by terminal callers. */
   sourceStopPromise: Promise<void> | undefined
@@ -236,7 +197,6 @@ function registerAdapter(
     readonly store: IStorageBase
     readonly controller?: IBackendChangeController
     readonly consistency: IStorageReactiveFeatureMetadata
-    readonly subscribe: IStorageReactiveFeatureMetadata['subscribe']
     readonly report: (error: unknown) => void
   }
 ): IStorageReactiveAdapter {
@@ -255,7 +215,6 @@ function registerAdapter(
 
   if (
     adapterState.input.controller === undefined &&
-    adapterState.input.subscribe === undefined &&
     adapterState.input.consistency.mode !== 'polling'
   )
     throw new StorageError(
@@ -296,16 +255,12 @@ function registerAdapter(
     report: (error) => reportCleanupError(adapterState.input.report, error)
   })
 
-  adapterState.sourceAbort = createAbortController()
-
   adapterState.invalidations = createEventChannel<IStorageChange | undefined>({
     dispatchPolicy: 'queued',
     report: (error) => reportCleanupError(adapterState.input.report, error)
   })
 
   adapterState.sourceRecord = {}
-
-  adapterState.sourceStopCalled = false
 
   adapterState.nextQueryOrder = 0
 
@@ -314,11 +269,6 @@ function registerAdapter(
     syncSafe: true,
     order: Number.MAX_SAFE_INTEGER,
     force: () => {
-      try {
-        adapterState.sourceAbort.abort()
-      } catch (error) {
-        reportCleanupError(adapterState.input.report, error)
-      }
       const stop = invokeSourceStop(adapterState)
       adapterState.cleanupPromises?.push(stop)
     }
@@ -362,7 +312,6 @@ function registerAdapter(
 function invokeSourceStop(adapterState: IReactiveAdapterContext): Promise<void> {
   if (adapterState.sourceStopPromise !== undefined) return adapterState.sourceStopPromise
   if (adapterState.sourceStop === undefined) return Promise.resolve()
-  adapterState.sourceStopCalled = true
   try {
     adapterState.sourceStopPromise = Promise.resolve(adapterState.sourceStop()).then(
       () => undefined
@@ -374,25 +323,6 @@ function invokeSourceStop(adapterState: IReactiveAdapterContext): Promise<void> 
   return adapterState.sourceStopPromise
 }
 
-/** Captures late disposer and releases it immediately after a sealed source admission. */
-function captureSourceStop(adapterState: IReactiveAdapterContext, value: unknown): void {
-  if (typeof value !== 'function') {
-    reportCleanupError(
-      adapterState.input.report,
-      createStorageTypeError(
-        StorageErrorCode.reactiveFeatureInvalid,
-        StorageErrorText.reactiveFeatureInvalid
-      )
-    )
-    return
-  }
-  adapterState.sourceStop = value as IStorageReactiveSourceDisposer
-  if (adapterState.sourceStopCalled || adapterState.adapterScope.lifecycle !== 'open')
-    void invokeSourceStop(adapterState).catch((error) =>
-      reportCleanupError(adapterState.input.report, error)
-    )
-}
-
 /** Publishes one backend invalidation; event-subscriber owns fanout snapshot/order. */
 function publishChange(adapterState: IReactiveAdapterContext, change?: IStorageChange): void {
   try {
@@ -402,27 +332,14 @@ function publishChange(adapterState: IReactiveAdapterContext, change?: IStorageC
   }
 }
 
-/** Performs one synchronous source subscription admission. */
+/** Subscribe through the installed native controller; polling adapters need no source lease. */
 function startSource(adapterState: IReactiveAdapterContext): void {
   if (adapterState.adapterScope.lifecycle !== 'open') return
-  let result: unknown
   try {
-    result = (
-      adapterState.input.subscribe ??
-      ((context) => adapterState.input.controller?.subscribe(context.onChange) ?? (() => undefined))
-    )({
-      store: adapterState.input.store,
-      scheduler: adapterState.serviceState.scheduler,
-      signal: adapterState.sourceAbort.signal,
-      report: (error) => reportCleanupError(adapterState.input.report, error),
-      onChange: (change?: IStorageChange) => publishChange(adapterState, change)
-    })
+    adapterState.sourceStop = adapterState.input.controller?.subscribe((change) =>
+      publishChange(adapterState, change)
+    )
   } catch (error) {
-    try {
-      adapterState.sourceAbort.abort(error)
-    } catch (abortError) {
-      reportCleanupError(adapterState.input.report, abortError)
-    }
     adapterState.adapterScope.close()
     throw createStorageTypeError(
       StorageErrorCode.reactiveFeatureInvalid,
@@ -430,26 +347,6 @@ function startSource(adapterState: IReactiveAdapterContext): void {
       error
     )
   }
-  if (typeof result === 'function') {
-    captureSourceStop(adapterState, result)
-    return
-  }
-  const violation = createStorageTypeError(
-    StorageErrorCode.reactiveFeatureInvalid,
-    StorageErrorText.reactiveFeatureInvalid
-  )
-  try {
-    adapterState.sourceAbort.abort(violation)
-  } catch (error) {
-    reportCleanupError(adapterState.input.report, error)
-  }
-  adapterState.adapterScope.close()
-  if (result !== null && (typeof result === 'object' || typeof result === 'function'))
-    void Promise.resolve(result).then(
-      (value: unknown) => captureSourceStop(adapterState, value),
-      (error) => reportCleanupError(adapterState.input.report, error)
-    )
-  throw violation
 }
 
 /** Registers one query as a lifecycle-owned resource, never in a terminal registry. */

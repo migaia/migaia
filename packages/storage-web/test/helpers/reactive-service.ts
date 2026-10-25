@@ -39,7 +39,7 @@ export async function createReactiveServiceFixture(options: {
   let attach!: () => void
   /** The original host still owns this service; the fixture creates no lifecycle or registry. */
   const fixture = defineFeature(memoryBackendKind, ({ featureExpose }) => {
-    service = createStorageReactiveService(featureExpose.getScheduler())
+    service = createStorageReactiveService()
     featureExpose.onDispose(() => service.dispose())
     attach = () => {
       controller = featureExpose.getChangeController()!
@@ -50,7 +50,6 @@ export async function createReactiveServiceFixture(options: {
         store: featureExpose.getStore(),
         controller,
         consistency: { mode: 'push', visibility: 'instance' },
-        subscribe: undefined,
         report: options.report ?? (() => undefined)
       })
       adapter.startSource()
