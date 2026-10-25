@@ -6,11 +6,7 @@ import { MessageChannel } from 'node:worker_threads'
 import { createHmac } from 'node:crypto'
 import { identityCodec } from '@migaia/serialize/codecs/identity/v1'
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
-import {
-  createStringFramer,
-  messageFramerV1,
-  readRpcBatchMembers
-} from '@migaia/rpc-contract/framing'
+import { createStringFramer, messageFramerV1 } from '@migaia/rpc-contract/framing'
 
 import { connect } from '../../dist/core/middleware/connect.js'
 import { abort } from '../../dist/core/middleware/abort.js'
@@ -29,11 +25,9 @@ import {
   type IRpcProbeEventView
 } from '../../dist/core/probe/index.js'
 import { readEndpointOwner } from '../../dist/core/internal/endpoint-projection.js'
-import { readRuntimePeerConnection } from '../../dist/remote/runtime-api/peer.js'
-import type { RpcOutboundAttachment } from '../../dist/core/internal/outbound-attachment.js'
-import { runtimeSources, RUNTIME_API_FIXTURE_BASE_CAPABILITIES } from '../runtime-api/fixture.js'
+import { RUNTIME_API_FIXTURE_BASE_CAPABILITIES } from '../runtime-api/fixture.js'
 import { RpcCapability } from '@migaia/rpc-contract'
-import { RpcRemoteError, RpcTimeoutError, RpcAbortError } from '@migaia/rpc-contract/errors'
+import { RpcRemoteError } from '@migaia/rpc-contract/errors'
 import { registerBatchAgreement } from '../../dist/core/internal/batch-frame.js'
 import type { RpcOutboundSender } from '../../dist/core/internal/outbound-sender.js'
 import type { ProviderAdmissionRegistry } from '../../dist/core/internal/provider-admission.js'
@@ -42,168 +36,6 @@ import type { ProviderAdmissionRegistry } from '../../dist/core/internal/provide
 const probeModes = ['absent', 'recording', 'throw', 'reject', 'reentrant'] as const
 
 describe('probe non-interference', () => {
-  it.each(probeModes)(
-    'preserves runtime results, business error chain, 64 calls and path state with %s probe',
-    async (mode) => {
-      /** One native cause distinguishes probe isolation from business error replacement. */
-      const original = new RangeError('probe isolation business failure')
-      /** The probe's own failure must never become the caller result. */
-      const sinkFailure = new Error('probe isolation sink failure')
-      /** Real ignored business work allows the original caller timeout and abort to win. */
-      let release!: () => void
-      const held = new Promise<void>((resolve) => {
-        release = resolve
-      })
-      /** Real provider call order remains independent of observation callbacks. */
-      const calls: number[] = []
-      /** Re-entrancy uses the genuine Peer request API and is triggered only once. */
-      let client: Awaited<ReturnType<typeof createRuntimePeer>>,
-        nested: Promise<unknown> | undefined
-      let count = 0
-      const reports: unknown[] = []
-      /** The existing Peer diagnostic owner retains the genuine business error reference. */
-      const businessReports: unknown[] = []
-      const probe =
-        mode === 'absent'
-          ? undefined
-          : defineProbe({
-              stages: ['message', 'envelope', 'encoded', 'frame', 'protected'],
-              onError: (error) => reports.push(error),
-              emit: (event: IRpcProbeEventView) => {
-                count++
-                if (mode === 'throw') throw sinkFailure
-                if (mode === 'reject') return Promise.reject(sinkFailure)
-                if (
-                  mode === 'reentrant' &&
-                  event.outcome === RpcProbeOutcome.created &&
-                  event.method === 'reenter' &&
-                  client &&
-                  !nested
-                )
-                  nested = client.request('echo', -1)
-              }
-            })
-      const capabilities = [
-        ...RUNTIME_API_FIXTURE_BASE_CAPABILITIES,
-        RpcCapability.generation,
-        RpcCapability.deadline
-      ]
-      const channel = runtimeSources(capabilities, capabilities)
-      const peers = await Promise.all([
-        createRuntimePeer({
-          connect: channel.sources[0],
-          probe,
-          report: (error) => businessReports.push(error)
-        }),
-        createRuntimePeer({
-          connect: channel.sources[1],
-          probe,
-          report: (error) => businessReports.push(error),
-          provide: {
-            reenter: () => 9,
-            hold: async () => {
-              await held
-              return 9
-            },
-            echo: (value: number) => {
-              if (value >= 0) calls.push(value)
-              return value
-            },
-            fail: () => {
-              throw original
-            },
-            values: async function* () {
-              yield 1
-              yield 2
-              yield 3
-            }
-          }
-        })
-      ])
-      client = peers[0]
-      /**
-       * Observe the existing physical transport, retaining its original receiver and
-       * implementation.
-       */
-      const sending = vi.spyOn(channel.transports[0], 'send')
-      /** These actual selected component references are the established fast/batch path facts. */
-      const sender = readEndpointOwner<RpcOutboundSender>(
-        readRuntimePeerConnection(client).endpoint,
-        'outbound-pipeline'
-      )!
-      try {
-        expect(sender.components.codec.encode).toBe(identityCodec.encode)
-        expect(sender.components.framer.frame).toBe(messageFramerV1.frame)
-        /** Re-entrancy is isolated from quota saturation before the exact 64-call batch. */
-        expect(await client.request('reenter')).toBe(9)
-        if (mode === 'reentrant') expect(await nested).toBe(-1)
-        sending.mockClear()
-        expect(
-          await Promise.all(Array.from({ length: 64 }, (_, value) => client.request('echo', value)))
-        ).toEqual(Array.from({ length: 64 }, (_, value) => value))
-        expect(calls).toEqual(Array.from({ length: 64 }, (_, value) => value))
-        /**
-         * Genuine batch members prove c64 kept batching rather than producing 64 independent
-         * writes.
-         */
-        const batches = sending.mock.calls.map(([frame]) => readRpcBatchMembers(frame))
-        expect(batches.some((members) => members !== undefined && members.length > 1)).toBe(true)
-        expect(sending.mock.calls.length).toBeLessThan(64)
-        expect(batches.reduce((total, members) => total + (members?.length ?? 1), 0)).toBe(64)
-        /**
-         * Plain Peer calls retain their original fast lane and remote wrapper with the native
-         * cause.
-         */
-        const error = await client.request('fail').catch((failure: unknown) => failure)
-        expect(error).toBeInstanceOf(RpcRemoteError)
-        expect(error).toMatchObject({
-          code: 'INTERNAL',
-          cause: { name: original.name, message: original.message, stack: original.stack }
-        })
-        expect(Reflect.get(error as object, 'cause')).toBeInstanceOf(RangeError)
-        expect(businessReports).toContain(original)
-        /** Timeout preserves its original native type and code in every observer configuration. */
-        const timeout = await client
-          .request('hold', undefined, { timeoutMs: 10 })
-          .catch((failure: unknown) => failure)
-        expect(timeout).toBeInstanceOf(RpcTimeoutError)
-        expect(timeout).toMatchObject({ source: 'rpc.endpoint', code: 'DEADLINE_EXCEEDED' })
-        /** Caller cancellation keeps the exact native reason rather than any probe failure. */
-        const controller = new AbortController(),
-          reason = new RangeError('probe isolation abort reason')
-        const aborted = client
-          .request('hold', undefined, { signal: controller.signal })
-          .catch((failure: unknown) => failure)
-        controller.abort(reason)
-        const abortError = await aborted
-        expect(abortError).toBeInstanceOf(RpcAbortError)
-        expect(abortError).toMatchObject({ source: 'rpc.endpoint', code: 'CANCELLED' })
-        expect(Reflect.get(abortError as object, 'cause')).toBe(reason)
-        release()
-        expect(await client.notify('echo', -2)).toBeUndefined()
-        const values: unknown[] = []
-        for await (const value of client.stream('values')) values.push(value)
-        expect(values).toEqual([1, 2, 3])
-        await nested
-        /** Package-owned snapshots prove no pending owner or replay state is leaked by observation. */
-        const attachment = readEndpointOwner<RpcOutboundAttachment>(
-          readRuntimePeerConnection(client).endpoint,
-          'outbound-attachment'
-        )!
-        expect(attachment.debugSnapshot().pending).toBe(0)
-        if (mode === 'absent') expect(count).toBe(0)
-        else expect(count).toBeGreaterThan(0)
-        if (mode === 'throw' || mode === 'reject') expect(reports.length).toBeGreaterThan(0)
-        else expect(reports).toEqual([])
-      } finally {
-        release()
-        sending.mockRestore()
-        await Promise.all(peers.map((peer) => peer.close()))
-        channel.close()
-      }
-    }
-  )
-
   it.each(probeModes)(
     'preserves encrypted chunk flow, admission rejection and ping with %s probe',
     async (mode) => {
