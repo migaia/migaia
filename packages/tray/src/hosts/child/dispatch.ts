@@ -67,68 +67,64 @@ class ChildDispatcher {
       name: TrayInternal.childPlugin,
       features: {
         control: defineFeature(() => ({
-          /** Validate before user plugins are created; one dispatcher belongs to one generation. */
-          init: async (input: ITrayInstanceInfo<string, unknown>) => {
-            if (this.#initialized || input.host !== this.#definition.name)
-              throw createTrayError(TrayErrorCode.childStateInvalid)
-            this.#initialized = true
-            /** Validator output is local application data, not another wire transfer. */
-            const info = Object.freeze({
-              ...input,
-              config: this.#definition.config ? this.#definition.config(input.config) : input.config
-            })
-            /** Feature dependencies refer to this exact per-init plugin definition. */
-            const client = createTrayPlugin(
-              this.#outlet,
-              info,
-              this.#exit,
-              this.#topics,
-              this.#definition
-            )
-            /** Parent never invokes this DSL factory; execution belongs entirely to the child. */
-            const plugins = this.#definition.plugins(info, client)
-            /** Internal plugin names cannot be shadowed by business plugins. */
-            if (
-              plugins.some((plugin: IPluginConstraint<any>) =>
-                [
-                  TrayInternal.childPlugin,
-                  TrayInternal.clientPlugin,
-                  TrayInternal.relayPlugin
-                ].some((name) => name === plugin.name)
-              )
-            )
-              throw createTrayError(TrayErrorCode.reservedName)
-            /** PluginHost performs one transaction and owns rollback of a failed batch. */
-            const batch = [client, ...plugins]
-            const views = await this.#host.use(...batch)
-            batch.forEach((plugin, index) => {
-              this.#handles.set(
-                plugin.name,
-                views[index] as IPluginHandle<IPluginConstraint<any, any>>
-              )
-              this.#installed.add(plugin.name)
-            })
-            return undefined
-          },
+          init: this.#init,
           invoke: this.#invoke,
-          stream: (input: ITrayInvocation, context?: IRpcContext) => this.#invoke(input, context),
+          stream: this.#stream,
           /** Business events stay separate from the parent's read-only lifecycle channel. */
           deliver: this.#topics.deliver,
-          /** Bounded logical wait lets the caller terminate a hung realm; cleanup keeps its owner. */
-          shutdown: async ({ graceMs }: { graceMs: number }) => {
-            /** Cleanup starts before the caller's logical deadline is validated or awaited. */
-            const shutdown = this.shutdown()
-            try {
-              await withTimeout(() => shutdown, { timeoutMs: graceMs, report: this.#report })
-            } catch (error) {
-              this.#report(error)
-              throw error
-            }
-          }
+          shutdown: this.#shutdownControl
         }))
       },
       install: () => ({})
     })
+  }
+  /** Validate before user plugins are created; one dispatcher belongs to one generation. */
+  readonly #init = async (input: ITrayInstanceInfo<string, unknown>): Promise<void> => {
+    if (this.#initialized || input.host !== this.#definition.name)
+      throw createTrayError(TrayErrorCode.childStateInvalid)
+    this.#initialized = true
+    /** Validator output is local application data, not another wire transfer. */
+    const info = Object.freeze({
+      ...input,
+      config: this.#definition.config ? this.#definition.config(input.config) : input.config
+    })
+    /** Feature dependencies refer to this exact per-init plugin definition. */
+    const client = createTrayPlugin(this.#outlet, info, this.#exit, this.#topics, this.#definition)
+    /** Parent never invokes this DSL factory; execution belongs entirely to the child. */
+    const plugins = this.#definition.plugins(info, client)
+    if (plugins.some(this.#hasReservedName)) throw createTrayError(TrayErrorCode.reservedName)
+    /** PluginHost performs one transaction and owns rollback of a failed batch. */
+    const batch = [client, ...plugins]
+    const views = await this.#host.use(...batch)
+    batch.forEach((plugin, index) => {
+      this.#handles.set(plugin.name, views[index] as IPluginHandle<IPluginConstraint<any, any>>)
+      this.#installed.add(plugin.name)
+    })
+    return undefined
+  }
+  /** Preserve short-circuit name getter reads against the same fixed three internal names. */
+  #hasReservedName(plugin: IPluginConstraint<any>): boolean {
+    /** This compile-time three-name list retains its original order before any name getter read. */
+    const reserved = [
+      TrayInternal.childPlugin,
+      TrayInternal.clientPlugin,
+      TrayInternal.relayPlugin
+    ] as const
+    return reserved.some((name) => name === plugin.name)
+  }
+  /** Streaming keeps its separate bound callable while borrowing the original invocation job. */
+  readonly #stream = (input: ITrayInvocation, context?: IRpcContext): unknown =>
+    this.#invoke(input, context)
+  /** Bounded logical wait lets the caller terminate a hung realm; cleanup keeps its owner. */
+  readonly #shutdownControl = async ({ graceMs }: { graceMs: number }): Promise<void> => {
+    /** Cleanup starts before the caller's logical deadline is validated or awaited. */
+    const shutdown = this.shutdown()
+    try {
+      await withTimeout(() => shutdown, { timeoutMs: graceMs, report: this.#report })
+    } catch (error) {
+      this.#report(error)
+      throw error
+    }
   }
   /** Share the original business cleanup, including rejection, without adding a realm deadline. */
   readonly shutdown = (): Promise<void> => {
