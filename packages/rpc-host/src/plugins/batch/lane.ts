@@ -81,9 +81,11 @@ export class RpcBatchLane {
     const abort = (): void => {
       if (this.#withdraw(entry)) entry.resolve()
     }
+    /** One explicit cleanup receipt retains the original listener and native admission release. */
+    const removal = { signal, abort, releaseAdmission }
     entry.remove = () => {
-      signal.removeEventListener('abort', abort)
-      releaseAdmission?.()
+      removal.signal.removeEventListener('abort', removal.abort)
+      removal.releaseAdmission?.()
     }
     signal.addEventListener('abort', abort, { once: true })
     if (signal.aborted) abort()

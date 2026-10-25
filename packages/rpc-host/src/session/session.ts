@@ -562,23 +562,26 @@ export class Session {
     if (this.#closing) return
     this.#media(S.frame, D.inbound, frame.data)
     this.#receiving = this.#receiving
-      .then(async () => {
-        this.#assertOpen()
-        if (this.#view)
-          await this.#options
-            .pipelines()
-            .pipeline(RpcFlowPoint.frameInbound)
-            .run({ frame, context: this.#context('inbound') }, async (payload) =>
-              this.#decode(payload.frame)
-            )
-        else await this.#decode(frame)
-      })
+      .then(() => this.#receiveFrame(frame))
       .catch((error) => {
         /** A forged authenticated frame cannot evict an already accepted legitimate source. */
         if (this.#view && isLocalRpcError(error, RpcAuthenticationError))
           this.#options.report(error)
         else return this.#fail(error, true)
       })
+  }
+
+  /** Process one admitted ingress slot through its actual accepted or bootstrap codec boundary. */
+  async #receiveFrame(frame: IRpcCarrierFrame): Promise<void> {
+    this.#assertOpen()
+    if (this.#view)
+      await this.#options
+        .pipelines()
+        .pipeline(RpcFlowPoint.frameInbound)
+        .run({ frame, context: this.#context('inbound') }, async (payload) =>
+          this.#decode(payload.frame)
+        )
+    else await this.#decode(frame)
   }
 
   /** Decode protected metadata, authenticate it, then restore original admitted binary values. */
