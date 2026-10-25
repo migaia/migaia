@@ -6,17 +6,27 @@ import {
   getPluginRuntimeIntegration,
   type IPluginHostCore
 } from '@migaia/plugin-host'
+import { rpcHostPipelines } from '@migaia/rpc-host/sdk'
 import { expect, it } from 'vitest'
 import { coreMemoryServer } from './core-fixture.js'
 
 /** A genuine native Host supplies the same identity and transaction to its RPC transport. */
 function receivingHost(name: string) {
-  return defineHost({
+  /** Original memory listeners borrow only this actual native Host's cold pipeline declarations. */
+  const rpc = rpcHostPipelines(
+    () => host,
+    (key) => host.pipeline(key),
+    ['memory']
+  )
+  /** The original configured identity still selects its own native Feature output. */
+  const host = defineHost({
+    ...rpc,
     host: {
       identity: { name },
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
     }
   })
+  return host
 }
 
 /** The original object middleware registered an owned resource with a no-op release. */

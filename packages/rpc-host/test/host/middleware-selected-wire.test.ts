@@ -1,7 +1,7 @@
 /** Selected wire business uses the canonical codec, installed plugins and original native IO. */
 import { defineHost } from '@migaia/plugin-host'
 import { createRpcHost } from '@migaia/rpc-host'
-import { RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
+import { rpcHostPipelines, RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
 import { chunk } from '@migaia/rpc-host/plugins/chunk'
 import { auth } from '@migaia/rpc-host/plugins/auth'
 import { schema } from '@migaia/rpc-host/plugins/schema'
@@ -12,6 +12,22 @@ import type { IRpcCarrierFrame } from '@migaia/rpc-contract/interfaces'
 import { expect, it, vi } from 'vitest'
 import { coreMemoryServer } from './core-fixture.js'
 import { MemoryCarrier } from '../fixtures/core-carrier.js'
+
+/** The original native-only subjects own genuine pipelines for their actual memory listeners. */
+function receivingHost() {
+  /** Independent native Hosts share only immutable declarations, never execution handles. */
+  const rpc = rpcHostPipelines(
+    () => host,
+    (key) => host.pipeline(key),
+    ['memory']
+  )
+  /** One original native runtime owns its actual registration and terminal cleanup. */
+  const host = defineHost({
+    ...rpc,
+    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
+  })
+  return host
+}
 
 // C023 parser behavior, C104 Unicode values and C118 fragment boundaries use actual public hooks.
 it('keeps selected schema parsing and Unicode fragment boundaries on the actual public pipeline', async () => {
@@ -153,13 +169,9 @@ it('keeps acquired native subscriptions and concurrent disposal identities witho
   /** Observe actual native subscriptions without replacing the original receiver or remover. */
   const subscribed = vi.spyOn(MemoryCarrier.prototype, 'subscribe')
   /** These two genuine native Hosts retain their separate disposal Promise identities. */
-  const left = defineHost({
-    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
-  })
+  const left = receivingHost()
   /** Concurrent native installation must not share another Host's close receipt. */
-  const right = defineHost({
-    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
-  })
+  const right = receivingHost()
   /** No removed optional protocol or contract role participates in either native installation. */
   const leftServer = coreMemoryServer('selected-wire-native-left')
   /** This independent real source owns the second native resource subject. */

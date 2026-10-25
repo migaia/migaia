@@ -1,13 +1,23 @@
 /** Ordinary native Features retain original exposed values, exact identity and owned cleanup. */
 import { defineFeature, defineHost, definePlugin } from '@migaia/plugin-host'
+import { rpcHostPipelines } from '@migaia/rpc-host/sdk'
 import { expect, it } from 'vitest'
 import { coreMemoryServer } from './core-fixture.js'
 
 /** One real native transaction owns both the RPC transport and ordinary Feature resources. */
 function receivingHost() {
-  return defineHost({
+  /** Each real SDK listener declares memory before the native transaction opens it. */
+  const rpc = rpcHostPipelines(
+    () => host,
+    (key) => host.pipeline(key),
+    ['memory']
+  )
+  /** Actual native Feature and pipeline ownership stay on the same original runtime. */
+  const host = defineHost({
+    ...rpc,
     host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   })
+  return host
 }
 
 /** The original exposed method remains callable through the actual native Feature handle. */

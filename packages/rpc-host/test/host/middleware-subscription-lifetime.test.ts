@@ -1,6 +1,6 @@
 /** Genuine native Hosts own actual subscriptions and release pre-attachment resources on rollback. */
 import { defineHost, definePlugin } from '@migaia/plugin-host'
-import { defineTransportPlugin } from '@migaia/rpc-host/sdk'
+import { defineTransportPlugin, rpcHostPipelines } from '@migaia/rpc-host/sdk'
 import { assert, expect, it, vi } from 'vitest'
 import { coreMemoryServer } from './core-fixture.js'
 import { MemoryCarrier } from '../fixtures/core-carrier.js'
@@ -10,9 +10,18 @@ type IConnectedClient = Awaited<ReturnType<ReturnType<typeof coreMemoryServer>['
 
 /** NativeHost, rather than RPC Root.close, is the original installation and resource owner. */
 function receivingHost() {
-  return defineHost({
+  /** Original memory listener and pre-attachment source use these genuine native declarations. */
+  const rpc = rpcHostPipelines(
+    () => host,
+    (key) => host.pipeline(key),
+    ['memory']
+  )
+  /** The sole native owner retains acquisition, rollback and its stable disposal completion. */
+  const host = defineHost({
+    ...rpc,
     host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   })
+  return host
 }
 
 // C017: exact old shared-port lookups retire; simultaneous physical receivers remain observable.
