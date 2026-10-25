@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import { defineHost } from '@migaia/plugin-host'
 import { rpcHostPipelines, RpcFlowPoint } from '@migaia/rpc-host/sdk'
+import { rpcPipelineOwner } from '../../dist/sdk/flow-pipelines.js'
 import {
   normalizeRpcFrame,
   deserializeRpcWireError,
@@ -25,7 +26,8 @@ class OwnerPair {
   /** Lazy execution access is evaluated only after this actual native handle exists. */
   readonly #rpc = rpcHostPipelines(
     () => this.#native,
-    (name) => this.#native.pipeline(name)
+    (name) => this.#native.pipeline(name),
+    ['test']
   )
   /** Genuine native stages execute the same provider pipeline as the public Host. */
   readonly #native = defineHost({
@@ -74,10 +76,13 @@ class OwnerPair {
 
   /** Connect actual new owners at their explicit IO boundary; semantic admission stays canonical. */
   constructor(forward?: IProviderForwardPort, failOpen?: unknown) {
-    this.#native.pipeline(RpcFlowPoint.dispatchInbound).use(async (payload, next) => {
-      this.completions.push(payload.context.completion)
-      await next(payload)
-    })
+    this.#rpc
+      .domainCore()
+      [rpcPipelineOwner].pipeline(RpcFlowPoint.dispatchInbound, 'test')
+      .use(async (payload, next) => {
+        this.completions.push(payload.context.completion)
+        await next(payload)
+      })
     this.#failOpen = failOpen
     this.source = {
       namespace: 'test',
@@ -128,7 +133,7 @@ class OwnerPair {
       calls: this.calls,
       self: this.serverSelf,
       send: this.serverSend,
-      pipelines: () => this.#native,
+      pipelines: () => this.#rpc.domainCore()[rpcPipelineOwner],
       notify: async () => undefined,
       forward: forward ?? {
         resolveEntry: () => undefined,
