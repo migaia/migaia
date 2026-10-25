@@ -89,6 +89,7 @@ export function coroutineCarrier(
   const io = new CoroutinePort(port, report)
   return createRpcMessageCarrier({
     id,
+    closingWrites: true,
     observation: io.observation,
     report,
     nativeBinary: true,

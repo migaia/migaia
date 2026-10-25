@@ -167,6 +167,7 @@ function createThreadCarrier(
   const io = new ThreadNativeIO(binding, report)
   return createRpcMessageCarrier({
     id,
+    closingWrites: true,
     report,
     nativeBinary: true,
     defaultCloseError: () => threadTransportError(ThreadErrorText.messagePortClosed),

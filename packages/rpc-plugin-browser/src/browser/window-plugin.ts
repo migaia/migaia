@@ -14,7 +14,7 @@ import type { IWindowPluginOptions } from './peer-types.js'
 /** Capture the exact borrowed Window and required origin before installation can touch native IO. */
 export function windowPlugin<const N extends string = 'window'>(
   options: IWindowPluginOptions & Readonly<{ namespace?: N }>
-): IRpcTransportPlugin<NoInfer<N>> {
+): IRpcTransportPlugin<NoInfer<N>, Record<never, never>, true> {
   if (!options?.window || typeof options.window.postMessage !== 'function')
     throw createBrowserPeerError(
       RpcBrowserErrorCode.invalidPeerSource,
@@ -32,6 +32,7 @@ export function windowPlugin<const N extends string = 'window'>(
   return defineTransportPlugin({
     name: options.name ?? BrowserPluginName.window,
     namespace: (options.namespace ?? BrowserNamespace.window) as N,
+    closingWrites: true,
     expose: options.expose,
     features: options.features,
     handshakeTimeoutMs: options.connect?.timeoutMs,

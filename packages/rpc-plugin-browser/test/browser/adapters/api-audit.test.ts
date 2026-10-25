@@ -27,6 +27,8 @@ it.each(['shared-worker', 'service-worker'] as const)(
             { report: () => undefined }
           )
     try {
+      expect(resource.closingWrites).toBe(true)
+      expect(resource.mapRetirement).toBeUndefined()
       /** Classification must retain the native failure class and its constructor-created stack. */
       let failure: unknown
       try {
@@ -105,6 +107,8 @@ it('retains the original RTC event error through the standard error chain', asyn
     },
     { report: () => undefined }
   )
+  expect(resource.closingWrites).toBe(true)
+  expect(resource.mapRetirement).toBeUndefined()
   /** A native lower-layer exception remains reachable after terminal listener cleanup. */
   const original = new DOMException('audit RTC lower-layer failure', 'OperationError')
   /** RTC-style errors carry the original exception on the event's error slot. */

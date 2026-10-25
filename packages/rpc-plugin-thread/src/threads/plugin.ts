@@ -133,7 +133,7 @@ export function threadPlugin<
       namespace?: N
       features?: readonly (IRpcCallFeature | IRpcNativeTransportFeature<E>)[]
     }>
-): IRpcTransportPlugin<N, IThreadNamespaceExtensions & E> {
+): IRpcTransportPlugin<N, IThreadNamespaceExtensions & E, true> {
   /** Runtime and exactly-one-source admission retain the original public source diagnostic. */
   const configured = options as IThreadPluginOptions & { connectToParent?: unknown }
   /** Omitted configuration is rejected synchronously without touching any native resource. */
@@ -155,8 +155,9 @@ export function threadPlugin<
   return defineTransportPlugin({
     name: configured.name ?? THREAD_NAMESPACE,
     namespace,
+    closingWrites: true,
     expose: configured.expose,
     features: configured.features,
     open: installation.open
-  }) as IRpcTransportPlugin<N, IThreadNamespaceExtensions & E>
+  }) as IRpcTransportPlugin<N, IThreadNamespaceExtensions & E, true>
 }

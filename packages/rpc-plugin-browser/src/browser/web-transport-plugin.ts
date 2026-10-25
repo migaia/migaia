@@ -108,6 +108,7 @@ async function openStream(
      */
     const carrier = createRpcByteCarrier({
       id: defaultRpcId(),
+      closingWrites: true,
       io,
       observation,
       assertTransfer: rejectBrowserTransfer,
@@ -134,7 +135,7 @@ function cleanupFailed(errors: readonly unknown[]): Error {
 /** Opening is cold; the reliable stream is created only by the receiving native host install. */
 export function webTransportPlugin<const N extends string = 'webTransport'>(
   options: IWebTransportPluginOptions & Readonly<{ namespace?: N }>
-): IRpcTransportPlugin<NoInfer<N>> {
+): IRpcTransportPlugin<NoInfer<N>, Record<never, never>, true> {
   if (!options?.session || typeof options.session.createBidirectionalStream !== 'function')
     throw createBrowserPeerError(
       RpcBrowserErrorCode.invalidPeerSource,
@@ -143,6 +144,7 @@ export function webTransportPlugin<const N extends string = 'webTransport'>(
   return defineTransportPlugin({
     name: options.name ?? WebTransportPluginText.name,
     namespace: (options.namespace ?? BrowserNamespace.webTransport) as N,
+    closingWrites: true,
     expose: options.expose,
     features: options.features,
     handshakeTimeoutMs: options.connect?.timeoutMs,

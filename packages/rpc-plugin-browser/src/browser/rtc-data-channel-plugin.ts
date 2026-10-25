@@ -12,7 +12,7 @@ import type { IRtcDataChannelPluginOptions } from './peer-types.js'
 /** Capture an already ordered/reliable native channel; no signaling or implicit native close. */
 export function rtcDataChannelPlugin<const N extends string = 'rtcDataChannel'>(
   options: IRtcDataChannelPluginOptions & Readonly<{ namespace?: N }>
-): IRpcTransportPlugin<NoInfer<N>> {
+): IRpcTransportPlugin<NoInfer<N>, Record<never, never>, true> {
   /** Native reliability settings are admitted before any listener acquisition. */
   const channel = options?.rtcDataChannel
   if (
@@ -28,6 +28,7 @@ export function rtcDataChannelPlugin<const N extends string = 'rtcDataChannel'>(
   return defineTransportPlugin({
     name: options.name ?? BrowserPluginName.rtc,
     namespace: (options.namespace ?? BrowserNamespace.rtc) as N,
+    closingWrites: true,
     expose: options.expose,
     features: options.features,
     handshakeTimeoutMs: options.connect?.timeoutMs,

@@ -234,6 +234,7 @@ export function createRtcDataChannelCarrier(
   const io = new RtcMessageIO(channel, context.report)
   return createRpcMessageCarrier({
     id: defaultRpcId(),
+    closingWrites: true,
     nativeBinary: false,
     assertTransfer: rejectBrowserTransfer,
     codec: new RpcJsonCarrierCodec({

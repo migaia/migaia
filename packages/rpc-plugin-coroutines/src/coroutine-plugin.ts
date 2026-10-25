@@ -106,7 +106,7 @@ export function coroutinePlugin<
       namespace?: N
       features?: readonly (IRpcCallFeature | IRpcNativeTransportFeature<E>)[]
     }>
-): IRpcTransportPlugin<N, ICoroutineNamespaceExtensions & E> {
+): IRpcTransportPlugin<N, ICoroutineNamespaceExtensions & E, true> {
   /** Source selection retains native TypeError/source/code and does no IO. */
   const task = options?.spawn,
     parent = options?.connectToParent
@@ -124,8 +124,9 @@ export function coroutinePlugin<
   return defineTransportPlugin({
     name: options.name ?? CoroutineText.namespace,
     namespace: (options.namespace ?? CoroutineText.namespace) as N,
+    closingWrites: true,
     expose: options.expose,
     features: options.features,
     open: installation.open
-  }) as IRpcTransportPlugin<N, ICoroutineNamespaceExtensions & E>
+  }) as IRpcTransportPlugin<N, ICoroutineNamespaceExtensions & E, true>
 }

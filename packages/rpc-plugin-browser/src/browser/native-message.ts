@@ -179,6 +179,7 @@ export function browserMessageCarrier(
   })
   return createRpcMessageCarrier({
     id: defaultRpcId(),
+    closingWrites: true,
     nativeBinary: true,
     digest: createRpcBackingDigest(),
     report: context.report,

@@ -197,9 +197,16 @@ export class ThreadSource<THandle extends IThreadHandle = IThreadHandle> {
   ): Promise<void> => {
     /** The actual accepted handle is never selected by a mutable peer name. */
     const session = this.#sessions.get(unit)
-    if (session) await this.#context.drain(session, remainingMs())
-    if (!signal.aborted)
-      await this.#source.supervisor?.stop?.beforeTerminate?.(unit, signal, remainingMs)
+    try {
+      if (session) await this.#context.drain(session, remainingMs())
+      if (!signal.aborted)
+        await this.#source.supervisor?.stop?.beforeTerminate?.(unit, signal, remainingMs)
+    } catch (primary) {
+      if (session) await this.#context.detach(session, primary).catch(this.#context.report)
+      throw primary
+    }
+    /** The original hook may still use RPC; only afterwards does the same Session finish closing. */
+    if (session) await this.#context.detach(session)
   }
   /** Link an acquired native unit to the shared SDK's subsequent real Session attachment. */
   readonly #openCarrier = async (unit: THandle, signal: IAbortSignal) => {

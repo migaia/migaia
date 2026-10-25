@@ -27,7 +27,11 @@ function portHost(
         namespace: 'coroutine',
         async open(context) {
           /** The sole original physical carrier is acquired by its real Session owner. */
-          const session = context.attach(coroutineCarrier(port, self.instanceId, context.report))
+          const carrier = coroutineCarrier(port, self.instanceId, context.report)
+          expect(carrier.closingWrites).toBe(true)
+          expect(carrier.mapRetirement).toBeUndefined()
+          /** The original Host attachment remains the only receiver and close authority. */
+          const session = context.attach(carrier)
           await session.ready
           return { dispose: () => context.detach(session) }
         }

@@ -15,7 +15,7 @@ import { createDedicatedWorkerCarrier } from './adapters/dedicated-worker.js'
 /** Borrow a real Worker or worker self; installation never launches or terminates its native owner. */
 export function dedicatedWorkerPlugin<const N extends string = 'worker'>(
   options: IWorkerPluginOptions & Readonly<{ namespace?: N }>
-): IRpcTransportPlugin<NoInfer<N>> {
+): IRpcTransportPlugin<NoInfer<N>, Record<never, never>, true> {
   /** Source admission is cold and precedes all native subscriptions. */
   const worker = options?.worker
   if (
@@ -31,6 +31,7 @@ export function dedicatedWorkerPlugin<const N extends string = 'worker'>(
   return defineTransportPlugin({
     name: options.name ?? BrowserPluginName.worker,
     namespace: (options.namespace ?? BrowserNamespace.worker) as N,
+    closingWrites: true,
     expose: options.expose,
     features: options.features,
     handshakeTimeoutMs: options.connect?.timeoutMs,

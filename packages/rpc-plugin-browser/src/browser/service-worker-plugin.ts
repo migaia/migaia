@@ -182,7 +182,7 @@ class ServiceWorkerClientListener {
 /** Capture either an actual page target/container or native worker Clients scope, without IO. */
 export function serviceWorkerPlugin<const N extends string = 'serviceWorker'>(
   options: IServiceWorkerPluginOptions & Readonly<{ namespace?: N }>
-): IRpcTransportPlugin<NoInfer<N>> {
+): IRpcTransportPlugin<NoInfer<N>, Record<never, never>, true> {
   /** Native page receive owner stays independent of the outgoing ServiceWorker. */
   const receiver =
     options?.receiver ??
@@ -209,6 +209,7 @@ export function serviceWorkerPlugin<const N extends string = 'serviceWorker'>(
   return defineTransportPlugin({
     name: options.name ?? ServiceWorkerPluginText.name,
     namespace: (options.namespace ?? BrowserNamespace.service) as N,
+    closingWrites: true,
     expose: options.expose,
     features: options.features,
     handshakeTimeoutMs: options.connect?.timeoutMs,

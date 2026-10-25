@@ -15,6 +15,8 @@ describe('thread channel ownership and portable boundary', () => {
     const channel = createNodeThreadCarrier(port, 'peer', (error) => {
       throw error
     })
+    expect(channel.closingWrites).toBe(true)
+    expect(channel.mapRetirement).toBeUndefined()
     const unsubscribe = channel.subscribe({
       frame: () => undefined,
       close: () => undefined,

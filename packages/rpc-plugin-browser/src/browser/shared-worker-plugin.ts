@@ -13,7 +13,7 @@ import type { ISharedWorkerPluginOptions } from './peer-types.js'
 /** Capture one existing page port or native connect scope; no physical effect occurs cold. */
 export function sharedWorkerPlugin<const N extends string = 'sharedWorker'>(
   options: ISharedWorkerPluginOptions & Readonly<{ namespace?: N }>
-): IRpcTransportPlugin<NoInfer<N>> {
+): IRpcTransportPlugin<NoInfer<N>, Record<never, never>, true> {
   if (
     !options ||
     Number(options.sharedWorker !== undefined) + Number(options.listen !== undefined) !== 1
@@ -42,6 +42,7 @@ export function sharedWorkerPlugin<const N extends string = 'sharedWorker'>(
   return defineTransportPlugin({
     name: options.name ?? BrowserPluginName.shared,
     namespace: (options.namespace ?? BrowserNamespace.shared) as N,
+    closingWrites: true,
     expose: options.expose,
     features: options.features,
     handshakeTimeoutMs: options.connect?.timeoutMs,

@@ -167,6 +167,7 @@ class BroadcastChannelListener {
     /** Native BroadcastChannel can clone actual backings, although it cannot transfer ownership. */
     const carrier = createRpcMessageCarrier({
       id: defaultRpcId(),
+      closingWrites: true,
       nativeBinary: true,
       assertTransfer: rejectBrowserTransfer,
       digest: createRpcBackingDigest(),
@@ -229,7 +230,7 @@ class BroadcastChannelListener {
 /** Capture a borrowed native channel; each real installation owns independent discovery membership. */
 export function broadcastChannelPlugin<const N extends string = 'broadcastChannel'>(
   options: IBroadcastChannelPluginOptions & Readonly<{ namespace?: N }>
-): IRpcTransportPlugin<NoInfer<N>> {
+): IRpcTransportPlugin<NoInfer<N>, Record<never, never>, true> {
   /** Native source shape is admitted before subscribing or publishing any discovery frame. */
   const channel = options?.channel
   if (
@@ -245,6 +246,7 @@ export function broadcastChannelPlugin<const N extends string = 'broadcastChanne
   return defineTransportPlugin({
     name: options.name ?? BroadcastChannelControl.plugin,
     namespace: (options.namespace ?? BrowserNamespace.broadcast) as N,
+    closingWrites: true,
     expose: options.expose,
     features: options.features,
     handshakeTimeoutMs: options.connect?.timeoutMs,

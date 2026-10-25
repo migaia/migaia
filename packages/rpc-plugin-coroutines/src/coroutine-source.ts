@@ -269,9 +269,16 @@ export class CoroutineSource {
   ): Promise<void> => {
     /** Exact unit identity cannot accidentally drain a replacement coroutine. */
     const session = this.#sessions.get(unit)
-    if (session) await this.#context.drain(session, remainingMs())
-    if (!signal.aborted)
-      await this.#options.supervisor?.stop?.beforeTerminate?.(unit, signal, remainingMs)
+    try {
+      if (session) await this.#context.drain(session, remainingMs())
+      if (!signal.aborted)
+        await this.#options.supervisor?.stop?.beforeTerminate?.(unit, signal, remainingMs)
+    } catch (primary) {
+      if (session) await this.#context.detach(session, primary).catch(this.#context.report)
+      throw primary
+    }
+    /** Preserve preclose RPC in the original hook before cooperative stop can close its ports. */
+    if (session) await this.#context.detach(session)
   }
   /**
    * Query uses the sole original native snapshot; coroutine resource sampling stays explicitly
