@@ -1,3 +1,7 @@
+/**
+ * Admit routing policies and select from one current candidate snapshot; registry owns instance
+ * lifetime.
+ */
 import { createTrayError } from '../errors.js'
 import { TrayErrorCode } from '../error-code.js'
 import { TrayInstanceState } from './constants.js'
@@ -55,19 +59,26 @@ class RoutingRegistry {
     }
     this.names = Object.freeze([...this.#policies.keys()])
   }
-  /** Pick one current ready admission; business calls never retry or migrate. */
+  /**
+   * Pick one current ready admission; business calls never retry or migrate. The policy contract
+   * receives every ready candidate, requiring one O(n) snapshot pass; returned id lookup is O(1).
+   */
   pick = (host: string, name: string): ITrayRecord => {
     const policy = this.#policies.get(name)
     if (!policy) throw createTrayError(TrayErrorCode.routingUnknown)
     /** Map insertion order is the admission's spawn order. */
     const candidates: ITrayRecord[] = []
+    /** Index only this snapshot so policy reentrancy cannot admit a later same-id replacement. */
+    const candidateIds = new Map<string, ITrayRecord>()
     for (const record of this.#registry.records.values())
       if (
         record.definition.name === host &&
         record.state === TrayInstanceState.ready &&
         !record.removed
-      )
+      ) {
         candidates.push(record)
+        candidateIds.set(record.id, record)
+      }
     if (!candidates.length) throw createTrayError(TrayErrorCode.hostUnavailable)
     /** Sequence state belongs to this registry and one host name. */
     let hostSequences = this.#sequences.get(host)
@@ -88,7 +99,7 @@ class RoutingRegistry {
     } catch (error) {
       throw createTrayError(TrayErrorCode.routingInvalid, error)
     }
-    const selected = candidates.find((record) => record.id === id)
+    const selected = candidateIds.get(id)
     if (!selected) throw createTrayError(TrayErrorCode.routingInvalid)
     return selected
   }
