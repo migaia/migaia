@@ -36,6 +36,18 @@ export const createMiddlewarePipelineExecutionError = (
   }
 }
 
+/** Preserves independent branch errors in their submission order. */
+export const createMiddlewarePipelineMultipleDownstreamError = (
+  errors: readonly unknown[]
+): AggregateError =>
+  attachErrorIdentity(
+    new AggregateError(errors, MiddlewarePipelineErrorText.multipleDownstreamFailed),
+    {
+      source: MIDDLEWARE_PIPELINE_SOURCE,
+      code: MiddlewarePipelineErrorCode.multipleDownstreamFailed
+    }
+  ) as AggregateError
+
 /** Owns all package invalid-option errors while preserving each caller's cause shape. */
 export const createMiddlewarePipelineInvalidOptionError = (
   message: string,

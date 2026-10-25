@@ -22,6 +22,11 @@ export const MiddlewarePipelineErrorCode = {
    */
   executionFailed: 'EXECUTION_FAILED',
   /**
+   * Several already-started async downstream traversals failed. Inspect errors in submission order;
+   * each entry is the original failure, independent of its settlement order.
+   */
+  multipleDownstreamFailed: 'MULTIPLE_DOWNSTREAM_FAILED',
+  /**
    * Invalid mode, onViolation or other callback, signal/control shape, signals, or lift target. The
    * caller must correct the supplied option rather than retrying the same input.
    */

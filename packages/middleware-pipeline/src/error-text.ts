@@ -5,6 +5,8 @@ export const MiddlewarePipelineErrorText = {
    * combiner.
    */
   executionFailed: 'middleware stage and downstream failed',
+  /** Stable aggregate text for independent failures from multiple downstream submissions. */
+  multipleDownstreamFailed: 'multiple middleware downstream traversals failed',
   /** Stable signal/control admission text used by construction and later cancellation reads. */
   invalidOption: 'middleware pipeline signal option is invalid',
   /** Primitive abort reasons are retained as cause beneath this package-owned message. */

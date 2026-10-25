@@ -13,6 +13,7 @@ export {
   GENERATOR_UNDEFINED,
   MiddlewarePipelineGeneratorSignals,
   MiddlewarePipelineMode,
+  MiddlewarePipelineNext,
   MiddlewarePipelineViolation,
   type IGeneratorMiddlewareSignals,
   type IMiddlewarePipelineMode,

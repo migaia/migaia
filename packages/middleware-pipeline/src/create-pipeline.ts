@@ -1,3 +1,4 @@
+/** Admits immutable pipeline options and exposes the public runner and canonical lift matrix. */
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { tryReadProperty } from '@migaia/utils/error'
 import { MiddlewarePipelineErrorText } from './error-text.js'
@@ -25,6 +26,7 @@ import {
 import {
   MiddlewarePipelineGeneratorSignals,
   MiddlewarePipelineMode,
+  MiddlewarePipelineNext,
   type IGeneratorMiddlewareSignals,
   type IMiddlewarePipelineMode,
   type IMiddlewarePipelineViolationHandler,
@@ -94,6 +96,8 @@ export type ICreatePipelineOptions<TMode extends IMiddlewarePipelineMode> = Read
    * downstream timing, and whether run throws synchronously or returns a promise.
    */
   readonly mode: TMode
+  /** Number of values one active stage may submit; omitted preserves single semantics. */
+  readonly next?: MiddlewarePipelineNext
   /**
    * Optional duplicate/late next reporter; defaults to a no-op. A rejected next never starts
    * downstream again.
@@ -247,8 +251,15 @@ const readPipelineOptions = (options: unknown): INormalizedPipelineOptions => {
   const onViolation = readCallback<IMiddlewarePipelineViolationHandler>(
     readOption(candidate, 'onViolation')
   )
+  /** Capture and validate the policy once before creating any runner state. */
+  const nextOption = readOption(candidate, 'next')
+  /** Only omission selects the default; null is an invalid explicitly supplied policy. */
+  const next = nextOption === undefined ? MiddlewarePipelineNext.single : nextOption
+  if (next !== MiddlewarePipelineNext.single && next !== MiddlewarePipelineNext.multiple)
+    throw createMiddlewarePipelineInvalidOptionError(MiddlewarePipelineErrorText.invalidOption)
   return Object.freeze({
     mode,
+    next,
     onViolation:
       onViolation === undefined
         ? ignoreViolation
@@ -286,19 +297,26 @@ const liftStage = (
   from: IMiddlewarePipelineMode,
   stage: unknown,
   onViolation: IMiddlewarePipelineViolationHandler,
-  signals: IGeneratorMiddlewareSignals
+  signals: IGeneratorMiddlewareSignals,
+  nextPolicy: MiddlewarePipelineNext
 ): unknown => {
   if (target === from) return stage
   if (target === MiddlewarePipelineMode.async && from === MiddlewarePipelineMode.sync)
-    return adaptSyncStageToAsync(stage as ISyncMiddlewareStage<unknown>, onViolation)
+    return adaptSyncStageToAsync(stage as ISyncMiddlewareStage<unknown>, onViolation, nextPolicy)
   if (target === MiddlewarePipelineMode.generator && from === MiddlewarePipelineMode.sync)
-    return adaptSyncStageToGenerator(stage as ISyncMiddlewareStage<unknown>, onViolation, signals)
+    return adaptSyncStageToGenerator(
+      stage as ISyncMiddlewareStage<unknown>,
+      onViolation,
+      signals,
+      nextPolicy
+    )
   if (target === MiddlewarePipelineMode.asyncGenerator) {
     if (from === MiddlewarePipelineMode.sync)
       return adaptSyncStageToAsyncGenerator(
         stage as ISyncMiddlewareStage<unknown>,
         onViolation,
-        signals
+        signals,
+        nextPolicy
       )
     if (from === MiddlewarePipelineMode.generator)
       return adaptGeneratorStageToAsyncGenerator(stage as IGeneratorMiddlewareStage<unknown>)
@@ -324,7 +342,8 @@ const runForMode = (
       done as (value: unknown, context?: IMiddlewarePipelineContext) => void,
       options.onViolation,
       signal,
-      options.assertActive
+      options.assertActive,
+      options.next
     )
   }
   if (mode === MiddlewarePipelineMode.async) {
@@ -341,6 +360,7 @@ const runForMode = (
       done as (value: unknown, context?: IMiddlewarePipelineContext) => void | Promise<void>,
       {
         onViolation: options.onViolation,
+        next: options.next,
         assertActive: options.assertActive,
         combineStageAndDownstreamError: options.combineStageAndDownstreamError,
         signal
@@ -356,7 +376,8 @@ const runForMode = (
       done as (value: unknown, context?: IMiddlewarePipelineContext) => void,
       options.signals,
       signal,
-      options.assertActive
+      options.assertActive,
+      options.next
     )
   }
   try {
@@ -368,7 +389,8 @@ const runForMode = (
       done as (value: unknown, context?: IMiddlewarePipelineContext) => void | Promise<void>,
       options.signals,
       signal,
-      options.assertActive
+      options.assertActive,
+      options.next
     )
   } catch (error) {
     return Promise.reject(error)
@@ -446,40 +468,58 @@ export function createPipeline<TValue>(
 export function createPipeline<TValue, const TMode extends IMiddlewarePipelineMode>(
   options: ICreatePipelineOptions<TMode>
 ): IMiddlewarePipeline<TMode, TValue, IGeneratorMiddlewareSignals>
-/** Normalizes options once and exposes immutable mode dispatch. */
+/** Normalizes options once and returns an immutable, named runner owner. */
 export function createPipeline(
   options: ICreatePipelineOptions<IMiddlewarePipelineMode>
 ): IMiddlewarePipeline<IMiddlewarePipelineMode, unknown, IGeneratorMiddlewareSignals> {
-  /** Frozen construction state shared by each independent run. */
-  const normalized = readPipelineOptions(options)
-  return Object.freeze({
-    mode: normalized.mode,
-    lift: (stage: unknown, from: IMiddlewarePipelineMode): unknown => {
-      if (!isPipelineMode(from))
-        throw createMiddlewarePipelineInvalidOptionError(
-          MiddlewarePipelineErrorText.unsupportedLift
-        )
-      return liftStage(normalized.mode, from, stage, normalized.onViolation, normalized.signals)
-    },
-    run: (
-      stages: readonly unknown[],
-      value: unknown,
-      done: unknown,
-      control?: IMiddlewarePipelineControlOptions
-    ): void | Promise<void> => {
-      try {
-        /**
-         * Existing mode runners own timing and execution; only their final failure crosses this
-         * boundary.
-         */
-        const pending = runForMode(normalized.mode, normalized, stages, value, done, control)
-        if (pending)
-          return pending.catch((error: unknown) => {
-            throw identifyMiddlewarePipelineFailure(error)
-          })
-      } catch (error) {
-        throw identifyMiddlewarePipelineFailure(error)
-      }
+  return Object.freeze(
+    new MiddlewarePipelineRuntime(readPipelineOptions(options))
+  ) as IMiddlewarePipeline<IMiddlewarePipelineMode, unknown, IGeneratorMiddlewareSignals>
+}
+
+/** Holds immutable configuration while every execution owns its own mutable traversal state. */
+class MiddlewarePipelineRuntime {
+  /** Public mode remains a stable value after construction. */
+  readonly mode: IMiddlewarePipelineMode
+  /** Admitted immutable options are shared across independent executions. */
+  readonly #options: INormalizedPipelineOptions
+
+  /** Captures only admitted construction data; no execution state lives on the runner. */
+  constructor(options: INormalizedPipelineOptions) {
+    this.#options = options
+    this.mode = options.mode
+  }
+
+  /** Uses the one canonical lift matrix with this pipeline's next policy. */
+  readonly lift = (stage: unknown, from: IMiddlewarePipelineMode): unknown => {
+    if (!isPipelineMode(from))
+      throw createMiddlewarePipelineInvalidOptionError(MiddlewarePipelineErrorText.unsupportedLift)
+    return liftStage(
+      this.mode,
+      from,
+      stage,
+      this.#options.onViolation,
+      this.#options.signals,
+      this.#options.next ?? MiddlewarePipelineNext.single
+    )
+  }
+
+  /** Preserves synchronous/async failure timing while adding package identity only at the boundary. */
+  readonly run = (
+    stages: readonly unknown[],
+    value: unknown,
+    done: unknown,
+    control?: IMiddlewarePipelineControlOptions
+  ): void | Promise<void> => {
+    try {
+      /** Dispatch selects the canonical mode runner without retaining per-run state here. */
+      const pending = runForMode(this.mode, this.#options, stages, value, done, control)
+      if (pending)
+        return pending.catch((error: unknown) => {
+          throw identifyMiddlewarePipelineFailure(error)
+        })
+    } catch (error) {
+      throw identifyMiddlewarePipelineFailure(error)
     }
-  }) as IMiddlewarePipeline<IMiddlewarePipelineMode, unknown, IGeneratorMiddlewareSignals>
+  }
 }

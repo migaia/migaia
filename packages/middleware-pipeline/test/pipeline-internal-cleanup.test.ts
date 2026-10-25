@@ -261,10 +261,12 @@ describe('pipeline internal cleanup', () => {
     ).toEqual(['errors.ts'])
     const create = source.find(([name]) => name === 'create-pipeline.ts')?.[1] ?? ''
     const runtime = source.find(([name]) => name === 'runtime.ts')?.[1] ?? ''
+    /** Canonical context admission moved with branching runners; its checks remain unique. */
+    const context = source.find(([name]) => name === 'runtime-context.ts')?.[1] ?? ''
     expect(create).not.toContain('const invalidOption')
     expect(runtime).not.toMatch(/readControlSignal|readAsyncSignal|invalidSignal/)
-    expect(runtime.lastIndexOf('import ')).toBeLessThan(
-      runtime.indexOf('function invokeWithContext')
+    expect(context.lastIndexOf('import ')).toBeLessThan(
+      context.indexOf('function invokeWithContext')
     )
     expect(runtime).toMatch(
       /\/\*\* Explicit generator result[^]*?\*\/\s*type IGeneratorUndefinedSignal/
@@ -352,7 +354,7 @@ describe('pipeline internal cleanup', () => {
     const source = files
       .map((name) => readFileSync(`${sourceDirectory}/${name}`, 'utf8'))
       .join('\n')
-    const runtime = readFileSync(`${sourceDirectory}/runtime.ts`, 'utf8')
+    const runtime = readFileSync(`${sourceDirectory}/runtime-context.ts`, 'utf8')
     const codes = readFileSync(`${sourceDirectory}/error-code.ts`, 'utf8')
     expect(runtime).toMatch(/import \{[^}]*\btryReadProperty\b[^}]*\} from '@migaia\/utils\/error'/)
     expect((runtime.match(/tryReadProperty\([^\n]*, 'reason'\)/g) ?? []).length).toBe(1)

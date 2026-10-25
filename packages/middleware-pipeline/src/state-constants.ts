@@ -17,6 +17,17 @@ export const MiddlewarePipelineMode = {
 export type IMiddlewarePipelineMode =
   (typeof MiddlewarePipelineMode)[keyof typeof MiddlewarePipelineMode]
 
+/** Selects whether an active stage may submit one or several downstream values. */
+export const MiddlewarePipelineNext = {
+  /** Keeps the existing duplicate-call protocol and selects one downstream value. */
+  single: 'single',
+  /** Gives every submitted value its own traversal of the remaining stages. */
+  multiple: 'multiple'
+} as const
+
+/** Construction policy shared by runners and their canonical lifting adapters. */
+export type MiddlewarePipelineNext = keyof typeof MiddlewarePipelineNext
+
 /**
  * Defines stable `next()` violations emitted by every runner. Hosts convert these values into
  * diagnostics or domain errors.
